@@ -1,5 +1,9 @@
 import asyncio
+import sys
+from pathlib import Path
 from logging.config import fileConfig
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from alembic import context
 from sqlalchemy import pool
@@ -7,7 +11,14 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.config import settings
 from app.database import Base
-from app.models import BuddhistText  # noqa: F401
+from app.models import (  # noqa: F401
+    BuddhistText, TextContent, User, Bookmark, ReadingHistory,
+    DataSource, TextIdentifier, TextRelation,
+    KGEntity, KGRelation, IIIFManifest,
+    TextEmbedding, ChatSession, ChatMessage,
+    Annotation, AnnotationReview,
+    DictionaryEntry,
+)
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.sync_database_url)

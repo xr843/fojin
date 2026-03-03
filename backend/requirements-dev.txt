@@ -1,0 +1,5 @@
+# Development / testing dependencies (install with: pip install -r requirements-dev.txt)
+-r requirements.txt
+pytest>=8.0
+anyio[trio]>=4.0
+pytest-anyio>=0.0.0

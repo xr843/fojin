@@ -16,6 +16,26 @@ class Settings(BaseSettings):
     redis_host: str = "localhost"
     redis_port: int = 6379
 
+    # JWT
+    jwt_secret_key: str = "fojin-jwt-secret-change-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 60 * 24 * 7  # 7 days
+
+    # LLM (OpenAI-compatible API)
+    llm_api_url: str = "https://api.openai.com/v1"
+    llm_api_key: str = ""
+    llm_model: str = "gpt-4o-mini"
+
+    # Embedding (can use a separate provider)
+    embedding_api_url: str = ""  # Falls back to llm_api_url if empty
+    embedding_api_key: str = ""  # Falls back to llm_api_key if empty
+    embedding_model: str = "BAAI/bge-m3"
+    embedding_dim: int = 1024
+
+    # 典津 API (guji.cckb.cn)
+    dianjin_api_key: str = ""
+    dianjin_api_url: str = "https://guji.cckb.cn/api"
+
     @property
     def database_url(self) -> str:
         return (
@@ -34,7 +54,7 @@ class Settings(BaseSettings):
     def redis_url(self) -> str:
         return f"redis://{self.redis_host}:{self.redis_port}/0"
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": ("../.env", ".env"), "env_file_encoding": "utf-8", "extra": "ignore"}
 
 
 settings = Settings()

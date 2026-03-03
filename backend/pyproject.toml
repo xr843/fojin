@@ -1,0 +1,9 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "anyio[trio]>=4.0",
+    "pytest-anyio>=0.0.0",
+]

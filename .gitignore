@@ -14,7 +14,11 @@ dist/
 .vite/
 
 # Data
+backend/data/
 data/cbeta/
+
+# Build artifacts
+*.tsbuildinfo
 
 # IDE
 .idea/
@@ -30,3 +34,5 @@ Thumbs.db
 pgdata/
 esdata/
 redisdata/
+node_modules/
+.venv/
