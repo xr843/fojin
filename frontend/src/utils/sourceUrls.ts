@@ -176,12 +176,12 @@ const SEARCH_PATTERNS: Record<string, (q: string) => string> = {
 
   // ===== 0032 新增 — 典津公开 API 数据源 =====
   // 佛教文献
-  "sd-mingdzj": (q) => `https://sdgj.sdlib.com/dzj/search?keyword=${q}`,
+  "sd-mingdzj": (q) => `http://guji.sdlib.com/search?keyword=${q}`,
   // 大型综合古籍库
   "souyun-guji": (q) => `https://sou-yun.cn/Query.aspx?type=allBook&QueryWord=${q}`,
   "cass-guji": (q) => `https://www.ncpssd.cn/guji/searchguji?keyword=${q}`,
   "nlc-szgj": (q) => `http://read.nlc.cn/allSearch/searchList?searchType=1001&showType=1&keyword=${q}`,
-  "nlc-zhgjzhh": (q) => `https://zhgj.nlc.cn/#/search?keyword=${q}`,
+  "nlc-zhgjzhh": (q) => `https://guji.nlc.cn/#/search?keyword=${q}`,
   // 日本
   "keio-dc": (q) => `https://dcollections.lib.keio.ac.jp/ja/search?q=${q}`,
   "kansai-u-dc": (q) => `https://www.iiif.ku-orcas.kansai-u.ac.jp/search?q=${q}`,
