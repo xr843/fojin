@@ -252,7 +252,7 @@ const SEARCH_PATTERNS: Record<string, (q: string) => string> = {
   "pali-tripitaka-15lang": (q) => `https://github.com/x39826/Pali_Tripitaka/search?q=${q}`,
 
   // ===== 0035 新增 — 典津交叉比对补充 =====
-  "taipei-npm-guji": (q) => `https://catalog.npm.gov.tw/search?q=${q}`,
+  "taipei-npm-guji": (q) => `https://digitalarchive.npm.gov.tw/Painting/Content?pid=&Dept=&sNo=&q=${q}`,
   "kr-aks-jangseogak": (q) => `https://jsg.aks.ac.kr/search?q=${q}`,
   "utokyo-toyo-bunka": (q) => `https://shanben.ioc.u-tokyo.ac.jp/search?q=${q}`,
   "utokyo-tobunken-nlc": (q) => `http://read.nlc.cn/allSearch/searchList?searchType=6&keyword=${q}`,

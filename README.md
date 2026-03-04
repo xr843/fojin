@@ -201,7 +201,7 @@ python scripts/import_all.py
 
 ## 数据库迁移
 
-迁移文件位于 `backend/alembic/versions/`，当前最新为 `0049`。
+迁移文件位于 `backend/alembic/versions/`，当前最新为 `0050`。
 
 ```bash
 cd backend
