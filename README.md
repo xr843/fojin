@@ -2,7 +2,7 @@
 
 全球佛教古籍数字资源聚合平台
 
-聚合 410 个数据源（329 活跃）、204 可搜索、8,900+ 目录记录、27 语种、32 国家/地区。可通过典津联检扩展至 72.8 万条跨平台古籍资源。
+聚合 375 个数据源（318 活跃）、204 可搜索、8,900+ 目录记录、28 语种、27 国家/地区。可通过典津联检扩展至 72.8 万条跨平台古籍资源。
 
 ## 快速启动
 
@@ -83,7 +83,7 @@ pytest tests/ -q
 
 ### 数据源管理
 
-- **多源聚合**：410 个数据源（活跃 329 个），覆盖 CBETA、SuttaCentral、84000、GRETIL、SAT、DDB、DILA 等，27 语种、32 国家/地区
+- **多源聚合**：375 个数据源（活跃 318 个），覆盖 CBETA、SuttaCentral、84000、GRETIL、SAT、DDB、DILA 等，28 语种、27 国家/地区
 - **分发端追踪**：区分数据源实体与官方分发端（Git 仓库、批量下载、API），标记主导入端
 - **典津联检**：对接典津平台 180 个数据源，按国家/地区分组浏览
 
@@ -167,7 +167,7 @@ DIANJIN_API_KEY=sk-gcis-your-api-key-here
 | `import_catalog.py` | CBETA 经目 | lzh |
 | `import_content.py` | CBETA 全文 | lzh |
 | `import_84000.py` | 84000 藏传佛典 | bo, en, sa |
-| `import_suttacentral.py` | SuttaCentral | pi, en, lzh |
+| `import_suttacentral.py` | SuttaCentral | lzh, pi, en |
 | `import_gretil.py` | GRETIL 梵文文献 | sa |
 | `import_dsbc.py` | DSBC 数字梵文佛典 | sa |
 | `import_sat.py` | SAT 大正藏 | lzh, ja |
@@ -175,7 +175,11 @@ DIANJIN_API_KEY=sk-gcis-your-api-key-here
 | `import_gandhari.py` | 犍陀罗语佛典 | pgd |
 | `import_vri_tipitaka.py` | VRI 巴利三藏 | pi |
 | `import_korean_tripitaka.py` | 高丽大藏经 | lzh, ko |
-| `import_polyglotta.py` | 多语种佛典 | sa, bo, lzh, pi, en |
+| `import_polyglotta.py` | 多语种佛典 | lzh, sa, bo, pi, en |
+| `import_kanripo_catalog.py` | Kanripo 漢籍リポジトリ | lzh |
+| `import_bdrc_manifests.py` | BDRC IIIF 写本 | bo |
+| `import_dila_authority.py` | DILA 权威数据库 | lzh |
+| `import_cbeta_alt_translations.py` | CBETA 异译关系 | lzh |
 
 批量导入：
 
@@ -197,7 +201,7 @@ python scripts/import_all.py
 
 ## 数据库迁移
 
-迁移文件位于 `backend/alembic/versions/`，当前最新为 `0042`。
+迁移文件位于 `backend/alembic/versions/`，当前最新为 `0046`。
 
 ```bash
 cd backend

@@ -68,20 +68,32 @@ export default function SourcesPage() {
     });
   }, [sources]);
 
+  const langOrder = ["lzh", "zh", "sa", "pi", "bo", "en", "ja", "ko"];
   const languages = useMemo(() => {
     if (!sources) return [];
     const set = new Set<string>();
     sources.forEach((s) => {
       if (s.languages) s.languages.split(",").forEach((l) => set.add(l.trim()));
     });
-    return Array.from(set).sort();
+    return Array.from(set).sort((a, b) => {
+      const ia = langOrder.indexOf(a);
+      const ib = langOrder.indexOf(b);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
   }, [sources]);
 
+  const catOrder = ["寺院", "图书馆", "博物馆", "高校研究", "研究机构", "数字项目", "辞典百科", "写本项目", "翻译项目"];
   const categories = useMemo(() => {
     if (!sources) return [];
     const set = new Set<string>();
     sources.forEach((s) => set.add(getCategory(s)));
-    return Array.from(set).sort();
+    return Array.from(set).sort((a, b) => {
+      if (a === "其他") return 1;
+      if (b === "其他") return -1;
+      const ia = catOrder.indexOf(a);
+      const ib = catOrder.indexOf(b);
+      return (ia === -1 ? 98 : ia) - (ib === -1 ? 98 : ib);
+    });
   }, [sources]);
 
   // 筛选
@@ -220,7 +232,12 @@ export default function SourcesPage() {
               <div className="sources-grid">
                 {items.map((s) => {
                   const cat = getCategory(s);
-                  const langs = (s.languages || "").split(",").map((l) => l.trim()).filter(Boolean);
+                  const langs = (s.languages || "").split(",").map((l) => l.trim()).filter(Boolean)
+                    .sort((a, b) => {
+                      const ia = langOrder.indexOf(a);
+                      const ib = langOrder.indexOf(b);
+                      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+                    });
                   const distributions = (s.distributions || [])
                     .filter((d) => d.is_active)
                     .slice(0, 5);
