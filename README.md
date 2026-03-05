@@ -2,7 +2,7 @@
 
 全球佛教古籍数字资源聚合平台
 
-聚合 317 个活跃数据源、8,949 条目录记录、28 语种。可通过典津联检扩展至 72.8 万条跨平台古籍资源。
+聚合 320 个活跃数据源、8,949 条目录记录、237,593 条辞典词条、28 语种。可通过典津联检扩展至 72.8 万条跨平台古籍资源。
 
 ## 快速启动
 
@@ -72,7 +72,7 @@ pytest tests/ -q
 
 - **全文检索**：基于 Elasticsearch 的全文搜索与元数据检索，支持朝代、部类、语种、数据源等多维度筛选
 - **联合检索**：并发查询本地数据库 + 典津跨平台 72.8 万条古籍资源，结果合并展示
-- **佛学辞典**：内置佛学术语词条查询
+- **佛学辞典**：内置 237,593 条多语种辞典词条（中文、巴利文、梵文），覆盖 6 部权威辞典
 
 ### 内容阅读
 
@@ -83,7 +83,7 @@ pytest tests/ -q
 
 ### 数据源管理
 
-- **多源聚合**：317 个活跃数据源，覆盖 CBETA、SuttaCentral、84000、GRETIL、SAT、DDB、DILA 等，28 语种
+- **多源聚合**：320 个活跃数据源，覆盖 CBETA、SuttaCentral、84000、GRETIL、SAT、DDB、DILA 等，28 语种
 - **分发端追踪**：区分数据源实体与官方分发端（Git 仓库、批量下载、API），标记主导入端
 - **典津联检**：对接典津平台 180 个数据源，按国家/地区分组浏览
 
@@ -180,6 +180,11 @@ DIANJIN_API_KEY=sk-gcis-your-api-key-here
 | `import_bdrc_manifests.py` | BDRC IIIF 写本 | bo |
 | `import_dila_authority.py` | DILA 权威数据库 | lzh |
 | `import_cbeta_alt_translations.py` | CBETA 异译关系 | lzh |
+| `import_sc_glossary.py` | SuttaCentral 巴利语词汇表 | pi |
+| `import_ncped.py` | NCPED 简明巴英辞典 | pi |
+| `import_nti_dict.py` | NTI 佛学辞典 | zh |
+| `import_edgerton_bhs.py` | Edgerton 佛教混合梵语辞典 | sa |
+| `import_monier_williams.py` | Monier-Williams 梵英大辞典 | sa |
 
 批量导入：
 
@@ -211,6 +216,8 @@ docker compose up -d --build
 # 运行数据库迁移
 docker exec fojin-backend alembic upgrade head
 ```
+
+所有容器已配置日志轮转（10MB × 3 文件），无需担心磁盘空间。
 
 ### 测试服务器部署
 

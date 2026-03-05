@@ -1,8 +1,15 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   postgres:
     image: pgvector/pgvector:pg15
     container_name: fojin-postgres
     restart: always
+    logging: *default-logging
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-fojin}
       POSTGRES_USER: ${POSTGRES_USER:-fojin}
@@ -23,6 +30,7 @@ services:
       dockerfile: Dockerfile
     container_name: fojin-es
     restart: always
+    logging: *default-logging
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
@@ -41,6 +49,7 @@ services:
     image: redis:7-alpine
     container_name: fojin-redis
     restart: always
+    logging: *default-logging
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
@@ -57,6 +66,7 @@ services:
       dockerfile: Dockerfile
     container_name: fojin-backend
     restart: always
+    logging: *default-logging
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
@@ -87,6 +97,7 @@ services:
       dockerfile: Dockerfile
     container_name: fojin-frontend
     restart: always
+    logging: *default-logging
     ports:
       - "${FRONTEND_PORT:-3000}:80"
     depends_on:

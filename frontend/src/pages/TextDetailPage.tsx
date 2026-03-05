@@ -67,23 +67,20 @@ export default function TextDetailPage() {
 
   const resources = [];
   // CBETA 在线阅读链接
-  if (text.cbeta_url) {
-    resources.push({ label: "CBETA 在线阅读", url: text.cbeta_url });
-  } else {
-    const cbetaUrl = buildCbetaReadUrl(text.cbeta_id);
-    if (cbetaUrl) {
-      resources.push({ label: "前往 CBETA 阅读", url: cbetaUrl });
-    }
+  const cbetaUrl = text.cbeta_url || buildCbetaReadUrl(text.cbeta_id);
+  if (cbetaUrl) {
+    resources.push({ label: "CBETA 在线阅读", url: cbetaUrl });
   }
-  // 多数据源链接（来自 TextIdentifier）
+  // 多数据源链接（来自 TextIdentifier），去重 CBETA
   if (identifiers) {
     for (const ident of identifiers) {
-      if (ident.source_url) {
-        resources.push({
-          label: `${ident.source_name} (${ident.source_uid})`,
-          url: ident.source_url,
-        });
-      }
+      if (!ident.source_url) continue;
+      // 跳过与 CBETA 在线阅读重复的链接
+      if (cbetaUrl && ident.source_url === cbetaUrl) continue;
+      resources.push({
+        label: `${ident.source_name} (${ident.source_uid})`,
+        url: ident.source_url,
+      });
     }
   }
 
