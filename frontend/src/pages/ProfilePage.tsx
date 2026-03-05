@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Typography, Card, Tabs, List, Tag, Empty, Spin, Descriptions, Button, Space } from "antd";
+import { Typography, Card, Tabs, List, Tag, Empty, Spin, Descriptions, Button, Space, Pagination } from "antd";
 import { BookOutlined, HistoryOutlined, UserOutlined, ReadOutlined } from "@ant-design/icons";
 import { useAuthStore } from "../stores/authStore";
 import { getBookmarks, getHistory } from "../api/client";
@@ -10,16 +11,18 @@ const { Title } = Typography;
 export default function ProfilePage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const [bmPage, setBmPage] = useState(1);
+  const [histPage, setHistPage] = useState(1);
 
-  const { data: bookmarks, isLoading: bmLoading } = useQuery({
-    queryKey: ["bookmarks"],
-    queryFn: getBookmarks,
+  const { data: bookmarksData, isLoading: bmLoading } = useQuery({
+    queryKey: ["bookmarks", bmPage],
+    queryFn: () => getBookmarks(bmPage),
     enabled: !!user,
   });
 
-  const { data: history, isLoading: histLoading } = useQuery({
-    queryKey: ["history"],
-    queryFn: getHistory,
+  const { data: historyData, isLoading: histLoading } = useQuery({
+    queryKey: ["history", histPage],
+    queryFn: () => getHistory(histPage),
     enabled: !!user,
   });
 
@@ -66,71 +69,87 @@ export default function ProfilePage() {
               key: "bookmarks",
               label: (
                 <span>
-                  <BookOutlined /> 我的收藏 {bookmarks ? `(${bookmarks.length})` : ""}
+                  <BookOutlined /> 我的收藏 {bookmarksData ? `(${bookmarksData.total})` : ""}
                 </span>
               ),
               children: bmLoading ? (
                 <div style={{ textAlign: "center", padding: 40 }}>
                   <Spin />
                 </div>
-              ) : !bookmarks?.length ? (
+              ) : !bookmarksData?.items?.length ? (
                 <Empty description="暂无收藏" />
               ) : (
-                <List
-                  dataSource={bookmarks}
-                  renderItem={(item) => (
-                    <List.Item
-                      style={{ cursor: "pointer" }}
-                      onClick={() => navigate(`/texts/${item.text_id}`)}
-                      actions={[
-                        <Tag color="blue">{item.cbeta_id}</Tag>,
-                      ]}
-                    >
-                      <List.Item.Meta
-                        title={item.title_zh}
-                        description={
-                          item.note ||
-                          `收藏于 ${new Date(item.created_at).toLocaleDateString("zh-CN")}`
-                        }
-                      />
-                    </List.Item>
+                <>
+                  <List
+                    dataSource={bookmarksData?.items}
+                    renderItem={(item) => (
+                      <List.Item
+                        style={{ cursor: "pointer" }}
+                        onClick={() => navigate(`/texts/${item.text_id}`)}
+                        actions={[
+                          <Tag color="blue">{item.cbeta_id}</Tag>,
+                        ]}
+                      >
+                        <List.Item.Meta
+                          title={item.title_zh}
+                          description={
+                            item.note ||
+                            `收藏于 ${new Date(item.created_at).toLocaleDateString("zh-CN")}`
+                          }
+                        />
+                      </List.Item>
+                    )}
+                  />
+                  {bookmarksData && bookmarksData.total > 20 && (
+                    <div style={{ textAlign: "center", marginTop: 16 }}>
+                      <Pagination current={bmPage} total={bookmarksData.total} pageSize={20}
+                        showSizeChanger={false} onChange={(p) => setBmPage(p)} />
+                    </div>
                   )}
-                />
+                </>
               ),
             },
             {
               key: "history",
               label: (
                 <span>
-                  <HistoryOutlined /> 阅读历史 {history ? `(${history.length})` : ""}
+                  <HistoryOutlined /> 阅读历史 {historyData ? `(${historyData.total})` : ""}
                 </span>
               ),
               children: histLoading ? (
                 <div style={{ textAlign: "center", padding: 40 }}>
                   <Spin />
                 </div>
-              ) : !history?.length ? (
+              ) : !historyData?.items?.length ? (
                 <Empty description="暂无阅读记录" />
               ) : (
-                <List
-                  dataSource={history}
-                  renderItem={(item) => (
-                    <List.Item
-                      style={{ cursor: "pointer" }}
-                      onClick={() => navigate(`/read/${item.text_id}?juan=${item.juan_num}`)}
-                      actions={[
-                        <Button type="link" icon={<ReadOutlined />}>
-                          继续阅读
-                        </Button>,
-                      ]}
-                    >
-                      <List.Item.Meta
-                        title={item.title_zh}
-                        description={`${item.cbeta_id} · 第${item.juan_num}卷 · ${new Date(item.last_read_at).toLocaleDateString("zh-CN")}`}
-                      />
-                    </List.Item>
+                <>
+                  <List
+                    dataSource={historyData?.items}
+                    renderItem={(item) => (
+                      <List.Item
+                        style={{ cursor: "pointer" }}
+                        onClick={() => navigate(`/read/${item.text_id}?juan=${item.juan_num}`)}
+                        actions={[
+                          <Button type="link" icon={<ReadOutlined />}>
+                            继续阅读
+                          </Button>,
+                        ]}
+                      >
+                        <List.Item.Meta
+                          title={item.title_zh}
+                          description={`${item.cbeta_id} · 第${item.juan_num}卷 · ${new Date(item.last_read_at).toLocaleDateString("zh-CN")}`}
+                        />
+                      </List.Item>
+                    )}
+                  />
+                  {historyData && historyData.total > 20 && (
+                    <div style={{ textAlign: "center", marginTop: 16 }}>
+                      <Pagination current={histPage} total={historyData.total} pageSize={20}
+                        showSizeChanger={false} onChange={(p) => setHistPage(p)} />
+                    </div>
                   )}
-                />
+                </>
               ),
             },
           ]}

@@ -1,15 +1,22 @@
+import logging
+import os
 from contextlib import asynccontextmanager
 
 import redis.asyncio as aioredis
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 
 from app.config import settings
-from app.core.elasticsearch import close_es, init_es
+from app.core.elasticsearch import close_es, get_es, init_es
 from app.core.rate_limit import RateLimitMiddleware
+from app.database import engine as async_engine
+
+logger = logging.getLogger(__name__)
 from app.api import auth, bookmarks, history, search, texts
 from app.api import sources, relations, knowledge_graph, iiif
-from app.api import chat, annotations, exports, dictionary
+from app.api import chat, annotations, exports, dictionary, citations
 from app.api import dianjin
 
 
@@ -31,14 +38,31 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+_cors_origins = os.environ.get(
+    "CORS_ORIGINS", "http://localhost:3000,http://localhost:5173,http://localhost:5174"
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
 )
 app.add_middleware(RateLimitMiddleware)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response: Response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 # Phase 1 routers
 app.include_router(auth.router, prefix="/api")
@@ -60,6 +84,9 @@ app.include_router(annotations.router, prefix="/api")
 # Dictionary
 app.include_router(dictionary.router, prefix="/api")
 
+# Citations
+app.include_router(citations.router, prefix="/api")
+
 # Phase 4 routers
 app.include_router(exports.router, prefix="/api")
 
@@ -68,5 +95,40 @@ app.include_router(dianjin.router, prefix="/api")
 
 
 @app.get("/api/health")
-async def health():
-    return {"status": "ok"}
+async def health(request: Request):
+    components: dict[str, str] = {}
+
+    # Check Redis
+    try:
+        redis_client = getattr(request.app.state, "redis", None)
+        if redis_client:
+            await redis_client.ping()
+            components["redis"] = "ok"
+        else:
+            components["redis"] = "not_configured"
+    except Exception:
+        components["redis"] = "error"
+
+    # Check PostgreSQL
+    try:
+        from sqlalchemy import text as sa_text
+        async with async_engine.connect() as conn:
+            await conn.execute(sa_text("SELECT 1"))
+        components["postgresql"] = "ok"
+    except Exception:
+        components["postgresql"] = "error"
+
+    # Check Elasticsearch
+    try:
+        es = get_es()
+        if es:
+            await es.ping()
+            components["elasticsearch"] = "ok"
+        else:
+            components["elasticsearch"] = "not_configured"
+    except Exception:
+        components["elasticsearch"] = "error"
+
+    all_ok = all(v == "ok" for v in components.values())
+    status = "ok" if all_ok else "degraded"
+    return {"status": status, **components}

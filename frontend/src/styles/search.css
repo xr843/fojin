@@ -15,13 +15,13 @@
 }
 
 .s-mode-bar {
-  border-bottom: 1px solid #e8e0d4;
+  border-bottom: 1px solid var(--fj-border);
   margin-bottom: 16px;
 }
 
 .s-mode-hint {
   font-size: 12px;
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   margin: -8px 0 8px;
   padding-left: 2px;
 }
@@ -49,10 +49,10 @@
   font-family: "Noto Serif SC", serif;
   font-size: 13px;
   font-weight: 600;
-  color: #2b2318;
+  color: var(--fj-ink);
   margin-bottom: 8px;
   padding-bottom: 6px;
-  border-bottom: 1px solid #e8e0d4;
+  border-bottom: 1px solid var(--fj-border);
 }
 
 .s-filter-item {
@@ -62,11 +62,11 @@
   padding: 4px 0;
   cursor: pointer;
   font-size: 13px;
-  color: #5c4f3d;
+  color: var(--fj-ink-light);
 }
 
 .s-filter-item:hover {
-  color: #8b2500;
+  color: var(--fj-accent);
 }
 
 .s-filter-name {
@@ -75,7 +75,7 @@
 
 .s-filter-count {
   font-size: 11px;
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
 }
 
 .s-filter-scroll {
@@ -88,7 +88,7 @@
 }
 
 .s-filter-scroll::-webkit-scrollbar-thumb {
-  background: #d9d0c1;
+  background: var(--fj-border);
   border-radius: 2px;
 }
 
@@ -107,7 +107,7 @@
 
 .s-result-count {
   font-size: 14px;
-  color: #8b2500;
+  color: var(--fj-accent);
 }
 
 .s-result-count strong {
@@ -115,7 +115,7 @@
 }
 
 .s-result-count span {
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   font-size: 12px;
   margin-left: 6px;
 }
@@ -123,8 +123,8 @@
 /* ---------- 结果卡片 ---------- */
 .s-card {
   display: flex;
-  background: #fff;
-  border: 1px solid #e8e0d4;
+  background: var(--fj-card-bg);
+  border: 1px solid var(--fj-border);
   border-radius: 8px;
   margin-bottom: 12px;
   transition: border-color 0.2s;
@@ -132,12 +132,12 @@
 }
 
 .s-card:hover {
-  border-color: #b08d57;
+  border-color: var(--fj-gold);
 }
 
 .s-card-ext {
-  border-left: 3px solid #d9d0c1;
-  background: #faf8f5;
+  border-left: 3px solid var(--fj-border);
+  background: var(--fj-bg-alt);
   opacity: 0.85;
 }
 
@@ -152,10 +152,10 @@
   align-items: center;
   justify-content: center;
   font-size: 11px;
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   text-align: center;
   line-height: 1.3;
-  border-right: 1px solid #f0ebe2;
+  border-right: 1px solid var(--fj-bg-alt);
 }
 
 .s-card-body {
@@ -168,12 +168,12 @@
   font-family: "Noto Serif SC", serif;
   font-size: 18px;
   font-weight: 600;
-  color: #2b2318;
+  color: var(--fj-ink);
   margin-bottom: 8px;
 }
 
 .s-card-title em {
-  color: #8b2500;
+  color: var(--fj-accent);
   font-style: normal;
   font-weight: 700;
 }
@@ -187,12 +187,12 @@
 
 .s-card-meta {
   font-size: 13px;
-  color: #5c4f3d;
+  color: var(--fj-ink-light);
   margin-bottom: 4px;
 }
 
 .s-card-meta em {
-  color: #8b2500;
+  color: var(--fj-accent);
   font-style: normal;
   font-weight: 600;
 }
@@ -217,9 +217,9 @@
 }
 
 .s-card-btn-primary {
-  background: #8b2500;
+  background: var(--fj-accent);
   color: #fff;
-  border: 1px solid #8b2500;
+  border: 1px solid var(--fj-accent);
 }
 
 .s-card-btn-primary:hover {
@@ -228,25 +228,25 @@
 }
 
 .s-card-btn {
-  background: #fff;
-  color: #5c4f3d;
-  border: 1px solid #d9d0c1;
+  background: var(--fj-card-bg);
+  color: var(--fj-ink-light);
+  border: 1px solid var(--fj-border);
 }
 
 .s-card-btn:hover {
-  border-color: #b08d57;
-  color: #2b2318;
+  border-color: var(--fj-gold);
+  color: var(--fj-ink);
 }
 
 /* ---------- 外部分隔线 ---------- */
 .s-ext-divider {
   text-align: center;
   font-size: 12px;
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   padding: 16px 0;
   margin: 8px 0;
-  border-top: 1px dashed #d9d0c1;
-  border-bottom: 1px dashed #d9d0c1;
+  border-top: 1px dashed var(--fj-border);
+  border-bottom: 1px dashed var(--fj-border);
 }
 
 /* ---------- 响应式 ---------- */

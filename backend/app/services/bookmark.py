@@ -1,5 +1,5 @@
 from fastapi import HTTPException, status
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.text import BuddhistText
@@ -7,14 +7,22 @@ from app.models.user import Bookmark
 from app.schemas.bookmark import BookmarkResponse
 
 
-async def get_bookmarks(session: AsyncSession, user_id: int) -> list[BookmarkResponse]:
+async def get_bookmarks(session: AsyncSession, user_id: int, page: int = 1, size: int = 20) -> dict:
+    # Count total
+    count_result = await session.execute(
+        select(func.count()).select_from(Bookmark).where(Bookmark.user_id == user_id)
+    )
+    total = count_result.scalar() or 0
+
     result = await session.execute(
         select(Bookmark, BuddhistText.title_zh, BuddhistText.cbeta_id)
         .join(BuddhistText, Bookmark.text_id == BuddhistText.id)
         .where(Bookmark.user_id == user_id)
         .order_by(Bookmark.created_at.desc())
+        .offset((page - 1) * size)
+        .limit(size)
     )
-    return [
+    items = [
         BookmarkResponse(
             id=bm.id,
             text_id=bm.text_id,
@@ -25,6 +33,7 @@ async def get_bookmarks(session: AsyncSession, user_id: int) -> list[BookmarkRes
         )
         for bm, title_zh, cbeta_id in result.all()
     ]
+    return {"total": total, "page": page, "size": size, "items": items}
 
 
 async def add_bookmark(

@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Layout, Menu, Typography, Spin, Button, Space, Tooltip } from "antd";
+import { Layout, Menu, Typography, Spin, Button, Space, Tooltip, Result, Breadcrumb } from "antd";
 import {
-  ArrowLeftOutlined,
   LeftOutlined,
   RightOutlined,
   LinkOutlined,
   HighlightOutlined,
+  HomeOutlined,
 } from "@ant-design/icons";
 import { getJuanList, getJuanContent, getTextIdentifiers } from "../api/client";
 import { buildSourceReadUrl, getSourceLabel } from "../utils/sourceUrls";
@@ -33,7 +33,7 @@ export default function ReaderPage() {
     enabled: !!tid,
   });
 
-  const { data: content, isLoading: contentLoading } = useQuery({
+  const { data: content, isLoading: contentLoading, isError: contentError, refetch: refetchContent } = useQuery({
     queryKey: ["juanContent", tid, currentJuan],
     queryFn: () => getJuanContent(tid, currentJuan),
     enabled: !!tid && currentJuan > 0,
@@ -71,10 +71,14 @@ export default function ReaderPage() {
 
   return (
     <div style={{ maxWidth: 1200, margin: "16px auto" }}>
-      <Space style={{ marginBottom: 12 }}>
-        <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)}>
-          返回
-        </Button>
+      <Space direction="vertical" style={{ marginBottom: 12, width: "100%" }}>
+        <Breadcrumb
+          items={[
+            { title: <span style={{ cursor: "pointer" }} onClick={() => navigate("/")}><HomeOutlined /> 首页</span> },
+            { title: <span style={{ cursor: "pointer" }} onClick={() => navigate(`/texts/${tid}`)}>经典详情</span> },
+            { title: "阅读" },
+          ]}
+        />
         {content && (
           <Typography.Title level={4} style={{ margin: 0 }}>
             {content.title_zh}
@@ -122,12 +126,13 @@ export default function ReaderPage() {
                   type="text"
                   icon={<HighlightOutlined />}
                   onClick={() => setAnnotationOpen(true)}
+                  aria-label="标注"
                 />
               </Tooltip>
               {sourceReadUrl && (
                 <Tooltip title={`${sourceLabel} 原站阅读`}>
                   <a href={sourceReadUrl} target="_blank" rel="noopener noreferrer">
-                    <Button type="text" icon={<LinkOutlined />} />
+                    <Button type="text" icon={<LinkOutlined />} aria-label="前往原站阅读" />
                   </a>
                 </Tooltip>
               )}
@@ -139,6 +144,13 @@ export default function ReaderPage() {
             <div style={{ textAlign: "center", padding: 80 }}>
               <Spin size="large" />
             </div>
+          ) : contentError ? (
+            <Result
+              status="error"
+              title="加载失败"
+              subTitle="经文内容加载出错，请稍后重试。"
+              extra={<Button type="primary" onClick={() => refetchContent()}>重试</Button>}
+            />
           ) : content ? (
             <div className="reader-content">{content.content}</div>
           ) : (

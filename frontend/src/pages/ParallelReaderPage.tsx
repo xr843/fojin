@@ -1,6 +1,6 @@
 import { useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Typography, Spin, Row, Col, Card, Select, InputNumber, Space, Empty, Button } from "antd";
+import { Typography, Spin, Row, Col, Card, Select, InputNumber, Space, Empty, Button, Result } from "antd";
 import { SwapOutlined, ArrowLeftOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { getParallelRead, getTextRelations } from "../api/client";
@@ -20,7 +20,7 @@ export default function ParallelReaderPage() {
     enabled: !!textId,
   });
 
-  const { data: parallel, isLoading } = useQuery({
+  const { data: parallel, isLoading, isError, refetch } = useQuery({
     queryKey: ["parallel", textId, compareId, juan],
     queryFn: () => getParallelRead(Number(textId), Number(compareId), juan),
     enabled: !!textId && !!compareId,
@@ -73,11 +73,18 @@ export default function ParallelReaderPage() {
         <div style={{ textAlign: "center", padding: 80 }}>
           <Spin size="large" />
         </div>
+      ) : isError ? (
+        <Result
+          status="error"
+          title="加载失败"
+          subTitle="对照内容加载出错，请稍后重试。"
+          extra={<Button type="primary" onClick={() => refetch()}>重试</Button>}
+        />
       ) : !parallel ? (
         <Empty description="对照内容未找到" />
       ) : (
         <Row gutter={16}>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Card
               title={
                 <span>
@@ -104,7 +111,7 @@ export default function ParallelReaderPage() {
               </div>
             </Card>
           </Col>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Card
               title={
                 <span>

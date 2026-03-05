@@ -1,4 +1,5 @@
-import { Layout as AntLayout, Typography, Button, Dropdown, Space } from "antd";
+import { useState } from "react";
+import { Layout as AntLayout, Typography, Button, Dropdown, Space, Drawer, Modal } from "antd";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import {
   UserOutlined,
@@ -8,6 +9,7 @@ import {
   ApartmentOutlined,
   DatabaseOutlined,
   CloudOutlined,
+  MenuOutlined,
 } from "@ant-design/icons";
 import { useAuthStore } from "../stores/authStore";
 
@@ -18,18 +20,27 @@ export default function Layout() {
   const location = useLocation();
   const { user, logout } = useAuthStore();
   const isHome = location.pathname === "/";
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const handleLogout = () => {
-    logout();
-    navigate("/");
+    Modal.confirm({
+      title: "确认退出",
+      content: "确定要退出登录吗？",
+      okText: "退出",
+      cancelText: "取消",
+      onOk: () => {
+        logout();
+        navigate("/");
+      },
+    });
   };
 
   /* 古典配色 */
-  const ink = "#2b2318";
-  const inkMuted = "#9a8e7a";
-  const accent = "#8b2500";
-  const pageBg = "#f8f5ef";
-  const headerBg = isHome ? "rgba(248,245,239,0.85)" : pageBg;
+  const ink = "var(--fj-ink)";
+  const inkMuted = "var(--fj-ink-muted)";
+  const accent = "var(--fj-accent)";
+  const pageBg = "var(--fj-bg)";
+  const headerBg = pageBg;
 
   const navItems = [
     { icon: <DatabaseOutlined />, label: "数据源", path: "/sources" },
@@ -39,6 +50,39 @@ export default function Layout() {
 
   return (
     <AntLayout style={{ minHeight: "100vh", background: pageBg }}>
+      <a
+        href="#main-content"
+        style={{
+          position: "absolute",
+          left: -9999,
+          top: "auto",
+          width: 1,
+          height: 1,
+          overflow: "hidden",
+          zIndex: 100,
+        }}
+        onFocus={(e) => {
+          e.currentTarget.style.position = "fixed";
+          e.currentTarget.style.left = "8px";
+          e.currentTarget.style.top = "8px";
+          e.currentTarget.style.width = "auto";
+          e.currentTarget.style.height = "auto";
+          e.currentTarget.style.overflow = "visible";
+          e.currentTarget.style.background = "#fff";
+          e.currentTarget.style.padding = "8px 16px";
+          e.currentTarget.style.borderRadius = "4px";
+          e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
+        }}
+        onBlur={(e) => {
+          e.currentTarget.style.position = "absolute";
+          e.currentTarget.style.left = "-9999px";
+          e.currentTarget.style.width = "1px";
+          e.currentTarget.style.height = "1px";
+          e.currentTarget.style.overflow = "hidden";
+        }}
+      >
+        跳至主要内容
+      </a>
       <Header
         style={{
           display: "flex",
@@ -63,30 +107,40 @@ export default function Layout() {
               margin: 0,
               letterSpacing: 4,
               cursor: "pointer",
-              fontWeight: 600,
-              fontSize: 16,
-              fontFamily: '"Noto Serif SC", serif',
+              fontWeight: 400,
+              fontSize: 22,
+              fontFamily: '"Ma Shan Zheng", "Noto Serif SC", serif',
             }}
             onClick={() => navigate("/")}
           >
             佛津
           </Typography.Title>
-          {navItems.map((item) => (
-            <Button
-              key={item.path}
-              type="text"
-              icon={item.icon}
-              style={{
-                color: inkMuted,
-                fontSize: 13,
-                fontWeight: 400,
-                fontFamily: '"Noto Serif SC", serif',
-              }}
-              onClick={() => navigate(item.path)}
-            >
-              {item.label}
-            </Button>
-          ))}
+          <div className="nav-desktop">
+            {navItems.map((item) => (
+              <Button
+                key={item.path}
+                type="text"
+                icon={item.icon}
+                style={{
+                  color: inkMuted,
+                  fontSize: 13,
+                  fontWeight: 400,
+                  fontFamily: '"Noto Serif SC", serif',
+                }}
+                onClick={() => navigate(item.path)}
+              >
+                {item.label}
+              </Button>
+            ))}
+          </div>
+          <Button
+            className="nav-mobile-trigger"
+            type="text"
+            icon={<MenuOutlined />}
+            onClick={() => setDrawerOpen(true)}
+            style={{ color: inkMuted }}
+            aria-label="打开导航菜单"
+          />
         </Space>
         <Space>
           {user ? (
@@ -144,7 +198,7 @@ export default function Layout() {
           )}
         </Space>
       </Header>
-      <Content style={{ padding: isHome ? 0 : "24px 32px", flex: 1 }}>
+      <Content id="main-content" style={{ padding: isHome ? 0 : "24px 32px", flex: 1 }}>
         <Outlet />
       </Content>
       <Footer
@@ -160,6 +214,28 @@ export default function Layout() {
       >
         佛津 FoJin &copy; 2026 — 全球佛教古籍数字资源聚合平台
       </Footer>
+      <Drawer
+        title="导航"
+        placement="left"
+        width={240}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+      >
+        <Space direction="vertical" style={{ width: "100%" }}>
+          {navItems.map((item) => (
+            <Button
+              key={item.path}
+              type="text"
+              icon={item.icon}
+              block
+              style={{ textAlign: "left", color: inkMuted }}
+              onClick={() => { navigate(item.path); setDrawerOpen(false); }}
+            >
+              {item.label}
+            </Button>
+          ))}
+        </Space>
+      </Drawer>
     </AntLayout>
   );
 }

@@ -30,48 +30,67 @@ async def list_sources(db: AsyncSession = Depends(get_db)):
 
 @router.get("/stats")
 async def source_stats(db: AsyncSession = Depends(get_db)):
-    """每个数据源的文本数、内容数、字符数统计。"""
-    # Get all sources
-    sources = await get_all_sources(db, active_only=False)
-
-    results = []
-    for src in sources:
-        # Count texts
-        text_count_result = await db.execute(
-            select(func.count(BuddhistText.id)).where(BuddhistText.source_id == src.id)
+    """每个数据源的文本数、内容数、字符数统计（单次聚合查询）。"""
+    text_counts = (
+        select(
+            BuddhistText.source_id,
+            func.count(BuddhistText.id).label("text_count"),
         )
-        text_count = text_count_result.scalar() or 0
+        .group_by(BuddhistText.source_id)
+        .subquery()
+    )
 
-        # Count identifiers
-        ident_count_result = await db.execute(
-            select(func.count(TextIdentifier.id)).where(TextIdentifier.source_id == src.id)
+    ident_counts = (
+        select(
+            TextIdentifier.source_id,
+            func.count(TextIdentifier.id).label("ident_count"),
         )
-        ident_count = ident_count_result.scalar() or 0
+        .group_by(TextIdentifier.source_id)
+        .subquery()
+    )
 
-        # Count contents and chars for texts from this source
-        content_stats_result = await db.execute(
-            select(
-                func.count(TextContent.id),
-                func.coalesce(func.sum(TextContent.char_count), 0),
-            ).join(BuddhistText, TextContent.text_id == BuddhistText.id)
-            .where(BuddhistText.source_id == src.id)
+    content_stats = (
+        select(
+            BuddhistText.source_id,
+            func.count(TextContent.id).label("content_count"),
+            func.coalesce(func.sum(TextContent.char_count), 0).label("char_count"),
         )
-        row = content_stats_result.one()
-        content_count = row[0] or 0
-        char_count = row[1] or 0
+        .join(BuddhistText, TextContent.text_id == BuddhistText.id)
+        .group_by(BuddhistText.source_id)
+        .subquery()
+    )
 
-        results.append({
-            "code": src.code,
-            "name_zh": src.name_zh,
-            "name_en": src.name_en,
-            "text_count": text_count,
-            "identifier_count": ident_count,
-            "content_count": content_count,
-            "char_count": int(char_count),
-            "is_active": src.is_active,
-        })
+    stmt = (
+        select(
+            DataSource.code,
+            DataSource.name_zh,
+            DataSource.name_en,
+            DataSource.is_active,
+            func.coalesce(text_counts.c.text_count, 0).label("text_count"),
+            func.coalesce(ident_counts.c.ident_count, 0).label("ident_count"),
+            func.coalesce(content_stats.c.content_count, 0).label("content_count"),
+            func.coalesce(content_stats.c.char_count, 0).label("char_count"),
+        )
+        .outerjoin(text_counts, DataSource.id == text_counts.c.source_id)
+        .outerjoin(ident_counts, DataSource.id == ident_counts.c.source_id)
+        .outerjoin(content_stats, DataSource.id == content_stats.c.source_id)
+        .order_by(DataSource.id)
+    )
 
-    return results
+    result = await db.execute(stmt)
+    return [
+        {
+            "code": row.code,
+            "name_zh": row.name_zh,
+            "name_en": row.name_en,
+            "text_count": row.text_count,
+            "identifier_count": row.ident_count,
+            "content_count": row.content_count,
+            "char_count": int(row.char_count),
+            "is_active": row.is_active,
+        }
+        for row in result.all()
+    ]
 
 
 @router.get("/texts/{text_id}/identifiers", response_model=list[TextIdentifierResponse])

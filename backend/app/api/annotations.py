@@ -4,12 +4,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_current_user
 from app.database import get_db
 from app.models.user import User
-from app.schemas.annotation import AnnotationCreate, AnnotationResponse
+from app.schemas.annotation import AnnotationCreate, AnnotationResponse, AnnotationReviewCreate
 from app.services.annotation import (
     create_annotation,
     delete_annotation,
     get_annotation,
     list_annotations_for_text,
+    review_annotation,
+    submit_annotation,
     update_annotation,
 )
 
@@ -57,6 +59,27 @@ async def update(
 ):
     """更新标注内容。"""
     return await update_annotation(db, annotation_id, user.id, content=data.content)
+
+
+@router.post("/{annotation_id}/submit", response_model=AnnotationResponse)
+async def submit(
+    annotation_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """提交标注审核（draft → pending）。"""
+    return await submit_annotation(db, annotation_id, user.id)
+
+
+@router.post("/{annotation_id}/review", response_model=AnnotationResponse)
+async def review(
+    annotation_id: int,
+    data: AnnotationReviewCreate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """审核标注（pending → approved/rejected/draft）。"""
+    return await review_annotation(db, annotation_id, user.id, data.action, data.comment)
 
 
 @router.delete("/{annotation_id}")

@@ -10,6 +10,7 @@ import {
   Space,
   Empty,
   Drawer,
+  Popconfirm,
   message,
 } from "antd";
 import { PlusOutlined, DeleteOutlined, SendOutlined } from "@ant-design/icons";
@@ -127,6 +128,7 @@ export default function AnnotationPanel({
             <Space>
               <Input
                 placeholder="起始位置"
+                aria-label="起始位置"
                 type="number"
                 value={form.start_pos}
                 onChange={(e) => setForm({ ...form, start_pos: Number(e.target.value) })}
@@ -134,6 +136,7 @@ export default function AnnotationPanel({
               />
               <Input
                 placeholder="结束位置"
+                aria-label="结束位置"
                 type="number"
                 value={form.end_pos}
                 onChange={(e) => setForm({ ...form, end_pos: Number(e.target.value) })}
@@ -152,6 +155,7 @@ export default function AnnotationPanel({
             <Input.TextArea
               rows={3}
               placeholder="标注内容"
+              aria-label="标注内容"
               value={form.content}
               onChange={(e) => setForm({ ...form, content: e.target.value })}
             />
@@ -187,13 +191,20 @@ export default function AnnotationPanel({
                     提交
                   </Button>
                 ),
-                <Button
+                <Popconfirm
                   key="delete"
-                  size="small"
-                  danger
-                  icon={<DeleteOutlined />}
-                  onClick={() => deleteMutation.mutate(ann.id)}
-                />,
+                  title="确认删除"
+                  description="确定要删除这条标注吗？"
+                  onConfirm={() => deleteMutation.mutate(ann.id)}
+                  okText="删除"
+                  cancelText="取消"
+                >
+                  <Button
+                    size="small"
+                    danger
+                    icon={<DeleteOutlined />}
+                  />
+                </Popconfirm>,
               ].filter(Boolean)}
             >
               <List.Item.Meta

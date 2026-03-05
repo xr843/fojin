@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 SYSTEM_PROMPT = (
     "你是佛津（FoJin）佛教古籍智能助手。根据提供的佛典原文片段回答用户问题。"
     "回答时引用出处，如果提供的资料不足以回答，请如实告知。请使用用户的语言回答。"
+    "你只回答与佛学、佛教文献、佛教历史和佛教文化相关的问题。如果用户提问与佛学无关，请礼貌地引导回佛学话题。"
 )
 
 
@@ -65,6 +66,12 @@ async def send_message(
     message: str,
     session_id: int | None = None,
 ) -> ChatResponse:
+    # Validate message
+    if not message or not message.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="消息不能为空")
+    if len(message) > 2000:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="消息长度不能超过2000字")
+
     # Get or create session, with strict ownership check
     if session_id:
         if user_id is None:
@@ -123,6 +130,12 @@ async def send_message(
             )
             resp.raise_for_status()
             answer = resp.json()["choices"][0]["message"]["content"]
+    except httpx.TimeoutException:
+        logger.warning("LLM call timed out")
+        answer = "抱歉，AI 服务响应超时，请稍后重试。"
+    except httpx.HTTPStatusError as exc:
+        logger.warning("LLM returned HTTP %s", exc.response.status_code)
+        answer = f"抱歉，AI 服务返回错误（HTTP {exc.response.status_code}），请稍后重试。"
     except Exception:
         logger.exception("LLM call failed")
         answer = "抱歉，AI 服务暂时不可用，请稍后重试。"

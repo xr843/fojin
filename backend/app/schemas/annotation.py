@@ -12,6 +12,11 @@ class AnnotationCreate(BaseModel):
     content: str
 
 
+class AnnotationReviewCreate(BaseModel):
+    action: str  # approve/reject/request_change
+    comment: str | None = None
+
+
 class AnnotationResponse(BaseModel):
     id: int
     text_id: int

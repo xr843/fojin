@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { useQuery } from "@tanstack/react-query";
 import {
   Typography,
@@ -9,13 +10,12 @@ import {
   Space,
   Card,
   Tag,
+  Breadcrumb,
 } from "antd";
 import {
-  ArrowLeftOutlined,
   ReadOutlined,
   FileImageOutlined,
-  BookOutlined,
-  FileTextOutlined,
+  HomeOutlined,
 } from "@ant-design/icons";
 import { getTextDetail, getTextManifests, getTextIdentifiers } from "../api/client";
 import { buildCbetaReadUrl } from "../utils/sourceUrls";
@@ -89,14 +89,19 @@ export default function TextDetailPage() {
 
   return (
     <div style={{ maxWidth: 800, margin: "24px auto" }}>
+      <Helmet>
+        <title>{text.title_zh} — 佛津</title>
+        <meta name="description" content={`${text.title_zh}${text.translator ? ` · ${text.translator}` : ""}${text.category ? ` · ${text.category}` : ""} — 佛津佛教古籍资源`} />
+        <link rel="canonical" href={`https://fojin.app/texts/${id}`} />
+      </Helmet>
       <Space direction="vertical" size="large" style={{ width: "100%" }}>
-        <Button
-          type="text"
-          icon={<ArrowLeftOutlined />}
-          onClick={() => navigate(-1)}
-        >
-          返回
-        </Button>
+        <Breadcrumb
+          items={[
+            { title: <span style={{ cursor: "pointer" }} onClick={() => navigate("/")}><HomeOutlined /> 首页</span> },
+            { title: <span style={{ cursor: "pointer" }} onClick={() => navigate("/search")}>搜索</span> },
+            { title: "经典详情" },
+          ]}
+        />
 
         <Card>
           <Title level={3} style={{ marginBottom: 4 }}>

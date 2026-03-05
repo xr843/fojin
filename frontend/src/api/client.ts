@@ -1,4 +1,5 @@
 import axios from "axios";
+import { useAuthStore } from "../stores/authStore";
 
 const api = axios.create({
   baseURL: "/api",
@@ -20,6 +21,21 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// Auto-logout on 401 responses (except auth endpoints)
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (
+      error.response?.status === 401 &&
+      !error.config?.url?.startsWith("/auth/")
+    ) {
+      useAuthStore.getState().logout();
+      window.location.href = "/login";
+    }
+    return Promise.reject(error);
+  },
+);
 
 export interface SearchHit {
   id: number;
@@ -120,6 +136,13 @@ export interface HistoryItem {
   cbeta_id: string;
   juan_num: number;
   last_read_at: string;
+}
+
+export interface PaginatedResponse<T> {
+  total: number;
+  page: number;
+  size: number;
+  items: T[];
 }
 
 export interface Filters {
@@ -288,6 +311,7 @@ export async function searchTexts(params: {
   dynasty?: string;
   category?: string;
   sources?: string;
+  sort?: string;
 }): Promise<SearchResponse> {
   const { data } = await api.get<SearchResponse>("/search", { params });
   return data;
@@ -331,8 +355,8 @@ export async function searchContent(params: {
 }
 
 // Bookmarks
-export async function getBookmarks(): Promise<BookmarkItem[]> {
-  const { data } = await api.get<BookmarkItem[]>("/bookmarks");
+export async function getBookmarks(page: number = 1, size: number = 20): Promise<PaginatedResponse<BookmarkItem>> {
+  const { data } = await api.get<PaginatedResponse<BookmarkItem>>("/bookmarks", { params: { page, size } });
   return data;
 }
 
@@ -355,8 +379,8 @@ export async function checkBookmark(textId: number): Promise<boolean> {
 }
 
 // Reading history
-export async function getHistory(): Promise<HistoryItem[]> {
-  const { data } = await api.get<HistoryItem[]>("/history");
+export async function getHistory(page: number = 1, size: number = 20): Promise<PaginatedResponse<HistoryItem>> {
+  const { data } = await api.get<PaginatedResponse<HistoryItem>>("/history", { params: { page, size } });
   return data;
 }
 

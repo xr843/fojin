@@ -1,7 +1,8 @@
 services:
   postgres:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     container_name: fojin-postgres
+    restart: always
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-fojin}
       POSTGRES_USER: ${POSTGRES_USER:-fojin}
@@ -17,8 +18,11 @@ services:
       retries: 5
 
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    build:
+      context: ./elasticsearch
+      dockerfile: Dockerfile
     container_name: fojin-es
+    restart: always
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
@@ -36,6 +40,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: fojin-redis
+    restart: always
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
@@ -51,6 +56,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: fojin-backend
+    restart: always
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
@@ -60,6 +66,8 @@ services:
       ES_HOST: http://elasticsearch:9200
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-changeme-in-production}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173,http://localhost:5174}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
@@ -78,6 +86,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: fojin-frontend
+    restart: always
     ports:
       - "${FRONTEND_PORT:-3000}:80"
     depends_on:

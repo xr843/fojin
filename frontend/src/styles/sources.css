@@ -17,14 +17,14 @@
   font-family: "Noto Serif SC", serif;
   font-size: 28px;
   font-weight: 700;
-  color: #2b2318;
+  color: var(--fj-ink);
   margin: 0 0 8px;
   letter-spacing: 4px;
 }
 
 .sources-desc {
   font-size: 14px;
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   margin: 0;
 }
 
@@ -36,7 +36,7 @@
   flex-wrap: wrap;
   padding: 16px 20px;
   background: #fff;
-  border: 1px solid #e8e0d4;
+  border: 1px solid var(--fj-border);
   border-radius: 8px;
   margin-bottom: 16px;
 }
@@ -47,13 +47,13 @@
 
 .sources-stats-bar {
   font-size: 13px;
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   margin-bottom: 20px;
   padding-left: 4px;
 }
 
 .sources-stats-bar strong {
-  color: #8b2500;
+  color: var(--fj-accent);
 }
 
 /* ---------- 分组 ---------- */
@@ -69,20 +69,20 @@
   gap: 8px;
   margin-bottom: 12px;
   padding-bottom: 8px;
-  border-bottom: 1px solid #e8e0d4;
+  border-bottom: 1px solid var(--fj-border);
 }
 
 .sources-group-name {
   font-family: "Noto Serif SC", serif;
   font-size: 16px;
   font-weight: 600;
-  color: #2b2318;
+  color: var(--fj-ink);
 }
 
 .sources-group-count {
   font-size: 11px;
-  color: #9a8e7a;
-  background: #f0ebe2;
+  color: var(--fj-ink-muted);
+  background: var(--fj-bg-alt);
   padding: 1px 8px;
   border-radius: 8px;
 }
@@ -96,14 +96,14 @@
 
 .source-card {
   background: #fff;
-  border: 1px solid #e8e0d4;
+  border: 1px solid var(--fj-border);
   border-radius: 8px;
   padding: 16px 18px;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .source-card:hover {
-  border-color: #b08d57;
+  border-color: var(--fj-gold);
   box-shadow: 0 2px 12px rgba(176, 141, 87, 0.08);
 }
 
@@ -116,7 +116,7 @@
 
 .source-card-icon {
   font-size: 18px;
-  color: #8b2500;
+  color: var(--fj-accent);
   flex-shrink: 0;
   margin-top: 2px;
 }
@@ -130,14 +130,14 @@
   font-family: "Noto Serif SC", serif;
   font-size: 14px;
   font-weight: 600;
-  color: #2b2318;
+  color: var(--fj-ink);
   display: block;
   line-height: 1.4;
 }
 
 .source-card-name-en {
   font-size: 11px;
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   display: block;
   line-height: 1.3;
   margin-top: 2px;
@@ -154,7 +154,7 @@
 
 .source-card-desc {
   font-size: 12px;
-  color: #5c4f3d;
+  color: var(--fj-ink-light);
   line-height: 1.7;
   margin: 0 0 8px;
   display: -webkit-box;
@@ -169,7 +169,7 @@
 
 .source-card-dists-title {
   font-size: 11px;
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   margin-bottom: 6px;
 }
 
@@ -187,7 +187,7 @@
   border: 1px solid #eee5d8;
   border-radius: 6px;
   background: #fcfaf6;
-  color: #5c4f3d;
+  color: var(--fj-ink-light);
   text-decoration: none;
   transition: all 0.15s;
 }
@@ -195,7 +195,7 @@
 .source-dist-link:hover {
   border-color: #d4a574;
   background: #fff;
-  color: #8b2500;
+  color: var(--fj-accent);
 }
 
 .source-dist-link.is-primary {
@@ -210,7 +210,7 @@
 
 .source-dist-meta {
   font-size: 10px;
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   white-space: nowrap;
 }
 
@@ -223,8 +223,8 @@
 
 .source-lang-tag {
   font-size: 10px;
-  color: #5c4f3d;
-  background: #f0ebe2;
+  color: var(--fj-ink-light);
+  background: var(--fj-bg-alt);
   padding: 1px 6px;
   border-radius: 3px;
 }
@@ -240,9 +240,9 @@
   align-items: center;
   gap: 4px;
   font-size: 12px;
-  color: #5c4f3d;
+  color: var(--fj-ink-light);
   padding: 4px 10px;
-  border: 1px solid #e8e0d4;
+  border: 1px solid var(--fj-border);
   border-radius: 4px;
   background: #faf8f3;
   text-decoration: none;
@@ -251,13 +251,13 @@
 }
 
 .source-btn:hover {
-  color: #8b2500;
-  border-color: #b08d57;
+  color: var(--fj-accent);
+  border-color: var(--fj-gold);
   background: #fff;
 }
 
 .source-btn-search {
-  color: #8b2500;
+  color: var(--fj-accent);
   border-color: #d4a574;
   background: #fdf6ee;
 }
@@ -265,6 +265,35 @@
 .source-btn-search:hover {
   background: #fff;
   border-color: #8b2500;
+}
+
+/* ---------- 数据可信度说明 ---------- */
+.sources-trust {
+  margin-bottom: 20px;
+  padding: 20px 24px;
+  background: var(--fj-bg-alt);
+  border: 1px solid var(--fj-border);
+  border-radius: 8px;
+}
+
+.sources-trust-items {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+.sources-trust-title {
+  font-family: "Noto Serif SC", serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fj-ink);
+  margin-bottom: 6px;
+}
+
+.sources-trust-desc {
+  font-size: 12px;
+  color: var(--fj-ink-light);
+  line-height: 1.8;
 }
 
 /* ---------- 响应式 ---------- */
@@ -284,5 +313,9 @@
 
   .sources-title {
     font-size: 22px;
+  }
+
+  .sources-trust-items {
+    grid-template-columns: 1fr;
   }
 }

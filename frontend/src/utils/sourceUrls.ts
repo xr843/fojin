@@ -197,7 +197,6 @@ const SEARCH_PATTERNS: Record<string, (q: string) => string> = {
   "shoudu-guji": (q) => `https://www.clcn.net.cn/search?q=${q}`,
   // 港澳
   "cuhk-rarebook": (q) => `https://repository.lib.cuhk.edu.hk/en/search?q=${q}`,
-  "cuhk-daojing": (q) => `https://repository.lib.cuhk.edu.hk/en/search?q=${q}`,
   "cuhk-tcm": (q) => `https://repository.lib.cuhk.edu.hk/en/search?q=${q}`,
   // 法国
   "gallica-guji": (q) => `https://gallica.bnf.fr/services/engine/search/sru?query=${q}`,

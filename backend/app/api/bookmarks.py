@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user
@@ -10,13 +10,15 @@ from app.services.bookmark import add_bookmark, check_bookmark, get_bookmarks, r
 router = APIRouter(prefix="/bookmarks", tags=["bookmarks"])
 
 
-@router.get("", response_model=list[BookmarkResponse])
+@router.get("")
 async def list_bookmarks(
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """获取当前用户的收藏列表。"""
-    return await get_bookmarks(db, user.id)
+    return await get_bookmarks(db, user.id, page, size)
 
 
 @router.post("", response_model=BookmarkResponse)

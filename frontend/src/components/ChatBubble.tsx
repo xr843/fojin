@@ -1,5 +1,6 @@
 import { Typography, Tag, Space } from "antd";
 import { UserOutlined, RobotOutlined, BookOutlined } from "@ant-design/icons";
+import { useNavigate } from "react-router-dom";
 
 const { Paragraph, Text } = Typography;
 
@@ -17,6 +18,7 @@ interface ChatBubbleProps {
 }
 
 export default function ChatBubble({ role, content, sources }: ChatBubbleProps) {
+  const navigate = useNavigate();
   const isUser = role === "user";
 
   return (
@@ -63,7 +65,11 @@ export default function ChatBubble({ role, content, sources }: ChatBubbleProps) 
             </Text>
             <div style={{ marginTop: 4 }}>
               {sources.map((s, i) => (
-                <Tag key={i} style={{ marginBottom: 4 }}>
+                <Tag
+                  key={i}
+                  style={{ marginBottom: 4, cursor: "pointer" }}
+                  onClick={() => navigate(`/read/${s.text_id}?juan=${s.juan_num}`)}
+                >
                   文本 #{s.text_id} 第{s.juan_num}卷
                   <Text style={{ fontSize: 11, color: "#999" }}>
                     {" "}

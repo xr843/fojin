@@ -77,8 +77,9 @@ async def get_primary_ingest_distributions(
 
 
 async def get_source_text_count(session: AsyncSession, source_id: int) -> int:
+    from sqlalchemy import func
     from app.models.text import BuddhistText
     result = await session.execute(
-        select(BuddhistText.id).where(BuddhistText.source_id == source_id)
+        select(func.count(BuddhistText.id)).where(BuddhistText.source_id == source_id)
     )
-    return len(result.all())
+    return result.scalar() or 0

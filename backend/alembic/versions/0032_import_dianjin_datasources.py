@@ -66,22 +66,6 @@ SOURCES = [
         "dianjin_code": "SDDZJ",
         "dianjin_records": 13499,
     },
-    {
-        "code": "cuhk-daojing",
-        "name_zh": "香港中文大学道教经典文库",
-        "name_en": "CUHK Daoist Classics",
-        "base_url": "https://repository.lib.cuhk.edu.hk/en/collection/daoist",
-        "access_type": "external",
-        "region": _REGION["HKG"],
-        "languages": "lzh,zh",
-        "description": "香港中文大学道教经典全文数据库，69条记录含道藏相关文献，佛道比较研究参考资源",
-        "supports_search": True,
-        "supports_fulltext": True,
-        "supports_iiif": False,
-        "supports_api": False,
-        "dianjin_code": "CHIDJ",
-        "dianjin_records": 69,
-    },
     # ===================================================================
     # 大型综合古籍库 (Major general archives with Buddhist content)
     # ===================================================================

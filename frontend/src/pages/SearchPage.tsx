@@ -1,16 +1,19 @@
 import { useState, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Pagination, Spin, Empty, Checkbox, Input, Tag, Button, Tabs,
+  Pagination, Spin, Empty, Checkbox, Input, Tag, Button, Tabs, Result, Select, Typography,
 } from "antd";
 import {
-  SearchOutlined, EyeOutlined, LinkOutlined, HeartOutlined, ReadOutlined, CloudOutlined,
+  SearchOutlined, EyeOutlined, LinkOutlined, ReadOutlined, CloudOutlined,
 } from "@ant-design/icons";
+import BookmarkButton from "../components/BookmarkButton";
 import { Alert } from "antd";
 import { searchTexts, searchContent, getSources, type SearchHit, type DataSource } from "../api/client";
 import { federatedSearch, type DianjinSearchHit } from "../api/dianjin";
 import { buildSearchUrl, hasDirectSearchUrl, getSourceLabel, buildSourceReadUrl } from "../utils/sourceUrls";
+import { sanitizeHighlight } from "../utils/sanitize";
 import "../styles/search.css";
 
 /* ---- 本地结果卡片 ---- */
@@ -28,7 +31,7 @@ function ResultCard({ hit, rank }: { hit: SearchHit; rank: number }) {
     <div className="s-card">
       <div className="s-card-rank">排序<br />#{rank}</div>
       <div className="s-card-body">
-        <div className="s-card-title" dangerouslySetInnerHTML={{ __html: titleHtml }} />
+        <div className="s-card-title" dangerouslySetInnerHTML={{ __html: sanitizeHighlight(titleHtml) }} />
         <div className="s-card-tags">
           {sourceName && (
             <Tag color="volcano" style={{ fontSize: 11 }}>{sourceName}</Tag>
@@ -63,7 +66,7 @@ function ResultCard({ hit, rank }: { hit: SearchHit; rank: number }) {
             onClick={() => navigate(`/texts/${hit.id}`)}>
             查看详情
           </Button>
-          <Button size="small" icon={<HeartOutlined />}>收藏</Button>
+          <BookmarkButton textId={hit.id} size="small" />
         </div>
       </div>
     </div>
@@ -87,11 +90,13 @@ function ExternalCard({ source, query, rank }: { source: DataSource; query: stri
           <span>馆藏: {source.name_zh}</span>
         </div>
         <div className="s-card-actions">
-          <a className="s-card-btn-primary" href={url} target="_blank" rel="noopener noreferrer">
+          <a className="s-card-btn-primary" href={url} target="_blank" rel="noopener noreferrer"
+            aria-label={`前往 ${source.name_zh} 搜索 ${query}`}>
             <LinkOutlined /> 前往原站搜索
           </a>
           {source.base_url && (
-            <a className="s-card-btn" href={source.base_url} target="_blank" rel="noopener noreferrer">
+            <a className="s-card-btn" href={source.base_url} target="_blank" rel="noopener noreferrer"
+              aria-label={`访问 ${source.name_zh} 主页`}>
               <EyeOutlined /> 访问主页
             </a>
           )}
@@ -142,10 +147,28 @@ export default function SearchPage() {
   const selectedSources = searchParams.get("sources") ?? "";
 
   const [page, setPage] = useState(1);
+
+  // Search history
+  const HISTORY_KEY = "fojin-search-history";
+  const getSearchHistory = (): string[] => {
+    try {
+      return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+    } catch { return []; }
+  };
+  const [searchHistory, setSearchHistory] = useState<string[]>(getSearchHistory);
+
+  const saveSearchHistory = (q: string) => {
+    if (!q.trim()) return;
+    const history = [q, ...getSearchHistory().filter((h) => h !== q)].slice(0, 10);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    setSearchHistory(history);
+  };
+
   const [dynasty] = useState<string>();
   const [category] = useState<string>();
   const [regionFilter, setRegionFilter] = useState<Set<string>>(new Set());
   const [institutionFilter, setInstitutionFilter] = useState<Set<string>>(new Set());
+  const sortBy = searchParams.get("sort") || "relevance";
 
   /** Update URL params (replaces current history entry) */
   const updateUrl = (overrides: Record<string, string>) => {
@@ -156,9 +179,9 @@ export default function SearchPage() {
     setSearchParams(next, { replace: true });
   };
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["search", query, page, dynasty, category, selectedSources],
-    queryFn: () => searchTexts({ q: query, page, size: 20, dynasty, category, sources: selectedSources || undefined }),
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["search", query, page, dynasty, category, selectedSources, sortBy],
+    queryFn: () => searchTexts({ q: query, page, size: 20, dynasty, category, sources: selectedSources || undefined, sort: sortBy !== "relevance" ? sortBy : undefined }),
     enabled: query.length > 0 && tab === "catalog",
   });
 
@@ -179,6 +202,7 @@ export default function SearchPage() {
   const handleSearch = (value: string) => {
     setPage(1);
     updateUrl({ q: value });
+    saveSearchHistory(value);
   };
 
   const clearSource = (code: string) => {
@@ -269,8 +293,16 @@ export default function SearchPage() {
     });
   }, [regionCounts]);
 
+  const pageTitle = query ? `${query} — 搜索 | 佛津` : "搜索 | 佛津";
+  const pageDesc = query ? `在佛津搜索"${query}"的结果` : "搜索全球佛教古籍数字资源";
+
   return (
     <div className="s-page">
+      <Helmet>
+        <title>{pageTitle}</title>
+        <meta name="description" content={pageDesc} />
+        <link rel="canonical" href={`https://fojin.app/search${query ? `?q=${encodeURIComponent(query)}` : ""}`} />
+      </Helmet>
       {/* 搜索栏 */}
       <div className="s-search-bar">
         <Input.Search
@@ -318,7 +350,19 @@ export default function SearchPage() {
       </div>
 
       {query.length === 0 ? (
-        <Empty description="请输入搜索关键词" style={{ marginTop: 80 }} />
+        <div style={{ marginTop: 80, textAlign: "center" }}>
+          <Empty description="请输入搜索关键词" />
+          {searchHistory.length > 0 && (
+            <div style={{ marginTop: 24 }}>
+              <Typography.Text type="secondary" style={{ fontSize: 13 }}>最近搜索：</Typography.Text>
+              <div style={{ marginTop: 8, display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+                {searchHistory.map((h) => (
+                  <Tag key={h} style={{ cursor: "pointer" }} onClick={() => handleSearch(h)}>{h}</Tag>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       ) : (
         <div className="s-layout">
           {/* 左侧筛选 */}
@@ -365,9 +409,31 @@ export default function SearchPage() {
                   : <>本地找到 <strong>{localTotal.toLocaleString()}</strong> 条结果</>
                 }
               </span>
+              {tab === "catalog" && (
+                <Select
+                  size="small"
+                  value={sortBy}
+                  onChange={(v) => { setPage(1); updateUrl({ sort: v }); }}
+                  style={{ width: 120 }}
+                  options={[
+                    { value: "relevance", label: "相关度" },
+                    { value: "title", label: "按经名" },
+                    { value: "dynasty", label: "按朝代" },
+                  ]}
+                />
+              )}
             </div>
 
             {loading && <div style={{ textAlign: "center", padding: 60 }}><Spin size="large" /></div>}
+
+            {!loading && isError && tab === "catalog" && (
+              <Result
+                status="error"
+                title="搜索失败"
+                subTitle="搜索服务暂时不可用，请稍后重试。"
+                extra={<Button type="primary" onClick={() => refetch()}>重试</Button>}
+              />
+            )}
 
             {/* 本地结果 */}
             {!loading && tab === "catalog" && data && data.results.map((hit, i) => (
@@ -384,7 +450,7 @@ export default function SearchPage() {
                   </div>
                   {hit.highlight.map((h, j) => (
                     <div key={j} className="s-card-meta" style={{ lineHeight: 1.7 }}
-                      dangerouslySetInnerHTML={{ __html: `...${h}...` }} />
+                      dangerouslySetInnerHTML={{ __html: `...${sanitizeHighlight(h)}...` }} />
                   ))}
                   <div className="s-card-actions">
                     <Button type="primary" size="small" icon={<ReadOutlined />}

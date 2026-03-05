@@ -350,7 +350,8 @@ export default function ForceGraph({
   }, [nodes, links, width, height, onNodeClick, showTooltip, hideTooltip]);
 
   return (
-    <div ref={containerRef} style={{ width: "100%", position: "relative" }}>
+    <div ref={containerRef} style={{ width: "100%", position: "relative" }} role="img" aria-label="知识图谱可视化">
+      <span className="sr-only">知识图谱：包含节点和关系的可视化网络图</span>
       <svg
         ref={svgRef}
         width={width}

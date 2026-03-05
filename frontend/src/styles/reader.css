@@ -3,11 +3,11 @@
   font-size: 18px;
   line-height: 2;
   text-indent: 2em;
-  color: #2c2c2c;
+  color: var(--fj-ink);
   white-space: pre-wrap;
   word-break: break-all;
   padding: 24px 32px;
-  background: #fff;
+  background: var(--fj-card-bg);
   min-height: 400px;
 }
 
@@ -21,4 +21,11 @@
   justify-content: space-between;
   align-items: center;
   padding: 12px 0;
+}
+
+@media (max-width: 768px) {
+  .reader-content {
+    padding: 16px;
+    font-size: 16px;
+  }
 }

@@ -13,6 +13,7 @@ import argparse
 import asyncio
 import importlib
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -72,9 +73,21 @@ async def run_import_module(module_name: str, description: str):
     try:
         mod = importlib.import_module(module_name)
         if hasattr(mod, "main"):
-            result = mod.main()
-            if asyncio.iscoroutine(result):
-                await result
+            # Extract default args from description, e.g. "(--all)" → ["--all"]
+            default_args: list[str] = []
+            m = re.search(r"\(([^)]+)\)", description)
+            if m:
+                default_args = m.group(1).strip().split()
+
+            # Temporarily set sys.argv so argparse inside the module sees the args
+            saved_argv = sys.argv
+            sys.argv = [module_name] + default_args
+            try:
+                result = mod.main()
+                if asyncio.iscoroutine(result):
+                    await result
+            finally:
+                sys.argv = saved_argv
             print(f"  ✓ {description} completed.")
         else:
             print(f"  ⚠ {module_name} has no main() function. Skipping.")

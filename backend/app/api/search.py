@@ -22,10 +22,11 @@ async def search(
     category: str | None = Query(None, description="分类筛选"),
     lang: str | None = Query(None, description="语言筛选 (lzh/pi/sa/bo/en)"),
     sources: str | None = Query(None, description="数据源筛选，逗号分隔 (cbeta,suttacentral,gretil)"),
+    sort: str | None = Query(None, description="排序方式 (relevance/title/dynasty)"),
 ):
     """搜索佛教典籍。支持经名、编号、译者等多字段搜索，可按语言和数据源筛选。"""
     es = get_es()
-    return await search_texts(es, q, page, size, dynasty, category, lang, sources)
+    return await search_texts(es, q, page, size, dynasty, category, lang, sources, sort)
 
 
 @router.get("/search/content")
@@ -49,10 +50,10 @@ async def filters(db: AsyncSession = Depends(get_db)):
     # languages_with_data: languages that have actual text records in DB (from ES agg)
     languages_with_data = sorted(aggs.get("languages", []))
 
-    # languages_all: all languages covered by registered data sources
+    # languages_all: all languages covered by active data sources
     from sqlalchemy import text as sa_text
     result = await db.execute(
-        sa_text("SELECT languages FROM data_sources WHERE languages IS NOT NULL AND languages != ''")
+        sa_text("SELECT languages FROM data_sources WHERE is_active = true AND languages IS NOT NULL AND languages != ''")
     )
     all_langs = set()
     for row in result.fetchall():

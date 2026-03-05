@@ -20,20 +20,20 @@
   font-family: "Noto Serif SC", serif;
   font-size: 20px;
   font-weight: 600;
-  color: #2b2318;
+  color: var(--fj-ink);
   margin: 0;
   letter-spacing: 2px;
 }
 
 .kg-header .anticon {
   font-size: 18px;
-  color: #8b2500;
+  color: var(--fj-accent);
 }
 
 /* ---------- 工具栏 ---------- */
 .kg-toolbar {
   background: #fff;
-  border: 1px solid #e8e0d4;
+  border: 1px solid var(--fj-border);
   border-radius: 8px;
   padding: 12px 16px;
   margin-bottom: 16px;
@@ -58,7 +58,7 @@
 
 .kg-toolbar-main .ant-input-affix-wrapper:hover,
 .kg-toolbar-main .ant-input-affix-wrapper:focus-within {
-  border-color: #b08d57;
+  border-color: var(--fj-gold);
 }
 
 .kg-toolbar-main .ant-select .ant-select-selector {
@@ -77,7 +77,7 @@
 .kg-depth-label {
   font-family: "Noto Serif SC", serif;
   font-size: 12px;
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   white-space: nowrap;
 }
 
@@ -86,11 +86,11 @@
 }
 
 .kg-toolbar .ant-slider .ant-slider-track {
-  background: #b08d57;
+  background: var(--fj-gold);
 }
 
 .kg-toolbar .ant-slider .ant-slider-handle::after {
-  box-shadow: 0 0 0 2px #b08d57;
+  box-shadow: 0 0 0 2px var(--fj-gold);
 }
 
 /* ---------- 关系过滤 ---------- */
@@ -100,24 +100,24 @@
   gap: 8px;
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px solid #f0ebe2;
+  border-top: 1px solid var(--fj-bg-alt);
 }
 
 .kg-predicate-label {
   font-family: "Noto Serif SC", serif;
   font-size: 12px;
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   flex-shrink: 0;
 }
 
 .kg-predicate-bar .ant-checkbox-wrapper {
   font-size: 12px;
-  color: #5c4f3d;
+  color: var(--fj-ink-light);
 }
 
 .kg-predicate-bar .ant-checkbox-checked .ant-checkbox-inner {
-  background-color: #8b2500;
-  border-color: #8b2500;
+  background-color: var(--fj-accent);
+  border-color: var(--fj-accent);
 }
 
 /* ---------- 三栏布局 ---------- */
@@ -137,7 +137,7 @@
 
 .kg-sidebar-card {
   background: #fff;
-  border: 1px solid #e8e0d4;
+  border: 1px solid var(--fj-border);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -146,9 +146,9 @@
   font-family: "Noto Serif SC", serif;
   font-size: 13px;
   font-weight: 600;
-  color: #2b2318;
+  color: var(--fj-ink);
   padding: 10px 14px;
-  border-bottom: 1px solid #f0ebe2;
+  border-bottom: 1px solid var(--fj-bg-alt);
   margin: 0;
 }
 
@@ -184,7 +184,7 @@
 
 .kg-result-item.active {
   background: #f5ece0;
-  border-left: 3px solid #8b2500;
+  border-left: 3px solid var(--fj-accent);
   padding-left: 11px;
 }
 
@@ -192,13 +192,13 @@
   font-family: "Noto Serif SC", serif;
   font-size: 14px;
   font-weight: 600;
-  color: #2b2318;
+  color: var(--fj-ink);
   line-height: 1.4;
 }
 
 .kg-result-sub {
   font-size: 12px;
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   margin-left: 6px;
   font-style: italic;
 }
@@ -251,7 +251,7 @@
 
 .kg-graph-container {
   background: #fff;
-  border: 1px solid #e8e0d4;
+  border: 1px solid var(--fj-border);
   border-radius: 8px;
   overflow: hidden;
   position: relative;
@@ -263,17 +263,17 @@
 
 .kg-graph-empty {
   background: #fff;
-  border: 1px solid #e8e0d4;
+  border: 1px solid var(--fj-border);
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 500px;
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
 }
 
 .kg-graph-empty .ant-empty-description {
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   font-family: "Noto Serif SC", serif;
   font-size: 13px;
 }
@@ -300,7 +300,7 @@
   align-items: center;
   gap: 16px;
   padding: 8px 14px;
-  border-top: 1px solid #f0ebe2;
+  border-top: 1px solid var(--fj-bg-alt);
   background: #faf8f5;
   flex-wrap: wrap;
 }
@@ -313,7 +313,7 @@
 
 .kg-legend-title {
   font-size: 11px;
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   font-family: "Noto Serif SC", serif;
 }
 
@@ -322,7 +322,7 @@
   align-items: center;
   gap: 4px;
   font-size: 11px;
-  color: #5c4f3d;
+  color: var(--fj-ink-light);
 }
 
 .kg-legend-dot {
@@ -349,7 +349,7 @@
 
 .kg-detail-card {
   background: #fff;
-  border: 1px solid #e8e0d4;
+  border: 1px solid var(--fj-border);
   border-radius: 8px;
   max-height: calc(100vh - 200px);
   overflow-y: auto;
@@ -366,14 +366,14 @@
 
 .kg-detail-empty {
   background: #fff;
-  border: 1px solid #e8e0d4;
+  border: 1px solid var(--fj-border);
   border-radius: 8px;
   padding: 40px 16px;
   text-align: center;
 }
 
 .kg-detail-empty .ant-empty-description {
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   font-family: "Noto Serif SC", serif;
   font-size: 12px;
 }

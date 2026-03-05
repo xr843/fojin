@@ -4,14 +4,104 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#1a1a2e" />
-    <meta name="description" content="全球佛教古籍数字资源聚合平台" />
+    <meta name="theme-color" content="#8b2500" />
+    <meta name="description" content="佛津 FoJin — 聚合全球 40+ 佛教数字资源，提供平行阅读、知识图谱、AI 问答等功能的古籍研究平台。覆盖汉传、藏传、南传、梵文等传统。" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://fojin.app/" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="佛津 FoJin — 全球佛教古籍数字资源聚合平台" />
+    <meta property="og:description" content="聚合全球 40+ 佛教数字资源，提供平行阅读、知识图谱、AI 问答等功能。覆盖汉传、藏传、南传、梵文等传统。" />
+    <meta property="og:url" content="https://fojin.app/" />
+    <meta property="og:image" content="https://fojin.app/landscape-bg.png" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:site_name" content="佛津 FoJin" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="佛津 FoJin — 全球佛教古籍数字资源聚合平台" />
+    <meta name="twitter:description" content="聚合全球 40+ 佛教数字资源，提供平行阅读、知识图谱、AI 问答等功能。" />
+    <meta name="twitter:image" content="https://fojin.app/landscape-bg.png" />
+
+    <!-- Font preload -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;600;700&display=swap" as="style" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;600;700&display=swap" />
+
     <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
     <title>佛津 FoJin — 全球佛教古籍数字资源聚合平台</title>
+
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "name": "佛津 FoJin",
+          "url": "https://fojin.app/",
+          "description": "全球佛教古籍数字资源聚合平台",
+          "inLanguage": "zh-CN",
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": "https://fojin.app/search?q={search_term_string}",
+            "query-input": "required name=search_term_string"
+          }
+        },
+        {
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            {
+              "@type": "ListItem",
+              "position": 1,
+              "name": "首页",
+              "item": "https://fojin.app/"
+            },
+            {
+              "@type": "ListItem",
+              "position": 2,
+              "name": "搜索",
+              "item": "https://fojin.app/search"
+            },
+            {
+              "@type": "ListItem",
+              "position": 3,
+              "name": "数据源",
+              "item": "https://fojin.app/sources"
+            }
+          ]
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <div style="max-width:800px;margin:40px auto;padding:0 24px;font-family:serif;color:#2b2318">
+        <h1>佛津 FoJin — 全球佛教古籍数字资源聚合平台</h1>
+        <p>佛津聚合全球 40 余个佛教数字资源，覆盖 27 个国家和地区，涵盖汉传、藏传、南传、梵文等多种传统。</p>
+        <h2>核心功能</h2>
+        <ul>
+          <li><strong>典籍搜索</strong> — 跨数据源检索佛教古籍，支持按经名、编号、译者查询</li>
+          <li><strong>平行阅读</strong> — 多版本逐段对照，一览异译</li>
+          <li><strong>知识图谱</strong> — 人物、寺院、宗派关系可视化</li>
+          <li><strong>AI 问答</strong> — 基于典籍原文的智能问答</li>
+          <li><strong>学术标注</strong> — 段落级批注与协作笔记</li>
+          <li><strong>引用生成</strong> — 一键导出学术引用格式</li>
+        </ul>
+        <h2>数据来源</h2>
+        <p>所有数据均来自全球学术机构、图书馆、大学及佛教研究组织的公开数字资源，包括 CBETA、BDRC、SAT、SuttaCentral 等权威项目。数据定期同步更新，经过自动去重与校验。</p>
+        <h2>导航</h2>
+        <ul>
+          <li><a href="/search">搜索典籍</a></li>
+          <li><a href="/sources">数据源导航</a></li>
+          <li><a href="/kg">知识图谱</a></li>
+          <li><a href="/dianjin">典津联检</a></li>
+        </ul>
+      </div>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

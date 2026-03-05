@@ -1,8 +1,8 @@
-# 佛津 (FoJin) v3.0
+# 佛津 (FoJin) v3.1
 
 全球佛教古籍数字资源聚合平台
 
-聚合 375 个数据源（318 活跃）、204 可搜索、8,900+ 目录记录、28 语种、27 国家/地区。可通过典津联检扩展至 72.8 万条跨平台古籍资源。
+聚合 317 个活跃数据源、8,949 条目录记录、28 语种。可通过典津联检扩展至 72.8 万条跨平台古籍资源。
 
 ## 快速启动
 
@@ -83,7 +83,7 @@ pytest tests/ -q
 
 ### 数据源管理
 
-- **多源聚合**：375 个数据源（活跃 318 个），覆盖 CBETA、SuttaCentral、84000、GRETIL、SAT、DDB、DILA 等，28 语种、27 国家/地区
+- **多源聚合**：317 个活跃数据源，覆盖 CBETA、SuttaCentral、84000、GRETIL、SAT、DDB、DILA 等，28 语种
 - **分发端追踪**：区分数据源实体与官方分发端（Git 仓库、批量下载、API），标记主导入端
 - **典津联检**：对接典津平台 180 个数据源，按国家/地区分组浏览
 
@@ -192,16 +192,50 @@ python scripts/import_all.py
 
 - **前端**：React 18 + TypeScript + Vite + Ant Design 5 + Zustand + TanStack Query
 - **后端**：FastAPI + SQLAlchemy (async) + Pydantic v2
-- **数据库**：PostgreSQL 15（+ pg_trgm 模糊搜索）
-- **搜索**：Elasticsearch 8
+- **数据库**：PostgreSQL 15 + pgvector（向量检索）+ pg_trgm（模糊搜索）
+- **搜索**：Elasticsearch 8（ICU 分词）
 - **缓存**：Redis 7
 - **跨平台联检**：典津 API (guji.cckb.cn) + httpx AsyncClient
+- **SEO**：react-helmet-async 动态 meta + JSON-LD 结构化数据 + sitemap.xml + 按路由静态 HTML 生成
 - **部署**：Docker Compose
 - **CI**：GitHub Actions
 
+## 部署
+
+### Docker Compose 部署（推荐）
+
+```bash
+cp .env.example .env
+# 编辑 .env 填写 API 密钥等配置
+docker compose up -d --build
+# 运行数据库迁移
+docker exec fojin-backend alembic upgrade head
+```
+
+### 测试服务器部署
+
+如需部署到内网测试服务器，可直接从本地同步代码和数据：
+
+```bash
+# 1. 同步代码
+rsync -az --exclude node_modules --exclude dist ./ user@server:~/projects/fojin/
+
+# 2. 启动服务
+ssh user@server "cd ~/projects/fojin && docker compose up -d --build"
+
+# 3. 运行迁移
+ssh user@server "docker exec fojin-backend alembic upgrade head"
+
+# 4. 从本地复制数据库（可选，比重新导入更快）
+docker exec fojin-postgres pg_dump -U fojin -d fojin --format=custom --exclude-table=text_embeddings -f /tmp/fojin.dump
+docker cp fojin-postgres:/tmp/fojin.dump /tmp/fojin.dump
+scp /tmp/fojin.dump user@server:/tmp/
+ssh user@server "docker cp /tmp/fojin.dump fojin-postgres:/tmp/ && docker exec fojin-postgres pg_restore -U fojin -d fojin --clean --if-exists --no-owner /tmp/fojin.dump"
+```
+
 ## 数据库迁移
 
-迁移文件位于 `backend/alembic/versions/`，当前最新为 `0050`。
+迁移文件位于 `backend/alembic/versions/`，当前最新为 `0051`。
 
 ```bash
 cd backend

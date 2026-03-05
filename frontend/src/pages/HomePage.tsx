@@ -9,7 +9,14 @@ import {
 } from "@ant-design/icons";
 import SourceSelector from "../components/SourceSelector";
 import { getStats, getSources, getFilters } from "../api/client";
+import { getLangName } from "../utils/sourceUrls";
 import "../styles/home.css";
+
+const HOT_TAGS = [
+  "金刚经", "心经", "华严经", "楞严经",
+  "玄奘", "鸠摩罗什",
+  "禅宗", "天台宗",
+];
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -22,9 +29,10 @@ export default function HomePage() {
   const { data: sources } = useQuery({ queryKey: ["sources"], queryFn: getSources });
   const { data: filters } = useQuery({ queryKey: ["filters"], queryFn: getFilters });
 
-  const handleSearch = () => {
-    if (query.trim()) {
-      const params = new URLSearchParams({ q: query.trim() });
+  const handleSearch = (q?: string) => {
+    const term = (q ?? query).trim();
+    if (term) {
+      const params = new URLSearchParams({ q: term });
       if (selectedSources.size > 0) {
         params.set("sources", Array.from(selectedSources).join(","));
       }
@@ -36,7 +44,9 @@ export default function HomePage() {
     if (e.key === "Enter") handleSearch();
   };
 
-  const langAllCount = filters?.languages_all?.length || 0;
+  const langAllCount = filters?.languages_all
+    ? new Set(filters.languages_all.map(getLangName)).size
+    : 0;
   const srcCount = sources?.length || 0;
   const srcLabel = selectedSources.size > 0
     ? `已选 ${selectedSources.size} 源`
@@ -45,6 +55,9 @@ export default function HomePage() {
   return (
     <div className="home-page">
       <section className="home-hero">
+        <div className="home-hero-bg">
+          <img src="/landscape-bg.png" alt="" />
+        </div>
         <h1 className="home-title">
           <span className="home-title-accent">佛</span>津
         </h1>
@@ -56,6 +69,9 @@ export default function HomePage() {
             <button
               className="search-combo-src"
               onClick={() => setSourceOpen(!sourceOpen)}
+              aria-label="选择数据源"
+              aria-expanded={sourceOpen}
+              aria-haspopup="listbox"
             >
               <DatabaseOutlined />
               <span>{srcLabel}</span>
@@ -66,12 +82,13 @@ export default function HomePage() {
             <input
               ref={inputRef}
               className="search-combo-input"
-              placeholder="输入经名、编号、译者..."
+              placeholder="输入经名、译者、宗派..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
+              aria-label="搜索佛教典籍"
             />
-            <button className="search-combo-btn" onClick={handleSearch}>
+            <button className="search-combo-btn" onClick={() => handleSearch()}>
               <SearchOutlined /> 搜索
             </button>
           </div>
@@ -86,7 +103,17 @@ export default function HomePage() {
           )}
         </div>
 
-        <div className="home-stats">
+        {/* 热门检索 */}
+        <div className="home-hot-tags">
+          <span className="home-hot-label">热门检索</span>
+          {HOT_TAGS.map((tag) => (
+            <button key={tag} className="home-hot-tag" onClick={() => handleSearch(tag)}>
+              {tag}
+            </button>
+          ))}
+        </div>
+
+        <div className="home-stats" role="group" aria-label="平台数据统计">
           <div className="home-stat-item">
             <div className="home-stat-num">
               {stats ? stats.total_texts.toLocaleString() : "—"}
@@ -101,6 +128,10 @@ export default function HomePage() {
             <div className="home-stat-num">{langAllCount || "—"}</div>
             <div className="home-stat-lbl">关联语种</div>
           </div>
+        </div>
+        <div className="home-trust">
+          数据来源均为全球学术机构公开资源，定期同步，自动去重 ·{" "}
+          <span className="home-trust-link" onClick={() => navigate("/sources")}>了解数据来源 →</span>
         </div>
       </section>
     </div>

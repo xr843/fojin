@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /graphql
+
+Sitemap: https://fojin.app/sitemap.xml

@@ -1,4 +1,11 @@
+import logging
+import os
+
 from pydantic_settings import BaseSettings
+
+logger = logging.getLogger(__name__)
+
+_DEFAULT_JWT_SECRET = "fojin-jwt-secret-change-in-production"
 
 
 class Settings(BaseSettings):
@@ -17,9 +24,9 @@ class Settings(BaseSettings):
     redis_port: int = 6379
 
     # JWT
-    jwt_secret_key: str = "fojin-jwt-secret-change-in-production"
+    jwt_secret_key: str = os.environ.get("JWT_SECRET_KEY", _DEFAULT_JWT_SECRET)
     jwt_algorithm: str = "HS256"
-    jwt_expire_minutes: int = 60 * 24 * 7  # 7 days
+    jwt_expire_minutes: int = 60 * 24  # 1 day
 
     # LLM (OpenAI-compatible API)
     llm_api_url: str = "https://api.openai.com/v1"
@@ -58,3 +65,17 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+_fojin_env = os.environ.get("FOJIN_ENV", "development").lower()
+
+if _fojin_env == "production":
+    if settings.jwt_secret_key == _DEFAULT_JWT_SECRET or len(settings.jwt_secret_key) < 32:
+        raise RuntimeError(
+            "FATAL: In production, JWT_SECRET_KEY must be set and at least 32 characters. "
+            "Set the JWT_SECRET_KEY environment variable."
+        )
+elif settings.jwt_secret_key == _DEFAULT_JWT_SECRET:
+    logger.warning(
+        "JWT_SECRET_KEY not set — using insecure default. "
+        "Set the JWT_SECRET_KEY environment variable in production!"
+    )

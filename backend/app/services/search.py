@@ -13,6 +13,7 @@ async def search_texts(
     category: str | None = None,
     lang: str | None = None,
     sources: str | None = None,
+    sort: str | None = None,
 ) -> SearchResponse:
     """Search Buddhist texts in Elasticsearch."""
     must = []
@@ -54,6 +55,15 @@ async def search_texts(
         elif codes:
             filter_clauses.append({"terms": {"source_code": codes}})
 
+    sort_clause = []
+    if sort == "title":
+        sort_clause = [{"title_zh.keyword": "asc"}, "_score"]
+    elif sort == "dynasty":
+        sort_clause = [{"dynasty.keyword": "asc"}, "_score"]
+    elif sort != "relevance":
+        # Default: relevance (use ES default _score sorting)
+        pass
+
     body = {
         "query": {
             "bool": {
@@ -74,7 +84,10 @@ async def search_texts(
         "size": size,
     }
 
-    result = await es.search(index=INDEX_NAME, body=body)
+    if sort_clause:
+        body["sort"] = sort_clause
+
+    result = await es.search(index=INDEX_NAME, body=body, timeout="10s")
 
     hits = result["hits"]
     total = hits["total"]["value"]
@@ -150,7 +163,7 @@ async def search_content(
         "size": size,
     }
 
-    result = await es.search(index=CONTENT_INDEX_NAME, body=body)
+    result = await es.search(index=CONTENT_INDEX_NAME, body=body, timeout="10s")
     hits = result["hits"]
     total = hits["total"]["value"]
 
@@ -182,7 +195,7 @@ async def get_aggregations(es: AsyncElasticsearch) -> dict:
             "sources": {"terms": {"field": "source_code", "size": 30}},
         },
     }
-    result = await es.search(index=INDEX_NAME, body=body)
+    result = await es.search(index=INDEX_NAME, body=body, timeout="10s")
     aggs = result["aggregations"]
     return {
         "dynasties": [b["key"] for b in aggs["dynasties"]["buckets"]],

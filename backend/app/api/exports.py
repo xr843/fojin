@@ -63,10 +63,10 @@ async def export_metadata_csv(
         ])
         yield header_buf.getvalue()
 
-        # Stream rows in batches
-        offset = 0
+        # Stream rows using keyset pagination
+        last_id = 0
         while True:
-            batch_stmt = stmt.offset(offset).limit(BATCH_SIZE)
+            batch_stmt = stmt.where(BuddhistText.id > last_id).limit(BATCH_SIZE)
             result = await db.execute(batch_stmt)
             texts = result.scalars().all()
             if not texts:
@@ -82,8 +82,8 @@ async def export_metadata_csv(
                     t.fascicle_count or "", t.category or "",
                     t.subcategory or "", t.lang or "lzh",
                 ])
+            last_id = texts[-1].id
             yield buf.getvalue()
-            offset += BATCH_SIZE
 
     return StreamingResponse(
         generate_csv(),
@@ -106,12 +106,14 @@ async def export_kg_json(
     async def generate_json():
         yield '{\n  "entities": [\n'
 
-        # Stream entities
-        offset = 0
+        # Stream entities using keyset pagination
+        last_id = 0
         first = True
         entity_ids: set[int] = set()
         while True:
-            result = await db.execute(entity_stmt.offset(offset).limit(BATCH_SIZE))
+            result = await db.execute(
+                entity_stmt.where(KGEntity.id > last_id).limit(BATCH_SIZE)
+            )
             entities = result.scalars().all()
             if not entities:
                 break
@@ -133,12 +135,11 @@ async def export_kg_json(
                 prefix = "    " if first else ",\n    "
                 first = False
                 yield prefix + json.dumps(obj, ensure_ascii=False)
-            offset += BATCH_SIZE
+            last_id = entities[-1].id
 
         yield '\n  ],\n  "relations": [\n'
 
-        # Stream relations; when filtering by entity_type, only include
-        # relations where BOTH endpoints are in the exported entity set.
+        # Stream relations using keyset pagination
         rel_stmt = select(KGRelation).order_by(KGRelation.id)
         skip_relations = False
         if entity_type:
@@ -148,14 +149,15 @@ async def export_kg_json(
                     KGRelation.object_id.in_(entity_ids),
                 )
             else:
-                # No entities matched the filter — skip relations entirely
                 skip_relations = True
 
-        offset = 0
+        last_id = 0
         first = True
         if not skip_relations:
             while True:
-                result = await db.execute(rel_stmt.offset(offset).limit(BATCH_SIZE))
+                result = await db.execute(
+                    rel_stmt.where(KGRelation.id > last_id).limit(BATCH_SIZE)
+                )
                 relations = result.scalars().all()
                 if not relations:
                     break
@@ -172,7 +174,7 @@ async def export_kg_json(
                     prefix = "    " if first else ",\n    "
                     first = False
                     yield prefix + json.dumps(obj, ensure_ascii=False)
-                offset += BATCH_SIZE
+                last_id = relations[-1].id
 
         yield '\n  ]\n}\n'
 
@@ -217,13 +219,15 @@ async def export_kg_jsonld(
         yield '  "@context": ' + json.dumps(context["@context"], ensure_ascii=False, indent=4) + ',\n'
         yield '  "@graph": [\n'
 
-        offset = 0
+        last_id = 0
         first = True
 
-        # Stream entities
+        # Stream entities using keyset pagination
         entity_ids: set[int] = set()
         while True:
-            result = await db.execute(entity_stmt.offset(offset).limit(BATCH_SIZE))
+            result = await db.execute(
+                entity_stmt.where(KGEntity.id > last_id).limit(BATCH_SIZE)
+            )
             entities = result.scalars().all()
             if not entities:
                 break
@@ -234,7 +238,6 @@ async def export_kg_jsonld(
                     "@type": f"fojin:{e.entity_type}",
                     "prefLabel": {"@value": e.name_zh, "@language": "zh"},
                 }
-                # Multilingual labels
                 if e.name_sa:
                     node.setdefault("altLabel", []).append({"@value": e.name_sa, "@language": "sa"})
                 if e.name_pi:
@@ -248,7 +251,6 @@ async def export_kg_jsonld(
                 if e.text_id:
                     node["fojin:linkedText"] = e.text_id
                 if e.external_ids:
-                    # Map external IDs to owl:sameAs
                     same_as = [v for v in e.external_ids.values() if isinstance(v, str) and v.startswith("http")]
                     if same_as:
                         node["sameAs"] = [{"@id": uri} for uri in same_as]
@@ -256,9 +258,9 @@ async def export_kg_jsonld(
                 prefix = "    " if first else ",\n    "
                 first = False
                 yield prefix + json.dumps(node, ensure_ascii=False)
-            offset += BATCH_SIZE
+            last_id = entities[-1].id
 
-        # Stream relations — same filtering logic as kg.json
+        # Stream relations using keyset pagination
         rel_stmt = select(KGRelation).order_by(KGRelation.id)
         skip_relations = False
         if entity_type:
@@ -270,10 +272,12 @@ async def export_kg_jsonld(
             else:
                 skip_relations = True
 
-        offset = 0
+        last_id = 0
         if not skip_relations:
             while True:
-                result = await db.execute(rel_stmt.offset(offset).limit(BATCH_SIZE))
+                result = await db.execute(
+                    rel_stmt.where(KGRelation.id > last_id).limit(BATCH_SIZE)
+                )
                 relations = result.scalars().all()
                 if not relations:
                     break
@@ -291,7 +295,7 @@ async def export_kg_jsonld(
                     prefix = "    " if first else ",\n    "
                     first = False
                     yield prefix + json.dumps(node, ensure_ascii=False)
-                offset += BATCH_SIZE
+                last_id = relations[-1].id
 
         yield '\n  ]\n}\n'
 

@@ -25,8 +25,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
 
-      - name: Run smoke tests
-        run: python -m pytest -q tests/test_smoke.py
+      - name: Run tests
+        run: python -m pytest -q tests/
 
   frontend:
     name: Frontend build
@@ -46,5 +46,5 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Type check & build
-        run: npm run build
+      - name: Type check & build (no warnings)
+        run: npm run build 2>&1 | tee build.log && ! grep -i "warning" build.log

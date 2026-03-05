@@ -65,7 +65,7 @@ SOURCE_DISTRIBUTIONS = [
         "code": "cbeta-cbdata-fulltext",
         "name": "CBData Fulltext",
         "channel_type": "bulk_dump",
-        "url": "https://cbdata.dila.edu.tw/fulltext",
+        "url": "https://cbdata.dila.edu.tw/static_pages/download_fulltext",
         "format": "txt/xml",
         "license_note": "CBETA 官方全文下载入口；使用需遵循 CBETA 与站点条款。",
         "is_primary_ingest": False,
@@ -260,7 +260,8 @@ def _insert_distribution(conn, item: dict) -> None:
         {"code": item["source_code"]},
     ).scalar()
     if source_id is None:
-        raise RuntimeError(f"Missing data_sources row for code={item['source_code']}")
+        # Source may not exist yet in a fresh DB (e.g. 'suttacentral' created by import scripts)
+        return
 
     existing = conn.execute(
         sa_text("SELECT id FROM source_distributions WHERE code = :code"),

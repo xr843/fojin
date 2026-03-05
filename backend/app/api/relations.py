@@ -10,12 +10,18 @@ router = APIRouter(prefix="/texts", tags=["relations"])
 
 
 @router.get("/{text_id}/relations", response_model=TextRelationsResponse)
-async def list_text_relations(text_id: int, db: AsyncSession = Depends(get_db)):
+async def list_text_relations(
+    text_id: int,
+    relation_type: str | None = Query(None, description="按关系类型筛选，如 cites, commentary, alt_translation, parallel"),
+    db: AsyncSession = Depends(get_db),
+):
     text = await get_text_by_id(db, text_id)
     if not text:
         raise HTTPException(status_code=404, detail="经典未找到")
 
     relations = await get_text_relations(db, text_id)
+    if relation_type:
+        relations = [r for r in relations if r["relation_type"] == relation_type]
     return TextRelationsResponse(
         text_id=text.id,
         title_zh=text.title_zh,

@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.text import BuddhistText
@@ -12,5 +12,5 @@ async def get_text_by_id(session: AsyncSession, text_id: int) -> BuddhistText | 
 
 
 async def get_text_count(session: AsyncSession) -> int:
-    result = await session.execute(select(BuddhistText.id))
-    return len(result.all())
+    result = await session.execute(select(func.count(BuddhistText.id)))
+    return result.scalar() or 0

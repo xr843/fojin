@@ -18,3 +18,10 @@
   background: #d9d9d9;
   border-radius: 3px;
 }
+
+@media (max-width: 768px) {
+  .parallel-reader-col {
+    height: auto;
+    max-height: 50vh;
+  }
+}

@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Helmet } from "react-helmet-async";
 import { Input, Select, Tag, Empty, Spin } from "antd";
 import {
   SearchOutlined, LinkOutlined, GlobalOutlined,
@@ -47,6 +48,7 @@ export default function SourcesPage() {
   const [langFilter, setLangFilter] = useState("all");
   const [catFilter, setCatFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState("name");
 
   const { data: sources, isLoading } = useQuery({
     queryKey: ["sources"],
@@ -106,7 +108,7 @@ export default function SourcesPage() {
   // 筛选
   const filtered = useMemo(() => {
     if (!sources) return [];
-    return sources.filter((s) => {
+    const result = sources.filter((s) => {
       if (search) {
         const q = search.toLowerCase();
         if (
@@ -126,7 +128,15 @@ export default function SourcesPage() {
       if (catFilter !== "all" && getCategory(s) !== catFilter) return false;
       return true;
     });
-  }, [sources, search, regionFilter, langFilter, catFilter]);
+    if (sortBy === "region") {
+      result.sort((a, b) => (a.region || "").localeCompare(b.region || "", "zh"));
+    } else if (sortBy === "count") {
+      result.sort((a, b) => (b.distributions?.length || 0) - (a.distributions?.length || 0));
+    } else {
+      result.sort((a, b) => a.name_zh.localeCompare(b.name_zh, "zh"));
+    }
+    return result;
+  }, [sources, search, regionFilter, langFilter, catFilter, sortBy]);
 
   // 按地区分组
   const grouped = useMemo(() => {
@@ -165,12 +175,38 @@ export default function SourcesPage() {
 
   return (
     <div className="sources-page">
+      <Helmet>
+        <title>数据源导航 | 佛津</title>
+        <meta name="description" content={`聚合全球 ${sources?.length || 40}+ 佛教数字资源，覆盖图书馆、大学、研究机构、数字项目等。`} />
+        <link rel="canonical" href="https://fojin.app/sources" />
+      </Helmet>
       <div className="sources-header">
         <h1 className="sources-title">数据源导航</h1>
         <p className="sources-desc">
           聚合全球 {sources?.length || 0} 个佛教数字资源：
           {directSearchCount} 可搜索 · {localCount} 已入库全文 · {remoteCount} 外站全文 · {iiifCount} 影像 · {apiCount} API
         </p>
+      </div>
+
+      <div className="sources-trust">
+        <div className="sources-trust-items">
+          <div className="sources-trust-item">
+            <div className="sources-trust-title">来源可溯</div>
+            <div className="sources-trust-desc">所有数据均来自 CBETA、BDRC、SAT、SuttaCentral 等学术机构公开发布的数字资源，每条记录保留原始来源标识与链接。</div>
+          </div>
+          <div className="sources-trust-item">
+            <div className="sources-trust-title">定期同步</div>
+            <div className="sources-trust-desc">通过 Git、API、批量导入等渠道与上游数据源保持同步，确保收录内容反映最新发布状态。</div>
+          </div>
+          <div className="sources-trust-item">
+            <div className="sources-trust-title">自动去重</div>
+            <div className="sources-trust-desc">跨数据源自动识别同一典籍的不同收录，合并为统一记录，保留各源的独立编号与访问链接。</div>
+          </div>
+          <div className="sources-trust-item">
+            <div className="sources-trust-title">覆盖广泛</div>
+            <div className="sources-trust-desc">涵盖 {regions.length} 个国家和地区、{languages.length} 种语言，覆盖汉传、藏传、南传、梵文等多种佛教传统。</div>
+          </div>
+        </div>
       </div>
 
       {/* 搜索与过滤栏 */}
@@ -208,6 +244,16 @@ export default function SourcesPage() {
           options={[
             { value: "all", label: `全部类型 (${categories.length})` },
             ...categories.map((c) => ({ value: c, label: c })),
+          ]}
+        />
+        <Select
+          value={sortBy}
+          onChange={setSortBy}
+          style={{ width: 120 }}
+          options={[
+            { value: "name", label: "按名称" },
+            { value: "region", label: "按地区" },
+            { value: "count", label: "按收录数" },
           ]}
         />
 

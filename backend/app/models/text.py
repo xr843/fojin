@@ -25,7 +25,7 @@ class BuddhistText(Base):
     cbeta_url: Mapped[str | None] = mapped_column(String(500))
     has_content: Mapped[bool] = mapped_column(Boolean, server_default="false")
     content_char_count: Mapped[int] = mapped_column(Integer, server_default="0")
-    source_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("data_sources.id"))
+    source_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("data_sources.id", ondelete="SET NULL"), index=True)
     lang: Mapped[str] = mapped_column(String(10), server_default="lzh")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -43,7 +43,7 @@ class TextContent(Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    text_id: Mapped[int] = mapped_column(Integer, ForeignKey("buddhist_texts.id"), index=True)
+    text_id: Mapped[int] = mapped_column(Integer, ForeignKey("buddhist_texts.id", ondelete="CASCADE"), index=True)
     juan_num: Mapped[int] = mapped_column(Integer)
     content: Mapped[str] = mapped_column(Text)
     content_html: Mapped[str | None] = mapped_column(Text)

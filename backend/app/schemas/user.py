@@ -1,6 +1,7 @@
+import re
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 
 
 class UserRegister(BaseModel):
@@ -8,6 +9,17 @@ class UserRegister(BaseModel):
     email: EmailStr
     password: str
     display_name: str | None = None
+
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("密码长度至少8位")
+        if not re.search(r"[a-zA-Z]", v):
+            raise ValueError("密码必须包含字母")
+        if not re.search(r"\d", v):
+            raise ValueError("密码必须包含数字")
+        return v
 
 
 class UserLogin(BaseModel):
