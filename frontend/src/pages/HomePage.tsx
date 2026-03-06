@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { useQuery } from "@tanstack/react-query";
 import {
   DatabaseOutlined,
@@ -54,6 +55,9 @@ export default function HomePage() {
 
   return (
     <div className="home-page">
+      <Helmet>
+        <title>佛津 — 全球佛教古籍数字资源聚合平台</title>
+      </Helmet>
       <section className="home-hero">
         <div className="home-hero-bg">
           <img src="/landscape-bg.png" alt="" />

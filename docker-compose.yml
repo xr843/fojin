@@ -10,12 +10,14 @@ services:
     container_name: fojin-postgres
     restart: always
     logging: *default-logging
+    mem_limit: 1g
+    cpus: 1.0
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-fojin}
       POSTGRES_USER: ${POSTGRES_USER:-fojin}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fojin_secret}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -31,12 +33,14 @@ services:
     container_name: fojin-es
     restart: always
     logging: *default-logging
+    mem_limit: 1536m
+    cpus: 1.5
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
     ports:
-      - "${ES_PORT:-9200}:9200"
+      - "127.0.0.1:${ES_PORT:-9200}:9200"
     volumes:
       - esdata:/usr/share/elasticsearch/data
     healthcheck:
@@ -50,8 +54,10 @@ services:
     container_name: fojin-redis
     restart: always
     logging: *default-logging
+    mem_limit: 256m
+    cpus: 0.5
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - redisdata:/data
     healthcheck:
@@ -67,6 +73,8 @@ services:
     container_name: fojin-backend
     restart: always
     logging: *default-logging
+    mem_limit: 1g
+    cpus: 1.0
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
@@ -80,7 +88,7 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173,http://localhost:5174}
       DIANJIN_API_KEY: ${DIANJIN_API_KEY:-}
     ports:
-      - "${BACKEND_PORT:-8000}:8000"
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     volumes:
       - ./backend:/app
       - ./data:/data
@@ -99,6 +107,8 @@ services:
     container_name: fojin-frontend
     restart: always
     logging: *default-logging
+    mem_limit: 128m
+    cpus: 0.25
     ports:
       - "${FRONTEND_PORT:-3000}:80"
     depends_on:

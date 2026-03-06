@@ -258,6 +258,21 @@
   word-break: break-word;
 }
 
+/* ---------- 全文检索折叠卡片 ---------- */
+.s-content-juan {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: var(--fj-sand-light, #faf7f2);
+  border-left: 3px solid #d4a574;
+  border-radius: 4px;
+}
+.s-content-juan-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #8b6914;
+  margin-bottom: 4px;
+}
+
 /* ---------- 响应式 ---------- */
 @media (max-width: 768px) {
   .s-layout {

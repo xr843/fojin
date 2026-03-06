@@ -147,29 +147,62 @@ async def search_content(
                 }
             }
 
+    highlight_cfg = {
+        "fields": {
+            "content": {
+                "fragment_size": 120,
+                "number_of_fragments": 3,
+                "pre_tags": ["<em>"],
+                "post_tags": ["</em>"],
+            }
+        }
+    }
+
+    # Collapse by text_id: one result per work, with inner_hits for juan count
     body = {
         "query": content_query,
-        "highlight": {
-            "fields": {
-                "content": {
-                    "fragment_size": 120,
-                    "number_of_fragments": 3,
-                    "pre_tags": ["<em>"],
-                    "post_tags": ["</em>"],
-                }
-            }
+        "highlight": highlight_cfg,
+        "collapse": {
+            "field": "text_id",
+            "inner_hits": {
+                "name": "matched_juans",
+                "size": 5,
+                "sort": [{"_score": "desc"}],
+                "highlight": highlight_cfg,
+            },
         },
         "from": (page - 1) * size,
         "size": size,
     }
 
+    # Use a separate cardinality aggregation to get total unique works
+    body["aggs"] = {
+        "total_works": {"cardinality": {"field": "text_id"}},
+        "total_juans": {"value_count": {"field": "text_id"}},
+    }
+
     result = await es.search(index=CONTENT_INDEX_NAME, body=body, timeout="10s")
     hits = result["hits"]
-    total = hits["total"]["value"]
+    total_works = result.get("aggregations", {}).get("total_works", {}).get("value", 0)
+    total_juans = result.get("aggregations", {}).get("total_juans", {}).get("value", 0)
 
     results = []
     for hit in hits["hits"]:
         src = hit["_source"]
+        # inner_hits contains all matched juans for this work
+        inner = hit.get("inner_hits", {}).get("matched_juans", {})
+        inner_total = inner.get("hits", {}).get("total", {}).get("value", 1)
+        inner_hits = inner.get("hits", {}).get("hits", [])
+
+        matched_juans = []
+        for ih in inner_hits:
+            ih_src = ih["_source"]
+            matched_juans.append({
+                "juan_num": ih_src.get("juan_num", 1),
+                "highlight": ih.get("highlight", {}).get("content", []),
+                "score": ih["_score"],
+            })
+
         results.append({
             "text_id": src["text_id"],
             "cbeta_id": src.get("cbeta_id", ""),
@@ -179,9 +212,17 @@ async def search_content(
             "juan_num": src.get("juan_num", 1),
             "highlight": hit.get("highlight", {}).get("content", []),
             "score": hit["_score"],
+            "matched_juan_count": inner_total,
+            "matched_juans": matched_juans,
         })
 
-    return {"total": total, "page": page, "size": size, "results": results}
+    return {
+        "total": total_works,
+        "total_juans": total_juans,
+        "page": page,
+        "size": size,
+        "results": results,
+    }
 
 
 async def get_aggregations(es: AsyncElasticsearch) -> dict:

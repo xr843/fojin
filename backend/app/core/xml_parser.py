@@ -68,7 +68,10 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
     if not xml_path.exists():
         return []
 
-    tree = etree.parse(str(xml_path))
+    try:
+        tree = etree.parse(str(xml_path))
+    except etree.XMLSyntaxError:
+        return []
     root = tree.getroot()
 
     # Find <body> element

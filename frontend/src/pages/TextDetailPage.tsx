@@ -156,14 +156,16 @@ export default function TextDetailPage() {
         </Card>
 
         <Space>
-          {text.has_content && (
+          {cbetaUrl && (
             <Button
               type="primary"
               size="large"
               icon={<ReadOutlined />}
-              onClick={() => navigate(`/read/${text.id}`)}
+              href={cbetaUrl}
+              target="_blank"
+              rel="noopener noreferrer"
             >
-              开始阅读
+              CBETA 阅读
             </Button>
           )}
           <BookmarkButton textId={text.id} />

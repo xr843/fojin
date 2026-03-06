@@ -1,5 +1,14 @@
+"""Shared fixtures for FoJin backend tests.
+
+These tests are designed to run without external services (PG, ES, Redis).
+They test pure logic: exceptions, URL building, schema validation, etc.
+
+For integration tests (test_search_api), ES/Redis/PG are mocked.
+"""
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+import pytest_asyncio
+from unittest.mock import AsyncMock, patch
 
 from httpx import ASGITransport, AsyncClient
 
@@ -15,6 +24,7 @@ def _make_mock_es(search_return=None):
             },
         }
     mock.search.return_value = search_return
+    mock.ping.return_value = True
     return mock
 
 
@@ -51,16 +61,16 @@ def mock_es():
     })
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def client(mock_es):
     """Async HTTP client with mocked ES (patched at each consumer module)."""
-    # Patch get_es at every module that imports it, so the already-bound symbols
-    # point to our mock instead of the real ES client.
     with patch("app.api.search.get_es", return_value=mock_es), \
          patch("app.core.elasticsearch.init_es", new_callable=AsyncMock), \
          patch("app.core.elasticsearch.close_es", new_callable=AsyncMock), \
+         patch("app.core.elasticsearch.get_es", return_value=mock_es), \
          patch("app.main.aioredis") as mock_redis_mod:
         mock_redis = AsyncMock()
+        mock_redis.ping.return_value = True
         mock_redis_mod.from_url.return_value = mock_redis
 
         from app.main import app

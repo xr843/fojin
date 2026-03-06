@@ -102,6 +102,12 @@ export interface JuanContentResponse {
   next_juan: number | null;
 }
 
+export interface MatchedJuan {
+  juan_num: number;
+  highlight: string[];
+  score: number;
+}
+
 export interface ContentSearchHit {
   text_id: number;
   cbeta_id: string;
@@ -111,10 +117,13 @@ export interface ContentSearchHit {
   juan_num: number;
   highlight: string[];
   score: number;
+  matched_juan_count: number;
+  matched_juans: MatchedJuan[];
 }
 
 export interface ContentSearchResponse {
   total: number;
+  total_juans: number;
   page: number;
   size: number;
   results: ContentSearchHit[];

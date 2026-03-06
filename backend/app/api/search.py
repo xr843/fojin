@@ -15,7 +15,7 @@ router = APIRouter(tags=["search"])
 
 @router.get("/search", response_model=SearchResponse)
 async def search(
-    q: str = Query("", description="搜索关键词"),
+    q: str = Query("", max_length=200, description="搜索关键词"),
     page: int = Query(1, ge=1, description="页码"),
     size: int = Query(20, ge=1, le=100, description="每页数量"),
     dynasty: str | None = Query(None, description="朝代筛选"),
@@ -31,7 +31,7 @@ async def search(
 
 @router.get("/search/content")
 async def content_search(
-    q: str = Query("", description="搜索关键词"),
+    q: str = Query("", max_length=200, description="搜索关键词"),
     page: int = Query(1, ge=1, description="页码"),
     size: int = Query(20, ge=1, le=100, description="每页数量"),
     sources: str | None = Query(None, description="数据源筛选，逗号分隔"),
@@ -69,7 +69,7 @@ async def filters(db: AsyncSession = Depends(get_db)):
 
 @router.get("/search/federated", response_model=FederatedSearchResponse)
 async def federated_search(
-    q: str = Query("", description="搜索关键词"),
+    q: str = Query("", max_length=200, description="搜索关键词"),
     page: int = Query(1, ge=1, description="页码"),
     size: int = Query(20, ge=1, le=100, description="每页数量"),
     dynasty: str | None = Query(None, description="朝代筛选"),

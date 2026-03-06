@@ -5,13 +5,16 @@ from contextlib import asynccontextmanager
 import redis.asyncio as aioredis
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 
 from app.config import settings
 from app.core.elasticsearch import close_es, get_es, init_es
+from app.core.exceptions import FoJinError, fojin_error_to_http
 from app.core.rate_limit import RateLimitMiddleware
 from app.database import engine as async_engine
+from app.services.dianjin import get_dianjin_client
 
 logger = logging.getLogger(__name__)
 from app.api import auth, bookmarks, history, search, texts
@@ -27,6 +30,7 @@ async def lifespan(app: FastAPI):
     await init_es()
     yield
     # Shutdown
+    await get_dianjin_client().close()
     await app.state.redis.close()
     await close_es()
 
@@ -63,6 +67,16 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(SecurityHeadersMiddleware)
+
+
+@app.exception_handler(FoJinError)
+async def fojin_error_handler(request: Request, exc: FoJinError):
+    http_exc = fojin_error_to_http(exc)
+    return JSONResponse(
+        status_code=http_exc.status_code,
+        content={"detail": http_exc.detail},
+    )
+
 
 # Phase 1 routers
 app.include_router(auth.router, prefix="/api")

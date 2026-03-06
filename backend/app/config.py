@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     # JWT
     jwt_secret_key: str = os.environ.get("JWT_SECRET_KEY", _DEFAULT_JWT_SECRET)
     jwt_algorithm: str = "HS256"
-    jwt_expire_minutes: int = 60 * 24  # 1 day
+    jwt_expire_minutes: int = 60 * 8  # 8 hours
 
     # LLM (OpenAI-compatible API)
     llm_api_url: str = "https://api.openai.com/v1"

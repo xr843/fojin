@@ -1,4 +1,4 @@
-# 佛津 (FoJin) v3.1
+# 佛津 (FoJin) v3.2
 
 全球佛教古籍数字资源聚合平台
 
@@ -68,11 +68,11 @@ pytest tests/ -q
 
 ## 主要功能
 
-- **多维检索**：经典检索（经名/译者/编号）、全文检索（经文正文关键词）、联合检索（本地 + 典津 72.8 万条跨平台古籍）、辞典检索（237,593 条多语种词条，支持语种筛选）
-- **经文阅读**：按卷浏览经文内容，支持多语种平行对读（汉/梵/巴利/藏/英）
-- **数据源导航**：320+ 全球佛教数字资源目录，按国家/地区、语种、类型筛选
-- **知识图谱**：9,600+ 实体（人物、寺院、经典、宗派等），力导向图可视化探索
-- **写本浏览**：通过 IIIF 协议查看数字化写本与善本影像
+- **多维检索**：经典检索（经名/译者/编号，覆盖 8,949 条经典目录）、全文检索（经文正文关键词）、联合检索（本地 + 典津 72.8 万条跨平台古籍）、辞典检索（6 部权威辞典、237,593 条词条，支持中/梵/巴利/英语种筛选）
+- **经文阅读**：按卷浏览经文内容，支持多语种平行对读（汉/梵/巴利/藏/英），覆盖 28 语种
+- **数据源导航**：320+ 全球佛教数字资源目录，按国家/地区、语种、类型筛选，涵盖 CBETA、SuttaCentral、84000、GRETIL、BDRC 等主流佛学数据库
+- **知识图谱**：9,600+ 实体、3,800+ 关系（人物、寺院、经典、宗派等），力导向图可视化探索
+- **写本浏览**：通过 IIIF 协议查看 BDRC 等机构的数字化写本与善本影像
 
 ## 用户使用说明
 
@@ -204,6 +204,19 @@ docker exec fojin-backend alembic upgrade head
 
 所有容器已配置日志轮转（10MB × 3 文件），无需担心磁盘空间。
 
+### 安全加固
+
+v3.2 包含以下安全优化：
+
+- **容器非 root 运行**：后端使用 `app` 用户，前端使用 `nginx` 用户
+- **多阶段构建**：后端 Dockerfile 使用 builder 阶段，最终镜像不含编译工具
+- **端口绑定**：PostgreSQL、Elasticsearch、Redis、Backend 端口仅绑定 `127.0.0.1`，不对外暴露
+- **资源限制**：每个容器设置 `mem_limit` 和 `cpus` 上限，防止单容器耗尽资源
+- **安全头**：Nginx 添加 CSP、X-Content-Type-Options、X-Frame-Options、Referrer-Policy
+- **搜索参数限制**：所有搜索查询参数添加 `max_length=200`
+- **JWT 过期时间**：从 24 小时缩短至 8 小时
+- **速率限制修复**：正确读取 Nginx 反向代理 `X-Forwarded-For` 头，按真实 IP 限流
+
 ### 测试服务器部署
 
 如需部署到内网测试服务器，可直接从本地同步代码和数据：
@@ -225,9 +238,35 @@ scp /tmp/fojin.dump user@server:/tmp/
 ssh user@server "docker cp /tmp/fojin.dump fojin-postgres:/tmp/ && docker exec fojin-postgres pg_restore -U fojin -d fojin --clean --if-exists --no-owner /tmp/fojin.dump"
 ```
 
+## 项目结构
+
+```
+fojin/
+├── backend/
+│   ├── app/
+│   │   ├── api/           # FastAPI 路由（search, texts, dictionary, chat 等）
+│   │   ├── core/          # 核心模块（ES、异常体系、速率限制、XML 解析）
+│   │   ├── models/        # SQLAlchemy ORM 模型
+│   │   ├── schemas/       # Pydantic 请求/响应模型
+│   │   └── services/      # 业务逻辑（搜索、典津客户端等）
+│   ├── alembic/versions/  # 数据库迁移（0001–0057）
+│   ├── scripts/           # 数据导入脚本
+│   └── tests/             # pytest 测试（异常、模式、搜索 API）
+├── frontend/
+│   ├── src/
+│   │   ├── components/    # 通用组件 + search/ 子目录（5 个搜索卡片组件）
+│   │   ├── pages/         # 页面组件
+│   │   ├── config/        # searchPatterns.json（150+ 搜索 URL 模板）
+│   │   ├── utils/         # sourceUrls、工具函数
+│   │   └── stores/        # Zustand 状态管理
+│   └── nginx.conf         # Nginx 配置（gzip_static + 安全头）
+├── elasticsearch/         # ES Dockerfile（ICU 插件）
+└── docker-compose.yml     # 编排配置（含资源限制与端口绑定）
+```
+
 ## 数据库迁移
 
-迁移文件位于 `backend/alembic/versions/`，当前最新为 `0051`。
+迁移文件位于 `backend/alembic/versions/`，当前最新为 `0057`。
 
 ```bash
 cd backend

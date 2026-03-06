@@ -129,10 +129,10 @@ export default function ProfilePage() {
                     renderItem={(item) => (
                       <List.Item
                         style={{ cursor: "pointer" }}
-                        onClick={() => navigate(`/read/${item.text_id}?juan=${item.juan_num}`)}
+                        onClick={() => navigate(`/texts/${item.text_id}`)}
                         actions={[
                           <Button type="link" icon={<ReadOutlined />}>
-                            继续阅读
+                            查看详情
                           </Button>,
                         ]}
                       >

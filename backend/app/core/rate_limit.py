@@ -23,7 +23,15 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if not redis_client:
             return await call_next(request)
 
-        client_ip = request.client.host if request.client else "unknown"
+        # Behind Nginx reverse proxy, request.client.host is always the
+        # internal Docker IP. Read the real client IP from X-Forwarded-For
+        # (set by Nginx: proxy_set_header X-Forwarded-For).
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            # X-Forwarded-For: client, proxy1, proxy2 — take the first
+            client_ip = forwarded.split(",")[0].strip()
+        else:
+            client_ip = request.client.host if request.client else "unknown"
         path = request.url.path
         minute_window = int(time.time()) // 60
 

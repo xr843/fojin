@@ -1,177 +1,22 @@
 import { useState, useMemo } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useQuery } from "@tanstack/react-query";
 import {
   Pagination, Spin, Empty, Checkbox, Input, Tag, Button, Tabs, Result, Select, Typography,
 } from "antd";
 import {
-  SearchOutlined, EyeOutlined, LinkOutlined, ReadOutlined, CloudOutlined, BookOutlined,
+  SearchOutlined, CloudOutlined, BookOutlined,
 } from "@ant-design/icons";
-import BookmarkButton from "../components/BookmarkButton";
 import { Alert } from "antd";
-import { searchTexts, searchContent, searchDictionary, getSources, type SearchHit, type DataSource, type DictEntry } from "../api/client";
-import { federatedSearch, type DianjinSearchHit } from "../api/dianjin";
-import { buildSearchUrl, hasDirectSearchUrl, getSourceLabel, buildSourceReadUrl } from "../utils/sourceUrls";
-import { sanitizeHighlight } from "../utils/sanitize";
+import { searchTexts, searchContent, searchDictionary, getSources, type SearchHit } from "../api/client";
+import { federatedSearch } from "../api/dianjin";
+import { hasDirectSearchUrl } from "../utils/sourceUrls";
+import { ResultCard, ExternalCard, DianjinCard, DictCard, ContentCard } from "../components/search";
 import "../styles/search.css";
-
-/* ---- 本地结果卡片 ---- */
-function ResultCard({ hit, rank }: { hit: SearchHit; rank: number }) {
-  const navigate = useNavigate();
-  const titleHtml = hit.highlight?.title_zh?.[0] ?? hit.title_zh;
-  const sourceName = hit.source_code ? getSourceLabel(hit.source_code) : null;
-  // Only build read URL for cbeta source where cbeta_id is the correct identifier.
-  // For other sources, cbeta_id may not be a valid identifier for that source;
-  // users should go to detail page to get the correct source-specific URL.
-  const isCbetaSource = !hit.source_code || hit.source_code === "cbeta" || hit.source_code === "cbeta-org" || hit.source_code === "cbeta-api";
-  const readUrl = isCbetaSource ? buildSourceReadUrl("cbeta", hit.cbeta_id) : null;
-
-  return (
-    <div className="s-card">
-      <div className="s-card-rank">排序<br />#{rank}</div>
-      <div className="s-card-body">
-        <div className="s-card-title" dangerouslySetInnerHTML={{ __html: sanitizeHighlight(titleHtml) }} />
-        <div className="s-card-tags">
-          {sourceName && (
-            <Tag color="volcano" style={{ fontSize: 11 }}>{sourceName}</Tag>
-          )}
-          <Tag style={{ fontSize: 11 }}>{hit.has_content ? "本地全文" : "目录数据"}</Tag>
-          {hit.category && <Tag style={{ fontSize: 11 }}>{hit.category}</Tag>}
-        </div>
-        <div className="s-card-meta">
-          {hit.translator && (
-            <span>主要责任者: {hit.dynasty ? `[${hit.dynasty}] ` : ""}{hit.translator}</span>
-          )}
-        </div>
-        <div className="s-card-meta">
-          <span>编号: {hit.cbeta_id}</span>
-        </div>
-        <div className="s-card-actions">
-          {hit.has_content && (
-            <Button type="primary" size="small" icon={<ReadOutlined />}
-              style={{ background: "#8b2500", borderColor: "#8b2500" }}
-              onClick={() => navigate(`/read/${hit.id}`)}>
-              在线阅读
-            </Button>
-          )}
-          {!hit.has_content && readUrl && (
-            <Button type="primary" size="small" icon={<LinkOutlined />}
-              style={{ background: "#8b2500", borderColor: "#8b2500" }}
-              href={readUrl} target="_blank" rel="noopener noreferrer">
-              前往 {sourceName || "原站"} 阅读
-            </Button>
-          )}
-          <Button size="small" icon={<EyeOutlined />}
-            onClick={() => navigate(`/texts/${hit.id}`)}>
-            查看详情
-          </Button>
-          <BookmarkButton textId={hit.id} size="small" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ---- 外部数据源结果卡片 ---- */
-function ExternalCard({ source, query, rank }: { source: DataSource; query: string; rank: number }) {
-  const url = buildSearchUrl(source.code, query) || "#";
-  return (
-    <div className="s-card s-card-ext">
-      <div className="s-card-rank">排序<br />#{rank}</div>
-      <div className="s-card-body">
-        <div className="s-card-title">{query}</div>
-        <div className="s-card-tags">
-          <Tag color="blue" style={{ fontSize: 11 }}>{source.name_zh}</Tag>
-          <Tag style={{ fontSize: 11 }}>外链跳转</Tag>
-          {source.region && <Tag style={{ fontSize: 11 }}>{source.region}</Tag>}
-        </div>
-        <div className="s-card-meta">
-          <span>馆藏: {source.name_zh}</span>
-        </div>
-        <div className="s-card-actions">
-          <a className="s-card-btn-primary" href={url} target="_blank" rel="noopener noreferrer"
-            aria-label={`前往 ${source.name_zh} 搜索 ${query}`}>
-            <LinkOutlined /> 前往原站搜索
-          </a>
-          {source.base_url && (
-            <a className="s-card-btn" href={source.base_url} target="_blank" rel="noopener noreferrer"
-              aria-label={`访问 ${source.name_zh} 主页`}>
-              <EyeOutlined /> 访问主页
-            </a>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ---- 典津结果卡片 ---- */
-function DianjinCard({ hit, rank }: { hit: DianjinSearchHit; rank: number }) {
-  return (
-    <div className="s-card" style={{ borderLeft: "3px solid #1677ff" }}>
-      <div className="s-card-rank">排序<br />#{rank}</div>
-      <div className="s-card-body">
-        <div className="s-card-title">{hit.title || "无题"}</div>
-        <div className="s-card-tags">
-          <Tag color="blue" style={{ fontSize: 11 }}>典津</Tag>
-          {hit.datasource_name && <Tag color="volcano" style={{ fontSize: 11 }}>{hit.datasource_name}</Tag>}
-          {hit.collection && <Tag style={{ fontSize: 11 }}>{hit.collection}</Tag>}
-          {hit.datasource_tags?.map((t) => (
-            <Tag key={t} style={{ fontSize: 10 }}>{t}</Tag>
-          ))}
-        </div>
-        <div className="s-card-meta">
-          {hit.main_responsibility && <span>责任者: {hit.main_responsibility}</span>}
-          {hit.edition && <span style={{ marginLeft: 12 }}>版本: {hit.edition}</span>}
-        </div>
-        <div className="s-card-actions">
-          {hit.detail_url && (
-            <a className="s-card-btn-primary" href={hit.detail_url} target="_blank" rel="noopener noreferrer">
-              <LinkOutlined /> 前往典津查看
-            </a>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ---- 辞典结果卡片 ---- */
-function DictCard({ hit, rank }: { hit: DictEntry; rank: number }) {
-  const [expanded, setExpanded] = useState(false);
-  const needsTruncate = hit.definition.length > 300;
-  const displayDef = needsTruncate && !expanded ? hit.definition.slice(0, 300) + "..." : hit.definition;
-  const langLabel: Record<string, string> = { zh: "中文", pi: "巴利文", sa: "梵文", en: "英文" };
-
-  return (
-    <div className="s-card">
-      <div className="s-card-rank">排序<br />#{rank}</div>
-      <div className="s-card-body">
-        <div className="s-card-title">
-          {hit.headword}
-          {hit.reading && <span style={{ fontSize: 14, fontWeight: 400, color: "var(--fj-ink-light)", marginLeft: 8 }}>({hit.reading})</span>}
-        </div>
-        <div className="s-card-tags">
-          <Tag color="green" style={{ fontSize: 11 }}>{langLabel[hit.lang] || hit.lang}</Tag>
-          {hit.source_name && <Tag color="volcano" style={{ fontSize: 11 }}>{hit.source_name}</Tag>}
-        </div>
-        <div className="s-card-meta">
-          <div className="s-dict-def">{displayDef}</div>
-          {needsTruncate && (
-            <Button type="link" size="small" onClick={() => setExpanded(!expanded)} style={{ padding: 0, fontSize: 12 }}>
-              {expanded ? "收起" : "展开全文"}
-            </Button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
 
   // Derive state from URL — these are the source of truth
   const query = searchParams.get("q") ?? "";
@@ -387,7 +232,7 @@ export default function SearchPage() {
             : tab === "content"
             ? "在经文正文中检索关键词"
             : tab === "dictionary"
-            ? "在 237,593 条多语种辞典词条中检索词头"
+            ? "在 393,624 条多语种辞典词条中检索词头与释义"
             : "同时搜索本地数据库和典津跨平台古籍资源"}
         </div>
       </div>
@@ -451,6 +296,8 @@ export default function SearchPage() {
                   ? <>联合找到 <strong>{(fedData?.combined_total || 0).toLocaleString()}</strong> 条结果（本地 {localTotal.toLocaleString()} + 典津 {(fedData?.dianjin_total || 0).toLocaleString()}）</>
                   : tab === "dictionary"
                   ? <>辞典找到 <strong>{localTotal.toLocaleString()}</strong> 条词条</>
+                  : tab === "content"
+                  ? <>在 <strong>{localTotal.toLocaleString()}</strong> 部经典中找到匹配（共 {(contentData?.total_juans || 0).toLocaleString()} 卷）</>
                   : <>本地找到 <strong>{localTotal.toLocaleString()}</strong> 条结果</>
                 }
               </span>
@@ -500,26 +347,7 @@ export default function SearchPage() {
             ))}
 
             {!loading && tab === "content" && contentData && contentData.results.map((hit, i) => (
-              <div key={`${hit.text_id}_${hit.juan_num}_${i}`} className="s-card">
-                <div className="s-card-rank">#{i + 1 + (page - 1) * 20}</div>
-                <div className="s-card-body">
-                  <div className="s-card-title">{hit.title_zh}</div>
-                  <div className="s-card-tags">
-                    <Tag style={{ fontSize: 11 }}>{hit.cbeta_id} · 第{hit.juan_num}卷</Tag>
-                  </div>
-                  {hit.highlight.map((h, j) => (
-                    <div key={j} className="s-card-meta" style={{ lineHeight: 1.7 }}
-                      dangerouslySetInnerHTML={{ __html: `...${sanitizeHighlight(h)}...` }} />
-                  ))}
-                  <div className="s-card-actions">
-                    <Button type="primary" size="small" icon={<ReadOutlined />}
-                      style={{ background: "#8b2500", borderColor: "#8b2500" }}
-                      onClick={() => navigate(`/read/${hit.text_id}?juan=${hit.juan_num}`)}>
-                      在线阅读
-                    </Button>
-                  </div>
-                </div>
-              </div>
+              <ContentCard key={`${hit.text_id}_${i}`} hit={hit} rank={i + 1 + (page - 1) * 20} />
             ))}
 
             {/* 联合检索结果 */}

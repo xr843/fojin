@@ -68,7 +68,7 @@ export default function ChatBubble({ role, content, sources }: ChatBubbleProps) 
                 <Tag
                   key={i}
                   style={{ marginBottom: 4, cursor: "pointer" }}
-                  onClick={() => navigate(`/read/${s.text_id}?juan=${s.juan_num}`)}
+                  onClick={() => navigate(`/texts/${s.text_id}`)}
                 >
                   文本 #{s.text_id} 第{s.juan_num}卷
                   <Text style={{ fontSize: 11, color: "#999" }}>

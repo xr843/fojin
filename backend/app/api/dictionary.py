@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from opencc import OpenCC
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -8,19 +9,34 @@ from app.models.dictionary import DictionaryEntry
 
 router = APIRouter(prefix="/dictionary", tags=["dictionary"])
 
+_s2t = OpenCC("s2t")
+_t2s = OpenCC("t2s")
+
+
+def _zh_variants(q: str) -> list[str]:
+    """Return deduplicated [original, simplified, traditional] variants."""
+    return list({q, _t2s.convert(q), _s2t.convert(q)})
+
 
 @router.get("/search")
 async def search_dictionary(
-    q: str = Query(..., min_length=1, description="搜索词条"),
+    q: str = Query(..., min_length=1, max_length=200, description="搜索词条"),
     lang: str | None = Query(None, description="语言筛选"),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    """搜索佛学辞典词条。"""
-    stmt = select(DictionaryEntry).where(
-        DictionaryEntry.headword.ilike(f"%{q}%")
-    )
+    """搜索佛学辞典词条（词头 + 释义 + 读音），支持简繁互搜。"""
+    variants = _zh_variants(q)
+    # Build OR conditions for all variants (simplified + traditional)
+    conditions = []
+    for v in variants:
+        like_v = f"%{v}%"
+        conditions.append(DictionaryEntry.headword.ilike(like_v))
+        conditions.append(DictionaryEntry.definition.ilike(like_v))
+        conditions.append(DictionaryEntry.reading.ilike(like_v))
+    filter_cond = or_(*conditions)
+    stmt = select(DictionaryEntry).where(filter_cond)
     if lang:
         stmt = stmt.where(DictionaryEntry.lang == lang)
 
@@ -28,10 +44,15 @@ async def search_dictionary(
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = (await db.execute(count_stmt)).scalar() or 0
 
-    # Paginate
+    # Relevance: exact headword (any variant) > substring headword > definition/reading
+    exact_cases = [(DictionaryEntry.headword == v, 3) for v in variants]
+    like_cases = [(DictionaryEntry.headword.ilike(f"%{v}%"), 2) for v in variants]
+    relevance = case(*exact_cases, *like_cases, else_=1)
+
+    # Paginate with relevance ordering
     stmt = (
         stmt.options(joinedload(DictionaryEntry.source))
-        .order_by(DictionaryEntry.headword)
+        .order_by(relevance.desc(), func.length(DictionaryEntry.headword), DictionaryEntry.headword)
         .offset((page - 1) * size)
         .limit(size)
     )
