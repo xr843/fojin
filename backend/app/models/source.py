@@ -25,6 +25,7 @@ class DataSource(Base):
     has_remote_fulltext: Mapped[bool] = mapped_column(Boolean, server_default="false")
     supports_iiif: Mapped[bool] = mapped_column(Boolean, server_default="false")
     supports_api: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    sort_order: Mapped[int] = mapped_column(Integer, server_default="0")
     is_active: Mapped[bool] = mapped_column(Boolean, server_default="true")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

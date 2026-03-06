@@ -9,7 +9,7 @@ async def get_all_sources(session: AsyncSession, active_only: bool = True) -> li
     stmt = (
         select(DataSource)
         .options(selectinload(DataSource.distributions))
-        .order_by(DataSource.id)
+        .order_by(DataSource.sort_order)
     )
     if active_only:
         stmt = stmt.where(DataSource.is_active == True)

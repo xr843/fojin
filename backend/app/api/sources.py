@@ -74,7 +74,7 @@ async def source_stats(db: AsyncSession = Depends(get_db)):
         .outerjoin(text_counts, DataSource.id == text_counts.c.source_id)
         .outerjoin(ident_counts, DataSource.id == ident_counts.c.source_id)
         .outerjoin(content_stats, DataSource.id == content_stats.c.source_id)
-        .order_by(DataSource.id)
+        .order_by(DataSource.sort_order)
     )
 
     result = await db.execute(stmt)
