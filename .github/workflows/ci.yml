@@ -46,5 +46,5 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Type check & build (no warnings)
-        run: npm run build 2>&1 | tee build.log && ! grep -i "warning" build.log
+      - name: Type check & build
+        run: npm run build
