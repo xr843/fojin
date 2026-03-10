@@ -26,6 +26,9 @@ data/cbeta/
 *.swp
 *.swo
 
+# Internal promotion materials (not for public repo)
+docs/promotion/
+
 # OS
 .DS_Store
 Thumbs.db
