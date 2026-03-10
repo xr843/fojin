@@ -1,0 +1,48 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  secrets-scan:
+    name: Check for leaked secrets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan for hardcoded secrets
+        run: |
+          echo "Scanning for potential secret patterns..."
+          FOUND=0
+
+          # Real API key patterns (high-confidence)
+          if git grep -inE 'sk-[a-zA-Z0-9]{20,}' -- ':(exclude)*.example' ':(exclude)*.md' ':(exclude)*.yml' ':(exclude)*.yaml' ':(exclude)node_modules'; then
+            echo "::error::Possible API key found in source code"
+            FOUND=1
+          fi
+
+          if git grep -inE 'ghp_[a-zA-Z0-9]{30,}' -- ':(exclude)*.example' ':(exclude)*.md'; then
+            echo "::error::GitHub token found in source code"
+            FOUND=1
+          fi
+
+          if git grep -inE 'apify_api_[a-zA-Z0-9]{20,}' -- ':(exclude)*.example' ':(exclude)*.md'; then
+            echo "::error::Apify token found in source code"
+            FOUND=1
+          fi
+
+          # Check for .env files committed
+          if git ls-files | grep -E '^\.env$|/\.env$' | grep -v '.example'; then
+            echo "::error::.env file committed to repository"
+            FOUND=1
+          fi
+
+          if [ $FOUND -eq 1 ]; then
+            exit 1
+          fi
+          echo "No secrets found."

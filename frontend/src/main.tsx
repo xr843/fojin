@@ -8,8 +8,9 @@ import "./styles/global.css";
 
 // Dify AI 助手：从环境变量注入配置并加载 embed 脚本
 (() => {
-  const token = import.meta.env.VITE_DIFY_APP_TOKEN || "DJaEyWyEt2IBG9qn";
-  const baseUrl = import.meta.env.VITE_DIFY_BASE_URL || "http://192.168.110.12:8080";
+  const token = import.meta.env.VITE_DIFY_APP_TOKEN;
+  const baseUrl = import.meta.env.VITE_DIFY_BASE_URL;
+  if (!token || !baseUrl) return; // Dify not configured — skip silently
   (window as any).difyChatbotConfig = { token, baseUrl };
   const s = document.createElement("script");
   s.src = `${baseUrl}/embed.min.js`;

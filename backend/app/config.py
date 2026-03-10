@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_JWT_SECRET = "fojin-jwt-secret-change-in-production"
+_DEFAULT_JWT_SECRET = "dev-only-insecure-default-replace-in-production"
 
 
 class Settings(BaseSettings):
@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     postgres_port: int = 5432
     postgres_db: str = "fojin"
     postgres_user: str = "fojin"
-    postgres_password: str = "fojin_secret"
+    postgres_password: str = ""
 
     # Elasticsearch
     es_host: str = "http://localhost:9200"

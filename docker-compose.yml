@@ -15,7 +15,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-fojin}
       POSTGRES_USER: ${POSTGRES_USER:-fojin}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fojin_secret}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -80,7 +80,7 @@ services:
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-fojin}
       POSTGRES_USER: ${POSTGRES_USER:-fojin}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fojin_secret}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       ES_HOST: http://elasticsearch:9200
       REDIS_HOST: redis
       REDIS_PORT: 6379
