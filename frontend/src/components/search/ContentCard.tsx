@@ -18,6 +18,11 @@ export default function ContentCard({ hit, rank }: { hit: ContentSearchHit; rank
         <div className="s-card-tags">
           <Tag style={{ fontSize: 11 }}>{hit.cbeta_id}</Tag>
           {hit.translator && <Tag style={{ fontSize: 11 }}>{hit.dynasty ? `[${hit.dynasty}] ` : ""}{hit.translator}</Tag>}
+          {hit.lang && hit.lang !== "lzh" && (
+            <Tag color="blue" style={{ fontSize: 11 }}>
+              {{ pi: "巴利文", en: "英文", bo: "藏文", sa: "梵文" }[hit.lang] || hit.lang}
+            </Tag>
+          )}
           <Tag color="orange" style={{ fontSize: 11 }}>{hit.matched_juan_count} 卷匹配</Tag>
         </div>
         {/* 最佳匹配卷 */}

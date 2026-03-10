@@ -38,7 +38,7 @@ CBETA_XML_REPO = "https://github.com/cbeta-org/xml-p5.git"
 
 # All CBETA collection prefixes
 ALL_COLLECTIONS = ["T", "X", "A", "K", "S", "F", "C", "D", "U", "P", "J", "L", "G", "M", "N", "B", "GA", "GB",
-                   "ZS", "I", "ZW"]
+                   "ZS", "I", "ZW", "Y", "TX", "LC"]
 
 CHECKPOINT_FILE = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),

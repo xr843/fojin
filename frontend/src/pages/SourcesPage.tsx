@@ -1,13 +1,14 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
-import { Input, Select, Tag, Empty, Spin } from "antd";
+import { Input, Select, Tag, Empty, Spin, Form, Button, message } from "antd";
 import {
   SearchOutlined, LinkOutlined, GlobalOutlined,
   DatabaseOutlined, BookOutlined, ApiOutlined,
-  FileImageOutlined, ReadOutlined,
+  FileImageOutlined, ReadOutlined, SendOutlined,
+  VerticalAlignTopOutlined,
 } from "@ant-design/icons";
-import { getSources, type DataSource } from "../api/client";
+import { getSources, submitSourceSuggestion, type DataSource } from "../api/client";
 import {
   buildSearchUrlWithFallback,
   getLangName,
@@ -50,6 +51,13 @@ export default function SourcesPage() {
   const [catFilter, setCatFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("default");
+  const [showTop, setShowTop] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setShowTop(window.scrollY > 400);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   const { data: sources, isLoading } = useQuery({
     queryKey: ["sources"],
@@ -409,6 +417,103 @@ export default function SourcesPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {/* 推荐数据源 */}
+      <SuggestSourceSection />
+
+      {showTop && (
+        <button
+          className="sources-back-top"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          aria-label="回到顶部"
+        >
+          <VerticalAlignTopOutlined />
+          <span>Top</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
+function SuggestSourceSection() {
+  const [form] = Form.useForm();
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = async (values: { name: string; url: string; description?: string }) => {
+    setSubmitting(true);
+    try {
+      await submitSourceSuggestion(values);
+      setSubmitted(true);
+      form.resetFields();
+    } catch {
+      message.error("提交失败，请稍后再试");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="sources-suggest">
+      <div className="sources-suggest-header">
+        <h2 className="sources-suggest-title">推荐数据源</h2>
+        <p className="sources-suggest-desc">
+          如果您知道尚未收录的佛教数字资源网站，欢迎推荐给我们
+        </p>
+      </div>
+      {submitted ? (
+        <div className="sources-suggest-success">
+          感谢您的推荐！我们会尽快查阅。
+        </div>
+      ) : (
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleSubmit}
+          className="sources-suggest-form"
+        >
+          <div className="sources-suggest-row">
+            <Form.Item
+              name="name"
+              label="网站名称"
+              rules={[{ required: true, message: "请输入网站名称" }]}
+              style={{ flex: 1 }}
+            >
+              <Input placeholder="例：CBETA 在线阅读" />
+            </Form.Item>
+            <Form.Item
+              name="url"
+              label="网站 URL"
+              rules={[
+                { required: true, message: "请输入网站地址" },
+                { type: "url", message: "请输入有效的网址" },
+              ]}
+              style={{ flex: 1 }}
+            >
+              <Input placeholder="https://..." />
+            </Form.Item>
+          </div>
+          <Form.Item name="description" label="简要说明">
+            <Input.TextArea
+              rows={3}
+              placeholder="简要描述该网站收录的内容、语种、特色等（选填）"
+              maxLength={2000}
+              showCount
+            />
+          </Form.Item>
+          <Form.Item style={{ marginBottom: 0 }}>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={submitting}
+              icon={<SendOutlined />}
+              className="sources-suggest-btn"
+            >
+              提交推荐
+            </Button>
+          </Form.Item>
+        </Form>
       )}
     </div>
   );

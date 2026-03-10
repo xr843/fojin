@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@200;300;400;600;700;900&family=ZCOOL+XiaoWei&display=swap');
+@import './fonts.css';
 
 :root {
   --fj-bg:        #f8f5ef;
@@ -57,6 +57,15 @@ em {
 @media (max-width: 768px) {
   .nav-desktop { display: none !important; }
   .nav-mobile-trigger { display: inline-flex !important; }
+}
+
+/* ========== Dify Chatbot Bubble ========== */
+#dify-chatbot-bubble-button {
+  background-color: #8b2500 !important;
+}
+#dify-chatbot-bubble-window {
+  width: 400px !important;
+  height: 600px !important;
 }
 
 /* ========== Reduced Motion ========== */

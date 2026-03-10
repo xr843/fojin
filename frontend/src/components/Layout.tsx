@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Layout as AntLayout, Typography, Button, Dropdown, Space, Drawer, Modal } from "antd";
+import { useState, useEffect } from "react";
+import { Layout as AntLayout, Typography, Button, Dropdown, Space, Drawer, Modal, Badge } from "antd";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import {
   UserOutlined,
@@ -8,10 +8,14 @@ import {
   LoginOutlined,
   ApartmentOutlined,
   DatabaseOutlined,
+  BookOutlined,
   CloudOutlined,
   MenuOutlined,
+  SettingOutlined,
+  RobotOutlined,
 } from "@ant-design/icons";
 import { useAuthStore } from "../stores/authStore";
+import { getPendingSuggestionCount } from "../api/client";
 
 const { Header, Content, Footer } = AntLayout;
 
@@ -42,10 +46,29 @@ export default function Layout() {
   const pageBg = "var(--fj-bg)";
   const headerBg = pageBg;
 
+  const [pendingCount, setPendingCount] = useState(0);
+  const isAdmin = user?.role === "admin";
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    getPendingSuggestionCount().then(setPendingCount).catch(() => {});
+  }, [isAdmin, location.pathname]);
+
   const navItems = [
     { icon: <DatabaseOutlined />, label: "数据源", path: "/sources" },
+    { icon: <BookOutlined />, label: "经典专题", path: "/collections" },
     { icon: <CloudOutlined />, label: "典津联检", path: "/dianjin" },
     { icon: <ApartmentOutlined />, label: "知识图谱", path: "/kg" },
+    { icon: <RobotOutlined />, label: "AI 问答", path: "/chat" },
+    ...(isAdmin
+      ? [
+          {
+            icon: <Badge count={pendingCount} size="small" offset={[4, -2]}><SettingOutlined /></Badge>,
+            label: "管理",
+            path: "/admin/suggestions",
+          },
+        ]
+      : []),
   ];
 
   return (

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useQuery } from "@tanstack/react-query";
@@ -23,6 +23,7 @@ import ResourceList from "../components/ResourceList";
 import BookmarkButton from "../components/BookmarkButton";
 import RelatedTexts from "../components/RelatedTexts";
 import CitationGenerator from "../components/CitationGenerator";
+import { addViewHistory } from "../utils/history";
 
 const { Title } = Typography;
 
@@ -48,6 +49,12 @@ export default function TextDetailPage() {
     queryFn: () => getTextIdentifiers(Number(id)),
     enabled: !!id,
   });
+
+  useEffect(() => {
+    if (text && id) {
+      addViewHistory(text.id, text.title_zh, `/texts/${id}`);
+    }
+  }, [text, id]);
 
   if (isLoading) {
     return (

@@ -137,6 +137,7 @@ export default function HomePage() {
           数据来源均为全球学术机构公开资源，定期同步，自动去重 ·{" "}
           <span className="home-trust-link" onClick={() => navigate("/sources")}>了解数据来源 →</span>
         </div>
+
       </section>
     </div>
   );

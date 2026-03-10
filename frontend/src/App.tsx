@@ -17,7 +17,9 @@ const KnowledgeGraphPage = lazy(() => import("./pages/KnowledgeGraphPage"));
 const ManuscriptViewerPage = lazy(() => import("./pages/ManuscriptViewerPage"));
 const ChatPage = lazy(() => import("./pages/ChatPage"));
 const ExportsPage = lazy(() => import("./pages/ExportsPage"));
+const CollectionsPage = lazy(() => import("./pages/CollectionsPage"));
 const DianjinBrowserPage = lazy(() => import("./pages/DianjinBrowserPage"));
+const AdminSuggestionsPage = lazy(() => import("./pages/AdminSuggestionsPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 
 function Loading() {
@@ -39,10 +41,14 @@ function App() {
             <Route path="/search" element={<SearchPage />} />
             <Route path="/texts/:id" element={<TextDetailPage />} />
             <Route path="/sources" element={<SourcesPage />} />
+            <Route path="/collections" element={<CollectionsPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route element={<ProtectedRoute />}>
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/chat" element={<RouteErrorBoundary><ChatPage /></RouteErrorBoundary>} />
+            </Route>
+            <Route element={<ProtectedRoute requiredRole="admin" />}>
+              <Route path="/admin/suggestions" element={<AdminSuggestionsPage />} />
             </Route>
             <Route path="/parallel/:textId" element={<ParallelReaderPage />} />
             <Route path="/kg" element={<RouteErrorBoundary><KnowledgeGraphPage /></RouteErrorBoundary>} />

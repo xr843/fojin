@@ -296,6 +296,100 @@
   line-height: 1.8;
 }
 
+/* ---------- 推荐数据源 ---------- */
+.sources-suggest {
+  margin-top: 40px;
+  padding: 28px 32px;
+  background: var(--fj-bg-alt);
+  border: 1px solid var(--fj-border);
+  border-radius: 8px;
+}
+
+.sources-suggest-header {
+  margin-bottom: 20px;
+}
+
+.sources-suggest-title {
+  font-family: "Noto Serif SC", serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--fj-ink);
+  margin: 0 0 6px;
+  letter-spacing: 2px;
+}
+
+.sources-suggest-desc {
+  font-size: 13px;
+  color: var(--fj-ink-muted);
+  margin: 0;
+}
+
+.sources-suggest-row {
+  display: flex;
+  gap: 16px;
+}
+
+.sources-suggest-form .ant-form-item-label > label {
+  font-family: "Noto Serif SC", serif;
+  font-size: 13px;
+  color: var(--fj-ink-light);
+}
+
+.sources-suggest-btn {
+  background: var(--fj-accent);
+  border-color: var(--fj-accent);
+  font-family: "Noto Serif SC", serif;
+  letter-spacing: 1px;
+}
+
+.sources-suggest-btn:hover {
+  background: #a03000 !important;
+  border-color: #a03000 !important;
+}
+
+.sources-suggest-success {
+  font-family: "Noto Serif SC", serif;
+  font-size: 15px;
+  color: var(--fj-accent);
+  text-align: center;
+  padding: 24px 0;
+  letter-spacing: 1px;
+}
+
+/* ---------- 回到顶部 ---------- */
+.sources-back-top {
+  position: fixed;
+  right: 32px;
+  bottom: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 48px;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid var(--fj-border);
+  border-radius: 8px;
+  color: var(--fj-ink-light);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s;
+  z-index: 100;
+}
+
+.sources-back-top:hover {
+  color: var(--fj-accent);
+  border-color: var(--fj-gold);
+  box-shadow: 0 2px 12px rgba(176, 141, 87, 0.15);
+}
+
+.sources-back-top .anticon {
+  font-size: 16px;
+}
+
 /* ---------- 响应式 ---------- */
 @media (max-width: 768px) {
   .sources-toolbar {
@@ -317,5 +411,14 @@
 
   .sources-trust-items {
     grid-template-columns: 1fr;
+  }
+
+  .sources-suggest {
+    padding: 20px 16px;
+  }
+
+  .sources-suggest-row {
+    flex-direction: column;
+    gap: 0;
   }
 }

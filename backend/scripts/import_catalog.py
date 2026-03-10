@@ -34,8 +34,36 @@ ALT_WORK_INFO_URL = f"{DILA_BASE}/work-info/work-info.json"
 CBETA_ORG_URL = "https://raw.githubusercontent.com/cbeta-org/cbeta-metadata/master/catalog/catalog.json"
 
 
+LOCAL_WORK_INFO = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "cbeta_all_works.json")
+
+
+def _parse_dict_format(data: dict) -> list[dict]:
+    entries = []
+    for work_id, info in data.items():
+        entry = {"work": work_id}
+        entry["title"] = info.get("title", info.get("title_zh", ""))
+        entry["byline"] = info.get("byline", "")
+        entry["juan"] = info.get("juan", info.get("fascicle_count"))
+        entry["category"] = info.get("category", "")
+        entries.append(entry)
+    return entries
+
+
 async def fetch_work_info() -> list[dict]:
-    """Fetch work info from DILA-edu or cbeta-org metadata repos."""
+    """Fetch work info from local file or DILA-edu/cbeta-org metadata repos."""
+    # Try local file first
+    if os.path.exists(LOCAL_WORK_INFO):
+        print(f"  Loading from local file: {LOCAL_WORK_INFO}")
+        with open(LOCAL_WORK_INFO) as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            entries = _parse_dict_format(data)
+            print(f"  Loaded {len(entries)} entries from local file")
+            return entries
+        elif isinstance(data, list):
+            print(f"  Loaded {len(data)} entries from local file")
+            return data
+
     async with httpx.AsyncClient(timeout=120.0, follow_redirects=True) as client:
         for url in [WORK_INFO_URL, ALT_WORK_INFO_URL, CBETA_ORG_URL]:
             try:
@@ -44,15 +72,7 @@ async def fetch_work_info() -> list[dict]:
                 if resp.status_code == 200:
                     data = resp.json()
                     if isinstance(data, dict):
-                        # DILA format: { "T0001": {...}, "T0002": {...}, ... }
-                        entries = []
-                        for work_id, info in data.items():
-                            entry = {"work": work_id}
-                            entry["title"] = info.get("title", info.get("title_zh", ""))
-                            entry["byline"] = info.get("byline", "")
-                            entry["juan"] = info.get("juan", info.get("fascicle_count"))
-                            entry["category"] = info.get("category", "")
-                            entries.append(entry)
+                        entries = _parse_dict_format(data)
                         print(f"  Fetched {len(entries)} entries (dict format)")
                         return entries
                     elif isinstance(data, list):
@@ -62,7 +82,6 @@ async def fetch_work_info() -> list[dict]:
                 print(f"  Failed: {e}")
 
     print("  All remote sources failed. Using built-in sample data.")
-    # Import the fallback from the existing script
     from import_cbeta import generate_sample_catalog
     return generate_sample_catalog()
 

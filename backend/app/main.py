@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 from app.api import auth, bookmarks, history, search, texts
 from app.api import sources, relations, knowledge_graph, iiif
 from app.api import chat, annotations, exports, dictionary, citations
-from app.api import dianjin
+from app.api import dianjin, source_suggestions
 
 
 @asynccontextmanager
@@ -106,6 +106,9 @@ app.include_router(exports.router, prefix="/api")
 
 # Dianjin (典津) cross-platform search
 app.include_router(dianjin.router, prefix="/api")
+
+# Source suggestions (public)
+app.include_router(source_suggestions.router, prefix="/api")
 
 
 @app.get("/api/health")

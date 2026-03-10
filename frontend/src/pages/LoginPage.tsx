@@ -42,7 +42,9 @@ export default function LoginPage() {
       message.success("注册成功，请登录");
       setActiveTab("login");
     } catch (err: any) {
-      message.error(err.response?.data?.detail || "注册失败");
+      const detail = err.response?.data?.detail;
+      const msg = Array.isArray(detail) ? detail.map((d: any) => d.msg).join("; ") : detail || "注册失败";
+      message.error(msg);
     } finally {
       setLoading(false);
     }
@@ -103,8 +105,16 @@ export default function LoginPage() {
                   >
                     <Input prefix={<MailOutlined />} placeholder="邮箱" size="large" />
                   </Form.Item>
-                  <Form.Item name="password" rules={[{ required: true, min: 6, message: "密码至少6位" }]}>
-                    <Input.Password prefix={<LockOutlined />} placeholder="密码" size="large" />
+                  <Form.Item
+                    name="password"
+                    rules={[
+                      { required: true, message: "请输入密码" },
+                      { min: 8, message: "密码至少8位" },
+                      { pattern: /[a-zA-Z]/, message: "密码必须包含字母" },
+                      { pattern: /\d/, message: "密码必须包含数字" },
+                    ]}
+                  >
+                    <Input.Password prefix={<LockOutlined />} placeholder="密码（至少8位，含字母和数字）" size="large" />
                   </Form.Item>
                   <Form.Item name="display_name">
                     <Input prefix={<UserOutlined />} placeholder="显示名称（选填）" size="large" />

@@ -84,3 +84,16 @@ class SourceDistribution(Base):
     )
 
     source: Mapped["DataSource"] = relationship(back_populates="distributions")
+
+
+class SourceSuggestion(Base):
+    __tablename__ = "source_suggestions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    url: Mapped[str] = mapped_column(String(500), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), server_default="pending")  # pending/reviewed/accepted/rejected
+    submitted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

@@ -1,9 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Input, Select, Tag, Empty, Spin, Badge } from "antd";
 import {
   SearchOutlined, LinkOutlined, BookOutlined,
-  CheckCircleOutlined, CloseCircleOutlined, DatabaseOutlined,
+  CheckCircleOutlined, CloseCircleOutlined, DatabaseOutlined, VerticalAlignTopOutlined,
 } from "@ant-design/icons";
 import {
   getDianjinHealth,
@@ -28,6 +28,13 @@ export default function DianjinBrowserPage() {
   const [search, setSearch] = useState("");
   const [regionFilter, setRegionFilter] = useState("all");
   const [tagFilter, setTagFilter] = useState("all");
+  const [showTop, setShowTop] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setShowTop(window.scrollY > 400);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   const { data: health } = useQuery<DianjinHealthStatus>({
     queryKey: ["dianjinHealth"],
@@ -266,6 +273,16 @@ export default function DianjinBrowserPage() {
             </div>
           ))}
         </div>
+      )}
+      {showTop && (
+        <button
+          className="sources-back-top"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          aria-label="回到顶部"
+        >
+          <VerticalAlignTopOutlined />
+          <span>Top</span>
+        </button>
       )}
     </div>
   );

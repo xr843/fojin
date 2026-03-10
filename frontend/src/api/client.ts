@@ -48,6 +48,7 @@ export interface SearchHit {
   cbeta_url: string | null;
   has_content: boolean;
   source_code: string | null;
+  lang: string | null;
   score: number | null;
   highlight: Record<string, string[]> | null;
 }
@@ -115,6 +116,8 @@ export interface ContentSearchHit {
   translator: string | null;
   dynasty: string | null;
   juan_num: number;
+  lang: string;
+  source_code: string | null;
   highlight: string[];
   score: number;
   matched_juan_count: number;
@@ -321,6 +324,7 @@ export async function searchTexts(params: {
   category?: string;
   sources?: string;
   sort?: string;
+  lang?: string;
 }): Promise<SearchResponse> {
   const { data } = await api.get<SearchResponse>("/search", { params });
   return data;
@@ -358,6 +362,7 @@ export async function searchContent(params: {
   page?: number;
   size?: number;
   sources?: string;
+  lang?: string;
 }): Promise<ContentSearchResponse> {
   const { data } = await api.get<ContentSearchResponse>("/search/content", { params });
   return data;
@@ -494,6 +499,54 @@ export async function searchDictionary(params: {
 export async function getTextManifests(textId: number): Promise<IIIFManifestInfo[]> {
   const { data } = await api.get<IIIFManifestInfo[]>(`/iiif/texts/${textId}/manifests`);
   return data;
+}
+
+// Source Suggestions
+export async function submitSourceSuggestion(payload: {
+  name: string;
+  url: string;
+  description?: string;
+}): Promise<{ id: number; name: string; url: string; status: string }> {
+  const { data } = await api.post("/source-suggestions", payload);
+  return data;
+}
+
+// Admin: Source Suggestions Management
+export interface SourceSuggestionItem {
+  id: number;
+  name: string;
+  url: string;
+  description: string | null;
+  status: string;
+  submitted_at: string | null;
+}
+
+export async function getSourceSuggestions(
+  page: number = 1,
+  size: number = 20,
+  status?: string,
+): Promise<PaginatedResponse<SourceSuggestionItem>> {
+  const { data } = await api.get<PaginatedResponse<SourceSuggestionItem>>(
+    "/source-suggestions",
+    { params: { page, size, status: status || undefined } },
+  );
+  return data;
+}
+
+export async function updateSuggestionStatus(
+  id: number,
+  status: string,
+): Promise<SourceSuggestionItem> {
+  const { data } = await api.patch<SourceSuggestionItem>(
+    `/source-suggestions/${id}`,
+    { status },
+  );
+  return data;
+}
+
+export async function getPendingSuggestionCount(): Promise<number> {
+  const { data } = await api.get<{ count: number }>("/source-suggestions/pending-count");
+  return data.count;
 }
 
 export default api;

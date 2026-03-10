@@ -121,6 +121,7 @@ async def search_content(
     page: int = 1,
     size: int = 20,
     sources: str | None = None,
+    lang: str | None = None,
 ) -> dict:
     """Search full-text content in Elasticsearch."""
     if not query:
@@ -135,17 +136,22 @@ async def search_content(
         }
     }
 
-    # Wrap in bool query if sources filter is present
+    # Wrap in bool query if sources or lang filter is present
+    filter_clauses = []
     if sources:
         codes = [c.strip() for c in sources.split(",") if c.strip()]
         if codes:
-            source_filter = {"term": {"source_code": codes[0]}} if len(codes) == 1 else {"terms": {"source_code": codes}}
-            content_query = {
-                "bool": {
-                    "must": [content_query],
-                    "filter": [source_filter],
-                }
+            filter_clauses.append({"term": {"source_code": codes[0]}} if len(codes) == 1 else {"terms": {"source_code": codes}})
+    if lang:
+        filter_clauses.append({"term": {"lang": lang}})
+
+    if filter_clauses:
+        content_query = {
+            "bool": {
+                "must": [content_query],
+                "filter": filter_clauses,
             }
+        }
 
     highlight_cfg = {
         "fields": {
@@ -210,6 +216,8 @@ async def search_content(
             "translator": src.get("translator"),
             "dynasty": src.get("dynasty"),
             "juan_num": src.get("juan_num", 1),
+            "lang": src.get("lang", "lzh"),
+            "source_code": src.get("source_code"),
             "highlight": hit.get("highlight", {}).get("content", []),
             "score": hit["_score"],
             "matched_juan_count": inner_total,

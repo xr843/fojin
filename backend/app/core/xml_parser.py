@@ -178,33 +178,24 @@ def resolve_xml_path(cbeta_id: str, xml_base_dir: str) -> Path | None:
     e.g.:
         xml-p5/T/T01/T01n0001.xml  (for T0001)
         xml-p5/X/X01/X01n0001.xml  (for X0001)
+        xml-p5/J/J01/J01nA042.xml  (for JA042)
 
     Some works span multiple files:
         T01n0001_001.xml, T01n0001_002.xml, ...
     """
     base = Path(xml_base_dir)
 
-    # Extract collection letter and numeric part
-    match = re.match(r"^([A-Z]+)(\d+)([a-z]?)$", cbeta_id)
-    if not match:
+    parsed = _parse_cbeta_id(cbeta_id)
+    if not parsed:
         return None
 
-    collection = match.group(1)
-    num_str = match.group(2)
-    suffix = match.group(3)
+    collection, padded_id, suffix = parsed
 
-    # Determine volume number from the work number
-    num = int(num_str)
-
-    # Search for the file in the collection directory
     collection_dir = base / collection
     if not collection_dir.exists():
         return None
 
-    # Try to find matching XML files
-    # Pattern: {Vol}n{Num}.xml or {Vol}n{Num}_001.xml
-    padded_num = num_str.zfill(4)
-    pattern = f"*n{padded_num}{suffix}.xml"
+    pattern = f"*n{padded_id}{suffix}.xml"
 
     for vol_dir in sorted(collection_dir.iterdir()):
         if not vol_dir.is_dir():
@@ -213,11 +204,33 @@ def resolve_xml_path(cbeta_id: str, xml_base_dir: str) -> Path | None:
         if matches:
             return matches[0]
 
-        # Also try multi-file pattern
-        multi_pattern = f"*n{padded_num}{suffix}_*.xml"
+        multi_pattern = f"*n{padded_id}{suffix}_*.xml"
         multi_matches = sorted(vol_dir.glob(multi_pattern))
         if multi_matches:
-            return multi_matches[0]  # Return first file; caller handles multi-file
+            return multi_matches[0]
+
+    return None
+
+
+def _parse_cbeta_id(cbeta_id: str) -> tuple[str, str, str] | None:
+    """
+    Parse a CBETA work ID into (collection_dir, file_id_part, suffix).
+
+    Standard: T0001 → ('T', '0001', '')
+    J series: JA042 → ('J', 'A042', ''), JB127 → ('J', 'B127', '')
+    """
+    # J collection special case: JA042, JB127 → dir=J, id_part=A042, B127
+    m = re.match(r"^J([AB])(\d+)([a-z]?)$", cbeta_id)
+    if m:
+        sub = m.group(1)  # A or B
+        num_str = m.group(2).zfill(3)
+        suffix = m.group(3)
+        return ("J", f"{sub}{num_str}", suffix)
+
+    # Standard: T0001, X0001, etc.
+    m = re.match(r"^([A-Z]+)(\d+)([a-z]?)$", cbeta_id)
+    if m:
+        return (m.group(1), m.group(2).zfill(4), m.group(3))
 
     return None
 
@@ -226,14 +239,11 @@ def find_all_xml_files(cbeta_id: str, xml_base_dir: str) -> list[Path]:
     """Find all XML files for a work (handles multi-file works)."""
     base = Path(xml_base_dir)
 
-    match = re.match(r"^([A-Z]+)(\d+)([a-z]?)$", cbeta_id)
-    if not match:
+    parsed = _parse_cbeta_id(cbeta_id)
+    if not parsed:
         return []
 
-    collection = match.group(1)
-    num_str = match.group(2)
-    suffix = match.group(3)
-    padded_num = num_str.zfill(4)
+    collection, padded_id, suffix = parsed
 
     collection_dir = base / collection
     if not collection_dir.exists():
@@ -245,11 +255,11 @@ def find_all_xml_files(cbeta_id: str, xml_base_dir: str) -> list[Path]:
             continue
 
         # Single file
-        pattern = f"*n{padded_num}{suffix}.xml"
+        pattern = f"*n{padded_id}{suffix}.xml"
         all_files.extend(vol_dir.glob(pattern))
 
         # Multi-file
-        multi_pattern = f"*n{padded_num}{suffix}_*.xml"
+        multi_pattern = f"*n{padded_id}{suffix}_*.xml"
         all_files.extend(vol_dir.glob(multi_pattern))
 
     return sorted(set(all_files))

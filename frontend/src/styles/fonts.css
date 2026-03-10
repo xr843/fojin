@@ -1,0 +1,19 @@
+/* Local font definitions (offline-friendly) */
+
+@import url('/fonts/noto-serif-sc.css');
+
+@font-face {
+  font-family: 'Ma Shan Zheng';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/MaShanZheng-Regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'ZCOOL XiaoWei';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/ZCOOLXiaoWei-Regular.woff2') format('woff2');
+}

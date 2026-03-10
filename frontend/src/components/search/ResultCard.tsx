@@ -23,6 +23,11 @@ export default function ResultCard({ hit, rank }: { hit: SearchHit; rank: number
           )}
           <Tag style={{ fontSize: 11 }}>{hit.has_content ? "本地全文" : "目录数据"}</Tag>
           {hit.category && <Tag style={{ fontSize: 11 }}>{hit.category}</Tag>}
+          {hit.lang && hit.lang !== "lzh" && (
+            <Tag color="blue" style={{ fontSize: 11 }}>
+              {{ pi: "巴利文", en: "英文", bo: "藏文", sa: "梵文" }[hit.lang] || hit.lang}
+            </Tag>
+          )}
         </div>
         <div className="s-card-meta">
           {hit.translator && (

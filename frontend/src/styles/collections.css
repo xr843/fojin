@@ -1,0 +1,259 @@
+/* 经典专题页面样式 */
+
+.coll-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.coll-card {
+  background: #fff;
+  border: 1px solid rgba(217, 208, 193, 0.5);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: box-shadow 0.2s;
+}
+
+.coll-card:hover {
+  box-shadow: 0 2px 12px rgba(139, 37, 0, 0.08);
+}
+
+.coll-card-header {
+  padding: 20px 24px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.coll-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.coll-card-icon {
+  font-size: 20px;
+  color: var(--fj-accent, #8b2500);
+}
+
+.coll-card-name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--fj-ink, #2c2417);
+  font-family: "Noto Serif SC", serif;
+}
+
+.coll-card-count {
+  font-size: 12px;
+  color: var(--fj-ink-muted, #9a8e7a);
+  margin-left: auto;
+}
+
+.coll-card-desc {
+  margin: 8px 0 4px;
+  font-size: 13px;
+  color: var(--fj-ink-muted, #9a8e7a);
+  line-height: 1.6;
+}
+
+.coll-card-toggle {
+  display: inline-block;
+  font-size: 12px;
+  color: var(--fj-accent, #8b2500);
+  margin-top: 4px;
+}
+
+.coll-card-body {
+  border-top: 1px solid rgba(217, 208, 193, 0.4);
+  padding: 16px 24px 20px;
+}
+
+.coll-section {
+  margin-bottom: 16px;
+}
+
+.coll-section:last-of-type {
+  margin-bottom: 12px;
+}
+
+.coll-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fj-ink, #2c2417);
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed rgba(217, 208, 193, 0.5);
+  font-family: "Noto Serif SC", serif;
+}
+
+.coll-section-title .anticon {
+  margin-right: 6px;
+  color: var(--fj-accent, #8b2500);
+}
+
+.coll-text-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.coll-text-item {
+  padding: 8px 12px;
+  background: rgba(245, 241, 235, 0.5);
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.coll-text-item:hover {
+  background: rgba(245, 241, 235, 0.9);
+}
+
+.coll-text-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.coll-text-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fj-ink, #2c2417);
+}
+
+.coll-text-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--fj-ink-muted, #9a8e7a);
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+
+.coll-text-note {
+  color: #b08d57;
+  font-style: italic;
+}
+
+/* 资源分类 Tab */
+.coll-res-section {
+  margin-top: 8px;
+}
+
+.coll-res-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(217, 208, 193, 0.4);
+  padding-bottom: 0;
+}
+
+.coll-res-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--fj-ink-muted, #9a8e7a);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: "Noto Serif SC", serif;
+  margin-bottom: -1px;
+}
+
+.coll-res-tab:hover {
+  color: var(--fj-ink, #2c2417);
+}
+
+.coll-res-tab.active {
+  color: var(--fj-accent, #8b2500);
+  border-bottom-color: var(--fj-accent, #8b2500);
+  font-weight: 500;
+}
+
+.coll-res-tab .anticon {
+  font-size: 13px;
+}
+
+.coll-res-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  font-size: 10px;
+  background: rgba(217, 208, 193, 0.4);
+  border-radius: 8px;
+  padding: 0 4px;
+}
+
+.coll-res-tab.active .coll-res-tab-count {
+  background: rgba(139, 37, 0, 0.12);
+  color: var(--fj-accent, #8b2500);
+}
+
+.coll-res-content {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 8px;
+}
+
+.coll-link-item {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 14px;
+  background: rgba(245, 241, 235, 0.5);
+  border: 1px solid rgba(217, 208, 193, 0.4);
+  border-radius: 6px;
+  text-decoration: none;
+  transition: all 0.15s;
+}
+
+.coll-link-item:hover {
+  background: rgba(245, 241, 235, 0.9);
+  border-color: var(--fj-accent, #8b2500);
+}
+
+.coll-link-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fj-accent, #8b2500);
+}
+
+.coll-link-desc {
+  font-size: 11px;
+  color: var(--fj-ink-muted, #9a8e7a);
+  margin-top: 3px;
+  line-height: 1.4;
+}
+
+.coll-card-actions {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(217, 208, 193, 0.3);
+}
+
+/* 响应式 */
+@media (max-width: 640px) {
+  .coll-card-header {
+    padding: 16px;
+  }
+  .coll-card-body {
+    padding: 12px 16px 16px;
+  }
+  .coll-card-name {
+    font-size: 16px;
+  }
+  .coll-card-count {
+    margin-left: 0;
+  }
+  .coll-res-content {
+    grid-template-columns: 1fr;
+  }
+}

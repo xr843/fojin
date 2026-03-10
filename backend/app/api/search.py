@@ -35,10 +35,11 @@ async def content_search(
     page: int = Query(1, ge=1, description="页码"),
     size: int = Query(20, ge=1, le=100, description="每页数量"),
     sources: str | None = Query(None, description="数据源筛选，逗号分隔"),
+    lang: str | None = Query(None, description="语言筛选 (lzh/pi/en)"),
 ):
     """全文内容搜索。搜索经文正文并高亮显示。"""
     es = get_es()
-    return await search_content(es, q, page, size, sources)
+    return await search_content(es, q, page, size, sources, lang)
 
 
 @router.get("/filters")

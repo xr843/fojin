@@ -24,10 +24,6 @@
     <meta name="twitter:description" content="聚合全球 40+ 佛教数字资源，提供平行阅读、知识图谱、AI 问答等功能。" />
     <meta name="twitter:image" content="https://fojin.app/landscape-bg.png" />
 
-    <!-- Font preload -->
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;600;700&display=swap" as="style" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;600;700&display=swap" />
-
     <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
     <title>佛津 FoJin — 全球佛教古籍数字资源聚合平台</title>
@@ -103,5 +99,14 @@
       </div>
     </noscript>
     <script type="module" src="/src/main.tsx"></script>
+
+    <!-- Dify AI 助手浮动气泡 -->
+    <script>
+      window.difyChatbotConfig = {
+        token: 'DJaEyWyEt2IBG9qn',
+        baseUrl: 'http://192.168.110.12:8080'
+      }
+    </script>
+    <script src="http://192.168.110.12:8080/embed.min.js" async></script>
   </body>
 </html>

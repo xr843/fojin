@@ -102,7 +102,7 @@ export default defineConfig({
       registerType: "autoUpdate",
       manifest: false, // We provide our own manifest.json in public/
       workbox: {
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
         runtimeCaching: [
           {
             urlPattern: /^\/api\//,

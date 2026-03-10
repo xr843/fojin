@@ -6,6 +6,7 @@ export interface UserProfile {
   username: string;
   email: string;
   display_name: string | null;
+  role: string;
   is_active: boolean;
   created_at: string;
 }

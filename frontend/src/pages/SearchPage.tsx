@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useQuery } from "@tanstack/react-query";
@@ -6,14 +6,16 @@ import {
   Pagination, Spin, Empty, Checkbox, Input, Tag, Button, Tabs, Result, Select, Typography,
 } from "antd";
 import {
-  SearchOutlined, CloudOutlined, BookOutlined,
+  SearchOutlined, CloudOutlined, BookOutlined, VerticalAlignTopOutlined,
 } from "@ant-design/icons";
 import { Alert } from "antd";
 import { searchTexts, searchContent, searchDictionary, getSources, type SearchHit } from "../api/client";
 import { federatedSearch } from "../api/dianjin";
 import { hasDirectSearchUrl } from "../utils/sourceUrls";
+import { addSearchHistory, getSearchHistory, type SearchHistoryItem } from "../utils/history";
 import { ResultCard, ExternalCard, DianjinCard, DictCard, ContentCard } from "../components/search";
 import "../styles/search.css";
+import "../styles/sources.css";
 
 export default function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -26,28 +28,28 @@ export default function SearchPage() {
   const [page, setPage] = useState(1);
 
   // Search history
-  const HISTORY_KEY = "fojin-search-history";
-  const getSearchHistory = (): string[] => {
-    try {
-      return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
-    } catch { return []; }
-  };
-  const [searchHistory, setSearchHistory] = useState<string[]>(getSearchHistory);
+  const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>(getSearchHistory);
 
   const saveSearchHistory = (q: string) => {
-    if (!q.trim()) return;
-    const history = [q, ...getSearchHistory().filter((h) => h !== q)].slice(0, 10);
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
-    setSearchHistory(history);
+    addSearchHistory(q, tab);
+    setSearchHistory(getSearchHistory());
   };
 
+  const langFilter = searchParams.get("lang") || "";
   const dictLang = searchParams.get("dict_lang") || "";
   const [dictPage, setDictPage] = useState(1);
   const [dynasty] = useState<string>();
   const [category] = useState<string>();
+  const [showTop, setShowTop] = useState(false);
   const [regionFilter, setRegionFilter] = useState<Set<string>>(new Set());
   const [institutionFilter, setInstitutionFilter] = useState<Set<string>>(new Set());
   const sortBy = searchParams.get("sort") || "relevance";
+
+  useEffect(() => {
+    const onScroll = () => setShowTop(window.scrollY > 400);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   /** Update URL params (replaces current history entry) */
   const updateUrl = (overrides: Record<string, string>) => {
@@ -59,14 +61,14 @@ export default function SearchPage() {
   };
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["search", query, page, dynasty, category, selectedSources, sortBy],
-    queryFn: () => searchTexts({ q: query, page, size: 20, dynasty, category, sources: selectedSources || undefined, sort: sortBy !== "relevance" ? sortBy : undefined }),
+    queryKey: ["search", query, page, dynasty, category, selectedSources, sortBy, langFilter],
+    queryFn: () => searchTexts({ q: query, page, size: 20, dynasty, category, sources: selectedSources || undefined, sort: sortBy !== "relevance" ? sortBy : undefined, lang: langFilter || undefined }),
     enabled: query.length > 0 && tab === "catalog",
   });
 
   const { data: contentData, isLoading: contentLoading } = useQuery({
-    queryKey: ["searchContent", query, page, selectedSources],
-    queryFn: () => searchContent({ q: query, page, size: 20, sources: selectedSources || undefined }),
+    queryKey: ["searchContent", query, page, selectedSources, langFilter],
+    queryFn: () => searchContent({ q: query, page, size: 20, sources: selectedSources || undefined, lang: langFilter || undefined }),
     enabled: query.length > 0 && tab === "content",
   });
 
@@ -245,7 +247,7 @@ export default function SearchPage() {
               <Typography.Text type="secondary" style={{ fontSize: 13 }}>最近搜索：</Typography.Text>
               <div style={{ marginTop: 8, display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
                 {searchHistory.map((h) => (
-                  <Tag key={h} style={{ cursor: "pointer" }} onClick={() => handleSearch(h)}>{h}</Tag>
+                  <Tag key={h.query} style={{ cursor: "pointer" }} onClick={() => handleSearch(h.query)}>{h.query}</Tag>
                 ))}
               </div>
             </div>
@@ -301,20 +303,37 @@ export default function SearchPage() {
                   : <>本地找到 <strong>{localTotal.toLocaleString()}</strong> 条结果</>
                 }
               </span>
-              {tab === "catalog" && (
-                <Select
-                  size="small"
-                  value={sortBy}
-                  onChange={(v) => { setPage(1); updateUrl({ sort: v }); }}
-                  style={{ width: 120 }}
-                  options={[
-                    { value: "relevance", label: "相关度" },
-                    { value: "title", label: "按经名" },
-                    { value: "dynasty", label: "按朝代" },
-                  ]}
-                />
-              )}
-              {tab === "dictionary" && (
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                {(tab === "catalog" || tab === "content") && (
+                  <Select
+                    size="small"
+                    value={langFilter || "all"}
+                    onChange={(v) => { setPage(1); updateUrl({ lang: v === "all" ? "" : v }); }}
+                    style={{ width: 110 }}
+                    options={[
+                      { value: "all", label: "全部语种" },
+                      { value: "lzh", label: "汉文" },
+                      { value: "pi", label: "巴利文" },
+                      { value: "en", label: "英文" },
+                      { value: "bo", label: "藏文" },
+                      { value: "sa", label: "梵文" },
+                    ]}
+                  />
+                )}
+                {tab === "catalog" && (
+                  <Select
+                    size="small"
+                    value={sortBy}
+                    onChange={(v) => { setPage(1); updateUrl({ sort: v }); }}
+                    style={{ width: 120 }}
+                    options={[
+                      { value: "relevance", label: "相关度" },
+                      { value: "title", label: "按经名" },
+                      { value: "dynasty", label: "按朝代" },
+                    ]}
+                  />
+                )}
+                {tab === "dictionary" && (
                 <Select
                   size="small"
                   value={dictLang || "all"}
@@ -328,6 +347,7 @@ export default function SearchPage() {
                   ]}
                 />
               )}
+              </div>
             </div>
 
             {loading && <div style={{ textAlign: "center", padding: 60 }}><Spin size="large" /></div>}
@@ -417,6 +437,16 @@ export default function SearchPage() {
             )}
           </main>
         </div>
+      )}
+      {showTop && (
+        <button
+          className="sources-back-top"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          aria-label="回到顶部"
+        >
+          <VerticalAlignTopOutlined />
+          <span>Top</span>
+        </button>
       )}
     </div>
   );
