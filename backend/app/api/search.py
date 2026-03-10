@@ -5,10 +5,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.elasticsearch import get_es
 from app.database import get_db
-from app.schemas.dianjin import FederatedSearchResponse
 from app.schemas.text import SearchResponse
-from app.services.dianjin import get_dianjin_client
 from app.services.search import get_aggregations, search_content, search_texts
+
+try:
+    from app.schemas.dianjin import FederatedSearchResponse
+    from app.services.dianjin import get_dianjin_client
+    _HAS_DIANJIN = True
+except ImportError:
+    _HAS_DIANJIN = False
 
 router = APIRouter(tags=["search"])
 
@@ -68,61 +73,63 @@ async def filters(db: AsyncSession = Depends(get_db)):
     return aggs
 
 
-@router.get("/search/federated", response_model=FederatedSearchResponse)
-async def federated_search(
-    q: str = Query("", max_length=200, description="搜索关键词"),
-    page: int = Query(1, ge=1, description="页码"),
-    size: int = Query(20, ge=1, le=100, description="每页数量"),
-    dynasty: str | None = Query(None, description="朝代筛选"),
-    category: str | None = Query(None, description="分类筛选"),
-    lang: str | None = Query(None, description="语言筛选"),
-    sources: str | None = Query(None, description="数据源筛选"),
-    include_dianjin: bool = Query(True, description="是否包含典津结果"),
-):
-    """联合检索：同时搜索本地数据库和典津跨平台古籍资源。"""
-    es = get_es()
+if _HAS_DIANJIN:
 
-    # Build coroutines
-    local_coro = search_texts(es, q, page, size, dynasty, category, lang, sources)
+    @router.get("/search/federated", response_model=FederatedSearchResponse)
+    async def federated_search(
+        q: str = Query("", max_length=200, description="搜索关键词"),
+        page: int = Query(1, ge=1, description="页码"),
+        size: int = Query(20, ge=1, le=100, description="每页数量"),
+        dynasty: str | None = Query(None, description="朝代筛选"),
+        category: str | None = Query(None, description="分类筛选"),
+        lang: str | None = Query(None, description="语言筛选"),
+        sources: str | None = Query(None, description="数据源筛选"),
+        include_dianjin: bool = Query(True, description="是否包含典津结果"),
+    ):
+        """联合检索：同时搜索本地数据库和典津跨平台古籍资源。"""
+        es = get_es()
 
-    dianjin_result = None
-    if include_dianjin and q:
-        dianjin_client = get_dianjin_client()
-        dianjin_coro = dianjin_client.search(query=q, page=page, size=size)
-        local_result, dianjin_result = await asyncio.gather(
-            local_coro, dianjin_coro, return_exceptions=True
-        )
-    else:
-        local_result = await local_coro
+        # Build coroutines
+        local_coro = search_texts(es, q, page, size, dynasty, category, lang, sources)
 
-    # Handle local result
-    if isinstance(local_result, Exception):
-        local_data = SearchResponse(total=0, page=page, size=size, results=[])
-    else:
-        local_data = local_result
-
-    # Handle dianjin result
-    dianjin_total = 0
-    dianjin_results = []
-    dianjin_error = None
-
-    if dianjin_result is not None:
-        if isinstance(dianjin_result, Exception):
-            dianjin_error = f"典津搜索异常: {str(dianjin_result)}"
+        dianjin_result = None
+        if include_dianjin and q:
+            dianjin_client = get_dianjin_client()
+            dianjin_coro = dianjin_client.search(query=q, page=page, size=size)
+            local_result, dianjin_result = await asyncio.gather(
+                local_coro, dianjin_coro, return_exceptions=True
+            )
         else:
-            dianjin_total = dianjin_result.total
-            dianjin_results = dianjin_result.results
-            dianjin_error = dianjin_result.error
-    elif not include_dianjin:
-        dianjin_error = None
-    elif not q:
+            local_result = await local_coro
+
+        # Handle local result
+        if isinstance(local_result, Exception):
+            local_data = SearchResponse(total=0, page=page, size=size, results=[])
+        else:
+            local_data = local_result
+
+        # Handle dianjin result
+        dianjin_total = 0
+        dianjin_results = []
         dianjin_error = None
 
-    return FederatedSearchResponse(
-        local_total=local_data.total,
-        local_results=[r.model_dump() for r in local_data.results],
-        dianjin_total=dianjin_total,
-        dianjin_results=dianjin_results,
-        dianjin_error=dianjin_error,
-        combined_total=local_data.total + dianjin_total,
-    )
+        if dianjin_result is not None:
+            if isinstance(dianjin_result, Exception):
+                dianjin_error = f"典津搜索异常: {str(dianjin_result)}"
+            else:
+                dianjin_total = dianjin_result.total
+                dianjin_results = dianjin_result.results
+                dianjin_error = dianjin_result.error
+        elif not include_dianjin:
+            dianjin_error = None
+        elif not q:
+            dianjin_error = None
+
+        return FederatedSearchResponse(
+            local_total=local_data.total,
+            local_results=[r.model_dump() for r in local_data.results],
+            dianjin_total=dianjin_total,
+            dianjin_results=dianjin_results,
+            dianjin_error=dianjin_error,
+            combined_total=local_data.total + dianjin_total,
+        )

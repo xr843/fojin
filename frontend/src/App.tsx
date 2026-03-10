@@ -18,7 +18,6 @@ const ManuscriptViewerPage = lazy(() => import("./pages/ManuscriptViewerPage"));
 const ChatPage = lazy(() => import("./pages/ChatPage"));
 const ExportsPage = lazy(() => import("./pages/ExportsPage"));
 const CollectionsPage = lazy(() => import("./pages/CollectionsPage"));
-const DianjinBrowserPage = lazy(() => import("./pages/DianjinBrowserPage"));
 const AdminSuggestionsPage = lazy(() => import("./pages/AdminSuggestionsPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 
@@ -54,7 +53,6 @@ function App() {
             <Route path="/kg" element={<RouteErrorBoundary><KnowledgeGraphPage /></RouteErrorBoundary>} />
             <Route path="/manuscripts/:textId" element={<RouteErrorBoundary><ManuscriptViewerPage /></RouteErrorBoundary>} />
             <Route path="/exports" element={<ExportsPage />} />
-            <Route path="/dianjin" element={<DianjinBrowserPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
           </Routes>

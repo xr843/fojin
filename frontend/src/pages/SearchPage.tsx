@@ -6,14 +6,12 @@ import {
   Pagination, Spin, Empty, Checkbox, Input, Tag, Button, Tabs, Result, Select, Typography,
 } from "antd";
 import {
-  SearchOutlined, CloudOutlined, BookOutlined, VerticalAlignTopOutlined,
+  SearchOutlined, BookOutlined, VerticalAlignTopOutlined,
 } from "@ant-design/icons";
-import { Alert } from "antd";
-import { searchTexts, searchContent, searchDictionary, getSources, type SearchHit } from "../api/client";
-import { federatedSearch } from "../api/dianjin";
+import { searchTexts, searchContent, searchDictionary, getSources } from "../api/client";
 import { hasDirectSearchUrl } from "../utils/sourceUrls";
 import { addSearchHistory, getSearchHistory, type SearchHistoryItem } from "../utils/history";
-import { ResultCard, ExternalCard, DianjinCard, DictCard, ContentCard } from "../components/search";
+import { ResultCard, ExternalCard, DictCard, ContentCard } from "../components/search";
 import "../styles/search.css";
 import "../styles/sources.css";
 
@@ -70,12 +68,6 @@ export default function SearchPage() {
     queryKey: ["searchContent", query, page, selectedSources, langFilter],
     queryFn: () => searchContent({ q: query, page, size: 20, sources: selectedSources || undefined, lang: langFilter || undefined }),
     enabled: query.length > 0 && tab === "content",
-  });
-
-  const { data: fedData, isLoading: fedLoading } = useQuery({
-    queryKey: ["federatedSearch", query, page, dynasty, category, selectedSources],
-    queryFn: () => federatedSearch({ q: query, page, size: 20, dynasty, category, sources: selectedSources || undefined }),
-    enabled: query.length > 0 && tab === "federated",
   });
 
   const { data: dictData, isLoading: dictLoading } = useQuery({
@@ -163,8 +155,8 @@ export default function SearchPage() {
     setInstitutionFilter(next);
   };
 
-  const loading = tab === "catalog" ? isLoading : tab === "content" ? contentLoading : tab === "dictionary" ? dictLoading : fedLoading;
-  const localTotal = tab === "catalog" ? (data?.total || 0) : tab === "content" ? (contentData?.total || 0) : tab === "dictionary" ? (dictData?.total || 0) : (fedData?.local_total || 0);
+  const loading = tab === "catalog" ? isLoading : tab === "content" ? contentLoading : dictLoading;
+  const localTotal = tab === "catalog" ? (data?.total || 0) : tab === "content" ? (contentData?.total || 0) : (dictData?.total || 0);
   const extTotal = query.length > 0 ? filteredExtSources.length : 0;
 
   const sortedRegions = useMemo(() => {
@@ -222,7 +214,6 @@ export default function SearchPage() {
           onChange={(k) => { setPage(1); updateUrl({ tab: k }); }}
           items={[
             { key: "catalog", label: "经典检索" },
-            { key: "federated", label: <><CloudOutlined /> 联合检索</> },
             { key: "content", label: "全文检索" },
             { key: "dictionary", label: <><BookOutlined /> 辞典检索</> },
           ]}
@@ -233,9 +224,7 @@ export default function SearchPage() {
             ? "按经名、译者、编号检索经典目录"
             : tab === "content"
             ? "在经文正文中检索关键词"
-            : tab === "dictionary"
-            ? "在 393,624 条多语种辞典词条中检索词头与释义"
-            : "同时搜索本地数据库和典津跨平台古籍资源"}
+            : "在 393,624 条多语种辞典词条中检索词头与释义"}
         </div>
       </div>
 
@@ -294,13 +283,11 @@ export default function SearchPage() {
           <main className="s-main">
             <div className="s-result-header">
               <span className="s-result-count">
-                {tab === "federated"
-                  ? <>联合找到 <strong>{(fedData?.combined_total || 0).toLocaleString()}</strong> 条结果（本地 {localTotal.toLocaleString()} + 典津 {(fedData?.dianjin_total || 0).toLocaleString()}）</>
-                  : tab === "dictionary"
+                {tab === "dictionary"
                   ? <>辞典找到 <strong>{localTotal.toLocaleString()}</strong> 条词条</>
                   : tab === "content"
                   ? <>在 <strong>{localTotal.toLocaleString()}</strong> 部经典中找到匹配（共 {(contentData?.total_juans || 0).toLocaleString()} 卷）</>
-                  : <>本地找到 <strong>{localTotal.toLocaleString()}</strong> 条结果</>
+                  : <>找到 <strong>{localTotal.toLocaleString()}</strong> 条结果</>
                 }
               </span>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -369,38 +356,6 @@ export default function SearchPage() {
             {!loading && tab === "content" && contentData && contentData.results.map((hit, i) => (
               <ContentCard key={`${hit.text_id}_${i}`} hit={hit} rank={i + 1 + (page - 1) * 20} />
             ))}
-
-            {/* 联合检索结果 */}
-            {!loading && tab === "federated" && fedData && (
-              <>
-                {fedData.dianjin_error && (
-                  <Alert
-                    type="warning"
-                    showIcon
-                    message="典津平台提示"
-                    description={fedData.dianjin_error}
-                    style={{ marginBottom: 12 }}
-                  />
-                )}
-
-                {/* 本地结果 */}
-                {fedData.local_results.map((hit, i) => (
-                  <ResultCard key={hit.id} hit={hit as SearchHit} rank={i + 1 + (page - 1) * 20} />
-                ))}
-
-                {/* 典津结果 */}
-                {fedData.dianjin_results.length > 0 && (
-                  <>
-                    <div className="s-ext-divider">
-                      典津跨平台找到 {fedData.dianjin_total.toLocaleString()} 条结果
-                    </div>
-                    {fedData.dianjin_results.map((hit, i) => (
-                      <DianjinCard key={`dj-${i}`} hit={hit} rank={i + 1} />
-                    ))}
-                  </>
-                )}
-              </>
-            )}
 
             {/* 辞典结果 */}
             {!loading && tab === "dictionary" && dictData && dictData.results.map((hit, i) => (

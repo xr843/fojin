@@ -14,13 +14,21 @@ from app.core.elasticsearch import close_es, get_es, init_es
 from app.core.exceptions import FoJinError, fojin_error_to_http
 from app.core.rate_limit import RateLimitMiddleware
 from app.database import engine as async_engine
-from app.services.dianjin import get_dianjin_client
+try:
+    from app.services.dianjin import get_dianjin_client
+    _HAS_DIANJIN = True
+except ImportError:
+    _HAS_DIANJIN = False
 
 logger = logging.getLogger(__name__)
 from app.api import auth, bookmarks, history, search, texts
 from app.api import sources, relations, knowledge_graph, iiif
 from app.api import chat, annotations, exports, dictionary, citations
-from app.api import dianjin, source_suggestions
+from app.api import source_suggestions
+try:
+    from app.api import dianjin
+except ImportError:
+    dianjin = None
 
 
 @asynccontextmanager
@@ -30,7 +38,8 @@ async def lifespan(app: FastAPI):
     await init_es()
     yield
     # Shutdown
-    await get_dianjin_client().close()
+    if _HAS_DIANJIN:
+        await get_dianjin_client().close()
     await app.state.redis.close()
     await close_es()
 
@@ -104,8 +113,9 @@ app.include_router(citations.router, prefix="/api")
 # Phase 4 routers
 app.include_router(exports.router, prefix="/api")
 
-# Dianjin (典津) cross-platform search
-app.include_router(dianjin.router, prefix="/api")
+# Dianjin (典津) cross-platform search — optional module
+if dianjin is not None:
+    app.include_router(dianjin.router, prefix="/api")
 
 # Source suggestions (public)
 app.include_router(source_suggestions.router, prefix="/api")

@@ -9,7 +9,6 @@ import {
   ApartmentOutlined,
   DatabaseOutlined,
   BookOutlined,
-  CloudOutlined,
   MenuOutlined,
   SettingOutlined,
   RobotOutlined,
@@ -57,7 +56,6 @@ export default function Layout() {
   const navItems = [
     { icon: <DatabaseOutlined />, label: "数据源", path: "/sources" },
     { icon: <BookOutlined />, label: "经典专题", path: "/collections" },
-    { icon: <CloudOutlined />, label: "典津联检", path: "/dianjin" },
     { icon: <ApartmentOutlined />, label: "知识图谱", path: "/kg" },
     { icon: <RobotOutlined />, label: "AI 问答", path: "/chat" },
     ...(isAdmin

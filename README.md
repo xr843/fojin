@@ -29,7 +29,7 @@ Buddhist texts are scattered across hundreds of databases worldwide — CBETA, S
 
 | What you need | How FoJin helps |
 |---|---|
-| Find a sutra across databases | **Federated search** across local index + 728K records from DianJin |
+| Find a sutra across databases | **Multi-dimensional search** across local index with 483+ sources |
 | Read the full text online | **4,488 fascicles** available for online reading |
 | Compare translations | **Parallel reading** in 30 languages side by side |
 | Look up Buddhist terms | **6 dictionaries**, 237K entries (Chinese/Sanskrit/Pali/English) |
@@ -54,7 +54,7 @@ Then visit: **http://localhost:3000**
 
 ### Multi-Dimensional Search
 
-Search across Buddhist canons by title, translator, catalog number, or full-text keyword. Federated search combines local Elasticsearch results with 728,000 records from the DianJin platform (Tsinghua/CNKI).
+Search across Buddhist canons by title, translator, catalog number, or full-text keyword. Powered by Elasticsearch with ICU tokenizer for multi-language support.
 
 <p align="center"><img src="./docs/screenshots/search.png" alt="Search results for Avatamsaka Sutra" width="800"></p>
 
@@ -108,7 +108,6 @@ FoJin aggregates data from major Buddhist digital projects worldwide:
 | [Gandhari.org](https://gandhari.org) | Gandhari manuscripts | Gandhari |
 | [VRI Tipitaka](https://tipitaka.org) | Pali Canon (Chattha Sangayana) | Pali |
 | [Korean Tripitaka](http://kb.sutra.re.kr) | Goryeo Tripitaka | Chinese, Korean |
-| [DianJin](https://guji.cckb.cn) | Pan-Chinese classics (federated) | Chinese |
 | + 398 more... | | |
 
 ## Tech Stack
@@ -210,7 +209,6 @@ FoJin is built on the generous work of the global Buddhist digital humanities co
 - [BDRC](https://bdrc.io) — Buddhist Digital Resource Center
 - [84000](https://84000.co) — Translating the Words of the Buddha
 - [SAT](https://21dzk.l.u-tokyo.ac.jp/SAT/) — SAT Daizokyo Text Database
-- [DianJin / CNKI](https://guji.cckb.cn) — Chinese Classic Texts Platform
 - All other data source providers listed in the [Sources page](https://fojin.app/sources)
 
 ---

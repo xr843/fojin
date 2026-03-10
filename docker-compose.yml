@@ -86,7 +86,6 @@ services:
       REDIS_PORT: 6379
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-changeme-in-production}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173,http://localhost:5174}
-      DIANJIN_API_KEY: ${DIANJIN_API_KEY:-}
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     volumes:

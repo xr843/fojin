@@ -29,6 +29,17 @@ data/cbeta/
 # Internal promotion materials (not for public repo)
 docs/promotion/
 
+# DianJin (典津) integration — optional local module, not included in public repo
+backend/app/api/dianjin.py
+backend/app/schemas/dianjin.py
+backend/app/services/dianjin.py
+backend/alembic/versions/0027_seed_dianjin_sources.py
+backend/alembic/versions/0032_import_dianjin_datasources.py
+backend/alembic/versions/0035_supplement_dianjin_cross_reference.py
+frontend/src/api/dianjin.ts
+frontend/src/components/search/DianjinCard.tsx
+frontend/src/pages/DianjinBrowserPage.tsx
+
 # OS
 .DS_Store
 Thumbs.db
