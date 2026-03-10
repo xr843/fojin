@@ -1,7 +1,7 @@
 import { Helmet } from "react-helmet-async";
 
-const DIFY_BASE_URL = "http://192.168.110.12:8080";
-const DIFY_APP_TOKEN = "DJaEyWyEt2IBG9qn";
+const DIFY_BASE_URL = import.meta.env.VITE_DIFY_BASE_URL || "http://192.168.110.12:8080";
+const DIFY_APP_TOKEN = import.meta.env.VITE_DIFY_APP_TOKEN || "DJaEyWyEt2IBG9qn";
 
 export default function ChatPage() {
   return (

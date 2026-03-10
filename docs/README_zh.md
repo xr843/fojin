@@ -1,0 +1,165 @@
+# 佛津 (FoJin) v3.3
+
+全球佛教古籍数字资源聚合平台
+
+聚合 409 个活跃数据源（覆盖 29 个国家/地区）、8,949 条目录记录、237,593 条辞典词条、29 语种。可通过典津联检扩展至 72.8 万条跨平台古籍资源。内置 AI 佛学助手「小津」（基于 Dify + RAG），覆盖 38 部核心佛经约 1,100 万字知识库。
+
+> **佛津 vs 典津**：典津（清华大学·同方知网）聚合 72.8 万条汉籍影像元数据，定位为通用古籍检索入口；佛津深耕佛教领域，提供**经文全文阅读、多语种对读、辞典检索、知识图谱**等一站式研究功能——不只是"找到"，更能"读到、查到、关联到"。
+
+| 维度 | 佛津 (FoJin) | 典津 (DianJin) |
+|------|-------------|---------------|
+| **定位** | 佛教古籍一站式研究平台 | 通用汉籍影像聚合检索 |
+| **领域深度** | 专注佛典，垂直深耕 | 泛古籍，广而通用 |
+| **全文阅读** | ✅ 4,488 卷经文在线阅读 | ❌ 仅提供元数据，需跳转外部平台 |
+| **多语种对读** | ✅ 汉/梵/巴利/藏/英等 29 语种平行对读 | ❌ 仅汉籍 |
+| **辞典检索** | ✅ 6 部权威辞典、237,593 条词条 | ❌ 无辞典功能 |
+| **知识图谱** | ✅ 9,600+ 实体、3,800+ 关系可视化 | ❌ 无知识图谱 |
+| **写本浏览** | ✅ IIIF 协议对接 BDRC 等写本影像 | ❌ 无写本浏览 |
+| **数据源** | 409 个佛教专题数据源，29 国/地区 | ~180 个通用汉籍数据源 |
+| **语种覆盖** | 29 语种（梵/巴利/藏/犍陀罗等） | 以汉文为主 |
+| **总记录量** | 8,949 条目录 + 典津 72.8 万条联检 | 72.8 万条影像元数据 |
+| **搜索模式** | 经典检索 + 全文检索 + 联合检索 + 辞典检索 | 影像元数据检索 |
+| **AI 问答** | ✅ RAG 知识库 + 大模型，基于经文原文回答 | ❌ 无 AI 功能 |
+| **互补关系** | ✅ 内置典津联检，兼得双方数据 | 仅自身数据 |
+
+## 快速启动
+
+### 使用 Docker Compose
+
+```bash
+cp .env.example .env
+docker compose up -d
+```
+
+服务启动后（端口取决于 `.env` 配置）：
+- 前端：http://localhost:3000
+- 后端 API：http://localhost:8000/docs
+- PostgreSQL：localhost:15432（默认 Docker 映射 5432）
+- Elasticsearch：localhost:9200
+- Redis：localhost:16379（默认 Docker 映射 6379）
+
+### 本地开发（不使用 Docker）
+
+**基础服务**：需要本地安装 PostgreSQL 15、Elasticsearch 8、Redis 7，或通过 Docker 仅启动基础服务：
+
+```bash
+docker compose up -d postgres elasticsearch redis
+```
+
+**后端**：
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+alembic upgrade head
+python scripts/init_es_index.py
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+**数据导入**：
+
+```bash
+cd backend
+# CBETA 经目导入
+python scripts/import_catalog.py
+# 多源导入编排器
+python scripts/import_all.py
+```
+
+**前端**：
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+**测试**：
+
+```bash
+cd backend
+pip install -r requirements-dev.txt
+pytest tests/ -q
+```
+
+## 主要功能
+
+- **多维检索**：经典检索（经名/译者/编号，覆盖 8,949 条经典目录）、全文检索（经文正文关键词）、联合检索（本地 + 典津 72.8 万条跨平台古籍）、辞典检索（6 部权威辞典、237,593 条词条，支持中/梵/巴利/英语种筛选），263 个数据源支持搜索跳转
+- **经文阅读**：按卷浏览经文内容，支持多语种平行对读（汉/梵/巴利/藏/英），覆盖 29 语种
+- **数据源导航**：409 个全球佛教数字资源（覆盖 29 个国家/地区），按国家/地区、语种、类型筛选，涵盖 CBETA、SuttaCentral、84000、GRETIL、BDRC 等主流佛学数据库
+- **知识图谱**：9,600+ 实体、3,800+ 关系（人物、寺院、经典、宗派等），力导向图可视化探索
+- **写本浏览**：通过 IIIF 协议查看 BDRC 等机构的数字化写本与善本影像
+- **AI 佛学问答**：内置「小津」(XiaoJin) AI 助手，基于 Dify + RAG 技术，覆盖 38 部核心佛经（四阿含、般若系、华严、法华、净土、唯识、中观等），约 1,100 万字知识库。全站浮动气泡 + `/chat` 专页，回答基于经文原文并附引用出处
+- **经典专题**：按主题分类浏览佛教经典（般若、净土、华严、禅宗等），提供系统化的学习路径
+
+## 技术栈
+
+- **前端**：React 18 + TypeScript + Vite + Ant Design 5 + Zustand + TanStack Query
+- **后端**：FastAPI + SQLAlchemy (async) + Pydantic v2
+- **数据库**：PostgreSQL 15 + pgvector（向量检索）+ pg_trgm（模糊搜索）
+- **搜索**：Elasticsearch 8（ICU 分词）
+- **缓存**：Redis 7
+- **跨平台联检**：典津 API (guji.cckb.cn) + httpx AsyncClient
+- **AI 问答**：Dify（独立部署） + 通义千问 LLM + RAG（向量检索 + 关键词检索双知识库）
+- **SEO**：react-helmet-async 动态 meta + JSON-LD 结构化数据 + sitemap.xml + 按路由静态 HTML 生成
+- **部署**：Docker Compose + Nginx（gzip_static 预压缩 + 静态资源长缓存）+ Dify（AI 训练服务器独立部署）
+- **CI**：GitHub Actions
+
+## 部署
+
+### Docker Compose 部署（推荐）
+
+```bash
+cp .env.example .env
+# 编辑 .env 填写 API 密钥等配置
+docker compose up -d --build
+# 运行数据库迁移
+docker exec fojin-backend alembic upgrade head
+```
+
+所有容器已配置日志轮转（10MB × 3 文件），无需担心磁盘空间。
+
+### 安全加固
+
+v3.2 包含以下安全优化：
+
+- **容器非 root 运行**：后端使用 `app` 用户，前端使用 `nginx` 用户
+- **多阶段构建**：后端 Dockerfile 使用 builder 阶段，最终镜像不含编译工具
+- **端口绑定**：PostgreSQL、Elasticsearch、Redis、Backend 端口仅绑定 `127.0.0.1`，不对外暴露
+- **资源限制**：每个容器设置 `mem_limit` 和 `cpus` 上限，防止单容器耗尽资源
+- **安全头**：Nginx 添加 CSP、X-Content-Type-Options、X-Frame-Options、Referrer-Policy
+- **搜索参数限制**：所有搜索查询参数添加 `max_length=200`
+- **JWT 过期时间**：从 24 小时缩短至 8 小时
+- **速率限制修复**：正确读取 Nginx 反向代理 `X-Forwarded-For` 头，按真实 IP 限流
+
+## 项目结构
+
+```
+fojin/
+├── backend/
+│   ├── app/
+│   │   ├── api/           # FastAPI 路由（search, texts, dictionary, chat 等）
+│   │   ├── core/          # 核心模块（ES、异常体系、速率限制、XML 解析）
+│   │   ├── models/        # SQLAlchemy ORM 模型
+│   │   ├── schemas/       # Pydantic 请求/响应模型
+│   │   └── services/      # 业务逻辑（搜索、典津客户端等）
+│   ├── alembic/versions/  # 数据库迁移（0001–0085）
+│   ├── scripts/           # 数据导入脚本
+│   └── tests/             # pytest 测试
+├── frontend/
+│   ├── src/
+│   │   ├── components/    # 通用组件 + search/ 子目录
+│   │   ├── pages/         # 页面组件
+│   │   ├── config/        # searchPatterns.json（150+ 搜索 URL 模板）
+│   │   ├── utils/         # 工具函数
+│   │   └── stores/        # Zustand 状态管理
+│   └── nginx.conf         # Nginx 配置
+├── elasticsearch/         # ES Dockerfile（ICU 插件）
+└── docker-compose.yml     # 编排配置
+```
+
+## 许可证
+
+Apache License 2.0 — 详见 [LICENSE](../LICENSE)。

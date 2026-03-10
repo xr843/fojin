@@ -1,0 +1,27 @@
+name: Feature Request
+description: Suggest a new feature or data source
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the feature
+      placeholder: A clear description of what you'd like
+    validations:
+      required: true
+  - type: textarea
+    id: usecase
+    attributes:
+      label: Use case
+      placeholder: How would this help your research or workflow?
+  - type: dropdown
+    id: type
+    attributes:
+      label: Type
+      options:
+        - New data source
+        - Search improvement
+        - UI/UX improvement
+        - New language support
+        - API feature
+        - Other

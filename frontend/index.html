@@ -100,13 +100,9 @@
     </noscript>
     <script type="module" src="/src/main.tsx"></script>
 
-    <!-- Dify AI 助手浮动气泡 -->
+    <!-- Dify AI 助手浮动气泡 (token 由 main.tsx 注入，避免硬编码) -->
     <script>
-      window.difyChatbotConfig = {
-        token: 'DJaEyWyEt2IBG9qn',
-        baseUrl: 'http://192.168.110.12:8080'
-      }
+      window.difyChatbotConfig = { token: '', baseUrl: '' }
     </script>
-    <script src="http://192.168.110.12:8080/embed.min.js" async></script>
   </body>
 </html>

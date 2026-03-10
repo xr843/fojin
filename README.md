@@ -1,306 +1,216 @@
-# 佛津 (FoJin) v3.3
+<div align="center">
 
-全球佛教古籍数字资源聚合平台
+# FoJin 佛津
 
-聚合 409 个活跃数据源（覆盖 29 个国家/地区）、8,949 条目录记录、237,593 条辞典词条、29 语种。可通过典津联检扩展至 72.8 万条跨平台古籍资源。内置 AI 佛学助手「小津」（基于 Dify + RAG），覆盖 38 部核心佛经约 1,100 万字知识库。
+### The World's Encyclopedic Buddhist Digital Text Platform
 
-> **佛津 vs 典津**：典津（清华大学·同方知网）聚合 72.8 万条汉籍影像元数据，定位为通用古籍检索入口；佛津深耕佛教领域，提供**经文全文阅读、多语种对读、辞典检索、知识图谱**等一站式研究功能——不只是"找到"，更能"读到、查到、关联到"。
+**409 sources. 29 languages. 27 countries. One search.**
 
-| 维度 | 佛津 (FoJin) | 典津 (DianJin) |
-|------|-------------|---------------|
-| **定位** | 佛教古籍一站式研究平台 | 通用汉籍影像聚合检索 |
-| **领域深度** | 专注佛典，垂直深耕 | 泛古籍，广而通用 |
-| **全文阅读** | ✅ 4,488 卷经文在线阅读 | ❌ 仅提供元数据，需跳转外部平台 |
-| **多语种对读** | ✅ 汉/梵/巴利/藏/英等 29 语种平行对读 | ❌ 仅汉籍 |
-| **辞典检索** | ✅ 6 部权威辞典、237,593 条词条 | ❌ 无辞典功能 |
-| **知识图谱** | ✅ 9,600+ 实体、3,800+ 关系可视化 | ❌ 无知识图谱 |
-| **写本浏览** | ✅ IIIF 协议对接 BDRC 等写本影像 | ❌ 无写本浏览 |
-| **数据源** | 409 个佛教专题数据源，29 国/地区 | ~180 个通用汉籍数据源 |
-| **语种覆盖** | 29 语种（梵/巴利/藏/犍陀罗等） | 以汉文为主 |
-| **总记录量** | 8,949 条目录 + 典津 72.8 万条联检 | 72.8 万条影像元数据 |
-| **搜索模式** | 经典检索 + 全文检索 + 联合检索 + 辞典检索 | 影像元数据检索 |
-| **AI 问答** | ✅ RAG 知识库 + 大模型，基于经文原文回答 | ❌ 无 AI 功能 |
-| **互补关系** | ✅ 内置典津联检，兼得双方数据 | 仅自身数据 |
+Aggregating the world's Buddhist digital heritage — from the Chinese Tripitaka to Sanskrit manuscripts, Pali suttas to Tibetan texts — with full-text reading, AI-powered Q&A, knowledge graph, and multi-language parallel reading.
 
-## 快速启动
+[Live Demo](https://fojin.app) &nbsp;&middot;&nbsp; [中文文档](./docs/README_zh.md) &nbsp;&middot;&nbsp; [Report Bug](https://github.com/xr843/fojin/issues)
 
-### 使用 Docker Compose
+<!-- TODO: Uncomment after first push
+[![CI](https://github.com/xr843/fojin/actions/workflows/ci.yml/badge.svg)](https://github.com/xr843/fojin/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+-->
+
+</div>
+
+---
+
+## Why FoJin?
+
+Buddhist texts are scattered across hundreds of databases worldwide — CBETA, SuttaCentral, BDRC, SAT, 84000, GRETIL, and many more. Each has different interfaces, languages, and data formats. Researchers spend more time *finding* texts than *reading* them.
+
+**FoJin solves this.** It aggregates 409+ sources into a single, searchable platform with features no other tool provides:
+
+| What you need | How FoJin helps |
+|---|---|
+| Find a sutra across databases | **Federated search** across local index + 728K records from DianJin |
+| Read the full text online | **4,488 fascicles** available for online reading |
+| Compare translations | **Parallel reading** in 29 languages side by side |
+| Look up Buddhist terms | **6 dictionaries**, 237K entries (Chinese/Sanskrit/Pali/English) |
+| Explore relationships | **Knowledge graph** with 9,600+ entities and 3,800+ relations |
+| View original manuscripts | **IIIF manuscript viewer** connected to BDRC and more |
+| Ask questions about texts | **AI Q&A** ("XiaoJin") grounded in 11M characters of canonical text |
+
+## Quick Start
 
 ```bash
+git clone https://github.com/xr843/fojin.git
+cd fojin
 cp .env.example .env
 docker compose up -d
 ```
 
-服务启动后（端口取决于 `.env` 配置）：
-- 前端：http://localhost:3000
-- 后端 API：http://localhost:8000/docs
-- PostgreSQL：localhost:15432（默认 Docker 映射 5432）
-- Elasticsearch：localhost:9200
-- Redis：localhost:16379（默认 Docker 映射 6379）
+Then visit: **http://localhost:3000**
 
-### 本地开发（不使用 Docker）
+> API docs at http://localhost:8000/docs
 
-**基础服务**：需要本地安装 PostgreSQL 15、Elasticsearch 8、Redis 7，或通过 Docker 仅启动基础服务：
+## Features
 
-```bash
-docker compose up -d postgres elasticsearch redis
+### Multi-Dimensional Search
+
+Search across Buddhist canons by title, translator, catalog number, or full-text keyword. Federated search combines local Elasticsearch results with 728,000 records from the DianJin platform (Tsinghua/CNKI).
+
+### Full-Text Reading
+
+Read 4,488 fascicles of Buddhist texts online. Navigate by volume, scroll through content, and jump between related texts.
+
+### Parallel Reading (29 Languages)
+
+Compare translations side by side — Classical Chinese, Sanskrit, Pali, Tibetan, English, Japanese, Korean, Gandhari, and 21 more languages.
+
+### Dictionary Lookup
+
+6 authoritative dictionaries with 237,593 entries:
+- **DDB** (Digital Dictionary of Buddhism)
+- **SuttaCentral Glossary** (Pali)
+- **NCPED** (New Concise Pali-English Dictionary)
+- **NTI** (Nan Tien Institute Buddhist Dictionary)
+- **Edgerton BHS** (Buddhist Hybrid Sanskrit Dictionary)
+- **Monier-Williams** (Sanskrit-English Dictionary)
+
+### Knowledge Graph
+
+9,600+ entities (persons, monasteries, texts, schools) and 3,800+ relationships, visualized as an interactive force-directed graph. Click any node to explore connections.
+
+### AI Q&A — "XiaoJin"
+
+Ask questions in natural language. XiaoJin answers based on canonical Buddhist texts (38 core sutras, ~11M characters) using RAG (Retrieval-Augmented Generation). Every answer includes citations to the source text.
+
+### Manuscript Viewer
+
+Browse digitized manuscripts and rare editions from BDRC and other institutions via IIIF protocol.
+
+## Data Sources
+
+FoJin aggregates data from major Buddhist digital projects worldwide:
+
+| Source | Content | Languages |
+|--------|---------|-----------|
+| [CBETA](https://cbeta.org) | Chinese Buddhist Canon | Classical Chinese |
+| [SuttaCentral](https://suttacentral.net) | Early Buddhist Texts | Pali, Chinese, English |
+| [84000](https://84000.co) | Tibetan Buddhist Canon | Tibetan, English, Sanskrit |
+| [BDRC](https://bdrc.io) | Tibetan manuscripts (IIIF) | Tibetan |
+| [SAT](https://21dzk.l.u-tokyo.ac.jp/SAT/) | Taisho Tripitaka | Chinese, Japanese |
+| [GRETIL](http://gretil.sub.uni-goettingen.de) | Sanskrit e-texts | Sanskrit |
+| [DSBC](https://www.dsbcproject.org) | Digital Sanskrit Buddhist Canon | Sanskrit |
+| [Gandhari.org](https://gandhari.org) | Gandhari manuscripts | Gandhari |
+| [VRI Tipitaka](https://tipitaka.org) | Pali Canon (Chattha Sangayana) | Pali |
+| [Korean Tripitaka](http://kb.sutra.re.kr) | Goryeo Tripitaka | Chinese, Korean |
+| [DianJin](https://guji.cckb.cn) | Pan-Chinese classics (federated) | Chinese |
+| + 398 more... | | |
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | React 18, TypeScript, Vite, Ant Design 5, Zustand, TanStack Query |
+| Backend | FastAPI, SQLAlchemy (async), Pydantic v2 |
+| Database | PostgreSQL 15 + pgvector + pg_trgm |
+| Search | Elasticsearch 8 (ICU tokenizer) |
+| Cache | Redis 7 |
+| AI | Dify + RAG (vector + keyword dual retrieval) |
+| Deploy | Docker Compose, Nginx (gzip_static, security headers) |
+| CI | GitHub Actions |
+
+## Architecture
+
+```
+                    +-----------+
+                    |  Nginx    |  (gzip, security headers, static cache)
+                    +-----+-----+
+                          |
+              +-----------+-----------+
+              |                       |
+        +-----+-----+          +-----+-----+
+        |  React 18  |          |  FastAPI   |
+        |  (Vite)    |          |  (async)   |
+        +------------+          +-----+------+
+                                      |
+                    +---------+-------+---------+
+                    |         |       |         |
+              +-----+   +----+--+ +--+---+ +---+----+
+              | PG 15 |  | ES 8  | |Redis | | Dify   |
+              |pgvector|  | ICU  | |cache | | RAG/AI |
+              +--------+  +------+ +------+ +--------+
 ```
 
-**后端**：
+## Development
 
 ```bash
+# Backend
 cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt
 alembic upgrade head
-python scripts/init_es_index.py
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
+uvicorn app.main:app --reload
 
-**数据导入**：
-
-```bash
-cd backend
-# CBETA 经目导入
-python scripts/import_catalog.py
-# 多源导入编排器
-python scripts/import_all.py
-```
-
-**前端**：
-
-```bash
+# Frontend
 cd frontend
 npm install
 npm run dev
+
+# Tests
+cd backend && pytest tests/ -q
 ```
 
-**测试**：
+## Security
 
-```bash
-cd backend
-pip install -r requirements-dev.txt
-pytest tests/ -q
-```
+- Non-root containers (backend: `app`, frontend: `nginx`)
+- Multi-stage Docker builds (no build tools in production)
+- Internal services bound to `127.0.0.1` only
+- Memory/CPU limits per container
+- CSP, X-Frame-Options, X-Content-Type-Options headers
+- Query length limits on all search parameters
+- JWT with 8h expiry, production requires strong secret
 
-## 主要功能
+## Contributing
 
-- **多维检索**：经典检索（经名/译者/编号，覆盖 8,949 条经典目录）、全文检索（经文正文关键词）、联合检索（本地 + 典津 72.8 万条跨平台古籍）、辞典检索（6 部权威辞典、237,593 条词条，支持中/梵/巴利/英语种筛选），263 个数据源支持搜索跳转
-- **经文阅读**：按卷浏览经文内容，支持多语种平行对读（汉/梵/巴利/藏/英），覆盖 29 语种
-- **数据源导航**：409 个全球佛教数字资源（覆盖 29 个国家/地区），按国家/地区、语种、类型筛选，涵盖 CBETA、SuttaCentral、84000、GRETIL、BDRC 等主流佛学数据库
-- **知识图谱**：9,600+ 实体、3,800+ 关系（人物、寺院、经典、宗派等），力导向图可视化探索
-- **写本浏览**：通过 IIIF 协议查看 BDRC 等机构的数字化写本与善本影像
-- **AI 佛学问答**：内置「小津」(XiaoJin) AI 助手，基于 Dify + RAG 技术，覆盖 38 部核心佛经（四阿含、般若系、华严、法华、净土、唯识、中观等），约 1,100 万字知识库。全站浮动气泡 + `/chat` 专页，回答基于经文原文并附引用出处
-- **经典专题**：按主题分类浏览佛教经典（般若、净土、华严、禅宗等），提供系统化的学习路径
+Contributions are welcome! Whether it's adding a new data source, improving search, fixing bugs, or translating the UI — we'd love your help.
 
-## 用户使用说明
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feat/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feat/amazing-feature`)
+5. Open a Pull Request
 
-### 搜索经典
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
-1. 在首页或搜索页输入关键词（经名、译者、编号等），点击搜索
-2. 默认进入「经典检索」Tab，可切换到「联合检索」（含典津平台）、「全文检索」（经文正文）或「辞典检索」（词条查询）
-3. 左侧可按国家/地区、馆藏机构筛选外部数据源
-4. 点击搜索结果的「在线阅读」进入阅读器，或「查看详情」进入经文详情页
+## Roadmap
 
-### 阅读经文
+- [ ] OCR pipeline for scanned texts
+- [ ] User annotations and collaborative notes
+- [ ] Citation export (BibTeX, Chicago, MLA)
+- [ ] Mobile-responsive reader
+- [ ] Public REST API with rate limiting
+- [ ] Embedding-based semantic search
+- [ ] Community-contributed data sources
 
-1. 在经文详情页点击「在线阅读」进入阅读器
-2. 左侧选择卷次，主区域显示经文内容
-3. 底部可翻到上/下卷
-4. 如需多语种对照，进入「平行对读」页面选择对照文本
+## License
 
-### 辞典检索
+[Apache License 2.0](LICENSE) — free for academic and commercial use.
 
-1. 搜索页切换到「辞典检索」Tab
-2. 输入词头（支持中文、梵文、巴利文）
-3. 右上角下拉框可按语种筛选
-4. 释义过长时点击「展开全文」查看完整内容
+## Acknowledgments
 
-### 浏览数据源
+FoJin is built on the generous work of the global Buddhist digital humanities community. Special thanks to:
 
-1. 导航栏点击「数据源」进入数据源导航页
-2. 通过国家/地区、语种、类型筛选感兴趣的数据源
-3. 源卡片显示该数据源的能力标识（本地全文、搜索、IIIF、API）
-4. 点击可跳转到对应数据源的官方网站
+- [CBETA](https://cbeta.org) — Chinese Buddhist Electronic Text Association
+- [SuttaCentral](https://suttacentral.net) — Early Buddhist Texts
+- [BDRC](https://bdrc.io) — Buddhist Digital Resource Center
+- [84000](https://84000.co) — Translating the Words of the Buddha
+- [SAT](https://21dzk.l.u-tokyo.ac.jp/SAT/) — SAT Daizokyo Text Database
+- [DianJin / CNKI](https://guji.cckb.cn) — Chinese Classic Texts Platform
+- All other data source providers listed in the [Sources page](https://fojin.app/sources)
 
-### 探索知识图谱
+---
 
-1. 导航栏点击「知识图谱」
-2. 左侧搜索实体（人物、寺院、经典等），点击结果加载图谱
-3. 中央图谱可拖拽、缩放，节点按类型着色
-4. 调整深度滑块控制关系展开层数
-5. 右侧面板显示选中实体的详细信息
+<div align="center">
 
-### AI 佛学问答
+**If FoJin is useful for your research, please consider giving it a star!**
 
-1. 点击页面右下角浮动气泡，或导航栏「AI 问答」进入 `/chat` 页面
-2. 输入佛学相关问题（如"地藏经中光目女的故事"、"华严经和法华经对佛性的论述有何不同"）
-3. AI 基于经文原文回答，并附引用来源
-4. 无需登录即可使用
+Made with care for the Buddhist studies community.
 
-## 典津跨平台联检
-
-佛津对接了典津平台 (guji.cckb.cn) API，实现跨平台古籍资源发现：
-
-- **数据源浏览**（`/dianjin`）：按国家/地区分组浏览典津 180 个数据源、72.8 万条古籍记录
-- **联合检索**（搜索页「联合检索」Tab）：并发查询本地 ES + 典津 API，合并展示结果
-- **降级容错**：典津不可用时本地搜索不受影响，前端显示警告提示
-
-### 配置
-
-在 `.env` 中设置典津 API Key：
-
-```bash
-DIANJIN_API_KEY=sk-gcis-your-api-key-here
-```
-
-未配置时数据源浏览（公开 API）仍可使用，仅联合搜索不可用。
-
-### 相关端点
-
-| 端点 | 说明 |
-|------|------|
-| `GET /api/dianjin/health` | 典津 API 连通性检查 |
-| `GET /api/dianjin/datasources` | 浏览典津数据源（公开，Redis 缓存 1h） |
-| `GET /api/dianjin/region-labels` | 地区代码→中文名映射 |
-| `GET /api/dianjin/institutions` | 机构列表（含地区信息） |
-| `POST /api/dianjin/search` | 代理搜索到典津（需 API Key） |
-| `GET /api/search/federated` | 联合检索（本地 + 典津并发） |
-| `GET /api/dictionary/search` | 辞典词条搜索（支持 q/lang/page/size 参数） |
-
-## 数据导入管道
-
-支持以下数据源的自动化导入：
-
-| 脚本 | 数据源 | 语种 |
-|------|--------|------|
-| `import_catalog.py` | CBETA 经目 | lzh |
-| `import_content.py` | CBETA 全文 | lzh |
-| `import_84000.py` | 84000 藏传佛典 | bo, en, sa |
-| `import_suttacentral.py` | SuttaCentral | lzh, pi, en |
-| `import_gretil.py` | GRETIL 梵文文献 | sa |
-| `import_dsbc.py` | DSBC 数字梵文佛典 | sa |
-| `import_sat.py` | SAT 大正藏 | lzh, ja |
-| `import_ddb.py` | DDB 电子佛学辞典 | lzh, en |
-| `import_gandhari.py` | 犍陀罗语佛典 | pgd |
-| `import_vri_tipitaka.py` | VRI 巴利三藏 | pi |
-| `import_korean_tripitaka.py` | 高丽大藏经 | lzh, ko |
-| `import_polyglotta.py` | 多语种佛典 | lzh, sa, bo, pi, en |
-| `import_kanripo_catalog.py` | Kanripo 漢籍リポジトリ | lzh |
-| `import_bdrc_manifests.py` | BDRC IIIF 写本 | bo |
-| `import_dila_authority.py` | DILA 权威数据库 | lzh |
-| `import_cbeta_alt_translations.py` | CBETA 异译关系 | lzh |
-| `import_sc_glossary.py` | SuttaCentral 巴利语词汇表 | pi |
-| `import_ncped.py` | NCPED 简明巴英辞典 | pi |
-| `import_nti_dict.py` | NTI 佛学辞典 | zh |
-| `import_edgerton_bhs.py` | Edgerton 佛教混合梵语辞典 | sa |
-| `import_monier_williams.py` | Monier-Williams 梵英大辞典 | sa |
-
-批量导入：
-
-```bash
-cd backend
-python scripts/import_all.py
-```
-
-## 技术栈
-
-- **前端**：React 18 + TypeScript + Vite + Ant Design 5 + Zustand + TanStack Query
-- **后端**：FastAPI + SQLAlchemy (async) + Pydantic v2
-- **数据库**：PostgreSQL 15 + pgvector（向量检索）+ pg_trgm（模糊搜索）
-- **搜索**：Elasticsearch 8（ICU 分词）
-- **缓存**：Redis 7
-- **跨平台联检**：典津 API (guji.cckb.cn) + httpx AsyncClient
-- **AI 问答**：Dify（独立部署） + 通义千问 LLM + RAG（向量检索 + 关键词检索双知识库）
-- **SEO**：react-helmet-async 动态 meta + JSON-LD 结构化数据 + sitemap.xml + 按路由静态 HTML 生成
-- **部署**：Docker Compose + Nginx（gzip_static 预压缩 + 静态资源长缓存）+ Dify（AI 训练服务器独立部署）
-- **CI**：GitHub Actions
-
-## 部署
-
-### Docker Compose 部署（推荐）
-
-```bash
-cp .env.example .env
-# 编辑 .env 填写 API 密钥等配置
-docker compose up -d --build
-# 运行数据库迁移
-docker exec fojin-backend alembic upgrade head
-```
-
-所有容器已配置日志轮转（10MB × 3 文件），无需担心磁盘空间。
-
-### 安全加固
-
-v3.2 包含以下安全优化：
-
-- **容器非 root 运行**：后端使用 `app` 用户，前端使用 `nginx` 用户
-- **多阶段构建**：后端 Dockerfile 使用 builder 阶段，最终镜像不含编译工具
-- **端口绑定**：PostgreSQL、Elasticsearch、Redis、Backend 端口仅绑定 `127.0.0.1`，不对外暴露
-- **资源限制**：每个容器设置 `mem_limit` 和 `cpus` 上限，防止单容器耗尽资源
-- **安全头**：Nginx 添加 CSP、X-Content-Type-Options、X-Frame-Options、Referrer-Policy
-- **搜索参数限制**：所有搜索查询参数添加 `max_length=200`
-- **JWT 过期时间**：从 24 小时缩短至 8 小时
-- **速率限制修复**：正确读取 Nginx 反向代理 `X-Forwarded-For` 头，按真实 IP 限流
-
-### 测试服务器部署
-
-如需部署到内网测试服务器，可直接从本地同步代码和数据：
-
-```bash
-# 1. 同步代码
-rsync -az --exclude node_modules --exclude dist ./ user@server:~/projects/fojin/
-
-# 2. 启动服务
-ssh user@server "cd ~/projects/fojin && docker compose up -d --build"
-
-# 3. 运行迁移
-ssh user@server "docker exec fojin-backend alembic upgrade head"
-
-# 4. 从本地复制数据库（可选，比重新导入更快）
-docker exec fojin-postgres pg_dump -U fojin -d fojin --format=custom --exclude-table=text_embeddings -f /tmp/fojin.dump
-docker cp fojin-postgres:/tmp/fojin.dump /tmp/fojin.dump
-scp /tmp/fojin.dump user@server:/tmp/
-ssh user@server "docker cp /tmp/fojin.dump fojin-postgres:/tmp/ && docker exec fojin-postgres pg_restore -U fojin -d fojin --clean --if-exists --no-owner /tmp/fojin.dump"
-```
-
-## 项目结构
-
-```
-fojin/
-├── backend/
-│   ├── app/
-│   │   ├── api/           # FastAPI 路由（search, texts, dictionary, chat 等）
-│   │   ├── core/          # 核心模块（ES、异常体系、速率限制、XML 解析）
-│   │   ├── models/        # SQLAlchemy ORM 模型
-│   │   ├── schemas/       # Pydantic 请求/响应模型
-│   │   └── services/      # 业务逻辑（搜索、典津客户端等）
-│   ├── alembic/versions/  # 数据库迁移（0001–0079）
-│   ├── scripts/           # 数据导入脚本
-│   └── tests/             # pytest 测试（异常、模式、搜索 API）
-├── frontend/
-│   ├── src/
-│   │   ├── components/    # 通用组件 + search/ 子目录（5 个搜索卡片组件）
-│   │   ├── pages/         # 页面组件
-│   │   ├── config/        # searchPatterns.json（150+ 搜索 URL 模板）
-│   │   ├── utils/         # sourceUrls、工具函数
-│   │   └── stores/        # Zustand 状态管理
-│   └── nginx.conf         # Nginx 配置（gzip_static + 安全头）
-├── elasticsearch/         # ES Dockerfile（ICU 插件）
-└── docker-compose.yml     # 编排配置（含资源限制与端口绑定）
-```
-
-## 数据库迁移
-
-迁移文件位于 `backend/alembic/versions/`，当前最新为 `0085`。
-
-```bash
-cd backend
-# 升级到最新
-alembic upgrade head
-# 查看当前版本
-alembic current
-# 回退一步
-alembic downgrade -1
-```
+</div>
