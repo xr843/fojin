@@ -198,7 +198,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 ## License
 
-[Apache License 2.0](LICENSE) — free for academic and commercial use.
+[Apache License 2.0](LICENSE) — applies to FoJin source code only. Third-party data sources retain their own licenses (CC BY-NC-SA, CC0, CC BY-NC-ND, etc.). See [NOTICE](NOTICE) for details.
 
 ## Acknowledgments
 

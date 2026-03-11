@@ -1,0 +1,89 @@
+FoJin (佛津)
+Copyright 2026 Tim Ren (xr843)
+
+Licensed under the Apache License, Version 2.0.
+
+================================================================================
+Third-Party Data Sources
+================================================================================
+
+FoJin aggregates Buddhist digital text data from the following third-party
+sources. Each source's content is subject to its own license terms. FoJin's
+Apache 2.0 license applies only to the FoJin source code itself, NOT to the
+content obtained from these data sources.
+
+Users and deployers are responsible for complying with each data source's
+license when using FoJin.
+
+--------------------------------------------------------------------------------
+CBETA (Chinese Buddhist Electronic Text Association)
+https://cbeta.org
+License: CC BY-NC-SA 4.0 (non-commercial, share-alike)
+Usage: Full text of the Chinese Buddhist Canon imported and indexed locally.
+Note: Commercial use requires separate authorization from CBETA.
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+SuttaCentral
+https://suttacentral.net
+License: CC0 (public domain) for Pali texts; CC BY-SA for translations
+Usage: Pali root texts and English translations imported via public REST API.
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+84000: Translating the Words of the Buddha
+https://84000.co
+License: CC BY-NC-ND 4.0 (non-commercial, no derivatives)
+Usage: Tibetan-English translations imported from publicly available TEI XML.
+Note: Content must not be modified. Commercial use is not permitted.
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+GRETIL (Göttingen Register of Electronic Texts in Indian Languages)
+https://gretil.sub.uni-goettingen.de
+License: Academic open access
+Usage: Sanskrit Buddhist e-texts downloaded and indexed locally.
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+DSBC (Digital Sanskrit Buddhist Canon)
+https://www.dsbcproject.org
+License: Academic open access
+Usage: Sanskrit texts downloaded and indexed locally.
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+BDRC (Buddhist Digital Resource Center)
+https://bdrc.io
+License: Varies by work; metadata queries via public SPARQL endpoint
+Usage: IIIF manifest references only; no content stored locally.
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+SAT Daizōkyō Text Database (University of Tokyo)
+https://21dzk.l.u-tokyo.ac.jp/SAT/
+License: Academic open access
+Usage: Metadata mapping and IIIF manifest links only; no content stored locally.
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+Dictionary Sources
+--------------------------------------------------------------------------------
+- DDB (Digital Dictionary of Buddhism) — CC BY-NC-SA
+- SuttaCentral Glossary — CC0
+- NCPED (New Concise Pali-English Dictionary) — Academic open access
+- NTI Buddhist Dictionary — Academic open access
+- Edgerton BHS Dictionary — Public domain
+- Monier-Williams Sanskrit Dictionary — Public domain
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+All Other Sources (398+)
+--------------------------------------------------------------------------------
+FoJin provides search redirect links to 398+ additional Buddhist digital
+archives worldwide. No content from these sources is downloaded or stored.
+Users are redirected to the original platforms to access content.
+--------------------------------------------------------------------------------
+
+For questions about data usage and licensing, please open an issue at:
+https://github.com/xr843/fojin/issues
