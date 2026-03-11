@@ -1,5 +1,7 @@
 # Contributing to FoJin
 
+[中文版](./docs/CONTRIBUTING_zh.md)
+
 Thank you for your interest in contributing to FoJin! This project aims to make Buddhist texts accessible to researchers worldwide, and every contribution helps.
 
 ## Ways to Contribute
