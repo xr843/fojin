@@ -93,6 +93,22 @@ async def list_source_suggestions(
     return {"total": total, "page": page, "size": size, "items": items}
 
 
+@router.delete("/{suggestion_id}", status_code=204)
+async def delete_source_suggestion(
+    suggestion_id: int,
+    _user=Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(SourceSuggestion).where(SourceSuggestion.id == suggestion_id)
+    )
+    suggestion = result.scalar_one_or_none()
+    if not suggestion:
+        raise HTTPException(status_code=404, detail="推荐记录不存在")
+    await db.delete(suggestion)
+    await db.commit()
+
+
 @router.patch("/{suggestion_id}", response_model=SourceSuggestionResponse)
 async def update_suggestion_status(
     suggestion_id: int,

@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
-import { Table, Tag, Button, Space, Select, message, Typography } from "antd";
-import { CheckOutlined, CloseOutlined } from "@ant-design/icons";
+import { Table, Tag, Button, Space, Select, message, Typography, Popconfirm } from "antd";
+import { CheckOutlined, CloseOutlined, DeleteOutlined } from "@ant-design/icons";
 import { Helmet } from "react-helmet-async";
 import {
   getSourceSuggestions,
   updateSuggestionStatus,
+  deleteSourceSuggestion,
   type SourceSuggestionItem,
 } from "../api/client";
 
@@ -54,6 +55,16 @@ export default function AdminSuggestionsPage() {
     }
   };
 
+  const handleDelete = async (id: number) => {
+    try {
+      await deleteSourceSuggestion(id);
+      message.success("已删除");
+      fetchData();
+    } catch {
+      message.error("删除失败");
+    }
+  };
+
   const columns = [
     {
       title: "名称",
@@ -92,28 +103,41 @@ export default function AdminSuggestionsPage() {
     },
     {
       title: "操作",
-      width: 160,
-      render: (_: unknown, record: SourceSuggestionItem) =>
-        record.status === "pending" ? (
-          <Space>
-            <Button
-              type="primary"
-              size="small"
-              icon={<CheckOutlined />}
-              onClick={() => handleStatusChange(record.id, "accepted")}
-            >
-              采纳
+      width: 220,
+      render: (_: unknown, record: SourceSuggestionItem) => (
+        <Space>
+          {record.status === "pending" && (
+            <>
+              <Button
+                type="primary"
+                size="small"
+                icon={<CheckOutlined />}
+                onClick={() => handleStatusChange(record.id, "accepted")}
+              >
+                采纳
+              </Button>
+              <Button
+                danger
+                size="small"
+                icon={<CloseOutlined />}
+                onClick={() => handleStatusChange(record.id, "rejected")}
+              >
+                拒绝
+              </Button>
+            </>
+          )}
+          <Popconfirm
+            title="确定删除这条推荐记录吗？"
+            onConfirm={() => handleDelete(record.id)}
+            okText="删除"
+            cancelText="取消"
+          >
+            <Button size="small" danger icon={<DeleteOutlined />}>
+              删除
             </Button>
-            <Button
-              danger
-              size="small"
-              icon={<CloseOutlined />}
-              onClick={() => handleStatusChange(record.id, "rejected")}
-            >
-              拒绝
-            </Button>
-          </Space>
-        ) : null,
+          </Popconfirm>
+        </Space>
+      ),
     },
   ];
 

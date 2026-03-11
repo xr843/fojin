@@ -544,6 +544,10 @@ export async function updateSuggestionStatus(
   return data;
 }
 
+export async function deleteSourceSuggestion(id: number): Promise<void> {
+  await api.delete(`/source-suggestions/${id}`);
+}
+
 export async function getPendingSuggestionCount(): Promise<number> {
   const { data } = await api.get<{ count: number }>("/source-suggestions/pending-count");
   return data.count;
