@@ -5,7 +5,7 @@ sqlalchemy[asyncio]==2.0.36
 alembic==1.14.1
 pydantic-settings==2.7.1
 pydantic[email]==2.10.0
-elasticsearch[async]==8.17.0
+elasticsearch[async]==9.3.0
 redis[hiredis]==5.2.1
 httpx==0.28.1
 python-jose[cryptography]==3.3.0
