@@ -43,17 +43,17 @@ async def search_texts(
         must.append({"match_all": {}})
 
     if dynasty:
-        filter_clauses.append({"term": {"dynasty": dynasty}})
+        filter_clauses.append({"term": {"dynasty.keyword": dynasty}})
     if category:
-        filter_clauses.append({"term": {"category": category}})
+        filter_clauses.append({"term": {"category.keyword": category}})
     if lang:
-        filter_clauses.append({"term": {"lang": lang}})
+        filter_clauses.append({"term": {"lang.keyword": lang}})
     if sources:
         codes = [c.strip() for c in sources.split(",") if c.strip()]
         if len(codes) == 1:
-            filter_clauses.append({"term": {"source_code": codes[0]}})
+            filter_clauses.append({"term": {"source_code.keyword": codes[0]}})
         elif codes:
-            filter_clauses.append({"terms": {"source_code": codes}})
+            filter_clauses.append({"terms": {"source_code.keyword": codes}})
 
     sort_clause = []
     if sort == "title":
@@ -238,10 +238,10 @@ async def get_aggregations(es: AsyncElasticsearch) -> dict:
     body = {
         "size": 0,
         "aggs": {
-            "dynasties": {"terms": {"field": "dynasty", "size": 50}},
-            "categories": {"terms": {"field": "category", "size": 50}},
-            "languages": {"terms": {"field": "lang", "size": 20}},
-            "sources": {"terms": {"field": "source_code", "size": 30}},
+            "dynasties": {"terms": {"field": "dynasty.keyword", "size": 50}},
+            "categories": {"terms": {"field": "category.keyword", "size": 50}},
+            "languages": {"terms": {"field": "lang.keyword", "size": 20}},
+            "sources": {"terms": {"field": "source_code.keyword", "size": 30}},
         },
     }
     result = await es.search(index=INDEX_NAME, body=body, timeout="10s")
