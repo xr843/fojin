@@ -1,4 +1,5 @@
 import logging
+from datetime import date
 
 import httpx
 from fastapi import HTTPException, status
@@ -6,11 +7,34 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.core.crypto import decrypt_api_key
 from app.models.chat import ChatMessage, ChatSession
+from app.models.user import User
 from app.schemas.chat import ChatResponse, ChatSource
 from app.services.embedding import generate_embedding, similarity_search
 
 logger = logging.getLogger(__name__)
+
+# Free daily limit for users without their own API key
+FREE_DAILY_LIMIT = 10
+
+# Provider → base URL mapping
+PROVIDER_URLS = {
+    "openai": "https://api.openai.com/v1",
+    "dashscope": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "deepseek": "https://api.deepseek.com/v1",
+    "siliconflow": "https://api.siliconflow.cn/v1",
+    "zhipu": "https://open.bigmodel.cn/api/paas/v4",
+}
+
+# Provider → default model
+PROVIDER_DEFAULT_MODELS = {
+    "openai": "gpt-4o-mini",
+    "dashscope": "qwen-plus",
+    "deepseek": "deepseek-chat",
+    "siliconflow": "Qwen/Qwen2.5-7B-Instruct",
+    "zhipu": "glm-4-flash",
+}
 
 SYSTEM_PROMPT = (
     "你是佛津（FoJin）佛教古籍智能助手。根据提供的佛典原文片段回答用户问题。"
@@ -60,11 +84,41 @@ async def get_history(session: AsyncSession, session_id: int) -> list[ChatMessag
     return list(result.scalars().all())
 
 
+def _resolve_llm_config(user: User | None) -> tuple[str, str, str, bool]:
+    """Return (api_url, api_key, model, is_byok) based on user's BYOK or platform default."""
+    if user and user.encrypted_api_key:
+        try:
+            key = decrypt_api_key(user.encrypted_api_key)
+            provider = user.api_provider or "openai"
+            url = PROVIDER_URLS.get(provider, settings.llm_api_url)
+            model = user.api_model or PROVIDER_DEFAULT_MODELS.get(provider, settings.llm_model)
+            return url, key, model, True
+        except Exception:
+            logger.warning("Failed to decrypt user %s API key, falling back to platform", user.id)
+    return settings.llm_api_url, settings.llm_api_key, settings.llm_model, False
+
+
+async def _check_daily_quota(db: AsyncSession, user: User) -> None:
+    """Check and increment daily free chat quota. Raises HTTPException if exceeded."""
+    today = date.today()
+    if user.last_chat_date != today:
+        user.daily_chat_count = 0
+        user.last_chat_date = today
+    if user.daily_chat_count >= FREE_DAILY_LIMIT:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"今日免费额度已用完（{FREE_DAILY_LIMIT}次/天）。配置自己的 API Key 可无限使用。",
+        )
+    user.daily_chat_count += 1
+    await db.flush()
+
+
 async def send_message(
     db: AsyncSession,
     user_id: int | None,
     message: str,
     session_id: int | None = None,
+    user: User | None = None,
 ) -> ChatResponse:
     # Validate message
     if not message or not message.strip():
@@ -72,16 +126,30 @@ async def send_message(
     if len(message) > 2000:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="消息长度不能超过2000字")
 
+    # Resolve LLM config (BYOK or platform)
+    api_url, api_key, model, is_byok = _resolve_llm_config(user)
+
+    # Check if platform has LLM configured (for non-BYOK users)
+    if not is_byok and not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="平台 AI 服务暂未配置。请在个人中心配置自己的 API Key 使用 AI 问答功能。",
+        )
+
+    # Daily quota check for non-BYOK users
+    if not is_byok and user:
+        await _check_daily_quota(db, user)
+
+    # Anonymous users cannot use chat
+    if user_id is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="请登录后使用 AI 问答功能")
+
     # Get or create session, with strict ownership check
     if session_id:
-        if user_id is None:
-            # 匿名用户不允许续写任何已有会话
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="匿名用户不能续写会话，请登录")
         chat_session = await get_session(db, session_id)
         if chat_session is None:
             chat_session = await create_session(db, user_id, title=message[:50])
         elif chat_session.user_id != user_id:
-            # 会话不属于当前用户（含匿名会话 user_id=None 的情况）
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权访问此会话")
     else:
         chat_session = await create_session(db, user_id, title=message[:50])
@@ -100,8 +168,7 @@ async def send_message(
     except Exception:
         logger.exception("Embedding/search failed, proceeding without RAG context")
 
-    # Build messages for LLM — 先读历史，再追加本次用户消息
-    # 注意：这里还没落库当前消息，所以历史里不包含本轮提问，不会重复
+    # Build messages for LLM
     history = await get_history(db, chat_session.id)
     llm_messages: list[dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
     for msg in history[-10:]:
@@ -119,10 +186,10 @@ async def send_message(
     try:
         async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.post(
-                f"{settings.llm_api_url}/chat/completions",
-                headers={"Authorization": f"Bearer {settings.llm_api_key}"},
+                f"{api_url}/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}"},
                 json={
-                    "model": settings.llm_model,
+                    "model": model,
                     "messages": llm_messages,
                     "temperature": 0.7,
                     "max_tokens": 2000,
@@ -135,12 +202,15 @@ async def send_message(
         answer = "抱歉，AI 服务响应超时，请稍后重试。"
     except httpx.HTTPStatusError as exc:
         logger.warning("LLM returned HTTP %s", exc.response.status_code)
-        answer = f"抱歉，AI 服务返回错误（HTTP {exc.response.status_code}），请稍后重试。"
+        if is_byok and exc.response.status_code == 401:
+            answer = "您的 API Key 无效或已过期，请在个人中心重新配置。"
+        else:
+            answer = f"抱歉，AI 服务返回错误（HTTP {exc.response.status_code}），请稍后重试。"
     except Exception:
         logger.exception("LLM call failed")
         answer = "抱歉，AI 服务暂时不可用，请稍后重试。"
 
-    # Save user message and assistant message together (after LLM call)
+    # Save messages
     user_msg = ChatMessage(session_id=chat_session.id, role="user", content=message)
     assistant_msg = ChatMessage(
         session_id=chat_session.id,

@@ -5,7 +5,7 @@ import {
   UserOutlined,
   LogoutOutlined,
   HeartOutlined,
-  GithubOutlined,
+  LoginOutlined,
   ApartmentOutlined,
   DatabaseOutlined,
   BookOutlined,
@@ -201,7 +201,7 @@ export default function Layout() {
           ) : (
             <Button
               type="text"
-              icon={<GithubOutlined />}
+              icon={<LoginOutlined />}
               style={{
                 color: "#fff",
                 background: accent,
@@ -212,9 +212,9 @@ export default function Layout() {
                 padding: "0 16px",
                 fontFamily: '"Noto Serif SC", serif',
               }}
-              onClick={() => window.open("https://github.com/xr843/fojin", "_blank")}
+              onClick={() => navigate("/login")}
             >
-              GitHub
+              登录
             </Button>
           )}
         </Space>
@@ -233,7 +233,7 @@ export default function Layout() {
           padding: "16px 32px",
         }}
       >
-        佛津 FoJin &copy; 2026 — 全球佛教古籍数字资源聚合平台 &nbsp;&middot;&nbsp; <a href="mailto:contact@fojin.app" style={{ color: "inherit" }}>contact@fojin.app</a>
+        佛津 FoJin &copy; 2026 — 全球佛教古籍数字资源聚合平台
       </Footer>
       <Drawer
         title="导航"

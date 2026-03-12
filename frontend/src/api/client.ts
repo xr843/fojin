@@ -553,4 +553,90 @@ export async function getPendingSuggestionCount(): Promise<number> {
   return data.count;
 }
 
+// --- Chat (AI Q&A) ---
+
+export interface ChatSource {
+  text_id: number;
+  juan_num: number;
+  chunk_text: string;
+  score: number;
+}
+
+export interface ChatResponse {
+  session_id: number;
+  message: string;
+  sources: ChatSource[];
+}
+
+export interface ChatSessionItem {
+  id: number;
+  title: string | null;
+  created_at: string;
+}
+
+export interface ChatMessageItem {
+  id: number;
+  role: string;
+  content: string;
+  sources: ChatSource[] | null;
+  created_at: string;
+}
+
+export async function sendChatMessage(
+  message: string,
+  sessionId?: number,
+): Promise<ChatResponse> {
+  const { data } = await api.post<ChatResponse>("/chat", {
+    message,
+    session_id: sessionId,
+  }, { timeout: 90000 });
+  return data;
+}
+
+export async function getChatSessions(): Promise<ChatSessionItem[]> {
+  const { data } = await api.get<ChatSessionItem[]>("/chat/sessions");
+  return data;
+}
+
+export async function getChatSession(sessionId: number): Promise<{
+  id: number;
+  title: string | null;
+  messages: ChatMessageItem[];
+  created_at: string;
+}> {
+  const { data } = await api.get(`/chat/sessions/${sessionId}`);
+  return data;
+}
+
+export async function deleteChatSession(sessionId: number): Promise<void> {
+  await api.delete(`/chat/sessions/${sessionId}`);
+}
+
+// --- BYOK (Bring Your Own Key) ---
+
+export interface ApiKeyStatus {
+  has_api_key: boolean;
+  provider: string | null;
+  model: string | null;
+  key_preview: string | null;
+}
+
+export async function getApiKeyStatus(): Promise<ApiKeyStatus> {
+  const { data } = await api.get<ApiKeyStatus>("/auth/api-key");
+  return data;
+}
+
+export async function saveApiKey(payload: {
+  api_key: string;
+  provider: string;
+  model?: string;
+}): Promise<ApiKeyStatus> {
+  const { data } = await api.put<ApiKeyStatus>("/auth/api-key", payload);
+  return data;
+}
+
+export async function deleteApiKey(): Promise<void> {
+  await api.delete("/auth/api-key");
+}
+
 export default api;

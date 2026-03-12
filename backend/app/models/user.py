@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -22,6 +22,13 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+    # BYOK (Bring Your Own Key)
+    encrypted_api_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    api_provider: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    api_model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    daily_chat_count: Mapped[int] = mapped_column(Integer, server_default="0")
+    last_chat_date = mapped_column(Date, nullable=True)
 
 
 class Bookmark(Base):

@@ -40,5 +40,21 @@ class UserProfile(BaseModel):
     role: str = "user"
     is_active: bool
     created_at: datetime
+    has_api_key: bool = False
+    api_provider: str | None = None
+    api_model: str | None = None
 
     model_config = {"from_attributes": True}
+
+
+class ApiKeyRequest(BaseModel):
+    api_key: str
+    provider: str = "openai"  # openai, dashscope, deepseek, etc.
+    model: str | None = None
+
+
+class ApiKeyStatus(BaseModel):
+    has_api_key: bool
+    provider: str | None = None
+    model: str | None = None
+    key_preview: str | None = None  # e.g. "sk-...3xF2"

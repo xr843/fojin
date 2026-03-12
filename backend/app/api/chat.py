@@ -29,9 +29,9 @@ async def chat(
     user: User | None = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """发送消息并获取 AI 回答。"""
+    """发送消息并获取 AI 回答（支持 BYOK）。"""
     user_id = user.id if user else None
-    return await send_message(db, user_id, data.message, data.session_id)
+    return await send_message(db, user_id, data.message, data.session_id, user=user)
 
 
 @router.get("/sessions", response_model=list[SessionListItem])
