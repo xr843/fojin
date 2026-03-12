@@ -5,7 +5,7 @@ import {
   UserOutlined,
   LogoutOutlined,
   HeartOutlined,
-  LoginOutlined,
+  GithubOutlined,
   ApartmentOutlined,
   DatabaseOutlined,
   BookOutlined,
@@ -201,7 +201,7 @@ export default function Layout() {
           ) : (
             <Button
               type="text"
-              icon={<LoginOutlined />}
+              icon={<GithubOutlined />}
               style={{
                 color: "#fff",
                 background: accent,
@@ -212,9 +212,9 @@ export default function Layout() {
                 padding: "0 16px",
                 fontFamily: '"Noto Serif SC", serif',
               }}
-              onClick={() => navigate("/login")}
+              onClick={() => window.open("https://github.com/xr843/fojin", "_blank")}
             >
-              登录
+              GitHub
             </Button>
           )}
         </Space>
