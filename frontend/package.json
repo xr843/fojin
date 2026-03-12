@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.62.0",
-    "antd": "^5.22.0",
+    "antd": "^6.3.2",
     "axios": "^1.7.9",
     "d3": "^7.9.0",
     "openseadragon": "^4.1.1",
