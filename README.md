@@ -217,7 +217,7 @@ FoJin is built on the generous work of the global Buddhist digital humanities co
 
 **If FoJin is useful for your research, please consider giving it a star!**
 
-[Discussions](https://github.com/xr843/fojin/discussions) &nbsp;&middot;&nbsp; [Issues](https://github.com/xr843/fojin/issues) &nbsp;&middot;&nbsp; [Contributing](CONTRIBUTING.md)
+[Discussions](https://github.com/xr843/fojin/discussions) &nbsp;&middot;&nbsp; [Issues](https://github.com/xr843/fojin/issues) &nbsp;&middot;&nbsp; [Contributing](CONTRIBUTING.md) &nbsp;&middot;&nbsp; [contact@fojin.app](mailto:contact@fojin.app)
 
 Made with care for the Buddhist studies community.
 

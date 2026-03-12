@@ -144,3 +144,7 @@ fojin/
 ## 许可证
 
 Apache License 2.0 — 详见 [LICENSE](../LICENSE)。
+
+## 联系我们
+
+邮箱：[contact@fojin.app](mailto:contact@fojin.app) &nbsp;&middot;&nbsp; [GitHub Discussions](https://github.com/xr843/fojin/discussions)
