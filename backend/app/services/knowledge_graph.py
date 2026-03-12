@@ -1,5 +1,5 @@
 from opencc import OpenCC
-from sqlalchemy import case, exists, or_, select, text, func
+from sqlalchemy import case, exists, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.knowledge_graph import KGEntity, KGRelation

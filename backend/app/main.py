@@ -14,6 +14,7 @@ from app.core.elasticsearch import close_es, get_es, init_es
 from app.core.exceptions import FoJinError, fojin_error_to_http
 from app.core.rate_limit import RateLimitMiddleware
 from app.database import engine as async_engine
+
 try:
     from app.services.dianjin import get_dianjin_client
     _HAS_DIANJIN = True
@@ -21,10 +22,24 @@ except ImportError:
     _HAS_DIANJIN = False
 
 logger = logging.getLogger(__name__)
-from app.api import auth, bookmarks, history, search, texts
-from app.api import sources, relations, knowledge_graph, iiif
-from app.api import chat, annotations, exports, dictionary, citations
-from app.api import source_suggestions
+from app.api import (
+    annotations,
+    auth,
+    bookmarks,
+    chat,
+    citations,
+    dictionary,
+    exports,
+    history,
+    iiif,
+    knowledge_graph,
+    relations,
+    search,
+    source_suggestions,
+    sources,
+    texts,
+)
+
 try:
     from app.api import dianjin
 except ImportError:

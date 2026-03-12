@@ -5,7 +5,6 @@ import redis.asyncio as aioredis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
 from app.models.iiif import IIIFManifest
 
 MANIFEST_CACHE_TTL = 3600  # 1 hour

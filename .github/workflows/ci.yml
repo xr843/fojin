@@ -25,6 +25,9 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
 
+      - name: Lint (ruff)
+        run: pip install ruff && ruff check app/
+
       - name: Run tests
         run: python -m pytest -q tests/ --ignore=tests/test_annotations_workflow.py -k "not test_kg_entity_detail"
 
@@ -45,6 +48,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Lint
+        run: npx eslint src/
 
       - name: Type check & build
         run: npm run build

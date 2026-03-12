@@ -1,6 +1,6 @@
+from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import HTTPException, status
 
 from app.models.text import BuddhistText
 from app.schemas.citation import CitationResponse

@@ -33,7 +33,7 @@ class DataSource(Base):
 
     texts: Mapped[list["BuddhistText"]] = relationship(back_populates="source")  # noqa: F821
     identifiers: Mapped[list["TextIdentifier"]] = relationship(back_populates="source")
-    distributions: Mapped[list["SourceDistribution"]] = relationship(  # noqa: F821
+    distributions: Mapped[list["SourceDistribution"]] = relationship(
         back_populates="source",
         cascade="all, delete-orphan",
     )

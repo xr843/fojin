@@ -3,7 +3,7 @@ from datetime import date
 
 import httpx
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -126,18 +126,6 @@ async def send_message(
     if len(message) > 2000:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="消息长度不能超过2000字")
 
-    # Anonymous users cannot use chat
-    if user_id is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="请登录后使用 AI 问答功能")
-
-    # Get or create session, with strict ownership check
-    if session_id:
-        chat_session = await get_session(db, session_id)
-        if chat_session is None:
-            chat_session = await create_session(db, user_id, title=message[:50])
-        elif chat_session.user_id != user_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权访问此会话")
-
     # Resolve LLM config (BYOK or platform)
     api_url, api_key, model, is_byok = _resolve_llm_config(user)
 
@@ -151,6 +139,18 @@ async def send_message(
     # Daily quota check for non-BYOK users
     if not is_byok and user:
         await _check_daily_quota(db, user)
+
+    # Anonymous users cannot use chat
+    if user_id is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="请登录后使用 AI 问答功能")
+
+    # Get or create session, with strict ownership check
+    if session_id:
+        chat_session = await get_session(db, session_id)
+        if chat_session is None:
+            chat_session = await create_session(db, user_id, title=message[:50])
+        elif chat_session.user_id != user_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权访问此会话")
     else:
         chat_session = await create_session(db, user_id, title=message[:50])
 
@@ -231,9 +231,7 @@ async def send_message(
 
 async def delete_session(db: AsyncSession, session_id: int, user_id: int) -> None:
     cs = await get_session_for_user(db, session_id, user_id)
-    # Delete messages first
-    msgs = await get_history(db, session_id)
-    for msg in msgs:
-        await db.delete(msg)
+    # Bulk delete messages in a single statement
+    await db.execute(delete(ChatMessage).where(ChatMessage.session_id == session_id))
     await db.delete(cs)
     await db.commit()

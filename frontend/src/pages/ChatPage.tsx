@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { Input, Button, Space, Spin, message, Alert } from "antd";
+import Markdown from "react-markdown";
 import {
   SendOutlined,
   RobotOutlined,
@@ -214,7 +215,11 @@ export default function ChatPage() {
                   whiteSpace: "pre-wrap",
                   wordBreak: "break-word",
                 }}>
-                  {m.content}
+                  {m.role === "assistant" ? (
+                    <div className="chat-markdown"><Markdown>{m.content}</Markdown></div>
+                  ) : (
+                    m.content
+                  )}
                   {m.sources && m.sources.length > 0 && (
                     <div style={{
                       marginTop: 8,

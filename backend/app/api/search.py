@@ -115,14 +115,12 @@ if _HAS_DIANJIN:
 
         if dianjin_result is not None:
             if isinstance(dianjin_result, Exception):
-                dianjin_error = f"典津搜索异常: {str(dianjin_result)}"
+                dianjin_error = f"典津搜索异常: {dianjin_result!s}"
             else:
                 dianjin_total = dianjin_result.total
                 dianjin_results = dianjin_result.results
                 dianjin_error = dianjin_result.error
-        elif not include_dianjin:
-            dianjin_error = None
-        elif not q:
+        elif not include_dianjin or not q:
             dianjin_error = None
 
         return FederatedSearchResponse(

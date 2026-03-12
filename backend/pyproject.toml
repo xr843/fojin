@@ -7,3 +7,40 @@ dev = [
     "anyio[trio]>=4.0",
     "pytest-anyio>=0.0.0",
 ]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+src = ["app", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+    "RUF", # ruff-specific
+]
+ignore = [
+    "E501",    # line too long (handled by formatter)
+    "E402",    # module level import not at top (main.py needs try/except before imports)
+    "E712",    # comparison to True (required by SQLAlchemy column expressions)
+    "B008",    # do not perform function calls in argument defaults (FastAPI Depends)
+    "SIM105",  # contextlib.suppress (explicit try/except is clearer for async cache writes)
+    "SIM108",  # ternary operator (if/else block is more readable for complex logic)
+    "RUF001",  # ambiguous unicode in string (Chinese text)
+    "RUF002",  # ambiguous unicode in docstring (Chinese text)
+    "RUF003",  # ambiguous unicode in comment (Chinese text)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true

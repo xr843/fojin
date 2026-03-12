@@ -68,6 +68,37 @@ em {
   height: 600px !important;
 }
 
+/* ========== Chat Markdown ========== */
+.chat-markdown p { margin: 0 0 0.5em; }
+.chat-markdown p:last-child { margin-bottom: 0; }
+.chat-markdown ul, .chat-markdown ol { margin: 0.3em 0; padding-left: 1.5em; }
+.chat-markdown pre {
+  background: rgba(0,0,0,0.06);
+  border-radius: 6px;
+  padding: 8px 12px;
+  overflow-x: auto;
+  font-size: 13px;
+  margin: 0.5em 0;
+}
+.chat-markdown code {
+  background: rgba(0,0,0,0.06);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-size: 13px;
+}
+.chat-markdown pre code { background: none; padding: 0; }
+.chat-markdown blockquote {
+  border-left: 3px solid var(--fj-gold);
+  padding-left: 12px;
+  margin: 0.5em 0;
+  opacity: 0.85;
+}
+.chat-markdown h1, .chat-markdown h2, .chat-markdown h3 {
+  font-size: 1em;
+  font-weight: 600;
+  margin: 0.5em 0 0.3em;
+}
+
 /* ========== Reduced Motion ========== */
 @media (prefers-reduced-motion: reduce) {
   *,

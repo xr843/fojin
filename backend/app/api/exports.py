@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_optional_user
 from app.database import get_db
-from app.models.text import BuddhistText
 from app.models.knowledge_graph import KGEntity, KGRelation
+from app.models.text import BuddhistText
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
@@ -211,10 +211,7 @@ async def export_kg_jsonld(
             },
             "@graph": [],
         }
-        # Emit context header as partial JSON; we'll stream @graph items
-        header = json.dumps(context, ensure_ascii=False, indent=2)
-        # Remove the closing `]` and `}` so we can append items
-        # Output: everything up to the empty @graph array opening
+        # Stream @graph items incrementally
         yield '{\n'
         yield '  "@context": ' + json.dumps(context["@context"], ensure_ascii=False, indent=4) + ',\n'
         yield '  "@graph": [\n'

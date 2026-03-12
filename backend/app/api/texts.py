@@ -1,7 +1,6 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_optional_user
@@ -52,7 +51,7 @@ async def read_juan(
             user_id=user.id, text_id=text_id, juan_num=juan_num
         ).on_conflict_do_update(
             constraint="uq_reading_history_user_text",
-            set_={"juan_num": juan_num, "last_read_at": datetime.now(timezone.utc)},
+            set_={"juan_num": juan_num, "last_read_at": datetime.now(UTC)},
         )
         await db.execute(stmt)
         await db.commit()

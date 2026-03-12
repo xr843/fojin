@@ -22,7 +22,6 @@ Parser for 84000 TEI XML translation files.
 import re
 from xml.etree import ElementTree as ET
 
-
 TEI_NS = "http://www.tei-c.org/ns/1.0"
 
 
