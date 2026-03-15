@@ -40,6 +40,7 @@ IMPORT_REGISTRY = {
         ("import_gandhari", "犍陀罗语佛典"),
         ("import_vri_tipitaka", "VRI 巴利三藏"),
         ("import_dila_authority", "DILA 权威数据"),
+        ("import_buddhason", "莊春江讀經站 阿含/尼柯耶"),
     ],
 }
 
