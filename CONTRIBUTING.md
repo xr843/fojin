@@ -72,7 +72,7 @@ To contribute a translation:
 
 ## Community
 
-- **Discord**: [Join our server](https://discord.gg/fojin) (coming soon)
+- **Discord**: [Join our server](https://discord.gg/76SZeuJekq)
 - **GitHub Discussions**: [Ask questions & share ideas](https://github.com/xr843/fojin/discussions)
 
 ## License

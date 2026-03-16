@@ -8,12 +8,13 @@
 
 Aggregating the world's Buddhist digital heritage — from the Chinese Tripitaka to Sanskrit manuscripts, Pali suttas to Tibetan texts — with full-text reading, AI-powered Q&A, knowledge graph, and multi-language parallel reading.
 
-[Live Demo](https://fojin.app) &nbsp;&middot;&nbsp; [中文文档](./docs/README_zh.md) &nbsp;&middot;&nbsp; [Report Bug](https://github.com/xr843/fojin/issues)
+[Live Demo](https://fojin.app) &nbsp;&middot;&nbsp; [中文文档](./docs/README_zh.md) &nbsp;&middot;&nbsp; [Discord](https://discord.gg/76SZeuJekq) &nbsp;&middot;&nbsp; [Report Bug](https://github.com/xr843/fojin/issues)
 
 [![CI](https://github.com/xr843/fojin/actions/workflows/ci.yml/badge.svg)](https://github.com/xr843/fojin/actions/workflows/ci.yml)
 [![Security Scan](https://github.com/xr843/fojin/actions/workflows/security.yml/badge.svg)](https://github.com/xr843/fojin/actions/workflows/security.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/xr843/fojin?style=social)](https://github.com/xr843/fojin)
+[![Discord](https://img.shields.io/discord/1482908181125529732?label=Discord&logo=discord&logoColor=white)](https://discord.gg/76SZeuJekq)
 
 ![FoJin — Global Buddhist Digital Text Platform](./docs/screenshots/hero.png)
 
