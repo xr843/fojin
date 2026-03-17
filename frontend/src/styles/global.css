@@ -138,6 +138,58 @@ em {
   overflow-y: auto;
 }
 
+/* ========== Layout Content Mobile ========== */
+@media (max-width: 768px) {
+  .ant-layout-content {
+    padding: 12px 10px !important;
+  }
+}
+
+/* ========== Text Detail Page Mobile ========== */
+.text-detail-page {
+  max-width: 800px;
+  margin: 24px auto;
+}
+
+@media (max-width: 768px) {
+  .text-detail-page {
+    margin: 8px auto;
+  }
+
+  .text-detail-page .ant-card {
+    border-radius: 6px;
+  }
+
+  .text-detail-page .ant-descriptions {
+    font-size: 13px;
+  }
+
+  .text-detail-page .ant-space {
+    gap: 8px !important;
+  }
+
+  .text-detail-page .ant-btn-lg {
+    height: 36px;
+    font-size: 14px;
+    padding: 4px 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .text-detail-page {
+    margin: 4px auto;
+  }
+
+  .text-detail-page .ant-descriptions-item-label {
+    width: 70px !important;
+    padding: 6px 8px !important;
+  }
+
+  .text-detail-page .ant-descriptions-item-content {
+    padding: 6px 8px !important;
+  }
+}
+
 /* ========== Reduced Motion ========== */
 @media (prefers-reduced-motion: reduce) {
   *,

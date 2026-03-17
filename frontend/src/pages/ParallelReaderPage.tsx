@@ -4,6 +4,7 @@ import { Typography, Spin, Row, Col, Card, Select, InputNumber, Space, Empty, Bu
 import { SwapOutlined, ArrowLeftOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { getParallelRead, getTextRelations } from "../api/client";
+import "../styles/parallel.css";
 
 const { Title, Paragraph } = Typography;
 
@@ -37,21 +38,20 @@ export default function ParallelReaderPage() {
   };
 
   return (
-    <div style={{ maxWidth: 1400, margin: "24px auto", padding: "0 16px" }}>
-      <Space style={{ marginBottom: 16 }}>
+    <div className="parallel-container">
+      <div className="parallel-header">
         <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)}>
           返回
         </Button>
         <Title level={3} style={{ margin: 0 }}>
           <SwapOutlined /> 平行对照阅读
         </Title>
-      </Space>
+      </div>
 
-      <Card size="small" style={{ marginBottom: 16 }}>
+      <Card size="small" style={{ marginBottom: 16 }} className="parallel-controls">
         <Space wrap>
           <span>对照版本：</span>
           <Select
-            style={{ width: 400 }}
             placeholder="选择对照文本"
             value={compareId ? Number(compareId) : undefined}
             onChange={handleCompareChange}
@@ -83,7 +83,7 @@ export default function ParallelReaderPage() {
       ) : !parallel ? (
         <Empty description="对照内容未找到" />
       ) : (
-        <Row gutter={16}>
+        <Row gutter={[16, 12]} className="parallel-columns">
           <Col xs={24} md={12}>
             <Card
               title={
@@ -98,16 +98,10 @@ export default function ParallelReaderPage() {
               }
               size="small"
             >
-              <div
-                style={{
-                  maxHeight: "70vh",
-                  overflow: "auto",
-                  lineHeight: 2,
-                  fontSize: 16,
-                  whiteSpace: "pre-wrap",
-                }}
-              >
-                {parallel.text_a.content || <Paragraph type="secondary">暂无内容</Paragraph>}
+              <div className="parallel-reader-col">
+                <div className="reader-content">
+                  {parallel.text_a.content || <Paragraph type="secondary">暂无内容</Paragraph>}
+                </div>
               </div>
             </Card>
           </Col>
@@ -125,16 +119,10 @@ export default function ParallelReaderPage() {
               }
               size="small"
             >
-              <div
-                style={{
-                  maxHeight: "70vh",
-                  overflow: "auto",
-                  lineHeight: 2,
-                  fontSize: 16,
-                  whiteSpace: "pre-wrap",
-                }}
-              >
-                {parallel.text_b.content || <Paragraph type="secondary">暂无内容</Paragraph>}
+              <div className="parallel-reader-col">
+                <div className="reader-content">
+                  {parallel.text_b.content || <Paragraph type="secondary">暂无内容</Paragraph>}
+                </div>
               </div>
             </Card>
           </Col>

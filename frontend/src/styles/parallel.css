@@ -1,3 +1,26 @@
+/* ── ParallelReaderPage responsive styles ── */
+
+.parallel-container {
+  max-width: 1400px;
+  margin: 24px auto;
+  padding: 0 16px;
+}
+
+.parallel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.parallel-header h3 {
+  margin: 0 !important;
+}
+
+.parallel-controls .ant-select {
+  width: 400px;
+}
+
 .parallel-reader-col {
   height: 70vh;
   overflow-y: auto;
@@ -19,9 +42,92 @@
   border-radius: 3px;
 }
 
+/* ── Tablet (max-width: 1024px) ── */
+@media (max-width: 1024px) {
+  .parallel-container {
+    margin: 16px auto;
+    padding: 0 12px;
+  }
+
+  .parallel-controls .ant-select {
+    width: 300px;
+  }
+
+  .parallel-reader-col {
+    height: 60vh;
+  }
+
+  .parallel-reader-col .reader-content {
+    font-size: 15px;
+    padding: 12px;
+  }
+}
+
+/* ── Mobile (max-width: 768px) ── */
 @media (max-width: 768px) {
+  .parallel-container {
+    margin: 12px auto;
+    padding: 0 8px;
+  }
+
+  .parallel-header {
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 12px;
+  }
+
+  .parallel-header h3 {
+    font-size: 18px !important;
+  }
+
+  .parallel-controls {
+    width: 100%;
+  }
+
+  .parallel-controls .ant-space {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .parallel-controls .ant-select {
+    width: 100% !important;
+    min-width: 0;
+  }
+
   .parallel-reader-col {
     height: auto;
     max-height: 50vh;
+  }
+
+  .parallel-reader-col .reader-content {
+    font-size: 15px;
+    line-height: 1.9;
+    padding: 12px 10px;
+  }
+
+  /* Add vertical spacing between stacked cards on mobile */
+  .parallel-columns .ant-col {
+    margin-bottom: 12px;
+  }
+
+  .parallel-columns .ant-col:last-child {
+    margin-bottom: 0;
+  }
+}
+
+/* ── Small phone (max-width: 480px) ── */
+@media (max-width: 480px) {
+  .parallel-container {
+    padding: 0 6px;
+  }
+
+  .parallel-reader-col {
+    max-height: 40vh;
+  }
+
+  .parallel-reader-col .reader-content {
+    font-size: 14px;
+    line-height: 1.8;
+    padding: 10px 8px;
   }
 }

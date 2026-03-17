@@ -93,7 +93,7 @@ export default function TextDetailPage() {
   }
 
   return (
-    <div style={{ maxWidth: 800, margin: "24px auto" }}>
+    <div className="text-detail-page">
       <Helmet>
         <title>{text.title_zh} — 佛津</title>
         <meta name="description" content={`${text.title_zh}${text.translator ? ` · ${text.translator}` : ""}${text.category ? ` · ${text.category}` : ""} — 佛津佛教古籍资源`} />

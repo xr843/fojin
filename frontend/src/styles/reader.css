@@ -58,11 +58,32 @@
   margin-bottom: 48px;
 }
 
-/* ── Mobile ── */
+/* ── Tablet (max-width: 1024px) ── */
+@media (max-width: 1024px) {
+  .reader-container {
+    margin: 20px auto;
+    padding: 0 14px;
+  }
+
+  .reader-body {
+    padding: 28px 20px;
+  }
+}
+
+/* ── Mobile (max-width: 768px) ── */
 @media (max-width: 768px) {
   .reader-container {
-    margin: 16px auto;
-    padding: 0 12px;
+    margin: 12px auto;
+    padding: 0 10px;
+  }
+
+  .reader-header {
+    margin-bottom: 16px;
+  }
+
+  .reader-header h3 {
+    font-size: 18px !important;
+    margin-bottom: 6px;
   }
 
   .reader-nav {
@@ -93,8 +114,15 @@
   }
 
   .reader-body {
-    padding: 20px 16px;
+    padding: 20px 14px;
     border-radius: 6px;
+    line-height: 2.0;
+  }
+
+  .reader-bottom-nav {
+    margin-top: 16px;
+    margin-bottom: 32px;
+    gap: 8px;
   }
 
   .reader-bottom-nav .ant-btn {
@@ -102,9 +130,20 @@
   }
 }
 
+/* ── Small phone (max-width: 480px) ── */
 @media (max-width: 480px) {
+  .reader-container {
+    padding: 0 8px;
+  }
+
   .reader-body {
-    padding: 16px 12px;
-    line-height: 2.0;
+    padding: 14px 10px;
+    line-height: 1.9;
+    font-size: var(--reader-font-size, 16px);
+    border-radius: 4px;
+  }
+
+  .reader-bottom-nav {
+    margin-bottom: 24px;
   }
 }
