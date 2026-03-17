@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     dianjin_api_key: str = ""
     dianjin_api_url: str = "https://guji.cckb.cn/api"
 
+    # Rate limiting (requests per minute)
+    rate_limit_default: int = 200
+    rate_limit_login: int = 10
+    rate_limit_register: int = 5
+
     @property
     def database_url(self) -> str:
         return (

@@ -7,12 +7,14 @@ import redis.exceptions as redis_exc
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.config import settings
+
 logger = logging.getLogger(__name__)
 
 # Stricter rate limits for sensitive auth endpoints (requests per minute)
 STRICT_PATHS: dict[str, int] = {
-    "/api/auth/login": 10,
-    "/api/auth/register": 5,
+    "/api/auth/login": settings.rate_limit_login,
+    "/api/auth/register": settings.rate_limit_register,
 }
 
 
@@ -38,7 +40,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         # Determine rate limit for this path
         strict_limit = STRICT_PATHS.get(path)
-        rate_limit = strict_limit if strict_limit is not None else 200
+        rate_limit = strict_limit if strict_limit is not None else settings.rate_limit_default
 
         # Use path-specific key for strict paths to avoid sharing budget
         if strict_limit is not None:
