@@ -25,7 +25,7 @@ async def dify_dataset_search(query: str, top_k: int = 3) -> list[dict]:
         return []
 
     results: list[dict] = []
-    async with httpx.AsyncClient(timeout=5) as client:
+    async with httpx.AsyncClient(timeout=2) as client:
         for dataset_id in dataset_ids:
             try:
                 resp = await client.post(

@@ -638,11 +638,10 @@ export async function sendChatMessageStream(
     let i = 0;
     const emit = () => {
       if (i < text.length) {
-        // Emit 2-4 characters per tick for natural speed
-        const chunk = text.slice(i, i + 2 + Math.floor(Math.random() * 3));
+        const chunk = text.slice(i, i + 1 + Math.floor(Math.random() * 2));
         callbacks.onToken(chunk);
         i += chunk.length;
-        setTimeout(emit, 15 + Math.random() * 25);
+        setTimeout(emit, 30 + Math.random() * 40);
       } else {
         callbacks.onDone();
       }
