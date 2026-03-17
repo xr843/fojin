@@ -86,6 +86,9 @@ services:
       REDIS_PORT: 6379
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-changeme-in-production}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173,http://localhost:5174}
+      DIFY_API_URL: ${DIFY_API_URL:-http://192.168.110.12:8080/v1}
+      DIFY_DATASET_API_KEY: ${DIFY_DATASET_API_KEY:-}
+      DIFY_DATASET_IDS: ${DIFY_DATASET_IDS:-0b3c24d7-40c3-49ba-8399-cb130c7a72ab,da2ceee4-b04e-441e-a013-dee40f801573}
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     volumes:

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import date
 
@@ -11,6 +12,7 @@ from app.core.crypto import decrypt_api_key
 from app.models.chat import ChatMessage, ChatSession
 from app.models.user import User
 from app.schemas.chat import ChatResponse, ChatSource
+from app.services.dify_retrieval import dify_dataset_search
 from app.services.embedding import generate_embedding, similarity_search
 
 logger = logging.getLogger(__name__)
@@ -154,19 +156,39 @@ async def send_message(
     if not is_byok and user:
         await _check_daily_quota(db, user)
 
-    # RAG: generate embedding and search
+    # RAG: hybrid retrieval — pgvector + Dify datasets in parallel
     sources: list[ChatSource] = []
     context_text = ""
     try:
+        # Launch Dify search concurrently with embedding generation
+        dify_task = asyncio.ensure_future(dify_dataset_search(message, top_k=3))
         query_embedding = await generate_embedding(message)
         search_results = await similarity_search(db, query_embedding, limit=5)
+
+        # pgvector sources
         sources = [ChatSource(**r) for r in search_results]
-        context_text = "\n\n".join(
-            f"[出处: 《{r['title_zh']}》第{r['juan_num']}卷]\n{r['chunk_text']}"
-            if r.get("title_zh")
-            else f"[出处: 文本#{r['text_id']} 第{r['juan_num']}卷]\n{r['chunk_text']}"
-            for r in search_results
-        )
+        context_parts = []
+        for r in search_results:
+            label = f"《{r['title_zh']}》第{r['juan_num']}卷" if r.get("title_zh") else f"文本#{r['text_id']} 第{r['juan_num']}卷"
+            context_parts.append(f"[出处: {label}]\n{r['chunk_text']}")
+
+        # Dify sources
+        try:
+            dify_results = await dify_task
+            for dr in dify_results:
+                sources.append(ChatSource(
+                    text_id=0,
+                    juan_num=0,
+                    chunk_text=dr["chunk_text"],
+                    score=dr["score"],
+                    title_zh="",
+                    source_type="dify",
+                ))
+                context_parts.append(f"[出处: 佛典知识库]\n{dr['chunk_text']}")
+        except Exception:
+            logger.warning("Dify retrieval failed, using pgvector results only")
+
+        context_text = "\n\n".join(context_parts)
     except Exception:
         logger.exception("Embedding/search failed, proceeding without RAG context")
 
