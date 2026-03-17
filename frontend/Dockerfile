@@ -10,11 +10,11 @@ RUN npm run build
 RUN find dist -type f \( -name '*.js' -o -name '*.css' -o -name '*.html' -o -name '*.svg' -o -name '*.json' \) \
     -exec gzip -9 -k {} \;
 
-FROM nginx:alpine
+FROM nginx:bookworm-slim
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Run as non-root nginx user (nginx:alpine provides this user)
+# Run as non-root nginx user
 RUN chown -R nginx:nginx /usr/share/nginx/html && \
     chown -R nginx:nginx /var/cache/nginx && \
     chown -R nginx:nginx /var/log/nginx && \
