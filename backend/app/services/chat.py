@@ -162,7 +162,9 @@ async def send_message(
         search_results = await similarity_search(db, query_embedding, limit=5)
         sources = [ChatSource(**r) for r in search_results]
         context_text = "\n\n".join(
-            f"[出处: 文本#{r['text_id']} 第{r['juan_num']}卷]\n{r['chunk_text']}"
+            f"[出处: 《{r['title_zh']}》第{r['juan_num']}卷]\n{r['chunk_text']}"
+            if r.get("title_zh")
+            else f"[出处: 文本#{r['text_id']} 第{r['juan_num']}卷]\n{r['chunk_text']}"
             for r in search_results
         )
     except Exception:

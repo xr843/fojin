@@ -52,11 +52,13 @@ async def similarity_search(
     embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
     raw_conn = await session.connection()
     result = await raw_conn.exec_driver_sql(
-        "SELECT text_id, juan_num, chunk_text, "
-        "1 - (embedding <=> $1::vector) AS score "
-        "FROM text_embeddings "
-        "WHERE embedding IS NOT NULL "
-        "ORDER BY embedding <=> $1::vector "
+        "SELECT te.text_id, te.juan_num, te.chunk_text, "
+        "1 - (te.embedding <=> $1::vector) AS score, "
+        "COALESCE(bt.title_zh, '') AS title_zh "
+        "FROM text_embeddings te "
+        "LEFT JOIN buddhist_texts bt ON bt.id = te.text_id "
+        "WHERE te.embedding IS NOT NULL "
+        "ORDER BY te.embedding <=> $1::vector "
         "LIMIT $2",
         (embedding_str, limit),
     )
@@ -67,6 +69,7 @@ async def similarity_search(
             "juan_num": row[1],
             "chunk_text": row[2],
             "score": float(row[3]),
+            "title_zh": row[4],
         }
         for row in rows
     ]

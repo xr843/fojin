@@ -13,6 +13,8 @@ class ChatSource(BaseModel):
     juan_num: int
     chunk_text: str
     score: float
+    title_zh: str = ""
+    source_type: str = "rag"
 
 
 class ChatResponse(BaseModel):
