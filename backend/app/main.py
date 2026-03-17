@@ -150,7 +150,8 @@ async def health(request: Request):
             components["redis"] = "ok"
         else:
             components["redis"] = "not_configured"
-    except Exception:
+    except (ConnectionError, OSError, Exception) as e:
+        logger.warning("Health check: Redis error: %s", e)
         components["redis"] = "error"
 
     # Check PostgreSQL
@@ -159,7 +160,8 @@ async def health(request: Request):
         async with async_engine.connect() as conn:
             await conn.execute(sa_text("SELECT 1"))
         components["postgresql"] = "ok"
-    except Exception:
+    except (ConnectionError, OSError, Exception) as e:
+        logger.warning("Health check: PostgreSQL error: %s", e)
         components["postgresql"] = "error"
 
     # Check Elasticsearch
@@ -170,7 +172,8 @@ async def health(request: Request):
             components["elasticsearch"] = "ok"
         else:
             components["elasticsearch"] = "not_configured"
-    except Exception:
+    except (ConnectionError, OSError, Exception) as e:
+        logger.warning("Health check: Elasticsearch error: %s", e)
         components["elasticsearch"] = "error"
 
     all_ok = all(v == "ok" for v in components.values())

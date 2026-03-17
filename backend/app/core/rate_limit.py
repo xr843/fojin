@@ -3,6 +3,7 @@
 import logging
 import time
 
+import redis.exceptions as redis_exc
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -57,8 +58,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                     media_type="application/json",
                     headers={"Retry-After": "60"},
                 )
-        except Exception:
-            logger.debug("Redis rate-limit check failed, allowing request", exc_info=True)
+        except (redis_exc.ConnectionError, redis_exc.TimeoutError, redis_exc.RedisError):
+            logger.warning("Redis rate-limit check failed, allowing request", exc_info=True)
 
         response = await call_next(request)
         return response
