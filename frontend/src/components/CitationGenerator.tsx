@@ -1,70 +1,101 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Select, Typography, Button, Space, message, Modal } from "antd";
-import { CopyOutlined, BookOutlined } from "@ant-design/icons";
-import api from "../api/client";
+import { Typography, Button, Space, message, Modal, Segmented } from "antd";
+import { CopyOutlined, DownloadOutlined, BookOutlined } from "@ant-design/icons";
+import { getTextDetail, type TextDetail } from "../api/client";
+import {
+  generateCitation,
+  downloadCitation,
+  type CitationFormat,
+  type CitationMeta,
+} from "../utils/citationFormats";
 
 const { Paragraph, Text } = Typography;
 
-interface CitationResponse {
-  text_id: number;
-  title: string;
-  style: string;
-  citation: string;
-}
-
 interface CitationGeneratorProps {
+  /** Text ID to generate citations for. */
   textId: number;
+  /** If textData is already available (e.g. from parent), skip the fetch. */
+  textData?: TextDetail | null;
   open: boolean;
   onClose: () => void;
 }
 
-const styleOptions = [
-  { value: "chicago", label: "Chicago" },
+const FORMAT_OPTIONS: { value: CitationFormat; label: string }[] = [
+  { value: "bibtex", label: "BibTeX" },
+  { value: "ris", label: "RIS" },
   { value: "apa", label: "APA" },
-  { value: "mla", label: "MLA" },
-  { value: "harvard", label: "Harvard" },
 ];
 
-export default function CitationGenerator({ textId, open, onClose }: CitationGeneratorProps) {
-  const [style, setStyle] = useState("chicago");
+function buildMeta(t: TextDetail): CitationMeta {
+  return {
+    id: t.id,
+    cbetaId: t.cbeta_id,
+    titleZh: t.title_zh,
+    titleEn: null,
+    translator: t.translator,
+    dynasty: t.dynasty,
+    category: t.category,
+  };
+}
 
-  const { data: citation } = useQuery<CitationResponse>({
-    queryKey: ["citation", textId, style],
-    queryFn: async () =>
-      (await api.get(`/citations/text/${textId}`, { params: { style } })).data,
-    enabled: open && !!textId,
+export default function CitationGenerator({
+  textId,
+  textData,
+  open,
+  onClose,
+}: CitationGeneratorProps) {
+  const [format, setFormat] = useState<CitationFormat>("bibtex");
+
+  // Only fetch if the parent didn't pass textData
+  const { data: fetched } = useQuery({
+    queryKey: ["text", textId],
+    queryFn: () => getTextDetail(textId),
+    enabled: open && !!textId && !textData,
   });
 
-  const handleCopy = () => {
-    if (citation) {
-      navigator.clipboard.writeText(citation.citation);
+  const text = textData ?? fetched;
+  const meta = text ? buildMeta(text) : null;
+  const citation = meta ? generateCitation(format, meta) : "";
+
+  const handleCopy = async () => {
+    if (!citation) return;
+    try {
+      await navigator.clipboard.writeText(citation);
       message.success("引用已复制到剪贴板");
+    } catch {
+      message.error("复制失败，请手动选择文本复制");
     }
+  };
+
+  const handleDownload = () => {
+    if (!meta) return;
+    downloadCitation(format, meta);
+    message.success("文件已下载");
   };
 
   return (
     <Modal
       title={
         <Space>
-          <BookOutlined /> 生成引用格式
+          <BookOutlined /> 导出引用
         </Space>
       }
       open={open}
       onCancel={onClose}
       footer={null}
-      width={500}
+      width={560}
     >
-      <Space direction="vertical" style={{ width: "100%" }}>
-        <Space>
-          <Text>引用风格:</Text>
-          <Select
-            value={style}
-            onChange={setStyle}
-            options={styleOptions}
-            style={{ width: 150 }}
+      <Space direction="vertical" style={{ width: "100%" }} size="middle">
+        <div>
+          <Text style={{ marginRight: 8 }}>引用格式:</Text>
+          <Segmented
+            value={format}
+            onChange={(v) => setFormat(v as CitationFormat)}
+            options={FORMAT_OPTIONS}
           />
-        </Space>
+        </div>
+
         {citation && (
           <div
             style={{
@@ -72,16 +103,42 @@ export default function CitationGenerator({ textId, open, onClose }: CitationGen
               padding: 16,
               borderRadius: 8,
               border: "1px solid #f0f0f0",
+              maxHeight: 240,
+              overflow: "auto",
             }}
           >
-            <Paragraph style={{ margin: 0, whiteSpace: "pre-wrap" }}>
-              {citation.citation}
+            <Paragraph
+              style={{
+                margin: 0,
+                whiteSpace: "pre-wrap",
+                fontFamily:
+                  format === "apa"
+                    ? "inherit"
+                    : "'Fira Code', 'Cascadia Code', monospace",
+                fontSize: format === "apa" ? 14 : 13,
+              }}
+            >
+              {citation}
             </Paragraph>
           </div>
         )}
-        <Button icon={<CopyOutlined />} onClick={handleCopy} disabled={!citation}>
-          复制引用
-        </Button>
+
+        <Space>
+          <Button
+            icon={<CopyOutlined />}
+            onClick={handleCopy}
+            disabled={!citation}
+          >
+            复制
+          </Button>
+          <Button
+            icon={<DownloadOutlined />}
+            onClick={handleDownload}
+            disabled={!meta}
+          >
+            下载文件
+          </Button>
+        </Space>
       </Space>
     </Modal>
   );

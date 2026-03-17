@@ -8,8 +8,10 @@ import {
   LeftOutlined,
   RightOutlined,
   FontSizeOutlined,
+  BookOutlined,
 } from "@ant-design/icons";
-import { getJuanList, getJuanContent } from "../api/client";
+import { getJuanList, getJuanContent, getTextDetail } from "../api/client";
+import CitationGenerator from "../components/CitationGenerator";
 import "../styles/reader.css";
 
 const FONT_SIZE_MIN = 14;
@@ -31,6 +33,7 @@ export default function TextReaderPage() {
   const textId = Number(id);
   const [juanNum, setJuanNum] = useState(1);
   const [fontSize, setFontSize] = useState(getInitialFontSize);
+  const [citationOpen, setCitationOpen] = useState(false);
 
   const { data: juanList } = useQuery({
     queryKey: ["juanList", textId],
@@ -41,6 +44,12 @@ export default function TextReaderPage() {
   const { data: content, isLoading } = useQuery({
     queryKey: ["juanContent", textId, juanNum],
     queryFn: () => getJuanContent(textId, juanNum),
+    enabled: !!textId,
+  });
+
+  const { data: textDetail } = useQuery({
+    queryKey: ["text", textId],
+    queryFn: () => getTextDetail(textId),
     enabled: !!textId,
   });
 
@@ -124,6 +133,13 @@ export default function TextReaderPage() {
               下一卷 <RightOutlined />
             </Button>
           </div>
+          <Button
+            size="small"
+            icon={<BookOutlined />}
+            onClick={() => setCitationOpen(true)}
+          >
+            引用
+          </Button>
           <div className="reader-font-controls">
             <Button
               size="small"
@@ -183,6 +199,13 @@ export default function TextReaderPage() {
           </Button>
         </div>
       )}
+
+      <CitationGenerator
+        textId={textId}
+        textData={textDetail}
+        open={citationOpen}
+        onClose={() => setCitationOpen(false)}
+      />
     </div>
   );
 }

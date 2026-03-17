@@ -194,24 +194,17 @@ export default function TextDetailPage() {
               手稿影像 ({manifests.length})
             </Button>
           )}
-          {/* TODO: 引用格式生成器和笔记功能待后端完善后启用
           <Button
             icon={<BookOutlined />}
             onClick={() => setCitationOpen(true)}
           >
-            引用
+            导出引用
           </Button>
-          <Button
-            icon={<FileTextOutlined />}
-            onClick={() => navigate("/notes")}
-          >
-            笔记
-          </Button>
-          */}
         </Space>
 
         <CitationGenerator
           textId={text.id}
+          textData={text}
           open={citationOpen}
           onClose={() => setCitationOpen(false)}
         />
