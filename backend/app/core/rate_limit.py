@@ -11,10 +11,12 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Stricter rate limits for sensitive auth endpoints (requests per minute)
+# Stricter rate limits for sensitive/expensive endpoints (requests per minute)
 STRICT_PATHS: dict[str, int] = {
     "/api/auth/login": settings.rate_limit_login,
     "/api/auth/register": settings.rate_limit_register,
+    "/api/search": 60,
+    "/api/search/content": 30,
 }
 
 

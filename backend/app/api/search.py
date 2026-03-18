@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -47,9 +48,13 @@ async def content_search(
     return await search_content(es, q, page, size, sources, lang)
 
 
+_filters_cache: dict = {"data": None, "expires": 0}
+
 @router.get("/filters")
 async def filters(db: AsyncSession = Depends(get_db)):
-    """获取可用的筛选选项（朝代、分类、语言、数据源）。"""
+    """获取可用的筛选选项（朝代、分类、语言、数据源）。缓存 5 分钟。"""
+    if _filters_cache["data"] and time.time() < _filters_cache["expires"]:
+        return _filters_cache["data"]
     es = get_es()
     aggs = await get_aggregations(es)
 
@@ -70,6 +75,8 @@ async def filters(db: AsyncSession = Depends(get_db)):
 
     aggs["languages"] = languages_with_data
     aggs["languages_all"] = sorted(all_langs)
+    _filters_cache["data"] = aggs
+    _filters_cache["expires"] = time.time() + 300  # 5 min TTL
     return aggs
 
 
