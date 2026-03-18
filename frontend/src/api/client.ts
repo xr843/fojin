@@ -607,6 +607,18 @@ export async function sendChatMessage(
   return data;
 }
 
+export interface ChatQuota {
+  limit: number;
+  used: number;
+  remaining: number;
+  has_byok: boolean;
+}
+
+export async function getChatQuota(): Promise<ChatQuota> {
+  const { data } = await api.get<ChatQuota>("/chat/quota");
+  return data;
+}
+
 export async function getChatSessions(): Promise<ChatSessionItem[]> {
   const { data } = await api.get<ChatSessionItem[]>("/chat/sessions");
   return data;

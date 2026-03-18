@@ -56,6 +56,24 @@ async def chat_stream(
     )
 
 
+@router.get("/quota")
+async def chat_quota(
+    user: User = Depends(get_current_user),
+):
+    """获取当前用户的每日问答配额。"""
+    from datetime import date
+    from app.services.chat import FREE_DAILY_LIMIT
+
+    used = user.daily_chat_count if user.last_chat_date == date.today() else 0
+    has_byok = bool(user.encrypted_api_key)
+    return {
+        "limit": FREE_DAILY_LIMIT,
+        "used": used,
+        "remaining": FREE_DAILY_LIMIT - used if not has_byok else -1,
+        "has_byok": has_byok,
+    }
+
+
 @router.get("/sessions", response_model=list[SessionListItem])
 async def get_sessions(
     user: User = Depends(get_current_user),

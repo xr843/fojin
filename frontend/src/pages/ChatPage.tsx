@@ -19,6 +19,7 @@ import {
   getChatSession,
   deleteChatSession,
   getApiKeyStatus,
+  getChatQuota,
   type ChatMessageItem,
   type ChatSource,
 } from "../api/client";
@@ -43,6 +44,12 @@ export default function ChatPage() {
   const { data: keyStatus } = useQuery({
     queryKey: ["apiKeyStatus"],
     queryFn: getApiKeyStatus,
+    enabled: !!user,
+  });
+
+  const { data: quota, refetch: refetchQuota } = useQuery({
+    queryKey: ["chatQuota"],
+    queryFn: getChatQuota,
     enabled: !!user,
   });
 
@@ -144,9 +151,10 @@ export default function ChatPage() {
       onDone: () => {
         streamingIdRef.current = 0;
         setSending(false);
+        refetchQuota();
       },
     });
-  }, [input, sending, sessionId, refetchSessions]);
+  }, [input, sending, sessionId, refetchSessions, refetchQuota]);
 
   if (!user) {
     return (
@@ -341,10 +349,10 @@ export default function ChatPage() {
 
           {/* Input */}
           <div style={{ padding: "12px 0", borderTop: "1px solid rgba(217,208,193,0.5)" }}>
-            {!keyStatus?.has_api_key && (
+            {!keyStatus?.has_api_key && quota && (
               <Alert
-                message={<span>每日免费 10 次问答。<a onClick={() => navigate("/profile?tab=apikey")}>配置 API Key</a> 可无限使用。</span>}
-                type="info" showIcon closable
+                message={<span>今日剩余 {quota.remaining}/{quota.limit} 次免费问答。<a onClick={() => navigate("/profile?tab=apikey")}>配置 API Key</a> 可无限使用。</span>}
+                type={quota.remaining <= 2 ? "warning" : "info"} showIcon closable
                 style={{ marginBottom: 8, fontSize: 12 }}
               />
             )}
