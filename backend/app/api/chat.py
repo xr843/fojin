@@ -62,6 +62,7 @@ async def chat_quota(
 ):
     """获取当前用户的每日问答配额。"""
     from datetime import date
+
     from app.services.chat import FREE_DAILY_LIMIT
 
     used = user.daily_chat_count if user.last_chat_date == date.today() else 0
