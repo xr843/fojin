@@ -16,7 +16,6 @@ import { useQuery } from "@tanstack/react-query";
 import {
   sendChatMessageStream,
   getChatSessions,
-  getChatSession,
   getChatSessionMessages,
   deleteChatSession,
   getApiKeyStatus,
