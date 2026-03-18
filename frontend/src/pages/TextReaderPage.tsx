@@ -9,12 +9,14 @@ import {
   RightOutlined,
   FontSizeOutlined,
   BookOutlined,
+  EditOutlined,
   HeartOutlined,
   HeartFilled,
 } from "@ant-design/icons";
 import { getJuanList, getJuanContent, getTextDetail, checkBookmark, addBookmark, removeBookmark } from "../api/client";
 import { useAuthStore } from "../stores/authStore";
 import CitationGenerator from "../components/CitationGenerator";
+import AnnotationPanel from "../components/AnnotationPanel";
 import "../styles/reader.css";
 
 const FONT_SIZE_MIN = 14;
@@ -37,6 +39,7 @@ export default function TextReaderPage() {
   const [juanNum, setJuanNum] = useState(1);
   const [fontSize, setFontSize] = useState(getInitialFontSize);
   const [citationOpen, setCitationOpen] = useState(false);
+  const [annotationOpen, setAnnotationOpen] = useState(false);
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
@@ -177,6 +180,13 @@ export default function TextReaderPage() {
           </Button>
           <Button
             size="small"
+            icon={<EditOutlined />}
+            onClick={() => setAnnotationOpen(true)}
+          >
+            标注
+          </Button>
+          <Button
+            size="small"
             icon={<BookOutlined />}
             onClick={() => setCitationOpen(true)}
           >
@@ -247,6 +257,13 @@ export default function TextReaderPage() {
         textData={textDetail}
         open={citationOpen}
         onClose={() => setCitationOpen(false)}
+      />
+
+      <AnnotationPanel
+        textId={textId}
+        juanNum={juanNum}
+        visible={annotationOpen}
+        onClose={() => setAnnotationOpen(false)}
       />
     </div>
   );
