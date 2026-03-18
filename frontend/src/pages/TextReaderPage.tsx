@@ -1,16 +1,19 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
-import { useQuery } from "@tanstack/react-query";
-import { Typography, Spin, Button, Select, Breadcrumb } from "antd";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Typography, Spin, Button, Select, Breadcrumb, message } from "antd";
 import {
   HomeOutlined,
   LeftOutlined,
   RightOutlined,
   FontSizeOutlined,
   BookOutlined,
+  HeartOutlined,
+  HeartFilled,
 } from "@ant-design/icons";
-import { getJuanList, getJuanContent, getTextDetail } from "../api/client";
+import { getJuanList, getJuanContent, getTextDetail, checkBookmark, addBookmark, removeBookmark } from "../api/client";
+import { useAuthStore } from "../stores/authStore";
 import CitationGenerator from "../components/CitationGenerator";
 import "../styles/reader.css";
 
@@ -34,6 +37,37 @@ export default function TextReaderPage() {
   const [juanNum, setJuanNum] = useState(1);
   const [fontSize, setFontSize] = useState(getInitialFontSize);
   const [citationOpen, setCitationOpen] = useState(false);
+  const [bookmarkLoading, setBookmarkLoading] = useState(false);
+  const { user } = useAuthStore();
+  const queryClient = useQueryClient();
+
+  const { data: bookmarked = false } = useQuery({
+    queryKey: ["bookmark", textId],
+    queryFn: () => checkBookmark(textId),
+    enabled: !!textId && !!user,
+  });
+
+  const toggleBookmark = async () => {
+    if (!user) {
+      message.info("请登录后收藏");
+      return;
+    }
+    setBookmarkLoading(true);
+    try {
+      if (bookmarked) {
+        await removeBookmark(textId);
+        message.success("已取消收藏");
+      } else {
+        await addBookmark(textId);
+        message.success("已收藏");
+      }
+      queryClient.invalidateQueries({ queryKey: ["bookmark", textId] });
+    } catch {
+      message.error("操作失败");
+    } finally {
+      setBookmarkLoading(false);
+    }
+  };
 
   const { data: juanList } = useQuery({
     queryKey: ["juanList", textId],
@@ -133,6 +167,14 @@ export default function TextReaderPage() {
               下一卷 <RightOutlined />
             </Button>
           </div>
+          <Button
+            size="small"
+            icon={bookmarked ? <HeartFilled style={{ color: "var(--fj-accent)" }} /> : <HeartOutlined />}
+            loading={bookmarkLoading}
+            onClick={toggleBookmark}
+          >
+            {bookmarked ? "已收藏" : "收藏"}
+          </Button>
           <Button
             size="small"
             icon={<BookOutlined />}
