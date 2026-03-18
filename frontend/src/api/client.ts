@@ -497,6 +497,43 @@ export interface DictSearchResponse {
   results: DictEntry[];
 }
 
+// --- Annotations ---
+
+export interface AnnotationItem {
+  id: number;
+  text_id: number;
+  juan_num: number;
+  start_pos: number;
+  end_pos: number;
+  annotation_type: string;
+  content: string;
+  user_id: number;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getAnnotations(textId: number, juanNum: number): Promise<AnnotationItem[]> {
+  const { data } = await api.get<AnnotationItem[]>("/annotations", { params: { text_id: textId, juan_num: juanNum } });
+  return data;
+}
+
+export async function createAnnotation(payload: {
+  text_id: number;
+  juan_num: number;
+  start_pos: number;
+  end_pos: number;
+  annotation_type: string;
+  content: string;
+}): Promise<AnnotationItem> {
+  const { data } = await api.post<AnnotationItem>("/annotations", payload);
+  return data;
+}
+
+export async function deleteAnnotation(annotationId: number): Promise<void> {
+  await api.delete(`/annotations/${annotationId}`);
+}
+
 export async function searchDictionary(params: {
   q: string;
   page?: number;
