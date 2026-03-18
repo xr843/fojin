@@ -4,7 +4,7 @@
 
 ### The World's Encyclopedic Buddhist Digital Text Platform
 
-**440+ sources. 30 languages. 30 countries. One search.**
+**450+ sources. 30 languages. 30 countries. One search.**
 
 Aggregating the world's Buddhist digital heritage — from the Chinese Tripitaka to Sanskrit manuscripts, Pali suttas to Tibetan texts — with full-text reading, AI-powered Q&A, knowledge graph, and multi-language parallel reading.
 
@@ -25,11 +25,11 @@ Aggregating the world's Buddhist digital heritage — from the Chinese Tripitaka
 
 Buddhist texts are scattered across hundreds of databases worldwide — CBETA, SuttaCentral, BDRC, SAT, 84000, GRETIL, and many more. Each has different interfaces, languages, and data formats. Researchers spend more time *finding* texts than *reading* them.
 
-**FoJin solves this.** It aggregates 440+ sources into a single, searchable platform with features no other tool provides:
+**FoJin solves this.** It aggregates 450+ sources into a single, searchable platform with features no other tool provides:
 
 | What you need | How FoJin helps |
 |---|---|
-| Find a sutra across databases | **Multi-dimensional search** across local index with 440+ sources |
+| Find a sutra across databases | **Multi-dimensional search** across local index with 450+ sources |
 | Read the full text online | **4,488 fascicles** available for online reading |
 | Compare translations | **Parallel reading** in 30 languages side by side |
 | Look up Buddhist terms | **6 dictionaries**, 237K entries (Chinese/Sanskrit/Pali/English) |
@@ -92,7 +92,7 @@ Browse digitized manuscripts and rare editions from BDRC and other institutions 
 
 ## Data Sources
 
-<p align="center"><img src="./docs/screenshots/sources.png" alt="483 data sources from 30 countries" width="800"></p>
+<p align="center"><img src="./docs/screenshots/sources.png" alt="450+ data sources from 30 countries" width="800"></p>
 
 FoJin aggregates data from major Buddhist digital projects worldwide:
 
@@ -188,13 +188,17 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 ## Roadmap
 
+- [x] ~~Citation export (BibTeX, RIS, APA)~~
+- [x] ~~Mobile-responsive reader~~
+- [x] ~~Public REST API with rate limiting~~
+- [x] ~~User annotations~~
+- [x] ~~Community-contributed data sources~~
+- [ ] Internationalization (i18n) — Japanese, Korean, Thai, Vietnamese UI
 - [ ] OCR pipeline for scanned texts
-- [ ] User annotations and collaborative notes
-- [ ] Citation export (BibTeX, Chicago, MLA)
-- [ ] Mobile-responsive reader
-- [ ] Public REST API with rate limiting
-- [ ] Embedding-based semantic search
-- [ ] Community-contributed data sources
+- [ ] Embedding-based semantic search across all texts
+- [ ] Collaborative annotation sharing
+- [ ] API documentation and developer portal
+- [ ] Integration with Zotero and reference managers
 
 ## License
 
