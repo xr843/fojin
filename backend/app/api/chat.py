@@ -16,6 +16,7 @@ from app.schemas.chat import (
 from app.services.chat import (
     delete_session,
     get_history,
+    get_history_paginated,
     get_session_for_user,
     list_sessions,
     send_message,
@@ -108,6 +109,34 @@ async def get_chat_session(
             for m in msgs
         ],
     )
+
+
+@router.get("/sessions/{session_id}/messages")
+async def get_session_messages(
+    session_id: int,
+    page: int = 1,
+    size: int = 50,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """分页获取会话消息（page=1 为最新消息）。"""
+    await get_session_for_user(db, session_id, user.id)
+    msgs, total = await get_history_paginated(db, session_id, page, min(size, 100))
+    return {
+        "total": total,
+        "page": page,
+        "size": size,
+        "messages": [
+            ChatMessageResponse(
+                id=m.id,
+                role=m.role,
+                content=m.content,
+                sources=[ChatSource(**s) for s in m.sources] if m.sources else None,
+                created_at=m.created_at,
+            )
+            for m in msgs
+        ],
+    }
 
 
 @router.delete("/sessions/{session_id}")

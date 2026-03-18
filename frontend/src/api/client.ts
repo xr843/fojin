@@ -634,6 +634,15 @@ export async function getChatSession(sessionId: number): Promise<{
   return data;
 }
 
+export async function getChatSessionMessages(
+  sessionId: number,
+  page: number = 1,
+  size: number = 50,
+): Promise<{ total: number; page: number; size: number; messages: ChatMessageItem[] }> {
+  const { data } = await api.get(`/chat/sessions/${sessionId}/messages`, { params: { page, size } });
+  return data;
+}
+
 export async function deleteChatSession(sessionId: number): Promise<void> {
   await api.delete(`/chat/sessions/${sessionId}`);
 }

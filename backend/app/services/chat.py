@@ -93,6 +93,29 @@ async def get_history(session: AsyncSession, session_id: int) -> list[ChatMessag
     return list(result.scalars().all())
 
 
+async def get_history_paginated(
+    session: AsyncSession, session_id: int, page: int = 1, size: int = 50,
+) -> tuple[list[ChatMessage], int]:
+    """Return paginated messages (newest first page=1) and total count."""
+    from sqlalchemy import func
+
+    count_result = await session.execute(
+        select(func.count()).where(ChatMessage.session_id == session_id)
+    )
+    total = count_result.scalar() or 0
+
+    # Page 1 = latest messages, page 2 = older, etc.
+    result = await session.execute(
+        select(ChatMessage)
+        .where(ChatMessage.session_id == session_id)
+        .order_by(ChatMessage.created_at.desc())
+        .offset((page - 1) * size)
+        .limit(size)
+    )
+    msgs = list(reversed(result.scalars().all()))  # reverse to chronological order
+    return msgs, total
+
+
 def _resolve_llm_config(user: User | None) -> tuple[str, str, str, bool]:
     """Return (api_url, api_key, model, is_byok) based on user's BYOK or platform default."""
     if user and user.encrypted_api_key:

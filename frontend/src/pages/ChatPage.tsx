@@ -17,6 +17,7 @@ import {
   sendChatMessageStream,
   getChatSessions,
   getChatSession,
+  getChatSessionMessages,
   deleteChatSession,
   getApiKeyStatus,
   getChatQuota,
@@ -33,6 +34,9 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessageItem[]>([]);
   const [sending, setSending] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [hasOlderMessages, setHasOlderMessages] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const { data: sessions, refetch: refetchSessions } = useQuery({
@@ -59,18 +63,38 @@ export default function ChatPage() {
 
   const loadSession = async (sid: number) => {
     try {
-      const data = await getChatSession(sid);
+      const data = await getChatSessionMessages(sid, 1, 50);
       setSessionId(sid);
       setMessages(data.messages);
+      setCurrentPage(1);
+      setHasOlderMessages(data.total > data.messages.length);
       scrollToBottom();
     } catch {
       message.error("加载会话失败");
     }
   };
 
+  const loadOlderMessages = async () => {
+    if (!sessionId || loadingOlder) return;
+    setLoadingOlder(true);
+    try {
+      const nextPage = currentPage + 1;
+      const data = await getChatSessionMessages(sessionId, nextPage, 50);
+      setMessages((prev) => [...data.messages, ...prev]);
+      setCurrentPage(nextPage);
+      setHasOlderMessages(nextPage * 50 < data.total);
+    } catch {
+      message.error("加载历史消息失败");
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
+
   const handleNewChat = () => {
     setSessionId(undefined);
     setMessages([]);
+    setHasOlderMessages(false);
+    setCurrentPage(1);
   };
 
   const handleDeleteSession = async (sid: number) => {
@@ -265,6 +289,14 @@ export default function ChatPage() {
           </Button>
           {/* Messages */}
           <div style={{ flex: 1, overflow: "auto", padding: "16px 0" }}>
+            {hasOlderMessages && (
+              <div style={{ textAlign: "center", marginBottom: 12 }}>
+                <Button size="small" type="text" loading={loadingOlder} onClick={loadOlderMessages}
+                  style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}>
+                  加载更早的消息
+                </Button>
+              </div>
+            )}
             {messages.length === 0 && (
               <div style={{ textAlign: "center", padding: "60px 24px", color: "var(--fj-ink-muted)" }}>
                 <RobotOutlined style={{ fontSize: 48, marginBottom: 16, color: "var(--fj-accent)" }} />
