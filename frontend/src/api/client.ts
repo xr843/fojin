@@ -467,6 +467,18 @@ export async function getKGEntityGraph(
   return data;
 }
 
+export interface KGStats {
+  entities: Record<string, number>;
+  relations: Record<string, number>;
+  total_entities: number;
+  total_relations: number;
+}
+
+export async function getKGStats(): Promise<KGStats> {
+  const { data } = await api.get<KGStats>("/kg/stats");
+  return data;
+}
+
 // Dictionary
 export interface DictEntry {
   id: number;

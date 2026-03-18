@@ -13,6 +13,7 @@ from app.services.knowledge_graph import (
     get_entity,
     get_entity_graph,
     get_entity_relations,
+    get_kg_stats,
     get_text_entities,
     search_entities,
 )
@@ -64,6 +65,11 @@ async def get_kg_entity_graph(
     pred_list = [p.strip() for p in predicates.split(",") if p.strip()] if predicates else None
     graph = await get_entity_graph(db, entity_id, depth, max_nodes=max_nodes, predicates=pred_list)
     return graph
+
+
+@router.get("/stats")
+async def kg_stats(db: AsyncSession = Depends(get_db)):
+    return await get_kg_stats(db)
 
 
 @router.get("/texts/{text_id}/entities", response_model=list[KGEntityResponse])

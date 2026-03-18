@@ -30,6 +30,60 @@
   color: var(--fj-accent);
 }
 
+/* ---------- 统计面板 ---------- */
+.kg-stats-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  cursor: pointer;
+  color: #9a8e7a;
+  font-size: 13px;
+  transition: color 0.2s;
+}
+.kg-stats-toggle:hover { color: var(--fj-ink); }
+.kg-stats-summary { font-family: "Noto Sans SC", sans-serif; }
+
+.kg-stats-panel {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+  background: #faf8f4;
+  border: 1px solid var(--fj-border);
+  border-radius: 8px;
+  padding: 12px 20px;
+  margin-bottom: 12px;
+}
+
+.kg-stats-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.kg-stats-group-title {
+  font-family: "Noto Serif SC", serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: #7a6e5c;
+  letter-spacing: 1px;
+}
+
+.kg-stats-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #7a6e5c;
+}
+
+.kg-stats-count {
+  font-weight: 600;
+  color: var(--fj-ink);
+  margin-left: 2px;
+}
+
 /* ---------- 工具栏 ---------- */
 .kg-toolbar {
   background: #fff;

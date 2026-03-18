@@ -226,6 +226,28 @@ async def get_entity_graph(
     return {"nodes": nodes, "links": links, "truncated": truncated}
 
 
+async def get_kg_stats(session: AsyncSession) -> dict:
+    """Return aggregate KG statistics: entity/relation counts by type."""
+    entity_sql = text(
+        "SELECT entity_type, COUNT(*) FROM kg_entities GROUP BY entity_type ORDER BY COUNT(*) DESC"
+    )
+    relation_sql = text(
+        "SELECT predicate, COUNT(*) FROM kg_relations GROUP BY predicate ORDER BY COUNT(*) DESC"
+    )
+    entity_result = await session.execute(entity_sql)
+    relation_result = await session.execute(relation_sql)
+
+    entity_counts = {row[0]: row[1] for row in entity_result.fetchall()}
+    relation_counts = {row[0]: row[1] for row in relation_result.fetchall()}
+
+    return {
+        "entities": entity_counts,
+        "relations": relation_counts,
+        "total_entities": sum(entity_counts.values()),
+        "total_relations": sum(relation_counts.values()),
+    }
+
+
 async def get_text_entities(session: AsyncSession, text_id: int) -> list[KGEntity]:
     """Get all KG entities linked to a specific text."""
     result = await session.execute(
