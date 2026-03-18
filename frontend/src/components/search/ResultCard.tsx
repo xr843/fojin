@@ -37,6 +37,11 @@ export default function ResultCard({ hit, rank }: { hit: SearchHit; rank: number
         <div className="s-card-meta">
           <span>编号: {hit.cbeta_id}</span>
         </div>
+        {hit.highlight && Object.entries(hit.highlight).filter(([k]) => k !== "title_zh").map(([field, fragments]) => (
+          <div key={field} className="s-card-preview" dangerouslySetInnerHTML={{
+            __html: sanitizeHighlight(fragments[0]),
+          }} />
+        ))}
         <div className="s-card-actions">
           {cbetaUrl && (
             <Button type="primary" size="small" icon={<LinkOutlined />}

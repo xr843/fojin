@@ -197,6 +197,19 @@
   font-weight: 600;
 }
 
+.s-card-preview {
+  font-size: 12px;
+  color: var(--fj-ink-muted);
+  margin-bottom: 4px;
+  line-height: 1.6;
+}
+
+.s-card-preview em {
+  color: var(--fj-accent);
+  font-style: normal;
+  font-weight: 600;
+}
+
 .s-card-actions {
   margin-top: 12px;
   display: flex;
