@@ -174,6 +174,33 @@ async def _save_messages(
     await db.commit()
 
 
+async def _generate_session_title(
+    api_url: str, api_key: str, model: str, message: str, answer: str,
+) -> str | None:
+    """Ask LLM to generate a short session title (5-10 chars). Returns None on failure."""
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(
+                f"{api_url}/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json={
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": "用5-10个中文字概括以下对话的主题，只输出标题，不要标点符号。"},
+                        {"role": "user", "content": f"用户问：{message[:100]}\n回答：{answer[:200]}"},
+                    ],
+                    "temperature": 0.3,
+                    "max_tokens": 30,
+                },
+            )
+            resp.raise_for_status()
+            title = resp.json()["choices"][0]["message"]["content"].strip().strip("\"'《》")
+            return title[:30] if title else None
+    except Exception:
+        logger.debug("Failed to generate session title, keeping default")
+        return None
+
+
 async def _prepare_chat(
     db: AsyncSession,
     user_id: int | None,
@@ -253,6 +280,13 @@ async def send_message(
         answer = "抱歉，AI 服务暂时不可用，请稍后重试。"
 
     await _save_messages(db, chat_session.id, message, answer, sources)
+
+    # Auto-generate a better session title for new sessions (first message)
+    if chat_session.title == message[:50]:
+        title = await _generate_session_title(api_url, api_key, model, message, answer)
+        if title:
+            chat_session.title = title
+            await db.commit()
 
     return ChatResponse(
         session_id=chat_session.id,
