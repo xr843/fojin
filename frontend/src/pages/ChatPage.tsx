@@ -95,7 +95,7 @@ export default function ChatPage() {
     const assistantMsg: ChatMessageItem = {
       id: assistantId,
       role: "assistant",
-      content: "",
+      content: "正在检索经文并生成回答...",
       sources: null,
       created_at: new Date().toISOString(),
     };
@@ -108,9 +108,12 @@ export default function ChatPage() {
     await sendChatMessageStream(msg, sessionId, {
       onToken: (content: string) => {
         setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId ? { ...m, content: m.content + content } : m,
-          ),
+          prev.map((m) => {
+            if (m.id !== assistantId) return m;
+            // Clear the "thinking" placeholder on first real token
+            const current = m.content === "正在检索经文并生成回答..." ? "" : m.content;
+            return { ...m, content: current + content };
+          }),
         );
         scrollToBottom();
       },
@@ -129,6 +132,14 @@ export default function ChatPage() {
       },
       onError: (errMsg: string) => {
         message.error(errMsg);
+        // Clear thinking placeholder on error
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId && m.content === "正在检索经文并生成回答..."
+              ? { ...m, content: "请求失败，请重试" }
+              : m,
+          ),
+        );
       },
       onDone: () => {
         streamingIdRef.current = 0;

@@ -627,81 +627,31 @@ export async function sendChatMessageStream(
   sessionId: number | undefined,
   callbacks: StreamCallbacks,
 ): Promise<void> {
-  let token = "";
   try {
-    const raw = localStorage.getItem("fojin-auth");
-    if (raw) {
-      const { state } = JSON.parse(raw);
-      if (state?.token) token = state.token;
+    const resp = await sendChatMessage(message, sessionId);
+    callbacks.onSessionId(resp.session_id);
+    if (resp.sources.length > 0) {
+      callbacks.onSources(resp.sources);
     }
-  } catch { /* ignore */ }
-
-  // Use stream.fojin.ai to bypass Cloudflare compression for real SSE streaming
-  const streamBase = "https://stream.fojin.ai";
-
-  const resp = await fetch(`${streamBase}/api/chat/stream`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify({ message, session_id: sessionId }),
-  });
-
-  if (!resp.ok) {
-    let detail = "请求失败";
-    try {
-      const err = await resp.json();
-      detail = err.detail || detail;
-    } catch { /* ignore */ }
+    // Typing animation — emit characters progressively for natural feel
+    const text = resp.message;
+    let i = 0;
+    const emit = () => {
+      if (i < text.length) {
+        const chunk = text.slice(i, i + 1 + Math.floor(Math.random() * 2));
+        callbacks.onToken(chunk);
+        i += chunk.length;
+        setTimeout(emit, 30 + Math.random() * 40);
+      } else {
+        callbacks.onDone();
+      }
+    };
+    emit();
+  } catch (err: any) {
+    const detail = err?.response?.data?.detail || "发送失败，请稍后重试";
     callbacks.onError(detail);
     callbacks.onDone();
-    return;
   }
-
-  const reader = resp.body?.getReader();
-  if (!reader) {
-    callbacks.onError("浏览器不支持流式响应");
-    callbacks.onDone();
-    return;
-  }
-
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
-
-    for (const line of lines) {
-      if (!line.startsWith("data: ")) continue;
-      try {
-        const event = JSON.parse(line.slice(6));
-        switch (event.type) {
-          case "token":
-            callbacks.onToken(event.content);
-            break;
-          case "sources":
-            callbacks.onSources(event.sources);
-            break;
-          case "session_id":
-            callbacks.onSessionId(event.session_id);
-            break;
-          case "error":
-            callbacks.onError(event.message);
-            break;
-          case "done":
-            callbacks.onDone();
-            return;
-        }
-      } catch { /* skip malformed lines */ }
-    }
-  }
-  callbacks.onDone();
 }
 
 // --- BYOK (Bring Your Own Key) ---
