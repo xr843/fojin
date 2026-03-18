@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Input, Select, Spin, Empty, Slider, Checkbox, Alert } from "antd";
-import { ApartmentOutlined, SearchOutlined } from "@ant-design/icons";
+import { Input, Select, Spin, Empty, Slider, Checkbox, Alert, Tooltip } from "antd";
+import { ApartmentOutlined, SearchOutlined, BarChartOutlined } from "@ant-design/icons";
 import ForceGraph, {
   TYPE_COLORS,
   TYPE_LABELS,
@@ -9,7 +9,7 @@ import ForceGraph, {
   PREDICATE_COLORS,
 } from "../components/ForceGraph";
 import EntityCard from "../components/EntityCard";
-import { searchKGEntities, getKGEntity, getKGEntityGraph } from "../api/client";
+import { searchKGEntities, getKGEntity, getKGEntityGraph, getKGStats } from "../api/client";
 import type { KGEntity } from "../api/client";
 import "../styles/kg.css";
 
@@ -35,6 +35,7 @@ const ALL_PREDICATES = [
   { value: "active_in", label: "所处" },
   { value: "alt_translation", label: "异译" },
   { value: "parallel_text", label: "平行文本" },
+  { value: "associated_with", label: "相关" },
 ];
 
 const ALL_PREDICATE_VALUES = ALL_PREDICATES.map((p) => p.value);
@@ -56,6 +57,13 @@ export default function KnowledgeGraphPage() {
   const [graphDepth, setGraphDepth] = useState(2);
   const [selectedPredicates, setSelectedPredicates] =
     useState<string[]>(ALL_PREDICATE_VALUES);
+  const [showStats, setShowStats] = useState(false);
+
+  const { data: kgStats } = useQuery({
+    queryKey: ["kg-stats"],
+    queryFn: getKGStats,
+    staleTime: 60_000,
+  });
 
   const { data: searchResults, isLoading: searching } = useQuery({
     queryKey: ["kg-search", query, entityType],
@@ -110,7 +118,44 @@ export default function KnowledgeGraphPage() {
       <div className="kg-header">
         <ApartmentOutlined />
         <h3>知识图谱</h3>
+        {kgStats && (
+          <Tooltip title="查看统计">
+            <span
+              className="kg-stats-toggle"
+              onClick={() => setShowStats(!showStats)}
+            >
+              <BarChartOutlined />
+              <span className="kg-stats-summary">
+                {kgStats.total_entities.toLocaleString()} 实体 / {kgStats.total_relations.toLocaleString()} 关系
+              </span>
+            </span>
+          </Tooltip>
+        )}
       </div>
+      {showStats && kgStats && (
+        <div className="kg-stats-panel">
+          <div className="kg-stats-group">
+            <span className="kg-stats-group-title">实体</span>
+            {Object.entries(kgStats.entities).map(([type, count]) => (
+              <span key={type} className="kg-stats-item">
+                <span className="kg-legend-dot" style={{ background: TYPE_COLORS[type] || "#888" }} />
+                {TYPE_LABEL_MAP[type] || type}
+                <span className="kg-stats-count">{count.toLocaleString()}</span>
+              </span>
+            ))}
+          </div>
+          <div className="kg-stats-group">
+            <span className="kg-stats-group-title">关系</span>
+            {Object.entries(kgStats.relations).map(([pred, count]) => (
+              <span key={pred} className="kg-stats-item">
+                <span className="kg-legend-line" style={{ background: PREDICATE_COLORS[pred] || "#bbb5a6" }} />
+                {PREDICATE_LABELS[pred] || pred}
+                <span className="kg-stats-count">{count.toLocaleString()}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Toolbar */}
       <div className="kg-toolbar">

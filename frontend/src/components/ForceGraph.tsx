@@ -59,6 +59,7 @@ const PREDICATE_LABELS: Record<string, string> = {
   teacher_of: "师承",
   cites: "引用",
   commentary_on: "注疏",
+  associated_with: "相关",
 };
 
 const PREDICATE_COLORS: Record<string, string> = {
@@ -70,6 +71,7 @@ const PREDICATE_COLORS: Record<string, string> = {
   teacher_of:       "#c08b3e",
   cites:            "#bbb5a6",
   commentary_on:    "#c75450",
+  associated_with:  "#5b8c6b",  // 翡翠
 };
 
 export { TYPE_COLORS, TYPE_LABELS, PREDICATE_LABELS, PREDICATE_COLORS };

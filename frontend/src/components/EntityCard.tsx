@@ -26,6 +26,7 @@ const PREDICATE_LABELS: Record<string, string> = {
   teacher_of: "师承",
   cites: "引用",
   commentary_on: "注疏",
+  associated_with: "相关",
 };
 
 /* 属性键中英映射 */
