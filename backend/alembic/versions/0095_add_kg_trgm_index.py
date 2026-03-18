@@ -18,7 +18,7 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     op.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
     op.execute(
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_kg_entities_name_zh_trgm "
+        "CREATE INDEX IF NOT EXISTS ix_kg_entities_name_zh_trgm "
         "ON kg_entities USING gin (name_zh gin_trgm_ops)"
     )
 
