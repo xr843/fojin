@@ -179,11 +179,11 @@ export default function Layout() {
                 { key: "vi", label: "Tiếng Việt" },
               ],
               onClick: ({ key }) => i18n.changeLanguage(key),
-              selectedKeys: [i18n.language],
+              selectedKeys: [i18n.resolvedLanguage ?? i18n.language],
             }}
           >
             <Button type="text" icon={<GlobalOutlined />} style={{ color: inkMuted, fontSize: 13 }}>
-              {t(`language.${i18n.language}`)}
+              {t(`language.${i18n.resolvedLanguage ?? i18n.language}`)}
             </Button>
           </Dropdown>
           {user ? (
