@@ -51,7 +51,8 @@ export default function HomePage() {
   const srcLabel = selectedSources.size > 0
     ? t("home.selected_sources", { count: selectedSources.size })
     : t("home.all_sources");
-  const hotTags = t("home.hot_tags", { returnObjects: true }) as string[];
+  const rawTags = t("home.hot_tags", { returnObjects: true });
+  const hotTags = Array.isArray(rawTags) ? rawTags : [];
 
   return (
     <div className="home-page">
