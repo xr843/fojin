@@ -5,12 +5,13 @@ import { useTranslation } from "react-i18next";
 import zhCN from "antd/locale/zh_CN";
 import enUS from "antd/locale/en_US";
 import jaJP from "antd/locale/ja_JP";
+import koKR from "antd/locale/ko_KR";
 import Layout from "./components/Layout";
 import ErrorBoundary from "./components/ErrorBoundary";
 import RouteErrorBoundary from "./components/RouteErrorBoundary";
 import ProtectedRoute from "./components/ProtectedRoute";
 
-const antdLocales: Record<string, typeof zhCN> = { zh: zhCN, en: enUS, ja: jaJP };
+const antdLocales: Record<string, typeof zhCN> = { zh: zhCN, en: enUS, ja: jaJP, ko: koKR };
 import HomePage from "./pages/HomePage";
 const SearchPage = lazy(() => import("./pages/SearchPage"));
 const TextDetailPage = lazy(() => import("./pages/TextDetailPage"));
