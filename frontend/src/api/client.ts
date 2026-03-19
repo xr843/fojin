@@ -697,29 +697,88 @@ export async function sendChatMessageStream(
   sessionId: number | undefined,
   callbacks: StreamCallbacks,
 ): Promise<void> {
+  // Get auth token from localStorage (same pattern as axios interceptor)
+  let token = "";
   try {
-    const resp = await sendChatMessage(message, sessionId);
-    callbacks.onSessionId(resp.session_id);
-    if (resp.sources.length > 0) {
-      callbacks.onSources(resp.sources);
+    const raw = localStorage.getItem("fojin-auth");
+    if (raw) {
+      const { state } = JSON.parse(raw);
+      if (state?.token) token = state.token;
     }
-    // Typing animation — emit characters progressively for natural feel
-    const text = resp.message;
-    let i = 0;
-    const emit = () => {
-      if (i < text.length) {
-        const chunk = text.slice(i, i + 1 + Math.floor(Math.random() * 2));
-        callbacks.onToken(chunk);
-        i += chunk.length;
-        setTimeout(emit, 30 + Math.random() * 40);
-      } else {
-        callbacks.onDone();
+  } catch { /* ignore */ }
+
+  try {
+    const resp = await fetch("/api/chat/stream", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ message, session_id: sessionId ?? null }),
+    });
+
+    if (!resp.ok) {
+      const text = await resp.text();
+      let detail = "发送失败，请稍后重试";
+      try { detail = JSON.parse(text).detail || detail; } catch { /* ignore */ }
+      if (resp.status === 401) {
+        useAuthStore.getState().logout();
+        window.location.href = "/login";
       }
-    };
-    emit();
+      callbacks.onError(detail);
+      callbacks.onDone();
+      return;
+    }
+
+    const reader = resp.body?.getReader();
+    if (!reader) {
+      callbacks.onError("浏览器不支持流式响应");
+      callbacks.onDone();
+      return;
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      // Keep the last incomplete line in the buffer
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const payload = line.slice(6).trim();
+        if (!payload) continue;
+        try {
+          const event = JSON.parse(payload);
+          switch (event.type) {
+            case "token":
+              callbacks.onToken(event.content);
+              break;
+            case "sources":
+              callbacks.onSources(event.sources);
+              break;
+            case "session_id":
+              callbacks.onSessionId(event.session_id);
+              break;
+            case "error":
+              callbacks.onError(event.message);
+              break;
+            case "done":
+              callbacks.onDone();
+              return;
+          }
+        } catch { /* skip malformed JSON */ }
+      }
+    }
+    // Stream ended without explicit "done" event
+    callbacks.onDone();
   } catch (err: any) {
-    const detail = err?.response?.data?.detail || "发送失败，请稍后重试";
-    callbacks.onError(detail);
+    callbacks.onError(err?.message || "网络错误，请稍后重试");
     callbacks.onDone();
   }
 }
