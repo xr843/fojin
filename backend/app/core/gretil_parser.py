@@ -1,14 +1,73 @@
 """
 Parser for GRETIL (Göttingen Register of Electronic Texts in Indian Languages) text files.
 
-GRETIL texts are typically plain text or simple markup files with header metadata.
+GRETIL texts are typically HTML files (.htm) with a standard boilerplate structure,
+or plain text files with header metadata.
 """
 
 import re
 
 
+def _is_html(content: str) -> bool:
+    """Check whether the content looks like an HTML document."""
+    return bool(re.search(r"<!DOCTYPE\s+html|<html", content[:500], re.IGNORECASE))
+
+
+def _parse_html(content: str) -> dict:
+    """Parse a GRETIL HTML file.
+
+    Standard structure:
+        <title> Author: Title </title>
+        <head>...<style>...</style>...</head>
+        <body>
+          metadata lines (author, title, input by, source)
+          <hr> ... GRETIL boilerplate / encoding table ... <hr>
+          actual Sanskrit text using <BR> as line breaks
+        </body>
+    """
+    # --- title ---
+    m = re.search(r"<title[^>]*>\s*(.+?)\s*</title>", content, re.IGNORECASE | re.DOTALL)
+    title = m.group(1).strip() if m else ""
+
+    # --- extract body element ---
+    m_body = re.search(r"<body[^>]*>(.*)</body>", content, re.IGNORECASE | re.DOTALL)
+    body_html = m_body.group(1) if m_body else content
+
+    # --- remove everything up to and including the second <hr> (boilerplate) ---
+    # The first <hr> starts the boilerplate notice, the second <hr> ends it.
+    parts = re.split(r"<hr\s*/?>", body_html, flags=re.IGNORECASE)
+    if len(parts) >= 3:
+        # Content is after the second <hr>
+        body_html = "<hr>".join(parts[2:])
+    elif len(parts) == 2:
+        # Only one <hr>, content is after it
+        body_html = parts[1]
+
+    # --- strip remaining HTML tags, convert <BR> to newlines ---
+    body_html = re.sub(r"<br\s*/?>", "\n", body_html, flags=re.IGNORECASE)
+    body_html = re.sub(r"<p\s*/?>", "\n", body_html, flags=re.IGNORECASE)
+    body_text = re.sub(r"<[^>]+>", "", body_html)
+
+    # --- clean up whitespace ---
+    body_text = re.sub(r"[ \t]+", " ", body_text)
+    # Collapse runs of blank lines into at most two newlines
+    body_text = re.sub(r"\n{3,}", "\n\n", body_text)
+    body_text = body_text.strip()
+
+    # --- author from title (common format: "Author: Title") ---
+    author = ""
+    if ":" in title:
+        author = title.split(":")[0].strip()
+
+    return {
+        "title": title,
+        "author": author,
+        "content": body_text,
+    }
+
+
 def parse_gretil_header(content: str) -> dict:
-    """Extract metadata from GRETIL file header.
+    """Extract metadata from GRETIL plain-text file header.
 
     GRETIL files often have header lines like:
         ## Title: Vajracchedikā Prajñāpāramitā
@@ -50,7 +109,7 @@ def parse_gretil_header(content: str) -> dict:
 
 
 def extract_body(content: str) -> str:
-    """Extract the main body text from a GRETIL file.
+    """Extract the main body text from a GRETIL plain-text file.
 
     Removes header comments, encoding markers, and other non-text content.
     """
@@ -90,6 +149,8 @@ def extract_body(content: str) -> str:
 def parse_gretil_file(content: str, filename: str = "") -> dict:
     """Parse a GRETIL text file and return structured data.
 
+    Handles both HTML (.htm) and plain-text formats.
+
     Returns:
         {
             "title": str,
@@ -99,6 +160,17 @@ def parse_gretil_file(content: str, filename: str = "") -> dict:
             "filename": str,
         }
     """
+    if _is_html(content):
+        parsed = _parse_html(content)
+        return {
+            "title": parsed["title"],
+            "author": parsed["author"],
+            "content": parsed["content"],
+            "char_count": len(parsed["content"]),
+            "filename": filename,
+            "source_info": "",
+        }
+
     metadata = parse_gretil_header(content)
     body = extract_body(content)
 
