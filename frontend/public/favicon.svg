@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Lotus flower favicon for FoJin -->
+  <!-- Center petal -->
+  <ellipse cx="32" cy="22" rx="7" ry="16" fill="#8b2500" opacity="0.95"/>
+  <!-- Left petals -->
+  <ellipse cx="32" cy="22" rx="7" ry="16" fill="#a03020" opacity="0.85" transform="rotate(-25 32 32)"/>
+  <ellipse cx="32" cy="22" rx="7" ry="16" fill="#b04535" opacity="0.7" transform="rotate(-50 32 32)"/>
+  <!-- Right petals -->
+  <ellipse cx="32" cy="22" rx="7" ry="16" fill="#a03020" opacity="0.85" transform="rotate(25 32 32)"/>
+  <ellipse cx="32" cy="22" rx="7" ry="16" fill="#b04535" opacity="0.7" transform="rotate(50 32 32)"/>
+  <!-- Gold center dot -->
+  <circle cx="32" cy="26" r="3.5" fill="#b08d57"/>
+  <!-- Base leaves -->
+  <ellipse cx="22" cy="44" rx="10" ry="4" fill="#5c7a4a" opacity="0.7" transform="rotate(-10 22 44)"/>
+  <ellipse cx="42" cy="44" rx="10" ry="4" fill="#5c7a4a" opacity="0.7" transform="rotate(10 42 44)"/>
+</svg>
