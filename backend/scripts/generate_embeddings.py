@@ -23,7 +23,18 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-async def process_content(session: AsyncSession, tc: TextContent) -> int:
+async def ensure_unique_index(session: AsyncSession) -> None:
+    """Create unique index on (text_id, juan_num, chunk_index) if not exists."""
+    await session.execute(
+        text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uix_text_embeddings_chunk "
+            "ON text_embeddings (text_id, juan_num, chunk_index)"
+        )
+    )
+    await session.commit()
+
+
+async def process_content(session: AsyncSession, tc: TextContent, progress: dict) -> int:
     """Process a single TextContent and store embeddings. Returns count of chunks."""
     chunks = chunk_text(tc.content, chunk_size=500, overlap=50)
     count = 0
@@ -37,7 +48,8 @@ async def process_content(session: AsyncSession, tc: TextContent) -> int:
                 text(
                     """
                     INSERT INTO text_embeddings (text_id, juan_num, chunk_index, chunk_text, embedding)
-                    VALUES (:text_id, :juan_num, :chunk_index, :chunk_text, :embedding::vector)
+                    VALUES (:text_id, :juan_num, :chunk_index, :chunk_text, CAST(:embedding AS vector))
+                    ON CONFLICT (text_id, juan_num, chunk_index) DO NOTHING
                     """
                 ),
                 {
@@ -51,12 +63,17 @@ async def process_content(session: AsyncSession, tc: TextContent) -> int:
             count += 1
         except Exception:
             logger.exception(f"Failed to embed chunk {i} of text {tc.text_id} juan {tc.juan_num}")
+        progress["total"] += 1
+        if progress["total"] % 100 == 0:
+            logger.info(f"Progress: {progress['total']} chunks processed so far")
     await session.commit()
     return count
 
 
 async def main(batch_size: int, text_id: int | None) -> None:
     async with async_session() as session:
+        await ensure_unique_index(session)
+
         query = select(TextContent)
         if text_id:
             query = query.where(TextContent.text_id == text_id)
@@ -67,14 +84,14 @@ async def main(batch_size: int, text_id: int | None) -> None:
         total = len(contents)
         logger.info(f"Found {total} text content records to process")
 
-        processed = 0
-        for tc in contents:
-            count = await process_content(session, tc)
-            processed += 1
+        progress = {"total": 0}
+        for processed, tc in enumerate(contents, 1):
+            count = await process_content(session, tc, progress)
             logger.info(
                 f"[{processed}/{total}] text_id={tc.text_id} juan={tc.juan_num} "
                 f"-> {count} chunks embedded"
             )
+        logger.info(f"Done. Total chunks processed: {progress['total']}")
 
 
 if __name__ == "__main__":
