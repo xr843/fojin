@@ -10,6 +10,7 @@ i18n
   .init({
     fallbackLng: "zh",
     supportedLngs: ["zh", "ja"],
+    load: "languageOnly",
     ns: ["translation"],
     defaultNS: "translation",
     backend: {
@@ -22,6 +23,9 @@ i18n
     },
     interpolation: {
       escapeValue: false,
+    },
+    react: {
+      useSuspense: false,
     },
   });
 
