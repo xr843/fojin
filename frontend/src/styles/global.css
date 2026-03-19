@@ -1,7 +1,6 @@
 @import './fonts.css';
 
-:root,
-[data-theme="light"] {
+:root {
   --fj-bg:        #f8f5ef;
   --fj-bg-alt:    #f0ebe2;
   --fj-ink:       #2b2318;
@@ -11,18 +10,6 @@
   --fj-gold:      #b08d57;
   --fj-border:    #d9d0c1;
   --fj-card-bg:   rgba(255,255,255,0.6);
-}
-
-[data-theme="dark"] {
-  --fj-bg:        #1a1714;
-  --fj-bg-alt:    #242019;
-  --fj-ink:       #e8e0d4;
-  --fj-ink-light: #c4b9a8;
-  --fj-ink-muted: #8a7e6c;
-  --fj-accent:    #d4654a;
-  --fj-gold:      #c9a66b;
-  --fj-border:    #3d362c;
-  --fj-card-bg:   rgba(40,36,30,0.8);
 }
 
 * {

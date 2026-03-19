@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
-import { ConfigProvider, Spin, theme as antTheme } from "antd";
+import { ConfigProvider, Spin } from "antd";
 import { useTranslation } from "react-i18next";
 import zhCN from "antd/locale/zh_CN";
 import jaJP from "antd/locale/ja_JP";
@@ -8,7 +8,6 @@ import Layout from "./components/Layout";
 import ErrorBoundary from "./components/ErrorBoundary";
 import RouteErrorBoundary from "./components/RouteErrorBoundary";
 import ProtectedRoute from "./components/ProtectedRoute";
-import { useThemeStore } from "./stores/themeStore";
 
 const antdLocales: Record<string, typeof zhCN> = { zh: zhCN, ja: jaJP };
 import HomePage from "./pages/HomePage";
@@ -37,16 +36,11 @@ function Loading() {
 }
 
 function App() {
-  const mode = useThemeStore((s) => s.mode);
   const { i18n } = useTranslation();
   const antLocale = antdLocales[i18n.language] || zhCN;
   return (
     <ConfigProvider
       locale={antLocale}
-      theme={{
-        algorithm:
-          mode === "dark" ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm,
-      }}
     >
       <ErrorBoundary>
         <Suspense fallback={<Loading />}>

@@ -37,8 +37,6 @@
   "auth.password_digit": "パスワードには数字を含めてください",
   "auth.login_btn": "ログイン",
   "auth.register_btn": "新規登録",
-  "theme.switch_light": "ライトモードに切替",
-  "theme.switch_dark": "ダークモードに切替",
   "home.search_placeholder": "経典名、訳者、宗派を入力...",
   "home.search_label": "仏教典籍を検索",
   "home.search_btn": "検索",

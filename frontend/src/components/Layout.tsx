@@ -13,13 +13,10 @@ import {
   SettingOutlined,
   RobotOutlined,
   GithubOutlined,
-  SunOutlined,
-  MoonOutlined,
   GlobalOutlined,
 } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../stores/authStore";
-import { useThemeStore } from "../stores/themeStore";
 import { getPendingSuggestionCount } from "../api/client";
 
 const { Header, Content, Footer } = AntLayout;
@@ -28,7 +25,6 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuthStore();
-  const { mode, toggleMode } = useThemeStore();
   const { t, i18n } = useTranslation();
   const isHome = location.pathname === "/";
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -186,13 +182,6 @@ export default function Layout() {
               {t(`language.${i18n.language}`)}
             </Button>
           </Dropdown>
-          <Button
-            type="text"
-            icon={mode === "dark" ? <SunOutlined /> : <MoonOutlined />}
-            onClick={toggleMode}
-            style={{ color: inkMuted, fontSize: 16 }}
-            aria-label={mode === "dark" ? t("theme.switch_light") : t("theme.switch_dark")}
-          />
           {user ? (
             <Dropdown
               menu={{

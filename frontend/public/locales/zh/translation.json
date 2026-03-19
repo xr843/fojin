@@ -37,8 +37,6 @@
   "auth.password_digit": "密码必须包含数字",
   "auth.login_btn": "登 录",
   "auth.register_btn": "注 册",
-  "theme.switch_light": "切换到浅色模式",
-  "theme.switch_dark": "切换到深色模式",
   "home.search_placeholder": "输入经名、译者、宗派...",
   "home.search_label": "搜索佛教典籍",
   "home.search_btn": "搜索",
