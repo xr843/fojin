@@ -84,6 +84,10 @@
   letter-spacing: 8px;
   margin-bottom: 28px;
 }
+:lang(en) .home-subtitle,
+:lang(ja) .home-subtitle {
+  letter-spacing: 2px;
+}
 
 /* ---------- 合并搜索栏 ---------- */
 .search-combo {
@@ -553,6 +557,8 @@
   .home-hero { padding: 80px 20px 48px; }
   .home-title { font-size: 48px; letter-spacing: 12px; }
   .home-subtitle { font-size: 12px; letter-spacing: 4px; }
+  :lang(en) .home-subtitle,
+  :lang(ja) .home-subtitle { letter-spacing: 1px; }
   .home-search-wrap { margin-bottom: 48px; }
 
   .home-stats { flex-direction: column; max-width: 200px; }
