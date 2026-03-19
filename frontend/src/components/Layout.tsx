@@ -175,6 +175,7 @@ export default function Layout() {
                 { key: "en", label: "English" },
                 { key: "ja", label: "日本語" },
                 { key: "ko", label: "한국어" },
+                { key: "th", label: "ไทย" },
               ],
               onClick: ({ key }) => i18n.changeLanguage(key),
               selectedKeys: [i18n.language],
