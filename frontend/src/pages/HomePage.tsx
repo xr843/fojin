@@ -64,7 +64,7 @@ export default function HomePage() {
           <img src="/landscape-bg.png" alt="" />
         </div>
         <h1 className="home-title">
-          <span className="home-title-accent">佛</span>津
+          <span className="home-title-accent">{t("home.title_accent")}</span>{t("home.title_rest")}
         </h1>
         <div className="home-subtitle">{t("app.tagline")}</div>
 

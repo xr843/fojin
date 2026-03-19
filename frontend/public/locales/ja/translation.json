@@ -1,5 +1,7 @@
 {
   "app.name": "佛津",
+  "home.title_accent": "佛",
+  "home.title_rest": "津",
   "app.tagline": "世界の仏教古典デジタルリソースプラットフォーム",
   "app.title": "佛津 — 世界の仏教古典デジタルリソースプラットフォーム",
   "nav.sources": "データソース",

@@ -84,6 +84,11 @@
   letter-spacing: 8px;
   margin-bottom: 28px;
 }
+:lang(en) .home-title,
+:lang(ja) .home-title {
+  letter-spacing: 8px;
+  font-size: 72px;
+}
 :lang(en) .home-subtitle,
 :lang(ja) .home-subtitle {
   letter-spacing: 2px;
@@ -556,6 +561,8 @@
 @media (max-width: 768px) {
   .home-hero { padding: 80px 20px 48px; }
   .home-title { font-size: 48px; letter-spacing: 12px; }
+  :lang(en) .home-title,
+  :lang(ja) .home-title { font-size: 40px; letter-spacing: 4px; }
   .home-subtitle { font-size: 12px; letter-spacing: 4px; }
   :lang(en) .home-subtitle,
   :lang(ja) .home-subtitle { letter-spacing: 1px; }

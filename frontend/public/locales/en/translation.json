@@ -1,5 +1,7 @@
 {
   "app.name": "佛津 FoJin",
+  "home.title_accent": "Fo",
+  "home.title_rest": "Jin",
   "app.tagline": "Global Buddhist Classics Digital Resource Platform",
   "app.title": "FoJin — Global Buddhist Classics Digital Resource Platform",
   "nav.sources": "Sources",

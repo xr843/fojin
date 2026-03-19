@@ -1,5 +1,7 @@
 {
   "app.name": "佛津",
+  "home.title_accent": "佛",
+  "home.title_rest": "津",
   "app.tagline": "全球佛教古籍数字资源聚合平台",
   "app.title": "佛津 — 全球佛教古籍数字资源聚合平台",
   "nav.sources": "数据源",
