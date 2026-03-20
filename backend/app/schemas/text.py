@@ -86,3 +86,4 @@ class SearchResponse(BaseModel):
     page: int
     size: int
     results: list[SearchHit]
+    suggestion: str | None = None

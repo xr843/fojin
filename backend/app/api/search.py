@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.elasticsearch import get_es
 from app.database import get_db
 from app.schemas.text import SearchResponse
-from app.services.search import get_aggregations, search_content, search_texts
+from app.services.search import get_aggregations, get_suggestions, search_content, search_texts
 
 try:
     from app.schemas.dianjin import FederatedSearchResponse
@@ -33,6 +33,16 @@ async def search(
     """搜索佛教典籍。支持经名、编号、译者等多字段搜索，可按语言和数据源筛选。"""
     es = get_es()
     return await search_texts(es, q, page, size, dynasty, category, lang, sources, sort)
+
+
+@router.get("/search/suggest")
+async def search_suggest(
+    q: str = Query(..., min_length=1, max_length=200, description="搜索建议关键词"),
+):
+    """根据输入返回搜索建议（自动补全）。"""
+    es = get_es()
+    suggestions = await get_suggestions(es, q)
+    return {"suggestions": suggestions}
 
 
 @router.get("/search/content")

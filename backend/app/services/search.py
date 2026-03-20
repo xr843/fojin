@@ -1,7 +1,11 @@
+import logging
+
 from elasticsearch import AsyncElasticsearch
 
 from app.core.elasticsearch import CONTENT_INDEX_NAME, INDEX_NAME
 from app.schemas.text import SearchHit, SearchResponse
+
+logger = logging.getLogger(__name__)
 
 
 async def search_texts(
@@ -112,7 +116,12 @@ async def search_texts(
             )
         )
 
-    return SearchResponse(total=total, page=page, size=size, results=results)
+    # When results are few, try to provide a spelling/phrase suggestion
+    suggestion = None
+    if query and total < 3:
+        suggestion = await _get_phrase_suggestion(es, query)
+
+    return SearchResponse(total=total, page=page, size=size, results=results, suggestion=suggestion)
 
 
 async def search_content(
@@ -231,6 +240,82 @@ async def search_content(
         "size": size,
         "results": results,
     }
+
+
+async def _get_phrase_suggestion(es: AsyncElasticsearch, query: str) -> str | None:
+    """Use ES phrase suggester to get a spelling correction for the query."""
+    try:
+        body = {
+            "suggest": {
+                "title_zh_suggestion": {
+                    "text": query,
+                    "phrase": {
+                        "field": "title_zh",
+                        "size": 1,
+                        "gram_size": 2,
+                        "direct_generator": [{"field": "title_zh", "suggest_mode": "popular"}],
+                        "highlight": {"pre_tag": "", "post_tag": ""},
+                    },
+                },
+                "title_en_suggestion": {
+                    "text": query,
+                    "phrase": {
+                        "field": "title_en",
+                        "size": 1,
+                        "gram_size": 3,
+                        "direct_generator": [{"field": "title_en", "suggest_mode": "popular"}],
+                        "highlight": {"pre_tag": "", "post_tag": ""},
+                    },
+                },
+            },
+            "size": 0,
+        }
+        result = await es.search(index=INDEX_NAME, body=body, timeout="5s")
+        suggestions = result.get("suggest", {})
+
+        # Check title_zh first, then title_en
+        for key in ("title_zh_suggestion", "title_en_suggestion"):
+            options = suggestions.get(key, [{}])[0].get("options", []) if suggestions.get(key) else []
+            if options and options[0].get("text") and options[0]["text"].strip() != query.strip():
+                return options[0]["text"]
+        return None
+    except Exception:
+        logger.debug("Phrase suggestion failed for query=%s", query, exc_info=True)
+        return None
+
+
+async def get_suggestions(es: AsyncElasticsearch, query: str, size: int = 5) -> list[str]:
+    """Get autocomplete suggestions using match_phrase_prefix on title fields."""
+    try:
+        body = {
+            "size": size,
+            "query": {
+                "bool": {
+                    "should": [
+                        {"match_phrase_prefix": {"title_zh": {"query": query, "max_expansions": 20}}},
+                        {"match_phrase_prefix": {"title_en": {"query": query, "max_expansions": 20}}},
+                        {"match_phrase_prefix": {"translator": {"query": query, "max_expansions": 10}}},
+                    ],
+                    "minimum_should_match": 1,
+                }
+            },
+            "_source": ["title_zh", "title_en"],
+        }
+        result = await es.search(index=INDEX_NAME, body=body, timeout="5s")
+        hits = result["hits"]["hits"]
+
+        seen: set[str] = set()
+        suggestions: list[str] = []
+        for hit in hits:
+            src = hit["_source"]
+            title = src.get("title_zh", "")
+            if title and title not in seen:
+                seen.add(title)
+                suggestions.append(title)
+        return suggestions[:size]
+    except Exception:
+        logger.debug("Autocomplete suggestions failed for query=%s", query, exc_info=True)
+        return []
 
 
 async def get_aggregations(es: AsyncElasticsearch) -> dict:

@@ -67,6 +67,8 @@
   "notfound.title": "404",
   "notfound.subtitle": "Sorry, the page you visited does not exist.",
   "notfound.back": "Back to home",
+  "search.no_results_for": "No results found for \"{{query}}\"",
+  "search.did_you_mean": "Did you mean",
   "language.zh": "中文",
   "language.en": "English",
   "language.ja": "日本語",

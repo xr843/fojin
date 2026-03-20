@@ -120,6 +120,28 @@
   margin-left: 6px;
 }
 
+/* ---------- "Did you mean..." suggestion ---------- */
+.s-did-you-mean {
+  font-size: 14px;
+  color: var(--fj-ink-muted);
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  background: var(--fj-sand-light, #faf7f2);
+  border-radius: 6px;
+  border: 1px solid var(--fj-border);
+}
+
+.s-did-you-mean-link {
+  color: var(--fj-accent);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.s-did-you-mean-link:hover {
+  text-decoration: underline;
+}
+
 /* ---------- 结果卡片 ---------- */
 .s-card {
   display: flex;

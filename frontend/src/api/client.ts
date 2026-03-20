@@ -58,6 +58,7 @@ export interface SearchResponse {
   page: number;
   size: number;
   results: SearchHit[];
+  suggestion?: string | null;
 }
 
 export interface TextDetail {
@@ -328,6 +329,11 @@ export async function searchTexts(params: {
 }): Promise<SearchResponse> {
   const { data } = await api.get<SearchResponse>("/search", { params });
   return data;
+}
+
+export async function getSearchSuggestions(q: string): Promise<string[]> {
+  const { data } = await api.get<{ suggestions: string[] }>("/search/suggest", { params: { q } });
+  return data.suggestions;
 }
 
 export async function getTextDetail(id: number): Promise<TextDetail> {

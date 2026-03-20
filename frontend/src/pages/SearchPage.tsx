@@ -1,14 +1,15 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Pagination, Empty, Checkbox, Input, Tag, Button, Tabs, Result, Select, Typography, Skeleton,
+  Pagination, Empty, Checkbox, Input, Tag, Button, Tabs, Result, Select, Typography, Skeleton, AutoComplete,
 } from "antd";
 import {
   SearchOutlined, BookOutlined, VerticalAlignTopOutlined,
 } from "@ant-design/icons";
-import { searchTexts, searchContent, searchDictionary, getSources } from "../api/client";
+import { searchTexts, searchContent, searchDictionary, getSources, getSearchSuggestions } from "../api/client";
 import { hasDirectSearchUrl } from "../utils/sourceUrls";
 import { addSearchHistory, getSearchHistory, type SearchHistoryItem } from "../utils/history";
 import { ResultCard, ExternalCard, DictCard, ContentCard } from "../components/search";
@@ -16,6 +17,7 @@ import "../styles/search.css";
 import "../styles/sources.css";
 
 export default function SearchPage() {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Derive state from URL — these are the source of truth
@@ -32,6 +34,32 @@ export default function SearchPage() {
     addSearchHistory(q, tab);
     setSearchHistory(getSearchHistory());
   };
+
+  // Autocomplete suggestions
+  const [acOptions, setAcOptions] = useState<{ value: string }[]>([]);
+  const [acInput, setAcInput] = useState(query);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const fetchSuggestions = useCallback((value: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!value || value.length < 1) {
+      setAcOptions([]);
+      return;
+    }
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const suggestions = await getSearchSuggestions(value);
+        setAcOptions(suggestions.map((s) => ({ value: s })));
+      } catch {
+        setAcOptions([]);
+      }
+    }, 300);
+  }, []);
+
+  // Sync acInput when URL query changes (e.g. clicking "did you mean" link)
+  useEffect(() => {
+    setAcInput(query);
+  }, [query]);
 
   const langFilter = searchParams.get("lang") || "";
   const dictLang = searchParams.get("dict_lang") || "";
@@ -184,15 +212,21 @@ export default function SearchPage() {
       </Helmet>
       {/* 搜索栏 */}
       <div className="s-search-bar">
-        <Input.Search
-          key={query}
-          defaultValue={query}
-          placeholder="输入书名、作者或版本"
-          enterButton={<><SearchOutlined /> 搜索</>}
-          size="large"
-          onSearch={handleSearch}
-          style={{ maxWidth: 640 }}
-        />
+        <AutoComplete
+          options={acOptions}
+          onSearch={fetchSuggestions}
+          onSelect={(value: string) => { setAcOptions([]); handleSearch(value); }}
+          value={acInput}
+          onChange={setAcInput}
+          style={{ maxWidth: 640, width: "100%" }}
+        >
+          <Input.Search
+            placeholder="输入书名、作者或版本"
+            enterButton={<><SearchOutlined /> 搜索</>}
+            size="large"
+            onSearch={handleSearch}
+          />
+        </AutoComplete>
       </div>
 
       {/* 已选数据源标签 */}
@@ -336,6 +370,23 @@ export default function SearchPage() {
               )}
               </div>
             </div>
+
+            {/* "Did you mean..." suggestion */}
+            {!loading && tab === "catalog" && data && data.suggestion && data.total < 3 && (
+              <div className="s-did-you-mean">
+                {t("search.no_results_for", { query })}
+                {" — "}
+                {t("search.did_you_mean")}{" "}
+                <a
+                  className="s-did-you-mean-link"
+                  onClick={(e) => { e.preventDefault(); handleSearch(data.suggestion!); }}
+                  href="#"
+                >
+                  &ldquo;{data.suggestion}&rdquo;
+                </a>
+                ？
+              </div>
+            )}
 
             {loading && Array.from({ length: 5 }).map((_, i) => (
               <div className="s-card" key={`skel-${i}`}>
