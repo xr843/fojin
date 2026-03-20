@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { Input, Button, Space, message, Alert } from "antd";
 import Markdown from "react-markdown";
+import rehypeSanitize from "rehype-sanitize";
 import {
   SendOutlined,
   RobotOutlined,
@@ -338,7 +339,7 @@ export default function ChatPage() {
                 }}>
                   {m.role === "assistant" ? (
                     <div className="chat-markdown">
-                      <Markdown>{m.content + (streamingIdRef.current === m.id ? " ▌" : "")}</Markdown>
+                      <Markdown rehypePlugins={[rehypeSanitize]}>{m.content + (streamingIdRef.current === m.id ? " ▌" : "")}</Markdown>
                     </div>
                   ) : (
                     m.content
