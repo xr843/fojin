@@ -1,20 +1,29 @@
 /**
  * Sanitize HTML highlights from Elasticsearch to prevent XSS.
- * Only allows safe formatting tags used for search highlight display.
+ * Uses DOMPurify for robust sanitization instead of regex-based stripping.
  */
 
+import DOMPurify from "dompurify";
+
 const ALLOWED_TAGS = ["em", "b", "strong", "mark"];
-const TAG_RE = /<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*>/g;
 
 /**
  * Strip all HTML tags except the allowed highlight tags.
- * This is a whitelist approach — anything not explicitly allowed is removed.
+ * Attributes are stripped from all tags to prevent event-handler injection.
  */
 export function sanitizeHighlight(html: string): string {
-  return html.replace(TAG_RE, (match, tagName) => {
-    if (ALLOWED_TAGS.includes(tagName.toLowerCase())) {
-      return match;
-    }
-    return "";
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS,
+    ALLOWED_ATTR: [],
   });
+}
+
+/**
+ * Escape a plain-text string for safe insertion into innerHTML.
+ * Use this when the input should never contain HTML (e.g., API data fields).
+ */
+export function escapeHtml(text: string): string {
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
 }

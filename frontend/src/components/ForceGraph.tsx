@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as d3 from "d3";
+import { escapeHtml } from "../utils/sanitize";
 
 interface GraphNode {
   id: number;
@@ -210,11 +211,11 @@ export default function ForceGraph({
           .attr("stroke-opacity", 0.9)
           .attr("stroke-width", 3);
         const label = PREDICATE_LABELS[d.predicate] || d.predicate;
-        const parts = [`<strong>${label}</strong>`];
+        const parts = [`<strong>${escapeHtml(label)}</strong>`];
         if (d.provenance)
-          parts.push(`<span style="color:#9a8e7a">来源: ${d.provenance}</span>`);
+          parts.push(`<span style="color:#9a8e7a">来源: ${escapeHtml(d.provenance)}</span>`);
         if (d.evidence)
-          parts.push(`<span style="color:#7a6e5c">证据: ${d.evidence}</span>`);
+          parts.push(`<span style="color:#7a6e5c">证据: ${escapeHtml(d.evidence)}</span>`);
         if (d.confidence < 1)
           parts.push(`<span style="color:#b08d57">置信度: ${d.confidence}</span>`);
         showTooltip(parts.join("<br>"), event.offsetX, event.offsetY);
@@ -319,8 +320,8 @@ export default function ForceGraph({
 
         // Tooltip
         const typeLabel = TYPE_LABELS[d.entity_type] || d.entity_type;
-        let html = `<strong>${d.name}</strong> <span style="color:#9a8e7a">${typeLabel}</span>`;
-        if (d.description) html += `<br><span style="color:#7a6e5c;font-size:11px">${d.description}</span>`;
+        let html = `<strong>${escapeHtml(d.name)}</strong> <span style="color:#9a8e7a">${escapeHtml(typeLabel)}</span>`;
+        if (d.description) html += `<br><span style="color:#7a6e5c;font-size:11px">${escapeHtml(d.description)}</span>`;
         showTooltip(html, event.offsetX, event.offsetY);
       })
       .on("mouseout", function () {
