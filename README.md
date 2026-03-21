@@ -133,7 +133,7 @@ FoJin aggregates data from major Buddhist digital projects worldwide:
 | Database | PostgreSQL 15 + pgvector + pg_trgm |
 | Search | Elasticsearch 8 (ICU tokenizer) |
 | Cache | Redis 7 |
-| AI | Dify + RAG (vector + keyword dual retrieval) |
+| AI | RAG (pgvector semantic search) + multi-provider LLM |
 | Deploy | Docker Compose, Nginx (gzip_static, security headers) |
 | CI | GitHub Actions |
 
@@ -154,9 +154,9 @@ FoJin aggregates data from major Buddhist digital projects worldwide:
                     +---------+-------+---------+
                     |         |       |         |
               +-----+   +----+--+ +--+---+ +---+----+
-              | PG 15 |  | ES 8  | |Redis | | Dify   |
-              |pgvector|  | ICU  | |cache | | RAG/AI |
-              +--------+  +------+ +------+ +--------+
+              | PG 15 |  | ES 8  | |Redis |
+              |pgvector|  | ICU  | |cache |
+              +--------+  +------+ +------+
 ```
 
 ## Development

@@ -197,12 +197,8 @@ export default function ChatPage() {
         if (m.sources && m.sources.length > 0) {
           md += "**引用来源:**\n";
           for (const s of m.sources) {
-            if (s.source_type === "dify") {
-              md += `- 📚 佛典知识库 (${Math.round(s.score * 100)}%)\n`;
-            } else {
-              const title = s.title_zh ? `《${s.title_zh}》第${s.juan_num}卷` : `文本#${s.text_id} 第${s.juan_num}卷`;
-              md += `- 📖 ${title} (${Math.round(s.score * 100)}%)\n`;
-            }
+            const title = s.title_zh ? `《${s.title_zh}》第${s.juan_num}卷` : `文本#${s.text_id} 第${s.juan_num}卷`;
+            md += `- 📖 ${title} (${Math.round(s.score * 100)}%)\n`;
           }
           md += "\n";
         }
@@ -402,33 +398,27 @@ export default function ChatPage() {
                     }}>
                       {m.sources.map((s, i) => (
                         <div key={i} style={{ marginBottom: 4 }}>
-                          {s.source_type === "dify" ? (
-                            <Tooltip title={s.chunk_text} placement="top" overlayStyle={{ maxWidth: 400 }}>
-                              <span style={{ cursor: "default" }}>{"📚"} 佛典知识库 ({Math.round(s.score * 100)}%)</span>
-                            </Tooltip>
-                          ) : (
-                            <Tooltip title={s.chunk_text} placement="top" overlayStyle={{ maxWidth: 400 }}>
-                              <a
-                                onClick={() => s.text_id > 0 && navigate(`/texts/${s.text_id}/read?juan=${s.juan_num}`)}
-                                style={{
-                                  cursor: s.text_id > 0 ? "pointer" : "default",
-                                  color: "inherit",
-                                  textDecoration: s.text_id > 0 ? "underline" : "none",
-                                  borderRadius: 4,
-                                  padding: "1px 4px",
-                                  transition: "background 0.2s",
-                                }}
-                                onMouseEnter={(e) => { if (s.text_id > 0) e.currentTarget.style.background = "rgba(176,141,87,0.15)"; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                              >
-                                {"📖"}{" "}
-                                {s.title_zh
-                                  ? `《${s.title_zh}》第${s.juan_num}卷`
-                                  : `文本#${s.text_id} 第${s.juan_num}卷`}
-                                {" "}({Math.round(s.score * 100)}%)
-                              </a>
-                            </Tooltip>
-                          )}
+                          <Tooltip title={s.chunk_text} placement="top" overlayStyle={{ maxWidth: 400 }}>
+                            <a
+                              onClick={() => s.text_id > 0 && navigate(`/texts/${s.text_id}/read?juan=${s.juan_num}`)}
+                              style={{
+                                cursor: s.text_id > 0 ? "pointer" : "default",
+                                color: "inherit",
+                                textDecoration: s.text_id > 0 ? "underline" : "none",
+                                borderRadius: 4,
+                                padding: "1px 4px",
+                                transition: "background 0.2s",
+                              }}
+                              onMouseEnter={(e) => { if (s.text_id > 0) e.currentTarget.style.background = "rgba(176,141,87,0.15)"; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                            >
+                              {"📖"}{" "}
+                              {s.title_zh
+                                ? `《${s.title_zh}》第${s.juan_num}卷`
+                                : `文本#${s.text_id} 第${s.juan_num}卷`}
+                              {" "}({Math.round(s.score * 100)}%)
+                            </a>
+                          </Tooltip>
                         </div>
                       ))}
                     </div>

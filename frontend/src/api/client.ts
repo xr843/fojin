@@ -616,7 +616,6 @@ export interface ChatSource {
   chunk_text: string;
   score: number;
   title_zh?: string;
-  source_type?: string;
 }
 
 export interface ChatResponse {

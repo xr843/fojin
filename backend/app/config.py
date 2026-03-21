@@ -43,11 +43,6 @@ class Settings(BaseSettings):
     dianjin_api_key: str = ""
     dianjin_api_url: str = "https://guji.cckb.cn/api"
 
-    # Dify Dataset API (for hybrid retrieval)
-    dify_api_url: str = ""
-    dify_dataset_api_key: str = ""
-    dify_dataset_ids: str = ""  # comma-separated dataset IDs
-
     # Rate limiting (requests per minute)
     rate_limit_default: int = 200
     rate_limit_login: int = 10
