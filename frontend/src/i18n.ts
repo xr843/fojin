@@ -11,6 +11,8 @@ i18n
     fallbackLng: "zh",
     supportedLngs: ["zh", "en", "ja", "ko", "th", "vi", "si", "my"],
     load: "languageOnly",
+    keySeparator: false,
+    nsSeparator: false,
     ns: ["translation"],
     defaultNS: "translation",
     backend: {
