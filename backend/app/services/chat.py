@@ -273,14 +273,17 @@ async def _prepare_chat(
     """
     _validate_message(message)
 
+    # Resolve session first so ownership checks (403) come before config checks (503)
+    chat_session = None
+    if user_id is not None:
+        chat_session = await _resolve_session(db, user_id, message, session_id)
+
     api_url, api_key, model, is_byok = _resolve_llm_config(user)
 
     if not is_byok and not api_key:
         raise ServiceError("平台 AI 服务暂未配置。请在个人中心配置自己的 API Key 使用 AI 问答功能。")
 
-    chat_session = None
     if user_id is not None:
-        chat_session = await _resolve_session(db, user_id, message, session_id)
         if not is_byok:
             await _check_daily_quota(db, user)
     else:
