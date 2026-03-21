@@ -65,7 +65,7 @@
   "notfound.title": "404",
   "notfound.subtitle": "抱歉，您访问的页面不存在。",
   "notfound.back": "返回首页",
-  "search.no_results_for": "没有找到"{{query}}"的结果",
+  "search.no_results_for": "没有找到「{{query}}」的结果",
   "search.did_you_mean": "您是否想搜索",
   "language.zh": "中文",
   "language.en": "English",
