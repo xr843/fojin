@@ -22,6 +22,8 @@ Parser for 84000 TEI XML translation files.
 import re
 from xml.etree import ElementTree as ET
 
+from defusedxml.ElementTree import fromstring as safe_fromstring
+
 TEI_NS = "http://www.tei-c.org/ns/1.0"
 
 
@@ -50,13 +52,13 @@ def parse_84000_tei(xml_content: str) -> dict:
     }
 
     try:
-        # Parse XML, handling namespaces
-        root = ET.fromstring(xml_content)
+        # Parse XML, handling namespaces (use defusedxml to prevent XXE attacks)
+        root = safe_fromstring(xml_content)
     except ET.ParseError:
         # Try to clean up common issues
         cleaned = re.sub(r'&(?!amp;|lt;|gt;|quot;|apos;)', '&amp;', xml_content)
         try:
-            root = ET.fromstring(cleaned)
+            root = safe_fromstring(cleaned)
         except ET.ParseError:
             return result
 
