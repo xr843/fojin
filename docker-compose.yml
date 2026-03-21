@@ -91,6 +91,8 @@ services:
       LLM_MODEL: ${LLM_MODEL:-}
       EMBEDDING_API_URL: ${EMBEDDING_API_URL:-}
       EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-m3}
+      DIANJIN_API_KEY: ${DIANJIN_API_KEY:-}
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     volumes:

@@ -44,6 +44,7 @@ async def retrieve_rag_context(
         context_text = "\n\n".join(context_parts)
     except Exception:
         logger.exception("Embedding/search failed, proceeding without RAG context")
+        await db.rollback()
 
     logger.debug("TIMING: Total RAG retrieval took %.2fs", time.monotonic() - t0)
     return sources, context_text

@@ -50,3 +50,4 @@ esdata/
 redisdata/
 node_modules/
 .venv/
+.gstack/
