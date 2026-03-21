@@ -8,7 +8,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-
 from app.config import settings
 from app.core.elasticsearch import close_es, get_es, init_es
 from app.core.exceptions import FoJinError, fojin_error_to_http
