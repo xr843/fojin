@@ -54,10 +54,10 @@ SOURCES = [
     },
     {
         "code": "cbeta-mcp",
-        "name_zh": "CBETA MCP服务器",
-        "name_en": "CBETA MCP Server",
-        "base_url": "https://github.com/hiing/Cbeta-MCP",
-        "description": "基于Model Context Protocol的CBETA佛典查询服务器，使AI大模型可直接检索超过2.2亿字汉文佛典",
+        "name_zh": "CBETA Online",
+        "name_en": "CBETA Online",
+        "base_url": "https://cbetaonline.dila.edu.tw/zh/",
+        "description": "中华电子佛典协会（CBETA）在线阅读平台，收录汉文佛典超过2.2亿字，提供全文检索、经文阅读与学术研究工具",
         "region": "中国台湾", "languages": "lzh", "access_type": "open",
     },
     # ── Silk Road & Archaeology ──

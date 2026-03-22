@@ -115,6 +115,14 @@ async def get_history_paginated(
     return msgs, total
 
 
+def _detect_model_from_url(api_url: str) -> str:
+    """Infer a default model name from the API URL when LLM_MODEL is empty."""
+    for provider, url in PROVIDER_URLS.items():
+        if url in api_url or api_url in url:
+            return PROVIDER_DEFAULT_MODELS[provider]
+    return "gpt-4o-mini"
+
+
 def _resolve_llm_config(user: User | None) -> tuple[str, str, str, bool]:
     """Return (api_url, api_key, model, is_byok) based on user's BYOK or platform default."""
     if user and user.encrypted_api_key:
@@ -126,7 +134,9 @@ def _resolve_llm_config(user: User | None) -> tuple[str, str, str, bool]:
             return url, key, model, True
         except Exception:
             logger.warning("Failed to decrypt user %s API key, falling back to platform", user.id)
-    return settings.llm_api_url, settings.llm_api_key, settings.llm_model, False
+    url = settings.llm_api_url or "https://api.openai.com/v1"
+    model = settings.llm_model or _detect_model_from_url(url)
+    return url, settings.llm_api_key, model, False
 
 
 async def _check_daily_quota(db: AsyncSession, user: User) -> None:
@@ -337,7 +347,8 @@ async def send_message(
         logger.warning("LLM call timed out")
         answer = "抱歉，AI 服务响应超时，请稍后重试。"
     except httpx.HTTPStatusError as exc:
-        logger.warning("LLM returned HTTP %s", exc.response.status_code)
+        resp_body = exc.response.text[:500] if exc.response else "N/A"
+        logger.warning("LLM returned HTTP %s: %s | url=%s model=%s", exc.response.status_code, resp_body, api_url, model)
         if is_byok and exc.response.status_code == 401:
             answer = "您的 API Key 无效或已过期，请在个人中心重新配置。"
         else:
@@ -476,7 +487,8 @@ async def send_message_stream(
         yield f"data: {json.dumps({'type': 'error', 'message': error_msg}, ensure_ascii=False)}\n\n"
         full_answer = full_answer or error_msg
     except httpx.HTTPStatusError as exc:
-        logger.warning("LLM stream returned HTTP %s", exc.response.status_code)
+        resp_body = exc.response.text[:500] if exc.response else "N/A"
+        logger.warning("LLM stream returned HTTP %s: %s | url=%s model=%s", exc.response.status_code, resp_body, api_url, model)
         if is_byok and exc.response.status_code == 401:
             error_msg = "您的 API Key 无效或已过期，请在个人中心重新配置。"
         else:
