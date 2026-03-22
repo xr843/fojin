@@ -244,6 +244,7 @@ from sqlalchemy import String, case, func, literal_column, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dynasty_config import DYNASTIES, resolve_dynasty
+from app.models.dictionary import DictionaryEntry
 from app.models.knowledge_graph import KGEntity, KGRelation
 from app.models.source import DataSource
 from app.models.text import BuddhistText
@@ -264,6 +265,7 @@ async def get_overview(db: AsyncSession, redis) -> dict:
     total_sources = (await db.execute(select(func.count(DataSource.id)).where(DataSource.is_active == True))).scalar() or 0
     total_kg_entities = (await db.execute(select(func.count(KGEntity.id)))).scalar() or 0
     total_kg_relations = (await db.execute(select(func.count(KGRelation.id)))).scalar() or 0
+    total_dict_entries = (await db.execute(select(func.count(DictionaryEntry.id)))).scalar() or 0
 
     # Distinct languages from texts (lang column)
     lang_q = select(BuddhistText.lang, func.count(BuddhistText.id)).where(
@@ -333,6 +335,7 @@ async def get_overview(db: AsyncSession, redis) -> dict:
             "total_languages": total_languages,
             "total_kg_entities": total_kg_entities,
             "total_kg_relations": total_kg_relations,
+            "total_dict_entries": total_dict_entries,
         },
         "dynasty_distribution": dynasty_distribution,
         "language_distribution": [{"language": l, "count": c} for l, c in lang_rows],
@@ -732,6 +735,7 @@ export interface StatsSummary {
   total_languages: number;
   total_kg_entities: number;
   total_kg_relations: number;
+  total_dict_entries: number;
 }
 
 export interface DynastyDistribution {
@@ -973,6 +977,7 @@ export default function SummaryCards({ summary, scholarlyMode }: Props) {
     { key: "languages", value: summary.total_languages, label: t("dashboard.totalLanguages") },
     { key: "entities", value: summary.total_kg_entities, label: t("dashboard.totalEntities") },
     { key: "relations", value: summary.total_kg_relations, label: t("dashboard.totalRelations") },
+    { key: "dict", value: summary.total_dict_entries, label: t("dashboard.totalDictEntries") },
   ];
 
   return (
@@ -1483,7 +1488,8 @@ In `frontend/public/locales/zh/translation.json`, add:
 "dashboard.totalSources": "数据源",
 "dashboard.totalLanguages": "语言种类",
 "dashboard.totalEntities": "知识实体",
-"dashboard.totalRelations": "知识关系"
+"dashboard.totalRelations": "知识关系",
+"dashboard.totalDictEntries": "字典条目"
 ```
 
 - [ ] **Step 4: Add English i18n keys**
