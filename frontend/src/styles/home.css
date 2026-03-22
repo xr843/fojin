@@ -556,25 +556,62 @@
   line-height: 1.5;
 }
 
-/* ---------- 响应式 ---------- */
+/* ---------- 响应式：平板 ---------- */
 @media (max-width: 768px) {
-  .home-hero { padding: 80px 20px 48px; }
+  .home-page { height: auto; min-height: calc(100vh - 52px - 50px); overflow: auto; }
+  .home-hero { padding: 40px 16px 32px; height: auto; min-height: calc(100vh - 52px - 50px); }
   .home-title { font-size: 48px; letter-spacing: 12px; }
   :lang(en) .home-title { font-size: 40px; letter-spacing: 4px; }
-  .home-subtitle { font-size: 12px; letter-spacing: 4px; }
+  .home-subtitle { font-size: 12px; letter-spacing: 4px; margin-bottom: 20px; }
   :lang(en) .home-subtitle,
   :lang(ja) .home-subtitle { letter-spacing: 1px; }
-  .home-search-wrap { margin-bottom: 48px; }
 
-  .home-stats { flex-direction: column; max-width: 200px; }
-  .home-stat-item { padding: 16px 0; }
-  .home-stat-item:not(:last-child)::after {
-    top: auto; bottom: 0; right: 20%; width: 60%; height: 1px;
-  }
-  .home-stat-num { font-size: 32px; }
+  .search-combo { max-width: 100%; }
+  .search-combo-bar { height: 48px; }
+  .search-combo-src { padding: 0 10px; font-size: 12px; }
+  .search-combo-badge { font-size: 10px; padding: 1px 6px; }
+  .search-combo-input { padding: 0 12px; font-size: 15px; }
+  .search-combo-input::placeholder { font-size: 13px; }
+  .search-combo-btn { padding: 0 16px; font-size: 14px; }
 
-  .home-features { grid-template-columns: repeat(2, 1fr); max-width: 360px; gap: 12px; }
+  .home-hot-tags { margin-bottom: 24px; gap: 6px; }
+  .home-hot-tag { padding: 2px 10px; font-size: 11px; }
+
+  .home-stats { flex-direction: row; max-width: 100%; gap: 0; margin-bottom: 0; }
+  .home-stat-item { padding: 8px 12px; }
+  .home-stat-num { font-size: 24px; margin-bottom: 4px; }
+  .home-stat-lbl { font-size: 10px; letter-spacing: 1px; }
+
+  .home-features { grid-template-columns: repeat(2, 1fr); max-width: 360px; gap: 12px; margin-top: 20px; }
   .home-feature-card { padding: 14px 12px; }
   .home-feature-icon { font-size: 22px; }
   .home-feature-desc { display: none; }
+
+  .home-trust { margin-top: 16px; font-size: 10px; }
+}
+
+/* ---------- 响应式：小屏手机 ---------- */
+@media (max-width: 480px) {
+  .home-hero { padding: 24px 14px 24px; }
+  .home-title { font-size: 40px; letter-spacing: 8px; margin-bottom: 4px; }
+  .home-subtitle { font-size: 11px; letter-spacing: 3px; margin-bottom: 16px; }
+
+  .search-combo-bar { height: 44px; border-radius: 6px; }
+  .search-combo-src .search-combo-src-text { display: none; }
+  .search-combo-src { padding: 0 8px; gap: 4px; }
+  .search-combo-btn .search-combo-btn-text { display: none; }
+  .search-combo-btn { padding: 0 14px; }
+  .search-combo-input { padding: 0 10px; font-size: 14px; }
+
+  .home-hot-tags { margin-bottom: 16px; }
+  .home-hot-label { font-size: 11px; }
+
+  .home-stat-item { padding: 6px 8px; }
+  .home-stat-num { font-size: 20px; }
+  .home-stat-lbl { font-size: 9px; }
+
+  .home-features { max-width: 100%; gap: 10px; margin-top: 16px; }
+  .home-feature-card { padding: 12px 8px; }
+  .home-feature-icon { font-size: 20px; margin-bottom: 4px; }
+  .home-feature-title { font-size: 12px; }
 }

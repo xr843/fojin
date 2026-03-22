@@ -79,7 +79,7 @@ export default function HomePage() {
               aria-haspopup="listbox"
             >
               <DatabaseOutlined />
-              <span>{srcLabel}</span>
+              <span className="search-combo-src-text">{srcLabel}</span>
               <span className="search-combo-badge">{srcCount}</span>
               {sourceOpen ? <UpOutlined /> : <DownOutlined />}
             </button>
@@ -94,7 +94,7 @@ export default function HomePage() {
               aria-label={t("home.search_label")}
             />
             <button className="search-combo-btn" onClick={() => handleSearch()}>
-              <SearchOutlined /> {t("home.search_btn")}
+              <SearchOutlined /> <span className="search-combo-btn-text">{t("home.search_btn")}</span>
             </button>
           </div>
 

@@ -57,6 +57,10 @@ em {
 @media (max-width: 768px) {
   .nav-desktop { display: none !important; }
   .nav-mobile-trigger { display: inline-flex !important; }
+
+  /* Header / Footer 移动端 padding */
+  .ant-layout-header { padding: 0 12px !important; }
+  .ant-layout-footer { padding: 12px 16px !important; }
 }
 
 /* ========== Chat Thinking Animation ========== */
