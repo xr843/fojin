@@ -30,6 +30,8 @@ const ExportsPage = lazy(() => import("./pages/ExportsPage"));
 const CollectionsPage = lazy(() => import("./pages/CollectionsPage"));
 const AdminSuggestionsPage = lazy(() => import("./pages/AdminSuggestionsPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
+const TimelinePage = lazy(() => import("./pages/TimelinePage"));
+const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 
 function Loading() {
   return (
@@ -68,6 +70,8 @@ function App() {
             <Route path="/kg" element={<RouteErrorBoundary><KnowledgeGraphPage /></RouteErrorBoundary>} />
             <Route path="/manuscripts/:textId" element={<RouteErrorBoundary><ManuscriptViewerPage /></RouteErrorBoundary>} />
             <Route path="/exports" element={<ExportsPage />} />
+            <Route path="/timeline" element={<TimelinePage />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
           </Routes>

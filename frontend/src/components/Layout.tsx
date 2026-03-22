@@ -14,6 +14,8 @@ import {
   RobotOutlined,
   GithubOutlined,
   GlobalOutlined,
+  FieldTimeOutlined,
+  BarChartOutlined,
 } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../stores/authStore";
@@ -61,6 +63,8 @@ export default function Layout() {
     { icon: <DatabaseOutlined />, label: t("nav.sources"), path: "/sources" },
     { icon: <BookOutlined />, label: t("nav.collections"), path: "/collections" },
     { icon: <ApartmentOutlined />, label: t("nav.kg"), path: "/kg" },
+    { icon: <FieldTimeOutlined />, label: t("nav.timeline"), path: "/timeline" },
+    { icon: <BarChartOutlined />, label: t("nav.dashboard"), path: "/dashboard" },
     { icon: <RobotOutlined />, label: t("nav.chat"), path: "/chat" },
     ...(isAdmin
       ? [

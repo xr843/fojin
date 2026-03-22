@@ -29,7 +29,7 @@ jobs:
         run: pip install -r requirements-dev.txt
 
       - name: Lint (ruff)
-        run: pip install ruff && ruff check app/
+        run: pip install ruff==0.9.7 && ruff check app/
 
       - name: Run tests
         run: python -m pytest -q tests/ --ignore=tests/test_annotations_workflow.py -k "not test_kg_entity_detail"
@@ -57,6 +57,9 @@ jobs:
 
       - name: Type check
         run: npx tsc -b --noEmit
+
+      - name: Unit tests (Vitest)
+        run: npx vitest run
 
       - name: Build (Vite)
         run: npx vite build

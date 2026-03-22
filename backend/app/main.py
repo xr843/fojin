@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 from contextlib import asynccontextmanager
 
 import redis.asyncio as aioredis
@@ -36,6 +37,7 @@ from app.api import (
     search,
     source_suggestions,
     sources,
+    stats,
     texts,
 )
 
@@ -92,7 +94,25 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    """Log method, path, status code, and duration for every request."""
+
+    async def dispatch(self, request: Request, call_next):
+        start = time.perf_counter()
+        response: Response = await call_next(request)
+        duration_ms = (time.perf_counter() - start) * 1000
+        logger.info(
+            "%s %s %d %.1fms",
+            request.method,
+            request.url.path,
+            response.status_code,
+            duration_ms,
+        )
+        return response
+
+
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RequestLoggingMiddleware)
 
 
 @app.exception_handler(FoJinError)
@@ -133,6 +153,9 @@ app.include_router(exports.router, prefix="/api")
 # Dianjin (典津) cross-platform search — optional module
 if dianjin is not None:
     app.include_router(dianjin.router, prefix="/api")
+
+# Stats (dashboard + timeline)
+app.include_router(stats.router, prefix="/api")
 
 # Source suggestions (public)
 app.include_router(source_suggestions.router, prefix="/api")

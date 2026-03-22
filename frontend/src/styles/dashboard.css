@@ -1,0 +1,79 @@
+.dashboard-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.dashboard-grid .full-width {
+  grid-column: 1 / -1;
+}
+
+.dashboard-card {
+  background: var(--fj-bg, #f8f5ef);
+  border: 1px solid var(--fj-border, #d9d0c1);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.dashboard-card h3 {
+  font-family: "Noto Serif SC", serif;
+  color: var(--fj-ink, #2b2318);
+  margin-bottom: 16px;
+  font-size: 16px;
+}
+
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.summary-card {
+  text-align: center;
+  padding: 16px 8px;
+  background: var(--fj-bg, #f8f5ef);
+  border: 1px solid var(--fj-border, #d9d0c1);
+  border-radius: 8px;
+}
+
+.summary-card .value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--fj-accent, #8b2500);
+  font-family: "Noto Serif SC", serif;
+}
+
+.summary-card .label {
+  font-size: 13px;
+  color: var(--fj-ink, #2b2318);
+  opacity: 0.7;
+  margin-top: 4px;
+}
+
+.scholarly-label {
+  font-size: 11px;
+  color: var(--fj-ink, #2b2318);
+  opacity: 0.5;
+}
+
+@media (max-width: 768px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+  .summary-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
