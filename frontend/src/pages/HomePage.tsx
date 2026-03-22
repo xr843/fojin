@@ -15,7 +15,7 @@ import { useTranslation } from "react-i18next";
 import SourceSelector from "../components/SourceSelector";
 import { getStats, getSources, getFilters } from "../api/client";
 import { getLangName } from "../utils/sourceUrls";
-import "../styles/home.css";
+import "../styles/home.css"; // mobile-responsive v2.1
 
 export default function HomePage() {
   const navigate = useNavigate();
