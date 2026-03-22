@@ -1,9 +1,9 @@
-import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { useQuery } from "@tanstack/react-query";
 import { Switch, Spin, Empty } from "antd";
 import { useTranslation } from "react-i18next";
 import { getStatsOverview } from "../api/stats";
+import { useTimelineStore } from "../stores/timelineStore";
 import SummaryCards from "../components/dashboard/SummaryCards";
 import DynastyBarChart from "../components/dashboard/DynastyBarChart";
 import LanguageDonut from "../components/dashboard/LanguageDonut";
@@ -15,7 +15,7 @@ import "../styles/dashboard.css";
 
 export default function DashboardPage() {
   const { t } = useTranslation();
-  const [scholarlyMode, setScholarlyMode] = useState(false);
+  const { scholarlyMode, toggleScholarlyMode } = useTimelineStore();
 
   const { data, isLoading } = useQuery({
     queryKey: ["statsOverview"],
@@ -51,7 +51,7 @@ export default function DashboardPage() {
         </h2>
         <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span>{t("dashboard.scholarlyMode")}</span>
-          <Switch checked={scholarlyMode} onChange={setScholarlyMode} />
+          <Switch checked={scholarlyMode} onChange={toggleScholarlyMode} />
         </label>
       </div>
 

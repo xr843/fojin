@@ -88,7 +88,6 @@ export default function TimelineChart({
   // Stagger y positions to reduce overlap
   // Sort by xYear, then assign y in a cycling pattern
   const sorted = [...nodes].sort((a, b) => a.xYear - b.xYear);
-  const yStep = Math.max(8, chartHeight / Math.max(sorted.length, 1));
   const yPositions = new Map<number, number>();
   sorted.forEach((n, i) => {
     // Use modular distribution across height
@@ -148,9 +147,6 @@ export default function TimelineChart({
     },
     [navigate],
   );
-
-  // Suppress unused variable warning
-  void yStep;
 
   return (
     <div ref={containerRef} style={{ position: "relative", width: "100%" }}>

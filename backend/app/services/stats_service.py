@@ -73,7 +73,15 @@ async def get_overview(db: AsyncSession, redis=None) -> dict:
         .order_by(func.count(BuddhistText.id).desc())
     )
     dynasty_rows = (await db.execute(dynasty_q)).all()
-    dynasty_distribution = [{"dynasty": r[0], "count": r[1]} for r in dynasty_rows]
+    dynasty_distribution = []
+    for r in dynasty_rows:
+        d = resolve_dynasty(r[0])
+        dynasty_distribution.append({
+            "dynasty": r[0],
+            "count": r[1],
+            "year_start": d["start"] if d else None,
+            "year_end": d["end"] if d else None,
+        })
 
     # Language distribution
     lang_q = (
@@ -109,20 +117,28 @@ async def get_overview(db: AsyncSession, redis=None) -> dict:
     )
     cov_rows = (await db.execute(coverage_q)).all()
     source_coverage = [
-        {"source_id": r[0], "name_zh": r[1], "text_count": r[2], "with_content": int(r[3] or 0)}
+        {
+            "source_name": r[1] or f"Source #{r[0]}",
+            "full_content": int(r[3] or 0),
+            "metadata_only": (r[2] or 0) - int(r[3] or 0),
+        }
         for r in cov_rows
     ]
 
     # Top translators
     trans_q = (
-        select(BuddhistText.translator, func.count(BuddhistText.id).label("count"))
+        select(
+            BuddhistText.translator,
+            func.mode().within_group(BuddhistText.dynasty).label("dynasty"),
+            func.count(BuddhistText.id).label("count"),
+        )
         .where(BuddhistText.translator.is_not(None))
         .group_by(BuddhistText.translator)
         .order_by(func.count(BuddhistText.id).desc())
         .limit(20)
     )
     trans_rows = (await db.execute(trans_q)).all()
-    top_translators = [{"translator": r[0], "count": r[1]} for r in trans_rows]
+    top_translators = [{"name": r[0], "dynasty": r[1], "count": r[2]} for r in trans_rows]
 
     result = {
         "summary": summary,
@@ -195,7 +211,7 @@ async def _timeline_texts(
 
 
 async def _timeline_figures(
-    db: AsyncSession, category: str | None, language: str | None, source_id: str | None, page: int, page_size: int
+    db: AsyncSession, _category: str | None, _language: str | None, _source_id: str | None, page: int, page_size: int
 ) -> dict:
     """Timeline items from KGEntity where entity_type == 'person'."""
     q = select(KGEntity).where(KGEntity.entity_type == "person")
@@ -223,7 +239,7 @@ async def _timeline_figures(
 
 
 async def _timeline_schools(
-    db: AsyncSession, category: str | None, language: str | None, source_id: str | None, page: int, page_size: int
+    db: AsyncSession, _category: str | None, _language: str | None, _source_id: str | None, page: int, page_size: int
 ) -> dict:
     """Timeline items from KGEntity where entity_type == 'school'."""
     q = select(KGEntity).where(KGEntity.entity_type == "school")
