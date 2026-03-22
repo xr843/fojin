@@ -69,7 +69,7 @@ Response: {
 }
 ```
 
-Pagination with cursor-based scrolling. Backend computes `year_start/year_end` from dynasty mapping when not explicitly set. Redis cache: 1 hour TTL.
+Offset-based pagination (`page` + `page_size`). Backend computes `year_start/year_end` from dynasty mapping when not explicitly set. Redis cache: 1 hour TTL.
 
 ## Feature 2: Statistics Dashboard (`/dashboard`)
 
@@ -132,6 +132,7 @@ Single aggregation query, cached in Redis for 1 hour.
 - **Dynasty mapping**: Shared `backend/app/core/dynasty_config.py` (Python dict, same data as frontend)
 - **Cache**: Redis with `stats:overview` and `stats:timeline:{hash}` keys, 1hr TTL
 - **No model changes**: All computed from existing `buddhist_texts.dynasty`, `kg_entities`, `kg_relations`
+- **Dynasty config sync**: `dynasty_years.ts` (frontend) and `dynasty_config.py` (backend) must stay in sync. Add a test that validates parity by comparing the JSON export of both configs.
 
 ### New Files
 
@@ -168,7 +169,7 @@ backend/
 - Backend aggregation queries should complete <500ms (indexed dynasty column + KG entity_type)
 - Redis cache eliminates repeated computation
 - Frontend lazy loads both pages
-- D3 timeline uses canvas rendering for >500 nodes, SVG for fewer
+- D3 timeline uses SVG rendering (sufficient for typical result sets of ~200 nodes per page)
 - Dashboard charts render progressively (summary cards first, then charts)
 
 ### Testing
