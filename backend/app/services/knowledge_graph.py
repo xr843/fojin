@@ -150,7 +150,7 @@ async def get_entity_graph(
             FROM kg_relations r
             WHERE (r.subject_id = ANY(:frontier) OR r.object_id = ANY(:frontier))
             {pred_filter}
-        """)
+        """)  # nosec B608 - pred_filter is a hardcoded clause, not user input
         result = await session.execute(sql, {**params, "frontier": list(frontier)})
         neighbors = {row[0] for row in result.fetchall()}
 
@@ -181,7 +181,7 @@ async def get_entity_graph(
         WHERE r.subject_id = ANY(:ids) AND r.object_id = ANY(:ids)
         {pred_filter}
         GROUP BY subject_id, predicate, object_id
-    """)
+    """)  # nosec B608 - pred_filter is a hardcoded clause, not user input
     edge_result = await session.execute(edge_sql, {**params, "ids": node_ids})
     edge_rows = edge_result.fetchall()
 
