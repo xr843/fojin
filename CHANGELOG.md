@@ -4,6 +4,16 @@ All notable changes to FoJin will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.3.1] — 2026-03-23
+
+### Added
+- Request logging middleware — logs method, path, status code, and duration for every request
+- Auth API tests (register, login, /me, API key management) — 15 new backend tests
+- Frontend unit tests now run in CI (Vitest)
+
+### Fixed
+- CI: pin ruff version to 0.9.7 to match pre-commit config and prevent version drift
+
 ## [3.3.0] — 2026-03-10
 
 First open-source release.
