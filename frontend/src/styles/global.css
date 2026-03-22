@@ -160,10 +160,14 @@ em {
   overflow-y: auto;
 }
 
-/* ========== Layout Content Mobile ========== */
+/* ========== Layout Content ========== */
+.layout-content-inner {
+  padding: 24px 32px;
+}
+
 @media (max-width: 768px) {
-  .ant-layout-content {
-    padding: 12px 10px !important;
+  .layout-content-inner {
+    padding: 12px 10px;
   }
 }
 

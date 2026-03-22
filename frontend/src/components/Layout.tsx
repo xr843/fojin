@@ -243,7 +243,7 @@ export default function Layout() {
           )}
         </Space>
       </Header>
-      <Content id="main-content" style={{ padding: isHome ? 0 : "24px 32px", flex: 1 }}>
+      <Content id="main-content" style={{ padding: isHome ? 0 : undefined, flex: 1 }} className={isHome ? undefined : "layout-content-inner"}>
         <Outlet />
       </Content>
       <Footer
