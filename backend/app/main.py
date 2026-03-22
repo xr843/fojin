@@ -36,6 +36,7 @@ from app.api import (
     search,
     source_suggestions,
     sources,
+    stats,
     texts,
 )
 
@@ -133,6 +134,9 @@ app.include_router(exports.router, prefix="/api")
 # Dianjin (典津) cross-platform search — optional module
 if dianjin is not None:
     app.include_router(dianjin.router, prefix="/api")
+
+# Stats (dashboard + timeline)
+app.include_router(stats.router, prefix="/api")
 
 # Source suggestions (public)
 app.include_router(source_suggestions.router, prefix="/api")
