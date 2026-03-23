@@ -231,7 +231,7 @@ FoJin is built on the generous work of the global Buddhist digital humanities co
 
 ## Related Projects
 
-- [Buddhist University](https://buddhistuniversity.net) — Open courses and encyclopaedia for Buddhist studies
+- [The Open Buddhist University](https://buddhistuniversity.net) — Free courses, books, and encyclopaedia for Buddhist studies
 
 ---
 
