@@ -10,6 +10,10 @@ from app.services.embedding import generate_embedding, similarity_search
 
 logger = logging.getLogger(__name__)
 
+# Minimum cosine similarity score to include a chunk in RAG context.
+# Chunks below this threshold are considered irrelevant and filtered out.
+MIN_RELEVANCE_SCORE = 0.35
+
 
 def _format_source_label(result: dict) -> str:
     if result.get("title_zh"):
@@ -21,11 +25,12 @@ async def retrieve_rag_context(
     db: AsyncSession,
     query: str,
     *,
-    pgvector_limit: int = 5,
+    pgvector_limit: int = 10,
 ) -> tuple[list[ChatSource], str]:
     """Run pgvector similarity search and return (sources, context_text).
 
-    Gracefully degrades: returns empty results on any retrieval failure.
+    Retrieves up to pgvector_limit candidates, then filters by relevance
+    score and caps at 8 results. Gracefully degrades on failure.
     """
     sources: list[ChatSource] = []
     context_text = ""
@@ -39,6 +44,9 @@ async def retrieve_rag_context(
         search_results = await similarity_search(db, query_embedding, limit=pgvector_limit)
         logger.debug("TIMING: pgvector search took %.2fs", time.monotonic() - t1)
 
+        # Filter out low-relevance chunks and cap at 8
+        search_results = [r for r in search_results if r["score"] >= MIN_RELEVANCE_SCORE][:8]
+
         sources = [ChatSource(**r) for r in search_results]
         context_parts = [f"[出处: {_format_source_label(r)}]\n{r['chunk_text']}" for r in search_results]
         context_text = "\n\n".join(context_parts)
@@ -46,5 +54,5 @@ async def retrieve_rag_context(
         logger.exception("Embedding/search failed, proceeding without RAG context")
         await db.rollback()
 
-    logger.debug("TIMING: Total RAG retrieval took %.2fs", time.monotonic() - t0)
+    logger.debug("TIMING: Total RAG retrieval took %.2fs (results: %d)", time.monotonic() - t0, len(sources))
     return sources, context_text
