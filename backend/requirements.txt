@@ -4,7 +4,7 @@ asyncpg==0.30.0
 sqlalchemy[asyncio]==2.0.36
 alembic==1.18.4
 pydantic-settings==2.13.1
-pydantic[email]==2.10.0
+pydantic[email]==2.12.5
 elasticsearch[async]==8.17.0
 redis[hiredis]==5.2.1
 httpx==0.28.1
