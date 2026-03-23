@@ -4,12 +4,18 @@ All notable changes to FoJin will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [3.3.1] — 2026-03-23
+## [3.4.0] — 2026-03-23
 
 ### Added
+- RAG relevance filtering — chunks below 0.35 cosine similarity are excluded from AI context
+- HNSW vector index on text_embeddings for O(log n) similarity search (was full table scan)
 - Request logging middleware — logs method, path, status code, and duration for every request
 - Auth API tests (register, login, /me, API key management) — 15 new backend tests
 - Frontend unit tests now run in CI (Vitest)
+
+### Changed
+- AI system prompt with structured rules, citation format【《经名》第N卷】, and few-shot example
+- RAG retrieval: fetch 10 candidates → filter by relevance → cap at 8 (was fixed top-5)
 
 ### Fixed
 - CI: pin ruff version to 0.9.7 to match pre-commit config and prevent version drift
