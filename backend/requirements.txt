@@ -1,4 +1,4 @@
-fastapi==0.115.6
+fastapi==0.121.0
 uvicorn[standard]==0.34.0
 asyncpg==0.30.0
 sqlalchemy[asyncio]==2.0.36
@@ -8,7 +8,7 @@ pydantic[email]==2.10.0
 elasticsearch[async]==8.17.0
 redis[hiredis]==5.2.1
 httpx==0.28.1
-python-jose[cryptography]==3.3.0
+python-jose[cryptography]==3.4.0
 bcrypt>=4.0.1
 defusedxml==0.7.1
 lxml==5.3.0

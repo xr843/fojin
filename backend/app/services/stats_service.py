@@ -156,7 +156,7 @@ async def get_overview(db: AsyncSession, redis=None) -> dict:
 def _timeline_cache_key(dimension: str, category, language, source_id, page: int, page_size: int) -> str:
     """Build a deterministic cache key for timeline queries."""
     raw = f"{dimension}|{category}|{language}|{source_id}|{page}|{page_size}"
-    h = hashlib.md5(raw.encode()).hexdigest()[:12]
+    h = hashlib.md5(raw.encode(), usedforsecurity=False).hexdigest()[:12]
     return f"stats:timeline:{h}"
 
 
