@@ -1,7 +1,7 @@
 """Batch generate embeddings for all text content.
 
 Usage:
-    python -m scripts.generate_embeddings [--batch-size 50] [--text-id 123]
+    python -m scripts.generate_embeddings [--batch-size 50] [--text-id 123] [--source gretil]
 """
 
 import argparse
@@ -16,7 +16,8 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import async_session
-from app.models.text import TextContent
+from app.models.source import DataSource
+from app.models.text import BuddhistText, TextContent
 from app.services.embedding import chunk_text, generate_embedding
 
 logging.basicConfig(level=logging.INFO)
@@ -70,13 +71,18 @@ async def process_content(session: AsyncSession, tc: TextContent, progress: dict
     return count
 
 
-async def main(batch_size: int, text_id: int | None) -> None:
+async def main(batch_size: int, text_id: int | None, source: str | None = None) -> None:
     async with async_session() as session:
         await ensure_unique_index(session)
 
         query = select(TextContent)
         if text_id:
             query = query.where(TextContent.text_id == text_id)
+        if source:
+            subq = select(BuddhistText.id).join(DataSource, BuddhistText.source_id == DataSource.id).where(
+                DataSource.code == source
+            )
+            query = query.where(TextContent.text_id.in_(subq))
         query = query.order_by(TextContent.text_id, TextContent.juan_num)
 
         result = await session.execute(query)
@@ -98,5 +104,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch-size", type=int, default=50)
     parser.add_argument("--text-id", type=int, default=None)
+    parser.add_argument("--source", type=str, default=None, help="Filter by data source code (e.g. gretil)")
     args = parser.parse_args()
-    asyncio.run(main(args.batch_size, args.text_id))
+    asyncio.run(main(args.batch_size, args.text_id, args.source))
