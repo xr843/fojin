@@ -60,6 +60,37 @@ async def generate_embedding(text_content: str) -> list[float]:
         raise EmbeddingServiceError("向量服务连接失败") from exc
 
 
+async def generate_embeddings_batch(texts: list[str]) -> list[list[float]]:
+    """Generate embeddings for multiple texts in a single API call.
+
+    OpenAI-compatible APIs accept a list of strings as `input`.
+    Returns a list of embedding vectors in the same order as input.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(
+                f"{_embedding_api_url()}/embeddings",
+                headers={"Authorization": f"Bearer {_embedding_api_key()}"},
+                json={
+                    "model": settings.embedding_model,
+                    "input": texts,
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            # API returns embeddings sorted by index
+            sorted_items = sorted(data["data"], key=lambda x: x["index"])
+            return [item["embedding"] for item in sorted_items]
+    except httpx.TimeoutException as exc:
+        raise EmbeddingServiceError("向量服务响应超时") from exc
+    except httpx.HTTPStatusError as exc:
+        raise EmbeddingServiceError(f"向量服务返回错误（HTTP {exc.response.status_code}）") from exc
+    except (KeyError, IndexError) as exc:
+        raise EmbeddingServiceError("向量服务返回格式异常") from exc
+    except httpx.HTTPError as exc:
+        raise EmbeddingServiceError("向量服务连接失败") from exc
+
+
 async def similarity_search(
     session: AsyncSession,
     query_embedding: list[float],
