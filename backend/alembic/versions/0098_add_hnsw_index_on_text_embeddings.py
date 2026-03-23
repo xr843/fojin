@@ -21,7 +21,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     op.execute(
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_text_embeddings_hnsw "
+        "CREATE INDEX IF NOT EXISTS ix_text_embeddings_hnsw "
         "ON text_embeddings USING hnsw (embedding vector_cosine_ops) "
         "WITH (m = 16, ef_construction = 64)"
     )
