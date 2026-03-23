@@ -116,8 +116,8 @@ export default function ChatPage() {
     abortRef.current = null;
   }, []);
 
-  const handleSend = useCallback(async () => {
-    const msg = input.trim();
+  const handleSendMessage = useCallback(async (text: string) => {
+    const msg = text.trim();
     if (!msg || sending) return;
 
     const userMsg: ChatMessageItem = {
@@ -191,7 +191,11 @@ export default function ChatPage() {
         refetchQuota();
       },
     }, abortController.signal);
-  }, [input, sending, sessionId, refetchSessions, refetchQuota]);
+  }, [sending, sessionId, user, refetchSessions, refetchQuota]);
+
+  const handleSend = useCallback(async () => {
+    await handleSendMessage(input);
+  }, [input, handleSendMessage]);
 
   const handleExport = useCallback(() => {
     if (messages.length === 0) {
@@ -347,6 +351,49 @@ export default function ChatPage() {
                 <div style={{ fontSize: 13, lineHeight: 1.8 }}>
                   可以问我关于佛经内容、佛教历史、经典翻译等问题
                   <br />每条回答均附经文原文引用
+                </div>
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 10,
+                  marginTop: 24,
+                  maxWidth: 480,
+                  marginLeft: "auto",
+                  marginRight: "auto",
+                }}>
+                  {[
+                    "《心经》中「色不异空」的含义是什么？",
+                    "鸠摩罗什与玄奘的翻译风格有何不同？",
+                    "四圣谛的核心教义是什么？",
+                    "禅宗的「不立文字」思想源自哪些经典？",
+                  ].map((q) => (
+                    <div
+                      key={q}
+                      onClick={() => handleSendMessage(q)}
+                      style={{
+                        padding: "10px 14px",
+                        borderRadius: 8,
+                        border: "1px solid rgba(217,208,193,0.6)",
+                        fontSize: 13,
+                        cursor: "pointer",
+                        lineHeight: 1.6,
+                        transition: "all 0.2s",
+                        color: "var(--fj-ink-muted)",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = "var(--fj-accent)";
+                        e.currentTarget.style.color = "var(--fj-accent)";
+                        e.currentTarget.style.background = "rgba(176,141,87,0.06)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = "rgba(217,208,193,0.6)";
+                        e.currentTarget.style.color = "var(--fj-ink-muted)";
+                        e.currentTarget.style.background = "transparent";
+                      }}
+                    >
+                      {q}
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
