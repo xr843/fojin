@@ -25,19 +25,25 @@ async def retrieve_rag_context(
     db: AsyncSession,
     query: str,
     *,
+    prev_query: str | None = None,
     pgvector_limit: int = 10,
 ) -> tuple[list[ChatSource], str]:
     """Run pgvector similarity search and return (sources, context_text).
 
     Retrieves up to pgvector_limit candidates, then filters by relevance
     score and caps at 8 results. Gracefully degrades on failure.
+
+    When prev_query is provided (from conversation history), it is prepended
+    to the current query for embedding generation, enabling context-aware
+    retrieval in multi-turn conversations.
     """
     sources: list[ChatSource] = []
     context_text = ""
     t0 = time.monotonic()
 
     try:
-        query_embedding = await generate_embedding(query)
+        search_query = f"{prev_query} {query}" if prev_query else query
+        query_embedding = await generate_embedding(search_query)
         t1 = time.monotonic()
         logger.debug("TIMING: Embedding took %.2fs", t1 - t0)
 

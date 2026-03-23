@@ -310,11 +310,18 @@ async def _prepare_chat(
         if client_ip:
             await _check_anonymous_quota(redis, client_ip)
 
-    # RAG: hybrid retrieval
-    sources, context_text = await retrieve_rag_context(db, message)
-
-    # Build messages for LLM (no history for anonymous users)
+    # Fetch history first so we can use previous context for RAG retrieval
     history = await get_history(db, chat_session.id) if chat_session else []
+
+    # Extract last user message from history for context-aware retrieval
+    prev_user_msg = None
+    for msg in reversed(history):
+        if msg.role == "user":
+            prev_user_msg = msg.content[:200]
+            break
+
+    # RAG: hybrid retrieval (context-aware with conversation history)
+    sources, context_text = await retrieve_rag_context(db, message, prev_query=prev_user_msg)
     llm_messages = _build_llm_messages(history, context_text, message)
 
     return chat_session, api_url, api_key, model, is_byok, sources, llm_messages
@@ -450,13 +457,20 @@ async def send_message_stream(
     yield f"data: {json.dumps({'type': 'session_id', 'session_id': chat_session.id if chat_session else 0}, ensure_ascii=False)}\n\n"
 
     # --- Phase 2: RAG retrieval (may take seconds) ---
-    sources, context_text = await retrieve_rag_context(db, message)
+    # Fetch history first so we can use previous context for RAG retrieval
+    history = await get_history(db, chat_session.id) if chat_session else []
+
+    # Extract last user message from history for context-aware retrieval
+    prev_user_msg = None
+    for msg in reversed(history):
+        if msg.role == "user":
+            prev_user_msg = msg.content[:200]
+            break
+
+    sources, context_text = await retrieve_rag_context(db, message, prev_query=prev_user_msg)
 
     if sources:
         yield f"data: {json.dumps({'type': 'sources', 'sources': [s.model_dump() for s in sources]}, ensure_ascii=False)}\n\n"
-
-    # Build messages for LLM (no history for anonymous users)
-    history = await get_history(db, chat_session.id) if chat_session else []
     llm_messages = _build_llm_messages(history, context_text, message)
 
     # --- Phase 3: stream LLM ---
