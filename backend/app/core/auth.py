@@ -1,7 +1,8 @@
 from datetime import UTC, datetime, timedelta
 
 import bcrypt
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import PyJWTError
 
 from app.config import settings
 
@@ -33,5 +34,5 @@ def verify_token(token: str) -> int | None:
         if user_id is None:
             return None
         return int(user_id)
-    except (JWTError, ValueError):
+    except (PyJWTError, ValueError):
         return None
