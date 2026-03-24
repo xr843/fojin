@@ -357,8 +357,21 @@ export async function getJuanList(textId: number): Promise<JuanListResponse> {
   return data;
 }
 
-export async function getJuanContent(textId: number, juanNum: number): Promise<JuanContentResponse> {
-  const { data } = await api.get<JuanContentResponse>(`/texts/${textId}/juans/${juanNum}`);
+export async function getJuanContent(textId: number, juanNum: number, lang?: string): Promise<JuanContentResponse> {
+  const params = lang ? { lang } : {};
+  const { data } = await api.get<JuanContentResponse>(`/texts/${textId}/juans/${juanNum}`, { params });
+  return data;
+}
+
+export interface JuanLanguagesResponse {
+  text_id: number;
+  juan_num: number;
+  languages: string[];
+  default_lang: string;
+}
+
+export async function getJuanLanguages(textId: number, juanNum: number): Promise<JuanLanguagesResponse> {
+  const { data } = await api.get<JuanLanguagesResponse>(`/texts/${textId}/juans/${juanNum}/languages`);
   return data;
 }
 

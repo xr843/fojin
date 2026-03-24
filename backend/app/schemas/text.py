@@ -54,6 +54,13 @@ class JuanListResponse(BaseModel):
     juans: list[JuanInfo]
 
 
+class JuanLanguagesResponse(BaseModel):
+    text_id: int
+    juan_num: int
+    languages: list[str]
+    default_lang: str
+
+
 class JuanContentResponse(BaseModel):
     text_id: int
     cbeta_id: str
@@ -62,6 +69,7 @@ class JuanContentResponse(BaseModel):
     total_juans: int
     content: str
     char_count: int
+    lang: str = "lzh"
     prev_juan: int | None = None
     next_juan: int | None = None
 
