@@ -4,11 +4,11 @@
 
 ### The World's Encyclopedic Buddhist Digital Text Platform
 
-**500+ sources. 30 languages. 30 countries. One search.**
+**505 sources. 30 languages. 30 countries. One search.**
 
-Aggregating the world's Buddhist digital heritage — 9,200+ texts in Pali, Classical Chinese, Tibetan, and Sanskrit from 504 data sources — with full-text reading, AI-powered Q&A, knowledge graph, collections, citations, annotations, bookmarks, and multi-language parallel reading.
+Aggregating the world's Buddhist digital heritage — 9,200+ texts in Pali, Classical Chinese, Tibetan, and Sanskrit from 505 data sources — with full-text reading, AI-powered Q&A (RAG + semantic search), knowledge graph, timeline visualization, collections, citations, annotations, bookmarks, and multi-language parallel reading.
 
-[Live Demo](https://fojin.app) &nbsp;&middot;&nbsp; [中文文档](./docs/README_zh.md) &nbsp;&middot;&nbsp; [Discord](https://discord.gg/76SZeuJekq) &nbsp;&middot;&nbsp; [Report Bug](https://github.com/xr843/fojin/issues)
+[Live Demo](https://fojin.app) &nbsp;&middot;&nbsp; [中文文档](./docs/README_zh.md) &nbsp;&middot;&nbsp; [Discussions](https://github.com/xr843/fojin/discussions) &nbsp;&middot;&nbsp; [Discord](https://discord.gg/76SZeuJekq) &nbsp;&middot;&nbsp; [Report Bug](https://github.com/xr843/fojin/issues)
 
 [![CI](https://github.com/xr843/fojin/actions/workflows/ci.yml/badge.svg)](https://github.com/xr843/fojin/actions/workflows/ci.yml)
 [![Security Scan](https://github.com/xr843/fojin/actions/workflows/security.yml/badge.svg)](https://github.com/xr843/fojin/actions/workflows/security.yml)
@@ -25,17 +25,19 @@ Aggregating the world's Buddhist digital heritage — 9,200+ texts in Pali, Clas
 
 Buddhist texts are scattered across hundreds of databases worldwide — CBETA, SuttaCentral, BDRC, SAT, 84000, GRETIL, and many more. Each has different interfaces, languages, and data formats. Researchers spend more time *finding* texts than *reading* them.
 
-**FoJin solves this.** It aggregates 504 sources into a single, searchable platform with features no other tool provides:
+**FoJin solves this.** It aggregates 505 sources into a single, searchable platform with features no other tool provides:
 
 | What you need | How FoJin helps |
 |---|---|
-| Find a sutra across databases | **Multi-dimensional search** across 9,200+ texts from 504 sources |
+| Find a sutra across databases | **Multi-dimensional search** across 9,200+ texts from 505 sources |
 | Read the full text online | **7,600+ texts** with full content available for online reading |
 | Compare translations | **Parallel reading** in 30 languages side by side |
-| Look up Buddhist terms | **6 dictionaries**, 237K entries (Chinese/Sanskrit/Pali/English) |
-| Explore relationships | **Knowledge graph** with 9,600+ entities and 3,800+ relations |
+| Look up Buddhist terms | **6 dictionaries**, 285K entries (Chinese/Sanskrit/Pali/English) |
+| Explore relationships | **Knowledge graph** with 9,700+ entities and 4,100+ relations |
+| Discover similar texts | **Semantic similarity** powered by 420K+ embedding vectors (pgvector + HNSW) |
 | View original manuscripts | **IIIF manuscript viewer** connected to BDRC and more |
-| Ask questions about texts | **AI Q&A** ("XiaoJin") grounded in 11M characters of canonical text |
+| Ask questions about texts | **AI Q&A** ("XiaoJin") grounded in canonical text via RAG with multi-turn context |
+| Explore history visually | **Timeline & Dashboard** — dynasty charts, translation trends, category analytics |
 | Save and organize | **Collections, bookmarks, annotations** for personal study |
 | Cite in research | **Citation export** (BibTeX, RIS, APA) for academic use |
 
@@ -70,7 +72,7 @@ Compare translations side by side — Classical Chinese, Sanskrit, Pali, Tibetan
 
 ### Dictionary Lookup
 
-6 authoritative dictionaries with 237,593 entries:
+6 authoritative dictionaries with 285,000+ entries:
 - **DDB** (Digital Dictionary of Buddhism)
 - **SuttaCentral Glossary** (Pali)
 - **NCPED** (New Concise Pali-English Dictionary)
@@ -80,13 +82,27 @@ Compare translations side by side — Classical Chinese, Sanskrit, Pali, Tibetan
 
 ### Knowledge Graph
 
-9,600+ entities (persons, monasteries, texts, schools) and 3,800+ relationships, visualized as an interactive force-directed graph. Click any node to explore connections.
+9,700+ entities (persons, monasteries, texts, schools) and 4,100+ relationships, visualized as an interactive force-directed graph. Click any node to explore connections.
 
 ### AI Q&A — "XiaoJin"
 
-Ask questions in natural language. XiaoJin answers based on canonical Buddhist texts (38 core sutras, ~11M characters) using RAG (Retrieval-Augmented Generation). Every answer includes citations to the source text.
+Ask questions in natural language. XiaoJin answers based on canonical Buddhist texts using RAG (Retrieval-Augmented Generation) with 420K+ embedding vectors and HNSW index for fast semantic search. Features include:
+
+- Multi-turn conversation with context awareness
+- Relevance-filtered retrieval (score threshold + top-8 selection)
+- Structured citations in 【《经名》第N卷】 format
+- Suggested starter questions for new users
+- BYOK (Bring Your Own Key) support for multiple LLM providers
 
 <p align="center"><img src="./docs/screenshots/ai-chat-answer.png" alt="AI Q&A answering about Xuanzang's disciples" width="800"></p>
+
+### Similar Passages Discovery
+
+When reading any text, the sidebar automatically finds semantically similar passages from other texts using pgvector cosine similarity. Discover cross-textual parallels, related commentaries, and thematic connections across the entire canon.
+
+### Timeline & Statistics Dashboard
+
+Visualize Buddhist textual history with interactive D3 charts — dynasty distribution, translation trends, language breakdown, category treemap, and top translators. Toggle between scholarly and popular presentation modes.
 
 ### Collections, Bookmarks & Annotations
 
@@ -106,7 +122,7 @@ Available in 8 languages: Chinese, English, Japanese, Korean, Thai, Vietnamese, 
 
 ## Data Sources
 
-<p align="center"><img src="./docs/screenshots/sources.png" alt="504 data sources from 30 countries" width="800"></p>
+<p align="center"><img src="./docs/screenshots/sources.png" alt="505 data sources from 30 countries" width="800"></p>
 
 FoJin aggregates data from major Buddhist digital projects worldwide:
 
@@ -122,41 +138,46 @@ FoJin aggregates data from major Buddhist digital projects worldwide:
 | [Gandhari.org](https://gandhari.org) | Gandhari manuscripts | Gandhari |
 | [VRI Tipitaka](https://tipitaka.org) | Pali Canon (Chattha Sangayana) | Pali |
 | [Korean Tripitaka](http://kb.sutra.re.kr) | Goryeo Tripitaka | Chinese, Korean |
-| + 494 more... | | |
+| + 495 more... | | |
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React 18, TypeScript, Vite, Ant Design 5, Zustand, TanStack Query |
-| Backend | FastAPI, SQLAlchemy (async), Pydantic v2 |
-| Database | PostgreSQL 15 + pgvector + pg_trgm |
+| Frontend | React 18, TypeScript, Vite, Ant Design 5, Zustand, TanStack Query, D3.js |
+| Backend | FastAPI, SQLAlchemy (async), Pydantic v2, SSE streaming |
+| Database | PostgreSQL 15 + pgvector (HNSW index) + pg_trgm |
 | Search | Elasticsearch 8 (ICU tokenizer) |
 | Cache | Redis 7 |
-| AI | RAG (pgvector semantic search) + multi-provider LLM |
-| Deploy | Docker Compose, Nginx (gzip_static, security headers) |
-| CI | GitHub Actions |
+| AI | RAG (420K+ vectors, BGE-M3 embeddings) + multi-provider LLM (OpenAI/DashScope/DeepSeek/SiliconFlow) |
+| Deploy | Docker Compose, Nginx (gzip, security headers), Cloudflare CDN |
+| CI | GitHub Actions (lint, test, security scan) |
 
 ## Architecture
 
 ```
-                    +-----------+
-                    |  Nginx    |  (gzip, security headers, static cache)
-                    +-----+-----+
-                          |
-              +-----------+-----------+
-              |                       |
-        +-----+-----+          +-----+-----+
-        |  React 18  |          |  FastAPI   |
-        |  (Vite)    |          |  (async)   |
-        +------------+          +-----+------+
+                  +-------------+
+                  | Cloudflare  |  (CDN, SSL, DDoS protection)
+                  +------+------+
+                         |
+                  +------+------+
+                  |   Nginx     |  (gzip, security headers, static cache)
+                  +------+------+
+                         |
+             +-----------+-----------+
+             |                       |
+       +-----+------+         +-----+------+
+       |  React 18   |         |  FastAPI    |
+       |  Vite + D3  |         |  async SSE  |
+       +-------------+         +------+------+
                                       |
-                    +---------+-------+---------+
-                    |         |       |         |
-              +-----+   +----+--+ +--+---+ +---+----+
-              | PG 15 |  | ES 8  | |Redis |
-              |pgvector|  | ICU  | |cache |
-              +--------+  +------+ +------+
+                   +--------+---------+---------+
+                   |        |         |         |
+             +-----+--+ +--+----+ +--+---+ +---+--------+
+             | PG 15   | | ES 8  | |Redis | | LLM APIs   |
+             | pgvector | | ICU   | |cache | | (multi-    |
+             | HNSW idx | |       | |      | |  provider) |
+             +---------+ +-------+ +------+ +------------+
 ```
 
 ## Development
@@ -202,14 +223,22 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 ## Roadmap
 
-- [x] ~~Citation export (BibTeX, RIS, APA)~~
-- [x] ~~Mobile-responsive reader~~
-- [x] ~~Public REST API with rate limiting~~
-- [x] ~~User annotations~~
-- [x] ~~Community-contributed data sources~~
-- [x] ~~Internationalization (i18n) — 8 UI languages (Chinese, English, Japanese, Korean, Thai, Vietnamese, Sinhala, Burmese)~~
+- [x] Citation export (BibTeX, RIS, APA)
+- [x] Mobile-responsive reader
+- [x] Public REST API with rate limiting
+- [x] User annotations
+- [x] Community-contributed data sources
+- [x] Internationalization (i18n) — 8 UI languages
+- [x] Embedding-based semantic search (420K+ vectors, HNSW index)
+- [x] AI Q&A with RAG, multi-turn context, and streaming
+- [x] Similar passages discovery (cross-text semantic matching)
+- [x] Timeline visualization and statistics dashboard
+- [x] User feedback system and notification center
+- [x] Admin dashboard (user management, platform analytics)
+- [ ] Admin feedback management panel
+- [ ] AI answer rating (thumbs up/down) for quality tracking
+- [ ] Cross-lingual search (query in Chinese, find Sanskrit/Pali/Tibetan results)
 - [ ] OCR pipeline for scanned texts
-- [ ] Embedding-based semantic search across all texts
 - [ ] Collaborative annotation sharing
 - [ ] API documentation and developer portal
 - [ ] Integration with Zotero and reference managers
