@@ -21,6 +21,7 @@ import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../stores/authStore";
 import { getPendingSuggestionCount, getPendingFeedbackCount } from "../api/client";
 import FeedbackButton from "./FeedbackButton";
+import NotificationBell from "./NotificationBell";
 
 const { Header, Content, Footer } = AntLayout;
 
@@ -214,6 +215,7 @@ export default function Layout() {
           />
         </Space>
         <Space>
+          <NotificationBell />
           <Dropdown
             menu={{
               items: [

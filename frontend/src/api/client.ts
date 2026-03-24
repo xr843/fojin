@@ -628,6 +628,38 @@ export async function reviewAnnotation(
   await api.post(`/annotations/${annotationId}/review`, payload);
 }
 
+// --- Notifications ---
+
+export interface NotificationItem {
+  id: number;
+  type: string;
+  title: string;
+  content: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+export async function getNotifications(page: number = 1, size: number = 20): Promise<{
+  total: number;
+  items: NotificationItem[];
+}> {
+  const { data } = await api.get("/notifications", { params: { page, size } });
+  return data;
+}
+
+export async function getUnreadNotificationCount(): Promise<number> {
+  const { data } = await api.get<{ count: number }>("/notifications/unread-count");
+  return data.count;
+}
+
+export async function markNotificationRead(id: number): Promise<void> {
+  await api.patch(`/notifications/${id}/read`);
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  await api.patch("/notifications/read-all");
+}
+
 // --- Feedback ---
 
 export async function submitFeedback(payload: {

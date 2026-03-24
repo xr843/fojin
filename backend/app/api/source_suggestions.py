@@ -1,14 +1,18 @@
 from datetime import datetime
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.deps import get_optional_user
 from app.core.exceptions import SuggestionNotFoundError
 from app.core.role_guard import require_role
 from app.database import get_db
-from app.models.source import SourceSuggestion
+from app.models.notification import Notification
+from app.models.source import DataSource, SourceSuggestion
+from app.models.user import User
 
 router = APIRouter(prefix="/source-suggestions", tags=["source-suggestions"])
 
@@ -44,12 +48,14 @@ class StatusUpdate(BaseModel):
 @router.post("", response_model=SourceSuggestionResponse, status_code=201)
 async def create_source_suggestion(
     payload: SourceSuggestionCreate,
+    user: User | None = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
     suggestion = SourceSuggestion(
         name=payload.name,
         url=payload.url,
         description=payload.description,
+        user_id=user.id if user else None,
     )
     db.add(suggestion)
     await db.commit()
@@ -123,7 +129,56 @@ async def update_suggestion_status(
     suggestion = result.scalar_one_or_none()
     if not suggestion:
         raise SuggestionNotFoundError()
+
+    old_status = suggestion.status
     suggestion.status = payload.status
+
+    # Auto-create DataSource when accepted
+    if payload.status == "accepted" and old_status != "accepted":
+        await _create_data_source(db, suggestion)
+
+    # Notify the submitting user if they exist
+    if suggestion.user_id and payload.status in ("accepted", "rejected"):
+        status_label = "已采纳" if payload.status == "accepted" else "已拒绝"
+        notification = Notification(
+            user_id=suggestion.user_id,
+            type="suggestion_review",
+            title=f"数据源推荐{status_label}",
+            content=f"您推荐的数据源「{suggestion.name}」{status_label}。",
+        )
+        db.add(notification)
+
     await db.commit()
     await db.refresh(suggestion)
     return suggestion
+
+
+async def _create_data_source(db: AsyncSession, suggestion: SourceSuggestion) -> None:
+    """Create a DataSource record from an accepted suggestion."""
+    # Generate code from URL domain
+    parsed = urlparse(suggestion.url)
+    domain = parsed.hostname or "unknown"
+    # Remove common prefixes
+    code = domain.removeprefix("www.").split(".")[0]
+
+    # Check if code already exists, append number if needed
+    base_code = code
+    counter = 1
+    while True:
+        existing = await db.execute(
+            select(func.count()).select_from(DataSource).where(DataSource.code == code)
+        )
+        if existing.scalar_one() == 0:
+            break
+        code = f"{base_code}-{counter}"
+        counter += 1
+
+    data_source = DataSource(
+        code=code,
+        name_zh=suggestion.name,
+        base_url=suggestion.url,
+        description=suggestion.description,
+        access_type="external",
+        is_active=True,
+    )
+    db.add(data_source)

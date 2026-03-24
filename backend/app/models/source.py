@@ -93,6 +93,7 @@ class SourceSuggestion(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     url: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
+    user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
     status: Mapped[str] = mapped_column(String(20), server_default="pending")  # pending/reviewed/accepted/rejected
     submitted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
