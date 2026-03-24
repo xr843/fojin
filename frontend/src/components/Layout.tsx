@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { Layout as AntLayout, Typography, Button, Dropdown, Space, Drawer, Modal, Badge } from "antd";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import {
@@ -10,7 +10,7 @@ import {
   DatabaseOutlined,
   BookOutlined,
   MenuOutlined,
-  SettingOutlined,
+  DashboardOutlined,
   RobotOutlined,
   GithubOutlined,
   GlobalOutlined,
@@ -19,7 +19,7 @@ import {
 } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../stores/authStore";
-import { getPendingSuggestionCount } from "../api/client";
+import { getPendingSuggestionCount, getPendingFeedbackCount } from "../api/client";
 import FeedbackButton from "./FeedbackButton";
 
 const { Header, Content, Footer } = AntLayout;
@@ -57,10 +57,17 @@ export default function Layout() {
 
   useEffect(() => {
     if (!isAdmin) return;
-    getPendingSuggestionCount().then(setPendingCount).catch(() => {});
+    Promise.all([getPendingSuggestionCount(), getPendingFeedbackCount()])
+      .then(([sc, fc]) => setPendingCount(sc + fc))
+      .catch(() => {});
   }, [isAdmin, location.pathname]);
 
-  const navItems = [
+  const navItems: Array<{
+    icon: ReactNode;
+    label: string;
+    path: string;
+    children?: Array<{ label: string; path: string }>;
+  }> = [
     { icon: <DatabaseOutlined />, label: t("nav.sources"), path: "/sources" },
     { icon: <BookOutlined />, label: t("nav.collections"), path: "/collections" },
     { icon: <ApartmentOutlined />, label: t("nav.kg"), path: "/kg" },
@@ -71,9 +78,16 @@ export default function Layout() {
     ...(isAdmin
       ? [
           {
-            icon: <Badge count={pendingCount} size="small" offset={[4, -2]}><SettingOutlined /></Badge>,
+            icon: <Badge count={pendingCount} size="small" offset={[4, -2]}><DashboardOutlined /></Badge>,
             label: t("nav.admin"),
-            path: "/admin/suggestions",
+            path: "/admin",
+            children: [
+              { label: t("nav.admin_overview"), path: "/admin" },
+              { label: t("nav.admin_users"), path: "/admin/users" },
+              { label: t("nav.admin_suggestions"), path: "/admin/suggestions" },
+              { label: t("nav.admin_annotations"), path: "/admin/annotations" },
+              { label: t("nav.admin_feedbacks"), path: "/admin/feedbacks" },
+            ],
           },
         ]
       : []),
@@ -147,22 +161,48 @@ export default function Layout() {
             佛津
           </Typography.Title>
           <div className="nav-desktop">
-            {navItems.map((item) => (
-              <Button
-                key={item.path}
-                type="text"
-                icon={item.icon}
-                style={{
-                  color: inkMuted,
-                  fontSize: 13,
-                  fontWeight: 400,
-                  fontFamily: '"Noto Serif SC", serif',
-                }}
-                onClick={() => navigate(item.path)}
-              >
-                {item.label}
-              </Button>
-            ))}
+            {navItems.map((item) =>
+              item.children ? (
+                <Dropdown
+                  key={item.path}
+                  menu={{
+                    items: item.children.map((child) => ({
+                      key: child.path,
+                      label: child.label,
+                      onClick: () => navigate(child.path),
+                    })),
+                  }}
+                >
+                  <Button
+                    type="text"
+                    icon={item.icon}
+                    style={{
+                      color: inkMuted,
+                      fontSize: 13,
+                      fontWeight: 400,
+                      fontFamily: '"Noto Serif SC", serif',
+                    }}
+                  >
+                    {item.label}
+                  </Button>
+                </Dropdown>
+              ) : (
+                <Button
+                  key={item.path}
+                  type="text"
+                  icon={item.icon}
+                  style={{
+                    color: inkMuted,
+                    fontSize: 13,
+                    fontWeight: 400,
+                    fontFamily: '"Noto Serif SC", serif',
+                  }}
+                  onClick={() => navigate(item.path)}
+                >
+                  {item.label}
+                </Button>
+              ),
+            )}
           </div>
           <Button
             className="nav-mobile-trigger"
@@ -282,18 +322,43 @@ export default function Layout() {
         onClose={() => setDrawerOpen(false)}
       >
         <Space direction="vertical" style={{ width: "100%" }}>
-          {navItems.map((item) => (
-            <Button
-              key={item.path}
-              type="text"
-              icon={item.icon}
-              block
-              style={{ textAlign: "left", color: inkMuted }}
-              onClick={() => { navigate(item.path); setDrawerOpen(false); }}
-            >
-              {item.label}
-            </Button>
-          ))}
+          {navItems.map((item) =>
+            item.children ? (
+              <div key={item.path}>
+                <Button
+                  type="text"
+                  icon={item.icon}
+                  block
+                  style={{ textAlign: "left", color: inkMuted, fontWeight: 500 }}
+                  onClick={() => { navigate(item.path); setDrawerOpen(false); }}
+                >
+                  {item.label}
+                </Button>
+                {item.children.map((child) => (
+                  <Button
+                    key={child.path}
+                    type="text"
+                    block
+                    style={{ textAlign: "left", color: inkMuted, paddingLeft: 32 }}
+                    onClick={() => { navigate(child.path); setDrawerOpen(false); }}
+                  >
+                    {child.label}
+                  </Button>
+                ))}
+              </div>
+            ) : (
+              <Button
+                key={item.path}
+                type="text"
+                icon={item.icon}
+                block
+                style={{ textAlign: "left", color: inkMuted }}
+                onClick={() => { navigate(item.path); setDrawerOpen(false); }}
+              >
+                {item.label}
+              </Button>
+            ),
+          )}
         </Space>
       </Drawer>
       <FeedbackButton />

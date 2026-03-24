@@ -29,6 +29,10 @@ const ChatPage = lazy(() => import("./pages/ChatPage"));
 const ExportsPage = lazy(() => import("./pages/ExportsPage"));
 const CollectionsPage = lazy(() => import("./pages/CollectionsPage"));
 const AdminSuggestionsPage = lazy(() => import("./pages/AdminSuggestionsPage"));
+const AdminDashboardPage = lazy(() => import("./pages/AdminDashboardPage"));
+const AdminUsersPage = lazy(() => import("./pages/AdminUsersPage"));
+const AdminAnnotationsPage = lazy(() => import("./pages/AdminAnnotationsPage"));
+const AdminFeedbacksPage = lazy(() => import("./pages/AdminFeedbacksPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 const TimelinePage = lazy(() => import("./pages/TimelinePage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
@@ -64,7 +68,11 @@ function App() {
               <Route path="/profile" element={<ProfilePage />} />
             </Route>
             <Route element={<ProtectedRoute requiredRole="admin" />}>
+              <Route path="/admin" element={<AdminDashboardPage />} />
+              <Route path="/admin/users" element={<AdminUsersPage />} />
               <Route path="/admin/suggestions" element={<AdminSuggestionsPage />} />
+              <Route path="/admin/annotations" element={<AdminAnnotationsPage />} />
+              <Route path="/admin/feedbacks" element={<AdminFeedbacksPage />} />
             </Route>
             <Route path="/parallel/:textId" element={<ParallelReaderPage />} />
             <Route path="/kg" element={<RouteErrorBoundary><KnowledgeGraphPage /></RouteErrorBoundary>} />
