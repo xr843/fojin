@@ -23,6 +23,7 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 from app.api import (
+    admin,
     annotations,
     auth,
     bookmarks,
@@ -159,6 +160,9 @@ app.include_router(stats.router, prefix="/api")
 
 # Source suggestions (public)
 app.include_router(source_suggestions.router, prefix="/api")
+
+# Admin dashboard
+app.include_router(admin.router, prefix="/api")
 
 
 @app.get("/api/health")
