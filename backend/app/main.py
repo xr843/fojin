@@ -33,6 +33,7 @@ from app.api import (
     citations,
     dictionary,
     exports,
+    feedback,
     history,
     iiif,
     knowledge_graph,
@@ -208,6 +209,9 @@ app.include_router(stats.router, prefix="/api")
 
 # Source suggestions (public)
 app.include_router(source_suggestions.router, prefix="/api")
+
+# Feedback
+app.include_router(feedback.router, prefix="/api")
 
 # Admin dashboard
 app.include_router(admin.router, prefix="/api")
