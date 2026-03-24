@@ -22,7 +22,10 @@ except ImportError:
     _HAS_DIANJIN = False
 
 logger = logging.getLogger(__name__)
+from datetime import UTC
+
 from app.api import (
+    admin,
     annotations,
     auth,
     bookmarks,
@@ -30,6 +33,7 @@ from app.api import (
     citations,
     dictionary,
     exports,
+    feedback,
     history,
     iiif,
     knowledge_graph,
@@ -111,8 +115,54 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         return response
 
 
+class LastActiveMiddleware(BaseHTTPMiddleware):
+    """Update user.last_active_at with 5-minute throttle."""
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+
+        # Only update for authenticated API requests
+        auth_header = request.headers.get("authorization", "")
+        if not auth_header.startswith("Bearer ") or not request.url.path.startswith("/api/"):
+            return response
+
+        try:
+            from app.core.auth import verify_token
+            token = auth_header[7:]
+            user_id = verify_token(token)
+            if user_id is None:
+                return response
+
+            redis_client = getattr(request.app.state, "redis", None)
+            if redis_client is None:
+                return response
+
+            # 5-minute throttle via Redis
+            key = f"last_active:{user_id}"
+            if await redis_client.set(key, "1", nx=True, ex=300):
+                from datetime import datetime
+
+                from sqlalchemy import update
+
+                from app.database import async_session
+                from app.models.user import User
+
+                async with async_session() as session:
+                    await session.execute(
+                        update(User)
+                        .where(User.id == user_id)
+                        .values(last_active_at=datetime.now(UTC))
+                    )
+                    await session.commit()
+        except Exception:
+            pass  # Never break request flow for activity tracking
+
+        return response
+
+
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(LastActiveMiddleware)
 
 
 @app.exception_handler(FoJinError)
@@ -159,6 +209,12 @@ app.include_router(stats.router, prefix="/api")
 
 # Source suggestions (public)
 app.include_router(source_suggestions.router, prefix="/api")
+
+# Feedback
+app.include_router(feedback.router, prefix="/api")
+
+# Admin dashboard
+app.include_router(admin.router, prefix="/api")
 
 
 @app.get("/api/health")

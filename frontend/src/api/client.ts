@@ -621,6 +621,139 @@ export async function getPendingSuggestionCount(): Promise<number> {
   return data.count;
 }
 
+export async function reviewAnnotation(
+  annotationId: number,
+  payload: { action: string; comment?: string },
+): Promise<void> {
+  await api.post(`/annotations/${annotationId}/review`, payload);
+}
+
+// --- Feedback ---
+
+export async function submitFeedback(payload: {
+  content: string;
+  contact?: string;
+}): Promise<{ id: number; content: string; status: string }> {
+  const { data } = await api.post("/feedbacks", payload);
+  return data;
+}
+
+export interface AdminFeedbackItem {
+  id: number;
+  user_id: number;
+  username: string;
+  content: string;
+  contact: string | null;
+  status: string;
+  created_at: string;
+}
+
+export async function getAdminFeedbacks(params: {
+  page?: number;
+  size?: number;
+  status?: string;
+}): Promise<PaginatedResponse<AdminFeedbackItem>> {
+  const { data } = await api.get<PaginatedResponse<AdminFeedbackItem>>("/feedbacks", { params });
+  return data;
+}
+
+export async function updateFeedbackStatus(
+  id: number,
+  status: string,
+): Promise<void> {
+  await api.patch(`/feedbacks/${id}`, { status });
+}
+
+export async function getPendingFeedbackCount(): Promise<number> {
+  const { data } = await api.get<{ count: number }>("/feedbacks/pending-count");
+  return data.count;
+}
+
+// --- Admin Dashboard ---
+
+export interface AdminOverview {
+  total_users: number;
+  new_users_today: number;
+  total_sessions: number;
+  new_sessions_today: number;
+  total_messages: number;
+  new_messages_today: number;
+  pending_suggestions: number;
+  pending_annotations: number;
+}
+
+export interface DailyCount {
+  date: string;
+  count: number;
+}
+
+export interface AdminTrends {
+  registrations: DailyCount[];
+  messages: DailyCount[];
+  active_users: DailyCount[];
+}
+
+export interface AdminUserItem {
+  id: number;
+  username: string;
+  display_name: string | null;
+  email: string;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+  last_active_at: string | null;
+}
+
+export interface AdminAnnotationItem {
+  id: number;
+  text_id: number;
+  juan_num: number;
+  annotation_type: string;
+  content: string;
+  user_id: number;
+  username: string;
+  status: string;
+  created_at: string;
+}
+
+export async function getAdminOverview(): Promise<AdminOverview> {
+  const { data } = await api.get<AdminOverview>("/admin/stats/overview");
+  return data;
+}
+
+export async function getAdminTrends(days: number = 30): Promise<AdminTrends> {
+  const { data } = await api.get<AdminTrends>("/admin/stats/trends", { params: { days } });
+  return data;
+}
+
+export async function getAdminUsers(params: {
+  page?: number;
+  size?: number;
+  q?: string;
+  sort_by?: string;
+  sort_order?: string;
+}): Promise<PaginatedResponse<AdminUserItem>> {
+  const { data } = await api.get<PaginatedResponse<AdminUserItem>>("/admin/users", { params });
+  return data;
+}
+
+export async function updateAdminUser(
+  id: number,
+  payload: { role?: string; is_active?: boolean },
+): Promise<AdminUserItem> {
+  const { data } = await api.patch<AdminUserItem>(`/admin/users/${id}`, payload);
+  return data;
+}
+
+export async function getAdminAnnotations(params: {
+  page?: number;
+  size?: number;
+  status?: string;
+}): Promise<PaginatedResponse<AdminAnnotationItem>> {
+  const { data } = await api.get<PaginatedResponse<AdminAnnotationItem>>("/admin/annotations", { params });
+  return data;
+}
+
 // --- Chat (AI Q&A) ---
 
 export interface ChatSource {
