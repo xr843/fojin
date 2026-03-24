@@ -1,6 +1,6 @@
 import { useState, useMemo, memo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, List, Tag, Typography, Button, Spin } from "antd";
+import { Card, List, Tag, Typography, Button, Spin, Empty } from "antd";
 import { SwapOutlined, ReadOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { getTextRelations } from "../api/client";
@@ -12,7 +12,7 @@ const RELATION_LABELS: Record<string, { label: string; color: string }> = {
   cites: { label: "引用", color: "red" },
 };
 
-function RelatedTextsInner({ textId }: { textId: number }) {
+function RelatedTextsContent({ textId }: { textId: number }) {
   const navigate = useNavigate();
   const [activeTypes, setActiveTypes] = useState<Set<string>>(new Set());
 
@@ -22,11 +22,9 @@ function RelatedTextsInner({ textId }: { textId: number }) {
     enabled: !!textId,
   });
 
-  // Collect the relation types that actually exist in the data
   const availableTypes = useMemo(() => {
     if (!data?.relations.length) return [];
     const types = new Set(data.relations.map((r) => r.relation_type));
-    // Return in the order defined by RELATION_LABELS
     return Object.keys(RELATION_LABELS).filter((t) => types.has(t));
   }, [data]);
 
@@ -39,11 +37,8 @@ function RelatedTextsInner({ textId }: { textId: number }) {
   const toggleType = (type: string) => {
     setActiveTypes((prev) => {
       const next = new Set(prev);
-      if (next.has(type)) {
-        next.delete(type);
-      } else {
-        next.add(type);
-      }
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
       return next;
     });
   };
@@ -53,18 +48,17 @@ function RelatedTextsInner({ textId }: { textId: number }) {
   }
 
   if (!data?.relations.length) {
-    return null;
+    return (
+      <Empty
+        image={Empty.PRESENTED_IMAGE_SIMPLE}
+        description="暂无关联经典"
+        style={{ padding: "16px 0" }}
+      />
+    );
   }
 
   return (
-    <Card
-      title={
-        <span>
-          <SwapOutlined /> 关联文本
-        </span>
-      }
-      size="small"
-    >
+    <>
       {availableTypes.length > 1 && (
         <div style={{ marginBottom: 12 }}>
           {availableTypes.map((type) => {
@@ -87,6 +81,7 @@ function RelatedTextsInner({ textId }: { textId: number }) {
         </div>
       )}
       <List
+        size="small"
         dataSource={filtered}
         renderItem={(item) => {
           const meta = RELATION_LABELS[item.relation_type] || {
@@ -133,8 +128,35 @@ function RelatedTextsInner({ textId }: { textId: number }) {
           );
         }}
       />
+    </>
+  );
+}
+
+/** Standalone card version (used in TextDetailPage) */
+function RelatedTextsCard({ textId }: { textId: number }) {
+  const { data } = useQuery({
+    queryKey: ["relations", textId],
+    queryFn: () => getTextRelations(textId),
+    enabled: !!textId,
+  });
+
+  if (!data?.relations.length) return null;
+
+  return (
+    <Card
+      title={
+        <span>
+          <SwapOutlined /> 关联文本
+        </span>
+      }
+      size="small"
+    >
+      <RelatedTextsContent textId={textId} />
     </Card>
   );
 }
 
-export default memo(RelatedTextsInner);
+/** Inline version (used in ReaderSidebar tabs) */
+const RelatedTexts = memo(RelatedTextsContent);
+export default RelatedTexts;
+export const RelatedTextsStandalone = memo(RelatedTextsCard);

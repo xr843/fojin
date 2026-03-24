@@ -786,6 +786,37 @@ export async function getAdminAnnotations(params: {
   return data;
 }
 
+// --- Similar Passages ---
+
+export interface SimilarPassageItem {
+  text_id: number;
+  juan_num: number;
+  chunk_text: string;
+  score: number;
+  title_zh: string;
+  translator: string | null;
+  dynasty: string | null;
+}
+
+export interface SimilarPassagesResponse {
+  text_id: number;
+  juan_num: number;
+  passages: SimilarPassageItem[];
+}
+
+export async function getSimilarPassages(
+  textId: number,
+  juanNum: number,
+  limit: number = 5,
+  minScore: number = 0.7,
+): Promise<SimilarPassagesResponse> {
+  const { data } = await api.get<SimilarPassagesResponse>(
+    `/texts/${textId}/juans/${juanNum}/similar`,
+    { params: { limit, min_score: minScore } },
+  );
+  return data;
+}
+
 // --- Chat (AI Q&A) ---
 
 export interface ChatSource {
