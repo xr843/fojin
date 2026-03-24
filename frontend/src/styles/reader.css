@@ -1,9 +1,64 @@
 /* ── TextReaderPage: mobile reading optimisation ── */
 
+/* ── Reader + Sidebar layout ── */
+.reader-with-sidebar {
+  display: flex;
+  gap: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
 .reader-container {
   max-width: 800px;
   margin: 24px auto;
   padding: 0 16px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Desktop sidebar ── */
+.reader-sidebar-desktop {
+  width: 320px;
+  flex-shrink: 0;
+  margin-top: 24px;
+}
+
+.reader-sidebar-panel {
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+  background: var(--fj-card-bg);
+  border: 1px solid var(--fj-border);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.reader-sidebar-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 4px;
+}
+
+.reader-sidebar-toggle {
+  position: sticky;
+  top: 16px;
+}
+
+/* ── Mobile: hide desktop sidebar, show FAB ── */
+.reader-sidebar-mobile {
+  display: none;
+}
+
+.reader-sidebar-fab {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 100;
+  width: 48px;
+  height: 48px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .reader-header {
@@ -88,6 +143,19 @@
 
 /* ── Tablet (max-width: 1024px) ── */
 @media (max-width: 1024px) {
+  .reader-with-sidebar {
+    flex-direction: column;
+    max-width: 800px;
+  }
+
+  .reader-sidebar-desktop {
+    display: none;
+  }
+
+  .reader-sidebar-mobile {
+    display: block;
+  }
+
   .reader-container {
     margin: 20px auto;
     padding: 0 14px;
@@ -105,6 +173,10 @@
 
 /* ── Mobile (max-width: 768px) ── */
 @media (max-width: 768px) {
+  .reader-with-sidebar {
+    padding: 0;
+  }
+
   .reader-container {
     margin: 12px auto;
     padding: 0 10px;

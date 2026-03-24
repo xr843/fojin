@@ -17,6 +17,7 @@ import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBook
 import { useAuthStore } from "../stores/authStore";
 import CitationGenerator from "../components/CitationGenerator";
 import AnnotationPanel from "../components/AnnotationPanel";
+import ReaderSidebar from "../components/ReaderSidebar";
 import "../styles/reader.css";
 
 const LANG_LABELS: Record<string, string> = {
@@ -122,6 +123,7 @@ export default function TextReaderPage() {
   };
 
   return (
+    <div className="reader-with-sidebar">
     <div className={`reader-container${compareLang ? " reader-bilingual" : ""}`}>
       <Helmet>
         <title>
@@ -335,6 +337,8 @@ export default function TextReaderPage() {
         visible={annotationOpen}
         onClose={() => setAnnotationOpen(false)}
       />
+    </div>
+    <ReaderSidebar textId={textId} juanNum={juanNum} />
     </div>
   );
 }
