@@ -35,7 +35,7 @@ export default function FeedbackButton() {
   return (
     <>
       <FloatButton
-        icon={<CommentOutlined />}
+        icon={<CommentOutlined style={{ color: "#8b4513" }} />}
         tooltip="意见反馈"
         onClick={() => setOpen(true)}
         style={{ right: 24, bottom: 24 }}
