@@ -22,7 +22,7 @@ import { getTextDetail, getTextManifests, getTextIdentifiers } from "../api/clie
 import { buildCbetaReadUrl } from "../utils/sourceUrls";
 import ResourceList from "../components/ResourceList";
 import BookmarkButton from "../components/BookmarkButton";
-import RelatedTexts from "../components/RelatedTexts";
+import { RelatedTextsStandalone as RelatedTexts } from "../components/RelatedTexts";
 import CitationGenerator from "../components/CitationGenerator";
 import { addViewHistory } from "../utils/history";
 
