@@ -628,6 +628,47 @@ export async function reviewAnnotation(
   await api.post(`/annotations/${annotationId}/review`, payload);
 }
 
+// --- Feedback ---
+
+export async function submitFeedback(payload: {
+  content: string;
+  contact?: string;
+}): Promise<{ id: number; content: string; status: string }> {
+  const { data } = await api.post("/feedbacks", payload);
+  return data;
+}
+
+export interface AdminFeedbackItem {
+  id: number;
+  user_id: number;
+  username: string;
+  content: string;
+  contact: string | null;
+  status: string;
+  created_at: string;
+}
+
+export async function getAdminFeedbacks(params: {
+  page?: number;
+  size?: number;
+  status?: string;
+}): Promise<PaginatedResponse<AdminFeedbackItem>> {
+  const { data } = await api.get<PaginatedResponse<AdminFeedbackItem>>("/feedbacks", { params });
+  return data;
+}
+
+export async function updateFeedbackStatus(
+  id: number,
+  status: string,
+): Promise<void> {
+  await api.patch(`/feedbacks/${id}`, { status });
+}
+
+export async function getPendingFeedbackCount(): Promise<number> {
+  const { data } = await api.get<{ count: number }>("/feedbacks/pending-count");
+  return data.count;
+}
+
 // --- Admin Dashboard ---
 
 export interface AdminOverview {

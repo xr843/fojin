@@ -20,6 +20,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../stores/authStore";
 import { getPendingSuggestionCount } from "../api/client";
+import FeedbackButton from "./FeedbackButton";
 
 const { Header, Content, Footer } = AntLayout;
 
@@ -295,6 +296,7 @@ export default function Layout() {
           ))}
         </Space>
       </Drawer>
+      <FeedbackButton />
     </AntLayout>
   );
 }
