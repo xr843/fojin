@@ -14,10 +14,19 @@ async def get_juan_list(session: AsyncSession, text_id: int) -> JuanListResponse
 
     result = await session.execute(
         select(TextContent.juan_num, TextContent.char_count)
-        .where(TextContent.text_id == text_id)
+        .where(TextContent.text_id == text_id, TextContent.lang == bt.lang)
         .order_by(TextContent.juan_num)
     )
     rows = result.all()
+    # Fallback: if no content in default lang, list all distinct juans
+    if not rows:
+        result = await session.execute(
+            select(TextContent.juan_num, TextContent.char_count)
+            .where(TextContent.text_id == text_id)
+            .distinct(TextContent.juan_num)
+            .order_by(TextContent.juan_num)
+        )
+        rows = result.all()
 
     return JuanListResponse(
         text_id=text_id,
@@ -63,6 +72,10 @@ async def get_juan_content(
     query = select(TextContent).where(TextContent.text_id == text_id, TextContent.juan_num == juan_num)
     if lang is not None:
         query = query.where(TextContent.lang == lang)
+    else:
+        # Prefer the text's own language when no lang specified
+        query = query.order_by((TextContent.lang == bt.lang).desc())
+    query = query.limit(1)
     result = await session.execute(query)
     tc = result.scalars().first()
     if tc is None:
