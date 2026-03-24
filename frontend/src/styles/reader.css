@@ -58,6 +58,34 @@
   margin-bottom: 48px;
 }
 
+/* ── Bilingual mode ── */
+.reader-bilingual {
+  max-width: 1400px;
+}
+
+.bilingual-column {
+  border: 1px solid rgba(217, 208, 193, 0.5);
+  border-radius: 8px;
+  padding: 16px;
+  height: 70vh;
+  overflow-y: auto;
+}
+
+.bilingual-column .reader-body {
+  border: none;
+  padding: 0;
+  border-radius: 0;
+}
+
+.bilingual-label {
+  font-family: "Noto Serif SC", serif;
+  font-size: 13px;
+  color: var(--fj-ink-muted);
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(217, 208, 193, 0.3);
+}
+
 /* ── Tablet (max-width: 1024px) ── */
 @media (max-width: 1024px) {
   .reader-container {
@@ -67,6 +95,11 @@
 
   .reader-body {
     padding: 28px 20px;
+  }
+
+  .bilingual-column {
+    height: 50vh;
+    margin-bottom: 16px;
   }
 }
 

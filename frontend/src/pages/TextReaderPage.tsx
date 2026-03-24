@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Typography, Spin, Button, Select, Breadcrumb, message } from "antd";
+import { Typography, Spin, Button, Select, Breadcrumb, Row, Col, message } from "antd";
 import {
   HomeOutlined,
   LeftOutlined,
@@ -13,11 +13,20 @@ import {
   HeartOutlined,
   HeartFilled,
 } from "@ant-design/icons";
-import { getJuanList, getJuanContent, getTextDetail, checkBookmark, addBookmark, removeBookmark } from "../api/client";
+import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBookmark, addBookmark, removeBookmark } from "../api/client";
 import { useAuthStore } from "../stores/authStore";
 import CitationGenerator from "../components/CitationGenerator";
 import AnnotationPanel from "../components/AnnotationPanel";
 import "../styles/reader.css";
+
+const LANG_LABELS: Record<string, string> = {
+  lzh: "文言文",
+  pi: "巴利文",
+  en: "English",
+  sa: "梵文",
+  bo: "藏文",
+  ja: "日本語",
+};
 
 const FONT_SIZE_MIN = 14;
 const FONT_SIZE_MAX = 28;
@@ -41,6 +50,7 @@ export default function TextReaderPage() {
   const [citationOpen, setCitationOpen] = useState(false);
   const [annotationOpen, setAnnotationOpen] = useState(false);
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
+  const [compareLang, setCompareLang] = useState<string | null>(null);
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
 
@@ -90,6 +100,19 @@ export default function TextReaderPage() {
     enabled: !!textId,
   });
 
+  const { data: langData } = useQuery({
+    queryKey: ["juanLanguages", textId, juanNum],
+    queryFn: () => getJuanLanguages(Number(textId), juanNum),
+    enabled: !!textId,
+  });
+
+  const { data: compareContent, isLoading: compareLoading } = useQuery({
+    queryKey: ["juanContent", textId, juanNum, compareLang],
+    queryFn: () => getJuanContent(Number(textId), juanNum, compareLang!),
+    enabled: !!compareLang,
+    staleTime: 3600000,
+  });
+
   const changeFontSize = (delta: number) => {
     setFontSize((prev) => {
       const next = Math.min(Math.max(prev + delta, FONT_SIZE_MIN), FONT_SIZE_MAX);
@@ -99,7 +122,7 @@ export default function TextReaderPage() {
   };
 
   return (
-    <div className="reader-container">
+    <div className={`reader-container${compareLang ? " reader-bilingual" : ""}`}>
       <Helmet>
         <title>
           {content?.title_zh
@@ -211,6 +234,22 @@ export default function TextReaderPage() {
               A+
             </Button>
           </div>
+          {langData && langData.languages.length > 1 && (
+            <Select
+              value={compareLang}
+              onChange={(val) => setCompareLang(val || null)}
+              placeholder="对照语言"
+              allowClear
+              style={{ width: 120 }}
+            >
+              {langData.languages
+                .filter((l) => l !== langData.default_lang)
+                .map((l) => (
+                  <Select.Option key={l} value={l}>{LANG_LABELS[l] || l}</Select.Option>
+                ))
+              }
+            </Select>
+          )}
         </div>
       </div>
 
@@ -220,12 +259,43 @@ export default function TextReaderPage() {
           <Spin size="large" />
         </div>
       ) : content ? (
-        <div
-          className="reader-body"
-          style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
-        >
-          {content.content}
-        </div>
+        compareLang ? (
+          <Row gutter={24}>
+            <Col xs={24} lg={12}>
+              <div className="bilingual-column">
+                <div className="bilingual-label">{LANG_LABELS[langData?.default_lang || ""] || "原文"}</div>
+                <div
+                  className="reader-body"
+                  style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
+                >
+                  {content.content}
+                </div>
+              </div>
+            </Col>
+            <Col xs={24} lg={12}>
+              <div className="bilingual-column">
+                <div className="bilingual-label">{LANG_LABELS[compareLang] || compareLang}</div>
+                {compareLoading ? (
+                  <div style={{ textAlign: "center", padding: 80 }}><Spin /></div>
+                ) : (
+                  <div
+                    className="reader-body"
+                    style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
+                  >
+                    {compareContent?.content || "暂无内容"}
+                  </div>
+                )}
+              </div>
+            </Col>
+          </Row>
+        ) : (
+          <div
+            className="reader-body"
+            style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
+          >
+            {content.content}
+          </div>
+        )
       ) : (
         <Typography.Text type="secondary">暂无内容</Typography.Text>
       )}
