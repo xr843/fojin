@@ -37,6 +37,7 @@ from app.api import (
     history,
     iiif,
     knowledge_graph,
+    notification,
     relations,
     search,
     source_suggestions,
@@ -215,6 +216,9 @@ app.include_router(feedback.router, prefix="/api")
 
 # Admin dashboard
 app.include_router(admin.router, prefix="/api")
+
+# Notifications
+app.include_router(notification.router, prefix="/api")
 
 
 @app.get("/api/health")
