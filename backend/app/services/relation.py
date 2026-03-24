@@ -158,15 +158,18 @@ async def get_parallel_content(
     if not text_a or not text_b:
         return None
 
+    # Prefer content in the text's own language, fall back to any available
     content_a = await session.execute(
-        select(TextContent).where(
-            TextContent.text_id == text_a_id, TextContent.juan_num == juan_num
-        )
+        select(TextContent)
+        .where(TextContent.text_id == text_a_id, TextContent.juan_num == juan_num)
+        .order_by((TextContent.lang == text_a.lang).desc())
+        .limit(1)
     )
     content_b = await session.execute(
-        select(TextContent).where(
-            TextContent.text_id == text_b_id, TextContent.juan_num == juan_num
-        )
+        select(TextContent)
+        .where(TextContent.text_id == text_b_id, TextContent.juan_num == juan_num)
+        .order_by((TextContent.lang == text_b.lang).desc())
+        .limit(1)
     )
     ca = content_a.scalar_one_or_none()
     cb = content_b.scalar_one_or_none()
