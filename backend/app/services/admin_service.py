@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import Date, case, cast, distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +12,7 @@ from app.schemas.admin import AdminAnnotationItem, AdminOverview, DailyCount
 
 async def get_overview(db: AsyncSession) -> AdminOverview:
     today = date.today()
-    today_start = datetime(today.year, today.month, today.day, tzinfo=timezone.utc)
+    today_start = datetime(today.year, today.month, today.day, tzinfo=UTC)
 
     total_users, new_users_today = await _count_with_today(db, User, User.created_at, today_start)
     total_sessions, new_sessions_today = await _count_with_today(db, ChatSession, ChatSession.created_at, today_start)
@@ -51,7 +51,7 @@ async def _count_with_today(db: AsyncSession, model, created_field, today_start:
 
 async def get_trends(db: AsyncSession, days: int = 30) -> dict:
     since = date.today() - timedelta(days=days - 1)
-    since_dt = datetime(since.year, since.month, since.day, tzinfo=timezone.utc)
+    since_dt = datetime(since.year, since.month, since.day, tzinfo=UTC)
 
     registrations = await _daily_counts(db, User, User.created_at, since_dt)
     messages = await _daily_counts(db, ChatMessage, ChatMessage.created_at, since_dt)

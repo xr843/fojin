@@ -1,6 +1,6 @@
 """Stats API endpoints for timeline and dashboard."""
 
-from enum import Enum
+from enum import StrEnum
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +11,7 @@ from app.services.stats_service import get_overview, get_timeline
 router = APIRouter(prefix="/stats", tags=["stats"])
 
 
-class TimelineDimension(str, Enum):
+class TimelineDimension(StrEnum):
     texts = "texts"
     figures = "figures"
     schools = "schools"
