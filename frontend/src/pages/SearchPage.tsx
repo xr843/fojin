@@ -208,9 +208,15 @@ export default function SearchPage() {
       <Helmet>
         <title>{pageTitle}</title>
         <meta name="description" content={pageDesc} />
-        <link rel="canonical" href={`https://fojin.app/search${query ? `?q=${encodeURIComponent(query)}` : ""}`} />
+        <link rel="canonical" href={`https://fojin.app/search${(() => { const p = new URLSearchParams(); if (query) p.set("q", query); if (page > 1) p.set("page", String(page)); return p.toString() ? `?${p.toString()}` : ""; })()}`} />
         <link rel="alternate" hrefLang="x-default" href={`https://fojin.app/search${query ? `?q=${encodeURIComponent(query)}` : ""}`} />
         <link rel="alternate" hrefLang="zh" href={`https://fojin.app/search${query ? `?q=${encodeURIComponent(query)}` : ""}`} />
+        {query && page > 1 && (
+          <link rel="prev" href={`https://fojin.app/search?${new URLSearchParams({ q: query, ...(page > 2 ? { page: String(page - 1) } : {}) }).toString()}`} />
+        )}
+        {query && localTotal > page * 20 && (
+          <link rel="next" href={`https://fojin.app/search?${new URLSearchParams({ q: query, page: String(page + 1) }).toString()}`} />
+        )}
       </Helmet>
       {/* 搜索栏 */}
       <div className="s-search-bar">
