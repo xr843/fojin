@@ -2,5 +2,8 @@ User-agent: *
 Allow: /
 Disallow: /api/
 Disallow: /graphql
+Disallow: /admin/
+Disallow: /profile/
+Disallow: /login
 
 Sitemap: https://fojin.app/sitemap.xml
