@@ -209,6 +209,8 @@ export default function SearchPage() {
         <title>{pageTitle}</title>
         <meta name="description" content={pageDesc} />
         <link rel="canonical" href={`https://fojin.app/search${query ? `?q=${encodeURIComponent(query)}` : ""}`} />
+        <link rel="alternate" hrefLang="x-default" href={`https://fojin.app/search${query ? `?q=${encodeURIComponent(query)}` : ""}`} />
+        <link rel="alternate" hrefLang="zh" href={`https://fojin.app/search${query ? `?q=${encodeURIComponent(query)}` : ""}`} />
       </Helmet>
       {/* 搜索栏 */}
       <div className="s-search-bar">

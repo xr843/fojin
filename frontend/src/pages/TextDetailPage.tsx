@@ -98,6 +98,8 @@ export default function TextDetailPage() {
         <title>{text.title_zh} — 佛津</title>
         <meta name="description" content={`${text.title_zh}${text.translator ? ` · ${text.translator}译` : ""}${text.dynasty ? ` · ${text.dynasty}` : ""}${text.category ? ` · ${text.category}` : ""} — 佛津佛教古籍数字资源平台`} />
         <link rel="canonical" href={`https://fojin.app/texts/${id}`} />
+        <link rel="alternate" hrefLang="x-default" href={`https://fojin.app/texts/${id}`} />
+        <link rel="alternate" hrefLang="zh" href={`https://fojin.app/texts/${id}`} />
         <meta property="og:type" content="book" />
         <meta property="og:title" content={`${text.title_zh} — 佛津`} />
         <meta property="og:description" content={`${text.title_zh}${text.translator ? ` · ${text.translator}译` : ""}${text.category ? ` · ${text.category}` : ""}`} />

@@ -58,6 +58,8 @@ export default function HomePage() {
     <div className="home-page">
       <Helmet>
         <title>{t("app.title")}</title>
+        <link rel="alternate" hrefLang="x-default" href="https://fojin.app/" />
+        <link rel="alternate" hrefLang="zh" href="https://fojin.app/" />
       </Helmet>
       <section className="home-hero">
         <div className="home-hero-bg">
