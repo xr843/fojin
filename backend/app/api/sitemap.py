@@ -31,7 +31,7 @@ def _xml_response(content: str) -> Response:
     )
 
 
-@router.get("/sitemap.xml")
+@router.api_route("/sitemap.xml", methods=["GET", "HEAD"])
 async def sitemap_index() -> Response:
     """Sitemap index pointing to sub-sitemaps."""
     async with async_session() as session:
@@ -49,7 +49,7 @@ async def sitemap_index() -> Response:
     return _xml_response("\n".join(sitemaps))
 
 
-@router.get("/sitemap-static.xml")
+@router.api_route("/sitemap-static.xml", methods=["GET", "HEAD"])
 async def sitemap_static() -> Response:
     """Static pages sitemap."""
     lines = ['<?xml version="1.0" encoding="UTF-8"?>']
@@ -65,7 +65,7 @@ async def sitemap_static() -> Response:
     return _xml_response("\n".join(lines))
 
 
-@router.get("/sitemap-texts-{batch}.xml")
+@router.api_route("/sitemap-texts-{batch}.xml", methods=["GET", "HEAD"])
 async def sitemap_texts(batch: int) -> FastAPIResponse:
     """Text pages sitemap, paginated by batch number."""
     if batch < 0:
