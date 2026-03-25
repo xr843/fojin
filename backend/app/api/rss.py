@@ -11,7 +11,7 @@ router = APIRouter(tags=["rss"])
 BASE_URL = "https://fojin.app"
 
 
-@router.get("/feed.xml")
+@router.api_route("/feed.xml", methods=["GET", "HEAD"])
 async def rss_feed() -> Response:
     """RSS 2.0 feed of the 50 most recently added texts."""
     async with async_session() as session:
