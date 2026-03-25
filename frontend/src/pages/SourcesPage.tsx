@@ -189,6 +189,8 @@ export default function SourcesPage() {
         <title>数据源导航 | 佛津</title>
         <meta name="description" content={`聚合全球 ${sources?.length || 40}+ 佛教数字资源，覆盖图书馆、大学、研究机构、数字项目等。`} />
         <link rel="canonical" href="https://fojin.app/sources" />
+        <link rel="alternate" hrefLang="x-default" href="https://fojin.app/sources" />
+        <link rel="alternate" hrefLang="zh" href="https://fojin.app/sources" />
       </Helmet>
       <div className="sources-header">
         <h1 className="sources-title">数据源导航</h1>

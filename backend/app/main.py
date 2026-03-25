@@ -39,6 +39,7 @@ from app.api import (
     knowledge_graph,
     notification,
     relations,
+    rss,
     search,
     sitemap,
     source_suggestions,
@@ -223,6 +224,9 @@ app.include_router(notification.router, prefix="/api")
 
 # SEO: sitemap at root (no /api prefix)
 app.include_router(sitemap.router)
+
+# SEO: RSS feed at root (no /api prefix)
+app.include_router(rss.router)
 
 
 @app.get("/api/health")
