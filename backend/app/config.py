@@ -43,6 +43,23 @@ class Settings(BaseSettings):
     dianjin_api_key: str = ""
     dianjin_api_url: str = "https://guji.cckb.cn/api"
 
+    # OAuth: GitHub
+    github_client_id: str = ""
+    github_client_secret: str = ""
+
+    # OAuth: Google
+    google_client_id: str = ""
+    google_client_secret: str = ""
+
+    # SMS: Alibaba Cloud
+    aliyun_sms_access_key_id: str = ""
+    aliyun_sms_access_key_secret: str = ""
+    aliyun_sms_sign_name: str = "佛津"
+    aliyun_sms_template_code: str = ""
+
+    # OAuth callback base URL (e.g. https://fojin.app)
+    oauth_redirect_base: str = "http://localhost:3000"
+
     # Rate limiting (requests per minute)
     rate_limit_default: int = 200
     rate_limit_login: int = 10

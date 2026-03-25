@@ -34,6 +34,24 @@ class User(Base):
     last_chat_date = mapped_column(Date, nullable=True)
 
 
+class SocialAccount(Base):
+    """Third-party OAuth accounts linked to a user."""
+
+    __tablename__ = "social_accounts"
+    __table_args__ = (
+        UniqueConstraint("provider", "provider_user_id", name="uq_social_provider_uid"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), index=True)
+    provider: Mapped[str] = mapped_column(String(30))  # github, google, phone
+    provider_user_id: Mapped[str] = mapped_column(String(200))  # GitHub uid / Google sub / phone number
+    provider_data: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON extra info
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class Bookmark(Base):
     __tablename__ = "bookmarks"
     __table_args__ = (
