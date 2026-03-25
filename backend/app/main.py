@@ -40,6 +40,7 @@ from app.api import (
     notification,
     relations,
     search,
+    sitemap,
     source_suggestions,
     sources,
     stats,
@@ -219,6 +220,9 @@ app.include_router(admin.router, prefix="/api")
 
 # Notifications
 app.include_router(notification.router, prefix="/api")
+
+# SEO: sitemap at root (no /api prefix)
+app.include_router(sitemap.router)
 
 
 @app.get("/api/health")

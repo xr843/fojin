@@ -96,8 +96,42 @@ export default function TextDetailPage() {
     <div className="text-detail-page">
       <Helmet>
         <title>{text.title_zh} — 佛津</title>
-        <meta name="description" content={`${text.title_zh}${text.translator ? ` · ${text.translator}` : ""}${text.category ? ` · ${text.category}` : ""} — 佛津佛教古籍资源`} />
+        <meta name="description" content={`${text.title_zh}${text.translator ? ` · ${text.translator}译` : ""}${text.dynasty ? ` · ${text.dynasty}` : ""}${text.category ? ` · ${text.category}` : ""} — 佛津佛教古籍数字资源平台`} />
         <link rel="canonical" href={`https://fojin.app/texts/${id}`} />
+        <meta property="og:type" content="book" />
+        <meta property="og:title" content={`${text.title_zh} — 佛津`} />
+        <meta property="og:description" content={`${text.title_zh}${text.translator ? ` · ${text.translator}译` : ""}${text.category ? ` · ${text.category}` : ""}`} />
+        <meta property="og:url" content={`https://fojin.app/texts/${id}`} />
+        <meta property="og:site_name" content="佛津 FoJin" />
+        <meta property="og:locale" content="zh_CN" />
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content={`${text.title_zh} — 佛津`} />
+        <meta name="twitter:description" content={`${text.title_zh}${text.translator ? ` · ${text.translator}译` : ""}${text.category ? ` · ${text.category}` : ""}`} />
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Book",
+            "name": text.title_zh,
+            ...(text.title_sa && { "alternateName": text.title_sa }),
+            "url": `https://fojin.app/texts/${id}`,
+            "inLanguage": text.lang || "lzh",
+            ...(text.translator && {
+              "translator": { "@type": "Person", "name": text.translator }
+            }),
+            ...(text.dynasty && { "temporalCoverage": text.dynasty }),
+            ...(text.category && { "genre": text.category }),
+            "isPartOf": {
+              "@type": "Collection",
+              "name": "佛津 FoJin 佛教古籍数字资源",
+              "url": "https://fojin.app/"
+            },
+            "provider": {
+              "@type": "WebSite",
+              "name": "佛津 FoJin",
+              "url": "https://fojin.app/"
+            }
+          })}
+        </script>
       </Helmet>
       <Space direction="vertical" size="large" style={{ width: "100%" }}>
         <Breadcrumb

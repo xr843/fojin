@@ -30,6 +30,12 @@ function seoPages(): Plugin {
       noscript:
         '<h1>佛津 — 知识图谱</h1><p>可视化展示佛教人物、寺院、宗派之间的关系网络。</p><a href="/">返回首页</a>',
     },
+    collections: {
+      title: "藏经收藏 | 佛津 FoJin",
+      desc: "浏览和管理您的佛教古籍收藏集合",
+      noscript:
+        '<h1>佛津 — 藏经收藏</h1><p>浏览和管理您的佛教古籍收藏集合。</p><a href="/">返回首页</a>',
+    },
   };
 
   return {
