@@ -1,12 +1,26 @@
-from fastapi import APIRouter, Depends
+import secrets
+
+from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import RedirectResponse
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.core.crypto import decrypt_api_key, encrypt_api_key
 from app.core.deps import get_current_user
 from app.database import get_db
 from app.models.user import User
 from app.schemas.user import ApiKeyRequest, ApiKeyStatus, TokenResponse, UserLogin, UserProfile, UserRegister
 from app.services.auth import login_user, register_user
+from app.services.oauth import (
+    github_authorize_url,
+    github_callback,
+    google_authorize_url,
+    google_callback,
+    send_sms_code,
+    sms_login,
+    verify_sms_code,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -97,3 +111,114 @@ async def delete_api_key(
     user.api_model = None
     await db.commit()
     return {"ok": True}
+
+
+# ── OAuth: GitHub ────────────────────────────────────────────
+
+
+@router.get("/github/login")
+async def github_login(request: Request):
+    """Redirect user to GitHub OAuth authorization page."""
+    state = secrets.token_urlsafe(16)
+    redis_client = request.app.state.redis
+    await redis_client.set(f"oauth_state:{state}", "github", ex=600)
+    return RedirectResponse(url=github_authorize_url(state))
+
+
+@router.get("/github/callback")
+async def github_oauth_callback(
+    code: str = Query(...),
+    state: str = Query(...),
+    request: Request = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """GitHub OAuth callback — exchange code for JWT, redirect to frontend."""
+    redis_client = request.app.state.redis
+    stored = await redis_client.get(f"oauth_state:{state}")
+    if stored != "github":
+        return RedirectResponse(url=f"{settings.oauth_redirect_base}/login?error=invalid_state")
+    await redis_client.delete(f"oauth_state:{state}")
+
+    try:
+        token_resp = await github_callback(code, db)
+        return RedirectResponse(
+            url=f"{settings.oauth_redirect_base}/login?token={token_resp.access_token}&provider=github"
+        )
+    except Exception:
+        return RedirectResponse(url=f"{settings.oauth_redirect_base}/login?error=github_failed")
+
+
+# ── OAuth: Google ────────────────────────────────────────────
+
+
+@router.get("/google/login")
+async def google_login(request: Request):
+    """Redirect user to Google OAuth authorization page."""
+    state = secrets.token_urlsafe(16)
+    redis_client = request.app.state.redis
+    await redis_client.set(f"oauth_state:{state}", "google", ex=600)
+    return RedirectResponse(url=google_authorize_url(state))
+
+
+@router.get("/google/callback")
+async def google_oauth_callback(
+    code: str = Query(...),
+    state: str = Query(...),
+    request: Request = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Google OAuth callback — exchange code for JWT, redirect to frontend."""
+    redis_client = request.app.state.redis
+    stored = await redis_client.get(f"oauth_state:{state}")
+    if stored != "google":
+        return RedirectResponse(url=f"{settings.oauth_redirect_base}/login?error=invalid_state")
+    await redis_client.delete(f"oauth_state:{state}")
+
+    try:
+        token_resp = await google_callback(code, db)
+        return RedirectResponse(
+            url=f"{settings.oauth_redirect_base}/login?token={token_resp.access_token}&provider=google"
+        )
+    except Exception:
+        return RedirectResponse(url=f"{settings.oauth_redirect_base}/login?error=google_failed")
+
+
+# ── SMS Login ────────────────────────────────────────────────
+
+
+class SmsCodeRequest(BaseModel):
+    phone: str
+
+
+class SmsLoginRequest(BaseModel):
+    phone: str
+    code: str
+
+
+@router.post("/sms/send-code")
+async def send_sms_verification(data: SmsCodeRequest, request: Request):
+    """Send SMS verification code to the given phone number."""
+    phone = data.phone.strip()
+    if not phone or len(phone) < 10:
+        return {"ok": False, "message": "请输入有效的手机号码"}
+
+    redis_client = request.app.state.redis
+    ok = await send_sms_code(phone, redis_client)
+    if not ok:
+        return {"ok": False, "message": "发送过于频繁，请稍后再试"}
+    return {"ok": True, "message": "验证码已发送"}
+
+
+@router.post("/sms/login", response_model=TokenResponse)
+async def sms_verification_login(
+    data: SmsLoginRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Verify SMS code and login (or register if new user)."""
+    redis_client = request.app.state.redis
+    valid = await verify_sms_code(data.phone, data.code, redis_client)
+    if not valid:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="验证码错误或已过期")
+    return await sms_login(data.phone, db)
