@@ -77,6 +77,7 @@ export interface TextDetail {
   cbeta_url: string | null;
   has_content: boolean;
   content_char_count: number;
+  lang: string;
   created_at: string;
 }
 
