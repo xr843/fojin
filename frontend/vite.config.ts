@@ -104,6 +104,7 @@ export default defineConfig({
       manifest: false, // We provide our own manifest.json in public/
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
+        navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
             urlPattern: /^\/api\//,
