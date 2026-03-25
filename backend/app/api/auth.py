@@ -118,11 +118,11 @@ async def delete_api_key(
 
 @router.get("/github/login")
 async def github_login(request: Request):
-    """Redirect user to GitHub OAuth authorization page."""
+    """Return GitHub OAuth authorization URL as JSON."""
     state = secrets.token_urlsafe(16)
     redis_client = request.app.state.redis
     await redis_client.set(f"oauth_state:{state}", "github", ex=600)
-    return RedirectResponse(url=github_authorize_url(state))
+    return {"url": github_authorize_url(state)}
 
 
 @router.get("/github/callback")
@@ -153,11 +153,11 @@ async def github_oauth_callback(
 
 @router.get("/google/login")
 async def google_login(request: Request):
-    """Redirect user to Google OAuth authorization page."""
+    """Return Google OAuth authorization URL as JSON."""
     state = secrets.token_urlsafe(16)
     redis_client = request.app.state.redis
     await redis_client.set(f"oauth_state:{state}", "google", ex=600)
-    return RedirectResponse(url=google_authorize_url(state))
+    return {"url": google_authorize_url(state)}
 
 
 @router.get("/google/callback")

@@ -185,7 +185,7 @@ function SocialLoginButtons() {
           icon={<GithubOutlined />}
           block
           size="large"
-          onClick={() => { window.location.href = "/api/auth/github/login"; }}
+          onClick={async () => { try { const { data } = await api.get("/auth/github/login"); window.location.href = data.url; } catch { message.error("GitHub 登录失败"); } }}
           style={{ background: "#24292e", color: "#fff", borderColor: "#24292e" }}
         >
           GitHub 登录
@@ -194,7 +194,7 @@ function SocialLoginButtons() {
           icon={<GoogleOutlined />}
           block
           size="large"
-          onClick={() => { window.location.href = "/api/auth/google/login"; }}
+          onClick={async () => { try { const { data } = await api.get("/auth/google/login"); window.location.href = data.url; } catch { message.error("Google 登录失败"); } }}
         >
           Google 登录
         </Button>
