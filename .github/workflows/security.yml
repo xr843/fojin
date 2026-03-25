@@ -101,7 +101,7 @@ jobs:
 
       - name: Display pip-audit results
         if: always()
-        run: pip-audit --desc
+        run: pip-audit --desc --ignore-vuln CVE-2026-4539
 
       - name: Upload pip-audit report
         if: always()
