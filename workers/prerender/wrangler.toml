@@ -1,0 +1,7 @@
+name = "fojin-prerender"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+
+[vars]
+ORIGIN = "https://fojin.app"
+API_BASE = "https://fojin.app/api"
