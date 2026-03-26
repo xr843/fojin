@@ -23,8 +23,9 @@ from app.services.rag_retrieval import retrieve_rag_context
 
 logger = logging.getLogger(__name__)
 
-# Free daily limit for users without their own API key
-FREE_DAILY_LIMIT = 10
+# Free daily limits for users without their own API key
+FREE_DAILY_LIMIT_USER = 30       # Logged-in users
+FREE_DAILY_LIMIT_ANONYMOUS = 10  # Anonymous users (encourage registration)
 
 # Provider → base URL mapping
 PROVIDER_URLS = {
@@ -155,8 +156,8 @@ async def _check_daily_quota(db: AsyncSession, user: User) -> None:
     if user.last_chat_date != today:
         user.daily_chat_count = 0
         user.last_chat_date = today
-    if user.daily_chat_count >= FREE_DAILY_LIMIT:
-        raise QuotaExceededError(limit=FREE_DAILY_LIMIT)
+    if user.daily_chat_count >= FREE_DAILY_LIMIT_USER:
+        raise QuotaExceededError(limit=FREE_DAILY_LIMIT_USER)
     user.daily_chat_count += 1
     await db.flush()
 
@@ -187,8 +188,8 @@ async def _check_anonymous_quota(redis, client_ip: str) -> None:
         current = await redis.incr(key)
         if current == 1:
             await redis.expire(key, 86400)  # 24h TTL
-        if current > FREE_DAILY_LIMIT:
-            raise QuotaExceededError(limit=FREE_DAILY_LIMIT)
+        if current > FREE_DAILY_LIMIT_ANONYMOUS:
+            raise QuotaExceededError(limit=FREE_DAILY_LIMIT_ANONYMOUS)
     except QuotaExceededError:
         raise
     except Exception:

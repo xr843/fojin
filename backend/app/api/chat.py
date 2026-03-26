@@ -14,7 +14,8 @@ from app.schemas.chat import (
     SessionListItem,
 )
 from app.services.chat import (
-    FREE_DAILY_LIMIT,
+    FREE_DAILY_LIMIT_ANONYMOUS,
+    FREE_DAILY_LIMIT_USER,
     delete_session,
     get_anonymous_quota_used,
     get_history,
@@ -83,10 +84,11 @@ async def chat_quota(
     if user:
         used = user.daily_chat_count if user.last_chat_date == date.today() else 0
         has_byok = bool(user.encrypted_api_key)
+        limit = FREE_DAILY_LIMIT_USER
         return {
-            "limit": FREE_DAILY_LIMIT,
+            "limit": limit,
             "used": used,
-            "remaining": FREE_DAILY_LIMIT - used if not has_byok else -1,
+            "remaining": limit - used if not has_byok else -1,
             "has_byok": has_byok,
         }
 
@@ -94,10 +96,11 @@ async def chat_quota(
     client_ip = _get_client_ip(request)
     redis = getattr(request.app.state, "redis", None)
     used = await get_anonymous_quota_used(redis, client_ip)
+    limit = FREE_DAILY_LIMIT_ANONYMOUS
     return {
-        "limit": FREE_DAILY_LIMIT,
+        "limit": limit,
         "used": used,
-        "remaining": FREE_DAILY_LIMIT - used,
+        "remaining": limit - used,
         "has_byok": False,
     }
 
