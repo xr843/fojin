@@ -1,10 +1,10 @@
 import json
 import logging
 import time as _time
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 
 import httpx
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -511,6 +511,85 @@ async def send_message_stream(
     if chat_session:
         await _save_messages(db, chat_session.id, message, full_answer, sources)
     yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+
+DEFAULT_HOT_QUESTIONS = [
+    "《心经》中「色不异空」的含义是什么？",
+    "鸠摩罗什与玄奘的翻译风格有何不同？",
+    "四圣谛的核心教义是什么？",
+    "禅宗的「不立文字」思想源自哪些经典？",
+]
+
+HOT_QUESTIONS_CACHE_KEY = "chat:hot_questions"
+HOT_QUESTIONS_CACHE_TTL = 3600  # 1 hour
+
+
+async def get_hot_questions(db: AsyncSession, redis=None) -> list[str]:
+    """Return top 8 most frequently asked questions from the last 7 days."""
+    if redis:
+        try:
+            cached = await redis.get(HOT_QUESTIONS_CACHE_KEY)
+            if cached:
+                return json.loads(cached)
+        except Exception:
+            logger.debug("Failed to read hot questions cache", exc_info=True)
+
+    since = datetime.now(UTC) - timedelta(days=7)
+    stmt = (
+        select(
+            func.left(ChatMessage.content, 20).label("prefix"),
+            func.min(ChatMessage.content).label("example"),
+            func.count().label("cnt"),
+        )
+        .where(ChatMessage.role == "user", ChatMessage.created_at >= since)
+        .group_by(func.left(ChatMessage.content, 20))
+        .order_by(func.count().desc())
+        .limit(8)
+    )
+    result = await db.execute(stmt)
+    rows = result.all()
+    questions = [row.example for row in rows if row.example and len(row.example.strip()) >= 4]
+
+    if len(questions) < 4:
+        seen = set(questions)
+        for q in DEFAULT_HOT_QUESTIONS:
+            if q not in seen:
+                questions.append(q)
+                seen.add(q)
+            if len(questions) >= 8:
+                break
+
+    questions = questions[:8]
+
+    if redis:
+        try:
+            await redis.set(HOT_QUESTIONS_CACHE_KEY, json.dumps(questions, ensure_ascii=False), ex=HOT_QUESTIONS_CACHE_TTL)
+        except Exception:
+            logger.debug("Failed to cache hot questions", exc_info=True)
+
+    return questions
+
+
+async def update_message_feedback(
+    db: AsyncSession, message_id: int, user_id: int, feedback: str | None,
+) -> ChatMessage:
+    """Update feedback (up/down/null) for an assistant message owned by the user."""
+    result = await db.execute(select(ChatMessage).where(ChatMessage.id == message_id))
+    msg = result.scalar_one_or_none()
+    if msg is None:
+        raise NotFoundError("消息未找到")
+
+    session = await get_session(db, msg.session_id)
+    if session is None or session.user_id != user_id:
+        raise AccessDeniedError("无权访问此消息")
+
+    if msg.role != "assistant":
+        raise ValidationError("只能对 AI 回答进行评价")
+
+    msg.feedback = feedback
+    await db.commit()
+    await db.refresh(msg)
+    return msg
 
 
 async def delete_session(db: AsyncSession, session_id: int, user_id: int) -> None:

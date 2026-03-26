@@ -16,6 +16,11 @@ import {
   StopOutlined,
   CopyOutlined,
   ReloadOutlined,
+  LikeOutlined,
+  LikeFilled,
+  DislikeOutlined,
+  DislikeFilled,
+  ReadOutlined,
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -25,6 +30,8 @@ import {
   deleteChatSession,
   getApiKeyStatus,
   getChatQuota,
+  getHotQuestions,
+  updateChatMessageFeedback,
   type ChatMessageItem,
   type ChatSource,
 } from "../api/client";
@@ -48,6 +55,12 @@ export default function ChatPage() {
     queryKey: ["chatSessions"],
     queryFn: getChatSessions,
     enabled: !!user,
+  });
+
+  const { data: hotQuestionsData } = useQuery({
+    queryKey: ["hotQuestions"],
+    queryFn: getHotQuestions,
+    staleTime: 3600_000,
   });
 
   const { data: keyStatus } = useQuery({
@@ -383,12 +396,12 @@ export default function ChatPage() {
                   marginLeft: "auto",
                   marginRight: "auto",
                 }}>
-                  {[
+                  {(hotQuestionsData?.questions ?? [
                     "《心经》中「色不异空」的含义是什么？",
                     "鸠摩罗什与玄奘的翻译风格有何不同？",
                     "四圣谛的核心教义是什么？",
                     "禅宗的「不立文字」思想源自哪些经典？",
-                  ].map((q) => (
+                  ]).map((q) => (
                     <div
                       key={q}
                       onClick={() => handleSendMessage(q)}
@@ -496,6 +509,38 @@ export default function ChatPage() {
                       ))}
                     </div>
                   )}
+                  {/* Related reading cards */}
+                  {m.role === "assistant" && m.sources && m.sources.length > 0 && streamingIdRef.current !== m.id && (() => {
+                    const seen = new Set<number>();
+                    const unique = m.sources!.filter((s) => {
+                      if (s.text_id <= 0 || seen.has(s.text_id)) return false;
+                      seen.add(s.text_id);
+                      return true;
+                    }).slice(0, 3);
+                    return unique.length > 0 ? (
+                      <div style={{
+                        marginTop: 8, padding: "6px 10px", borderRadius: 8,
+                        background: "rgba(176,141,87,0.08)", border: "1px solid rgba(176,141,87,0.2)",
+                      }}>
+                        {unique.map((s) => (
+                          <div key={s.text_id} style={{
+                            display: "flex", alignItems: "center", gap: 6, padding: "3px 0", fontSize: 12,
+                          }}>
+                            <ReadOutlined style={{ color: "var(--fj-accent)", fontSize: 13 }} />
+                            <span style={{ fontFamily: '"Noto Serif SC", serif', color: "var(--fj-ink)" }}>
+                              {s.title_zh ? `《${s.title_zh}》` : `文本#${s.text_id}`}
+                            </span>
+                            <a
+                              onClick={() => navigate(`/texts/${s.text_id}/read`)}
+                              style={{ color: "var(--fj-accent)", cursor: "pointer", marginLeft: "auto", whiteSpace: "nowrap" }}
+                            >
+                              阅读全文 →
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null;
+                  })()}
                   {/* Action buttons for assistant messages */}
                   {m.role === "assistant" && m.content !== "正在检索经文并生成回答..." && streamingIdRef.current !== m.id && (
                     <div style={{ marginTop: 6, display: "flex", gap: 4 }}>
@@ -506,17 +551,47 @@ export default function ChatPage() {
                           onClick={() => { navigator.clipboard.writeText(m.content); message.success("已复制"); }}
                         />
                       </Tooltip>
+                      {user && (
+                        <>
+                          <Tooltip title="有帮助">
+                            <Button
+                              type="text" size="small"
+                              icon={m.feedback === "up" ? <LikeFilled /> : <LikeOutlined />}
+                              style={{ color: m.feedback === "up" ? "var(--fj-accent)" : "var(--fj-ink-muted)", fontSize: 12 }}
+                              onClick={() => {
+                                const newFeedback = m.feedback === "up" ? null : "up";
+                                setMessages((prev) => prev.map((x) => x.id === m.id ? { ...x, feedback: newFeedback } : x));
+                                updateChatMessageFeedback(m.id, newFeedback as "up" | "down" | null).catch(() => {
+                                  setMessages((prev) => prev.map((x) => x.id === m.id ? { ...x, feedback: m.feedback } : x));
+                                });
+                              }}
+                            />
+                          </Tooltip>
+                          <Tooltip title="没帮助">
+                            <Button
+                              type="text" size="small"
+                              icon={m.feedback === "down" ? <DislikeFilled /> : <DislikeOutlined />}
+                              style={{ color: m.feedback === "down" ? "#e74c3c" : "var(--fj-ink-muted)", fontSize: 12 }}
+                              onClick={() => {
+                                const newFeedback = m.feedback === "down" ? null : "down";
+                                setMessages((prev) => prev.map((x) => x.id === m.id ? { ...x, feedback: newFeedback } : x));
+                                updateChatMessageFeedback(m.id, newFeedback as "up" | "down" | null).catch(() => {
+                                  setMessages((prev) => prev.map((x) => x.id === m.id ? { ...x, feedback: m.feedback } : x));
+                                });
+                              }}
+                            />
+                          </Tooltip>
+                        </>
+                      )}
                       {m.content === "请求失败，请重试" && (
                         <Tooltip title="重试">
                           <Button
                             type="text" size="small" icon={<ReloadOutlined />}
                             style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
                             onClick={() => {
-                              // Find the user message before this failed assistant message
                               const idx = messages.findIndex((x) => x.id === m.id);
                               const userMsg = idx > 0 ? messages[idx - 1] : null;
                               if (userMsg && userMsg.role === "user") {
-                                // Remove failed pair and resend
                                 setMessages((prev) => prev.filter((x) => x.id !== m.id && x.id !== userMsg.id));
                                 handleSendMessage(userMsg.content);
                               }

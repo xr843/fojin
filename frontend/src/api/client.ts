@@ -845,6 +845,7 @@ export interface ChatMessageItem {
   role: string;
   content: string;
   sources: ChatSource[] | null;
+  feedback?: string | null;
   created_at: string;
 }
 
@@ -897,6 +898,22 @@ export async function getChatSessionMessages(
 
 export async function deleteChatSession(sessionId: number): Promise<void> {
   await api.delete(`/chat/sessions/${sessionId}`);
+}
+
+export async function updateChatMessageFeedback(
+  messageId: number,
+  feedback: "up" | "down" | null,
+): Promise<void> {
+  await api.put(`/chat/messages/${messageId}/feedback`, { feedback });
+}
+
+export interface HotQuestionsResponse {
+  questions: string[];
+}
+
+export async function getHotQuestions(): Promise<HotQuestionsResponse> {
+  const { data } = await api.get<HotQuestionsResponse>("/chat/hot-questions");
+  return data;
 }
 
 export interface StreamCallbacks {
