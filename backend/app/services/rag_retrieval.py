@@ -50,8 +50,20 @@ async def retrieve_rag_context(
         search_results = await similarity_search(db, query_embedding, limit=pgvector_limit)
         logger.debug("TIMING: pgvector search took %.2fs", time.monotonic() - t1)
 
-        # Filter out low-relevance chunks and cap at 8
-        search_results = [r for r in search_results if r["score"] >= MIN_RELEVANCE_SCORE][:8]
+        # Filter out low-relevance chunks, deduplicate by (text_id, juan_num), cap at 8
+        seen = set()
+        filtered = []
+        for r in search_results:
+            if r["score"] < MIN_RELEVANCE_SCORE:
+                continue
+            key = (r["text_id"], r["juan_num"])
+            if key in seen:
+                continue
+            seen.add(key)
+            filtered.append(r)
+            if len(filtered) >= 8:
+                break
+        search_results = filtered
 
         sources = [ChatSource(**r) for r in search_results]
         context_parts = [f"[出处: {_format_source_label(r)}]\n{r['chunk_text']}" for r in search_results]
