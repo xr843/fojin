@@ -234,7 +234,7 @@ export default function TextDetailPage() {
           <Button
             icon={<BookOutlined />}
             onClick={() => setCitationOpen(true)}
-            style={{ background: "var(--fj-accent)", borderColor: "var(--fj-accent)", color: "#fff" }}
+            style={{ background: "#5b8c6b", borderColor: "#5b8c6b", color: "#fff" }}
           >
             导出引用
           </Button>
