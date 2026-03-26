@@ -217,6 +217,7 @@ export default function TextDetailPage() {
               href={cbetaUrl}
               target="_blank"
               rel="noopener noreferrer"
+              style={{ background: "var(--fj-accent)", borderColor: "var(--fj-accent)", color: "#fff" }}
             >
               CBETA 阅读
             </Button>
@@ -233,6 +234,7 @@ export default function TextDetailPage() {
           <Button
             icon={<BookOutlined />}
             onClick={() => setCitationOpen(true)}
+            style={{ background: "var(--fj-accent)", borderColor: "var(--fj-accent)", color: "#fff" }}
           >
             导出引用
           </Button>
