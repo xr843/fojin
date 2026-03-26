@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -6,6 +7,10 @@ from pydantic import BaseModel, Field
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=2000)
     session_id: int | None = None
+
+
+class FeedbackRequest(BaseModel):
+    feedback: Literal["up", "down"] | None = None
 
 
 class ChatSource(BaseModel):
@@ -27,6 +32,7 @@ class ChatMessageResponse(BaseModel):
     role: str
     content: str
     sources: list[ChatSource] | None
+    feedback: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

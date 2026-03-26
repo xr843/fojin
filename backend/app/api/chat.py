@@ -11,6 +11,7 @@ from app.schemas.chat import (
     ChatResponse,
     ChatSessionResponse,
     ChatSource,
+    FeedbackRequest,
     SessionListItem,
 )
 from app.services.chat import (
@@ -20,10 +21,12 @@ from app.services.chat import (
     get_anonymous_quota_used,
     get_history,
     get_history_paginated,
+    get_hot_questions,
     get_session_for_user,
     list_sessions,
     send_message,
     send_message_stream,
+    update_message_feedback,
 )
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -105,6 +108,17 @@ async def chat_quota(
     }
 
 
+@router.get("/hot-questions")
+async def hot_questions(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """获取热门问题推荐列表。"""
+    redis = getattr(request.app.state, "redis", None)
+    questions = await get_hot_questions(db, redis=redis)
+    return {"questions": questions}
+
+
 @router.get("/sessions", response_model=list[SessionListItem])
 async def get_sessions(
     user: User = Depends(get_current_user),
@@ -133,6 +147,7 @@ async def get_chat_session(
                 role=m.role,
                 content=m.content,
                 sources=[ChatSource(**s) for s in m.sources] if m.sources else None,
+                feedback=m.feedback,
                 created_at=m.created_at,
             )
             for m in msgs
@@ -161,11 +176,31 @@ async def get_session_messages(
                 role=m.role,
                 content=m.content,
                 sources=[ChatSource(**s) for s in m.sources] if m.sources else None,
+                feedback=m.feedback,
                 created_at=m.created_at,
             )
             for m in msgs
         ],
     }
+
+
+@router.put("/messages/{message_id}/feedback", response_model=ChatMessageResponse)
+async def set_message_feedback(
+    message_id: int,
+    data: FeedbackRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """对 AI 回答进行评价（点赞/点踩/取消）。"""
+    msg = await update_message_feedback(db, message_id, user.id, data.feedback)
+    return ChatMessageResponse(
+        id=msg.id,
+        role=msg.role,
+        content=msg.content,
+        sources=[ChatSource(**s) for s in msg.sources] if msg.sources else None,
+        feedback=msg.feedback,
+        created_at=msg.created_at,
+    )
 
 
 @router.delete("/sessions/{session_id}")
