@@ -141,8 +141,9 @@ def _resolve_llm_config(user: User | None) -> tuple[str, str, str, bool]:
             url = PROVIDER_URLS.get(provider, settings.llm_api_url)
             model = user.api_model or PROVIDER_DEFAULT_MODELS.get(provider, settings.llm_model)
             return url, key, model, True
-        except Exception:
-            logger.warning("Failed to decrypt user %s API key, falling back to platform", user.id)
+        except Exception as exc:
+            logger.warning("Failed to decrypt user %s API key: %s", user.id, exc)
+            raise ServiceError("您的 API Key 解密失败，请在个人中心重新配置。") from None
     url = settings.llm_api_url or "https://api.openai.com/v1"
     model = settings.llm_model or _detect_model_from_url(url)
     return url, settings.llm_api_key, model, False
@@ -216,13 +217,45 @@ async def _resolve_session(
     return await create_session(db, user_id, title=message[:50])
 
 
+def _estimate_tokens(text: str) -> int:
+    """Rough token estimate: ~1.5 chars per token for Chinese text."""
+    return max(1, len(text) * 2 // 3)
+
+
+# Reserve tokens for system prompt + output (max_tokens=2000)
+_MAX_INPUT_TOKENS = 6000
+
+
 def _build_llm_messages(
     history: list[ChatMessage], context_text: str, message: str
 ) -> list[dict[str, str]]:
-    """Build the message list for the LLM call."""
+    """Build the message list for the LLM call, trimming if too long."""
     llm_messages: list[dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
-    for msg in history[-10:]:
+    budget = _MAX_INPUT_TOKENS - _estimate_tokens(SYSTEM_PROMPT) - _estimate_tokens(message)
+
+    # RAG context gets priority over history
+    if context_text:
+        ctx_tokens = _estimate_tokens(context_text)
+        if ctx_tokens > budget * 0.6:
+            # Truncate context to 60% of remaining budget
+            max_chars = int(budget * 0.6 * 1.5)
+            context_text = context_text[:max_chars]
+            ctx_tokens = _estimate_tokens(context_text)
+        budget -= ctx_tokens
+
+    # Add as many recent history messages as budget allows
+    trimmed_history = []
+    for msg in reversed(history[-10:]):
+        msg_tokens = _estimate_tokens(msg.content)
+        if budget - msg_tokens < 0:
+            break
+        budget -= msg_tokens
+        trimmed_history.append(msg)
+    trimmed_history.reverse()
+
+    for msg in trimmed_history:
         llm_messages.append({"role": msg.role, "content": msg.content})
+
     if context_text:
         llm_messages.append({
             "role": "user",
@@ -407,71 +440,21 @@ async def send_message_stream(
     # Flush Cloudflare's response buffer with a padded SSE comment (~2KB).
     yield ": " + " " * 2048 + "\n\n"
 
-    # --- Phase 1: fast validation + session (no network calls) ---
-    if not message or not message.strip():
-        yield f"data: {json.dumps({'type': 'error', 'message': '消息不能为空'})}\n\n"
+    # --- Phase 1: validation, quota, session, RAG (reuse _prepare_chat) ---
+    try:
+        chat_session, api_url, api_key, model, is_byok, sources, llm_messages = await _prepare_chat(
+            db, user_id, message, session_id, user, client_ip=client_ip, redis=redis,
+        )
+    except (ValidationError, QuotaExceededError, AccessDeniedError, ServiceError) as exc:
+        yield f"data: {json.dumps({'type': 'error', 'message': str(exc)}, ensure_ascii=False)}\n\n"
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
         return
-    if len(message) > 2000:
-        yield f"data: {json.dumps({'type': 'error', 'message': '消息长度不能超过2000字'})}\n\n"
-        yield f"data: {json.dumps({'type': 'done'})}\n\n"
-        return
-
-    api_url, api_key, model, is_byok = _resolve_llm_config(user)
-    if not is_byok and not api_key:
-        yield f"data: {json.dumps({'type': 'error', 'message': '平台 AI 服务暂未配置。请在个人中心配置自己的 API Key 使用 AI 问答功能。'})}\n\n"
-        yield f"data: {json.dumps({'type': 'done'})}\n\n"
-        return
-
-    chat_session = None
-    if user_id is not None:
-        chat_session = await _resolve_session(db, user_id, message, session_id)
-        if not is_byok:
-            today = date.today()
-            if user.last_chat_date != today:
-                user.daily_chat_count = 0
-                user.last_chat_date = today
-            if user.daily_chat_count >= FREE_DAILY_LIMIT:
-                yield f"data: {json.dumps({'type': 'error', 'message': f'今日免费额度已用完（{FREE_DAILY_LIMIT}次/天）。配置自己的 API Key 可无限使用。'})}\n\n"
-                yield f"data: {json.dumps({'type': 'done'})}\n\n"
-                return
-            user.daily_chat_count += 1
-            await db.flush()
-    else:
-        # Anonymous user — check IP-based quota via Redis
-        if client_ip:
-            used = await get_anonymous_quota_used(redis, client_ip)
-            if used >= FREE_DAILY_LIMIT:
-                yield f"data: {json.dumps({'type': 'error', 'message': f'今日免费额度已用完（{FREE_DAILY_LIMIT}次/天）。注册登录后配置 API Key 可无限使用。'})}\n\n"
-                yield f"data: {json.dumps({'type': 'done'})}\n\n"
-                return
-            try:
-                key = _anon_quota_key(client_ip)
-                current = await redis.incr(key)
-                if current == 1:
-                    await redis.expire(key, 86400)
-            except Exception:
-                logger.warning("Redis anonymous quota increment failed", exc_info=True)
 
     # Yield session_id immediately so frontend gets a fast response
     yield f"data: {json.dumps({'type': 'session_id', 'session_id': chat_session.id if chat_session else 0}, ensure_ascii=False)}\n\n"
 
-    # --- Phase 2: RAG retrieval (may take seconds) ---
-    # Fetch history first so we can use previous context for RAG retrieval
-    history = await get_history(db, chat_session.id) if chat_session else []
-
-    # Extract last user message from history for context-aware retrieval
-    prev_user_msg = None
-    for msg in reversed(history):
-        if msg.role == "user":
-            prev_user_msg = msg.content[:200]
-            break
-
-    sources, context_text = await retrieve_rag_context(db, message, prev_query=prev_user_msg)
-
     if sources:
         yield f"data: {json.dumps({'type': 'sources', 'sources': [s.model_dump() for s in sources]}, ensure_ascii=False)}\n\n"
-    llm_messages = _build_llm_messages(history, context_text, message)
 
     # --- Phase 3: stream LLM ---
     full_answer = ""

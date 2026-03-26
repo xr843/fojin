@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
-import { Input, Button, Space, message, Alert, Tooltip } from "antd";
+import { Input, Button, Space, message, Alert, Tooltip, Modal } from "antd";
 import Markdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
 import {
@@ -14,6 +14,8 @@ import {
   MenuOutlined,
   DownloadOutlined,
   StopOutlined,
+  CopyOutlined,
+  ReloadOutlined,
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -36,6 +38,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessageItem[]>([]);
   const [sending, setSending] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sessionFilter, setSessionFilter] = useState("");
   const [hasOlderMessages, setHasOlderMessages] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -98,14 +101,23 @@ export default function ChatPage() {
     setCurrentPage(1);
   };
 
-  const handleDeleteSession = async (sid: number) => {
-    try {
-      await deleteChatSession(sid);
-      if (sessionId === sid) handleNewChat();
-      refetchSessions();
-    } catch {
-      message.error("删除失败");
-    }
+  const handleDeleteSession = (sid: number) => {
+    Modal.confirm({
+      title: "删除会话",
+      content: "删除后无法恢复，确定要删除这个会话吗？",
+      okText: "删除",
+      cancelText: "取消",
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await deleteChatSession(sid);
+          if (sessionId === sid) handleNewChat();
+          refetchSessions();
+        } catch {
+          message.error("删除失败");
+        }
+      },
+    });
   };
 
   const streamingIdRef = useRef<number>(0);
@@ -279,8 +291,18 @@ export default function ChatPage() {
             onClick={() => navigate("/profile?tab=apikey")}>
             {keyStatus?.has_api_key ? `已配置 Key (${keyStatus.provider})` : "配置 API Key"}
           </Button>
+          {sessions && sessions.length > 5 && (
+            <Input
+              placeholder="搜索会话..."
+              size="small"
+              allowClear
+              value={sessionFilter}
+              onChange={(e) => setSessionFilter(e.target.value)}
+              style={{ marginTop: 4, fontSize: 12 }}
+            />
+          )}
           <div style={{ flex: 1, overflow: "auto", marginTop: 8 }}>
-            {sessions?.map((s) => (
+            {sessions?.filter((s) => !sessionFilter || (s.title || "").includes(sessionFilter)).map((s) => (
               <div key={s.id}
                 style={{
                   padding: "8px 12px",
@@ -472,6 +494,36 @@ export default function ChatPage() {
                           </Tooltip>
                         </div>
                       ))}
+                    </div>
+                  )}
+                  {/* Action buttons for assistant messages */}
+                  {m.role === "assistant" && m.content !== "正在检索经文并生成回答..." && streamingIdRef.current !== m.id && (
+                    <div style={{ marginTop: 6, display: "flex", gap: 4 }}>
+                      <Tooltip title="复制回答">
+                        <Button
+                          type="text" size="small" icon={<CopyOutlined />}
+                          style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
+                          onClick={() => { navigator.clipboard.writeText(m.content); message.success("已复制"); }}
+                        />
+                      </Tooltip>
+                      {m.content === "请求失败，请重试" && (
+                        <Tooltip title="重试">
+                          <Button
+                            type="text" size="small" icon={<ReloadOutlined />}
+                            style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
+                            onClick={() => {
+                              // Find the user message before this failed assistant message
+                              const idx = messages.findIndex((x) => x.id === m.id);
+                              const userMsg = idx > 0 ? messages[idx - 1] : null;
+                              if (userMsg && userMsg.role === "user") {
+                                // Remove failed pair and resend
+                                setMessages((prev) => prev.filter((x) => x.id !== m.id && x.id !== userMsg.id));
+                                handleSendMessage(userMsg.content);
+                              }
+                            }}
+                          />
+                        </Tooltip>
+                      )}
                     </div>
                   )}
                 </div>
