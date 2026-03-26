@@ -44,7 +44,7 @@ async def generate_embedding(text_content: str) -> list[float]:
     Uses an in-process LRU cache to avoid repeated API calls for identical queries.
     Raises EmbeddingServiceError on network, HTTP, or response format errors.
     """
-    cache_key = hashlib.md5(text_content.encode()).hexdigest()
+    cache_key = hashlib.md5(text_content.encode(), usedforsecurity=False).hexdigest()  # nosec B324
     if cache_key in _embedding_cache:
         _embedding_cache.move_to_end(cache_key)
         logger.debug("Embedding cache hit for query (md5=%s)", cache_key[:8])
