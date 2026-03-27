@@ -363,7 +363,7 @@ export default function Layout() {
           )}
         </Space>
       </Drawer>
-      <FeedbackButton />
+      {isHome && <FeedbackButton />}
     </AntLayout>
   );
 }
