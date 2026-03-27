@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { Input, Button, Space, message, Alert, Tooltip, Modal } from "antd";
@@ -34,8 +34,32 @@ import {
   updateChatMessageFeedback,
   type ChatMessageItem,
   type ChatSource,
+  type ChatSessionItem,
 } from "../api/client";
 import { useAuthStore } from "../stores/authStore";
+
+function groupSessionsByDate(sessions: ChatSessionItem[]): { label: string; items: ChatSessionItem[] }[] {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today.getTime() - 86400000);
+  const weekAgo = new Date(today.getTime() - 7 * 86400000);
+
+  const groups: Record<string, ChatSessionItem[]> = { today: [], yesterday: [], week: [], older: [] };
+  for (const s of sessions) {
+    const d = new Date(s.created_at);
+    if (d >= today) groups.today.push(s);
+    else if (d >= yesterday) groups.yesterday.push(s);
+    else if (d >= weekAgo) groups.week.push(s);
+    else groups.older.push(s);
+  }
+
+  const result: { label: string; items: ChatSessionItem[] }[] = [];
+  if (groups.today.length) result.push({ label: "今天", items: groups.today });
+  if (groups.yesterday.length) result.push({ label: "昨天", items: groups.yesterday });
+  if (groups.week.length) result.push({ label: "本周", items: groups.week });
+  if (groups.older.length) result.push({ label: "更早", items: groups.older });
+  return result;
+}
 
 export default function ChatPage() {
   const navigate = useNavigate();
@@ -73,6 +97,15 @@ export default function ChatPage() {
     queryKey: ["chatQuota"],
     queryFn: getChatQuota,
   });
+
+  const filteredSessions = useMemo(
+    () => sessions?.filter((s) => !sessionFilter || (s.title || "").includes(sessionFilter)),
+    [sessions, sessionFilter],
+  );
+  const groupedSessions = useMemo(
+    () => groupSessionsByDate(filteredSessions ?? []),
+    [filteredSessions],
+  );
 
   const scrollToBottom = () => {
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
@@ -271,23 +304,30 @@ export default function ChatPage() {
                 {keyStatus?.has_api_key ? `已配置 Key (${keyStatus.provider})` : "配置 API Key"}
               </Button>
               <div style={{ flex: 1, overflow: "auto", marginTop: 8 }}>
-                {sessions?.map((s) => (
-                  <div key={s.id}
-                    style={{
-                      padding: "8px 12px", borderRadius: 6, cursor: "pointer", fontSize: 13,
-                      color: sessionId === s.id ? "var(--fj-accent)" : "var(--fj-ink-muted)",
-                      background: sessionId === s.id ? "rgba(217,208,193,0.3)" : "transparent",
-                      display: "flex", justifyContent: "space-between", alignItems: "center",
-                    }}
-                    onClick={() => { loadSession(s.id); setSidebarOpen(false); }}
-                  >
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-                      {s.title || "新对话"}
-                    </span>
-                    <DeleteOutlined
-                      style={{ fontSize: 11, color: "var(--fj-ink-muted)", marginLeft: 4 }}
-                      onClick={(e) => { e.stopPropagation(); handleDeleteSession(s.id); }}
-                    />
+                {groupedSessions.map((group) => (
+                  <div key={group.label}>
+                    <div style={{ fontSize: 11, color: "var(--fj-ink-muted)", opacity: 0.6, padding: "6px 12px 2px", fontWeight: 500 }}>
+                      {group.label}
+                    </div>
+                    {group.items.map((s) => (
+                      <div key={s.id}
+                        style={{
+                          padding: "8px 12px", borderRadius: 6, cursor: "pointer", fontSize: 13,
+                          color: sessionId === s.id ? "var(--fj-accent)" : "var(--fj-ink-muted)",
+                          background: sessionId === s.id ? "rgba(217,208,193,0.3)" : "transparent",
+                          display: "flex", justifyContent: "space-between", alignItems: "center",
+                        }}
+                        onClick={() => { loadSession(s.id); setSidebarOpen(false); }}
+                      >
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                          {s.title || "新对话"}
+                        </span>
+                        <DeleteOutlined
+                          style={{ fontSize: 11, color: "var(--fj-ink-muted)", marginLeft: 4 }}
+                          onClick={(e) => { e.stopPropagation(); handleDeleteSession(s.id); }}
+                        />
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>
@@ -315,28 +355,35 @@ export default function ChatPage() {
             />
           )}
           <div style={{ flex: 1, overflow: "auto", marginTop: 8 }}>
-            {sessions?.filter((s) => !sessionFilter || (s.title || "").includes(sessionFilter)).map((s) => (
-              <div key={s.id}
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: 6,
-                  cursor: "pointer",
-                  fontSize: 13,
-                  color: sessionId === s.id ? "var(--fj-accent)" : "var(--fj-ink-muted)",
-                  background: sessionId === s.id ? "rgba(217,208,193,0.3)" : "transparent",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-                onClick={() => loadSession(s.id)}
-              >
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-                  {s.title || "新对话"}
-                </span>
-                <DeleteOutlined
-                  style={{ fontSize: 11, color: "var(--fj-ink-muted)", marginLeft: 4 }}
-                  onClick={(e) => { e.stopPropagation(); handleDeleteSession(s.id); }}
-                />
+            {groupedSessions.map((group) => (
+              <div key={group.label}>
+                <div style={{ fontSize: 11, color: "var(--fj-ink-muted)", opacity: 0.6, padding: "6px 12px 2px", fontWeight: 500 }}>
+                  {group.label}
+                </div>
+                {group.items.map((s) => (
+                  <div key={s.id}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: 6,
+                      cursor: "pointer",
+                      fontSize: 13,
+                      color: sessionId === s.id ? "var(--fj-accent)" : "var(--fj-ink-muted)",
+                      background: sessionId === s.id ? "rgba(217,208,193,0.3)" : "transparent",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                    onClick={() => loadSession(s.id)}
+                  >
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                      {s.title || "新对话"}
+                    </span>
+                    <DeleteOutlined
+                      style={{ fontSize: 11, color: "var(--fj-ink-muted)", marginLeft: 4 }}
+                      onClick={(e) => { e.stopPropagation(); handleDeleteSession(s.id); }}
+                    />
+                  </div>
+                ))}
               </div>
             ))}
           </div>
