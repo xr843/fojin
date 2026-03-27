@@ -91,11 +91,12 @@ em {
 }
 
 /* ========== Chat Markdown ========== */
-.chat-markdown p { margin: 0 0 0.25em; }
+.chat-markdown p { margin: 0 0 0.15em; }
 .chat-markdown p:last-child { margin-bottom: 0; }
-.chat-markdown ul, .chat-markdown ol { margin: 0.15em 0; padding-left: 1.5em; }
-.chat-markdown li { margin-bottom: 0.1em; }
+.chat-markdown ul, .chat-markdown ol { margin: 0.1em 0; padding-left: 1.5em; }
+.chat-markdown li { margin-bottom: 0; }
 .chat-markdown li p { margin: 0; }
+.chat-markdown li + li { margin-top: 0.1em; }
 .chat-markdown pre {
   background: rgba(0,0,0,0.06);
   border-radius: 6px;
@@ -114,13 +115,13 @@ em {
 .chat-markdown blockquote {
   border-left: 3px solid var(--fj-gold);
   padding-left: 12px;
-  margin: 0.3em 0;
+  margin: 0.2em 0;
   opacity: 0.85;
 }
 .chat-markdown h1, .chat-markdown h2, .chat-markdown h3 {
   font-size: 1em;
   font-weight: 600;
-  margin: 0.4em 0 0.15em;
+  margin: 0.3em 0 0.1em;
 }
 
 /* ========== Chat Sidebar Mobile ========== */
