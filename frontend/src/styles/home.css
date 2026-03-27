@@ -512,39 +512,6 @@
   border-color: #b08d57;
 }
 
-/* ---------- GitHub Star 按钮 ---------- */
-.home-github-star {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin: 16px auto;
-  padding: 8px 20px;
-  background: #24292e;
-  color: #fff;
-  border-radius: 8px;
-  font-size: 14px;
-  text-decoration: none;
-  transition: background 0.2s;
-  cursor: pointer;
-}
-.home-github-star:hover {
-  background: #444d56;
-  color: #fff;
-}
-.home-github-star-count {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: rgba(255,255,255,0.15);
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 13px;
-}
-.home-github-star-count .anticon-star {
-  color: #f5c518;
-  font-size: 12px;
-}
-
 /* ---------- 功能导航卡片 ---------- */
 .home-features {
   display: grid;
