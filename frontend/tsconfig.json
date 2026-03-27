@@ -15,7 +15,8 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": true,
+    "resolveJsonModule": true
   },
-  "include": ["src"]
+  "include": ["src", "public/locales/zh/translation.json"]
 }
