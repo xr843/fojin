@@ -10,8 +10,6 @@ import {
   ApartmentOutlined,
   RobotOutlined,
   BookOutlined,
-  GithubOutlined,
-  StarFilled,
 } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import SourceSelector from "../components/SourceSelector";
@@ -30,11 +28,6 @@ export default function HomePage() {
   const { data: stats } = useQuery({ queryKey: ["stats"], queryFn: getStats });
   const { data: sources } = useQuery({ queryKey: ["sources"], queryFn: getSources });
   const { data: filters } = useQuery({ queryKey: ["filters"], queryFn: getFilters });
-  const { data: ghData } = useQuery({
-    queryKey: ["github-stars"],
-    queryFn: () => fetch("https://api.github.com/repos/xr843/fojin").then(r => r.json()),
-    staleTime: 3600000,
-  });
 
   const handleSearch = (q?: string) => {
     const term = (q ?? query).trim();
@@ -143,21 +136,6 @@ export default function HomePage() {
             <div className="home-stat-lbl">{t("home.stat_langs")}</div>
           </div>
         </div>
-
-        <a
-          className="home-github-star"
-          href="https://github.com/xr843/fojin"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <GithubOutlined />
-          <span>Star on GitHub</span>
-          {ghData?.stargazers_count != null && (
-            <span className="home-github-star-count">
-              <StarFilled /> {ghData.stargazers_count}
-            </span>
-          )}
-        </a>
 
         <div className="home-features">
           <div className="home-feature-card" onClick={() => navigate("/sources")}>
