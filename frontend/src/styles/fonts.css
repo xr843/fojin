@@ -2,6 +2,17 @@
 
 @import url('/fonts/noto-serif-sc.css');
 
+/* Subset: only 佛津 (1.6KB) — preloaded in index.html for instant title render */
+@font-face {
+  font-family: 'Ma Shan Zheng';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/MaShanZheng-title.woff2') format('woff2');
+  unicode-range: U+4F5B, U+6D25;
+}
+
+/* Full charset fallback for any other Ma Shan Zheng usage */
 @font-face {
   font-family: 'Ma Shan Zheng';
   font-style: normal;
