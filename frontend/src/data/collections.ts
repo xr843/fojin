@@ -99,7 +99,7 @@ const collections: Collection[] = [
       ],
       manuscript: [
         { name: "京都国立博物馆 金字写本", url: "https://knmdb.kyohaku.go.jp/eng/2922.html", desc: "华严经金字写本高清数字影像" },
-        { name: "大都会博物馆 入法界品贝叶", url: "https://www.metmuseum.org/art/collection/search/856355", desc: "尼泊尔 Gandavyuha 贝叶残页" },
+        { name: "大都会博物馆 佛教写本", url: "https://www.metmuseum.org/art/collection/search?q=gandavyuha", desc: "尼泊尔 Gandavyuha 相关馆藏" },
         { name: "克利夫兰美术馆 高丽金字写本", url: "https://www.clevelandart.org/art/1994.25", desc: "高丽时代华严经金字写本" },
         { name: "IDP 国际敦煌项目", url: "https://idp.bl.uk/", desc: "敦煌华严经写卷数字影像" },
         { name: "曼彻斯特大学 华严经写卷", url: "https://www.digitalcollections.manchester.ac.uk/view/PR-CHCR-00459", desc: "馆藏华严经写卷数字影像" },
@@ -280,12 +280,11 @@ const collections: Collection[] = [
         { name: "Internet Archive 楞严经", url: "https://archive.org/details/ShurangamaSutra_201407", desc: "陆宽昱译本免费下载" },
       ],
       manuscript: [
-        { name: "CBETA 楞严经校勘", url: "https://www.cbeta.org/cn/node/5238", desc: "十三部藏经楞严经文异同对比" },
+        { name: "CBETA 楞严经全文", url: "https://cbetaonline.dila.edu.tw/zh/T0945", desc: "CBETA 在线楞严经校勘全文" },
         { name: "书格 古籍善本", url: "https://www.shuge.org/", desc: "楞严经宋元明刻本影像" },
       ],
       research: [
-        { name: "DRBU 楞严经学术资源", url: "https://repstein.faculty.drbu.edu/Buddhism/Shurangama/Shurangama.htm", desc: "Ron Epstein 编辑，含注疏列表、真伪考证" },
-        { name: "楞严经真伪考辨", url: "https://repstein.faculty.drbu.edu/Buddhism/authenticity.htm", desc: "系统回应伪经说，百条论证" },
+        { name: "DRBU 楞严经学术资源", url: "https://web.archive.org/web/2024/https://repstein.faculty.drbu.edu/Buddhism/Shurangama/Shurangama.htm", desc: "Ron Epstein 编辑，含注疏列表、真伪考证（存档）" },
         { name: "台大佛学数位图书馆", url: "https://buddhism.lib.ntu.edu.tw/", desc: "楞严经研究论文" },
       ],
       temple: [
