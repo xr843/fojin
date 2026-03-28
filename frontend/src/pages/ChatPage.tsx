@@ -660,8 +660,8 @@ export default function ChatPage() {
             {!keyStatus?.has_api_key && quota && quota.remaining >= 0 && (
               <Alert
                 message={<span>每日免费 {quota.limit} 次问答，今日剩余 {quota.remaining} 次。{user
-                  ? <a onClick={() => navigate("/profile?tab=apikey")}>配置 API Key</a>
-                  : <a onClick={() => navigate("/login")}>登录</a>} 可无限使用。</span>}
+                  ? <><a onClick={() => navigate("/profile?tab=apikey")}>配置 API Key</a> 可无限使用。</>
+                  : <><a onClick={() => navigate("/login")}>登录</a>后每日可用 30 次。配置自己的 API Key 可无限使用。</>}</span>}
                 type={quota.remaining <= 2 ? "warning" : "info"} showIcon closable
                 style={{ marginBottom: 8, fontSize: 12 }}
               />
