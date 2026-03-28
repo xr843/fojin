@@ -242,6 +242,24 @@
   background: #fff;
 }
 
+/* ---------- 注册提示条 ---------- */
+.home-tip {
+  display: flex;
+  align-items: center;
+  max-width: 600px;
+  margin: 12px auto 0;
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--fj-ink-light);
+  background: rgba(217, 208, 193, 0.25);
+  border: 1px solid rgba(217, 208, 193, 0.5);
+  border-radius: 6px;
+  line-height: 1.6;
+}
+.home-tip a {
+  color: var(--fj-accent);
+}
+
 /* ---------- 可信度说明 ---------- */
 .home-trust {
   font-family: "Noto Serif SC", serif;

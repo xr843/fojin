@@ -12,17 +12,21 @@ import {
   BookOutlined,
 } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
+import { InfoCircleOutlined, CloseOutlined } from "@ant-design/icons";
 import SourceSelector from "../components/SourceSelector";
 import { getStats, getSources, getFilters } from "../api/client";
 import { getLangName } from "../utils/sourceUrls";
+import { useAuthStore } from "../stores/authStore";
 import "../styles/home.css"; // mobile-responsive v2.1
 
 export default function HomePage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { user } = useAuthStore();
   const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
   const [sourceOpen, setSourceOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [tipDismissed, setTipDismissed] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { data: stats } = useQuery({ queryKey: ["stats"], queryFn: getStats });
@@ -119,6 +123,21 @@ export default function HomePage() {
             </button>
           ))}
         </div>
+
+        {!user && !tipDismissed && (
+          <div className="home-tip">
+            <InfoCircleOutlined style={{ marginRight: 6, flexShrink: 0 }} />
+            <span>
+              无需注册即可搜索与浏览。
+              <a onClick={() => navigate("/login")} style={{ cursor: "pointer", textDecoration: "underline" }}>注册登录</a>
+              后可使用收藏夹、AI 问答、阅读历史、标注笔记、自定义 API Key 等功能。
+            </span>
+            <CloseOutlined
+              onClick={() => setTipDismissed(true)}
+              style={{ marginLeft: 8, cursor: "pointer", flexShrink: 0, fontSize: 12, opacity: 0.6 }}
+            />
+          </div>
+        )}
 
         <div className="home-stats" role="group" aria-label={t("home.stat_label")}>
           <div className="home-stat-item">
