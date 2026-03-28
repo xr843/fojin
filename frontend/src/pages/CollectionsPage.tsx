@@ -31,18 +31,30 @@ const RESOURCE_ICONS: Record<ResourceCategory, React.ReactNode> = {
   temple: <GlobalOutlined />,
 };
 
-function TextItem({ t, navigate }: { t: CollectionText; navigate: ReturnType<typeof useNavigate> }) {
+function TextItem({ t, navigate, cbetaMap }: { t: CollectionText; navigate: ReturnType<typeof useNavigate>; cbetaMap: Record<string, number> }) {
+  const textId = t.cbeta_id ? cbetaMap[t.cbeta_id] : undefined;
   return (
     <div className="coll-text-item">
       <div className="coll-text-main">
-        <span className="coll-text-title">{t.title}</span>
+        <span
+          className="coll-text-title"
+          style={textId ? { cursor: "pointer", color: "var(--fj-accent)" } : undefined}
+          onClick={textId ? () => navigate(`/texts/${textId}`) : undefined}
+        >
+          {t.title}
+        </span>
         {t.cbeta_id && (
           <Tag
-            color="volcano"
+            color={textId ? "green" : "volcano"}
             style={{ fontSize: 10, margin: 0, lineHeight: "16px", padding: "0 4px", cursor: "pointer" }}
-            onClick={() => navigate(`/search?q=${encodeURIComponent(t.cbeta_id!)}`)}
+            onClick={() => textId ? navigate(`/texts/${textId}`) : navigate(`/search?q=${encodeURIComponent(t.cbeta_id!)}`)}
           >
             {t.cbeta_id}
+          </Tag>
+        )}
+        {textId && (
+          <Tag color="green" style={{ fontSize: 10, margin: 0, lineHeight: "16px", padding: "0 4px" }}>
+            已收录
           </Tag>
         )}
       </div>
@@ -98,7 +110,7 @@ function ResourceTabs({ resources }: { resources: Collection["resources"] }) {
   );
 }
 
-function CollectionCard({ coll }: { coll: Collection }) {
+function CollectionCard({ coll, cbetaMap }: { coll: Collection; cbetaMap: Record<string, number> }) {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
 
@@ -133,7 +145,7 @@ function CollectionCard({ coll }: { coll: Collection }) {
             </div>
             <div className="coll-text-list">
               {coll.mainTexts.map((t) => (
-                <TextItem key={t.cbeta_id || t.title} t={t} navigate={navigate} />
+                <TextItem key={t.cbeta_id || t.title} t={t} navigate={navigate} cbetaMap={cbetaMap} />
               ))}
             </div>
           </div>
@@ -146,7 +158,7 @@ function CollectionCard({ coll }: { coll: Collection }) {
               </div>
               <div className="coll-text-list">
                 {coll.commentaries.map((t) => (
-                  <TextItem key={t.cbeta_id || t.title} t={t} navigate={navigate} />
+                  <TextItem key={t.cbeta_id || t.title} t={t} navigate={navigate} cbetaMap={cbetaMap} />
                 ))}
               </div>
             </div>
@@ -178,11 +190,23 @@ function CollectionCard({ coll }: { coll: Collection }) {
 export default function CollectionsPage() {
   const [search, setSearch] = useState("");
   const [showTop, setShowTop] = useState(false);
+  const [cbetaMap, setCbetaMap] = useState<Record<string, number>>({});
 
   useEffect(() => {
     const onScroll = () => setShowTop(window.scrollY > 400);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    const allIds = collections.flatMap((c) =>
+      [...c.mainTexts, ...c.commentaries].map((t) => t.cbeta_id).filter(Boolean),
+    );
+    if (allIds.length === 0) return;
+    fetch(`/api/texts/lookup-cbeta?ids=${encodeURIComponent(allIds.join(","))}`)
+      .then((r) => r.json())
+      .then((data) => setCbetaMap(data))
+      .catch(() => {});
   }, []);
 
   const filtered = useMemo(() => {
@@ -242,7 +266,7 @@ export default function CollectionsPage() {
       ) : (
         <div className="coll-list">
           {filtered.map((c) => (
-            <CollectionCard key={c.id} coll={c} />
+            <CollectionCard key={c.id} coll={c} cbetaMap={cbetaMap} />
           ))}
         </div>
       )}
