@@ -516,6 +516,266 @@ const collections: Collection[] = [
       ],
     },
   },
+
+  // ==================== 9. 阿含经/尼柯耶系列 ====================
+  {
+    id: "agama",
+    name: "阿含经/尼柯耶系列",
+    tradition: "原始佛教",
+    description:
+      "阿含经是原始佛教的根本经典，保存了释迦牟尼佛最早期的教说。汉译四部阿含与巴利五部尼柯耶大体对应，是研究佛陀本怀的第一手资料。近代以来，阿含经在佛学研究中的重要性日益凸显。",
+    mainTexts: [
+      { title: "长阿含经", cbeta_id: "T0001", author: "佛陀耶舍、竺佛念", dynasty: "姚秦", note: "22卷30经，对应巴利长部尼柯耶 (DN)" },
+      { title: "中阿含经", cbeta_id: "T0026", author: "瞿昙僧伽提婆", dynasty: "东晋", note: "60卷222经，对应巴利中部尼柯耶 (MN)" },
+      { title: "杂阿含经", cbeta_id: "T0099", author: "求那跋陀罗", dynasty: "刘宋", note: "50卷1362经，对应巴利相应部尼柯耶 (SN)，最核心的阿含" },
+      { title: "增一阿含经", cbeta_id: "T0125", author: "瞿昙僧伽提婆", dynasty: "东晋", note: "51卷，对应巴利增支部尼柯耶 (AN)" },
+      { title: "别译杂阿含经", cbeta_id: "T0100", author: "失译", dynasty: "不详", note: "杂阿含部分经异译" },
+      { title: "佛说大般涅槃经", cbeta_id: "T0007", author: "法显", dynasty: "东晋", note: "长阿含游行经异译，记佛陀入灭" },
+    ],
+    commentaries: [
+      { title: "瑜伽师地论·摄事分", cbeta_id: "T1579", author: "弥勒菩萨说，玄奘译", dynasty: "唐", note: "卷85-100为杂阿含经注释" },
+      { title: "阿毗达磨大毗婆沙论", cbeta_id: "T1545", author: "五百大阿罗汉造，玄奘译", dynasty: "唐", note: "200卷，解释阿含教义的百科全书" },
+      { title: "阿毗达磨俱舍论", cbeta_id: "T1558", author: "世亲造，玄奘译", dynasty: "唐", note: "阿含教义体系化总结" },
+      { title: "成实论", cbeta_id: "T1646", author: "诃梨跋摩造，鸠摩罗什译", dynasty: "姚秦", note: "经部论师系统化阿含义理" },
+    ],
+    resources: {
+      reading: [
+        { name: "CBETA 阿含部", url: "https://cbetaonline.dila.edu.tw/zh/T0001", desc: "四部阿含全文在线" },
+        { name: "SuttaCentral", url: "https://suttacentral.net/", desc: "巴利尼柯耶多语言对照，汉巴对读" },
+        { name: "Access to Insight", url: "https://www.accesstoinsight.org/tipitaka/index.html", desc: "巴利经藏经典英译" },
+        { name: "庄春江 阿含经南北对读", url: "https://agama.buddhason.org/", desc: "汉译阿含与巴利尼柯耶逐经对照" },
+      ],
+      translation: [
+        { name: "Bhikkhu Bodhi 尼柯耶英译", url: "https://wisdomexperience.org/authors/bhikkhu-bodhi/", desc: "当代最权威的巴利经藏完整英译" },
+        { name: "84000 阿含经藏译英", url: "https://84000.co/", desc: "部分阿含经从藏文翻译" },
+        { name: "BDK 长阿含经英译", url: "https://www.bdkamerica.org/", desc: "Numata 基金会长阿含英译" },
+        { name: "Sutta Friends Foundation", url: "https://www.suttafriends.org/", desc: "杂阿含英译计划" },
+      ],
+      manuscript: [
+        { name: "IDP 国际敦煌项目", url: "https://idp.bl.uk/", desc: "敦煌阿含经写本数字影像" },
+        { name: "Gandhari.org", url: "https://gandhari.org/", desc: "犍陀罗语阿含写本（最古层佛经写本）" },
+        { name: "DILA 梵文写本数据库", url: "https://www.dila.edu.tw/", desc: "梵文阿含残卷研究" },
+      ],
+      research: [
+        { name: "印顺法师《杂阿含经论会编》", url: "https://yinshun-edu.org.tw/", desc: "阿含研究里程碑著作" },
+        { name: "台大佛学数位图书馆", url: "https://buddhism.lib.ntu.edu.tw/", desc: "阿含经研究论文全文" },
+        { name: "SuttaCentral Parallels", url: "https://suttacentral.net/", desc: "汉巴藏梵平行经文数据库" },
+        { name: "JIABS", url: "https://poj.peeters-leuven.be/content.php?url=journal&journal_code=JIABS", desc: "早期佛教研究权威期刊" },
+      ],
+      temple: [
+        { name: "Bodhi Monastery", url: "https://bodhimonastery.org/", desc: "美国，菩提比丘常驻，阿含教学" },
+        { name: "Amaravati Buddhist Monastery", url: "https://www.amaravati.org/", desc: "英国，阿姜查传承，原始佛教修行" },
+      ],
+    },
+  },
+
+  // ==================== 10. 密教系列 ====================
+  {
+    id: "esoteric",
+    name: "密教系列",
+    tradition: "真言宗/天台密教",
+    description:
+      "密教（真言宗、金刚乘）以《大日经》和《金刚顶经》为两大根本经典，强调三密加持（身口意）和曼荼罗修法。善无畏、金刚智、不空三大士将密教传入中国，空海大师东传日本创立真言宗。",
+    mainTexts: [
+      { title: "大毗卢遮那成佛神变加持经（大日经）", cbeta_id: "T0848", author: "善无畏、一行", dynasty: "唐", note: "胎藏界根本经典，7卷" },
+      { title: "金刚顶一切如来真实摄大乘现证大教王经", cbeta_id: "T0865", author: "不空", dynasty: "唐", note: "金刚界根本经典" },
+      { title: "苏悉地羯罗经", cbeta_id: "T0893", author: "善无畏", dynasty: "唐", note: "密教事部修法根本经典" },
+      { title: "佛说一切如来真实摄大乘现证三昧大教王经", cbeta_id: "T0882", author: "施护", dynasty: "宋", note: "金刚顶经广本，30卷" },
+      { title: "大乐金刚不空真实三么耶经", cbeta_id: "T0243", author: "不空", dynasty: "唐", note: "般若理趣经，密教般若观" },
+      { title: "仁王护国般若波罗蜜多经陀罗尼念诵仪轨", cbeta_id: "T0994", author: "不空", dynasty: "唐", note: "护国密法" },
+    ],
+    commentaries: [
+      { title: "大日经疏", cbeta_id: "T1796", author: "一行", dynasty: "唐", note: "大日经最重要注释，20卷" },
+      { title: "金刚顶经疏", cbeta_id: "T1665", author: "不空述，含光记", dynasty: "唐" },
+      { title: "大日经义释", cbeta_id: "X0349", author: "温古（觉苑）", dynasty: "辽", note: "大日经疏的再注释" },
+      { title: "十住心论", cbeta_id: "T2425", author: "空海", dynasty: "日本平安", note: "空海判教代表作，十种心" },
+      { title: "即身成佛义", cbeta_id: "T2428", author: "空海", dynasty: "日本平安", note: "真言宗核心教义" },
+      { title: "声字实相义", cbeta_id: "T2429", author: "空海", dynasty: "日本平安", note: "真言宗语言哲学" },
+    ],
+    resources: {
+      reading: [
+        { name: "CBETA 密教部", url: "https://cbetaonline.dila.edu.tw/zh/T0848", desc: "大日经及密教经典全文" },
+        { name: "SAT 大正藏", url: "https://21dzk.l.u-tokyo.ac.jp/SAT/", desc: "东京大学大正藏数据库" },
+        { name: "Encyclopaedia of Buddhism", url: "https://encyclopediaofbuddhism.org/wiki/Vajrayāna", desc: "金刚乘词条" },
+      ],
+      translation: [
+        { name: "84000 密续英译", url: "https://84000.co/canon-sections/tantra-collection", desc: "藏传密续英译合集" },
+        { name: "BDK 大日经英译", url: "https://www.bdkamerica.org/", desc: "Numata 基金会英译" },
+        { name: "DSBC 梵文密教文献", url: "https://www.dsbcproject.org/", desc: "梵文密教原典数字化" },
+      ],
+      manuscript: [
+        { name: "高野山灵宝馆", url: "https://www.reihokan.or.jp/", desc: "真言宗总本山，密教文物" },
+        { name: "IDP 国际敦煌项目", url: "https://idp.bl.uk/", desc: "敦煌密教写本与绢画" },
+        { name: "BDRC 藏文密续", url: "https://library.bdrc.io/", desc: "藏传密教文献数字化" },
+      ],
+      research: [
+        { name: "高野山大学密教文化研究所", url: "https://www.koyasan-u.ac.jp/", desc: "真言宗最高学府" },
+        { name: "种智院大学", url: "https://www.shuchiin.ac.jp/", desc: "空海创立，密教研究" },
+        { name: "大正大学综合佛教研究所", url: "https://www.tais.ac.jp/", desc: "密教学术研究中心" },
+      ],
+      temple: [
+        { name: "高野山金刚峰寺", url: "https://www.koyasan.or.jp/en/", desc: "真言宗总本山，世界遗产" },
+        { name: "东寺（教王护国寺）", url: "https://toji.or.jp/en/", desc: "京都，空海主持的密教道场" },
+        { name: "青龙寺", url: "https://www.xa-travel.com/attractions/qinglongsi.html", desc: "西安，空海入唐求法之地" },
+      ],
+    },
+  },
+
+  // ==================== 11. 涅槃经系列 ====================
+  {
+    id: "nirvana",
+    name: "涅槃经系列",
+    tradition: "涅槃宗/如来藏",
+    description:
+      "《大般涅槃经》是佛陀入灭前的最后教说，提出「一切众生悉有佛性」的思想，对中国佛教影响深远。涅槃学派（涅槃宗）曾与成实学派并列南北朝佛学两大主流，其佛性论深刻影响了禅宗和天台宗。",
+    mainTexts: [
+      { title: "大般涅槃经（北本）", cbeta_id: "T0374", author: "昙无谶", dynasty: "北凉", note: "40卷，最完整的汉译本" },
+      { title: "大般涅槃经（南本）", cbeta_id: "T0375", author: "慧严等再治", dynasty: "刘宋", note: "36卷，南方流通本" },
+      { title: "佛说大般泥洹经", cbeta_id: "T0376", author: "法显", dynasty: "东晋", note: "6卷，最早汉译，仅前分" },
+      { title: "大般涅槃经后分", cbeta_id: "T0377", author: "若那跋陀罗", dynasty: "唐", note: "补译遗缺部分" },
+      { title: "胜鬘师子吼一乘大方便方广经", cbeta_id: "T0353", author: "求那跋陀罗", dynasty: "刘宋", note: "如来藏思想核心经典" },
+      { title: "大方等如来藏经", cbeta_id: "T0666", author: "佛陀跋陀罗", dynasty: "东晋", note: "最早明确使用「如来藏」概念" },
+      { title: "佛说不增不减经", cbeta_id: "T0668", author: "菩提流支", dynasty: "元魏", note: "如来藏系重要经典" },
+    ],
+    commentaries: [
+      { title: "大般涅槃经集解", cbeta_id: "T1763", author: "宝亮等", dynasty: "梁", note: "汇集南朝诸师涅槃注疏" },
+      { title: "涅槃经游意", cbeta_id: "T1768", author: "吉藏", dynasty: "隋", note: "三论宗立场的涅槃经导论" },
+      { title: "涅槃玄义发源机要", cbeta_id: "T1766", author: "智圆", dynasty: "宋", note: "天台宗涅槃注疏" },
+      { title: "究竟一乘宝性论", cbeta_id: "T1611", author: "勒那摩提", dynasty: "元魏", note: "如来藏/佛性论系统论著" },
+      { title: "佛性论", cbeta_id: "T1610", author: "天亲菩萨造，真谛译", dynasty: "陈", note: "佛性思想体系化" },
+      { title: "大乘起信论", cbeta_id: "T1666", author: "马鸣菩萨造，真谛译", dynasty: "陈", note: "如来藏与唯识融合的重要论典" },
+    ],
+    resources: {
+      reading: [
+        { name: "CBETA 涅槃部", url: "https://cbetaonline.dila.edu.tw/zh/T0374", desc: "大般涅槃经全文在线" },
+        { name: "SAT 大正藏", url: "https://21dzk.l.u-tokyo.ac.jp/SAT/", desc: "东京大学大正藏数据库" },
+        { name: "NTI Reader", url: "https://ntireader.org/taisho/t0374.html", desc: "涅槃经中英佛典阅读器" },
+      ],
+      translation: [
+        { name: "84000 涅槃经", url: "https://84000.co/translation/toh119", desc: "大般涅槃经藏译英" },
+        { name: "Nirvana Sutra.net", url: "https://www.nirvanasutra.net/", desc: "Mark Blum 英译全文在线" },
+        { name: "BDK 胜鬘经英译", url: "https://www.bdkamerica.org/", desc: "Numata 基金会英译" },
+      ],
+      manuscript: [
+        { name: "IDP 国际敦煌项目", url: "https://idp.bl.uk/", desc: "敦煌涅槃经写本影像" },
+        { name: "数字敦煌", url: "https://www.e-dunhuang.com/", desc: "涅槃变相壁画全景" },
+        { name: "书格 古籍善本", url: "https://www.shuge.org/", desc: "涅槃经宋元刻本影像" },
+      ],
+      research: [
+        { name: "台大佛学数位图书馆", url: "https://buddhism.lib.ntu.edu.tw/", desc: "涅槃经与佛性论研究论文" },
+        { name: "斯坦福哲学百科 · 佛性", url: "https://plato.stanford.edu/entries/buddha-nature/", desc: "佛性/如来藏思想学术综述" },
+        { name: "BuddhaNexus 文本比对", url: "https://buddhanexus2.kc-tbts.uni-hamburg.de/", desc: "涅槃经跨语种平行对照" },
+      ],
+      temple: [
+        { name: "大谷大学", url: "https://www.otani.ac.jp/", desc: "日本京都，涅槃经与真宗研究重镇" },
+      ],
+    },
+  },
+
+  // ==================== 12. 阿毗达磨系列 ====================
+  {
+    id: "abhidharma",
+    name: "阿毗达磨系列",
+    tradition: "部派佛教",
+    description:
+      "阿毗达磨（论藏）是对佛陀教说的系统化分析与归纳。说一切有部的「一身六足」七论和南传上座部的七论构成两大阿毗达磨体系。世亲的《俱舍论》被誉为「聪明论」，是学习阿毗达磨的最佳入门。",
+    mainTexts: [
+      { title: "阿毗达磨发智论", cbeta_id: "T1544", author: "迦多衍尼子造，玄奘译", dynasty: "唐", note: "有部「身论」，阿毗达磨根本论" },
+      { title: "阿毗达磨大毗婆沙论", cbeta_id: "T1545", author: "五百大阿罗汉造，玄奘译", dynasty: "唐", note: "200卷，发智论注释，百科全书式巨著" },
+      { title: "阿毗达磨俱舍论", cbeta_id: "T1558", author: "世亲造，玄奘译", dynasty: "唐", note: "30卷，「聪明论」，学阿毗达磨必读" },
+      { title: "阿毗达磨俱舍论（真谛译）", cbeta_id: "T1559", author: "世亲造，真谛译", dynasty: "陈", note: "旧译本，22卷" },
+      { title: "阿毗达磨顺正理论", cbeta_id: "T1562", author: "众贤造，玄奘译", dynasty: "唐", note: "80卷，有部正统反驳世亲" },
+      { title: "阿毗昙八犍度论", cbeta_id: "T1543", author: "迦旃延子造，僧伽提婆等译", dynasty: "符秦", note: "发智论旧译" },
+      { title: "阿毗达磨集异门足论", cbeta_id: "T1536", author: "舍利子说，玄奘译", dynasty: "唐", note: "六足论之一" },
+      { title: "阿毗达磨法蕴足论", cbeta_id: "T1537", author: "大目乾连说，玄奘译", dynasty: "唐", note: "六足论之一" },
+    ],
+    commentaries: [
+      { title: "俱舍论记", cbeta_id: "T1821", author: "普光", dynasty: "唐", note: "俱舍论最重要注释，30卷" },
+      { title: "俱舍论疏", cbeta_id: "T1822", author: "法宝", dynasty: "唐", note: "俱舍论疏释，30卷" },
+      { title: "俱舍论颂疏", cbeta_id: "T1823", author: "圆晖", dynasty: "唐", note: "俱舍偈颂注释，入门首选" },
+      { title: "杂阿毗昙心论", cbeta_id: "T1552", author: "法救造，僧伽跋摩译", dynasty: "刘宋", note: "俱舍论之前的阿毗达磨纲要" },
+    ],
+    resources: {
+      reading: [
+        { name: "CBETA 毗昙部", url: "https://cbetaonline.dila.edu.tw/zh/T1558", desc: "俱舍论及全部阿毗达磨论典" },
+        { name: "SuttaCentral 阿毗达磨", url: "https://suttacentral.net/abhidhamma", desc: "巴利阿毗达磨七论" },
+        { name: "Deerpark 佛经阅读器", url: "https://deerpark.app/", desc: "优雅排版阅读" },
+      ],
+      translation: [
+        { name: "BDK 俱舍论英译", url: "https://www.bdkamerica.org/", desc: "Leo Pruden 英译全本" },
+        { name: "Bhikkhu Bodhi 阿毗达磨导论", url: "https://wisdomexperience.org/product/comprehensive-manual-of-abhidhamma/", desc: "南传阿毗达磨概要英译" },
+        { name: "84000 俱舍论", url: "https://84000.co/", desc: "藏文俱舍论英译" },
+      ],
+      manuscript: [
+        { name: "吉尔吉特写本 (UNESCO)", url: "https://en.unesco.org/memoryoftheworld/registry/303", desc: "含阿毗达磨梵文残卷" },
+        { name: "GRETIL 梵文文本", url: "https://gretil.sub.uni-goettingen.de/", desc: "俱舍论梵文电子文本" },
+        { name: "DSBC 梵文佛典", url: "https://www.dsbcproject.org/", desc: "阿毗达磨梵文原典" },
+      ],
+      research: [
+        { name: "台大佛学数位图书馆", url: "https://buddhism.lib.ntu.edu.tw/", desc: "俱舍论与部派佛教论文" },
+        { name: "斯坦福哲学百科 · Abhidharma", url: "https://plato.stanford.edu/entries/abhidharma/", desc: "阿毗达磨哲学学术综述" },
+        { name: "牛津佛教研究中心", url: "https://ocbs.org/", desc: "阿毗达磨比较研究" },
+      ],
+      temple: [
+        { name: "法鼓文理学院", url: "https://www.dila.edu.tw/", desc: "阿毗达磨研究课程" },
+        { name: "Pa-Auk Forest Monastery", url: "https://www.paauk.org/", desc: "缅甸，阿毗达磨实修传统" },
+      ],
+    },
+  },
+
+  // ==================== 13. 南传巴利三藏 ====================
+  {
+    id: "pali-canon",
+    name: "南传巴利三藏",
+    tradition: "上座部佛教",
+    description:
+      "巴利三藏（Tipitaka）是上座部佛教的完整典籍，包含经藏（Sutta Pitaka）、律藏（Vinaya Pitaka）和论藏（Abhidhamma Pitaka）。它是现存最完整、最古老的佛教经典体系，以巴利语传承，主要流传于斯里兰卡、缅甸、泰国等南传佛教国家。",
+    mainTexts: [
+      { title: "长部尼柯耶 (Dīgha Nikāya)", cbeta_id: "", author: "", dynasty: "", note: "34经，含大念处经、梵网经等" },
+      { title: "中部尼柯耶 (Majjhima Nikāya)", cbeta_id: "", author: "", dynasty: "", note: "152经，佛教修行最核心教导" },
+      { title: "相应部尼柯耶 (Saṃyutta Nikāya)", cbeta_id: "", author: "", dynasty: "", note: "按主题分类的经集" },
+      { title: "增支部尼柯耶 (Aṅguttara Nikāya)", cbeta_id: "", author: "", dynasty: "", note: "按数字法数分类" },
+      { title: "小部尼柯耶 (Khuddaka Nikāya)", cbeta_id: "", author: "", dynasty: "", note: "含法句经、本生经、经集等15部" },
+      { title: "法句经 (Dhammapada)", cbeta_id: "", author: "", dynasty: "", note: "423偈，佛教最广泛流传的经典" },
+    ],
+    commentaries: [
+      { title: "清净道论 (Visuddhimagga)", cbeta_id: "", author: "觉音 (Buddhaghosa)", dynasty: "5世纪", note: "上座部最重要的论著，修行百科全书" },
+      { title: "摄阿毗达磨义论 (Abhidhammattha Sangaha)", cbeta_id: "", author: "阿耨楼陀 (Anuruddha)", dynasty: "11世纪", note: "南传阿毗达磨入门必读" },
+      { title: "善见律毗婆沙", cbeta_id: "T1462", author: "僧伽跋陀罗", dynasty: "南齐", note: "巴利律藏注释书汉译" },
+      { title: "弥兰陀王问经 (Milindapañha)", cbeta_id: "", author: "", dynasty: "约公元前1世纪", note: "弥兰陀王与那先比丘问答" },
+    ],
+    resources: {
+      reading: [
+        { name: "SuttaCentral", url: "https://suttacentral.net/", desc: "巴利三藏多语言平台，含完整英译" },
+        { name: "Access to Insight", url: "https://www.accesstoinsight.org/", desc: "经典巴利经文英译库" },
+        { name: "DhammaTalks", url: "https://www.dhammatalks.org/suttas/index.html", desc: "Thanissaro Bhikkhu 经文英译" },
+        { name: "Tipitaka.org", url: "https://tipitaka.org/", desc: "六种文字三藏全文" },
+        { name: "Digital Pali Reader", url: "https://www.digitalpalireader.online/", desc: "巴利原文在线阅读器" },
+      ],
+      translation: [
+        { name: "Bhikkhu Bodhi 完整英译", url: "https://wisdomexperience.org/authors/bhikkhu-bodhi/", desc: "四部尼柯耶权威英译" },
+        { name: "Bhikkhu Sujato 英译", url: "https://suttacentral.net/", desc: "SuttaCentral 现代英译，CC0 许可" },
+        { name: "PTS 巴利圣典协会", url: "https://palitextsociety.org/", desc: "巴利文本与英译出版" },
+        { name: "庄春江 巴利经藏中译", url: "https://agama.buddhason.org/", desc: "巴利经藏完整中译" },
+      ],
+      manuscript: [
+        { name: "CSCD 巴利三藏电子版", url: "https://tipitaka.org/romn/", desc: "第六次结集版巴利原文" },
+        { name: "Sri Lanka Encyclopaedia of Buddhism", url: "https://www.buddhanet.net/encyclopedia.htm", desc: "斯里兰卡佛教百科" },
+        { name: "剑桥大学 巴利写本", url: "https://cudl.lib.cam.ac.uk/", desc: "馆藏巴利贝叶写本数字化" },
+      ],
+      research: [
+        { name: "巴利圣典协会 (PTS)", url: "https://palitextsociety.org/", desc: "1881年成立，巴利文本研究核心" },
+        { name: "Numata Center for Buddhist Translation", url: "https://www.bdkamerica.org/", desc: "巴利经典翻译研究" },
+        { name: "牛津巴利语-英语词典", url: "https://dsal.uchicago.edu/dictionaries/pali/", desc: "PTS 巴利词典在线版" },
+        { name: "斯坦福哲学百科 · Theravada", url: "https://plato.stanford.edu/entries/theravada/", desc: "上座部佛教学术综述" },
+      ],
+      temple: [
+        { name: "Mahavihara（大寺）", url: "https://www.anuradhapura.org/", desc: "斯里兰卡阿努拉德普勒，上座部根本道场" },
+        { name: "Wat Phra Dhammakaya", url: "https://www.dhammakaya.or.th/", desc: "泰国，大藏经数字化项目" },
+        { name: "International Meditation Centre", url: "https://www.internationalmeditationcentre.org/", desc: "缅甸，乌巴庆传承内观禅修" },
+      ],
+    },
+  },
 ];
 
 export default collections;
