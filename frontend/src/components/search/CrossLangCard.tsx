@@ -4,7 +4,7 @@ import { EyeOutlined, LinkOutlined, TranslationOutlined } from "@ant-design/icon
 import BookmarkButton from "../BookmarkButton";
 import { sanitizeHighlight } from "../../utils/sanitize";
 import { getSourceLabel, buildCbetaReadUrl } from "../../utils/sourceUrls";
-import type { SearchHit } from "../../api/client";
+import type { CrossLanguageSearchHit } from "../../api/client";
 
 const LANG_LABELS: Record<string, string> = {
   lzh: "汉文",
@@ -24,29 +24,57 @@ const LANG_COLORS: Record<string, string> = {
   sa: "green",
 };
 
-export default function ResultCard({ hit, rank }: { hit: SearchHit; rank: number }) {
+interface TitleEntry {
+  lang: string;
+  title: string;
+  highlighted?: string;
+}
+
+export default function CrossLangCard({ hit, rank }: { hit: CrossLanguageSearchHit; rank: number }) {
   const navigate = useNavigate();
   const titleHtml = hit.highlight?.title_zh?.[0] ?? hit.title_zh;
   const sourceName = hit.source_code ? getSourceLabel(hit.source_code) : null;
   const cbetaUrl = buildCbetaReadUrl(hit.cbeta_id);
   const relatedTranslations = hit.related_translations || [];
 
+  // Collect all available titles for this text
+  const titles: TitleEntry[] = [];
+  if (hit.title_en) titles.push({ lang: "en", title: hit.title_en, highlighted: hit.highlight?.title_en?.[0] });
+  if (hit.title_sa) titles.push({ lang: "sa", title: hit.title_sa, highlighted: hit.highlight?.title_sa?.[0] });
+  if (hit.title_pi) titles.push({ lang: "pi", title: hit.title_pi, highlighted: hit.highlight?.title_pi?.[0] });
+  if (hit.title_bo) titles.push({ lang: "bo", title: hit.title_bo, highlighted: hit.highlight?.title_bo?.[0] });
+
   return (
     <div className="s-card">
       <div className="s-card-rank">排序<br />#{rank}</div>
       <div className="s-card-body">
         <div className="s-card-title" dangerouslySetInnerHTML={{ __html: sanitizeHighlight(titleHtml) }} />
+        {/* Show all available titles in other languages */}
+        {titles.length > 0 && (
+          <div className="s-card-alt-titles" style={{ marginBottom: 6 }}>
+            {titles.map((t) => (
+              <div key={t.lang} style={{ fontSize: 12, color: "#6b5e4d", lineHeight: 1.6 }}>
+                <Tag color={LANG_COLORS[t.lang] || "default"} style={{ fontSize: 10, padding: "0 4px", lineHeight: "18px" }}>
+                  {LANG_LABELS[t.lang] || t.lang}
+                </Tag>
+                {t.highlighted ? (
+                  <span dangerouslySetInnerHTML={{ __html: sanitizeHighlight(t.highlighted) }} />
+                ) : (
+                  <span>{t.title}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
         <div className="s-card-tags">
           {sourceName && (
             <Tag color="volcano" style={{ fontSize: 11 }}>{sourceName}</Tag>
           )}
           <Tag style={{ fontSize: 11 }}>{hit.has_content ? "本地全文" : "目录数据"}</Tag>
           {hit.category && <Tag style={{ fontSize: 11 }}>{hit.category}</Tag>}
-          {hit.lang && hit.lang !== "lzh" && (
-            <Tag color="blue" style={{ fontSize: 11 }}>
-              {{ pi: "巴利文", en: "英文", bo: "藏文", sa: "梵文" }[hit.lang] || hit.lang}
-            </Tag>
-          )}
+          <Tag color={LANG_COLORS[hit.lang] || "default"} style={{ fontSize: 11 }}>
+            {LANG_LABELS[hit.lang] || hit.lang}
+          </Tag>
         </div>
         <div className="s-card-meta">
           {hit.translator && (
@@ -56,15 +84,10 @@ export default function ResultCard({ hit, rank }: { hit: SearchHit; rank: number
         <div className="s-card-meta">
           <span>编号: {hit.cbeta_id}</span>
         </div>
-        {hit.highlight && Object.entries(hit.highlight).filter(([k]) => k !== "title_zh").map(([field, fragments]) => (
-          <div key={field} className="s-card-preview" dangerouslySetInnerHTML={{
-            __html: sanitizeHighlight(fragments[0]),
-          }} />
-        ))}
         {relatedTranslations.length > 0 && (
           <div className="s-card-translations">
             <TranslationOutlined style={{ fontSize: 12, color: "#9a8e7a", marginRight: 4 }} />
-            <span style={{ fontSize: 12, color: "#9a8e7a", marginRight: 6 }}>其他语言版本:</span>
+            <span style={{ fontSize: 12, color: "#9a8e7a", marginRight: 6 }}>关联翻译:</span>
             {relatedTranslations.map((rt) => (
               <Tag
                 key={rt.id}

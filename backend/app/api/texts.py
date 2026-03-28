@@ -22,7 +22,9 @@ async def lookup_cbeta_ids(
     ids: str = Query(..., description="Comma-separated CBETA IDs"),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, int]:
-    """Batch lookup CBETA IDs → text IDs. Returns {cbeta_id: text_id} for found entries."""
+    """Batch lookup CBETA IDs to internal text IDs. Returns {cbeta_id: text_id} for found entries.
+
+    批量将 CBETA 编号映射到系统内部 ID。"""
     cbeta_ids = [s.strip() for s in ids.split(",") if s.strip()][:500]
     if not cbeta_ids:
         return {}
@@ -50,7 +52,9 @@ class SimilarPassagesResponse(BaseModel):
 
 @router.get("/texts/{text_id}", response_model=TextResponseBase)
 async def get_text(text_id: int, db: AsyncSession = Depends(get_db)):
-    """获取经典详情。"""
+    """Get text metadata by ID, including title, translator, dynasty, and source.
+
+    获取经典详情（标题、译者、朝代、数据源等元数据）。"""
     text = await get_text_by_id(db, text_id)
     if not text:
         raise TextNotFoundError(text_id=text_id)
@@ -59,7 +63,9 @@ async def get_text(text_id: int, db: AsyncSession = Depends(get_db)):
 
 @router.get("/texts/{text_id}/juans", response_model=JuanListResponse)
 async def list_juans(text_id: int, db: AsyncSession = Depends(get_db)):
-    """获取经典的卷列表。"""
+    """List all juan (scrolls/fascicles) of a text.
+
+    获取经典的卷列表。"""
     result = await get_juan_list(db, text_id)
     if result is None:
         raise TextNotFoundError(text_id=text_id)
@@ -68,7 +74,9 @@ async def list_juans(text_id: int, db: AsyncSession = Depends(get_db)):
 
 @router.get("/texts/{text_id}/juans/{juan_num}/languages", response_model=JuanLanguagesResponse)
 async def juan_languages(text_id: int, juan_num: int, db: AsyncSession = Depends(get_db)):
-    """获取某卷的可用语言列表。"""
+    """Get available language versions for a specific juan.
+
+    获取某卷的可用语言列表。"""
     result = await get_juan_languages(db, text_id, juan_num)
     if result is None:
         raise TextNotFoundError(text_id=text_id)
@@ -83,7 +91,9 @@ async def read_juan(
     db: AsyncSession = Depends(get_db),
     user: User | None = Depends(get_optional_user),
 ):
-    """获取经典某一卷的内容。登录用户自动记录阅读历史。"""
+    """Read the content of a specific juan. Reading history is recorded for authenticated users.
+
+    获取经典某一卷的内容。登录用户自动记录阅读历史。"""
     result = await get_juan_content(db, text_id, juan_num, lang=lang)
     if result is None:
         raise TextNotFoundError(text_id=text_id)
@@ -106,7 +116,9 @@ async def read_juan(
 
 @router.get("/stats")
 async def stats(db: AsyncSession = Depends(get_db)):
-    """获取平台统计数据。"""
+    """Get platform-wide statistics (total text count).
+
+    获取平台统计数据。"""
     count = await get_text_count(db)
     return {"total_texts": count}
 
@@ -119,7 +131,9 @@ async def similar_passages(
     min_score: float = Query(0.7, ge=0.0, le=1.0),
     db: AsyncSession = Depends(get_db),
 ):
-    """基于 pgvector 语义相似度，查找其他经典中的相似段落。"""
+    """Find semantically similar passages in other texts using pgvector embeddings.
+
+    基于 pgvector 语义相似度，查找其他经典中的相似段落。"""
     # 1. Get the average embedding for this juan's chunks
     raw_conn = await db.connection()
     avg_result = await raw_conn.exec_driver_sql(

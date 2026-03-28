@@ -27,7 +27,9 @@ async def search_dictionary(
     size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    """搜索佛学辞典词条（词头 + 释义 + 读音），支持简繁互搜。"""
+    """Search Buddhist dictionary entries by headword, definition, or reading. Supports simplified/traditional Chinese interconversion.
+
+    搜索佛学辞典词条（词头 + 释义 + 读音），支持简繁互搜。"""
     variants = _zh_variants(q)
     # Build OR conditions for all variants (simplified + traditional)
     conditions = []
@@ -83,7 +85,9 @@ async def search_dictionary(
 
 @router.get("/{entry_id}")
 async def get_entry(entry_id: int, db: AsyncSession = Depends(get_db)):
-    """获取辞典词条详情。"""
+    """Get full dictionary entry details including definition, reading, and source.
+
+    获取辞典词条详情。"""
     result = await db.execute(
         select(DictionaryEntry)
         .options(joinedload(DictionaryEntry.source))

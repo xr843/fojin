@@ -9,7 +9,7 @@ elasticsearch[async]==8.17.0
 redis[hiredis]==5.2.1
 httpx==0.28.1
 PyJWT==2.12.1
-cryptography==46.0.5
+cryptography==46.0.6
 bcrypt==4.1.1
 defusedxml==0.7.1
 lxml==5.3.0

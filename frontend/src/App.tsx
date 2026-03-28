@@ -26,6 +26,7 @@ const ParallelReaderPage = lazy(() => import("./pages/ParallelReaderPage"));
 const KnowledgeGraphPage = lazy(() => import("./pages/KnowledgeGraphPage"));
 const ManuscriptViewerPage = lazy(() => import("./pages/ManuscriptViewerPage"));
 const ChatPage = lazy(() => import("./pages/ChatPage"));
+const SutraLandingPage = lazy(() => import("./pages/SutraLandingPage"));
 const ExportsPage = lazy(() => import("./pages/ExportsPage"));
 const CollectionsPage = lazy(() => import("./pages/CollectionsPage"));
 const AdminSuggestionsPage = lazy(() => import("./pages/AdminSuggestionsPage"));
@@ -62,6 +63,7 @@ function App() {
             <Route path="/texts/:id/read" element={<TextReaderPage />} />
             <Route path="/sources" element={<SourcesPage />} />
             <Route path="/collections" element={<CollectionsPage />} />
+            <Route path="/sutras/:slug" element={<SutraLandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/chat" element={<RouteErrorBoundary><ChatPage /></RouteErrorBoundary>} />
             <Route element={<ProtectedRoute />}>

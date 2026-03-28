@@ -20,6 +20,17 @@ STATIC_PAGES = [
     ("/collections", "weekly", "0.7"),
     ("/kg", "weekly", "0.7"),
     ("/chat", "weekly", "0.6"),
+    # Sutra landing pages
+    ("/sutras/heart-sutra", "monthly", "0.9"),
+    ("/sutras/diamond-sutra", "monthly", "0.9"),
+    ("/sutras/lotus-sutra", "monthly", "0.9"),
+    ("/sutras/avatamsaka-sutra", "monthly", "0.9"),
+    ("/sutras/shurangama-sutra", "monthly", "0.9"),
+    ("/sutras/amitabha-sutra", "monthly", "0.9"),
+    ("/sutras/ksitigarbha-sutra", "monthly", "0.9"),
+    ("/sutras/medicine-buddha-sutra", "monthly", "0.9"),
+    ("/sutras/platform-sutra", "monthly", "0.9"),
+    ("/sutras/vimalakirti-sutra", "monthly", "0.9"),
 ]
 
 

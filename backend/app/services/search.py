@@ -1,11 +1,131 @@
 import logging
+from collections import defaultdict
 
 from elasticsearch import AsyncElasticsearch
+from sqlalchemy import or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.elasticsearch import CONTENT_INDEX_NAME, INDEX_NAME
-from app.schemas.text import SearchHit, SearchResponse
+from app.models.relation import TextRelation
+from app.models.text import BuddhistText
+from app.schemas.text import (
+    CrossLanguageSearchHit,
+    CrossLanguageSearchResponse,
+    RelatedTranslation,
+    SearchHit,
+    SearchResponse,
+)
 
 logger = logging.getLogger(__name__)
+
+
+# Language code to primary title field mapping
+_LANG_TITLE_MAP = {
+    "lzh": "title_zh", "zh": "title_zh",
+    "en": "title_en",
+    "sa": "title_sa",
+    "pi": "title_pi",
+    "bo": "title_bo",
+}
+
+
+async def fetch_related_translations(
+    db: AsyncSession,
+    text_ids: list[int],
+) -> dict[int, list[RelatedTranslation]]:
+    """Batch-fetch related translations for a list of text IDs.
+
+    Returns a dict mapping text_id -> list of RelatedTranslation.
+    Only includes parallel and alt_translation relations.
+    """
+    if not text_ids:
+        return {}
+
+    # Query text_relations for all text_ids at once
+    stmt = (
+        select(TextRelation)
+        .where(
+            or_(
+                TextRelation.text_a_id.in_(text_ids),
+                TextRelation.text_b_id.in_(text_ids),
+            ),
+            TextRelation.relation_type.in_(["parallel", "alt_translation"]),
+        )
+    )
+    result = await db.execute(stmt)
+    relations = result.scalars().all()
+
+    if not relations:
+        return {}
+
+    # Collect all related text IDs we need metadata for
+    related_ids: set[int] = set()
+    for rel in relations:
+        related_ids.add(rel.text_a_id)
+        related_ids.add(rel.text_b_id)
+    # Fetch metadata for all related texts (including those in text_ids,
+    # so cross-references between search results are preserved)
+    meta_stmt = (
+        select(
+            BuddhistText.id,
+            BuddhistText.title_zh,
+            BuddhistText.title_en,
+            BuddhistText.title_sa,
+            BuddhistText.title_pi,
+            BuddhistText.title_bo,
+            BuddhistText.lang,
+        )
+        .where(BuddhistText.id.in_(related_ids))
+    )
+    meta_result = await db.execute(meta_stmt)
+    meta_map: dict[int, dict] = {}
+    for row in meta_result.all():
+        meta_map[row.id] = {
+            "id": row.id,
+            "title_zh": row.title_zh,
+            "title_en": row.title_en,
+            "title_sa": row.title_sa,
+            "title_pi": row.title_pi,
+            "title_bo": row.title_bo,
+            "lang": row.lang,
+        }
+
+    # Build the result mapping
+    result_map: dict[int, list[RelatedTranslation]] = defaultdict(list)
+    seen: dict[int, set[int]] = defaultdict(set)  # prevent duplicates
+
+    for rel in relations:
+        for tid in text_ids:
+            if rel.text_a_id == tid:
+                other_id = rel.text_b_id
+            elif rel.text_b_id == tid:
+                other_id = rel.text_a_id
+            else:
+                continue
+
+            if other_id in seen[tid]:
+                continue
+            seen[tid].add(other_id)
+
+            meta = meta_map.get(other_id)
+            if not meta:
+                continue
+
+            # Pick the best title for the related text
+            lang = meta["lang"]
+            title_field = _LANG_TITLE_MAP.get(lang, "title_zh")
+            title = meta.get(title_field) or meta.get("title_zh") or ""
+
+            result_map[tid].append(
+                RelatedTranslation(
+                    id=other_id,
+                    title=title,
+                    lang=lang,
+                    relation_type=rel.relation_type,
+                )
+            )
+
+    return dict(result_map)
 
 
 async def search_texts(
@@ -18,6 +138,7 @@ async def search_texts(
     lang: str | None = None,
     sources: str | None = None,
     sort: str | None = None,
+    db: AsyncSession | None = None,
 ) -> SearchResponse:
     """Search Buddhist texts in Elasticsearch."""
     must = []
@@ -120,6 +241,13 @@ async def search_texts(
     suggestion = None
     if query and total < 3:
         suggestion = await _get_phrase_suggestion(es, query)
+
+    # Enrich with related translations if db session is available
+    if db and results:
+        text_ids = [r.id for r in results]
+        rel_map = await fetch_related_translations(db, text_ids)
+        for r in results:
+            r.related_translations = rel_map.get(r.id, [])
 
     return SearchResponse(total=total, page=page, size=size, results=results, suggestion=suggestion)
 
@@ -316,6 +444,126 @@ async def get_suggestions(es: AsyncElasticsearch, query: str, size: int = 5) -> 
     except Exception:
         logger.debug("Autocomplete suggestions failed for query=%s", query, exc_info=True)
         return []
+
+
+async def search_cross_language(
+    es: AsyncElasticsearch,
+    query: str,
+    page: int = 1,
+    size: int = 20,
+    dynasty: str | None = None,
+    category: str | None = None,
+    sources: str | None = None,
+    db: AsyncSession | None = None,
+) -> CrossLanguageSearchResponse:
+    """Cross-language search: search across ALL title fields simultaneously.
+
+    For each result, fetches related translations and groups them together.
+    """
+    must = []
+    filter_clauses: list[dict] = []
+
+    if query:
+        must.append(
+            {
+                "multi_match": {
+                    "query": query,
+                    "fields": [
+                        "title_zh^3",
+                        "title_en^2",
+                        "title_sa^2",
+                        "title_bo^2",
+                        "title_pi^2",
+                        "translator^1",
+                        "cbeta_id^4",
+                        "taisho_id^4",
+                    ],
+                    "type": "best_fields",
+                    "fuzziness": "AUTO",
+                }
+            }
+        )
+    else:
+        must.append({"match_all": {}})
+
+    if dynasty:
+        filter_clauses.append({"term": {"dynasty": dynasty}})
+    if category:
+        filter_clauses.append({"term": {"category": category}})
+    if sources:
+        codes = [c.strip() for c in sources.split(",") if c.strip()]
+        if len(codes) == 1:
+            filter_clauses.append({"term": {"source_code": codes[0]}})
+        elif codes:
+            filter_clauses.append({"terms": {"source_code": codes}})
+
+    body = {
+        "query": {
+            "bool": {
+                "must": must,
+                "filter": filter_clauses,
+            }
+        },
+        "highlight": {
+            "fields": {
+                "title_zh": {},
+                "title_en": {},
+                "title_sa": {},
+                "title_pi": {},
+                "title_bo": {},
+                "translator": {},
+            },
+            "pre_tags": ["<em>"],
+            "post_tags": ["</em>"],
+        },
+        "from": (page - 1) * size,
+        "size": size,
+    }
+
+    result = await es.search(index=INDEX_NAME, body=body, timeout="10s")
+
+    hits = result["hits"]
+    total = hits["total"]["value"]
+
+    results = []
+    for hit in hits["hits"]:
+        src = hit["_source"]
+        results.append(
+            CrossLanguageSearchHit(
+                id=src.get("id") or int(hit["_id"]),
+                taisho_id=src.get("taisho_id"),
+                cbeta_id=src["cbeta_id"],
+                title_zh=src["title_zh"],
+                title_en=src.get("title_en"),
+                title_sa=src.get("title_sa"),
+                title_pi=src.get("title_pi"),
+                title_bo=src.get("title_bo"),
+                translator=src.get("translator"),
+                dynasty=src.get("dynasty"),
+                category=src.get("category"),
+                cbeta_url=src.get("cbeta_url"),
+                has_content=src.get("has_content", False),
+                source_code=src.get("source_code"),
+                lang=src.get("lang", "lzh"),
+                score=hit["_score"],
+                highlight=hit.get("highlight"),
+            )
+        )
+
+    # Enrich with related translations
+    if db and results:
+        text_ids = [r.id for r in results]
+        rel_map = await fetch_related_translations(db, text_ids)
+        for r in results:
+            r.related_translations = rel_map.get(r.id, [])
+
+    suggestion = None
+    if query and total < 3:
+        suggestion = await _get_phrase_suggestion(es, query)
+
+    return CrossLanguageSearchResponse(
+        total=total, page=page, size=size, results=results, suggestion=suggestion,
+    )
 
 
 async def get_aggregations(es: AsyncElasticsearch) -> dict:

@@ -30,6 +30,9 @@ async def search_kg_entities(
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
 ):
+    """Search knowledge graph entities (people, texts, schools, concepts) by name.
+
+    搜索知识图谱实体（人物、经典、宗派、概念）。"""
     entities, total = await search_entities(
         db, q, entity_type, limit, offset, has_relations=has_relations
     )
@@ -41,6 +44,9 @@ async def search_kg_entities(
 
 @router.get("/entities/{entity_id}", response_model=KGEntityDetailResponse)
 async def get_kg_entity(entity_id: int, db: AsyncSession = Depends(get_db)):
+    """Get entity details with all its relations.
+
+    获取实体详情及其所有关系。"""
     entity = await get_entity(db, entity_id)
     if not entity:
         raise KGEntityNotFoundError(entity_id=entity_id)
@@ -59,6 +65,9 @@ async def get_kg_entity_graph(
     predicates: str | None = Query(None, description="Comma-separated predicate filter"),
     db: AsyncSession = Depends(get_db),
 ):
+    """Get a subgraph centered on an entity, with configurable depth and predicate filtering.
+
+    获取以某实体为中心的子图，可配置遍历深度和谓词过滤。"""
     entity = await get_entity(db, entity_id)
     if not entity:
         raise KGEntityNotFoundError(entity_id=entity_id)
@@ -69,10 +78,16 @@ async def get_kg_entity_graph(
 
 @router.get("/stats")
 async def kg_stats(db: AsyncSession = Depends(get_db)):
+    """Get knowledge graph statistics (entity and relation counts by type).
+
+    获取知识图谱统计信息（各类型实体与关系数量）。"""
     return await get_kg_stats(db)
 
 
 @router.get("/texts/{text_id}/entities", response_model=list[KGEntityResponse])
 async def list_text_entities(text_id: int, db: AsyncSession = Depends(get_db)):
+    """List all knowledge graph entities linked to a specific text.
+
+    列出与指定经文关联的所有知识图谱实体。"""
     entities = await get_text_entities(db, text_id)
     return [KGEntityResponse.model_validate(e) for e in entities]

@@ -64,6 +64,9 @@ def mock_es():
 @pytest_asyncio.fixture
 async def client(mock_es):
     """Async HTTP client with mocked ES (patched at each consumer module)."""
+    async def mock_get_db():
+        yield None
+
     with patch("app.api.search.get_es", return_value=mock_es), \
          patch("app.core.elasticsearch.init_es", new_callable=AsyncMock), \
          patch("app.core.elasticsearch.close_es", new_callable=AsyncMock), \
@@ -74,6 +77,9 @@ async def client(mock_es):
         mock_redis_mod.from_url.return_value = mock_redis
 
         from app.main import app
+        from app.database import get_db
+        app.dependency_overrides[get_db] = mock_get_db
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             yield ac
+        app.dependency_overrides.pop(get_db, None)

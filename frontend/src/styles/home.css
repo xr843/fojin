@@ -242,6 +242,17 @@
   background: #fff;
 }
 
+/* ---------- 热门经典标签 ---------- */
+.home-popular-sutras {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 40px;
+  max-width: 780px;
+}
+
 /* ---------- 注册提示条 ---------- */
 .home-tip {
   display: flex;
