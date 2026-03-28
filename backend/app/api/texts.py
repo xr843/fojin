@@ -2,17 +2,34 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_optional_user
 from app.core.exceptions import TextNotFoundError
 from app.database import get_db
+from app.models.text import Text
 from app.models.user import ReadingHistory, User
 from app.schemas.text import JuanContentResponse, JuanLanguagesResponse, JuanListResponse, TextResponseBase
 from app.services.content import get_juan_content, get_juan_languages, get_juan_list
 from app.services.text import get_text_by_id, get_text_count
 
 router = APIRouter(tags=["texts"])
+
+
+@router.get("/texts/lookup-cbeta")
+async def lookup_cbeta_ids(
+    ids: str = Query(..., description="Comma-separated CBETA IDs"),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, int]:
+    """Batch lookup CBETA IDs → text IDs. Returns {cbeta_id: text_id} for found entries."""
+    cbeta_ids = [s.strip() for s in ids.split(",") if s.strip()][:500]
+    if not cbeta_ids:
+        return {}
+    result = await db.execute(
+        select(Text.cbeta_id, Text.id).where(Text.cbeta_id.in_(cbeta_ids))
+    )
+    return dict(result.all())
 
 
 class SimilarPassageItem(BaseModel):
