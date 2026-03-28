@@ -352,6 +352,8 @@
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+  position: relative;
+  z-index: 20;
 }
 
 .src-panel-header {
