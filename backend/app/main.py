@@ -67,11 +67,165 @@ async def lifespan(app: FastAPI):
     await close_es()
 
 
+_API_DESCRIPTION = """\
+**FoJin (佛津)** is a Buddhist digital text platform aggregating scriptures,
+translations, dictionaries, and scholarly resources from across the world.
+
+## Overview / 概览
+
+| Metric | Value |
+|--------|-------|
+| Texts / 经文 | 9,200+ across Mahayana, Theravada, Vajrayana traditions |
+| Data sources / 数据源 | 500+ curated sources |
+| Languages / 语言 | 30+ including Classical Chinese (lzh), Pali, Sanskrit, Tibetan, English |
+| Dictionaries / 辞典 | 6 dictionaries, 285,000+ entries |
+| AI Q&A / AI 问答 | RAG-powered Buddhist studies assistant |
+| Knowledge Graph / 知识图谱 | Entities, relations, and graph traversal |
+
+## Core Features / 核心功能
+
+- **Full-text search** with faceted filtering by dynasty, language, category, and source
+- **Content search** across scripture bodies with keyword highlighting
+- **Parallel reading** for comparing translations side by side
+- **AI chat** with Retrieval-Augmented Generation grounded in canonical texts
+- **Knowledge graph** exploring relationships between people, texts, schools, and concepts
+- **IIIF manifests** for interoperable image delivery
+- **Citation export** in BibTeX, RIS, and Chicago formats
+- **RSS & Sitemap** for syndication and SEO
+
+## Data Attribution / 数据致谢
+
+FoJin aggregates data from the following scholarly sources.
+All data is used in compliance with its respective license.
+
+| Source | License | Note |
+|--------|---------|------|
+| **[CBETA 中华电子佛典协会](https://www.cbeta.org/)** | CC BY-NC-SA 4.0 | 经文数据由 CBETA 中华电子佛典协会提供 / Buddhist text data provided by CBETA |
+| **[SuttaCentral](https://suttacentral.net/)** | CC0 1.0 | Early Buddhist texts and translations |
+| **[84000](https://read.84000.co/)** | CC BY-NC-ND 3.0 | Translating the Words of the Buddha |
+| **[GRETIL](http://gretil.sub.uni-goettingen.de/)** | Academic use | Goettingen Register of Electronic Texts in Indian Languages |
+| **[DILA 法鼓佛教学院](https://www.dila.edu.tw/)** | Various | Buddhist authority databases and dictionaries |
+| Other sources | Various | See `/api/sources` for full list with individual licenses |
+
+## Rate Limits / 请求频率限制
+
+| Scope | Limit |
+|-------|-------|
+| Global / 全局 | 200 requests / minute |
+| Search / 搜索 | 60 requests / minute |
+| Content search / 全文搜索 | 30 requests / minute |
+
+Exceeding these limits returns HTTP 429. Include an `Authorization` header for higher quotas.
+
+## Authentication / 认证
+
+Most read endpoints are public. Write operations (bookmarks, annotations, chat history)
+require a JWT Bearer token obtained via `/api/auth/login`.
+"""
+
+_OPENAPI_TAGS = [
+    {
+        "name": "search",
+        "description": "Text search, content search, suggestions, and filters / 经文搜索、全文搜索、搜索建议与筛选项",
+    },
+    {
+        "name": "texts",
+        "description": "Buddhist text metadata and juan (scroll) content retrieval / 经文元数据与卷内容读取",
+    },
+    {
+        "name": "dictionary",
+        "description": "Buddhist dictionary lookup across 6 dictionaries with 285,000+ entries / 佛学辞典检索（六部辞典，28.5万+词条）",
+    },
+    {
+        "name": "knowledge-graph",
+        "description": "Knowledge graph: entities, relations, and graph traversal / 知识图谱：实体、关系与图遍历",
+    },
+    {
+        "name": "chat",
+        "description": "AI Q&A powered by RAG over canonical Buddhist texts / AI 问答（基于经文的检索增强生成）",
+    },
+    {
+        "name": "relations",
+        "description": "Text relations and parallel reading / 经文关系与平行对读",
+    },
+    {
+        "name": "sources",
+        "description": "Data source metadata, statistics, and distribution channels / 数据源信息、统计与发行渠道",
+    },
+    {
+        "name": "citations",
+        "description": "Academic citation generation (BibTeX, RIS, Chicago) / 学术引用导出",
+    },
+    {
+        "name": "auth",
+        "description": "User authentication and account management / 用户认证与账户管理",
+    },
+    {
+        "name": "bookmarks",
+        "description": "Personal bookmarks and collections / 个人书签与收藏",
+    },
+    {
+        "name": "history",
+        "description": "Reading history tracking / 阅读历史记录",
+    },
+    {
+        "name": "annotations",
+        "description": "Text annotations and highlights / 经文批注与标记",
+    },
+    {
+        "name": "exports",
+        "description": "Export texts in PDF, EPUB, and other formats / 导出经文为 PDF、EPUB 等格式",
+    },
+    {
+        "name": "iiif",
+        "description": "IIIF manifests for interoperable image delivery / IIIF 标准图像清单",
+    },
+    {
+        "name": "stats",
+        "description": "Platform statistics and timeline data / 平台统计数据与时间线",
+    },
+    {
+        "name": "dianjin",
+        "description": "Dianjin (典津) cross-platform ancient text federated search / 典津跨平台古籍联合检索",
+    },
+    {
+        "name": "source-suggestions",
+        "description": "Community-submitted data source suggestions / 社区数据源推荐",
+    },
+    {
+        "name": "feedbacks",
+        "description": "User feedback submission and management / 用户反馈",
+    },
+    {
+        "name": "notifications",
+        "description": "User notification management / 用户通知管理",
+    },
+    {
+        "name": "admin",
+        "description": "Admin dashboard and management (requires admin role) / 管理后台（需管理员权限）",
+    },
+    {
+        "name": "sitemap",
+        "description": "Dynamic XML sitemap for SEO / SEO 动态站点地图",
+    },
+    {
+        "name": "rss",
+        "description": "RSS 2.0 feed for recently added texts / RSS 订阅最新经文",
+    },
+]
+
 app = FastAPI(
-    title="佛津 FoJin API",
-    description="全球佛教古籍数字资源聚合平台",
+    title="FoJin API — Buddhist Digital Text Platform",
+    description=_API_DESCRIPTION,
     version="3.0.0",
     lifespan=lifespan,
+    license_info={
+        "name": "Apache 2.0",
+        "url": "https://www.apache.org/licenses/LICENSE-2.0",
+    },
+    openapi_tags=_OPENAPI_TAGS,
+    docs_url="/docs",
+    redoc_url="/redoc",
 )
 
 _cors_origins = os.environ.get(

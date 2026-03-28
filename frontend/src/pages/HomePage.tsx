@@ -10,6 +10,7 @@ import {
   ApartmentOutlined,
   RobotOutlined,
   BookOutlined,
+  ReadOutlined,
 } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { InfoCircleOutlined, CloseOutlined } from "@ant-design/icons";
@@ -17,6 +18,7 @@ import SourceSelector from "../components/SourceSelector";
 import { getStats, getSources, getFilters } from "../api/client";
 import { getLangName } from "../utils/sourceUrls";
 import { useAuthStore } from "../stores/authStore";
+import { popularSutras } from "../data/popularSutras";
 import "../styles/home.css"; // mobile-responsive v2.1
 
 export default function HomePage() {
@@ -177,6 +179,19 @@ export default function HomePage() {
             <div className="home-feature-title">{t("home.feature_collections_title")}</div>
             <div className="home-feature-desc">{t("home.feature_collections_desc")}</div>
           </div>
+        </div>
+
+        <div className="home-popular-sutras">
+          <span className="home-hot-label"><ReadOutlined /> 热门经典</span>
+          {popularSutras.map((s) => (
+            <button
+              key={s.slug}
+              className="home-hot-tag"
+              onClick={() => navigate(`/sutras/${s.slug}`)}
+            >
+              {s.title_zh}
+            </button>
+          ))}
         </div>
 
         <div className="home-trust">

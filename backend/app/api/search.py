@@ -6,8 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.elasticsearch import get_es
 from app.database import get_db
-from app.schemas.text import SearchResponse
-from app.services.search import get_aggregations, get_suggestions, search_content, search_texts
+from app.schemas.text import CrossLanguageSearchResponse, SearchResponse
+from app.services.search import get_aggregations, get_suggestions, search_content, search_cross_language, search_texts
 
 try:
     from app.schemas.dianjin import FederatedSearchResponse
@@ -29,20 +29,42 @@ async def search(
     lang: str | None = Query(None, description="语言筛选 (lzh/pi/sa/bo/en)"),
     sources: str | None = Query(None, description="数据源筛选，逗号分隔 (cbeta,suttacentral,gretil)"),
     sort: str | None = Query(None, description="排序方式 (relevance/title/dynasty)"),
+    db: AsyncSession = Depends(get_db),
 ):
-    """搜索佛教典籍。支持经名、编号、译者等多字段搜索，可按语言和数据源筛选。"""
+    """Search Buddhist texts by title, ID, translator, etc. with faceted filtering.
+
+    搜索佛教典籍。支持经名、编号、译者等多字段搜索，可按朝代、分类、语言和数据源筛选。"""
     es = get_es()
-    return await search_texts(es, q, page, size, dynasty, category, lang, sources, sort)
+    return await search_texts(es, q, page, size, dynasty, category, lang, sources, sort, db=db)
 
 
 @router.get("/search/suggest")
 async def search_suggest(
     q: str = Query(..., min_length=1, max_length=200, description="搜索建议关键词"),
 ):
-    """根据输入返回搜索建议（自动补全）。"""
+    """Return search suggestions (autocomplete) based on input.
+
+    根据输入返回搜索建议（自动补全）。"""
     es = get_es()
     suggestions = await get_suggestions(es, q)
     return {"suggestions": suggestions}
+
+
+@router.get("/search/cross-language", response_model=CrossLanguageSearchResponse)
+async def cross_language_search(
+    q: str = Query("", max_length=200, description="搜索关键词"),
+    page: int = Query(1, ge=1, description="页码"),
+    size: int = Query(20, ge=1, le=100, description="每页数量"),
+    dynasty: str | None = Query(None, description="朝代筛选"),
+    category: str | None = Query(None, description="分类筛选"),
+    sources: str | None = Query(None, description="数据源筛选，逗号分隔"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Cross-language search across all title fields (zh, en, sa, pi, bo).
+
+    跨语言搜索：同时搜索所有语种标题字段，自动获取相关翻译版本，按"作品族"分组展示。"""
+    es = get_es()
+    return await search_cross_language(es, q, page, size, dynasty, category, sources, db=db)
 
 
 @router.get("/search/content")
@@ -53,7 +75,9 @@ async def content_search(
     sources: str | None = Query(None, description="数据源筛选，逗号分隔"),
     lang: str | None = Query(None, description="语言筛选 (lzh/pi/en)"),
 ):
-    """全文内容搜索。搜索经文正文并高亮显示。"""
+    """Full-text content search across scripture bodies with keyword highlighting.
+
+    全文内容搜索。搜索经文正文并高亮显示匹配段落。Rate limit: 30/min."""
     es = get_es()
     return await search_content(es, q, page, size, sources, lang)
 
@@ -62,7 +86,9 @@ _filters_cache: dict = {"data": None, "expires": 0}
 
 @router.get("/filters")
 async def filters(db: AsyncSession = Depends(get_db)):
-    """获取可用的筛选选项（朝代、分类、语言、数据源）。缓存 5 分钟。"""
+    """Get available filter facets (dynasty, category, language, source). Cached for 5 minutes.
+
+    获取可用的筛选选项（朝代、分类、语言、数据源）。缓存 5 分钟。"""
     if _filters_cache["data"] and time.time() < _filters_cache["expires"]:
         return _filters_cache["data"]
     es = get_es()
@@ -103,7 +129,9 @@ if _HAS_DIANJIN:
         sources: str | None = Query(None, description="数据源筛选"),
         include_dianjin: bool = Query(True, description="是否包含典津结果"),
     ):
-        """联合检索：同时搜索本地数据库和典津跨平台古籍资源。"""
+        """Federated search across local database and Dianjin cross-platform ancient text resources.
+
+        联合检索：同时搜索本地数据库和典津跨平台古籍资源。"""
         es = get_es()
 
         # Build coroutines

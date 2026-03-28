@@ -37,6 +37,13 @@ api.interceptors.response.use(
   },
 );
 
+export interface RelatedTranslation {
+  id: number;
+  title: string;
+  lang: string;
+  relation_type: string;
+}
+
 export interface SearchHit {
   id: number;
   taisho_id: string | null;
@@ -51,6 +58,7 @@ export interface SearchHit {
   lang: string | null;
   score: number | null;
   highlight: Record<string, string[]> | null;
+  related_translations: RelatedTranslation[];
 }
 
 export interface SearchResponse {
@@ -58,6 +66,35 @@ export interface SearchResponse {
   page: number;
   size: number;
   results: SearchHit[];
+  suggestion?: string | null;
+}
+
+export interface CrossLanguageSearchHit {
+  id: number;
+  taisho_id: string | null;
+  cbeta_id: string;
+  title_zh: string;
+  title_en: string | null;
+  title_sa: string | null;
+  title_pi: string | null;
+  title_bo: string | null;
+  translator: string | null;
+  dynasty: string | null;
+  category: string | null;
+  cbeta_url: string | null;
+  has_content: boolean;
+  source_code: string | null;
+  lang: string;
+  score: number | null;
+  highlight: Record<string, string[]> | null;
+  related_translations: RelatedTranslation[];
+}
+
+export interface CrossLanguageSearchResponse {
+  total: number;
+  page: number;
+  size: number;
+  results: CrossLanguageSearchHit[];
   suggestion?: string | null;
 }
 
@@ -329,6 +366,18 @@ export async function searchTexts(params: {
   lang?: string;
 }): Promise<SearchResponse> {
   const { data } = await api.get<SearchResponse>("/search", { params });
+  return data;
+}
+
+export async function searchCrossLanguage(params: {
+  q: string;
+  page?: number;
+  size?: number;
+  dynasty?: string;
+  category?: string;
+  sources?: string;
+}): Promise<CrossLanguageSearchResponse> {
+  const { data } = await api.get<CrossLanguageSearchResponse>("/search/cross-language", { params });
   return data;
 }
 

@@ -7,12 +7,12 @@ import {
   Pagination, Empty, Checkbox, Input, Tag, Button, Tabs, Result, Select, Typography, Skeleton, AutoComplete,
 } from "antd";
 import {
-  SearchOutlined, BookOutlined, VerticalAlignTopOutlined,
+  SearchOutlined, BookOutlined, VerticalAlignTopOutlined, TranslationOutlined,
 } from "@ant-design/icons";
-import { searchTexts, searchContent, searchDictionary, getSources, getSearchSuggestions } from "../api/client";
+import { searchTexts, searchContent, searchDictionary, searchCrossLanguage, getSources, getSearchSuggestions } from "../api/client";
 import { hasDirectSearchUrl } from "../utils/sourceUrls";
 import { addSearchHistory, getSearchHistory, type SearchHistoryItem } from "../utils/history";
-import { ResultCard, ExternalCard, DictCard, ContentCard } from "../components/search";
+import { ResultCard, ExternalCard, DictCard, ContentCard, CrossLangCard } from "../components/search";
 import "../styles/search.css";
 import "../styles/sources.css";
 
@@ -104,6 +104,12 @@ export default function SearchPage() {
     enabled: query.length > 0 && tab === "dictionary",
   });
 
+  const { data: crossLangData, isLoading: crossLangLoading } = useQuery({
+    queryKey: ["searchCrossLang", query, page, dynasty, category, selectedSources],
+    queryFn: () => searchCrossLanguage({ q: query, page, size: 20, dynasty, category, sources: selectedSources || undefined }),
+    enabled: query.length > 0 && tab === "crosslang",
+  });
+
   const { data: sources } = useQuery({ queryKey: ["sources"], queryFn: getSources });
 
   const handleSearch = (value: string) => {
@@ -183,8 +189,8 @@ export default function SearchPage() {
     setInstitutionFilter(next);
   };
 
-  const loading = tab === "catalog" ? isLoading : tab === "content" ? contentLoading : dictLoading;
-  const localTotal = tab === "catalog" ? (data?.total || 0) : tab === "content" ? (contentData?.total || 0) : (dictData?.total || 0);
+  const loading = tab === "catalog" ? isLoading : tab === "content" ? contentLoading : tab === "crosslang" ? crossLangLoading : dictLoading;
+  const localTotal = tab === "catalog" ? (data?.total || 0) : tab === "content" ? (contentData?.total || 0) : tab === "crosslang" ? (crossLangData?.total || 0) : (dictData?.total || 0);
   const extTotal = query.length > 0 ? filteredExtSources.length : 0;
 
   const sortedRegions = useMemo(() => {
@@ -257,6 +263,7 @@ export default function SearchPage() {
           items={[
             { key: "catalog", label: "经典检索" },
             { key: "content", label: "全文检索" },
+            { key: "crosslang", label: <><TranslationOutlined /> 跨语言搜索</> },
             { key: "dictionary", label: <><BookOutlined /> 辞典检索</> },
           ]}
           size="small"
@@ -266,6 +273,8 @@ export default function SearchPage() {
             ? "按经名、译者、编号检索经典目录"
             : tab === "content"
             ? "在经文正文中检索关键词"
+            : tab === "crosslang"
+            ? "同时搜索所有语种标题，自动关联翻译版本"
             : "在 393,624 条多语种辞典词条中检索词头与释义"}
         </div>
       </div>
@@ -329,6 +338,8 @@ export default function SearchPage() {
                   ? <>辞典找到 <strong>{localTotal.toLocaleString()}</strong> 条词条</>
                   : tab === "content"
                   ? <>在 <strong>{localTotal.toLocaleString()}</strong> 部经典中找到匹配（共 {(contentData?.total_juans || 0).toLocaleString()} 卷）</>
+                  : tab === "crosslang"
+                  ? <>跨语言搜索找到 <strong>{localTotal.toLocaleString()}</strong> 条结果</>
                   : <>找到 <strong>{localTotal.toLocaleString()}</strong> 条结果</>
                 }
               </span>
@@ -443,6 +454,11 @@ export default function SearchPage() {
 
             {!loading && tab === "content" && contentData && contentData.results.map((hit, i) => (
               <ContentCard key={`${hit.text_id}_${i}`} hit={hit} rank={i + 1 + (page - 1) * 20} />
+            ))}
+
+            {/* 跨语言结果 */}
+            {!loading && tab === "crosslang" && crossLangData && crossLangData.results.map((hit, i) => (
+              <CrossLangCard key={hit.id} hit={hit} rank={i + 1 + (page - 1) * 20} />
             ))}
 
             {/* 辞典结果 */}

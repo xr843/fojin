@@ -46,7 +46,9 @@ async def chat(
     user: User | None = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """发送消息并获取 AI 回答（支持 BYOK + 匿名）。"""
+    """Send a message and receive an AI answer grounded in Buddhist texts (RAG). Supports BYOK and anonymous access.
+
+    发送消息并获取基于经文的 AI 回答（支持自带 API Key 及匿名访问）。"""
     user_id = user.id if user else None
     client_ip = _get_client_ip(request) if not user else None
     redis = getattr(request.app.state, "redis", None)
@@ -60,7 +62,9 @@ async def chat_stream(
     user: User | None = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """SSE 流式发送消息并获取 AI 回答。"""
+    """Stream AI answer via Server-Sent Events (SSE). Same as POST /chat but with real-time token streaming.
+
+    SSE 流式发送消息并获取 AI 回答。"""
     user_id = user.id if user else None
     client_ip = _get_client_ip(request) if not user else None
     redis = getattr(request.app.state, "redis", None)
@@ -81,7 +85,9 @@ async def chat_quota(
     request: Request,
     user: User | None = Depends(get_optional_user),
 ):
-    """获取当前用户或匿名用户的每日问答配额。"""
+    """Get daily chat quota for the current user or anonymous visitor.
+
+    获取当前用户或匿名用户的每日问答配额。"""
     from datetime import date
 
     if user:
@@ -113,7 +119,9 @@ async def hot_questions(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """获取热门问题推荐列表。"""
+    """Get recommended hot questions for the AI Q&A feature.
+
+    获取热门问题推荐列表。"""
     redis = getattr(request.app.state, "redis", None)
     questions = await get_hot_questions(db, redis=redis)
     return {"questions": questions}
@@ -124,7 +132,9 @@ async def get_sessions(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """获取当前用户的会话列表。"""
+    """List all chat sessions for the authenticated user.
+
+    获取当前用户的会话列表。需要登录。"""
     return await list_sessions(db, user.id)
 
 
@@ -134,7 +144,9 @@ async def get_chat_session(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """获取会话详情及消息历史。"""
+    """Get session details with full message history.
+
+    获取会话详情及消息历史。"""
     cs = await get_session_for_user(db, session_id, user.id)
     msgs = await get_history(db, session_id)
     return ChatSessionResponse(
@@ -163,7 +175,9 @@ async def get_session_messages(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """分页获取会话消息（page=1 为最新消息）。"""
+    """Paginated session messages (page=1 returns the most recent messages).
+
+    分页获取会话消息（page=1 为最新消息）。"""
     await get_session_for_user(db, session_id, user.id)
     msgs, total = await get_history_paginated(db, session_id, page, min(size, 100))
     return {
@@ -191,7 +205,9 @@ async def set_message_feedback(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """对 AI 回答进行评价（点赞/点踩/取消）。"""
+    """Rate an AI response (thumbs up / thumbs down / clear).
+
+    对 AI 回答进行评价（点赞/点踩/取消）。"""
     msg = await update_message_feedback(db, message_id, user.id, data.feedback)
     return ChatMessageResponse(
         id=msg.id,
@@ -209,6 +225,8 @@ async def remove_session(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """删除会话。"""
+    """Delete a chat session and all its messages.
+
+    删除会话及其所有消息。"""
     await delete_session(db, session_id, user.id)
     return {"ok": True}

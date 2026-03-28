@@ -25,13 +25,18 @@ router = APIRouter(prefix="/sources", tags=["sources"])
 
 @router.get("", response_model=list[DataSourceResponse])
 async def list_sources(db: AsyncSession = Depends(get_db)):
+    """List all data sources with metadata, license info, and language coverage.
+
+    列出所有数据源及其元数据、许可协议和语言覆盖范围。"""
     sources = await get_all_sources(db)
     return sources
 
 
 @router.get("/stats")
 async def source_stats(db: AsyncSession = Depends(get_db)):
-    """每个数据源的文本数、内容数、字符数统计（单次聚合查询）。"""
+    """Per-source statistics: text count, content count, and character count (single aggregation query).
+
+    每个数据源的文本数、内容数、字符数统计。"""
     text_counts = (
         select(
             BuddhistText.source_id,
@@ -96,6 +101,9 @@ async def source_stats(db: AsyncSession = Depends(get_db)):
 
 @router.get("/texts/{text_id}/identifiers", response_model=list[TextIdentifierResponse])
 async def list_text_identifiers(text_id: int, db: AsyncSession = Depends(get_db)):
+    """List all cross-platform identifiers for a text (CBETA, SuttaCentral, etc.).
+
+    列出经文在各平台的标识符（CBETA、SuttaCentral 等）。"""
     identifiers = await get_text_identifiers(db, text_id)
     return [
         TextIdentifierResponse(
@@ -112,6 +120,9 @@ async def list_text_identifiers(text_id: int, db: AsyncSession = Depends(get_db)
 
 @router.get("/ingest/primary", response_model=list[SourceDistributionListResponse])
 async def list_primary_ingest_distributions(db: AsyncSession = Depends(get_db)):
+    """List primary ingest distribution channels for all active sources.
+
+    列出所有活跃数据源的主要导入分发渠道。"""
     items = await get_primary_ingest_distributions(db)
     return [
         SourceDistributionListResponse(
@@ -136,6 +147,9 @@ async def list_primary_ingest_distributions(db: AsyncSession = Depends(get_db)):
 
 @router.get("/{code}/distributions", response_model=list[SourceDistributionResponse])
 async def list_source_distributions(code: str, db: AsyncSession = Depends(get_db)):
+    """List all distribution channels for a specific data source.
+
+    列出指定数据源的所有分发渠道。"""
     source = await get_source_by_code(db, code)
     if not source:
         raise SourceNotFoundError(code)
@@ -144,6 +158,9 @@ async def list_source_distributions(code: str, db: AsyncSession = Depends(get_db
 
 @router.get("/{code}", response_model=DataSourceResponse)
 async def get_source(code: str, db: AsyncSession = Depends(get_db)):
+    """Get a single data source by its code (e.g. 'cbeta', 'suttacentral').
+
+    按代码获取单个数据源详情。"""
     source = await get_source_by_code(db, code)
     if not source:
         raise SourceNotFoundError(code)
