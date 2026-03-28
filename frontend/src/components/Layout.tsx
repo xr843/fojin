@@ -219,7 +219,8 @@ export default function Layout() {
           <Dropdown
             menu={{
               items: [
-                { key: "zh", label: "中文" },
+                { key: "zh", label: "中文简体" },
+                { key: "zh-Hant", label: "中文繁體" },
                 { key: "en", label: "English" },
                 { key: "ja", label: "日本語" },
                 { key: "ko", label: "한국어" },
