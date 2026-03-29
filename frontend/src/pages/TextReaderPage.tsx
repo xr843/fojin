@@ -92,16 +92,17 @@ function reflowText(raw: string): TextSegment[] {
     return allPuncts === 1 && line.length <= 12;
   };
 
-  let inVerseBlock = false; // true after 頌曰/偈曰 until next 論曰 or blank line
+  let inVerseBlock = false;
+  // Before the first 論曰, verse-like lines are opening verses
+  let beforeFirstProse = true;
 
   for (let i = 0; i < lines.length; i++) {
     const trimmed = lines[i].trim();
 
-    // Blank line → paragraph break, exit verse mode
+    // Blank line → paragraph break
     if (trimmed === "") {
       flushProse();
       segments.push({ type: "break" });
-      // Don't reset inVerseBlock on blank lines within verse blocks
       continue;
     }
 
@@ -110,41 +111,35 @@ function reflowText(raw: string): TextSegment[] {
     const isProseMarker = /^(論曰|述曰|疏曰|解曰|釋曰)/.test(trimmed);
 
     if (isProseMarker) {
+      beforeFirstProse = false;
       inVerseBlock = false;
       if (proseBuf) flushProse();
       proseBuf = trimmed;
       continue;
     }
 
-    // "頌曰" anywhere in line triggers verse mode for subsequent lines
+    // "頌曰" anywhere in line triggers verse mode
     if (hasVerseMarker) {
+      beforeFirstProse = false;
       proseBuf += trimmed;
       flushProse();
       inVerseBlock = true;
       continue;
     }
 
-    // In verse block: lines that look like verse stay as verse
-    if (inVerseBlock && isVerse(trimmed)) {
+    // Verse mode (after 頌曰 or at opening before first 論曰)
+    if ((inVerseBlock || beforeFirstProse) && isVerse(trimmed)) {
+      flushProse();
       segments.push({ type: "verse", text: trimmed });
       continue;
     }
 
-    // If we were in verse block but line doesn't look like verse, exit verse mode
+    // If we were in verse block but line doesn't look like verse, exit
     if (inVerseBlock && !isVerse(trimmed)) {
       inVerseBlock = false;
     }
-
-    // Auto-detect verse: if current AND next line both look like verse,
-    // enter verse mode (handles opening verses without 頌曰 marker)
-    if (!inVerseBlock && isVerse(trimmed)) {
-      const nextTrimmed = (i + 1 < lines.length) ? lines[i + 1].trim() : "";
-      if (isVerse(nextTrimmed) || (segments.length > 0 && segments[segments.length - 1].type === "verse")) {
-        flushProse();
-        segments.push({ type: "verse", text: trimmed });
-        inVerseBlock = true;
-        continue;
-      }
+    if (beforeFirstProse && !isVerse(trimmed)) {
+      beforeFirstProse = false;
     }
 
     // Default: merge into prose paragraph
