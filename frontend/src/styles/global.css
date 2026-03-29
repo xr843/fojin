@@ -218,6 +218,40 @@ em {
   }
 }
 
+/* ========== Ask XiaoJin Floating Button ========== */
+.ask-xiaojin-btn {
+  position: absolute;
+  z-index: 1000;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 20px;
+  background: var(--fj-accent);
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  animation: ask-xiaojin-fadein 0.15s ease-out;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.ask-xiaojin-btn:hover {
+  background: #a03000;
+  transform: scale(1.04);
+}
+
+.ask-xiaojin-btn:active {
+  transform: scale(0.97);
+}
+
+@keyframes ask-xiaojin-fadein {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* ========== Reduced Motion ========== */
 @media (prefers-reduced-motion: reduce) {
   *,

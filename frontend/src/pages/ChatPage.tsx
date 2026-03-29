@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback, useMemo, type ReactNode } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useState, useRef, useCallback, useMemo, useEffect, type ReactNode } from "react";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { Input, Button, Space, message, Alert, Tooltip, Modal } from "antd";
 import Markdown from "react-markdown";
@@ -321,6 +321,24 @@ export default function ChatPage() {
   const handleSend = useCallback(async () => {
     await handleSendMessage(input);
   }, [input, handleSendMessage]);
+
+  // Handle pre-filled message from URL params (e.g. from "Ask XiaoJin" button on reader page)
+  const [searchParams, setSearchParams] = useSearchParams();
+  const autoSentRef = useRef(false);
+  useEffect(() => {
+    const q = searchParams.get("q");
+    const context = searchParams.get("context");
+    const source = searchParams.get("source");
+    if (!q || !context || autoSentRef.current) return;
+
+    autoSentRef.current = true;
+    setSearchParams({}, { replace: true });
+
+    const msg = source
+      ? `关于《${source}》中的这段经文：\n\n> ${context}\n\n${q}`
+      : `关于这段经文：\n\n> ${context}\n\n${q}`;
+    handleSendMessage(msg);
+  }, [searchParams, setSearchParams, handleSendMessage]);
 
   const handleExport = useCallback(() => {
     if (messages.length === 0) {
