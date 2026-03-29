@@ -16,12 +16,11 @@ TEI_NS = "http://www.tei-c.org/ns/1.0"
 CB_NS = "http://www.cbeta.org/ns/1.0"
 NSMAP = {"tei": TEI_NS, "cb": CB_NS}
 
-# Elements whose text content we want to extract
+# Elements whose text content we want to extract (leaf content elements)
 CONTENT_TAGS = {
     f"{{{TEI_NS}}}p",
     f"{{{TEI_NS}}}l",       # verse line
     f"{{{TEI_NS}}}head",
-    f"{{{CB_NS}}}div",
 }
 
 # Elements to skip entirely (including their children)
