@@ -46,13 +46,28 @@ Buddhist texts are scattered across hundreds of databases worldwide — CBETA, S
 ```bash
 git clone https://github.com/xr843/fojin.git
 cd fojin
-cp .env.example .env
-docker compose up -d
+cp .env.example .env        # edit POSTGRES_PASSWORD before starting
+docker compose up -d         # database migrations run automatically
 ```
 
 Then visit: **http://localhost:3000**
 
 > API docs at http://localhost:8000/docs
+
+After first startup, the platform has the database schema and source metadata but **no text content**. To import texts from public data sources:
+
+```bash
+# Import CBETA Chinese Buddhist Canon
+docker exec fojin-backend python scripts/import_cbeta.py
+
+# Import SuttaCentral Early Buddhist Texts
+docker exec fojin-backend python scripts/import_suttacentral.py
+
+# See all available importers
+ls backend/scripts/import_*.py
+```
+
+Each importer downloads data directly from the original source (CBETA, SuttaCentral, etc.) — no data is bundled in this repository.
 
 ## Features
 
@@ -118,7 +133,7 @@ Browse digitized manuscripts and rare editions from BDRC and other institutions 
 
 ### Multi-Language UI
 
-Available in 8 languages: Chinese, English, Japanese, Korean, Thai, Vietnamese, Sinhala, and Burmese.
+Available in 9 languages: Simplified Chinese, Traditional Chinese, English, Japanese, Korean, Thai, Vietnamese, Sinhala, and Burmese.
 
 ## Data Sources
 
@@ -228,7 +243,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 - [x] Public REST API with rate limiting
 - [x] User annotations
 - [x] Community-contributed data sources
-- [x] Internationalization (i18n) — 8 UI languages
+- [x] Internationalization (i18n) — 9 UI languages
 - [x] Embedding-based semantic search (420K+ vectors, HNSW index)
 - [x] AI Q&A with RAG, multi-turn context, and streaming
 - [x] Similar passages discovery (cross-text semantic matching)
@@ -240,7 +255,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 - [ ] Cross-lingual search (query in Chinese, find Sanskrit/Pali/Tibetan results)
 - [ ] OCR pipeline for scanned texts
 - [ ] Collaborative annotation sharing
-- [ ] API documentation and developer portal
+- [x] API documentation (OpenAPI/Swagger at `/docs`, ReDoc at `/redoc`)
 - [ ] Integration with Zotero and reference managers
 
 ## License
