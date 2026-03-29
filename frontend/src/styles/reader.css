@@ -95,15 +95,10 @@
 
 .reader-body {
   font-family: "Noto Serif SC", "Source Han Serif SC", serif;
-  font-size: var(--reader-font-size, 18px);
-  line-height: 2;
-  letter-spacing: 0.04em;
+  font-size: var(--reader-font-size, 17px);
+  line-height: 1.8;
   color: var(--fj-ink);
-  background: var(--fj-card-bg);
-  padding: 36px 40px;
-  border-radius: 8px;
-  border: 1px solid var(--fj-border);
-  text-align: justify;
+  padding: 20px 0;
 }
 
 .reader-bottom-nav {
@@ -161,7 +156,7 @@
   }
 
   .reader-body {
-    padding: 32px 28px;
+    padding: 16px 0;
   }
 
   .bilingual-column {
@@ -218,9 +213,8 @@
   }
 
   .reader-body {
-    padding: 24px 18px;
-    border-radius: 6px;
-    line-height: 1.85;
+    padding: 12px 0;
+    line-height: 1.75;
   }
 
   .reader-bottom-nav {
@@ -241,10 +235,9 @@
   }
 
   .reader-body {
-    padding: 16px 12px;
-    line-height: 1.8;
+    padding: 10px 0;
+    line-height: 1.7;
     font-size: var(--reader-font-size, 16px);
-    border-radius: 4px;
   }
 
   .reader-bottom-nav {

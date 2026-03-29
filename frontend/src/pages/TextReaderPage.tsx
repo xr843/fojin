@@ -300,7 +300,7 @@ export default function TextReaderPage() {
                   style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
                 >
                   {reflowText(content.content).map((para, i) =>
-                    para === "" ? <br key={i} /> : <p key={i} style={{ margin: "0 0 0.4em", textIndent: "2em" }}>{para}</p>
+                    para === "" ? <br key={i} /> : <p key={i} style={{ margin: "0 0 1em" }}>{para}</p>
                   )}
                 </div>
               </div>
@@ -317,7 +317,7 @@ export default function TextReaderPage() {
                   >
                     {compareContent?.content
                       ? reflowText(compareContent.content).map((para, i) =>
-                          para === "" ? <br key={i} /> : <p key={i} style={{ margin: "0 0 0.4em", textIndent: "2em" }}>{para}</p>
+                          para === "" ? <br key={i} /> : <p key={i} style={{ margin: "0 0 1em" }}>{para}</p>
                         )
                       : "暂无内容"}
                   </div>
@@ -331,7 +331,7 @@ export default function TextReaderPage() {
             style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
           >
             {reflowText(content.content).map((para, i) =>
-              para === "" ? <br key={i} /> : <p key={i} style={{ margin: "0 0 0.4em", textIndent: "2em" }}>{para}</p>
+              para === "" ? <br key={i} /> : <p key={i} style={{ margin: "0 0 1em" }}>{para}</p>
             )}
           </div>
         )
