@@ -63,19 +63,33 @@ function reflowText(raw: string): TextSegment[] {
     }
   };
 
-  // Pre-scan: check if a line looks like verse
-  // Verse lines: end with ，。, short, single clause (0-1 mid-punctuation)
-  // Prose lines: longer, multiple clauses
+  // Verse detection: Buddhist verse lines are typically 5-char or 7-char
+  // clauses joined by ，。 at the end, with at most one ，in the middle
+  // connecting two equal-length half-lines.
+  // e.g. "諸一切種諸冥滅，拔眾生出生死泥，" (7+7 = ~16 chars with punct)
+  // vs prose: "聖眾，故先讚德方申敬禮。諸言所表謂佛" (multiple clauses, ~18 chars)
   const isVerse = (line: string): boolean => {
-    if (line.length < 4 || line.length > 26) return false;
+    if (line.length < 4 || line.length > 22) return false;
     // Must end with Chinese punctuation
     if (!/[，。；]$/.test(line)) return false;
-    // Count mid-line punctuation (exclude the trailing one)
-    const body = line.slice(0, -1);
-    const midPuncts = (body.match(/[，。；：]/g) || []).length;
-    // Verse: at most 1 mid-punctuation (e.g. "諸一切種諸冥滅，" has 0)
-    // Also allow lines with large whitespace (CBETA verse formatting)
-    return midPuncts <= 1 || /\s{2,}/.test(line);
+    // Count ALL Chinese punctuation in the line
+    const allPuncts = (line.match(/[，。、；：！？]/g) || []).length;
+    // Strict verse: at most 2 punctuation total (e.g. "五言，五言，" or "七言，")
+    // Prose lines typically have 3+ punctuation marks
+    if (allPuncts > 2) return false;
+    // Lines with whitespace gaps are CBETA verse formatting
+    if (/\s{2,}/.test(line)) return true;
+    // For lines with exactly 1-2 punctuation, check symmetry
+    // Verse halves should be roughly equal length (e.g. 5+5, 7+7)
+    if (allPuncts === 2) {
+      const parts = line.split(/[，。、；]/);
+      if (parts.length >= 2 && parts[0].length > 0 && parts[1].length > 0) {
+        const ratio = Math.min(parts[0].length, parts[1].length) / Math.max(parts[0].length, parts[1].length);
+        return ratio >= 0.5; // halves within 2:1 ratio
+      }
+    }
+    // Single punctuation at end: likely a verse half-line
+    return allPuncts === 1 && line.length <= 12;
   };
 
   for (let i = 0; i < lines.length; i++) {
@@ -350,7 +364,7 @@ export default function TextReaderPage() {
                   style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
                 >
                   {reflowText(content.content).map((para, i) =>
-                    para.type === "break" ? <br key={i} /> : para.type === "verse" ? <p key={i} style={{ margin: "0 0 0.2em", paddingLeft: "4em", color: "var(--fj-ink)" }}>{para.text}</p> : <p key={i} style={{ margin: "0 0 1em" }}>{para.text}</p>
+                    para.type === "break" ? <br key={i} /> : para.type === "verse" ? <p key={i} style={{ margin: 0, paddingLeft: "2em" }}>{para.text}</p> : <p key={i} style={{ margin: "0 0 0.8em" }}>{para.text}</p>
                   )}
                 </div>
               </div>
@@ -367,7 +381,7 @@ export default function TextReaderPage() {
                   >
                     {compareContent?.content
                       ? reflowText(compareContent.content).map((para, i) =>
-                          para.type === "break" ? <br key={i} /> : para.type === "verse" ? <p key={i} style={{ margin: "0 0 0.2em", paddingLeft: "4em", color: "var(--fj-ink)" }}>{para.text}</p> : <p key={i} style={{ margin: "0 0 1em" }}>{para.text}</p>
+                          para.type === "break" ? <br key={i} /> : para.type === "verse" ? <p key={i} style={{ margin: 0, paddingLeft: "2em" }}>{para.text}</p> : <p key={i} style={{ margin: "0 0 0.8em" }}>{para.text}</p>
                         )
                       : "暂无内容"}
                   </div>
@@ -381,7 +395,7 @@ export default function TextReaderPage() {
             style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
           >
             {reflowText(content.content).map((para, i) =>
-              para.type === "break" ? <br key={i} /> : para.type === "verse" ? <p key={i} style={{ margin: "0 0 0.2em", paddingLeft: "4em", color: "var(--fj-ink)" }}>{para.text}</p> : <p key={i} style={{ margin: "0 0 1em" }}>{para.text}</p>
+              para.type === "break" ? <br key={i} /> : para.type === "verse" ? <p key={i} style={{ margin: 0, paddingLeft: "2em" }}>{para.text}</p> : <p key={i} style={{ margin: "0 0 0.8em" }}>{para.text}</p>
             )}
           </div>
         )
