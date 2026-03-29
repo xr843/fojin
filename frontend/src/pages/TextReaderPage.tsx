@@ -35,30 +35,69 @@ const FONT_SIZE_MAX = 28;
 const FONT_SIZE_STEP = 2;
 const FONT_SIZE_KEY = "fojin-reader-font-size";
 
+/** Segment type for rendering */
+type TextSegment = { type: "prose"; text: string } | { type: "verse"; text: string } | { type: "break" };
+
 /**
- * Reflow raw text for natural paragraph layout (like CBETA Online).
- * Source data has hard line breaks every ~18 chars. We merge consecutive
- * non-empty lines into paragraphs, preserving blank-line paragraph breaks.
+ * Detect if a line is a verse/gatha (偈颂).
+ * Verses are short lines with balanced comma/period patterns,
+ * like "諸一切種諸冥滅，拔眾生出生死泥，"
  */
-function reflowText(raw: string): string[] {
+function isVerseLine(line: string): boolean {
+  if (line.length > 30 || line.length < 4) return false;
+  // Count punctuation marks typical of verse: ，。、；
+  const puncts = (line.match(/[，。、；]/g) || []).length;
+  // Verses typically have 1-3 punctuation marks in a short line
+  if (puncts >= 1 && line.length <= 25) return true;
+  // Lines with large whitespace gaps (CBETA verse formatting)
+  if (/\s{2,}/.test(line) && puncts >= 1) return true;
+  return false;
+}
+
+/**
+ * Reflow raw text into segments matching CBETA Online layout.
+ * - Blank lines → paragraph breaks
+ * - Short balanced lines → verses (keep as individual lines)
+ * - Consecutive long lines → merge into prose paragraphs
+ * - "論曰：" / "頌曰：" at line start → new paragraph
+ */
+function reflowText(raw: string): TextSegment[] {
   const lines = raw.split("\n");
-  const paragraphs: string[] = [];
-  let current = "";
+  const segments: TextSegment[] = [];
+  let proseBuf = "";
+
+  const flushProse = () => {
+    if (proseBuf) {
+      segments.push({ type: "prose", text: proseBuf });
+      proseBuf = "";
+    }
+  };
 
   for (const line of lines) {
     const trimmed = line.trim();
+
+    // Blank line → paragraph break
     if (trimmed === "") {
-      if (current) {
-        paragraphs.push(current);
-        current = "";
-      }
-      paragraphs.push(""); // preserve blank line as paragraph break
+      flushProse();
+      segments.push({ type: "break" });
+      continue;
+    }
+
+    // Check if this line starts a new paragraph (論曰：、頌曰： etc.)
+    const startsNewPara = /^(論曰|頌曰|述曰|疏曰|解曰|釋曰|問[：:]|答[：:])/.test(trimmed);
+
+    if (isVerseLine(trimmed)) {
+      flushProse();
+      segments.push({ type: "verse", text: trimmed });
+    } else if (startsNewPara && proseBuf) {
+      flushProse();
+      proseBuf = trimmed;
     } else {
-      current += trimmed;
+      proseBuf += trimmed;
     }
   }
-  if (current) paragraphs.push(current);
-  return paragraphs;
+  flushProse();
+  return segments;
 }
 
 function getInitialFontSize(): number {
@@ -300,7 +339,7 @@ export default function TextReaderPage() {
                   style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
                 >
                   {reflowText(content.content).map((para, i) =>
-                    para === "" ? <br key={i} /> : <p key={i} style={{ margin: "0 0 1em" }}>{para}</p>
+                    para.type === "break" ? <br key={i} /> : para.type === "verse" ? <p key={i} style={{ margin: "0 0 0.2em", paddingLeft: "4em", color: "var(--fj-ink)" }}>{para.text}</p> : <p key={i} style={{ margin: "0 0 1em" }}>{para.text}</p>
                   )}
                 </div>
               </div>
@@ -317,7 +356,7 @@ export default function TextReaderPage() {
                   >
                     {compareContent?.content
                       ? reflowText(compareContent.content).map((para, i) =>
-                          para === "" ? <br key={i} /> : <p key={i} style={{ margin: "0 0 1em" }}>{para}</p>
+                          para.type === "break" ? <br key={i} /> : para.type === "verse" ? <p key={i} style={{ margin: "0 0 0.2em", paddingLeft: "4em", color: "var(--fj-ink)" }}>{para.text}</p> : <p key={i} style={{ margin: "0 0 1em" }}>{para.text}</p>
                         )
                       : "暂无内容"}
                   </div>
@@ -331,7 +370,7 @@ export default function TextReaderPage() {
             style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
           >
             {reflowText(content.content).map((para, i) =>
-              para === "" ? <br key={i} /> : <p key={i} style={{ margin: "0 0 1em" }}>{para}</p>
+              para.type === "break" ? <br key={i} /> : para.type === "verse" ? <p key={i} style={{ margin: "0 0 0.2em", paddingLeft: "4em", color: "var(--fj-ink)" }}>{para.text}</p> : <p key={i} style={{ margin: "0 0 1em" }}>{para.text}</p>
             )}
           </div>
         )
