@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     embedding_model: str = "BAAI/bge-m3"
     embedding_dim: int = 1024
 
+    # Reranker (optional API-based cross-encoder, e.g. SiliconFlow bge-reranker-v2-m3)
+    reranker_api_url: str = ""   # e.g. https://api.siliconflow.cn/v1
+    reranker_api_key: str = ""   # Falls back to embedding_api_key if empty
+    reranker_model: str = "BAAI/bge-reranker-v2-m3"
+
     # 典津 API (guji.cckb.cn)
     dianjin_api_key: str = ""
     dianjin_api_url: str = "https://guji.cckb.cn/api"

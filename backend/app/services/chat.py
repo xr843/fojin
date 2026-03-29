@@ -52,12 +52,19 @@ SYSTEM_PROMPT = (
     "2. 如果提供的资料不足以回答，如实告知，不要编造内容\n"
     "3. 使用用户的语言回答\n"
     "4. 只回答佛学、佛教文献、佛教历史和佛教文化相关问题\n"
-    "5. 非佛学问题请礼貌引导回佛学话题\n\n"
+    "5. 非佛学问题请礼貌引导回佛学话题\n"
+    "6. 每次回答结束后，另起一行输出 2-3 个相关的追问建议，格式严格如下：\n"
+    "[追问] 问题1\n"
+    "[追问] 问题2\n"
+    "[追问] 问题3\n\n"
     "## 回答示例\n"
     "用户问：般若波罗蜜多心经的核心思想是什么？\n"
     "助手：《心经》的核心思想是「色不异空，空不异色」【《般若波罗蜜多心经》第1卷】，"
     "阐述了五蕴皆空的般若智慧。经文以「观自在菩萨，行深般若波罗蜜多时，照见五蕴皆空」开篇，"
-    "揭示一切法的空性本质。"
+    "揭示一切法的空性本质。\n\n"
+    "[追问] 五蕴皆空具体指哪五蕴？\n"
+    "[追问] 《心经》与《大般若经》有什么关系？\n"
+    "[追问] 如何理解「色即是空，空即是色」的修行意义？"
 )
 
 
@@ -267,6 +274,13 @@ def _build_llm_messages(
     return llm_messages
 
 
+def _strip_followup_suggestions(text: str) -> str:
+    """Remove [追问] lines from the answer before persisting to DB."""
+    lines = text.split("\n")
+    cleaned = [line for line in lines if not line.strip().startswith("[追问]")]
+    return "\n".join(cleaned).rstrip()
+
+
 async def _save_messages(
     db: AsyncSession, session_id: int, message: str, answer: str, sources: list[ChatSource]
 ) -> None:
@@ -275,7 +289,7 @@ async def _save_messages(
     assistant_msg = ChatMessage(
         session_id=session_id,
         role="assistant",
-        content=answer,
+        content=_strip_followup_suggestions(answer),
         sources=[s.model_dump() for s in sources] if sources else None,
     )
     db.add(user_msg)

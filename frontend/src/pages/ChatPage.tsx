@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useRef, useCallback, useMemo, useEffect, type ReactNode } from "react";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { Input, Button, Space, message, Alert, Tooltip, Modal } from "antd";
 import Markdown from "react-markdown";
@@ -37,6 +37,51 @@ import {
   type ChatSessionItem,
 } from "../api/client";
 import { useAuthStore } from "../stores/authStore";
+
+/** Extract [追问] follow-up suggestions from assistant message text. */
+function parseFollowUps(content: string): { cleanContent: string; suggestions: string[] } {
+  const lines = content.split("\n");
+  const suggestions: string[] = [];
+  const cleanLines: string[] = [];
+  for (const line of lines) {
+    const match = line.trim().match(/^\[追问]\s*(.+)/);
+    if (match) {
+      suggestions.push(match[1].trim());
+    } else {
+      cleanLines.push(line);
+    }
+  }
+  // Remove trailing empty lines left after stripping suggestions
+  const cleaned = cleanLines.join("\n").replace(/\n+$/, "");
+  return { cleanContent: cleaned, suggestions };
+}
+
+/**
+ * Replace citation patterns like 【《心经》第1卷】 in markdown content
+ * with clickable markdown links using source data to map title -> text_id.
+ */
+function injectCitationLinks(content: string, sources: ChatSource[] | null): string {
+  if (!sources || sources.length === 0) return content;
+
+  const titleMap = new Map<string, ChatSource>();
+  for (const s of sources) {
+    if (!s.title_zh || s.text_id <= 0) continue;
+    const existing = titleMap.get(s.title_zh);
+    if (!existing || s.score > existing.score) {
+      titleMap.set(s.title_zh, s);
+    }
+  }
+  if (titleMap.size === 0) return content;
+
+  return content.replace(/【《([^》]+)》(?:第(\d+)卷)?】/g, (_match, title: string, juanStr: string | undefined) => {
+    const source = titleMap.get(title);
+    if (!source) return _match;
+    const juan = juanStr ? parseInt(juanStr, 10) : source.juan_num;
+    const url = `/texts/${source.text_id}/read?juan=${juan}`;
+    const label = juanStr ? `【《${title}》第${juanStr}卷】` : `【《${title}》】`;
+    return `[${label}](${url})`;
+  });
+}
 
 function groupSessionsByDate(sessions: ChatSessionItem[]): { label: string; items: ChatSessionItem[] }[] {
   const now = new Date();
@@ -106,6 +151,28 @@ export default function ChatPage() {
     () => groupSessionsByDate(filteredSessions ?? []),
     [filteredSessions],
   );
+
+  // Custom markdown components: render internal citation links with react-router Link
+  const markdownComponents = useMemo(() => ({
+    a: ({ href, children }: { href?: string; children?: ReactNode }) => {
+      if (href && href.startsWith("/texts/")) {
+        return (
+          <Link
+            to={href}
+            style={{
+              color: "var(--fj-accent)",
+              textDecoration: "none",
+              borderBottom: "1px dashed var(--fj-accent)",
+              fontWeight: 500,
+            }}
+          >
+            {children}
+          </Link>
+        );
+      }
+      return <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>;
+    },
+  }), []);
 
   const scrollToBottom = () => {
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
@@ -254,6 +321,24 @@ export default function ChatPage() {
   const handleSend = useCallback(async () => {
     await handleSendMessage(input);
   }, [input, handleSendMessage]);
+
+  // Handle pre-filled message from URL params (e.g. from "Ask XiaoJin" button on reader page)
+  const [searchParams, setSearchParams] = useSearchParams();
+  const autoSentRef = useRef(false);
+  useEffect(() => {
+    const q = searchParams.get("q");
+    const context = searchParams.get("context");
+    const source = searchParams.get("source");
+    if (!q || !context || autoSentRef.current) return;
+
+    autoSentRef.current = true;
+    setSearchParams({}, { replace: true });
+
+    const msg = source
+      ? `关于《${source}》中的这段经文：\n\n> ${context}\n\n${q}`
+      : `关于这段经文：\n\n> ${context}\n\n${q}`;
+    handleSendMessage(msg);
+  }, [searchParams, setSearchParams, handleSendMessage]);
 
   const handleExport = useCallback(() => {
     if (messages.length === 0) {
@@ -513,11 +598,53 @@ export default function ChatPage() {
                         正在检索经文并生成回答
                         <span className="chat-thinking-dots"><span /><span /><span /></span>
                       </div>
-                    ) : (
-                      <div className="chat-markdown">
-                        <Markdown rehypePlugins={[rehypeSanitize]}>{m.content + (streamingIdRef.current === m.id ? " ▌" : "")}</Markdown>
-                      </div>
-                    )
+                    ) : (() => {
+                      const isStreaming = streamingIdRef.current === m.id;
+                      const { cleanContent, suggestions } = isStreaming
+                        ? { cleanContent: m.content, suggestions: [] }
+                        : parseFollowUps(m.content);
+                      return (
+                        <>
+                          <div className="chat-markdown">
+                            <Markdown rehypePlugins={[rehypeSanitize]} components={markdownComponents}>{injectCitationLinks(cleanContent, m.sources) + (isStreaming ? " ▌" : "")}</Markdown>
+                          </div>
+                          {suggestions.length > 0 && !sending && (
+                            <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                              {suggestions.map((q, i) => (
+                                <span
+                                  key={i}
+                                  onClick={() => handleSendMessage(q)}
+                                  style={{
+                                    display: "inline-block",
+                                    padding: "4px 12px",
+                                    borderRadius: 14,
+                                    border: "1px solid var(--fj-gold, #b08d57)",
+                                    color: "var(--fj-gold, #b08d57)",
+                                    fontSize: 12,
+                                    cursor: "pointer",
+                                    background: "transparent",
+                                    transition: "all 0.2s",
+                                    lineHeight: 1.6,
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = "rgba(176,141,87,0.1)";
+                                    e.currentTarget.style.color = "var(--fj-accent)";
+                                    e.currentTarget.style.borderColor = "var(--fj-accent)";
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = "transparent";
+                                    e.currentTarget.style.color = "var(--fj-gold, #b08d57)";
+                                    e.currentTarget.style.borderColor = "var(--fj-gold, #b08d57)";
+                                  }}
+                                >
+                                  {q}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()
                   ) : (
                     m.content
                   )}

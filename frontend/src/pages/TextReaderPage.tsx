@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -17,6 +17,7 @@ import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBook
 import { useAuthStore } from "../stores/authStore";
 import CitationGenerator from "../components/CitationGenerator";
 import AnnotationPanel from "../components/AnnotationPanel";
+import AskXiaojinButton from "../components/AskXiaojinButton";
 import ReaderSidebar from "../components/ReaderSidebar";
 import "../styles/reader.css";
 
@@ -54,6 +55,7 @@ export default function TextReaderPage() {
   const [compareLang, setCompareLang] = useState<string | null>(null);
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
+  const readerContentRef = useRef<HTMLDivElement>(null);
 
   const { data: bookmarked = false } = useQuery({
     queryKey: ["bookmark", textId],
@@ -256,6 +258,7 @@ export default function TextReaderPage() {
       </div>
 
       {/* Content */}
+      <div ref={readerContentRef} style={{ position: "relative" }}>
       {isLoading ? (
         <div style={{ textAlign: "center", padding: 80 }}>
           <Spin size="large" />
@@ -301,6 +304,11 @@ export default function TextReaderPage() {
       ) : (
         <Typography.Text type="secondary">暂无内容</Typography.Text>
       )}
+      <AskXiaojinButton
+        containerRef={readerContentRef}
+        source={`${content?.title_zh || ""}第${juanNum}卷`}
+      />
+      </div>
 
       {/* Bottom navigation */}
       {content && (
