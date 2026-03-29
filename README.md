@@ -4,9 +4,9 @@
 
 ### The World's Encyclopedic Buddhist Digital Text Platform
 
-**505 sources. 30 languages. 30 countries. One search.**
+**505 sources. 30 languages. 30 countries. 17,800+ full-text volumes. One search.**
 
-Aggregating the world's Buddhist digital heritage — 9,200+ texts in Pali, Classical Chinese, Tibetan, and Sanskrit from 505 data sources — with full-text reading, AI-powered Q&A (RAG + semantic search), knowledge graph, timeline visualization, collections, citations, annotations, bookmarks, and multi-language parallel reading.
+Aggregating the world's Buddhist digital heritage — 9,200+ texts with 17,800+ volumes of full content in Pali, Classical Chinese, Tibetan, and Sanskrit from 505 data sources — with CBETA-style reading, AI-powered Q&A (RAG + reranking + citations), knowledge graph, timeline visualization, collections, citations, annotations, bookmarks, and multi-language parallel reading.
 
 [Live Demo](https://fojin.app) &nbsp;&middot;&nbsp; [API Docs](https://fojin.app/docs) &nbsp;&middot;&nbsp; [中文文档](./docs/README_zh.md) &nbsp;&middot;&nbsp; [Discussions](https://github.com/xr843/fojin/discussions) &nbsp;&middot;&nbsp; [Discord](https://discord.gg/76SZeuJekq) &nbsp;&middot;&nbsp; [Report Bug](https://github.com/xr843/fojin/issues)
 
@@ -30,13 +30,13 @@ Buddhist texts are scattered across hundreds of databases worldwide — CBETA, S
 | What you need | How FoJin helps |
 |---|---|
 | Find a sutra across databases | **Multi-dimensional search** across 9,200+ texts from 505 sources |
-| Read the full text online | **7,600+ texts** with full content available for online reading |
+| Read the full text online | **7,600+ texts** with 17,800+ volumes of full content, CBETA-style layout |
 | Compare translations | **Parallel reading** in 30 languages side by side |
 | Look up Buddhist terms | **6 dictionaries**, 285K entries (Chinese/Sanskrit/Pali/English) |
 | Explore relationships | **Knowledge graph** with 9,700+ entities and 4,100+ relations |
 | Discover similar texts | **Semantic similarity** powered by 420K+ embedding vectors (pgvector + HNSW) |
 | View original manuscripts | **IIIF manuscript viewer** connected to BDRC and more |
-| Ask questions about texts | **AI Q&A** ("XiaoJin") grounded in canonical text via RAG with multi-turn context |
+| Ask questions about texts | **AI Q&A** ("XiaoJin") with RAG, reranking, clickable citations, and follow-up suggestions |
 | Explore history visually | **Timeline & Dashboard** — dynasty charts, translation trends, category analytics |
 | Save and organize | **Collections, bookmarks, annotations** for personal study |
 | Cite in research | **Citation export** (BibTeX, RIS, APA) for academic use |
@@ -79,7 +79,7 @@ Search across Buddhist canons by title, translator, catalog number, or full-text
 
 ### Full-Text Reading
 
-Read 7,600+ Buddhist texts with full content online. Navigate by volume, scroll through content, and jump between related texts.
+Read 7,600+ Buddhist texts with 17,800+ volumes of full content online. CBETA-style typography with intelligent verse/prose detection, paragraph reflow, and adjustable font size. Navigate by volume, scroll through content, and jump between related texts.
 
 ### Parallel Reading (30 Languages)
 
@@ -104,9 +104,11 @@ Compare translations side by side — Classical Chinese, Sanskrit, Pali, Tibetan
 Ask questions in natural language. XiaoJin answers based on canonical Buddhist texts using RAG (Retrieval-Augmented Generation) with 420K+ embedding vectors and HNSW index for fast semantic search. Features include:
 
 - Multi-turn conversation with context awareness
-- Relevance-filtered retrieval (score threshold + top-8 selection)
-- Structured citations in 【《经名》第N卷】 format
-- Suggested starter questions for new users
+- Keyword + optional API cross-encoder **reranking** for higher answer quality
+- **Clickable citations** in 【《经名》第N卷】 format — click to jump to the text reader
+- **Progressive follow-up suggestions** (concept → related texts → practice)
+- **"Ask XiaoJin" button** on the reader page — select text to ask about it
+- **Tab key** cycles through suggested questions in the input box
 - BYOK (Bring Your Own Key) support for multiple LLM providers
 
 <p align="center"><img src="./docs/screenshots/ai-chat-answer.png" alt="AI Q&A answering about Xuanzang's disciples" width="800"></p>
@@ -250,12 +252,21 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 - [x] Timeline visualization and statistics dashboard
 - [x] User feedback system and notification center
 - [x] Admin dashboard (user management, platform analytics)
-- [ ] Admin feedback management panel
-- [ ] AI answer rating (thumbs up/down) for quality tracking
+- [x] API documentation (OpenAPI/Swagger at `/docs`, ReDoc at `/redoc`)
+- [x] AI answer reranking (keyword + optional API cross-encoder)
+- [x] Clickable citation links in AI answers
+- [x] Progressive follow-up suggestions after AI answers
+- [x] "Ask XiaoJin" floating button on reader page
+- [x] Tab key to cycle through suggested questions
+- [x] CBETA-style text layout with verse/prose detection
+- [x] Auto database migration on Docker startup
+- [x] AI answer rating (thumbs up/down) for quality tracking
+- [ ] Topic ontology browsing page
 - [ ] Cross-lingual search (query in Chinese, find Sanskrit/Pali/Tibetan results)
+- [ ] Open data export (JSON/CSV for researchers)
+- [ ] MCP Server for AI assistant integration
 - [ ] OCR pipeline for scanned texts
 - [ ] Collaborative annotation sharing
-- [x] API documentation (OpenAPI/Swagger at `/docs`, ReDoc at `/redoc`)
 - [ ] Integration with Zotero and reference managers
 
 ## License
