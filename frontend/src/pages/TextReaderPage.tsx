@@ -39,27 +39,17 @@ const FONT_SIZE_KEY = "fojin-reader-font-size";
 type TextSegment = { type: "prose"; text: string } | { type: "verse"; text: string } | { type: "break" };
 
 /**
- * Detect if a line is a verse/gatha (偈颂).
- * Verses are short lines with balanced comma/period patterns,
- * like "諸一切種諸冥滅，拔眾生出生死泥，"
- */
-function isVerseLine(line: string): boolean {
-  if (line.length > 30 || line.length < 4) return false;
-  // Count punctuation marks typical of verse: ，。、；
-  const puncts = (line.match(/[，。、；]/g) || []).length;
-  // Verses typically have 1-3 punctuation marks in a short line
-  if (puncts >= 1 && line.length <= 25) return true;
-  // Lines with large whitespace gaps (CBETA verse formatting)
-  if (/\s{2,}/.test(line) && puncts >= 1) return true;
-  return false;
-}
-
-/**
  * Reflow raw text into segments matching CBETA Online layout.
- * - Blank lines → paragraph breaks
- * - Short balanced lines → verses (keep as individual lines)
- * - Consecutive long lines → merge into prose paragraphs
- * - "論曰：" / "頌曰：" at line start → new paragraph
+ *
+ * CBETA source data has hard line breaks every ~18 chars. We need to:
+ * 1. Merge consecutive prose lines into flowing paragraphs
+ * 2. Keep verse/gatha (偈颂) lines as separate indented lines
+ * 3. Break paragraphs at blank lines and markers like 論曰/頌曰
+ *
+ * Verse detection: a line is a verse if it ends with ，or 。and the
+ * text before the final punctuation contains no other ，。(i.e. it's
+ * a single clause per line, typical of Buddhist verse structure).
+ * Prose lines have multiple clauses (multiple ，。) within one line.
  */
 function reflowText(raw: string): TextSegment[] {
   const lines = raw.split("\n");
@@ -73,8 +63,23 @@ function reflowText(raw: string): TextSegment[] {
     }
   };
 
-  for (const line of lines) {
-    const trimmed = line.trim();
+  // Pre-scan: check if a line looks like verse
+  // Verse lines: end with ，。, short, single clause (0-1 mid-punctuation)
+  // Prose lines: longer, multiple clauses
+  const isVerse = (line: string): boolean => {
+    if (line.length < 4 || line.length > 26) return false;
+    // Must end with Chinese punctuation
+    if (!/[，。；]$/.test(line)) return false;
+    // Count mid-line punctuation (exclude the trailing one)
+    const body = line.slice(0, -1);
+    const midPuncts = (body.match(/[，。；：]/g) || []).length;
+    // Verse: at most 1 mid-punctuation (e.g. "諸一切種諸冥滅，" has 0)
+    // Also allow lines with large whitespace (CBETA verse formatting)
+    return midPuncts <= 1 || /\s{2,}/.test(line);
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
 
     // Blank line → paragraph break
     if (trimmed === "") {
@@ -83,18 +88,24 @@ function reflowText(raw: string): TextSegment[] {
       continue;
     }
 
-    // Check if this line starts a new paragraph (論曰：、頌曰： etc.)
+    // Check paragraph markers
     const startsNewPara = /^(論曰|頌曰|述曰|疏曰|解曰|釋曰|問[：:]|答[：:])/.test(trimmed);
 
-    if (isVerseLine(trimmed)) {
-      flushProse();
-      segments.push({ type: "verse", text: trimmed });
-    } else if (startsNewPara && proseBuf) {
-      flushProse();
-      proseBuf = trimmed;
-    } else {
-      proseBuf += trimmed;
+    // For verse detection, require at least 2 consecutive verse-like lines
+    if (isVerse(trimmed)) {
+      const nextTrimmed = (i + 1 < lines.length) ? lines[i + 1].trim() : "";
+      const prevWasVerse = segments.length > 0 && segments[segments.length - 1].type === "verse";
+      if (prevWasVerse || isVerse(nextTrimmed)) {
+        flushProse();
+        segments.push({ type: "verse", text: trimmed });
+        continue;
+      }
     }
+
+    if (startsNewPara && proseBuf) {
+      flushProse();
+    }
+    proseBuf += trimmed;
   }
   flushProse();
   return segments;
