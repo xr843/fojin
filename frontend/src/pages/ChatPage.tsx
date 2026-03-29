@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useRef, useCallback, useMemo, type ReactNode } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { Input, Button, Space, message, Alert, Tooltip, Modal } from "antd";
 import Markdown from "react-markdown";
@@ -54,6 +54,33 @@ function parseFollowUps(content: string): { cleanContent: string; suggestions: s
   // Remove trailing empty lines left after stripping suggestions
   const cleaned = cleanLines.join("\n").replace(/\n+$/, "");
   return { cleanContent: cleaned, suggestions };
+}
+
+/**
+ * Replace citation patterns like 【《心经》第1卷】 in markdown content
+ * with clickable markdown links using source data to map title -> text_id.
+ */
+function injectCitationLinks(content: string, sources: ChatSource[] | null): string {
+  if (!sources || sources.length === 0) return content;
+
+  const titleMap = new Map<string, ChatSource>();
+  for (const s of sources) {
+    if (!s.title_zh || s.text_id <= 0) continue;
+    const existing = titleMap.get(s.title_zh);
+    if (!existing || s.score > existing.score) {
+      titleMap.set(s.title_zh, s);
+    }
+  }
+  if (titleMap.size === 0) return content;
+
+  return content.replace(/【《([^》]+)》(?:第(\d+)卷)?】/g, (_match, title: string, juanStr: string | undefined) => {
+    const source = titleMap.get(title);
+    if (!source) return _match;
+    const juan = juanStr ? parseInt(juanStr, 10) : source.juan_num;
+    const url = `/texts/${source.text_id}/read?juan=${juan}`;
+    const label = juanStr ? `【《${title}》第${juanStr}卷】` : `【《${title}》】`;
+    return `[${label}](${url})`;
+  });
 }
 
 function groupSessionsByDate(sessions: ChatSessionItem[]): { label: string; items: ChatSessionItem[] }[] {
@@ -124,6 +151,28 @@ export default function ChatPage() {
     () => groupSessionsByDate(filteredSessions ?? []),
     [filteredSessions],
   );
+
+  // Custom markdown components: render internal citation links with react-router Link
+  const markdownComponents = useMemo(() => ({
+    a: ({ href, children }: { href?: string; children?: ReactNode }) => {
+      if (href && href.startsWith("/texts/")) {
+        return (
+          <Link
+            to={href}
+            style={{
+              color: "var(--fj-accent)",
+              textDecoration: "none",
+              borderBottom: "1px dashed var(--fj-accent)",
+              fontWeight: 500,
+            }}
+          >
+            {children}
+          </Link>
+        );
+      }
+      return <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>;
+    },
+  }), []);
 
   const scrollToBottom = () => {
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
@@ -539,7 +588,7 @@ export default function ChatPage() {
                       return (
                         <>
                           <div className="chat-markdown">
-                            <Markdown rehypePlugins={[rehypeSanitize]}>{cleanContent + (isStreaming ? " ▌" : "")}</Markdown>
+                            <Markdown rehypePlugins={[rehypeSanitize]} components={markdownComponents}>{injectCitationLinks(cleanContent, m.sources) + (isStreaming ? " ▌" : "")}</Markdown>
                           </div>
                           {suggestions.length > 0 && !sending && (
                             <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>
