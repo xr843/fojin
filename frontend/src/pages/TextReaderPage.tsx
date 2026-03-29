@@ -92,33 +92,50 @@ function reflowText(raw: string): TextSegment[] {
     return allPuncts === 1 && line.length <= 12;
   };
 
+  let inVerseBlock = false; // true after 頌曰/偈曰 until next 論曰 or blank line
+
   for (let i = 0; i < lines.length; i++) {
     const trimmed = lines[i].trim();
 
-    // Blank line → paragraph break
+    // Blank line → paragraph break, exit verse mode
     if (trimmed === "") {
       flushProse();
       segments.push({ type: "break" });
+      // Don't reset inVerseBlock on blank lines within verse blocks
       continue;
     }
 
     // Check paragraph markers
-    const startsNewPara = /^(論曰|頌曰|述曰|疏曰|解曰|釋曰|問[：:]|答[：:])/.test(trimmed);
+    const isVerseMarker = /頌曰[：:]?\s*$|偈曰[：:]?\s*$/.test(trimmed);
+    const isProseMarker = /^(論曰|述曰|疏曰|解曰|釋曰)/.test(trimmed);
 
-    // For verse detection, require at least 2 consecutive verse-like lines
-    if (isVerse(trimmed)) {
-      const nextTrimmed = (i + 1 < lines.length) ? lines[i + 1].trim() : "";
-      const prevWasVerse = segments.length > 0 && segments[segments.length - 1].type === "verse";
-      if (prevWasVerse || isVerse(nextTrimmed)) {
-        flushProse();
-        segments.push({ type: "verse", text: trimmed });
-        continue;
-      }
+    if (isProseMarker) {
+      inVerseBlock = false;
+      if (proseBuf) flushProse();
+      proseBuf = trimmed;
+      continue;
     }
 
-    if (startsNewPara && proseBuf) {
+    // "頌曰：" triggers verse mode — flush prose first, then the marker itself is prose
+    if (isVerseMarker) {
+      proseBuf += trimmed;
       flushProse();
+      inVerseBlock = true;
+      continue;
     }
+
+    // In verse block: lines that look like verse stay as verse
+    if (inVerseBlock && isVerse(trimmed)) {
+      segments.push({ type: "verse", text: trimmed });
+      continue;
+    }
+
+    // If we were in verse block but line doesn't look like verse, exit verse mode
+    if (inVerseBlock && !isVerse(trimmed)) {
+      inVerseBlock = false;
+    }
+
+    // Default: merge into prose paragraph
     proseBuf += trimmed;
   }
   flushProse();
