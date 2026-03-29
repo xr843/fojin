@@ -82,6 +82,7 @@ export default function AskXiaojinButton({ containerRef, source }: AskXiaojinBut
     };
 
     const handleSelectionChange = () => {
+      if (clickingRef.current) return; // Don't hide while clicking the button
       const selection = window.getSelection();
       if (!selection || selection.isCollapsed || !selection.toString().trim()) {
         hideButton();
@@ -102,6 +103,9 @@ export default function AskXiaojinButton({ containerRef, source }: AskXiaojinBut
     };
   }, [containerRef, updatePosition, hideButton]);
 
+  // Track whether the button is being clicked to prevent race conditions
+  const clickingRef = useRef(false);
+
   const handleClick = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -116,6 +120,7 @@ export default function AskXiaojinButton({ containerRef, source }: AskXiaojinBut
     });
 
     setVisible(false);
+    clickingRef.current = false;
     navigate(`/chat?${params.toString()}`);
   }, [navigate, source]);
 
@@ -127,9 +132,10 @@ export default function AskXiaojinButton({ containerRef, source }: AskXiaojinBut
       className="ask-xiaojin-btn"
       style={{ top: position.top, left: position.left }}
       onMouseDown={(e) => {
-        // Prevent selection from being cleared
+        // Prevent selection from being cleared and mark as clicking
         e.preventDefault();
         e.stopPropagation();
+        clickingRef.current = true;
         if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
       }}
       onClick={handleClick}
