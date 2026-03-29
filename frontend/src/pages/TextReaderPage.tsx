@@ -35,6 +35,32 @@ const FONT_SIZE_MAX = 28;
 const FONT_SIZE_STEP = 2;
 const FONT_SIZE_KEY = "fojin-reader-font-size";
 
+/**
+ * Reflow raw text for natural paragraph layout (like CBETA Online).
+ * Source data has hard line breaks every ~18 chars. We merge consecutive
+ * non-empty lines into paragraphs, preserving blank-line paragraph breaks.
+ */
+function reflowText(raw: string): string[] {
+  const lines = raw.split("\n");
+  const paragraphs: string[] = [];
+  let current = "";
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed === "") {
+      if (current) {
+        paragraphs.push(current);
+        current = "";
+      }
+      paragraphs.push(""); // preserve blank line as paragraph break
+    } else {
+      current += trimmed;
+    }
+  }
+  if (current) paragraphs.push(current);
+  return paragraphs;
+}
+
 function getInitialFontSize(): number {
   try {
     const v = localStorage.getItem(FONT_SIZE_KEY);
@@ -273,7 +299,9 @@ export default function TextReaderPage() {
                   className="reader-body"
                   style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
                 >
-                  {content.content}
+                  {reflowText(content.content).map((para, i) =>
+                    para === "" ? <br key={i} /> : <p key={i} style={{ margin: "0 0 0.4em", textIndent: "2em" }}>{para}</p>
+                  )}
                 </div>
               </div>
             </Col>
@@ -287,7 +315,11 @@ export default function TextReaderPage() {
                     className="reader-body"
                     style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
                   >
-                    {compareContent?.content || "暂无内容"}
+                    {compareContent?.content
+                      ? reflowText(compareContent.content).map((para, i) =>
+                          para === "" ? <br key={i} /> : <p key={i} style={{ margin: "0 0 0.4em", textIndent: "2em" }}>{para}</p>
+                        )
+                      : "暂无内容"}
                   </div>
                 )}
               </div>
@@ -298,7 +330,9 @@ export default function TextReaderPage() {
             className="reader-body"
             style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
           >
-            {content.content}
+            {reflowText(content.content).map((para, i) =>
+              para === "" ? <br key={i} /> : <p key={i} style={{ margin: "0 0 0.4em", textIndent: "2em" }}>{para}</p>
+            )}
           </div>
         )
       ) : (
