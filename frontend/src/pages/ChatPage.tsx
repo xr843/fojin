@@ -333,8 +333,13 @@ export default function ChatPage() {
         break;
       }
     }
-    // Fallback to hot questions
-    return hotQuestionsData?.questions ?? [];
+    // Fallback to hot questions (same defaults as the welcome card)
+    return hotQuestionsData?.questions ?? [
+      "《心经》中「色不异空」的含义是什么？",
+      "鸠摩罗什与玄奘的翻译风格有何不同？",
+      "四圣谛的核心教义是什么？",
+      "禅宗的「不立文字」思想源自哪些经典？",
+    ];
   }, [messages, hotQuestionsData]);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
