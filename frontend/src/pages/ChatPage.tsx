@@ -839,7 +839,7 @@ export default function ChatPage() {
                 value={input}
                 onChange={(e) => { setInput(e.target.value); tabIndexRef.current = -1; }}
                 onPressEnter={handleSend}
-                placeholder={tabSuggestions.length > 0 ? "按 Tab 快速输入推荐问题" : "输入佛学问题，如：《心经》的核心思想是什么？"}
+                placeholder={tabSuggestions.length > 0 ? `${tabSuggestions[(tabIndexRef.current + 1) % tabSuggestions.length]}    ⇥ Tab` : "输入佛学问题，如：《心经》的核心思想是什么？"}
                 disabled={sending}
                 size="large"
                 style={{ fontFamily: '"Noto Serif SC", serif' }}
