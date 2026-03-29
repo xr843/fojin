@@ -99,7 +99,6 @@
   line-height: 2;
   letter-spacing: 0.04em;
   color: var(--fj-ink);
-  white-space: pre-wrap;
   background: var(--fj-card-bg);
   padding: 36px 40px;
   border-radius: 8px;
