@@ -106,7 +106,7 @@ function reflowText(raw: string): TextSegment[] {
     }
 
     // Check paragraph markers
-    const isVerseMarker = /頌曰[：:]?\s*$|偈曰[：:]?\s*$/.test(trimmed);
+    const hasVerseMarker = /頌曰[：:]?|偈曰[：:]?/.test(trimmed);
     const isProseMarker = /^(論曰|述曰|疏曰|解曰|釋曰)/.test(trimmed);
 
     if (isProseMarker) {
@@ -116,8 +116,8 @@ function reflowText(raw: string): TextSegment[] {
       continue;
     }
 
-    // "頌曰：" triggers verse mode — flush prose first, then the marker itself is prose
-    if (isVerseMarker) {
+    // "頌曰" anywhere in line triggers verse mode for subsequent lines
+    if (hasVerseMarker) {
       proseBuf += trimmed;
       flushProse();
       inVerseBlock = true;
@@ -133,6 +133,18 @@ function reflowText(raw: string): TextSegment[] {
     // If we were in verse block but line doesn't look like verse, exit verse mode
     if (inVerseBlock && !isVerse(trimmed)) {
       inVerseBlock = false;
+    }
+
+    // Auto-detect verse: if current AND next line both look like verse,
+    // enter verse mode (handles opening verses without 頌曰 marker)
+    if (!inVerseBlock && isVerse(trimmed)) {
+      const nextTrimmed = (i + 1 < lines.length) ? lines[i + 1].trim() : "";
+      if (isVerse(nextTrimmed) || (segments.length > 0 && segments[segments.length - 1].type === "verse")) {
+        flushProse();
+        segments.push({ type: "verse", text: trimmed });
+        inVerseBlock = true;
+        continue;
+      }
     }
 
     // Default: merge into prose paragraph
