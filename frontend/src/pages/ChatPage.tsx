@@ -337,14 +337,25 @@ export default function ChatPage() {
     return hotQuestionsData?.questions ?? [];
   }, [messages, hotQuestionsData]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key !== "Tab" || tabSuggestions.length === 0) return;
-    if (input && !tabSuggestions.includes(input)) return; // user typed something custom
-    e.preventDefault();
-    const nextIndex = (tabIndexRef.current + 1) % tabSuggestions.length;
-    tabIndexRef.current = nextIndex;
-    setInput(tabSuggestions[nextIndex]);
-  }, [input, tabSuggestions]);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // Attach native keydown listener to capture Tab before Ant Design / browser handles it
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "Tab" || tabSuggestions.length === 0) return;
+      const val = (e.target as HTMLInputElement).value || "";
+      if (val && !tabSuggestions.includes(val)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const nextIndex = (tabIndexRef.current + 1) % tabSuggestions.length;
+      tabIndexRef.current = nextIndex;
+      setInput(tabSuggestions[nextIndex]);
+    };
+    el.addEventListener("keydown", handler);
+    return () => el.removeEventListener("keydown", handler);
+  }, [tabSuggestions]);
 
   // Handle pre-filled message from URL params (e.g. from "Ask XiaoJin" button on reader page)
   const [searchParams, setSearchParams] = useSearchParams();
@@ -819,11 +830,11 @@ export default function ChatPage() {
             )}
             <Space.Compact style={{ width: "100%" }}>
               <Input
+                ref={(instance) => { inputRef.current = instance?.input ?? null; }}
                 value={input}
                 onChange={(e) => { setInput(e.target.value); tabIndexRef.current = -1; }}
                 onPressEnter={handleSend}
-                onKeyDown={handleKeyDown}
-                placeholder={tabSuggestions.length > 0 ? `按 Tab 快速输入推荐问题` : "输入佛学问题，如：《心经》的核心思想是什么？"}
+                placeholder={tabSuggestions.length > 0 ? "按 Tab 快速输入推荐问题" : "输入佛学问题，如：《心经》的核心思想是什么？"}
                 disabled={sending}
                 size="large"
                 style={{ fontFamily: '"Noto Serif SC", serif' }}
