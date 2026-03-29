@@ -38,6 +38,24 @@ import {
 } from "../api/client";
 import { useAuthStore } from "../stores/authStore";
 
+/** Extract [追问] follow-up suggestions from assistant message text. */
+function parseFollowUps(content: string): { cleanContent: string; suggestions: string[] } {
+  const lines = content.split("\n");
+  const suggestions: string[] = [];
+  const cleanLines: string[] = [];
+  for (const line of lines) {
+    const match = line.trim().match(/^\[追问]\s*(.+)/);
+    if (match) {
+      suggestions.push(match[1].trim());
+    } else {
+      cleanLines.push(line);
+    }
+  }
+  // Remove trailing empty lines left after stripping suggestions
+  const cleaned = cleanLines.join("\n").replace(/\n+$/, "");
+  return { cleanContent: cleaned, suggestions };
+}
+
 function groupSessionsByDate(sessions: ChatSessionItem[]): { label: string; items: ChatSessionItem[] }[] {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -513,11 +531,53 @@ export default function ChatPage() {
                         正在检索经文并生成回答
                         <span className="chat-thinking-dots"><span /><span /><span /></span>
                       </div>
-                    ) : (
-                      <div className="chat-markdown">
-                        <Markdown rehypePlugins={[rehypeSanitize]}>{m.content + (streamingIdRef.current === m.id ? " ▌" : "")}</Markdown>
-                      </div>
-                    )
+                    ) : (() => {
+                      const isStreaming = streamingIdRef.current === m.id;
+                      const { cleanContent, suggestions } = isStreaming
+                        ? { cleanContent: m.content, suggestions: [] }
+                        : parseFollowUps(m.content);
+                      return (
+                        <>
+                          <div className="chat-markdown">
+                            <Markdown rehypePlugins={[rehypeSanitize]}>{cleanContent + (isStreaming ? " ▌" : "")}</Markdown>
+                          </div>
+                          {suggestions.length > 0 && !sending && (
+                            <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                              {suggestions.map((q, i) => (
+                                <span
+                                  key={i}
+                                  onClick={() => handleSendMessage(q)}
+                                  style={{
+                                    display: "inline-block",
+                                    padding: "4px 12px",
+                                    borderRadius: 14,
+                                    border: "1px solid var(--fj-gold, #b08d57)",
+                                    color: "var(--fj-gold, #b08d57)",
+                                    fontSize: 12,
+                                    cursor: "pointer",
+                                    background: "transparent",
+                                    transition: "all 0.2s",
+                                    lineHeight: 1.6,
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = "rgba(176,141,87,0.1)";
+                                    e.currentTarget.style.color = "var(--fj-accent)";
+                                    e.currentTarget.style.borderColor = "var(--fj-accent)";
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = "transparent";
+                                    e.currentTarget.style.color = "var(--fj-gold, #b08d57)";
+                                    e.currentTarget.style.borderColor = "var(--fj-gold, #b08d57)";
+                                  }}
+                                >
+                                  {q}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()
                   ) : (
                     m.content
                   )}
