@@ -115,6 +115,7 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sessionFilter, setSessionFilter] = useState("");
+  const tabIndexRef = useRef(-1);
   const [hasOlderMessages, setHasOlderMessages] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -321,6 +322,29 @@ export default function ChatPage() {
   const handleSend = useCallback(async () => {
     await handleSendMessage(input);
   }, [input, handleSendMessage]);
+
+  // Tab key: cycle through suggested questions when input is empty
+  const tabSuggestions = useMemo(() => {
+    // Prefer follow-up suggestions from the last assistant message
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "assistant") {
+        const { suggestions } = parseFollowUps(messages[i].content);
+        if (suggestions.length > 0) return suggestions;
+        break;
+      }
+    }
+    // Fallback to hot questions
+    return hotQuestionsData?.questions ?? [];
+  }, [messages, hotQuestionsData]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key !== "Tab" || tabSuggestions.length === 0) return;
+    if (input && !tabSuggestions.includes(input)) return; // user typed something custom
+    e.preventDefault();
+    const nextIndex = (tabIndexRef.current + 1) % tabSuggestions.length;
+    tabIndexRef.current = nextIndex;
+    setInput(tabSuggestions[nextIndex]);
+  }, [input, tabSuggestions]);
 
   // Handle pre-filled message from URL params (e.g. from "Ask XiaoJin" button on reader page)
   const [searchParams, setSearchParams] = useSearchParams();
@@ -796,9 +820,10 @@ export default function ChatPage() {
             <Space.Compact style={{ width: "100%" }}>
               <Input
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => { setInput(e.target.value); tabIndexRef.current = -1; }}
                 onPressEnter={handleSend}
-                placeholder="输入佛学问题，如：《心经》的核心思想是什么？"
+                onKeyDown={handleKeyDown}
+                placeholder={tabSuggestions.length > 0 ? `按 Tab 快速输入推荐问题` : "输入佛学问题，如：《心经》的核心思想是什么？"}
                 disabled={sending}
                 size="large"
                 style={{ fontFamily: '"Noto Serif SC", serif' }}
