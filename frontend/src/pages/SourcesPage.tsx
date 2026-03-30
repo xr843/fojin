@@ -95,9 +95,8 @@ export default function SourcesPage() {
       });
     });
     return Array.from(nameToCode.values()).sort((a, b) => {
-      const ia = langOrder.indexOf(a);
-      const ib = langOrder.indexOf(b);
-      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+      const order = (c: string) => c === "mul" ? 999 : langOrder.indexOf(c) === -1 ? 99 : langOrder.indexOf(c);
+      return order(a) - order(b);
     });
   }, [sources]);
 

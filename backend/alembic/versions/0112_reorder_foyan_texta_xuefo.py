@@ -1,14 +1,14 @@
 """Move foyan, texta-studio, xuefo to higher sort order.
 
-Revision ID: 0110
-Revises: 0109
+Revision ID: 0112
+Revises: 0111
 """
 
 from alembic import op
 from sqlalchemy import text
 
-revision = "0110"
-down_revision = "0109"
+revision = "0112"
+down_revision = "0111"
 branch_labels = None
 depends_on = None
 
