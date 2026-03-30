@@ -130,7 +130,7 @@ services:
     mem_limit: 256m
     cpus: 0.5
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-fojin}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-fojin}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-fojin}:${POSTGRES_PASSWORD}@postgres:5432/umami
       APP_SECRET: ${UMAMI_APP_SECRET:-change-me-in-production}
       BASE_PATH: /umami
     ports:
