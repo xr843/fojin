@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -148,7 +148,7 @@ async def reply_feedback(
     if not feedback:
         raise HTTPException(status_code=404, detail="反馈不存在")
     feedback.admin_reply = payload.reply
-    feedback.replied_at = datetime.now(datetime.UTC)
+    feedback.replied_at = datetime.now(UTC)
     if feedback.status == "pending":
         feedback.status = "read"
     # 给用户发送站内通知
