@@ -1,6 +1,5 @@
 """RAG retrieval: pgvector semantic similarity search + reranking."""
 
-import asyncio
 import logging
 import time
 
@@ -160,11 +159,9 @@ async def retrieve_rag_context(
         t1 = time.monotonic()
         logger.debug("TIMING: Embedding took %.2fs", t1 - t0)
 
-        # Search text chunks and data sources in parallel
-        text_results, source_results = await asyncio.gather(
-            similarity_search(db, query_embedding, limit=pgvector_limit),
-            source_similarity_search(db, query_embedding, limit=3, min_score=0.5),
-        )
+        # Search text chunks, then data sources (sequential to avoid session conflicts)
+        text_results = await similarity_search(db, query_embedding, limit=pgvector_limit)
+        source_results = await source_similarity_search(db, query_embedding, limit=3, min_score=0.5)
         logger.debug("TIMING: pgvector search took %.2fs", time.monotonic() - t1)
 
         # Filter out low-relevance chunks and deduplicate by (text_id, juan_num)
