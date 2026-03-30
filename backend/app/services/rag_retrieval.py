@@ -1,5 +1,6 @@
 """RAG retrieval: pgvector semantic similarity search + reranking."""
 
+import asyncio
 import logging
 import time
 
@@ -8,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.schemas.chat import ChatSource
-from app.services.embedding import generate_embedding, similarity_search
+from app.services.embedding import generate_embedding, similarity_search, source_similarity_search
 
 logger = logging.getLogger(__name__)
 
@@ -159,13 +160,17 @@ async def retrieve_rag_context(
         t1 = time.monotonic()
         logger.debug("TIMING: Embedding took %.2fs", t1 - t0)
 
-        search_results = await similarity_search(db, query_embedding, limit=pgvector_limit)
+        # Search text chunks and data sources in parallel
+        text_results, source_results = await asyncio.gather(
+            similarity_search(db, query_embedding, limit=pgvector_limit),
+            source_similarity_search(db, query_embedding, limit=3, min_score=0.5),
+        )
         logger.debug("TIMING: pgvector search took %.2fs", time.monotonic() - t1)
 
         # Filter out low-relevance chunks and deduplicate by (text_id, juan_num)
         seen = set()
         filtered = []
-        for r in search_results:
+        for r in text_results:
             if r["score"] < MIN_RELEVANCE_SCORE:
                 continue
             key = (r["text_id"], r["juan_num"])
@@ -183,6 +188,17 @@ async def retrieve_rag_context(
         sources = [ChatSource(**r) for r in search_results]
         context_parts = [f"[出处: {_format_source_label(r)}]\n{r['chunk_text']}" for r in search_results]
         context_text = "\n\n".join(context_parts)
+
+        # Append source recommendations if any matched
+        if source_results:
+            logger.debug("Found %d relevant data sources (scores: %s)",
+                         len(source_results), [f"{s['name_zh']}={s['score']:.3f}" for s in source_results])
+            source_lines = []
+            for s in source_results:
+                desc = (s["description"] or "")[:80]
+                url = s["base_url"] or ""
+                source_lines.append(f"- {s['name_zh']}：{desc}（{url}）")
+            context_text += "\n\n[相关数据源推荐]\n" + "\n".join(source_lines)
     except Exception:
         logger.exception("Embedding/search failed, proceeding without RAG context")
         await db.rollback()
