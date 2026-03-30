@@ -9,6 +9,7 @@ from app.core.deps import get_current_user
 from app.core.role_guard import require_role
 from app.database import get_db
 from app.models.feedback import Feedback
+from app.models.notification import Notification
 from app.models.user import User
 
 router = APIRouter(prefix="/feedbacks", tags=["feedbacks"])
@@ -24,6 +25,8 @@ class FeedbackResponse(BaseModel):
     content: str
     contact: str | None
     status: str
+    admin_reply: str | None = None
+    replied_at: datetime | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -36,9 +39,15 @@ class AdminFeedbackItem(BaseModel):
     content: str
     contact: str | None
     status: str
+    admin_reply: str | None = None
+    replied_at: datetime | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class FeedbackReply(BaseModel):
+    reply: str = Field(..., min_length=1, max_length=2000)
 
 
 class AdminFeedbackListResponse(BaseModel):
@@ -103,6 +112,8 @@ async def list_feedbacks(
             content=fb.content,
             contact=fb.contact,
             status=fb.status,
+            admin_reply=fb.admin_reply,
+            replied_at=fb.replied_at,
             created_at=fb.created_at,
         ))
     return {"total": total, "page": page, "size": size, "items": items}
@@ -120,6 +131,34 @@ async def update_feedback_status(
     if not feedback:
         raise HTTPException(status_code=404, detail="反馈不存在")
     feedback.status = payload.status
+    await db.commit()
+    await db.refresh(feedback)
+    return feedback
+
+
+@router.post("/{feedback_id}/reply", response_model=FeedbackResponse)
+async def reply_feedback(
+    feedback_id: int,
+    payload: FeedbackReply,
+    _user=Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Feedback).where(Feedback.id == feedback_id))
+    feedback = result.scalar_one_or_none()
+    if not feedback:
+        raise HTTPException(status_code=404, detail="反馈不存在")
+    feedback.admin_reply = payload.reply
+    feedback.replied_at = datetime.now(datetime.UTC)
+    if feedback.status == "pending":
+        feedback.status = "read"
+    # 给用户发送站内通知
+    notification = Notification(
+        user_id=feedback.user_id,
+        type="feedback_reply",
+        title="您的反馈已收到回复",
+        content=payload.reply,
+    )
+    db.add(notification)
     await db.commit()
     await db.refresh(feedback)
     return feedback

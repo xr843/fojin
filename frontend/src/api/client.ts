@@ -728,6 +728,8 @@ export interface AdminFeedbackItem {
   content: string;
   contact: string | null;
   status: string;
+  admin_reply: string | null;
+  replied_at: string | null;
   created_at: string;
 }
 
@@ -745,6 +747,10 @@ export async function updateFeedbackStatus(
   status: string,
 ): Promise<void> {
   await api.patch(`/feedbacks/${id}`, { status });
+}
+
+export async function replyFeedback(id: number, reply: string): Promise<void> {
+  await api.post(`/feedbacks/${id}/reply`, { reply });
 }
 
 export async function getPendingFeedbackCount(): Promise<number> {
