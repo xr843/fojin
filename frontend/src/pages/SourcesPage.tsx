@@ -49,6 +49,7 @@ export default function SourcesPage() {
   const [regionFilter, setRegionFilter] = useState("all");
   const [langFilter, setLangFilter] = useState("all");
   const [catFilter, setCatFilter] = useState("all");
+  const [fieldFilter, setFieldFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("default");
   const [showTop, setShowTop] = useState(false);
@@ -100,6 +101,25 @@ export default function SourcesPage() {
     });
   }, [sources]);
 
+  const FIELD_NAMES: Record<string, string> = {
+    han: "汉传佛教", theravada: "南传佛教", tibetan: "藏传佛教",
+    sanskrit: "梵文佛典", dunhuang: "敦煌学", art: "佛教艺术与考古",
+    dictionary: "辞典工具", dh: "数字人文",
+  };
+  const fieldOrder = ["han", "theravada", "tibetan", "sanskrit", "dunhuang", "art", "dictionary", "dh"];
+  const researchFields = useMemo(() => {
+    if (!sources) return [];
+    const set = new Set<string>();
+    sources.forEach((s) => {
+      if (s.research_fields) s.research_fields.split(",").forEach((f) => set.add(f.trim()));
+    });
+    return Array.from(set).sort((a, b) => {
+      const ia = fieldOrder.indexOf(a);
+      const ib = fieldOrder.indexOf(b);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
+  }, [sources]);
+
   const catOrder = ["寺院", "图书馆", "博物馆", "高校研究", "研究机构", "数字项目", "辞典百科", "写本项目", "翻译项目"];
   const categories = useMemo(() => {
     if (!sources) return [];
@@ -134,6 +154,10 @@ export default function SourcesPage() {
         const filterName = getLangName(langFilter);
         if (!langs.some((l) => getLangName(l) === filterName)) return false;
       }
+      if (fieldFilter !== "all") {
+        const fields = (s.research_fields || "").split(",").map((f) => f.trim());
+        if (!fields.includes(fieldFilter)) return false;
+      }
       if (catFilter !== "all" && getCategory(s) !== catFilter) return false;
       return true;
     });
@@ -146,7 +170,7 @@ export default function SourcesPage() {
     }
     // sortBy === "default": keep backend sort_order
     return result;
-  }, [sources, search, regionFilter, langFilter, catFilter, sortBy]);
+  }, [sources, search, regionFilter, langFilter, fieldFilter, catFilter, sortBy]);
 
   // 按地区分组
   const grouped = useMemo(() => {
@@ -247,6 +271,15 @@ export default function SourcesPage() {
           options={[
             { value: "all", label: `全部语种 (${languages.length})` },
             ...languages.map((l) => ({ value: l, label: getLangName(l) })),
+          ]}
+        />
+        <Select
+          value={fieldFilter}
+          onChange={setFieldFilter}
+          style={{ width: 150 }}
+          options={[
+            { value: "all", label: `研究领域 (${researchFields.length})` },
+            ...researchFields.map((f) => ({ value: f, label: FIELD_NAMES[f] || f })),
           ]}
         />
         <Select

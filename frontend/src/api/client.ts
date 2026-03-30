@@ -246,6 +246,7 @@ export interface DataSource {
   access_type: "local" | "external" | "api";
   region: string | null;
   languages: string | null;
+  research_fields: string | null;
   supports_search: boolean;
   supports_fulltext: boolean;
   has_local_fulltext: boolean;

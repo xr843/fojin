@@ -36,6 +36,7 @@ class DataSourceResponse(BaseModel):
     access_type: str = "external"
     region: str | None = None
     languages: str | None = None
+    research_fields: str | None = None
     supports_search: bool = False
     supports_fulltext: bool = False
     has_local_fulltext: bool = False
