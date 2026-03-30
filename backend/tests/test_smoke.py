@@ -80,6 +80,7 @@ async def test_sources_include_distributions(client):
     fake_source.access_type = "local"
     fake_source.region = "中国台湾"
     fake_source.languages = "lzh"
+    fake_source.research_fields = "han"
     fake_source.supports_search = True
     fake_source.supports_fulltext = True
     fake_source.has_local_fulltext = True
