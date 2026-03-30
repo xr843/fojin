@@ -106,7 +106,7 @@ export default function SourcesPage() {
     dunhuang: "敦煌学", art: "佛教艺术",
     dictionary: "辞典工具", dh: "数字人文",
   };
-  const fieldOrder = ["han", "theravada", "tibetan", "dunhuang", "art", "dictionary", "dh"];
+  const fieldOrder = ["han", "theravada", "tibetan", "dictionary", "dh", "dunhuang", "art"];
   const researchFields = useMemo(() => {
     if (!sources) return [];
     const set = new Set<string>();
