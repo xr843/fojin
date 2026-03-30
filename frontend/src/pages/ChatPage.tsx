@@ -246,6 +246,11 @@ export default function ChatPage() {
     const msg = text.trim();
     if (!msg || sending) return;
 
+    // Umami: track chat question (truncated to 30 chars for privacy)
+    if (typeof umami !== "undefined") {
+      umami.track("chat", { question: msg.slice(0, 30) });
+    }
+
     const userMsg: ChatMessageItem = {
       id: Date.now(),
       role: "user",

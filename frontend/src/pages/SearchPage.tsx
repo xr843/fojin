@@ -116,6 +116,10 @@ export default function SearchPage() {
     setPage(1);
     updateUrl({ q: value });
     saveSearchHistory(value);
+    // Umami: track search keyword
+    if (typeof umami !== "undefined" && value) {
+      umami.track("search", { keyword: value });
+    }
   };
 
   const clearSource = (code: string) => {

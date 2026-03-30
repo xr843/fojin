@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -222,6 +222,13 @@ export default function TextReaderPage() {
     queryFn: () => getJuanLanguages(Number(textId), juanNum),
     enabled: !!textId,
   });
+
+  // Umami: track text reading when detail loads
+  useEffect(() => {
+    if (textDetail && typeof umami !== "undefined") {
+      umami.track("read", { id: String(textId), title: textDetail.title_zh || "" });
+    }
+  }, [textId, textDetail]);
 
   const { data: compareContent, isLoading: compareLoading } = useQuery({
     queryKey: ["juanContent", textId, juanNum, compareLang],

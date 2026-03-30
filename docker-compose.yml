@@ -122,6 +122,28 @@ services:
       redis:
         condition: service_healthy
 
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    container_name: fojin-umami
+    restart: always
+    logging: *default-logging
+    mem_limit: 256m
+    cpus: 0.5
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-fojin}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-fojin}
+      APP_SECRET: ${UMAMI_APP_SECRET:-change-me-in-production}
+      BASE_PATH: /umami
+    ports:
+      - "127.0.0.1:3001:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/umami/api/heartbeat || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   frontend:
     depends_on:
       backend:
