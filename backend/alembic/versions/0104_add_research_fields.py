@@ -134,7 +134,7 @@ EXACT_MAPPINGS: dict[str, str] = {
     "dunhuang-academy": "dunhuang",
     "dunhuang-cave17": "dunhuang",
     "dunhuang-hanji": "dunhuang",
-    "dunhuang-iiif": "dunhuang,art",
+    "dunhuang-iiif": "dunhuang",
     "dunhuang-research-db": "dunhuang",
     "dunhuang-snupg": "dunhuang",
     "ihp-dunhuang": "dunhuang",
