@@ -85,13 +85,14 @@ async def main() -> None:
 
         embeddings = await generate_embeddings_batch(texts)
 
-        # Write back to DB
-        async with async_engine.begin() as conn:
+        # Write back to DB using raw driver SQL ($1/$2 placeholders for asyncpg)
+        async with async_engine.connect() as conn:
+            raw_conn = await conn.get_raw_connection()
             for source_id, embedding in zip(ids, embeddings, strict=True):
                 embedding_str = "[" + ",".join(str(x) for x in embedding) + "]"
-                await conn.execute(
-                    text("UPDATE data_sources SET embedding = :emb::vector WHERE id = :id"),
-                    {"emb": embedding_str, "id": source_id},
+                await raw_conn.driver_connection.execute(
+                    "UPDATE data_sources SET embedding = $1::vector WHERE id = $2",
+                    embedding_str, source_id,
                 )
                 updated += 1
 
