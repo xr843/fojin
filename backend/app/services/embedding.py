@@ -144,3 +144,36 @@ async def similarity_search(
         }
         for row in rows
     ]
+
+
+async def source_similarity_search(
+    session: AsyncSession,
+    query_embedding: list[float],
+    limit: int = 3,
+    min_score: float = 0.5,
+) -> list[dict]:
+    """Find most relevant data sources using pgvector cosine distance."""
+    embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
+    raw_conn = await session.connection()
+    result = await raw_conn.exec_driver_sql(
+        "SELECT ds.id, ds.code, ds.name_zh, ds.description, ds.base_url, "
+        "1 - (ds.embedding <=> $1::vector) AS score "
+        "FROM data_sources ds "
+        "WHERE ds.embedding IS NOT NULL AND ds.is_active = true "
+        "ORDER BY ds.embedding <=> $1::vector "
+        "LIMIT $2",
+        (embedding_str, limit),
+    )
+    rows = result.fetchall()
+    return [
+        {
+            "source_id": row[0],
+            "code": row[1],
+            "name_zh": row[2],
+            "description": row[3],
+            "base_url": row[4],
+            "score": float(row[5]),
+        }
+        for row in rows
+        if float(row[5]) >= min_score
+    ]
