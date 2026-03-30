@@ -19,6 +19,7 @@ class DataSource(Base):
     access_type: Mapped[str] = mapped_column(String(20), server_default="external")  # local/external/api
     region: Mapped[str | None] = mapped_column(String(50))
     languages: Mapped[str | None] = mapped_column(String(200))  # comma-separated ISO 639 codes
+    research_fields: Mapped[str | None] = mapped_column(String(500))  # comma-separated: han,theravada,tibetan,sanskrit,dunhuang,art,dictionary,dh
     supports_search: Mapped[bool] = mapped_column(Boolean, server_default="false")
     supports_fulltext: Mapped[bool] = mapped_column(Boolean, server_default="false")
     has_local_fulltext: Mapped[bool] = mapped_column(Boolean, server_default="false")
