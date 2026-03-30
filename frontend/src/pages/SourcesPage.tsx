@@ -103,7 +103,7 @@ export default function SourcesPage() {
 
   const FIELD_NAMES: Record<string, string> = {
     han: "汉传佛教", theravada: "南传佛教", tibetan: "藏传佛教",
-    sanskrit: "梵文佛典", dunhuang: "敦煌学", art: "佛教艺术与考古",
+    sanskrit: "梵文佛典", dunhuang: "敦煌学", art: "佛教艺术",
     dictionary: "辞典工具", dh: "数字人文",
   };
   const fieldOrder = ["han", "theravada", "tibetan", "sanskrit", "dunhuang", "art", "dictionary", "dh"];
