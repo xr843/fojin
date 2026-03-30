@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
-import { Table, Tag, Space, Select, Typography, message, Button } from "antd";
+import { Table, Tag, Space, Select, Typography, message, Button, Modal, Input } from "antd";
 import { Helmet } from "react-helmet-async";
 import {
   getAdminFeedbacks,
   updateFeedbackStatus,
+  replyFeedback,
   type AdminFeedbackItem,
 } from "../api/client";
 
@@ -25,6 +26,9 @@ export default function AdminFeedbacksPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
+  const [replyModal, setReplyModal] = useState<AdminFeedbackItem | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [replying, setReplying] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -54,6 +58,27 @@ export default function AdminFeedbacksPage() {
       fetchData();
     } catch {
       message.error("操作失败");
+    }
+  };
+
+  const openReplyModal = (record: AdminFeedbackItem) => {
+    setReplyModal(record);
+    setReplyText(record.admin_reply || "");
+  };
+
+  const handleReply = async () => {
+    if (!replyModal || !replyText.trim()) return;
+    setReplying(true);
+    try {
+      await replyFeedback(replyModal.id, replyText.trim());
+      message.success("回复已发送，用户将收到通知");
+      setReplyModal(null);
+      setReplyText("");
+      fetchData();
+    } catch {
+      message.error("回复失败");
+    } finally {
+      setReplying(false);
     }
   };
 
@@ -88,12 +113,18 @@ export default function AdminFeedbacksPage() {
     },
     {
       title: "操作",
-      width: 200,
+      width: 260,
       render: (_: unknown, record: AdminFeedbackItem) => (
         <Space>
+          <Button
+            type={record.admin_reply ? "default" : "primary"}
+            size="small"
+            onClick={() => openReplyModal(record)}
+          >
+            {record.admin_reply ? "查看回复" : "回复"}
+          </Button>
           {record.status === "pending" && (
             <Button
-              type="primary"
               size="small"
               onClick={() => handleStatusChange(record.id, "read")}
             >
@@ -154,6 +185,49 @@ export default function AdminFeedbacksPage() {
           size="middle"
         />
       </div>
+
+      <Modal
+        title={replyModal ? `回复 ${replyModal.username} 的反馈` : "回复"}
+        open={!!replyModal}
+        onCancel={() => { setReplyModal(null); setReplyText(""); }}
+        onOk={handleReply}
+        okText="发送回复"
+        cancelText="取消"
+        confirmLoading={replying}
+        okButtonProps={{ disabled: !replyText.trim() }}
+      >
+        {replyModal && (
+          <div style={{ marginBottom: 16 }}>
+            <Typography.Text type="secondary">用户反馈：</Typography.Text>
+            <div style={{
+              background: "#faf8f5", padding: "8px 12px", borderRadius: 6,
+              marginTop: 4, fontSize: 13, lineHeight: 1.6,
+            }}>
+              {replyModal.content}
+            </div>
+            {replyModal.contact && (
+              <div style={{ marginTop: 8, fontSize: 12, color: "#999" }}>
+                联系方式：{replyModal.contact}
+              </div>
+            )}
+          </div>
+        )}
+        <Typography.Text type="secondary">管理员回复：</Typography.Text>
+        <Input.TextArea
+          rows={4}
+          value={replyText}
+          onChange={(e) => setReplyText(e.target.value)}
+          placeholder="输入回复内容，用户将在通知中心收到此回复"
+          maxLength={2000}
+          showCount
+          style={{ marginTop: 4 }}
+        />
+        {replyModal?.replied_at && (
+          <div style={{ marginTop: 8, fontSize: 12, color: "#999" }}>
+            上次回复时间：{new Date(replyModal.replied_at).toLocaleString("zh-CN")}
+          </div>
+        )}
+      </Modal>
     </>
   );
 }

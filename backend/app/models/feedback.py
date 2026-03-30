@@ -14,6 +14,8 @@ class Feedback(Base):
     content: Mapped[str] = mapped_column(Text)
     contact: Mapped[str | None] = mapped_column(String(200), nullable=True)
     status: Mapped[str] = mapped_column(String(20), server_default="pending")
+    admin_reply: Mapped[str | None] = mapped_column(Text, nullable=True)
+    replied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
