@@ -223,6 +223,13 @@ export default function TextReaderPage() {
     enabled: !!textId,
   });
 
+  // Umami: track text reading when detail loads
+  useEffect(() => {
+    if (textDetail && typeof umami !== "undefined") {
+      umami.track("read", { id: String(textId), title: textDetail.title || "" });
+    }
+  }, [textId, textDetail]);
+
   const { data: compareContent, isLoading: compareLoading } = useQuery({
     queryKey: ["juanContent", textId, juanNum, compareLang],
     queryFn: () => getJuanContent(Number(textId), juanNum, compareLang!),
