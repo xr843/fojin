@@ -1,14 +1,13 @@
 """Remove 'mul' tag from sources with specific languages listed.
 
-Revision ID: 0108
-Revises: 0107
+Revision ID: 0110
+Revises: 0109
 """
 
 from alembic import op
-import sqlalchemy as sa
 
-revision = "0108"
-down_revision = "0107"
+revision = "0110"
+down_revision = "0109"
 branch_labels = None
 depends_on = None
 
