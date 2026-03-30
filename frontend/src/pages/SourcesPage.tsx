@@ -111,7 +111,10 @@ export default function SourcesPage() {
     if (!sources) return [];
     const set = new Set<string>();
     sources.forEach((s) => {
-      if (s.research_fields) s.research_fields.split(",").forEach((f) => set.add(f.trim()));
+      if (s.research_fields) s.research_fields.split(",").forEach((f) => {
+        const key = f.trim();
+        if (key in FIELD_NAMES) set.add(key);
+      });
     });
     return Array.from(set).sort((a, b) => {
       const ia = fieldOrder.indexOf(a);
