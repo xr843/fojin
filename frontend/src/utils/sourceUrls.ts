@@ -142,6 +142,10 @@ export const LANG_NAMES: Record<string, string> = {
   hi: "印地文",
   jv: "爪哇文",
   es: "西班牙文",
+  mn: "蒙古文",
+  bn: "孟加拉文",
+  cs: "捷克文",
+  mul: "多语种",
 };
 
 export function getLangName(code: string): string {
