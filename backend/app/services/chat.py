@@ -471,6 +471,10 @@ async def send_message_stream(
     # Yield session_id immediately so frontend gets a fast response
     yield f"data: {json.dumps({'type': 'session_id', 'session_id': chat_session.id if chat_session else 0}, ensure_ascii=False)}\n\n"
 
+    # RAG 检索已完成，立即发送 sources 事件，让前端尽早渲染引用区域
+    if sources:
+        yield f"data: {json.dumps({'type': 'sources', 'sources': [s.model_dump() for s in sources]}, ensure_ascii=False)}\n\n"
+
     # --- Phase 3: stream LLM ---
     full_answer = ""
     try:
@@ -521,10 +525,6 @@ async def send_message_stream(
         error_msg = "抱歉，AI 服务暂时不可用，请稍后重试。"
         yield f"data: {json.dumps({'type': 'error', 'message': error_msg}, ensure_ascii=False)}\n\n"
         full_answer = full_answer or error_msg
-
-    # Send sources after answer is complete, so citations appear below the text
-    if sources:
-        yield f"data: {json.dumps({'type': 'sources', 'sources': [s.model_dump() for s in sources]}, ensure_ascii=False)}\n\n"
 
     if chat_session:
         await _save_messages(db, chat_session.id, message, full_answer, sources)
