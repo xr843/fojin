@@ -1022,6 +1022,7 @@ export interface StreamCallbacks {
   onToken: (content: string) => void;
   onSources: (sources: ChatSource[]) => void;
   onSessionId: (sessionId: number) => void;
+  onSearching?: (message: string) => void;
   onError: (message: string) => void;
   onDone: () => void;
 }
@@ -1071,6 +1072,9 @@ export function sendChatMessageStream(
               break;
             case "session_id":
               callbacks.onSessionId(event.session_id);
+              break;
+            case "searching":
+              callbacks?.onSearching?.(event.message);
               break;
             case "error":
               callbacks.onError(event.message);

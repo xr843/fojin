@@ -298,6 +298,13 @@ export default function ChatPage() {
           ),
         );
       },
+      onSearching: (searchMsg: string) => {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId ? { ...m, content: searchMsg } : m,
+          ),
+        );
+      },
       onSessionId: (newSessionId: number) => {
         if (!sessionId) {
           setSessionId(newSessionId);

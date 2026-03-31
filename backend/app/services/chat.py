@@ -459,6 +459,9 @@ async def send_message_stream(
     yield ": " + " " * 2048 + "\n\n"
 
     # --- Phase 1: validation, quota, session, RAG (reuse _prepare_chat) ---
+    # 立即告知前端正在检索，消除空白等待感
+    yield f"data: {json.dumps({'type': 'searching', 'message': '正在检索相关经文...'}, ensure_ascii=False)}\n\n"
+
     try:
         chat_session, api_url, api_key, model, is_byok, sources, llm_messages = await _prepare_chat(
             db, user_id, message, session_id, user, client_ip=client_ip, redis=redis,
@@ -470,10 +473,6 @@ async def send_message_stream(
 
     # Yield session_id immediately so frontend gets a fast response
     yield f"data: {json.dumps({'type': 'session_id', 'session_id': chat_session.id if chat_session else 0}, ensure_ascii=False)}\n\n"
-
-    # RAG 检索已完成，立即发送 sources 事件，让前端尽早渲染引用区域
-    if sources:
-        yield f"data: {json.dumps({'type': 'sources', 'sources': [s.model_dump() for s in sources]}, ensure_ascii=False)}\n\n"
 
     # --- Phase 3: stream LLM ---
     full_answer = ""
@@ -525,6 +524,10 @@ async def send_message_stream(
         error_msg = "抱歉，AI 服务暂时不可用，请稍后重试。"
         yield f"data: {json.dumps({'type': 'error', 'message': error_msg}, ensure_ascii=False)}\n\n"
         full_answer = full_answer or error_msg
+
+    # 回答完成后显示引用来源——先论点后论据，自然阅读顺序
+    if sources:
+        yield f"data: {json.dumps({'type': 'sources', 'sources': [s.model_dump() for s in sources]}, ensure_ascii=False)}\n\n"
 
     if chat_session:
         await _save_messages(db, chat_session.id, message, full_answer, sources)

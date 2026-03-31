@@ -1,7 +1,7 @@
-"""测试 chat SSE 事件流中 sources 事件的顺序。
+"""测试 chat SSE 事件流中事件的顺序。
 
 验证 send_message_stream 生成器输出的 SSE 事件满足前端预期的顺序：
-  padding → session_id → sources → token(s) → done
+  padding → searching → session_id → token(s) → sources → done
 """
 
 import json
@@ -96,10 +96,10 @@ def _make_mock_httpx_client(tokens: list[str]):
 
 
 @pytest.mark.anyio
-async def test_sources_before_tokens():
-    """验证 sources 事件出现在第一个 token 事件之前。
+async def test_sources_after_tokens():
+    """验证 sources 事件出现在最后一个 token 事件之后（先论点后论据）。
 
-    预期事件顺序：session_id → sources → token → token → done
+    预期事件顺序：searching → session_id → token → token → sources → done
     """
     sources = _make_fake_sources()
     prepare_return = _make_prepare_chat_return(sources)
@@ -120,21 +120,25 @@ async def test_sources_before_tokens():
     event_types = [e["type"] for e in events]
 
     # 基本顺序验证
-    assert event_types[0] == "session_id", f"第一个事件应为 session_id，实际为 {event_types[0]}"
-    assert event_types[1] == "sources", f"第二个事件应为 sources，实际为 {event_types[1]}"
+    assert event_types[0] == "searching", f"第一个事件应为 searching，实际为 {event_types[0]}"
+    assert event_types[1] == "session_id", f"第二个事件应为 session_id，实际为 {event_types[1]}"
     assert event_types[-1] == "done", f"最后一个事件应为 done，实际为 {event_types[-1]}"
 
-    # sources 必须在所有 token 之前
+    # sources 必须在所有 token 之后
     sources_idx = event_types.index("sources")
-    first_token_idx = event_types.index("token")
-    assert sources_idx < first_token_idx, (
-        f"sources 事件（位置 {sources_idx}）应在第一个 token 事件（位置 {first_token_idx}）之前"
+    last_token_idx = len(event_types) - 1 - event_types[::-1].index("token")
+    assert sources_idx > last_token_idx, (
+        f"sources 事件（位置 {sources_idx}）应在最后一个 token 事件（位置 {last_token_idx}）之后"
     )
 
     # 验证 sources 事件内容
     sources_event = events[sources_idx]
     assert len(sources_event["sources"]) == 2
     assert sources_event["sources"][0]["title_zh"] == "心经"
+
+    # 验证 searching 事件内容
+    searching_event = events[0]
+    assert "检索" in searching_event["message"]
 
 
 @pytest.mark.anyio
@@ -166,7 +170,8 @@ async def test_empty_sources_not_emitted():
         f"空 sources 时不应发送 sources 事件，但事件流中包含: {event_types}"
     )
     # 验证基本结构仍然完整
-    assert event_types[0] == "session_id"
+    assert event_types[0] == "searching"
+    assert event_types[1] == "session_id"
     assert event_types[-1] == "done"
     assert "token" in event_types
 
@@ -190,7 +195,7 @@ async def test_session_id_value_correct():
             chunks.append(chunk)
 
     events = _parse_sse_events(chunks)
-    session_event = events[0]
+    session_event = events[1]  # searching 之后是 session_id
     assert session_event["type"] == "session_id"
     assert session_event["session_id"] == 42, (
         f"session_id 应为 42，实际为 {session_event['session_id']}"
@@ -221,8 +226,8 @@ async def test_error_during_prepare_yields_error_and_done():
     events = _parse_sse_events(chunks)
     event_types = [e["type"] for e in events]
 
-    assert event_types == ["error", "done"], (
-        f"prepare 异常时应只有 [error, done]，实际为 {event_types}"
+    assert event_types == ["searching", "error", "done"], (
+        f"prepare 异常时应为 [searching, error, done]，实际为 {event_types}"
     )
     assert "session_id" not in event_types
     assert "sources" not in event_types
