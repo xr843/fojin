@@ -101,10 +101,10 @@ class DILAGitHubImporter(BaseImporter):
         result = await session.execute(
             text("""
                 INSERT INTO kg_relations (subject_id, predicate, object_id, source, confidence)
-                SELECT :sid, :pred, :oid, :src, 1.0
+                SELECT :sid, CAST(:pred AS varchar), :oid, CAST(:src AS varchar), 1.0
                 WHERE NOT EXISTS (
                     SELECT 1 FROM kg_relations
-                    WHERE subject_id = :sid AND predicate = :pred AND object_id = :oid
+                    WHERE subject_id = :sid AND predicate = CAST(:pred AS varchar) AND object_id = :oid
                 )
             """),
             {"sid": subject_id, "pred": predicate, "oid": object_id, "src": source},
