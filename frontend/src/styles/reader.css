@@ -97,6 +97,7 @@
   font-family: "Noto Serif SC", "Source Han Serif SC", serif;
   font-size: var(--reader-font-size, 17px);
   line-height: 1.8;
+  line-break: strict; /* CJK 标点禁则：句号逗号不出现在行首，左引号不出现在行尾 */
   color: var(--fj-ink);
   padding: 20px 0;
 }
