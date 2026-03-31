@@ -645,7 +645,7 @@ async def search_semantic(
         codes = [c.strip() for c in sources.split(",") if c.strip()]
         if codes:
             placeholders = ", ".join(f"${param_idx + i}" for i in range(len(codes)))
-            filter_conditions.append(f"AND bt.source_code IN ({placeholders})")
+            filter_conditions.append(f"AND ds.code IN ({placeholders})")
             params.extend(codes)
             param_idx += len(codes)
 
@@ -655,11 +655,12 @@ async def search_semantic(
         "SELECT te.text_id, te.juan_num, te.chunk_text, "  # nosec B608
         "1 - (te.embedding <=> $1::vector) AS score, "
         "COALESCE(bt.title_zh, '') AS title_zh, "
-        "bt.translator, bt.dynasty, bt.category, bt.source_code, "
+        "bt.translator, bt.dynasty, bt.category, ds.code AS source_code, "
         "bt.cbeta_id, bt.cbeta_url, "
         "CASE WHEN bt.content_char_count > 0 THEN true ELSE false END AS has_content "
         "FROM text_embeddings te "
         "JOIN buddhist_texts bt ON bt.id = te.text_id "
+        "LEFT JOIN data_sources ds ON ds.id = bt.source_id "
         "WHERE te.embedding IS NOT NULL "
         f"AND 1 - (te.embedding <=> $1::vector) >= $2 "
         f"{filter_sql} "
