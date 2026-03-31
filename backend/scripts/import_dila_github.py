@@ -29,7 +29,7 @@ from lxml import etree
 from scripts.base_importer import BaseImporter
 from sqlalchemy import select, text
 
-from app.models.knowledge_graph import KGEntity, KGRelation
+from app.models.knowledge_graph import KGEntity
 
 TEI_NS = "http://www.tei-c.org/ns/1.0"
 
@@ -96,25 +96,20 @@ class DILAGitHubImporter(BaseImporter):
     async def _create_relation_if_not_exists(
         self, session, *, subject_id: int, predicate: str, object_id: int, source: str,
     ) -> bool:
-        """Create KGRelation if not already exists. Returns True if created."""
+        """Create KGRelation if not already exists (atomic INSERT WHERE NOT EXISTS)."""
+        await session.flush()  # flush pending entities first
         result = await session.execute(
-            select(KGRelation).where(
-                KGRelation.subject_id == subject_id,
-                KGRelation.predicate == predicate,
-                KGRelation.object_id == object_id,
-            )
+            text("""
+                INSERT INTO kg_relations (subject_id, predicate, object_id, source, confidence)
+                SELECT :sid, :pred, :oid, :src, 1.0
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM kg_relations
+                    WHERE subject_id = :sid AND predicate = :pred AND object_id = :oid
+                )
+            """),
+            {"sid": subject_id, "pred": predicate, "oid": object_id, "src": source},
         )
-        if result.scalar_one_or_none():
-            return False
-
-        session.add(KGRelation(
-            subject_id=subject_id,
-            predicate=predicate,
-            object_id=object_id,
-            source=source,
-            confidence=1.0,
-        ))
-        return True
+        return result.rowcount > 0
 
     async def import_lineage(self, session):
         """Phase 1: Import teacher/student relationships from Person XML."""
