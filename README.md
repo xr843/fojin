@@ -284,6 +284,10 @@ FoJin is built on the generous work of the global Buddhist digital humanities co
 - [SAT](https://21dzk.l.u-tokyo.ac.jp/SAT/) — SAT Daizokyo Text Database
 - All other data source providers listed in the [Sources page](https://fojin.app/sources)
 
+## Community
+
+- [LINUX DO](https://linux.do) — 感谢 LINUX DO 社区的支持与反馈
+
 ## Related Projects
 
 - [The Open Buddhist University](https://buddhistuniversity.net) — Free courses, books, and encyclopaedia for Buddhist studies
