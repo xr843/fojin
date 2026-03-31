@@ -4,9 +4,9 @@
 
 ### The World's Encyclopedic Buddhist Digital Text Platform
 
-**505 sources. 30 languages. 30 countries. 17,800+ full-text volumes. One search.**
+**503 sources. 30 languages. 30 countries. 17,800+ full-text volumes. One search.**
 
-Aggregating the world's Buddhist digital heritage — 9,200+ texts with 17,800+ volumes of full content in Pali, Classical Chinese, Tibetan, and Sanskrit from 505 data sources — with CBETA-style reading, AI-powered Q&A (RAG + reranking + citations), knowledge graph, timeline visualization, collections, citations, annotations, bookmarks, and multi-language parallel reading.
+Aggregating the world's Buddhist digital heritage — 9,200+ texts with 17,800+ volumes of full content in Pali, Classical Chinese, Tibetan, and Sanskrit from 503 data sources — with CBETA-style reading, AI-powered Q&A (RAG + reranking + citations + data source recommendations), knowledge graph with 31K+ entities and 28K+ relations (including 23K teacher-student lineage chains), 12 dictionaries with 289K entries, timeline visualization, collections, citations, annotations, bookmarks, and multi-language parallel reading.
 
 [Live Demo](https://fojin.app) &nbsp;&middot;&nbsp; [API Docs](https://fojin.app/docs) &nbsp;&middot;&nbsp; [中文文档](./docs/README_zh.md) &nbsp;&middot;&nbsp; [Discussions](https://github.com/xr843/fojin/discussions) &nbsp;&middot;&nbsp; [Discord](https://discord.gg/76SZeuJekq) &nbsp;&middot;&nbsp; [Report Bug](https://github.com/xr843/fojin/issues)
 
@@ -25,15 +25,15 @@ Aggregating the world's Buddhist digital heritage — 9,200+ texts with 17,800+ 
 
 Buddhist texts are scattered across hundreds of databases worldwide — CBETA, SuttaCentral, BDRC, SAT, 84000, GRETIL, and many more. Each has different interfaces, languages, and data formats. Researchers spend more time *finding* texts than *reading* them.
 
-**FoJin solves this.** It aggregates 505 sources into a single, searchable platform with features no other tool provides:
+**FoJin solves this.** It aggregates 503 sources into a single, searchable platform with features no other tool provides:
 
 | What you need | How FoJin helps |
 |---|---|
-| Find a sutra across databases | **Multi-dimensional search** across 9,200+ texts from 505 sources |
+| Find a sutra across databases | **Multi-dimensional search** across 9,200+ texts from 503 sources |
 | Read the full text online | **7,600+ texts** with 17,800+ volumes of full content, CBETA-style layout |
 | Compare translations | **Parallel reading** in 30 languages side by side |
-| Look up Buddhist terms | **6 dictionaries**, 285K entries (Chinese/Sanskrit/Pali/English) |
-| Explore relationships | **Knowledge graph** with 9,700+ entities and 4,100+ relations |
+| Look up Buddhist terms | **12 dictionaries**, 289K entries (Chinese/Sanskrit/Pali/Tibetan/English) |
+| Explore relationships | **Knowledge graph** with 31K+ entities and 28K+ relations (23K lineage chains) |
 | Discover similar texts | **Semantic similarity** powered by 420K+ embedding vectors (pgvector + HNSW) |
 | View original manuscripts | **IIIF manuscript viewer** connected to BDRC and more |
 | Ask questions about texts | **AI Q&A** ("XiaoJin") with RAG, reranking, clickable citations, and follow-up suggestions |
@@ -87,17 +87,23 @@ Compare translations side by side — Classical Chinese, Sanskrit, Pali, Tibetan
 
 ### Dictionary Lookup
 
-6 authoritative dictionaries with 285,000+ entries:
+12 authoritative dictionaries with 289,000+ entries:
+- **Ding Fubao** (丁福保佛学大辞典)
+- **Soothill-Hodous** (A Dictionary of Chinese Buddhist Terms)
+- **Hopkins** (Tibetan-Sanskrit-English Dictionary)
 - **DDB** (Digital Dictionary of Buddhism)
+- **NTI** (Nan Tien Institute Buddhist Dictionary)
 - **SuttaCentral Glossary** (Pali)
 - **NCPED** (New Concise Pali-English Dictionary)
-- **NTI** (Nan Tien Institute Buddhist Dictionary)
+- **PTS PED** (Pali Text Society Pali-English Dictionary)
 - **Edgerton BHS** (Buddhist Hybrid Sanskrit Dictionary)
 - **Monier-Williams** (Sanskrit-English Dictionary)
+- **Rangjung Yeshe** (Tibetan-English Dictionary)
+- **Nanshan Vinaya** (南山律学辞典)
 
 ### Knowledge Graph
 
-9,700+ entities (persons, monasteries, texts, schools) and 4,100+ relationships, visualized as an interactive force-directed graph. Click any node to explore connections.
+31,000+ entities (persons, monasteries, texts, schools, concepts) and 28,000+ relationships — including 23,000 teacher-student lineage chains from the DILA Authority Database — visualized as an interactive force-directed graph. Click any node to explore connections.
 
 ### AI Q&A — "XiaoJin"
 
@@ -107,6 +113,7 @@ Ask questions in natural language. XiaoJin answers based on canonical Buddhist t
 - Keyword + optional API cross-encoder **reranking** for higher answer quality
 - **Clickable citations** in 【《经名》第N卷】 format — click to jump to the text reader
 - **Progressive follow-up suggestions** (concept → related texts → practice)
+- **Smart data source recommendations** — when users ask about finding databases, AI automatically recommends relevant sources from 503 data sources via semantic similarity
 - **"Ask XiaoJin" button** on the reader page — select text to ask about it
 - **Tab key** cycles through suggested questions in the input box
 - BYOK (Bring Your Own Key) support for multiple LLM providers
@@ -139,9 +146,9 @@ Available in 9 languages: Simplified Chinese, Traditional Chinese, English, Japa
 
 ## Data Sources
 
-<p align="center"><img src="./docs/screenshots/sources.png" alt="505 data sources from 30 countries" width="800"></p>
+<p align="center"><img src="./docs/screenshots/sources.png" alt="503 data sources from 30 countries" width="800"></p>
 
-FoJin aggregates data from major Buddhist digital projects worldwide:
+FoJin aggregates data from major Buddhist digital projects worldwide. Sources are categorized by research field (Han, Theravada, Tibetan, Sanskrit, Dunhuang, Art, Dictionary, Digital Humanities) and filterable by region, language, and type:
 
 | Source | Content | Languages |
 |--------|---------|-----------|
@@ -150,12 +157,13 @@ FoJin aggregates data from major Buddhist digital projects worldwide:
 | [84000](https://84000.co) | Tibetan Buddhist Canon | Tibetan, English, Sanskrit |
 | [BDRC](https://bdrc.io) | Tibetan manuscripts (IIIF) | Tibetan |
 | [SAT](https://21dzk.l.u-tokyo.ac.jp/SAT/) | Taisho Tripitaka | Chinese, Japanese |
+| [DILA](https://authority.dila.edu.tw) | Authority databases (persons, places, catalogs) | Multi-language |
 | [GRETIL](http://gretil.sub.uni-goettingen.de) | Sanskrit e-texts | Sanskrit |
 | [DSBC](https://www.dsbcproject.org) | Digital Sanskrit Buddhist Canon | Sanskrit |
 | [Gandhari.org](https://gandhari.org) | Gandhari manuscripts | Gandhari |
 | [VRI Tipitaka](https://tipitaka.org) | Pali Canon (Chattha Sangayana) | Pali |
 | [Korean Tripitaka](http://kb.sutra.re.kr) | Goryeo Tripitaka | Chinese, Korean |
-| + 495 more... | | |
+| + 492 more... | | |
 
 ## Tech Stack
 
@@ -166,7 +174,7 @@ FoJin aggregates data from major Buddhist digital projects worldwide:
 | Database | PostgreSQL 15 + pgvector (HNSW index) + pg_trgm |
 | Search | Elasticsearch 8 (ICU tokenizer) |
 | Cache | Redis 7 |
-| AI | RAG (420K+ vectors, BGE-M3 embeddings) + multi-provider LLM (OpenAI/DashScope/DeepSeek/SiliconFlow) |
+| AI | RAG (420K+ text vectors + 503 source vectors, BGE-M3 embeddings, HNSW) + multi-provider LLM (OpenAI/DashScope/DeepSeek/SiliconFlow) |
 | Deploy | Docker Compose, Nginx (gzip, security headers), Cloudflare CDN |
 | CI | GitHub Actions (lint, test, security scan) |
 
@@ -261,6 +269,12 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 - [x] CBETA-style text layout with verse/prose detection
 - [x] Auto database migration on Docker startup
 - [x] AI answer rating (thumbs up/down) for quality tracking
+- [x] Research field filtering for data sources (8 categories)
+- [x] Admin feedback reply with notification system
+- [x] AI-powered data source recommendations in chat (semantic similarity)
+- [x] DILA Authority lineage import (23K teacher-student relations)
+- [x] DILA catalog associations (contributors, places for 2,300+ texts)
+- [x] Nanshan Vinaya Dictionary (3,200+ Buddhist precept terms)
 - [ ] Topic ontology browsing page
 - [ ] Cross-lingual search (query in Chinese, find Sanskrit/Pali/Tibetan results)
 - [ ] Open data export (JSON/CSV for researchers)
