@@ -14,7 +14,11 @@ from app.schemas.text import (
     RelatedTranslation,
     SearchHit,
     SearchResponse,
+    SemanticSearchHit,
+    SemanticSearchResponse,
 )
+from app.services.embedding import generate_embedding
+from app.services.rag_retrieval import MIN_RELEVANCE_SCORE
 
 logger = logging.getLogger(__name__)
 
@@ -585,3 +589,133 @@ async def get_aggregations(es: AsyncElasticsearch) -> dict:
         "languages": [b["key"] for b in aggs["languages"]["buckets"]],
         "sources": [b["key"] for b in aggs["sources"]["buckets"]],
     }
+
+
+async def search_semantic(
+    db: AsyncSession,
+    query: str,
+    size: int = 20,
+    dynasty: str | None = None,
+    category: str | None = None,
+    lang: str | None = None,
+    sources: str | None = None,
+) -> SemanticSearchResponse:
+    """语义搜索：基于 pgvector 向量检索，复用 RAG embedding 能力。
+
+    流程：
+      1. 生成查询向量
+      2. pgvector 余弦相似度检索（多取一些用于后过滤）
+      3. 关联 buddhist_texts 获取元数据
+      4. 按筛选条件后过滤
+      5. 去重（同一 text_id 只保留最高分的 chunk）
+      6. 截断至 size 条返回
+    """
+    if not query:
+        return SemanticSearchResponse(total=0, results=[])
+
+    try:
+        query_embedding = await generate_embedding(query)
+    except Exception:
+        logger.exception("语义搜索：生成向量失败")
+        return SemanticSearchResponse(total=0, results=[], error="向量服务暂时不可用，请稍后重试")
+
+    # 多取一些结果用于后过滤（筛选条件可能过滤掉一部分）
+    pgvector_limit = size * 5
+
+    embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
+
+    # 构建筛选条件 SQL
+    filter_conditions = []
+    params: list = [embedding_str, MIN_RELEVANCE_SCORE, pgvector_limit]
+    param_idx = 4  # $1=embedding, $2=min_score, $3=limit, $4+ 为筛选参数
+
+    if dynasty:
+        filter_conditions.append(f"AND bt.dynasty = ${param_idx}")
+        params.append(dynasty)
+        param_idx += 1
+    if category:
+        filter_conditions.append(f"AND bt.category = ${param_idx}")
+        params.append(category)
+        param_idx += 1
+    if lang:
+        filter_conditions.append(f"AND bt.lang = ${param_idx}")
+        params.append(lang)
+        param_idx += 1
+    if sources:
+        codes = [c.strip() for c in sources.split(",") if c.strip()]
+        if codes:
+            placeholders = ", ".join(f"${param_idx + i}" for i in range(len(codes)))
+            filter_conditions.append(f"AND bt.source_code IN ({placeholders})")
+            params.extend(codes)
+            param_idx += len(codes)
+
+    filter_sql = " ".join(filter_conditions)
+
+    sql = (
+        "SELECT te.text_id, te.juan_num, te.chunk_text, "
+        "1 - (te.embedding <=> $1::vector) AS score, "
+        "COALESCE(bt.title_zh, '') AS title_zh, "
+        "bt.translator, bt.dynasty, bt.category, bt.source_code, "
+        "bt.cbeta_id, bt.cbeta_url, "
+        "CASE WHEN bt.content_char_count > 0 THEN true ELSE false END AS has_content "
+        "FROM text_embeddings te "
+        "JOIN buddhist_texts bt ON bt.id = te.text_id "
+        "WHERE te.embedding IS NOT NULL "
+        f"AND 1 - (te.embedding <=> $1::vector) >= $2 "
+        f"{filter_sql} "
+        "ORDER BY te.embedding <=> $1::vector "
+        "LIMIT $3"
+    )
+
+    try:
+        raw_conn = await db.connection()
+        result = await raw_conn.exec_driver_sql(sql, tuple(params))
+        rows = result.fetchall()
+    except Exception:
+        logger.exception("语义搜索：数据库查询失败")
+        await db.rollback()
+        return SemanticSearchResponse(total=0, results=[])
+
+    # 去重：同一 text_id 只保留最高分的 chunk
+    seen_texts: dict[int, dict] = {}
+    for row in rows:
+        text_id = row[0]
+        score = float(row[3])
+        if text_id not in seen_texts or score > seen_texts[text_id]["score"]:
+            seen_texts[text_id] = {
+                "text_id": text_id,
+                "juan_num": row[1],
+                "snippet": row[2][:300] if row[2] else "",  # 截取前300字符作为摘要
+                "score": score,
+                "title_zh": row[4],
+                "translator": row[5],
+                "dynasty": row[6],
+                "category": row[7],
+                "source_code": row[8],
+                "cbeta_id": row[9],
+                "cbeta_url": row[10],
+                "has_content": row[11],
+            }
+
+    # 按相似度降序排列
+    sorted_results = sorted(seen_texts.values(), key=lambda r: r["score"], reverse=True)[:size]
+
+    hits = [
+        SemanticSearchHit(
+            text_id=r["text_id"],
+            juan_num=r["juan_num"],
+            title_zh=r["title_zh"],
+            translator=r["translator"],
+            dynasty=r["dynasty"],
+            category=r["category"],
+            source_code=r["source_code"],
+            cbeta_id=r["cbeta_id"],
+            cbeta_url=r["cbeta_url"],
+            has_content=r["has_content"],
+            snippet=r["snippet"],
+            similarity_score=round(r["score"], 4),
+        )
+        for r in sorted_results
+    ]
+
+    return SemanticSearchResponse(total=len(hits), results=hits)

@@ -6,8 +6,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.elasticsearch import get_es
 from app.database import get_db
-from app.schemas.text import CrossLanguageSearchResponse, SearchResponse
-from app.services.search import get_aggregations, get_suggestions, search_content, search_cross_language, search_texts
+from app.schemas.text import CrossLanguageSearchResponse, SearchResponse, SemanticSearchResponse
+from app.services.search import (
+    get_aggregations,
+    get_suggestions,
+    search_content,
+    search_cross_language,
+    search_semantic,
+    search_texts,
+)
 
 try:
     from app.schemas.dianjin import FederatedSearchResponse
@@ -80,6 +87,22 @@ async def content_search(
     全文内容搜索。搜索经文正文并高亮显示匹配段落。Rate limit: 30/min."""
     es = get_es()
     return await search_content(es, q, page, size, sources, lang)
+
+
+@router.get("/search/semantic", response_model=SemanticSearchResponse)
+async def semantic_search(
+    q: str = Query("", max_length=200, description="语义搜索关键词"),
+    size: int = Query(20, ge=1, le=50, description="返回数量"),
+    dynasty: str | None = Query(None, description="朝代筛选"),
+    category: str | None = Query(None, description="分类筛选"),
+    lang: str | None = Query(None, description="语言筛选 (lzh/pi/sa/bo/en)"),
+    sources: str | None = Query(None, description="数据源筛选，逗号分隔 (cbeta,suttacentral,gretil)"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Semantic search using pgvector embedding similarity.
+
+    语义搜索。基于向量相似度在 34.7 万段经文中检索语义最相关的内容。支持按朝代、分类、语言和数据源筛选。"""
+    return await search_semantic(db, q, size, dynasty, category, lang, sources)
 
 
 _filters_cache: dict = {"data": None, "expires": 0}

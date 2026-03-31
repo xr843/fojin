@@ -132,3 +132,26 @@ class CrossLanguageSearchResponse(BaseModel):
     size: int
     results: list[CrossLanguageSearchHit]
     suggestion: str | None = None
+
+
+class SemanticSearchHit(BaseModel):
+    """语义搜索结果项"""
+    text_id: int
+    juan_num: int
+    title_zh: str
+    translator: str | None = None
+    dynasty: str | None = None
+    category: str | None = None
+    source_code: str | None = None
+    cbeta_id: str | None = None
+    cbeta_url: str | None = None
+    has_content: bool = False
+    snippet: str  # 匹配的文本片段
+    similarity_score: float  # 余弦相似度分数
+
+
+class SemanticSearchResponse(BaseModel):
+    """语义搜索响应"""
+    total: int
+    results: list[SemanticSearchHit]
+    error: str | None = None  # 服务异常时返回错误提示信息
