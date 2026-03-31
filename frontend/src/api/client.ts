@@ -1,5 +1,17 @@
 import axios from "axios";
 import { useAuthStore } from "../stores/authStore";
+import type {
+  TextId,
+  SourceId,
+  ChatSessionId,
+  UserId,
+  DictEntryId,
+  KGEntityId,
+  AnnotationId,
+  BookmarkId,
+  NotificationId,
+  IIIFManifestId,
+} from "../types/branded";
 
 const api = axios.create({
   baseURL: "/api",
@@ -38,14 +50,14 @@ api.interceptors.response.use(
 );
 
 export interface RelatedTranslation {
-  id: number;
+  id: TextId;
   title: string;
   lang: string;
   relation_type: string;
 }
 
 export interface SearchHit {
-  id: number;
+  id: TextId;
   taisho_id: string | null;
   cbeta_id: string;
   title_zh: string;
@@ -70,7 +82,7 @@ export interface SearchResponse {
 }
 
 export interface CrossLanguageSearchHit {
-  id: number;
+  id: TextId;
   taisho_id: string | null;
   cbeta_id: string;
   title_zh: string;
@@ -99,7 +111,7 @@ export interface CrossLanguageSearchResponse {
 }
 
 export interface TextDetail {
-  id: number;
+  id: TextId;
   taisho_id: string | null;
   cbeta_id: string;
   title_zh: string;
@@ -124,14 +136,14 @@ export interface JuanInfo {
 }
 
 export interface JuanListResponse {
-  text_id: number;
+  text_id: TextId;
   title_zh: string;
   total_juans: number;
   juans: JuanInfo[];
 }
 
 export interface JuanContentResponse {
-  text_id: number;
+  text_id: TextId;
   cbeta_id: string;
   title_zh: string;
   juan_num: number;
@@ -149,7 +161,7 @@ export interface MatchedJuan {
 }
 
 export interface ContentSearchHit {
-  text_id: number;
+  text_id: TextId;
   cbeta_id: string;
   title_zh: string;
   translator: string | null;
@@ -172,8 +184,8 @@ export interface ContentSearchResponse {
 }
 
 export interface BookmarkItem {
-  id: number;
-  text_id: number;
+  id: BookmarkId;
+  text_id: TextId;
   title_zh: string;
   cbeta_id: string;
   note: string | null;
@@ -182,7 +194,7 @@ export interface BookmarkItem {
 
 export interface HistoryItem {
   id: number;
-  text_id: number;
+  text_id: TextId;
   title_zh: string;
   cbeta_id: string;
   juan_num: number;
@@ -210,7 +222,7 @@ export interface Stats {
 
 export interface TextIdentifierInfo {
   id: number;
-  source_id: number;
+  source_id: SourceId;
   source_code: string;
   source_name: string;
   source_uid: string;
@@ -221,7 +233,7 @@ export interface TextIdentifierInfo {
 
 export interface SourceDistribution {
   id: number;
-  source_id?: number;
+  source_id?: SourceId;
   source_code?: string;
   source_name?: string;
   code: string;
@@ -237,7 +249,7 @@ export interface SourceDistribution {
 }
 
 export interface DataSource {
-  id: number;
+  id: SourceId;
   code: string;
   name_zh: string;
   name_en: string | null;
@@ -258,7 +270,7 @@ export interface DataSource {
 }
 
 export interface RelatedTextInfo {
-  text_id: number;
+  text_id: TextId;
   cbeta_id: string;
   title_zh: string;
   translator: string | null;
@@ -270,13 +282,13 @@ export interface RelatedTextInfo {
 }
 
 export interface TextRelationsResponse {
-  text_id: number;
+  text_id: TextId;
   title_zh: string;
   relations: RelatedTextInfo[];
 }
 
 export interface ParallelTextContent {
-  text_id: number;
+  text_id: TextId;
   cbeta_id: string;
   title_zh: string;
   translator: string | null;
@@ -291,7 +303,7 @@ export interface ParallelReadResponse {
 }
 
 export interface KGEntity {
-  id: number;
+  id: KGEntityId;
   entity_type: string;
   name_zh: string;
   name_sa: string | null;
@@ -300,14 +312,14 @@ export interface KGEntity {
   name_en: string | null;
   description: string | null;
   properties: Record<string, any> | null;
-  text_id: number | null;
+  text_id: TextId | null;
   external_ids: Record<string, string> | null;
 }
 
 export interface EntityRelationItem {
   predicate: string;
   direction: string;
-  target_id: number;
+  target_id: KGEntityId;
   target_name: string;
   target_type: string;
   confidence: number;
@@ -324,15 +336,15 @@ export interface KGSearchResponse {
 }
 
 export interface KGGraphNode {
-  id: number;
+  id: KGEntityId;
   name: string;
   entity_type: string;
   description: string | null;
 }
 
 export interface KGGraphLink {
-  source: number;
-  target: number;
+  source: KGEntityId;
+  target: KGEntityId;
   predicate: string;
   confidence: number;
   provenance: string | null;
@@ -346,9 +358,9 @@ export interface KGGraphResponse {
 }
 
 export interface IIIFManifestInfo {
-  id: number;
-  text_id: number;
-  source_id: number;
+  id: IIIFManifestId;
+  text_id: TextId;
+  source_id: SourceId;
   label: string;
   manifest_url: string;
   thumbnail_url: string | null;
@@ -379,6 +391,40 @@ export async function searchCrossLanguage(params: {
   sources?: string;
 }): Promise<CrossLanguageSearchResponse> {
   const { data } = await api.get<CrossLanguageSearchResponse>("/search/cross-language", { params });
+  return data;
+}
+
+// 语义搜索（智能搜索）
+export interface SemanticSearchHit {
+  text_id: TextId;
+  juan_num: number;
+  title_zh: string;
+  translator: string | null;
+  dynasty: string | null;
+  category: string | null;
+  source_code: string | null;
+  cbeta_id: string | null;
+  cbeta_url: string | null;
+  has_content: boolean;
+  snippet: string;
+  similarity_score: number;
+}
+
+export interface SemanticSearchResponse {
+  total: number;
+  results: SemanticSearchHit[];
+  error?: string;  // 服务异常时的错误提示
+}
+
+export async function searchSemantic(params: {
+  q: string;
+  size?: number;
+  dynasty?: string;
+  category?: string;
+  lang?: string;
+  sources?: string;
+}): Promise<SemanticSearchResponse> {
+  const { data } = await api.get<SemanticSearchResponse>("/search/semantic", { params, timeout: 30000 });
   return data;
 }
 
@@ -415,7 +461,7 @@ export async function getJuanContent(textId: number, juanNum: number, lang?: str
 }
 
 export interface JuanLanguagesResponse {
-  text_id: number;
+  text_id: TextId;
   juan_num: number;
   languages: string[];
   default_lang: string;
@@ -551,7 +597,7 @@ export async function getKGStats(): Promise<KGStats> {
 
 // Dictionary
 export interface DictEntry {
-  id: number;
+  id: DictEntryId;
   headword: string;
   reading: string | null;
   definition: string;
@@ -570,14 +616,14 @@ export interface DictSearchResponse {
 // --- Annotations ---
 
 export interface AnnotationItem {
-  id: number;
-  text_id: number;
+  id: AnnotationId;
+  text_id: TextId;
   juan_num: number;
   start_pos: number;
   end_pos: number;
   annotation_type: string;
   content: string;
-  user_id: number;
+  user_id: UserId;
   status: string;
   created_at: string;
   updated_at: string;
@@ -632,7 +678,7 @@ export async function submitSourceSuggestion(payload: {
 
 // Admin: Source Suggestions Management
 export interface SourceSuggestionItem {
-  id: number;
+  id: number; // 暂不品牌化，使用频率低
   name: string;
   url: string;
   description: string | null;
@@ -682,7 +728,7 @@ export async function reviewAnnotation(
 // --- Notifications ---
 
 export interface NotificationItem {
-  id: number;
+  id: NotificationId;
   type: string;
   title: string;
   content: string;
@@ -723,7 +769,7 @@ export async function submitFeedback(payload: {
 
 export interface AdminFeedbackItem {
   id: number;
-  user_id: number;
+  user_id: UserId;
   username: string;
   content: string;
   contact: string | null;
@@ -783,7 +829,7 @@ export interface AdminTrends {
 }
 
 export interface AdminUserItem {
-  id: number;
+  id: UserId;
   username: string;
   display_name: string | null;
   email: string;
@@ -794,12 +840,12 @@ export interface AdminUserItem {
 }
 
 export interface AdminAnnotationItem {
-  id: number;
-  text_id: number;
+  id: AnnotationId;
+  text_id: TextId;
   juan_num: number;
   annotation_type: string;
   content: string;
-  user_id: number;
+  user_id: UserId;
   username: string;
   status: string;
   created_at: string;
@@ -846,7 +892,7 @@ export async function getAdminAnnotations(params: {
 // --- Similar Passages ---
 
 export interface SimilarPassageItem {
-  text_id: number;
+  text_id: TextId;
   juan_num: number;
   chunk_text: string;
   score: number;
@@ -856,7 +902,7 @@ export interface SimilarPassageItem {
 }
 
 export interface SimilarPassagesResponse {
-  text_id: number;
+  text_id: TextId;
   juan_num: number;
   passages: SimilarPassageItem[];
 }
@@ -877,7 +923,7 @@ export async function getSimilarPassages(
 // --- Chat (AI Q&A) ---
 
 export interface ChatSource {
-  text_id: number;
+  text_id: TextId;
   juan_num: number;
   chunk_text: string;
   score: number;
@@ -885,13 +931,13 @@ export interface ChatSource {
 }
 
 export interface ChatResponse {
-  session_id: number;
+  session_id: ChatSessionId;
   message: string;
   sources: ChatSource[];
 }
 
 export interface ChatSessionItem {
-  id: number;
+  id: ChatSessionId;
   title: string | null;
   created_at: string;
 }

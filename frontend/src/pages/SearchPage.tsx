@@ -4,15 +4,15 @@ import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Pagination, Empty, Checkbox, Input, Tag, Button, Tabs, Result, Select, Typography, Skeleton, AutoComplete,
+  Pagination, Empty, Checkbox, Input, Tag, Button, Tabs, Result, Select, Typography, Skeleton, AutoComplete, Alert,
 } from "antd";
 import {
-  SearchOutlined, BookOutlined, VerticalAlignTopOutlined, TranslationOutlined,
+  SearchOutlined, BookOutlined, VerticalAlignTopOutlined, TranslationOutlined, ThunderboltOutlined,
 } from "@ant-design/icons";
-import { searchTexts, searchContent, searchDictionary, searchCrossLanguage, getSources, getSearchSuggestions } from "../api/client";
+import { searchTexts, searchContent, searchDictionary, searchCrossLanguage, searchSemantic, getSources, getSearchSuggestions } from "../api/client";
 import { hasDirectSearchUrl } from "../utils/sourceUrls";
 import { addSearchHistory, getSearchHistory, type SearchHistoryItem } from "../utils/history";
-import { ResultCard, ExternalCard, DictCard, ContentCard, CrossLangCard } from "../components/search";
+import { ResultCard, ExternalCard, DictCard, ContentCard, CrossLangCard, SemanticCard } from "../components/search";
 import "../styles/search.css";
 import "../styles/sources.css";
 
@@ -110,6 +110,12 @@ export default function SearchPage() {
     enabled: query.length > 0 && tab === "crosslang",
   });
 
+  const { data: semanticData, isLoading: semanticLoading } = useQuery({
+    queryKey: ["searchSemantic", query, selectedSources, langFilter, dynasty, category],
+    queryFn: () => searchSemantic({ q: query, size: 20, dynasty, category, lang: langFilter || undefined, sources: selectedSources || undefined }),
+    enabled: query.length > 0 && tab === "semantic",
+  });
+
   const { data: sources } = useQuery({ queryKey: ["sources"], queryFn: getSources });
 
   const handleSearch = (value: string) => {
@@ -193,8 +199,8 @@ export default function SearchPage() {
     setInstitutionFilter(next);
   };
 
-  const loading = tab === "catalog" ? isLoading : tab === "content" ? contentLoading : tab === "crosslang" ? crossLangLoading : dictLoading;
-  const localTotal = tab === "catalog" ? (data?.total || 0) : tab === "content" ? (contentData?.total || 0) : tab === "crosslang" ? (crossLangData?.total || 0) : (dictData?.total || 0);
+  const loading = tab === "catalog" ? isLoading : tab === "content" ? contentLoading : tab === "crosslang" ? crossLangLoading : tab === "semantic" ? semanticLoading : dictLoading;
+  const localTotal = tab === "catalog" ? (data?.total || 0) : tab === "content" ? (contentData?.total || 0) : tab === "crosslang" ? (crossLangData?.total || 0) : tab === "semantic" ? (semanticData?.total || 0) : (dictData?.total || 0);
   const extTotal = query.length > 0 ? filteredExtSources.length : 0;
 
   const sortedRegions = useMemo(() => {
@@ -267,6 +273,7 @@ export default function SearchPage() {
           items={[
             { key: "catalog", label: "经典检索" },
             { key: "content", label: "全文检索" },
+            { key: "semantic", label: <><ThunderboltOutlined /> 智能搜索</> },
             { key: "crosslang", label: <><TranslationOutlined /> 跨语言搜索</> },
             { key: "dictionary", label: <><BookOutlined /> 辞典检索</> },
           ]}
@@ -277,6 +284,8 @@ export default function SearchPage() {
             ? "按经名、译者、编号检索经典目录"
             : tab === "content"
             ? "在经文正文中检索关键词"
+            : tab === "semantic"
+            ? "基于 AI 向量语义理解，在 34.7 万段经文中检索最相关内容"
             : tab === "crosslang"
             ? "同时搜索所有语种标题，自动关联翻译版本"
             : "在 393,624 条多语种辞典词条中检索词头与释义"}
@@ -342,13 +351,15 @@ export default function SearchPage() {
                   ? <>辞典找到 <strong>{localTotal.toLocaleString()}</strong> 条词条</>
                   : tab === "content"
                   ? <>在 <strong>{localTotal.toLocaleString()}</strong> 部经典中找到匹配（共 {(contentData?.total_juans || 0).toLocaleString()} 卷）</>
+                  : tab === "semantic"
+                  ? <>语义搜索找到 <strong>{localTotal.toLocaleString()}</strong> 条相关结果</>
                   : tab === "crosslang"
                   ? <>跨语言搜索找到 <strong>{localTotal.toLocaleString()}</strong> 条结果</>
                   : <>找到 <strong>{localTotal.toLocaleString()}</strong> 条结果</>
                 }
               </span>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                {(tab === "catalog" || tab === "content") && (
+                {(tab === "catalog" || tab === "content" || tab === "semantic") && (
                   <Select
                     size="small"
                     value={langFilter || "all"}
@@ -460,6 +471,22 @@ export default function SearchPage() {
               <ContentCard key={`${hit.text_id}_${i}`} hit={hit} rank={i + 1 + (page - 1) * 20} />
             ))}
 
+            {/* 语义搜索错误提示 */}
+            {!loading && tab === "semantic" && semanticData?.error && (
+              <Alert
+                type="warning"
+                message={semanticData.error}
+                showIcon
+                closable
+                style={{ marginBottom: 12 }}
+              />
+            )}
+
+            {/* 语义搜索结果 */}
+            {!loading && tab === "semantic" && semanticData && semanticData.results.map((hit, i) => (
+              <SemanticCard key={`${hit.text_id}_${hit.juan_num}`} hit={hit} rank={i + 1} />
+            ))}
+
             {/* 跨语言结果 */}
             {!loading && tab === "crosslang" && crossLangData && crossLangData.results.map((hit, i) => (
               <CrossLangCard key={hit.id} hit={hit} rank={i + 1 + (page - 1) * 20} />
@@ -478,8 +505,8 @@ export default function SearchPage() {
               </div>
             )}
 
-            {/* 本地分页 */}
-            {!loading && tab !== "dictionary" && localTotal > 20 && (
+            {/* 本地分页（语义搜索不分页） */}
+            {!loading && tab !== "dictionary" && tab !== "semantic" && localTotal > 20 && (
               <div style={{ textAlign: "center", margin: "16px 0" }}>
                 <Pagination current={page} total={localTotal} pageSize={20}
                   showSizeChanger={false} onChange={(p) => setPage(p)} />
