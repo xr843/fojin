@@ -42,3 +42,58 @@ test.describe("搜索功能", () => {
     await expect(page).toHaveURL(/\/search\?q=/);
   });
 });
+
+test.describe("语义搜索", () => {
+  test("智能搜索 tab 可见", async ({ page }) => {
+    await page.goto("/search?q=般若");
+    await page.waitForLoadState("networkidle");
+
+    // 验证"智能搜索"tab 存在且可见
+    const semanticTab = page.getByRole("tab", { name: /智能搜索/ });
+    await expect(semanticTab).toBeVisible();
+  });
+
+  test("点击智能搜索 tab 切换激活状态", async ({ page }) => {
+    await page.goto("/search?q=般若");
+    await page.waitForLoadState("networkidle");
+
+    const semanticTab = page.getByRole("tab", { name: /智能搜索/ });
+    await semanticTab.click();
+
+    // 切换后 URL 应包含 tab=semantic
+    await expect(page).toHaveURL(/tab=semantic/);
+
+    // tab 应处于激活状态（Ant Design 用 aria-selected 标记）
+    await expect(semanticTab).toHaveAttribute("aria-selected", "true");
+  });
+
+  test("切换到智能搜索 tab 后显示提示文案", async ({ page }) => {
+    await page.goto("/search?q=般若");
+    await page.waitForLoadState("networkidle");
+
+    // 点击智能搜索 tab
+    const semanticTab = page.getByRole("tab", { name: /智能搜索/ });
+    await semanticTab.click();
+
+    // 验证提示文案可见
+    const hint = page.locator(".s-mode-hint");
+    await expect(hint).toContainText("基于 AI 向量语义理解");
+  });
+
+  test("智能搜索 tab 下输入查询触发搜索", async ({ page }) => {
+    // 直接通过 URL 进入语义搜索 tab
+    await page.goto("/search?q=心经&tab=semantic");
+    await page.waitForLoadState("networkidle");
+
+    // 验证页面处于语义搜索 tab（URL 参数正确）
+    await expect(page).toHaveURL(/tab=semantic/);
+
+    // 验证结果区域存在（主内容区应可见，不验证具体搜索结果）
+    const main = page.locator(".s-main");
+    await expect(main).toBeVisible();
+
+    // 验证结果计数区域显示了语义搜索的统计文案
+    const resultCount = page.locator(".s-result-count");
+    await expect(resultCount).toContainText("语义搜索找到");
+  });
+});

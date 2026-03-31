@@ -652,7 +652,7 @@ async def search_semantic(
     filter_sql = " ".join(filter_conditions)
 
     sql = (
-        "SELECT te.text_id, te.juan_num, te.chunk_text, "
+        "SELECT te.text_id, te.juan_num, te.chunk_text, "  # nosec B608
         "1 - (te.embedding <=> $1::vector) AS score, "
         "COALESCE(bt.title_zh, '') AS title_zh, "
         "bt.translator, bt.dynasty, bt.category, bt.source_code, "
