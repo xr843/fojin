@@ -238,38 +238,34 @@ class DILAGitHubImporter(BaseImporter):
         print(f"  Found {len(json_files)} catalog JSON files.")
 
         relations_created = 0
-        texts_updated = 0
+        texts_matched = 0
 
         for json_path in json_files:
             canon_code = json_path.stem  # e.g. "T", "X"
             with open(json_path, encoding="utf-8") as f:
-                entries = json.load(f)
+                data = json.load(f)
 
-            if not isinstance(entries, list):
+            # JSON is a dict {cbeta_id: entry}, e.g. {"T0001": {...}}
+            if isinstance(data, list):
+                items = [(f"{canon_code}{i:04d}", e) for i, e in enumerate(data)]
+            elif isinstance(data, dict):
+                items = list(data.items())
+            else:
                 continue
 
-            for entry in entries:
-                vol = entry.get("vol", "")
-                title = entry.get("title", "")
-                if not vol or not title:
+            canon_relations = 0
+            for cbeta_id, entry in items:
+                if not isinstance(entry, dict):
                     continue
 
-                # Match to buddhist_texts by cbeta_id pattern (e.g. "T0001")
-                # vol format: "T01" -> cbeta_id starts with "T"
-                # Extract text number from authorityID: CA0000001 -> not useful
-                # Better: match by canon + title
-                cbeta_prefix = canon_code  # T, X, etc.
-
-                # Try to find matching text by title + source canon
+                # Match to buddhist_texts directly by cbeta_id key
                 result = await session.execute(
-                    text("""
-                        SELECT id FROM buddhist_texts
-                        WHERE cbeta_id LIKE :prefix AND title_zh = :title
-                        LIMIT 1
-                    """),
-                    {"prefix": f"{cbeta_prefix}%", "title": title},
+                    text("SELECT id FROM buddhist_texts WHERE cbeta_id = :cid LIMIT 1"),
+                    {"cid": cbeta_id},
                 )
                 text_row = result.first()
+                if text_row:
+                    texts_matched += 1
 
                 # Import contributors as person entities + relations
                 contributors = entry.get("contributors", [])
@@ -308,7 +304,7 @@ class DILAGitHubImporter(BaseImporter):
                         source="dila_catalog",
                     )
                     if created:
-                        relations_created += 1
+                        canon_relations += 1
 
                 # Import places
                 places = entry.get("places", [])
@@ -355,14 +351,17 @@ class DILAGitHubImporter(BaseImporter):
                                 source="dila_catalog",
                             )
                             if created:
-                                relations_created += 1
+                                canon_relations += 1
+
+                if canon_relations % 100 == 0 and canon_relations > 0:
+                    await session.flush()
 
             await session.flush()
-            print(f"    {canon_code}: processed {len(entries)} entries")
+            relations_created += canon_relations
+            print(f"    {canon_code}: {len(items)} entries, {canon_relations} relations")
 
         self.stats.relations_created += relations_created
-        self.stats.texts_updated += texts_updated
-        print(f"  Catalog import done: {relations_created} relations created.")
+        print(f"  Catalog import done: {texts_matched} texts matched, {relations_created} relations created.")
 
     async def run_import(self):
         if not self.data_dir.exists():
