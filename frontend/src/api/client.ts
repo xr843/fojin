@@ -265,6 +265,7 @@ export interface DataSource {
   has_remote_fulltext: boolean;
   supports_iiif: boolean;
   supports_api: boolean;
+  sort_order: number;
   is_active: boolean;
   distributions: SourceDistribution[];
 }

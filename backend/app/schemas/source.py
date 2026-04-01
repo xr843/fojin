@@ -43,6 +43,7 @@ class DataSourceResponse(BaseModel):
     has_remote_fulltext: bool = False
     supports_iiif: bool = False
     supports_api: bool = False
+    sort_order: int = 0
     is_active: bool = True
     created_at: datetime
     distributions: list[SourceDistributionResponse] = Field(default_factory=list)

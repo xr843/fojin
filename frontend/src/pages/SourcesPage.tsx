@@ -159,9 +159,9 @@ export default function SourcesPage() {
         }
       }
     }
-    // 组内按名称排序
+    // 组内按 sort_order 排序（值越小越靠前），相同则按名称
     for (const items of Object.values(map)) {
-      items.sort((a, b) => a.name_zh.localeCompare(b.name_zh, "zh"));
+      items.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name_zh.localeCompare(b.name_zh, "zh"));
     }
     // 组间排序
     const orderList = groupBy === "region" ? regionOrder
