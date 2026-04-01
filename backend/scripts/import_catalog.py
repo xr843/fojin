@@ -10,9 +10,12 @@ Also auto-creates TextIdentifier for each CBETA entry.
 import asyncio
 import json
 import os
+import re
 import sys
+from pathlib import Path
 
 import httpx
+from lxml import etree
 from sqlalchemy import select, text
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -35,6 +38,115 @@ CBETA_ORG_URL = "https://raw.githubusercontent.com/cbeta-org/cbeta-metadata/mast
 
 
 LOCAL_WORK_INFO = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "cbeta_all_works.json")
+DEFAULT_XML_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "xml-p5")
+
+# TEI namespace
+TEI_NS = "http://www.tei-c.org/ns/1.0"
+
+
+def _extract_work_id_from_filename(filename: str) -> str | None:
+    """Extract CBETA work ID from XML filename. e.g. T01n0001.xml -> T0001"""
+    m = re.match(r"^([A-Z]+)\d+n([A-Z]?\d+[a-z]?)(?:_\d+)?\.xml$", filename)
+    if not m:
+        return None
+    prefix = m.group(1)
+    num_part = m.group(2)
+    return f"{prefix}{num_part}"
+
+
+def _parse_xml_header(xml_path: Path) -> dict | None:
+    """Parse TEI XML header to extract title, author/byline, and extent (juan count)."""
+    try:
+        # Only parse the header, not the full document
+        for event, elem in etree.iterparse(str(xml_path), events=("end",), tag=f"{{{TEI_NS}}}teiHeader"):
+            header = elem
+            break
+        else:
+            return None
+    except Exception:
+        return None
+
+    ns = {"tei": TEI_NS}
+
+    # Extract title (level="m" is the work title)
+    title = None
+    for t in header.findall(".//tei:titleStmt/tei:title", ns):
+        if t.get("level") == "m" and t.get("{http://www.w3.org/XML/1998/namespace}lang") == "zh-Hant":
+            title = t.text
+            break
+    if not title:
+        # Fallback: any title with zh-Hant
+        for t in header.findall(".//tei:titleStmt/tei:title", ns):
+            if t.get("{http://www.w3.org/XML/1998/namespace}lang") == "zh-Hant" and t.text:
+                # Extract title after "No. XXX " pattern
+                text = t.text
+                m = re.search(r"No\.\s*\d+[a-z]?\s+(.+)", text)
+                if m:
+                    title = m.group(1)
+                    break
+
+    # Extract author/byline
+    byline = ""
+    author_elem = header.find(".//tei:titleStmt/tei:author", ns)
+    if author_elem is not None and author_elem.text:
+        byline = author_elem.text.strip()
+
+    # Extract extent (juan count)
+    juan = None
+    extent_elem = header.find(".//tei:extent", ns)
+    if extent_elem is not None and extent_elem.text:
+        m = re.match(r"(\d+)卷", extent_elem.text.strip())
+        if m:
+            juan = int(m.group(1))
+
+    if not title:
+        return None
+
+    return {"title": title, "byline": byline, "juan": juan}
+
+
+def scan_xml_directory(xml_dir: str, collections: list[str] | None = None) -> list[dict]:
+    """Scan xml-p5 directory to generate catalog entries from TEI XML headers."""
+    base = Path(xml_dir)
+    if not base.exists():
+        return []
+
+    if collections is None:
+        collections = [d.name for d in sorted(base.iterdir()) if d.is_dir() and d.name[0].isupper()]
+
+    entries = []
+    seen_ids = set()
+
+    for col in collections:
+        col_dir = base / col
+        if not col_dir.exists():
+            continue
+
+        xml_files = sorted(col_dir.rglob("*.xml"))
+        for xml_file in xml_files:
+            work_id = _extract_work_id_from_filename(xml_file.name)
+            if not work_id or work_id in seen_ids:
+                continue
+            seen_ids.add(work_id)
+
+            meta = _parse_xml_header(xml_file)
+            if meta is None:
+                # Minimal entry with just the work ID
+                entries.append({"work": work_id, "title": work_id, "byline": "", "juan": None, "category": ""})
+                continue
+
+            entries.append({
+                "work": work_id,
+                "title": meta["title"],
+                "byline": meta["byline"],
+                "juan": meta["juan"],
+                "category": "",
+            })
+
+        print(f"  Scanned {col}: {len(xml_files)} XML files, {len([e for e in entries if e['work'].startswith(col)])} unique works")
+
+    print(f"  Total: {len(entries)} unique works from xml-p5 directory")
+    return entries
 
 
 def _parse_dict_format(data: dict) -> list[dict]:
@@ -81,7 +193,16 @@ async def fetch_work_info() -> list[dict]:
             except Exception as e:
                 print(f"  Failed: {e}")
 
-    print("  All remote sources failed. Using built-in sample data.")
+    # Try scanning local xml-p5 directory
+    xml_dir = os.environ.get("CBETA_XML_DIR", DEFAULT_XML_DIR)
+    if os.path.exists(xml_dir):
+        print(f"  All remote sources failed. Scanning local xml-p5 directory: {xml_dir}")
+        collections = os.environ.get("CBETA_COLLECTIONS", "").split(",") if os.environ.get("CBETA_COLLECTIONS") else None
+        entries = scan_xml_directory(xml_dir, collections=collections if collections else None)
+        if entries:
+            return entries
+
+    print("  All sources failed. Using built-in sample data.")
     from import_cbeta import generate_sample_catalog
     return generate_sample_catalog()
 
@@ -132,18 +253,19 @@ def transform_entry(entry: dict) -> dict | None:
     }
 
 
-async def upsert_to_postgres(session: AsyncSession, records: list[dict]) -> dict[str, int]:
+async def upsert_to_postgres(session: AsyncSession, records: list[dict], source_id: int | None = None) -> dict[str, int]:
     """Upsert records to PostgreSQL with ON CONFLICT DO UPDATE."""
     id_map = {}
     for i, rec in enumerate(records):
+        rec_with_source = {**rec, "source_id": source_id}
         result = await session.execute(
             text("""
                 INSERT INTO buddhist_texts
                     (taisho_id, cbeta_id, title_zh, title_sa, title_bo, title_pi,
-                     translator, dynasty, fascicle_count, category, subcategory, cbeta_url)
+                     translator, dynasty, fascicle_count, category, subcategory, cbeta_url, source_id)
                 VALUES
                     (:taisho_id, :cbeta_id, :title_zh, :title_sa, :title_bo, :title_pi,
-                     :translator, :dynasty, :fascicle_count, :category, :subcategory, :cbeta_url)
+                     :translator, :dynasty, :fascicle_count, :category, :subcategory, :cbeta_url, :source_id)
                 ON CONFLICT (cbeta_id) DO UPDATE SET
                     taisho_id = EXCLUDED.taisho_id,
                     title_zh = EXCLUDED.title_zh,
@@ -152,10 +274,11 @@ async def upsert_to_postgres(session: AsyncSession, records: list[dict]) -> dict
                     fascicle_count = EXCLUDED.fascicle_count,
                     category = EXCLUDED.category,
                     subcategory = EXCLUDED.subcategory,
-                    cbeta_url = EXCLUDED.cbeta_url
+                    cbeta_url = EXCLUDED.cbeta_url,
+                    source_id = COALESCE(EXCLUDED.source_id, buddhist_texts.source_id)
                 RETURNING id
             """),
-            rec,
+            rec_with_source,
         )
         row = result.fetchone()
         id_map[rec["cbeta_id"]] = row[0]
@@ -268,8 +391,14 @@ async def main():
     engine = create_async_engine(settings.database_url)
     session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
+    # Get or create CBETA source_id
     async with session_factory() as session:
-        id_map = await upsert_to_postgres(session, records)
+        result = await session.execute(text("SELECT id FROM data_sources WHERE code = 'cbeta'"))
+        row = result.fetchone()
+        source_id = row[0] if row else None
+
+    async with session_factory() as session:
+        id_map = await upsert_to_postgres(session, records, source_id=source_id)
         print(f"  PostgreSQL: {len(id_map)} records upserted.")
 
     es = AsyncElasticsearch(settings.es_host)
