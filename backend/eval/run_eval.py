@@ -255,19 +255,28 @@ async def main():
 
     report = generate_report(results, tag=args.tag)
 
-    REPORTS_DIR.mkdir(exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     tag_suffix = f"-{args.tag}" if args.tag else ""
-    report_path = REPORTS_DIR / f"eval-{timestamp}{tag_suffix}.md"
-    report_path.write_text(report, encoding="utf-8")
 
-    raw_path = REPORTS_DIR / f"eval-{timestamp}{tag_suffix}.json"
-    raw_path.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+        report_path = REPORTS_DIR / f"eval-{timestamp}{tag_suffix}.md"
+        report_path.write_text(report, encoding="utf-8")
+        raw_path = REPORTS_DIR / f"eval-{timestamp}{tag_suffix}.json"
+        raw_path.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
+        saved = f"\nReport: {report_path}\nRaw: {raw_path}"
+    except OSError:
+        # Fallback: write to /tmp when running inside Docker
+        fallback = Path("/tmp")
+        report_path = fallback / f"eval-{timestamp}{tag_suffix}.md"
+        report_path.write_text(report, encoding="utf-8")
+        raw_path = fallback / f"eval-{timestamp}{tag_suffix}.json"
+        raw_path.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
+        saved = f"\nReport: {report_path}\nRaw: {raw_path}"
 
     print(f"\n{'='*60}")
     print(report)
-    print(f"\nReport: {report_path}")
-    print(f"Raw: {raw_path}")
+    print(saved)
 
 
 if __name__ == "__main__":
