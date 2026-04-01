@@ -38,6 +38,13 @@ import {
 } from "../api/client";
 import { useAuthStore } from "../stores/authStore";
 
+/** Collapse loose markdown lists into tight lists by removing blank lines between list items. */
+function tightenLists(md: string): string {
+  return md.replace(/^(\d+\.\s.*)\n\n+(?=\s)/gm, "$1\n")
+    .replace(/^(\d+\.)\n\n+(\s)/gm, "$1\n$2")
+    .replace(/\n\n+(?=\d+\.\s)/g, "\n");
+}
+
 /** Extract [追问] follow-up suggestions from assistant message text. */
 function parseFollowUps(content: string): { cleanContent: string; suggestions: string[] } {
   const lines = content.split("\n");
@@ -658,7 +665,7 @@ export default function ChatPage() {
                       return (
                         <>
                           <div className="chat-markdown">
-                            <Markdown rehypePlugins={[rehypeSanitize]} components={markdownComponents}>{injectCitationLinks(cleanContent, m.sources) + (isStreaming ? " ▌" : "")}</Markdown>
+                            <Markdown rehypePlugins={[rehypeSanitize]} components={markdownComponents}>{tightenLists(injectCitationLinks(cleanContent, m.sources)) + (isStreaming ? " ▌" : "")}</Markdown>
                           </div>
                           {suggestions.length > 0 && !sending && (
                             <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>
