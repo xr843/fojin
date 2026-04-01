@@ -28,7 +28,7 @@ export default function SourcesPage() {
   const [langFilter, setLangFilter] = useState("all");
   const [fieldFilter, setFieldFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState("default");
+  const [groupBy, setGroupBy] = useState<"region" | "field" | "lang">("region");
   const [showTop, setShowTop] = useState(false);
 
   useEffect(() => {
@@ -125,34 +125,56 @@ export default function SourcesPage() {
       }
       return true;
     });
-    if (sortBy === "region") {
-      result.sort((a, b) => (a.region || "").localeCompare(b.region || "", "zh"));
-    } else if (sortBy === "count") {
-      result.sort((a, b) => (b.distributions?.length || 0) - (a.distributions?.length || 0));
-    } else if (sortBy === "name") {
-      result.sort((a, b) => a.name_zh.localeCompare(b.name_zh, "zh"));
-    }
-    // sortBy === "default": keep backend sort_order
     return result;
-  }, [sources, search, regionFilter, langFilter, fieldFilter, sortBy]);
+  }, [sources, search, regionFilter, langFilter, fieldFilter]);
 
-  // 按地区分组
+  // 动态分组
   const grouped = useMemo(() => {
     const map: Record<string, DataSource[]> = {};
+    const addTo = (key: string, s: DataSource) => {
+      if (!map[key]) map[key] = [];
+      map[key].push(s);
+    };
     for (const s of filtered) {
-      const r = s.region || "其他";
-      if (!map[r]) map[r] = [];
-      map[r].push(s);
+      if (groupBy === "region") {
+        addTo(s.region || "其他", s);
+      } else if (groupBy === "field") {
+        const fields = (s.research_fields || "").split(",").map((f) => f.trim()).filter(Boolean);
+        if (fields.length === 0) {
+          addTo("其他", s);
+        } else {
+          fields.forEach((f) => addTo(FIELD_NAMES[f] || f, s));
+        }
+      } else {
+        const langs = (s.languages || "").split(",").map((l) => l.trim()).filter(Boolean);
+        if (langs.length === 0) {
+          addTo("其他", s);
+        } else {
+          // 按中文名去重后分组
+          const seen = new Set<string>();
+          langs.forEach((l) => {
+            const name = getLangName(l);
+            if (!seen.has(name)) { seen.add(name); addTo(name, s); }
+          });
+        }
+      }
     }
-    // 排序：中国大陆第一，中国台湾第二，其他最后
+    // 组内按名称排序
+    for (const items of Object.values(map)) {
+      items.sort((a, b) => a.name_zh.localeCompare(b.name_zh, "zh"));
+    }
+    // 组间排序
+    const orderList = groupBy === "region" ? regionOrder
+      : groupBy === "field" ? fieldOrder.map((f) => FIELD_NAMES[f] || f)
+      : langOrder.map((l) => getLangName(l));
     return Object.entries(map).sort(([a], [b]) => {
       if (a === "其他") return 1;
       if (b === "其他") return -1;
-      const ia = regionOrder.indexOf(a);
-      const ib = regionOrder.indexOf(b);
+      const ia = orderList.indexOf(a);
+      const ib = orderList.indexOf(b);
       return (ia === -1 ? 98 : ia) - (ib === -1 ? 98 : ib);
     });
-  }, [filtered]);
+  }, [filtered, groupBy]);
 
   const localCount = useMemo(() => (sources || []).filter((s) => s.has_local_fulltext).length, [sources]);
   const remoteCount = useMemo(() => (sources || []).filter((s) => s.has_remote_fulltext).length, [sources]);
@@ -247,14 +269,13 @@ export default function SourcesPage() {
           ]}
         />
         <Select
-          value={sortBy}
-          onChange={setSortBy}
-          style={{ width: 120 }}
+          value={groupBy}
+          onChange={setGroupBy}
+          style={{ width: 130 }}
           options={[
-            { value: "default", label: "默认排序" },
-            { value: "name", label: "按名称" },
-            { value: "region", label: "按地区" },
-            { value: "count", label: "按收录数" },
+            { value: "region", label: "按地区分组" },
+            { value: "field", label: "按研究领域" },
+            { value: "lang", label: "按语种" },
           ]}
         />
 
@@ -272,16 +293,17 @@ export default function SourcesPage() {
 
       <div className="sources-stats-bar">
         当前显示 <strong>{filtered.length}</strong> / {sources?.length || 0} 个数据源
+        {groupBy !== "region" && ` · ${grouped.length} 个分组`}
       </div>
 
       {filtered.length === 0 ? (
         <Empty description="无匹配数据源" style={{ marginTop: 60 }} />
       ) : (
         <div className="sources-groups">
-          {grouped.map(([region, items]) => (
-            <div key={region} className="sources-group">
+          {grouped.map(([groupName, items]) => (
+            <div key={groupName} className="sources-group">
               <div className="sources-group-header">
-                <span className="sources-group-name">{region}</span>
+                <span className="sources-group-name">{groupName}</span>
                 <span className="sources-group-count">{items.length}</span>
               </div>
               <div className="sources-grid">
