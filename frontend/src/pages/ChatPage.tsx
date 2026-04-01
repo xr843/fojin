@@ -40,8 +40,9 @@ import { useAuthStore } from "../stores/authStore";
 
 /** Collapse loose markdown lists into tight lists by removing blank lines between list items. */
 function tightenLists(md: string): string {
-  return md.replace(/^(\d+\.\s.*)\n\n+(?=\s)/gm, "$1\n")
-    .replace(/^(\d+\.)\n\n+(\s)/gm, "$1\n$2")
+  // "1.\n\n内容" → "1. 内容" (编号独占一行后跟空行)
+  return md.replace(/^(\d+\.)\s*\n\n+/gm, "$1 ")
+    // "内容\n\n2." → "内容\n2." (列表项之间的空行)
     .replace(/\n\n+(?=\d+\.\s)/g, "\n");
 }
 
