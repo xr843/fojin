@@ -306,12 +306,8 @@ export default function ChatPage() {
           ),
         );
       },
-      onSearching: (searchMsg: string) => {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId ? { ...m, content: searchMsg } : m,
-          ),
-        );
+      onSearching: (_searchMsg: string) => {
+        // 搜索状态由初始占位符 "正在检索经文并生成回答..." 显示，不覆盖 content
       },
       onSessionId: (newSessionId: number) => {
         if (!sessionId) {
