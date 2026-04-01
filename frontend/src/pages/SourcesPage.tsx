@@ -4,9 +4,8 @@ import { Helmet } from "react-helmet-async";
 import { Input, Select, Tag, Empty, Spin, Form, Button, message } from "antd";
 import {
   SearchOutlined, LinkOutlined, GlobalOutlined,
-  DatabaseOutlined, BookOutlined, ApiOutlined,
-  FileImageOutlined, ReadOutlined, SendOutlined,
-  VerticalAlignTopOutlined,
+  ApiOutlined, FileImageOutlined, ReadOutlined,
+  SendOutlined, VerticalAlignTopOutlined,
 } from "@ant-design/icons";
 import { getSources, submitSourceSuggestion, type DataSource } from "../api/client";
 import {
@@ -16,20 +15,6 @@ import {
 } from "../utils/sourceUrls";
 import "../styles/sources.css";
 
-function getCategory(s: DataSource): string {
-  const n = s.name_zh + (s.name_en || "");
-  if (/翻译|Translation/i.test(n)) return "翻译项目";
-  if (/图书馆|Library/i.test(n)) return "图书馆";
-  if (/大学|University|Univ|Institute/i.test(n)) return "高校研究";
-  if (/博物馆|Museum/i.test(n)) return "博物馆";
-  if (/寺|Temple|Monastery|Order/i.test(n)) return "寺院";
-  if (/研究|Academy|Research|Society|Foundation/i.test(n)) return "研究机构";
-  if (/辞典|词典|Dictionary|百科|Wiki|Encyclopedia/i.test(n)) return "辞典百科";
-  if (/写本|手稿|Manuscript|MSS|Palm/i.test(n)) return "写本项目";
-  if (/数据|Digital|电子|CBETA|BDRC|数字/i.test(n)) return "数字项目";
-  return "其他";
-}
-
 function getChannelLabel(channelType: string): string {
   if (channelType === "git") return "Git";
   if (channelType === "bulk_dump") return "批量";
@@ -37,18 +22,10 @@ function getChannelLabel(channelType: string): string {
   return channelType;
 }
 
-const CATEGORY_ICONS: Record<string, React.ReactNode> = {
-  "数字项目": <DatabaseOutlined />,
-  "图书馆": <BookOutlined />,
-  "高校研究": <BookOutlined />,
-  "翻译项目": <GlobalOutlined />,
-};
-
 export default function SourcesPage() {
   const [search, setSearch] = useState("");
   const [regionFilter, setRegionFilter] = useState("all");
   const [langFilter, setLangFilter] = useState("all");
-  const [catFilter, setCatFilter] = useState("all");
   const [fieldFilter, setFieldFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("default");
@@ -122,20 +99,6 @@ export default function SourcesPage() {
     });
   }, [sources]);
 
-  const catOrder = ["寺院", "图书馆", "博物馆", "高校研究", "研究机构", "数字项目", "辞典百科", "写本项目", "翻译项目"];
-  const categories = useMemo(() => {
-    if (!sources) return [];
-    const set = new Set<string>();
-    sources.forEach((s) => set.add(getCategory(s)));
-    return Array.from(set).sort((a, b) => {
-      if (a === "其他") return 1;
-      if (b === "其他") return -1;
-      const ia = catOrder.indexOf(a);
-      const ib = catOrder.indexOf(b);
-      return (ia === -1 ? 98 : ia) - (ib === -1 ? 98 : ib);
-    });
-  }, [sources]);
-
   // 筛选
   const filtered = useMemo(() => {
     if (!sources) return [];
@@ -160,7 +123,6 @@ export default function SourcesPage() {
         const fields = (s.research_fields || "").split(",").map((f) => f.trim());
         if (!fields.includes(fieldFilter)) return false;
       }
-      if (catFilter !== "all" && getCategory(s) !== catFilter) return false;
       return true;
     });
     if (sortBy === "region") {
@@ -172,7 +134,7 @@ export default function SourcesPage() {
     }
     // sortBy === "default": keep backend sort_order
     return result;
-  }, [sources, search, regionFilter, langFilter, fieldFilter, catFilter, sortBy]);
+  }, [sources, search, regionFilter, langFilter, fieldFilter, sortBy]);
 
   // 按地区分组
   const grouped = useMemo(() => {
@@ -285,15 +247,6 @@ export default function SourcesPage() {
           ]}
         />
         <Select
-          value={catFilter}
-          onChange={setCatFilter}
-          style={{ width: 140 }}
-          options={[
-            { value: "all", label: `全部类型 (${categories.length})` },
-            ...categories.map((c) => ({ value: c, label: c })),
-          ]}
-        />
-        <Select
           value={sortBy}
           onChange={setSortBy}
           style={{ width: 120 }}
@@ -333,7 +286,6 @@ export default function SourcesPage() {
               </div>
               <div className="sources-grid">
                 {items.map((s) => {
-                  const cat = getCategory(s);
                   const langs = [...new Map(
                     (s.languages || "").split(",").map((l) => l.trim()).filter(Boolean)
                       .map((l) => [getLangName(l), l] as const)
@@ -354,7 +306,7 @@ export default function SourcesPage() {
                     <div key={s.code} className="source-card">
                       <div className="source-card-top">
                         <span className="source-card-icon">
-                          {CATEGORY_ICONS[cat] || <GlobalOutlined />}
+                          <GlobalOutlined />
                         </span>
                         <div className="source-card-titles">
                           <span className="source-card-name">{s.name_zh}</span>
