@@ -71,6 +71,44 @@ SYSTEM_PROMPT = (
 )
 
 
+def _classify_and_enhance_prompt(message: str) -> str:
+    """Detect question type and append type-specific instructions to system prompt."""
+    msg = message.lower()
+
+    # 经文查证型：问"出自""出处""哪部经""原文"
+    if any(kw in msg for kw in ["出自", "出处", "哪部经", "哪卷", "原文", "偈颂", "完整内容"]):
+        return SYSTEM_PROMPT + (
+            "\n\n## 本次回答特别要求（经文查证型）\n"
+            "- 必须精确标注经名和卷数，格式：【《经名》第N卷】\n"
+            "- 如果能找到原文，直接引用原文段落\n"
+            "- 说明该段经文的上下文和背景\n"
+            "- 如果不确定具体卷数，如实说明\n"
+        )
+
+    # 比较分析型：问"区别""不同""比较""差异""vs"
+    if any(kw in msg for kw in ["区别", "不同", "比较", "差异", "对比", "相同"]):
+        return SYSTEM_PROMPT + (
+            "\n\n## 本次回答特别要求（比较分析型）\n"
+            "- 使用对照结构回答，逐点比较\n"
+            "- 每个对比维度都要有经典依据\n"
+            "- 先总结核心区别，再展开细节\n"
+            "- 避免笼统概述，要有具体的经论引用\n"
+        )
+
+    # 历史人物型：问"谁""创立""贡献""生平""何时"
+    if any(kw in msg for kw in ["谁创立", "贡献", "生平", "何时", "翻译了", "历史"]):
+        return SYSTEM_PROMPT + (
+            "\n\n## 本次回答特别要求（历史人物型）\n"
+            "- 按时间线组织回答\n"
+            "- 提供具体的人名、年代、地点\n"
+            "- 列出主要著作或译作的具体名称\n"
+            "- 说明其历史影响和地位\n"
+        )
+
+    # 默认：术语解释和修行实践用基础 prompt
+    return SYSTEM_PROMPT
+
+
 async def create_session(session: AsyncSession, user_id: int | None, title: str | None = None) -> ChatSession:
     cs = ChatSession(user_id=user_id, title=title)
     session.add(cs)
@@ -241,8 +279,9 @@ def _build_llm_messages(
     history: list[ChatMessage], context_text: str, message: str
 ) -> list[dict[str, str]]:
     """Build the message list for the LLM call, trimming if too long."""
-    llm_messages: list[dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
-    budget = _MAX_INPUT_TOKENS - _estimate_tokens(SYSTEM_PROMPT) - _estimate_tokens(message)
+    enhanced_prompt = _classify_and_enhance_prompt(message)
+    llm_messages: list[dict[str, str]] = [{"role": "system", "content": enhanced_prompt}]
+    budget = _MAX_INPUT_TOKENS - _estimate_tokens(enhanced_prompt) - _estimate_tokens(message)
 
     # RAG context gets priority over history
     if context_text:
