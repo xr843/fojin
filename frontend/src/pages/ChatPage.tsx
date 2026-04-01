@@ -641,8 +641,8 @@ export default function ChatPage() {
                 }}>
                   {m.role === "user" ? <UserOutlined /> : <RobotOutlined />}
                 </div>
+                <div style={{ maxWidth: "75%", display: "flex", flexDirection: "column", alignItems: m.role === "user" ? "flex-end" : "flex-start" }}>
                 <div style={{
-                  maxWidth: "75%",
                   padding: "10px 16px",
                   borderRadius: 12,
                   background: m.role === "user" ? "var(--fj-accent)" : "rgba(217,208,193,0.2)",
@@ -706,18 +706,7 @@ export default function ChatPage() {
                       );
                     })()
                   ) : (
-                    <>
-                      {m.content}
-                      <div style={{ marginTop: 6, display: "flex", justifyContent: "flex-end" }}>
-                        <Tooltip title="复制">
-                          <Button
-                            type="text" size="small" icon={<CopyOutlined />}
-                            style={{ color: "rgba(255,255,255,0.6)", fontSize: 12 }}
-                            onClick={() => { navigator.clipboard.writeText(m.content); message.success("已复制"); }}
-                          />
-                        </Tooltip>
-                      </div>
-                    </>
+                    m.content
                   )}
                   {m.sources && m.sources.length > 0 && (
                     <div style={{
@@ -786,17 +775,18 @@ export default function ChatPage() {
                       </div>
                     ) : null;
                   })()}
-                  {/* Action buttons for assistant messages */}
-                  {m.role === "assistant" && m.content !== "正在检索经文并生成回答..." && streamingIdRef.current !== m.id && (
-                    <div style={{ marginTop: 6, display: "flex", gap: 4 }}>
-                      <Tooltip title="复制回答">
-                        <Button
-                          type="text" size="small" icon={<CopyOutlined />}
-                          style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
-                          onClick={() => { navigator.clipboard.writeText(m.content); message.success("已复制"); }}
-                        />
-                      </Tooltip>
-                      {user && (
+                </div>
+                {/* Action buttons outside bubble */}
+                {m.content !== "正在检索经文并生成回答..." && streamingIdRef.current !== m.id && (
+                  <div style={{ marginTop: 4, display: "flex", gap: 4 }}>
+                    <Tooltip title="复制">
+                      <Button
+                        type="text" size="small" icon={<CopyOutlined />}
+                        style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
+                        onClick={() => { navigator.clipboard.writeText(m.content); message.success("已复制"); }}
+                      />
+                    </Tooltip>
+                      {m.role === "assistant" && user && (
                         <>
                           <Tooltip title="有帮助">
                             <Button
@@ -828,7 +818,7 @@ export default function ChatPage() {
                           </Tooltip>
                         </>
                       )}
-                      {m.content === "请求失败，请重试" && (
+                      {m.role === "assistant" && m.content === "请求失败，请重试" && (
                         <Tooltip title="重试">
                           <Button
                             type="text" size="small" icon={<ReloadOutlined />}
