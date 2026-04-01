@@ -706,7 +706,18 @@ export default function ChatPage() {
                       );
                     })()
                   ) : (
-                    m.content
+                    <>
+                      {m.content}
+                      <div style={{ marginTop: 6, display: "flex", justifyContent: "flex-end" }}>
+                        <Tooltip title="复制">
+                          <Button
+                            type="text" size="small" icon={<CopyOutlined />}
+                            style={{ color: "rgba(255,255,255,0.6)", fontSize: 12 }}
+                            onClick={() => { navigator.clipboard.writeText(m.content); message.success("已复制"); }}
+                          />
+                        </Tooltip>
+                      </div>
+                    </>
                   )}
                   {m.sources && m.sources.length > 0 && (
                     <div style={{
