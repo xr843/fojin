@@ -94,6 +94,7 @@ em {
 .chat-markdown p { margin: 0; }
 .chat-markdown ul, .chat-markdown ol { margin: 0; padding-left: 1.5em; }
 .chat-markdown li { margin: 0; padding: 0; }
+.chat-markdown li + li { margin-top: 0.2em; }
 .chat-markdown li p { margin: 0; }
 .chat-markdown li > ul, .chat-markdown li > ol { margin: 0; }
 .chat-markdown pre {
