@@ -46,8 +46,12 @@ class DpdImporter(BaseImporter):
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
 
-        # Query main headword table
-        query = "SELECT * FROM dpd_headwords ORDER BY id"
+        # Query only needed columns for efficiency
+        query = """SELECT id, lemma_1, lemma_2, pos, grammar,
+                          meaning_1, meaning_2, meaning_lit,
+                          construction, sanskrit, root_key, root_base,
+                          example_1, sutta_1
+                   FROM dpd_headwords ORDER BY id"""
         if self.limit > 0:
             query += f" LIMIT {self.limit}"
 
