@@ -65,6 +65,23 @@
   font-size: 18px !important;
   padding: 0 11px !important;
   align-items: center;
+  border-color: var(--fj-gold, #8b6914) !important;
+}
+
+.dict-search-box .ant-input-search .ant-input-affix-wrapper:hover,
+.dict-search-box .ant-input-search .ant-input-affix-wrapper:focus-within {
+  border-color: var(--fj-accent, #8b2500) !important;
+  box-shadow: 0 0 0 2px rgba(139, 37, 0, 0.1) !important;
+}
+
+.dict-search-box .ant-input-search .ant-input-search-button {
+  background: var(--fj-accent, #8b2500) !important;
+  border-color: var(--fj-accent, #8b2500) !important;
+}
+
+.dict-search-box .ant-input-search .ant-input-search-button:hover {
+  background: var(--fj-accent-hover, #a03000) !important;
+  border-color: var(--fj-accent-hover, #a03000) !important;
 }
 
 .dict-hot-terms {
