@@ -96,30 +96,43 @@ async def process_content(session, tc: TextContent, progress: dict) -> int:
 
 
 async def main(batch_size: int, text_id: int | None, source: str | None = None) -> None:
+    PAGE_SIZE = 200  # fetch in small pages to avoid OOM
+
     async with async_session() as session:
         await ensure_unique_index(session)
 
-        query = select(TextContent)
+        # First, get total count and list of IDs only (lightweight)
+        id_query = select(TextContent.id, TextContent.text_id, TextContent.juan_num)
         if text_id:
-            query = query.where(TextContent.text_id == text_id)
+            id_query = id_query.where(TextContent.text_id == text_id)
         if source:
             subq = select(BuddhistText.id).join(DataSource, BuddhistText.source_id == DataSource.id).where(
                 DataSource.code == source
             )
-            query = query.where(TextContent.text_id.in_(subq))
-        query = query.order_by(TextContent.text_id, TextContent.juan_num)
+            id_query = id_query.where(TextContent.text_id.in_(subq))
+        id_query = id_query.order_by(TextContent.text_id, TextContent.juan_num)
 
-        result = await session.execute(query)
-        contents = result.scalars().all()
-        total = len(contents)
+        result = await session.execute(id_query)
+        content_ids = result.all()
+        total = len(content_ids)
         logger.info(f"Found {total} text content records to process")
 
         progress = {"total": 0, "skipped": 0}
-        for processed, tc in enumerate(contents, 1):
+        for processed, (tc_id, tc_text_id, tc_juan_num) in enumerate(content_ids, 1):
+            # Load one TextContent at a time
+            tc_result = await session.execute(select(TextContent).where(TextContent.id == tc_id))
+            tc = tc_result.scalar_one_or_none()
+            if tc is None:
+                continue
+
             count = await process_content(session, tc, progress)
+
+            # Expire the loaded object to free memory
+            session.expire(tc)
+
             if count > 0:
                 logger.info(
-                    f"[{processed}/{total}] text_id={tc.text_id} juan={tc.juan_num} "
+                    f"[{processed}/{total}] text_id={tc_text_id} juan={tc_juan_num} "
                     f"-> {count} new chunks embedded"
                 )
             elif processed % 50 == 0:

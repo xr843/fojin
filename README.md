@@ -4,9 +4,9 @@
 
 ### The World's Encyclopedic Buddhist Digital Text Platform
 
-**503 sources. 30 languages. 30 countries. 17,800+ full-text volumes. One search.**
+**503 sources. 30 languages. 30 countries. 23,500+ full-text volumes. One search.**
 
-Aggregating the world's Buddhist digital heritage — 9,200+ texts with 17,800+ volumes of full content in Pali, Classical Chinese, Tibetan, and Sanskrit from 503 data sources — with CBETA-style reading, AI-powered Q&A (RAG + reranking + citations + data source recommendations), knowledge graph with 31K+ entities and 28K+ relations (including 23K teacher-student lineage chains), 12 dictionaries with 289K entries, timeline visualization, collections, citations, annotations, bookmarks, and multi-language parallel reading.
+Aggregating the world's Buddhist digital heritage — 10,500+ texts with 23,500+ volumes of full content in Pali, Classical Chinese, Tibetan, and Sanskrit from 503 data sources — with CBETA-style reading, AI-powered Q&A (RAG + reranking + citations + data source recommendations), knowledge graph with 31K+ entities and 28K+ relations (including 23K teacher-student lineage chains), 12 dictionaries with 289K entries, timeline visualization, collections, citations, annotations, bookmarks, and multi-language parallel reading.
 
 [Live Demo](https://fojin.app) &nbsp;&middot;&nbsp; [API Docs](https://fojin.app/docs) &nbsp;&middot;&nbsp; [中文文档](./docs/README_zh.md) &nbsp;&middot;&nbsp; [Discussions](https://github.com/xr843/fojin/discussions) &nbsp;&middot;&nbsp; [Discord](https://discord.gg/76SZeuJekq) &nbsp;&middot;&nbsp; [Report Bug](https://github.com/xr843/fojin/issues)
 
@@ -29,12 +29,12 @@ Buddhist texts are scattered across hundreds of databases worldwide — CBETA, S
 
 | What you need | How FoJin helps |
 |---|---|
-| Find a sutra across databases | **Multi-dimensional search** across 9,200+ texts from 503 sources |
-| Read the full text online | **7,600+ texts** with 17,800+ volumes of full content, CBETA-style layout |
+| Find a sutra across databases | **Multi-dimensional search** across 10,500+ texts from 503 sources |
+| Read the full text online | **8,900+ texts** with 23,500+ volumes of full content, CBETA-style layout |
 | Compare translations | **Parallel reading** in 30 languages side by side |
 | Look up Buddhist terms | **12 dictionaries**, 289K entries (Chinese/Sanskrit/Pali/Tibetan/English) |
 | Explore relationships | **Knowledge graph** with 31K+ entities and 28K+ relations (23K lineage chains) |
-| Discover similar texts | **Semantic similarity** powered by 420K+ embedding vectors (pgvector + HNSW) |
+| Discover similar texts | **Semantic similarity** powered by 678K+ embedding vectors (pgvector + HNSW) |
 | View original manuscripts | **IIIF manuscript viewer** connected to BDRC and more |
 | Ask questions about texts | **AI Q&A** ("XiaoJin") with RAG, reranking, clickable citations, and follow-up suggestions |
 | Explore history visually | **Timeline & Dashboard** — dynasty charts, translation trends, category analytics |
@@ -57,8 +57,14 @@ Then visit: **http://localhost:3000**
 After first startup, the platform has the database schema and source metadata but **no text content**. To import texts from public data sources:
 
 ```bash
-# Import CBETA Chinese Buddhist Canon
-docker exec fojin-backend python scripts/import_cbeta.py
+# Import CBETA catalog (auto-scans local xml-p5 directory or fetches from remote)
+docker exec fojin-backend python scripts/import_catalog.py
+
+# Import CBETA full text content (requires xml-p5 repository)
+docker exec fojin-backend python scripts/import_content.py --all --xml-dir /data/xml-p5
+
+# Generate embeddings for AI Q&A (supports incremental processing)
+docker exec fojin-backend python -m scripts.generate_embeddings --source cbeta
 
 # Import SuttaCentral Early Buddhist Texts
 docker exec fojin-backend python scripts/import_suttacentral.py
@@ -79,7 +85,7 @@ Search across Buddhist canons by title, translator, catalog number, or full-text
 
 ### Full-Text Reading
 
-Read 7,600+ Buddhist texts with 17,800+ volumes of full content online. CBETA-style typography with intelligent verse/prose detection, paragraph reflow, and adjustable font size. Navigate by volume, scroll through content, and jump between related texts.
+Read 8,900+ Buddhist texts with 23,500+ volumes of full content online. CBETA-style typography with intelligent verse/prose detection, paragraph reflow, and adjustable font size. Navigate by volume, scroll through content, and jump between related texts.
 
 ### Parallel Reading (30 Languages)
 
@@ -107,7 +113,7 @@ Compare translations side by side — Classical Chinese, Sanskrit, Pali, Tibetan
 
 ### AI Q&A — "XiaoJin"
 
-Ask questions in natural language. XiaoJin answers based on canonical Buddhist texts using RAG (Retrieval-Augmented Generation) with 420K+ embedding vectors and HNSW index for fast semantic search. Features include:
+Ask questions in natural language. XiaoJin answers based on canonical Buddhist texts using RAG (Retrieval-Augmented Generation) with 678K+ embedding vectors and HNSW index for fast semantic search. Features include:
 
 - Multi-turn conversation with context awareness
 - Keyword + optional API cross-encoder **reranking** for higher answer quality
@@ -174,7 +180,7 @@ FoJin aggregates data from major Buddhist digital projects worldwide. Sources ar
 | Database | PostgreSQL 15 + pgvector (HNSW index) + pg_trgm |
 | Search | Elasticsearch 8 (ICU tokenizer) |
 | Cache | Redis 7 |
-| AI | RAG (420K+ text vectors + 503 source vectors, BGE-M3 embeddings, HNSW) + multi-provider LLM (OpenAI/DashScope/DeepSeek/SiliconFlow) |
+| AI | RAG (678K+ text vectors + 503 source vectors, BGE-M3 embeddings, HNSW) + multi-provider LLM (OpenAI/DashScope/DeepSeek/SiliconFlow) |
 | Deploy | Docker Compose, Nginx (gzip, security headers), Cloudflare CDN |
 | CI | GitHub Actions (lint, test, security scan) |
 
@@ -254,7 +260,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 - [x] User annotations
 - [x] Community-contributed data sources
 - [x] Internationalization (i18n) — 9 UI languages
-- [x] Embedding-based semantic search (420K+ vectors, HNSW index)
+- [x] Embedding-based semantic search (678K+ vectors, HNSW index)
 - [x] AI Q&A with RAG, multi-turn context, and streaming
 - [x] Similar passages discovery (cross-text semantic matching)
 - [x] Timeline visualization and statistics dashboard
@@ -275,6 +281,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 - [x] DILA Authority lineage import (23K teacher-student relations)
 - [x] DILA catalog associations (contributors, places for 2,300+ texts)
 - [x] Nanshan Vinaya Dictionary (3,200+ Buddhist precept terms)
+- [x] CBETA full-text import — Taishō (T) + Xuzangjing (X): 3,600+ texts, 143M characters, 432K embedding vectors
 - [ ] Topic ontology browsing page
 - [ ] Cross-lingual search (query in Chinese, find Sanskrit/Pali/Tibetan results)
 - [ ] Open data export (JSON/CSV for researchers)
