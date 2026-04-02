@@ -84,7 +84,8 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
 
     def flush_juan():
         nonlocal current_lines
-        text = "\n".join(line for line in current_lines if line.strip())
+        # Keep blank lines (paragraph boundaries) but strip leading/trailing empties
+        text = "\n".join(current_lines)
         text = text.strip()
         if text:
             juans.append({
@@ -142,6 +143,11 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
         if tag in CONTENT_TAGS:
             text = _extract_text(elem).strip()
             if text:
+                # Insert blank line between <p> elements to preserve paragraph
+                # boundaries. The frontend reflowText handles mid-word splits
+                # by only breaking when the previous line ends with punctuation.
+                if tag == f"{{{TEI_NS}}}p" and current_lines:
+                    current_lines.append("")
                 current_lines.append(text)
             return
 
