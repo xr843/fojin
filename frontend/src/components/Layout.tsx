@@ -71,13 +71,13 @@ export default function Layout() {
     children?: Array<{ label: string; path: string }>;
   }> = [
     { icon: <DatabaseOutlined />, label: t("nav.sources"), path: "/sources" },
-    { icon: <BookOutlined />, label: t("nav.collections"), path: "/collections" },
-    { icon: <FileTextOutlined />, label: t("nav.dictionary"), path: "/dictionary" },
+    { icon: <RobotOutlined />, label: t("nav.chat"), path: "/chat" },
     { icon: <ApartmentOutlined />, label: t("nav.kg"), path: "/kg" },
+    { icon: <FileTextOutlined />, label: t("nav.dictionary"), path: "/dictionary" },
+    { icon: <BookOutlined />, label: t("nav.collections"), path: "/collections" },
     // TODO: 时间线和数据总览暂时隐藏，待优化后重新上线
     // { icon: <FieldTimeOutlined />, label: t("nav.timeline"), path: "/timeline" },
     // { icon: <BarChartOutlined />, label: t("nav.dashboard"), path: "/dashboard" },
-    { icon: <RobotOutlined />, label: t("nav.chat"), path: "/chat" },
     ...(isAdmin
       ? [
           {
