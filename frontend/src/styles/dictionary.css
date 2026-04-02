@@ -3,7 +3,7 @@
    ======================================== */
 
 .dict-page {
-  max-width: 1000px;
+  max-width: 1100px;
   margin: 0 auto;
   padding: 0 16px 48px;
 }
@@ -29,23 +29,23 @@
 }
 
 .dict-search-box {
-  max-width: 720px;
+  max-width: 860px;
   margin: 0 auto 16px;
 }
 
 .dict-search-box .ant-input-search {
-  font-size: 16px;
+  font-size: 18px;
 }
 
 .dict-search-box .ant-input-search .ant-input {
-  height: 48px;
-  font-size: 16px;
+  height: 56px;
+  font-size: 18px;
 }
 
 .dict-search-box .ant-input-search .ant-input-search-button {
-  height: 48px;
-  font-size: 16px;
-  padding: 0 24px;
+  height: 56px;
+  font-size: 18px;
+  padding: 0 32px;
 }
 
 .dict-hot-terms {
