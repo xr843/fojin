@@ -8,7 +8,6 @@ import { useTranslation } from "react-i18next";
 import {
   getDictionarySources,
   searchDictionaryGrouped,
-  getDictionaryHot,
 } from "../api/client";
 import type { DictEntry } from "../api/client";
 import "../styles/dictionary.css";
@@ -92,12 +91,6 @@ export default function DictionaryPage() {
     staleTime: 300_000,
   });
 
-  const { data: hotTerms } = useQuery({
-    queryKey: ["dict-hot"],
-    queryFn: getDictionaryHot,
-    staleTime: 300_000,
-  });
-
   const { data: searchResult, isLoading: searching } = useQuery({
     queryKey: ["dict-search-grouped", query, langFilter],
     queryFn: () =>
@@ -115,11 +108,6 @@ export default function DictionaryPage() {
     setSearchParams({ q: trimmed });
   };
 
-  const handleHotClick = (term: string) => {
-    setInputValue(term);
-    setQuery(term);
-    setSearchParams({ q: term });
-  };
 
   // Collect unique languages from sources
   const availableLangs = useMemo(() => {
@@ -173,19 +161,7 @@ export default function DictionaryPage() {
           />
         </div>
 
-        {/* Hot terms */}
-        {hotTerms && hotTerms.length > 0 && (
-          <div className="dict-hot-terms">
-            <span style={{ fontSize: 13, color: "var(--fj-ink-muted)", lineHeight: "24px" }}>
-              热门:
-            </span>
-            {hotTerms.map((term) => (
-              <Tag key={term} onClick={() => handleHotClick(term)}>
-                {term}
-              </Tag>
-            ))}
-          </div>
-        )}
+        {/* Hot terms removed per user request */}
       </div>
 
       {/* Landing state: source cards */}
