@@ -72,6 +72,7 @@ async def save_api_key(
     user.encrypted_api_key = encrypt_api_key(data.api_key)
     user.api_provider = data.provider
     user.api_model = data.model
+    user.api_custom_url = data.custom_url if data.provider == "custom" else None
     await db.commit()
     key = data.api_key
     return ApiKeyStatus(
@@ -79,6 +80,7 @@ async def save_api_key(
         provider=data.provider,
         model=data.model,
         key_preview=f"{key[:6]}...{key[-4:]}" if len(key) > 10 else "***",
+        custom_url=user.api_custom_url,
     )
 
 
@@ -97,6 +99,7 @@ async def get_api_key_status(user: User = Depends(get_current_user)):
         provider=user.api_provider,
         model=user.api_model,
         key_preview=preview,
+        custom_url=user.api_custom_url,
     )
 
 
@@ -109,6 +112,7 @@ async def delete_api_key(
     user.encrypted_api_key = None
     user.api_provider = None
     user.api_model = None
+    user.api_custom_url = None
     await db.commit()
     return {"ok": True}
 

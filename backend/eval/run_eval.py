@@ -77,7 +77,7 @@ async def run_single_question(question_data: dict, skip_llm: bool = False) -> di
     import httpx
     from app.services.chat import _resolve_llm_config
 
-    api_url, api_key, model, _ = _resolve_llm_config(None)
+    api_url, api_key, model, _, _ = _resolve_llm_config(None)
     llm_messages = _build_llm_messages([], context_text, question)
 
     t1 = time.monotonic()

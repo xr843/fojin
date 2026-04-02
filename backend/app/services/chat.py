@@ -27,23 +27,89 @@ logger = logging.getLogger(__name__)
 FREE_DAILY_LIMIT_USER = 30       # Logged-in users
 FREE_DAILY_LIMIT_ANONYMOUS = 10  # Anonymous users (encourage registration)
 
-# Provider → base URL mapping
+# Provider → base URL mapping (most are OpenAI-compatible; Anthropic uses its own format)
 PROVIDER_URLS = {
-    "openai": "https://api.openai.com/v1",
-    "dashscope": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    # 国内
     "deepseek": "https://api.deepseek.com/v1",
-    "siliconflow": "https://api.siliconflow.cn/v1",
+    "dashscope": "https://dashscope.aliyuncs.com/compatible-mode/v1",
     "zhipu": "https://open.bigmodel.cn/api/paas/v4",
+    "moonshot": "https://api.moonshot.cn/v1",
+    "doubao": "https://ark.cn-beijing.volces.com/api/v3",
+    "minimax": "https://api.minimax.chat/v1",
+    "stepfun": "https://api.stepfun.com/v1",
+    "baichuan": "https://api.baichuan-ai.com/v1",
+    "yi": "https://api.lingyiwanwu.com/v1",
+    "siliconflow": "https://api.siliconflow.cn/v1",
+    # 国际
+    "openai": "https://api.openai.com/v1",
+    "gemini": "https://generativelanguage.googleapis.com/v1beta/openai",
+    "groq": "https://api.groq.com/openai/v1",
+    "mistral": "https://api.mistral.ai/v1",
+    "xai": "https://api.x.ai/v1",
+    "openrouter": "https://openrouter.ai/api/v1",
+    "anthropic": "https://api.anthropic.com/v1",
 }
 
 # Provider → default model
 PROVIDER_DEFAULT_MODELS = {
-    "openai": "gpt-4o-mini",
-    "dashscope": "qwen-plus",
+    # 国内
     "deepseek": "deepseek-chat",
-    "siliconflow": "Qwen/Qwen2.5-7B-Instruct",
+    "dashscope": "qwen-plus",
     "zhipu": "glm-4-flash",
+    "moonshot": "moonshot-v1-8k",
+    "doubao": "doubao-1.5-pro-32k",
+    "minimax": "MiniMax-Text-01",
+    "stepfun": "step-1-8k",
+    "baichuan": "Baichuan4-Air",
+    "yi": "yi-lightning",
+    "siliconflow": "Qwen/Qwen2.5-7B-Instruct",
+    # 国际
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-2.0-flash",
+    "groq": "llama-3.3-70b-versatile",
+    "mistral": "mistral-small-latest",
+    "xai": "grok-2-latest",
+    "openrouter": "openai/gpt-4o-mini",
+    "anthropic": "claude-sonnet-4-20250514",
 }
+
+# Anthropic uses a different API format; detect by provider or URL
+ANTHROPIC_API_VERSION = "2023-06-01"
+
+
+def _is_anthropic(api_url: str, provider: str | None = None) -> bool:
+    return provider == "anthropic" or "api.anthropic.com" in api_url
+
+
+def _build_anthropic_headers(api_key: str) -> dict:
+    return {
+        "x-api-key": api_key,
+        "anthropic-version": ANTHROPIC_API_VERSION,
+        "content-type": "application/json",
+    }
+
+
+def _convert_messages_for_anthropic(messages: list[dict]) -> tuple[str, list[dict]]:
+    """Extract system prompt and convert messages to Anthropic format."""
+    system = ""
+    user_messages = []
+    for m in messages:
+        if m["role"] == "system":
+            system = m["content"] if not system else system + "\n\n" + m["content"]
+        else:
+            user_messages.append({"role": m["role"], "content": m["content"]})
+    return system, user_messages
+
+
+def _build_anthropic_body(model: str, messages: list[dict], *, temperature: float = 0.7,
+                          max_tokens: int = 2000, stream: bool = False) -> dict:
+    system, user_messages = _convert_messages_for_anthropic(messages)
+    body: dict = {"model": model, "messages": user_messages, "temperature": temperature, "max_tokens": max_tokens}
+    if system:
+        body["system"] = system
+    if stream:
+        body["stream"] = True
+    return body
 
 SYSTEM_PROMPT = (
     "你是佛津（FoJin）佛教古籍智能助手。\n\n"
@@ -181,21 +247,25 @@ def _detect_model_from_url(api_url: str) -> str:
     return "gpt-4o-mini"
 
 
-def _resolve_llm_config(user: User | None) -> tuple[str, str, str, bool]:
-    """Return (api_url, api_key, model, is_byok) based on user's BYOK or platform default."""
+def _resolve_llm_config(user: User | None) -> tuple[str, str, str, bool, str]:
+    """Return (api_url, api_key, model, is_byok, provider) based on user's BYOK or platform default."""
     if user and user.encrypted_api_key:
         try:
             key = decrypt_api_key(user.encrypted_api_key)
             provider = user.api_provider or "openai"
-            url = PROVIDER_URLS.get(provider, settings.llm_api_url)
-            model = user.api_model or PROVIDER_DEFAULT_MODELS.get(provider, settings.llm_model)
-            return url, key, model, True
+            if provider == "custom":
+                url = user.api_custom_url or settings.llm_api_url
+                model = user.api_model or "gpt-4o-mini"
+            else:
+                url = PROVIDER_URLS.get(provider, settings.llm_api_url)
+                model = user.api_model or PROVIDER_DEFAULT_MODELS.get(provider, settings.llm_model)
+            return url, key, model, True, provider
         except Exception as exc:
             logger.warning("Failed to decrypt user %s API key: %s", user.id, exc)
             raise ServiceError("您的 API Key 解密失败，请在个人中心重新配置。") from None
     url = settings.llm_api_url or "https://api.openai.com/v1"
     model = settings.llm_model or _detect_model_from_url(url)
-    return url, settings.llm_api_key, model, False
+    return url, settings.llm_api_key, model, False, "openai"
 
 
 async def _check_daily_quota(db: AsyncSession, user: User) -> None:
@@ -341,25 +411,28 @@ async def _save_messages(
 
 async def _generate_session_title(
     api_url: str, api_key: str, model: str, message: str, answer: str,
+    *, provider: str | None = None,
 ) -> str | None:
     """Ask LLM to generate a short session title (5-10 chars). Returns None on failure."""
+    messages = [
+        {"role": "system", "content": "用5-10个中文字概括以下对话的主题，只输出标题，不要标点符号。"},
+        {"role": "user", "content": f"用户问：{message[:100]}\n回答：{answer[:200]}"},
+    ]
     try:
         async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.post(
-                f"{api_url}/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}"},
-                json={
-                    "model": model,
-                    "messages": [
-                        {"role": "system", "content": "用5-10个中文字概括以下对话的主题，只输出标题，不要标点符号。"},
-                        {"role": "user", "content": f"用户问：{message[:100]}\n回答：{answer[:200]}"},
-                    ],
-                    "temperature": 0.3,
-                    "max_tokens": 30,
-                },
-            )
-            resp.raise_for_status()
-            title = resp.json()["choices"][0]["message"]["content"].strip().strip("\"'《》")
+            if _is_anthropic(api_url, provider):
+                body = _build_anthropic_body(model, messages, temperature=0.3, max_tokens=30)
+                resp = await client.post(f"{api_url}/messages", headers=_build_anthropic_headers(api_key), json=body)
+                resp.raise_for_status()
+                title = resp.json()["content"][0]["text"].strip().strip("\"'《》")
+            else:
+                resp = await client.post(
+                    f"{api_url}/chat/completions",
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    json={"model": model, "messages": messages, "temperature": 0.3, "max_tokens": 30},
+                )
+                resp.raise_for_status()
+                title = resp.json()["choices"][0]["message"]["content"].strip().strip("\"'《》")
             return title[:30] if title else None
     except Exception:
         logger.debug("Failed to generate session title, keeping default")
@@ -374,10 +447,10 @@ async def _prepare_chat(
     user: User | None = None,
     client_ip: str | None = None,
     redis=None,
-) -> tuple[ChatSession | None, str, str, str, bool, list[ChatSource], list[dict[str, str]]]:
+) -> tuple[ChatSession | None, str, str, str, bool, str, list[ChatSource], list[dict[str, str]]]:
     """Shared setup for send_message and send_message_stream.
 
-    Returns (chat_session, api_url, api_key, model, is_byok, sources, llm_messages).
+    Returns (chat_session, api_url, api_key, model, is_byok, provider, sources, llm_messages).
     chat_session is None for anonymous users.
     """
     _validate_message(message)
@@ -387,7 +460,7 @@ async def _prepare_chat(
     if user_id is not None:
         chat_session = await _resolve_session(db, user_id, message, session_id)
 
-    api_url, api_key, model, is_byok = _resolve_llm_config(user)
+    api_url, api_key, model, is_byok, provider = _resolve_llm_config(user)
 
     if not is_byok and not api_key:
         raise ServiceError("平台 AI 服务暂未配置。请在个人中心配置自己的 API Key 使用 AI 问答功能。")
@@ -414,7 +487,7 @@ async def _prepare_chat(
     sources, context_text = await retrieve_rag_context(db, message, prev_query=prev_user_msg)
     llm_messages = _build_llm_messages(history, context_text, message)
 
-    return chat_session, api_url, api_key, model, is_byok, sources, llm_messages
+    return chat_session, api_url, api_key, model, is_byok, provider, sources, llm_messages
 
 
 async def send_message(
@@ -427,7 +500,7 @@ async def send_message(
     redis=None,
 ) -> ChatResponse:
     _t0 = _time.monotonic()
-    chat_session, api_url, api_key, model, is_byok, sources, llm_messages = await _prepare_chat(
+    chat_session, api_url, api_key, model, is_byok, provider, sources, llm_messages = await _prepare_chat(
         db, user_id, message, session_id, user, client_ip=client_ip, redis=redis,
     )
     _t1 = _time.monotonic()
@@ -436,18 +509,21 @@ async def send_message(
     # Call LLM
     try:
         async with httpx.AsyncClient(timeout=60) as client:
-            resp = await client.post(
-                f"{api_url}/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}"},
-                json={
-                    "model": model,
-                    "messages": llm_messages,
-                    "temperature": 0.7,
-                    "max_tokens": 2000,
-                },
-            )
-            resp.raise_for_status()
-            answer = resp.json()["choices"][0]["message"]["content"]
+            if _is_anthropic(api_url, provider):
+                body = _build_anthropic_body(model, llm_messages)
+                resp = await client.post(
+                    f"{api_url}/messages", headers=_build_anthropic_headers(api_key), json=body,
+                )
+                resp.raise_for_status()
+                answer = resp.json()["content"][0]["text"]
+            else:
+                resp = await client.post(
+                    f"{api_url}/chat/completions",
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    json={"model": model, "messages": llm_messages, "temperature": 0.7, "max_tokens": 2000},
+                )
+                resp.raise_for_status()
+                answer = resp.json()["choices"][0]["message"]["content"]
         logger.debug("TIMING: LLM call took %.2fs", _time.monotonic() - _t1)
     except httpx.TimeoutException:
         logger.warning("LLM call timed out")
@@ -468,7 +544,7 @@ async def send_message(
 
         # Auto-generate a better session title for new sessions (first message)
         if chat_session.title == message[:50]:
-            title = await _generate_session_title(api_url, api_key, model, message, answer)
+            title = await _generate_session_title(api_url, api_key, model, message, answer, provider=provider)
             if title:
                 chat_session.title = title
                 await db.commit()
@@ -502,7 +578,7 @@ async def send_message_stream(
     yield f"data: {json.dumps({'type': 'searching', 'message': '正在检索相关经文...'}, ensure_ascii=False)}\n\n"
 
     try:
-        chat_session, api_url, api_key, model, is_byok, sources, llm_messages = await _prepare_chat(
+        chat_session, api_url, api_key, model, is_byok, provider, sources, llm_messages = await _prepare_chat(
             db, user_id, message, session_id, user, client_ip=client_ip, redis=redis,
         )
     except (ValidationError, QuotaExceededError, AccessDeniedError, ServiceError) as exc:
@@ -516,34 +592,59 @@ async def send_message_stream(
     # --- Phase 3: stream LLM ---
     full_answer = ""
     try:
-        async with httpx.AsyncClient(timeout=60) as client, client.stream(
-            "POST",
-            f"{api_url}/chat/completions",
-            headers={"Authorization": f"Bearer {api_key}"},
-            json={
-                "model": model,
-                "messages": llm_messages,
-                "temperature": 0.7,
-                "max_tokens": 2000,
-                "stream": True,
-            },
-        ) as resp:
-            resp.raise_for_status()
-            async for line in resp.aiter_lines():
-                if not line.startswith("data: "):
-                    continue
-                payload = line[6:]
-                if payload.strip() == "[DONE]":
-                    break
-                try:
-                    chunk = json.loads(payload)
-                    delta = chunk.get("choices", [{}])[0].get("delta", {})
-                    content = delta.get("content", "")
-                    if content:
-                        full_answer += content
-                        yield f"data: {json.dumps({'type': 'token', 'content': content}, ensure_ascii=False)}\n\n"
-                except (json.JSONDecodeError, IndexError, KeyError):
-                    continue
+        if _is_anthropic(api_url, provider):
+            # Anthropic streaming: different event format
+            body = _build_anthropic_body(model, llm_messages, stream=True)
+            async with httpx.AsyncClient(timeout=60) as client, client.stream(
+                "POST", f"{api_url}/messages", headers=_build_anthropic_headers(api_key), json=body,
+            ) as resp:
+                resp.raise_for_status()
+                async for line in resp.aiter_lines():
+                    if not line.startswith("data: "):
+                        continue
+                    payload = line[6:]
+                    try:
+                        chunk = json.loads(payload)
+                        event_type = chunk.get("type", "")
+                        if event_type == "content_block_delta":
+                            content = chunk.get("delta", {}).get("text", "")
+                            if content:
+                                full_answer += content
+                                yield f"data: {json.dumps({'type': 'token', 'content': content}, ensure_ascii=False)}\n\n"
+                        elif event_type == "message_stop":
+                            break
+                    except (json.JSONDecodeError, KeyError):
+                        continue
+        else:
+            # OpenAI-compatible streaming
+            async with httpx.AsyncClient(timeout=60) as client, client.stream(
+                "POST",
+                f"{api_url}/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json={
+                    "model": model,
+                    "messages": llm_messages,
+                    "temperature": 0.7,
+                    "max_tokens": 2000,
+                    "stream": True,
+                },
+            ) as resp:
+                resp.raise_for_status()
+                async for line in resp.aiter_lines():
+                    if not line.startswith("data: "):
+                        continue
+                    payload = line[6:]
+                    if payload.strip() == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(payload)
+                        delta = chunk.get("choices", [{}])[0].get("delta", {})
+                        content = delta.get("content", "")
+                        if content:
+                            full_answer += content
+                            yield f"data: {json.dumps({'type': 'token', 'content': content}, ensure_ascii=False)}\n\n"
+                    except (json.JSONDecodeError, IndexError, KeyError):
+                        continue
     except httpx.TimeoutException:
         logger.warning("LLM stream timed out")
         error_msg = "抱歉，AI 服务响应超时，请稍后重试。"

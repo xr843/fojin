@@ -1168,6 +1168,7 @@ export async function saveApiKey(payload: {
   api_key: string;
   provider: string;
   model?: string;
+  custom_url?: string;
 }): Promise<ApiKeyStatus> {
   const { data } = await api.put<ApiKeyStatus>("/auth/api-key", payload);
   return data;
