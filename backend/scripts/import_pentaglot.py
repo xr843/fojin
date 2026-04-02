@@ -30,57 +30,66 @@ class PentaglotImporter(DilaBaseImporter):
     DICT_LANG = "zh"
 
     def parse_entry(self, entry_el, index: int) -> dict | None:
-        form_el = entry_el.find(f"{{{TEI_NS}}}form")
-        if form_el is None:
-            form_el = entry_el.find("form")
-        if form_el is None:
-            return None
+        """
+        PTG format — no <form>, languages are in <sense xml:lang="...">:
+        <entry xml:id="p005.2">
+            <sense xml:lang="san-Latn">buddhaḥ</sense>
+            <sense xml:lang="bod-Tibt"/>
+            <sense xml:lang="mnc-Latn">fucihi</sense>
+            <sense xml:lang="mon-Latn">burkhan</sense>
+            <sense xml:lang="zho-Hant">佛</sense>
+        </entry>
+        Use Chinese as headword, Sanskrit as reading, build multilingual definition.
+        """
+        XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
+        senses = entry_el.findall(f"{{{TEI_NS}}}sense")
+        if not senses:
+            senses = entry_el.findall("sense")
 
-        headword = self._strip_tags(form_el).strip()
+        langs = {}
+        for sense_el in senses:
+            lang = sense_el.get(XML_LANG, "") or sense_el.get("lang", "")
+            text = self._strip_tags(sense_el).strip()
+            if text:
+                langs[lang] = text
+
+        # Chinese headword
+        headword = langs.get("zho-Hant", "") or langs.get("zho-Hans", "") or langs.get("zho", "")
+        if not headword:
+            # Fallback: use Sanskrit
+            headword = langs.get("san-Latn", "") or langs.get("san", "")
         if not headword:
             return None
 
-        # Collect all sense/definition text
-        parts = []
+        # Build definition showing all languages
+        def_parts = []
         entry_data = {}
+        lang_labels = {
+            "san-Latn": ("梵", "sanskrit"),
+            "bod-Tibt": ("藏", "tibetan"),
+            "mnc-Latn": ("滿", "manchu"),
+            "mon-Latn": ("蒙", "mongolian"),
+            "zho-Hant": ("漢", None),
+        }
+        for lang_code, (label, data_key) in lang_labels.items():
+            val = langs.get(lang_code, "")
+            if val and val != headword:
+                def_parts.append(f"{label}: {val}")
+            if val and data_key:
+                entry_data[data_key] = val
 
-        for sense_el in entry_el.findall(f"{{{TEI_NS}}}sense") or entry_el.findall("sense"):
-            sense_text = self._strip_tags(sense_el).strip()
-            if sense_text:
-                parts.append(sense_text)
-
-            # Extract language-tagged terms
-            for cit_el in sense_el.findall(f"{{{TEI_NS}}}cit") or sense_el.findall("cit"):
-                lang = cit_el.get("{http://www.w3.org/XML/1998/namespace}lang", "")
-                quote_el = cit_el.find(f"{{{TEI_NS}}}quote")
-                if quote_el is None:
-                    quote_el = cit_el.find("quote")
-                if quote_el is not None:
-                    text = self._strip_tags(quote_el).strip()
-                    if text:
-                        if "san" in lang:
-                            entry_data["sanskrit"] = text
-                        elif "bod" in lang or "tib" in lang:
-                            entry_data["tibetan"] = text
-                        elif "mon" in lang:
-                            entry_data["mongolian"] = text
-                        elif "mnc" in lang:
-                            entry_data["manchu"] = text
-
-        if not parts:
-            full_text = self._strip_tags(entry_el).strip()
-            if full_text and full_text != headword:
-                parts.append(full_text)
-
-        definition = "\n\n".join(parts)
+        definition = "\n".join(def_parts) if def_parts else langs.get("san-Latn", "")
         if not definition:
             return None
 
+        xml_id = entry_el.get("{http://www.w3.org/XML/1998/namespace}id", "") or entry_el.get("id", "")
+        external_id = f"ptg-{xml_id}" if xml_id else f"ptg-{index}"
+
         return {
             "headword": headword,
-            "reading": None,
+            "reading": langs.get("san-Latn"),
             "definition": definition,
-            "external_id": f"ptg-{index}",
+            "external_id": external_id,
             "entry_data": entry_data if entry_data else None,
         }
 
