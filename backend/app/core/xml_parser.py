@@ -30,6 +30,7 @@ SKIP_TAGS = {
     f"{{{TEI_NS}}}rdg",
     f"{{{TEI_NS}}}ref",
     f"{{{CB_NS}}}tt",       # translation table
+    f"{{{CB_NS}}}mulu",     # table of contents entry (e.g. "2" in juan heading)
 }
 
 
