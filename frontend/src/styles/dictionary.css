@@ -51,12 +51,20 @@
 
 .dict-search-box .ant-input-search .ant-input-search-button {
   height: 56px !important;
-  font-size: 18px;
-  padding: 0 32px;
+  min-height: 56px !important;
+  font-size: 18px !important;
+  padding: 0 32px !important;
 }
 
 .dict-search-box .ant-input-search .ant-input-group-addon {
-  height: 56px;
+  height: 56px !important;
+}
+
+.dict-search-box .ant-input-search .ant-input-affix-wrapper {
+  height: 56px !important;
+  font-size: 18px !important;
+  padding: 0 11px !important;
+  align-items: center;
 }
 
 .dict-hot-terms {

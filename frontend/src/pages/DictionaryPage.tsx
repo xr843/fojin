@@ -161,11 +161,15 @@ export default function DictionaryPage() {
             size="large"
             placeholder="搜索佛学术语..."
             prefix={<SearchOutlined style={{ color: "var(--fj-ink-muted)" }} />}
-            enterButton="搜索"
+            enterButton="搜 索"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onSearch={handleSearch}
             allowClear
+            style={{ height: 56 }}
+            styles={{
+              input: { height: 56, fontSize: 18, lineHeight: "56px" },
+            }}
           />
         </div>
 
