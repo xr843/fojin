@@ -24,22 +24,28 @@ def _zh_variants(q: str) -> list[str]:
     return list({q, _t2s.convert(q), _s2t.convert(q)})
 
 
-def _build_search_conditions(variants: list[str]):
-    """Build OR conditions for all variants (simplified + traditional)."""
+def _build_exact_prefix_conditions(variants: list[str]):
+    """Build conditions for exact match + prefix match (fast, uses btree index)."""
     conditions = []
     for v in variants:
-        like_v = f"%{v}%"
-        conditions.append(DictionaryEntry.headword.ilike(like_v))
-        conditions.append(DictionaryEntry.definition.ilike(like_v))
-        conditions.append(DictionaryEntry.reading.ilike(like_v))
+        conditions.append(DictionaryEntry.headword == v)
+        conditions.append(DictionaryEntry.headword.ilike(f"{v}%"))
+    return or_(*conditions)
+
+
+def _build_substring_conditions(variants: list[str]):
+    """Build conditions for substring match (slower, uses trgm index)."""
+    conditions = []
+    for v in variants:
+        conditions.append(DictionaryEntry.headword.ilike(f"%{v}%"))
     return or_(*conditions)
 
 
 def _build_relevance(variants: list[str]):
-    """Build relevance scoring: exact headword > substring headword > definition/reading."""
+    """Build relevance scoring: exact headword > prefix > substring."""
     exact_cases = [(DictionaryEntry.headword == v, 3) for v in variants]
-    like_cases = [(DictionaryEntry.headword.ilike(f"%{v}%"), 2) for v in variants]
-    return case(*exact_cases, *like_cases, else_=1)
+    prefix_cases = [(DictionaryEntry.headword.ilike(f"{v}%"), 2) for v in variants]
+    return case(*exact_cases, *prefix_cases, else_=1)
 
 
 def _entry_to_dict(e: DictionaryEntry) -> dict:
@@ -110,31 +116,41 @@ async def search_dictionary_grouped(
 ):
     """Search dictionary entries grouped by source. Supports simplified/traditional Chinese interconversion.
 
-    按来源分组搜索辞典词条，支持简繁互搜。"""
+    按来源分组搜索辞典词条，支持简繁互搜。
+    Two-phase search: first exact+prefix (fast), then substring if needed."""
     variants = _zh_variants(q)
-    filter_cond = _build_search_conditions(variants)
     relevance = _build_relevance(variants)
 
-    stmt = select(DictionaryEntry).where(filter_cond).options(joinedload(DictionaryEntry.source))
+    # Phase 1: exact + prefix match (fast, uses btree index)
+    fast_cond = _build_exact_prefix_conditions(variants)
+    base_filters = []
     if lang:
-        stmt = stmt.where(DictionaryEntry.lang == lang)
+        base_filters.append(DictionaryEntry.lang == lang)
     if source:
-        stmt = stmt.join(DictionaryEntry.source).where(DataSource.code == source)
+        base_filters.append(DataSource.code == source)
 
-    # Count total
-    count_stmt = select(func.count()).select_from(
-        select(DictionaryEntry.id).where(filter_cond).subquery()
-        if not lang and not source
-        else stmt.with_only_columns(DictionaryEntry.id).subquery()
-    )
-    total = (await db.execute(count_stmt)).scalar() or 0
-
-    # Fetch all matching entries ordered by relevance (capped for performance)
-    stmt = stmt.order_by(
-        relevance.desc(), func.length(DictionaryEntry.headword), DictionaryEntry.headword
-    ).limit(500)
+    stmt = select(DictionaryEntry).where(fast_cond, *base_filters).options(joinedload(DictionaryEntry.source))
+    if source:
+        stmt = stmt.join(DictionaryEntry.source)
+    stmt = stmt.order_by(relevance.desc(), func.length(DictionaryEntry.headword), DictionaryEntry.headword).limit(200)
     result = await db.execute(stmt)
-    entries = result.unique().scalars().all()
+    entries = list(result.unique().scalars().all())
+    total = len(entries)
+
+    # Phase 2: substring match only if phase 1 found very few results
+    if total < 5:
+        sub_cond = _build_substring_conditions(variants)
+        stmt2 = select(DictionaryEntry).where(sub_cond, *base_filters).options(joinedload(DictionaryEntry.source))
+        if source:
+            stmt2 = stmt2.join(DictionaryEntry.source)
+        stmt2 = stmt2.order_by(relevance.desc(), func.length(DictionaryEntry.headword)).limit(200)
+        result2 = await db.execute(stmt2)
+        seen_ids = {e.id for e in entries}
+        for e in result2.unique().scalars().all():
+            if e.id not in seen_ids:
+                entries.append(e)
+                seen_ids.add(e.id)
+        total = len(entries)
 
     # Group by source
     groups_map: dict[str, dict] = {}
@@ -165,24 +181,24 @@ async def search_dictionary(
     size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    """Search Buddhist dictionary entries by headword, definition, or reading. Supports simplified/traditional Chinese interconversion.
+    """Search Buddhist dictionary entries by headword. Supports simplified/traditional Chinese interconversion.
 
-    搜索佛学辞典词条（词头 + 释义 + 读音），支持简繁互搜。"""
+    搜索佛学辞典词条（词头匹配），支持简繁互搜。"""
     variants = _zh_variants(q)
-    filter_cond = _build_search_conditions(variants)
+    fast_cond = _build_exact_prefix_conditions(variants)
+    relevance = _build_relevance(variants)
 
-    stmt = select(DictionaryEntry).where(filter_cond)
+    base_filters = []
     if lang:
-        stmt = stmt.where(DictionaryEntry.lang == lang)
+        base_filters.append(DictionaryEntry.lang == lang)
+
+    stmt = select(DictionaryEntry).where(fast_cond, *base_filters)
     if source:
         stmt = stmt.join(DictionaryEntry.source).where(DataSource.code == source)
 
     # Count
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = (await db.execute(count_stmt)).scalar() or 0
-
-    # Relevance ordering
-    relevance = _build_relevance(variants)
 
     # Paginate with relevance ordering
     stmt = (

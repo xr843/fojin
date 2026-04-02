@@ -66,6 +66,11 @@ function EntryItem({ entry }: { entry: DictEntry }) {
         >
           {LANG_LABELS[entry.lang] || entry.lang}
         </Tag>
+        {entry.source_name && (
+          <Tag color="orange" style={{ fontSize: 11, marginLeft: 4 }}>
+            {entry.source_name}
+          </Tag>
+        )}
       </div>
       {expanded ? (
         <div className="dict-entry-def-full">{entry.definition}</div>
