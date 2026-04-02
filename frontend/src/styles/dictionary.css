@@ -15,11 +15,11 @@
 
 .dict-title {
   font-family: "Noto Serif SC", serif;
-  font-size: 28px;
+  font-size: 36px;
   font-weight: 700;
   color: var(--fj-ink);
   margin: 0 0 8px;
-  letter-spacing: 4px;
+  letter-spacing: 6px;
 }
 
 .dict-subtitle {
