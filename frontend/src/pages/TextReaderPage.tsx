@@ -130,18 +130,24 @@ function reflowText(raw: string): TextSegment[] {
   // Before the first 論曰, verse-like lines are opening verses
   let beforeFirstProse = true;
   let firstNonEmptyIdx = -1;
+  let lastNonEmptyLine = "";
 
   for (let i = 0; i < lines.length; i++) {
     const trimmed = lines[i].trim();
 
-    // Blank line → paragraph break
+    // Blank line → paragraph break, but ONLY if the previous non-empty line
+    // ends with sentence-final punctuation. CBETA XML <p> boundaries sometimes
+    // fall mid-word (e.g. 淨\n\n色), so we must not break there.
     if (trimmed === "") {
-      flushProse();
-      segments.push({ type: "break" });
+      if (/[。！？」』]$/.test(lastNonEmptyLine)) {
+        flushProse();
+        segments.push({ type: "break" });
+      }
       continue;
     }
 
-    // Track first non-empty line index for head detection
+    // Track non-empty lines
+    lastNonEmptyLine = trimmed;
     if (firstNonEmptyIdx < 0) firstNonEmptyIdx = i;
     const relIdx = i - firstNonEmptyIdx;
 
