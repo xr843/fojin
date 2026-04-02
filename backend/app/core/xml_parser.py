@@ -121,6 +121,17 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
                     current_juan = int(n)
                 except ValueError:
                     current_juan += 1
+                # Extract juan title text (e.g. "阿毘達磨俱舍論卷第一")
+                juan_text = _extract_text(elem).strip()
+                if juan_text:
+                    current_lines.append(juan_text)
+            return
+
+        # Extract byline (author/translator info)
+        if tag == f"{{{TEI_NS}}}byline":
+            text = _extract_text(elem).strip()
+            if text:
+                current_lines.append(text)
             return
 
         # Skip certain elements
