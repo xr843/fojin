@@ -37,15 +37,26 @@
   font-size: 18px;
 }
 
+.dict-search-box .ant-input-search .ant-input-wrapper {
+  height: 56px;
+}
+
 .dict-search-box .ant-input-search .ant-input {
   height: 56px;
   font-size: 18px;
+  line-height: 56px;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .dict-search-box .ant-input-search .ant-input-search-button {
-  height: 56px;
+  height: 56px !important;
   font-size: 18px;
   padding: 0 32px;
+}
+
+.dict-search-box .ant-input-search .ant-input-group-addon {
+  height: 56px;
 }
 
 .dict-hot-terms {
