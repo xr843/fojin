@@ -102,6 +102,54 @@
   padding: 20px 0;
 }
 
+/* ── CBETA-style typography ── */
+
+/* 经名标题 (e.g. 長阿含經序) */
+.reader-body .text-head {
+  font-size: 1.2em;
+  color: var(--fj-accent, #8b6914);
+  text-align: center;
+  margin: 0.5em 0 1em;
+  padding: 0.5em 0;
+}
+
+/* 卷标题 (e.g. 佛說長阿含經卷第一) */
+.reader-body .text-juan {
+  font-size: 1.1em;
+  color: var(--fj-accent, #8b6914);
+  text-align: center;
+  margin: 1.5em 0 1em;
+  padding: 0.3em 0;
+}
+
+/* 署名/译者 (e.g. 後秦弘始年佛陀耶舍共竺佛念譯) */
+.reader-body .text-byline {
+  color: #408080;
+  text-align: right;
+  margin: 0 0 1.2em;
+  font-size: 0.95em;
+}
+
+/* 品名/章节 (e.g. （一）第一分初大本經第一) */
+.reader-body .text-section {
+  text-align: center;
+  margin: 1.5em 0 1em;
+  font-size: 1.05em;
+}
+
+/* 正文段落 */
+.reader-body .text-prose {
+  text-indent: 2em;
+  margin: 0 0 1em;
+}
+
+/* 偈颂 */
+.reader-body .text-verse {
+  margin: 0;
+  padding-left: 4em;
+  text-indent: 0;
+}
+
 .reader-bottom-nav {
   display: flex;
   justify-content: space-between;
