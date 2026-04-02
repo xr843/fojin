@@ -14,6 +14,7 @@ import "../styles/dictionary.css";
 
 const LANG_COLORS: Record<string, string> = {
   zh: "red",
+  lzh: "red",
   pi: "green",
   sa: "orange",
   bo: "blue",
@@ -24,6 +25,7 @@ const LANG_COLORS: Record<string, string> = {
 
 const LANG_LABELS: Record<string, string> = {
   zh: "中文",
+  lzh: "文言文",
   pi: "巴利文",
   sa: "梵文",
   bo: "藏文",
