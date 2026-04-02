@@ -98,6 +98,9 @@
   border-color: var(--fj-border);
   background: var(--fj-card-bg);
   color: var(--fj-ink-light);
+  font-size: 15px;
+  padding: 4px 12px;
+  line-height: 1.6;
 }
 
 .dict-hot-terms .ant-tag:hover {
