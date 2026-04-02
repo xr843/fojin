@@ -49,8 +49,9 @@ class UserProfile(BaseModel):
 
 class ApiKeyRequest(BaseModel):
     api_key: str
-    provider: str = "openai"  # openai, dashscope, deepseek, etc.
+    provider: str = "openai"
     model: str | None = None
+    custom_url: str | None = None  # Only used when provider="custom"
 
 
 class ApiKeyStatus(BaseModel):
@@ -58,3 +59,4 @@ class ApiKeyStatus(BaseModel):
     provider: str | None = None
     model: str | None = None
     key_preview: str | None = None  # e.g. "sk-...3xF2"
+    custom_url: str | None = None

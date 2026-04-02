@@ -9,11 +9,27 @@ import { getBookmarks, getHistory, getApiKeyStatus, saveApiKey, deleteApiKey } f
 const { Title } = Typography;
 
 const PROVIDERS = [
-  { value: "dashscope", label: "通义千问 (DashScope)" },
+  // 国内
   { value: "deepseek", label: "DeepSeek" },
-  { value: "siliconflow", label: "SiliconFlow" },
+  { value: "dashscope", label: "通义千问 (DashScope)" },
   { value: "zhipu", label: "智谱 AI (GLM)" },
+  { value: "moonshot", label: "月之暗面 (Kimi)" },
+  { value: "doubao", label: "字节豆包 (Doubao)" },
+  { value: "minimax", label: "MiniMax" },
+  { value: "stepfun", label: "阶跃星辰 (StepFun)" },
+  { value: "baichuan", label: "百川智能 (Baichuan)" },
+  { value: "yi", label: "零一万物 (Yi)" },
+  { value: "siliconflow", label: "SiliconFlow" },
+  // 国际
   { value: "openai", label: "OpenAI" },
+  { value: "anthropic", label: "Anthropic (Claude)" },
+  { value: "gemini", label: "Google Gemini" },
+  { value: "groq", label: "Groq" },
+  { value: "mistral", label: "Mistral" },
+  { value: "xai", label: "xAI (Grok)" },
+  { value: "openrouter", label: "OpenRouter" },
+  // 自定义
+  { value: "custom", label: "自定义 (Custom)" },
 ];
 
 export default function ProfilePage() {
@@ -26,6 +42,7 @@ export default function ProfilePage() {
   const [apiKey, setApiKey] = useState("");
   const [provider, setProvider] = useState("dashscope");
   const [apiModel, setApiModel] = useState("");
+  const [apiCustomUrl, setApiCustomUrl] = useState("");
   const [saving, setSaving] = useState(false);
 
   const defaultTab = searchParams.get("tab") || "profile";
@@ -40,7 +57,12 @@ export default function ProfilePage() {
     if (!apiKey.trim()) { message.warning("请输入 API Key"); return; }
     setSaving(true);
     try {
-      await saveApiKey({ api_key: apiKey.trim(), provider, model: apiModel || undefined });
+      await saveApiKey({
+        api_key: apiKey.trim(),
+        provider,
+        model: apiModel || undefined,
+        custom_url: provider === "custom" ? apiCustomUrl.trim() || undefined : undefined,
+      });
       message.success("API Key 已保存");
       setApiKey("");
       refetchKey();
@@ -241,9 +263,22 @@ export default function ProfilePage() {
                         value={provider}
                         onChange={setProvider}
                         options={PROVIDERS}
+                        showSearch
+                        optionFilterProp="label"
                         style={{ width: "100%", marginTop: 4 }}
                       />
                     </div>
+                    {provider === "custom" && (
+                      <div>
+                        <Typography.Text strong>API Base URL</Typography.Text>
+                        <Input
+                          value={apiCustomUrl}
+                          onChange={(e) => setApiCustomUrl(e.target.value)}
+                          placeholder="https://your-api.example.com/v1"
+                          style={{ marginTop: 4 }}
+                        />
+                      </div>
+                    )}
                     <div>
                       <Typography.Text strong>API Key</Typography.Text>
                       <Input.Password

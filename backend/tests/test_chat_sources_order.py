@@ -45,7 +45,7 @@ def _make_prepare_chat_return(sources: list[ChatSource]):
         {"role": "system", "content": "你是佛津助手"},
         {"role": "user", "content": "什么是般若"},
     ]
-    return (fake_session, "https://api.example.com/v1", "fake-key", "test-model", False, sources, llm_messages)
+    return (fake_session, "https://api.example.com/v1", "fake-key", "test-model", False, "openai", sources, llm_messages)
 
 
 def _make_mock_httpx_client(tokens: list[str]):

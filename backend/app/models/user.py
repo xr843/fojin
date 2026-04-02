@@ -30,6 +30,7 @@ class User(Base):
     encrypted_api_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     api_provider: Mapped[str | None] = mapped_column(String(50), nullable=True)
     api_model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    api_custom_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     daily_chat_count: Mapped[int] = mapped_column(Integer, server_default="0")
     last_chat_date = mapped_column(Date, nullable=True)
 
