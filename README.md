@@ -6,7 +6,7 @@
 
 **503 sources. 30 languages. 30 countries. 23,500+ full-text volumes. One search.**
 
-Aggregating the world's Buddhist digital heritage — 10,500+ texts with 23,500+ volumes of full content in Pali, Classical Chinese, Tibetan, and Sanskrit from 503 data sources — with CBETA-style reading, AI-powered Q&A (RAG + reranking + citations + data source recommendations), knowledge graph with 31K+ entities and 28K+ relations (including 23K teacher-student lineage chains), 12 dictionaries with 289K entries, timeline visualization, collections, citations, annotations, bookmarks, and multi-language parallel reading.
+Aggregating the world's Buddhist digital heritage — 10,500+ texts with 23,500+ volumes of full content in Pali, Classical Chinese, Tibetan, and Sanskrit from 503 data sources — with CBETA-style reading, AI-powered Q&A (RAG + reranking + citations + data source recommendations), knowledge graph with 31K+ entities and 28K+ relations (including 23K teacher-student lineage chains), 12 dictionaries with 397K entries, timeline visualization, collections, citations, annotations, bookmarks, and multi-language parallel reading.
 
 [Live Demo](https://fojin.app) &nbsp;&middot;&nbsp; [API Docs](https://fojin.app/docs) &nbsp;&middot;&nbsp; [中文文档](./docs/README_zh.md) &nbsp;&middot;&nbsp; [Discussions](https://github.com/xr843/fojin/discussions) &nbsp;&middot;&nbsp; [Discord](https://discord.gg/76SZeuJekq) &nbsp;&middot;&nbsp; [Report Bug](https://github.com/xr843/fojin/issues)
 
@@ -32,7 +32,7 @@ Buddhist texts are scattered across hundreds of databases worldwide — CBETA, S
 | Find a sutra across databases | **Multi-dimensional search** across 10,500+ texts from 503 sources |
 | Read the full text online | **8,900+ texts** with 23,500+ volumes of full content, CBETA-style layout |
 | Compare translations | **Parallel reading** in 30 languages side by side |
-| Look up Buddhist terms | **12 dictionaries**, 289K entries (Chinese/Sanskrit/Pali/Tibetan/English) |
+| Look up Buddhist terms | **12 dictionaries**, 397K entries (Chinese/Sanskrit/Pali/Tibetan/English) |
 | Explore relationships | **Knowledge graph** with 31K+ entities and 28K+ relations (23K lineage chains) |
 | Discover similar texts | **Semantic similarity** powered by 678K+ embedding vectors (pgvector + HNSW) |
 | View original manuscripts | **IIIF manuscript viewer** connected to BDRC and more |
@@ -93,7 +93,7 @@ Compare translations side by side — Classical Chinese, Sanskrit, Pali, Tibetan
 
 ### Dictionary Lookup
 
-12 authoritative dictionaries with 289,000+ entries:
+12 authoritative dictionaries with 397,000+ entries:
 - **Ding Fubao** (丁福保佛学大辞典)
 - **Soothill-Hodous** (A Dictionary of Chinese Buddhist Terms)
 - **Hopkins** (Tibetan-Sanskrit-English Dictionary)
