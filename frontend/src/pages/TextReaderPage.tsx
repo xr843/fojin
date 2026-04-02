@@ -64,10 +64,27 @@ function reflowText(raw: string): TextSegment[] {
   let proseBuf = "";
 
   const flushProse = () => {
-    if (proseBuf) {
+    if (!proseBuf) return;
+    // Split long prose into paragraphs at sentence boundaries (。) to match
+    // CBETA's <p> granularity. Prefer splitting at classical Chinese
+    // paragraph-ending particles (矣焉也哉乎耳) which signal topic shifts.
+    if (proseBuf.length > 150) {
+      const sentences = proseBuf.split(/(?<=。)/);
+      let buf = "";
+      for (const s of sentences) {
+        buf += s;
+        if (!buf.endsWith("。")) continue;
+        const atParticle = /[矣焉也哉乎耳]。$/.test(buf);
+        if ((atParticle && buf.length >= 60) || buf.length >= 120) {
+          segments.push({ type: "prose", text: buf });
+          buf = "";
+        }
+      }
+      if (buf) segments.push({ type: "prose", text: buf });
+    } else {
       segments.push({ type: "prose", text: proseBuf });
-      proseBuf = "";
     }
+    proseBuf = "";
   };
 
   // Verse detection: Buddhist verse lines are typically 5-char or 7-char

@@ -131,6 +131,10 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
         if tag in CONTENT_TAGS:
             text = _extract_text(elem).strip()
             if text:
+                # Insert blank line before <p> to preserve paragraph boundaries
+                # (so reflowText can split paragraphs correctly)
+                if tag == f"{{{TEI_NS}}}p" and current_lines:
+                    current_lines.append("")
                 current_lines.append(text)
             return
 
