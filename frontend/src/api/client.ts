@@ -656,9 +656,53 @@ export async function searchDictionary(params: {
   page?: number;
   size?: number;
   lang?: string;
+  source?: string;
 }): Promise<DictSearchResponse> {
   const { data } = await api.get<DictSearchResponse>("/dictionary/search", { params });
   return data;
+}
+
+// Dictionary Sources
+export interface DictSourceInfo {
+  id: number;
+  code: string;
+  name_zh: string;
+  name_en: string | null;
+  entry_count: number;
+  languages: string[];
+  base_url: string | null;
+}
+
+export async function getDictionarySources(): Promise<DictSourceInfo[]> {
+  const { data } = await api.get<DictSourceInfo[]>("/dictionary/sources");
+  return data;
+}
+
+// Dictionary grouped search
+export interface DictGroupedResult {
+  source_code: string;
+  source_name: string;
+  total: number;
+  entries: DictEntry[];
+}
+
+export interface DictGroupedSearchResponse {
+  total: number;
+  groups: DictGroupedResult[];
+}
+
+export async function searchDictionaryGrouped(params: {
+  q: string;
+  lang?: string;
+}): Promise<DictGroupedSearchResponse> {
+  const { data } = await api.get<DictGroupedSearchResponse>("/dictionary/search/grouped", { params });
+  return data;
+}
+
+// Dictionary hot terms
+export async function getDictionaryHot(): Promise<string[]> {
+  const { data } = await api.get<{ terms: string[] }>("/dictionary/hot");
+  return data.terms;
 }
 
 // IIIF Manifests
