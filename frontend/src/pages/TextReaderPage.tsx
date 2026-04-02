@@ -36,7 +36,14 @@ const FONT_SIZE_STEP = 2;
 const FONT_SIZE_KEY = "fojin-reader-font-size";
 
 /** Segment type for rendering */
-type TextSegment = { type: "prose"; text: string } | { type: "verse"; text: string } | { type: "break" };
+type TextSegment =
+  | { type: "prose"; text: string }
+  | { type: "verse"; text: string }
+  | { type: "break" }
+  | { type: "head"; text: string }
+  | { type: "juan"; text: string }
+  | { type: "byline"; text: string }
+  | { type: "section"; text: string };
 
 /**
  * Reflow raw text into segments matching CBETA Online layout.
@@ -92,9 +99,37 @@ function reflowText(raw: string): TextSegment[] {
     return allPuncts === 1 && line.length <= 12;
   };
 
+  // Structural detection helpers
+  const isHead = (line: string, idx: number): boolean => {
+    // First non-empty line, short (经名标题), e.g. "長阿含經序"
+    if (idx > 2) return false;
+    if (line.length > 15 || line.length < 2) return false;
+    // Must contain 經/論/律/品/序/疏 etc.
+    return /[經论論律品序疏記集傳]/.test(line) && !/[，。；：！？、]/.test(line);
+  };
+
+  const isJuan = (line: string): boolean => {
+    // 卷标题: e.g. "佛說長阿含經卷第一", "大般若波羅蜜多經卷第二"
+    return /卷第?[一二三四五六七八九十百千\d]+/.test(line) && line.length <= 25 && !/[，。]/.test(line);
+  };
+
+  const isByline = (line: string): boolean => {
+    // 译者署名: e.g. "後秦弘始年佛陀耶舍共竺佛念譯", "長安釋僧肇述"
+    return /[譯译述撰注疏記造]$/.test(line) && line.length <= 25 && !/[，。；]/.test(line);
+  };
+
+  const isSection = (line: string): boolean => {
+    // 品名/章节: e.g. "（一）第一分初大本經第一", "大緣方便經第二"
+    // Starts with （number） or contains 品第/分第/經第
+    if (/^[（(][一二三四五六七八九十\d]+[）)]/.test(line)) return true;
+    if (/[品分經]第[一二三四五六七八九十百\d]+/.test(line) && line.length <= 20 && !/[，。]/.test(line)) return true;
+    return false;
+  };
+
   let inVerseBlock = false;
   // Before the first 論曰, verse-like lines are opening verses
   let beforeFirstProse = true;
+  let firstNonEmptyIdx = -1;
 
   for (let i = 0; i < lines.length; i++) {
     const trimmed = lines[i].trim();
@@ -103,6 +138,35 @@ function reflowText(raw: string): TextSegment[] {
     if (trimmed === "") {
       flushProse();
       segments.push({ type: "break" });
+      continue;
+    }
+
+    // Track first non-empty line index for head detection
+    if (firstNonEmptyIdx < 0) firstNonEmptyIdx = i;
+    const relIdx = i - firstNonEmptyIdx;
+
+    // Structural elements: head, juan, byline, section
+    if (isJuan(trimmed)) {
+      flushProse();
+      segments.push({ type: "juan", text: trimmed });
+      continue;
+    }
+
+    if (isByline(trimmed)) {
+      flushProse();
+      segments.push({ type: "byline", text: trimmed });
+      continue;
+    }
+
+    if (isSection(trimmed)) {
+      flushProse();
+      segments.push({ type: "section", text: trimmed });
+      continue;
+    }
+
+    if (isHead(trimmed, relIdx)) {
+      flushProse();
+      segments.push({ type: "head", text: trimmed });
       continue;
     }
 
@@ -147,6 +211,18 @@ function reflowText(raw: string): TextSegment[] {
   }
   flushProse();
   return segments;
+}
+
+function renderSegment(seg: TextSegment, i: number) {
+  switch (seg.type) {
+    case "break": return <br key={i} />;
+    case "head": return <p key={i} className="text-head">{seg.text}</p>;
+    case "juan": return <p key={i} className="text-juan">{seg.text}</p>;
+    case "byline": return <p key={i} className="text-byline">{seg.text}</p>;
+    case "section": return <p key={i} className="text-section">{seg.text}</p>;
+    case "verse": return <p key={i} className="text-verse">{seg.text}</p>;
+    case "prose": return <p key={i} className="text-prose">{seg.text}</p>;
+  }
 }
 
 function getInitialFontSize(): number {
@@ -394,9 +470,7 @@ export default function TextReaderPage() {
                   className="reader-body"
                   style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
                 >
-                  {reflowText(content.content).map((para, i) =>
-                    para.type === "break" ? <br key={i} /> : para.type === "verse" ? <p key={i} style={{ margin: 0, paddingLeft: "2em" }}>{para.text}</p> : <p key={i} style={{ margin: "0 0 0.8em" }}>{para.text}</p>
-                  )}
+                  {reflowText(content.content).map(renderSegment)}
                 </div>
               </div>
             </Col>
@@ -411,9 +485,7 @@ export default function TextReaderPage() {
                     style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
                   >
                     {compareContent?.content
-                      ? reflowText(compareContent.content).map((para, i) =>
-                          para.type === "break" ? <br key={i} /> : para.type === "verse" ? <p key={i} style={{ margin: 0, paddingLeft: "2em" }}>{para.text}</p> : <p key={i} style={{ margin: "0 0 0.8em" }}>{para.text}</p>
-                        )
+                      ? reflowText(compareContent.content).map(renderSegment)
                       : "暂无内容"}
                   </div>
                 )}
@@ -425,9 +497,7 @@ export default function TextReaderPage() {
             className="reader-body"
             style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
           >
-            {reflowText(content.content).map((para, i) =>
-              para.type === "break" ? <br key={i} /> : para.type === "verse" ? <p key={i} style={{ margin: 0, paddingLeft: "2em" }}>{para.text}</p> : <p key={i} style={{ margin: "0 0 0.8em" }}>{para.text}</p>
-            )}
+            {reflowText(content.content).map(renderSegment)}
           </div>
         )
       ) : (
