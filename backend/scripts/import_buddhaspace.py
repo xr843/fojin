@@ -1,5 +1,5 @@
 """
-Import 7 Buddhist dictionaries from buddhaspace.org/dict/.
+Import 9 Buddhist dictionaries from buddhaspace.org/dict/.
 
 Source: https://buddhaspace.org/dict/ (台大獅子吼佛學專站)
 Dictionaries:
@@ -10,6 +10,8 @@ Dictionaries:
   5. 法相辭典 朱芾煌 (fxcd)     ~5K entries
   6. 佛學常見詞彙 陳義孝 (cxy)   ~4K entries
   7. 阿含辭典 莊春江 (ccj)      ~2K entries
+  8. 續一切經音義 希麟 (secg)    ~5K entries
+  9. 新集藏經音義隨函錄 (gjg)    ~3K entries
 
 Each dictionary has an index page at /dict/{code}/data/ listing all entries as links,
 and individual entry pages at /dict/{code}/data/{double-url-encoded-headword}.html.
@@ -86,6 +88,20 @@ DICTIONARIES = [
         "name_zh": "阿含辭典（莊春江）",
         "name_en": "Agama Dictionary (Zhuang Chunjiang)",
         "description": "阿含辭典，莊春江居士編著。via buddhaspace.org",
+    },
+    {
+        "path": "secg",
+        "source_code": "bs-xu-yinyi",
+        "name_zh": "續一切經音義（希麟）",
+        "name_en": "Supplement to Yiqiejing Yinyi (Xilin)",
+        "description": "續一切經音義，遼·希麟集。via buddhaspace.org",
+    },
+    {
+        "path": "gjg",
+        "source_code": "bs-suihan-lu",
+        "name_zh": "新集藏經音義隨函錄（可洪）",
+        "name_en": "Xinji Zangjing Yinyi Suihan Lu (Kehong)",
+        "description": "新集藏經音義隨函錄，後唐·可洪撰。via buddhaspace.org",
     },
 ]
 
