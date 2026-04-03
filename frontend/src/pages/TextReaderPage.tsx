@@ -269,20 +269,22 @@ function DictPopover({
 }) {
   if (!state.visible) return null;
 
+  // 取第一条释义用于紧凑展示
+  const firstEntry = state.result?.groups?.[0]?.entries?.[0];
+  const sourceName = state.result?.groups?.[0]?.source_name;
+
   // 计算浮层位置，防止超出视口
-  const popoverWidth = 300;
-  const popoverMaxHeight = 280;
+  const popoverWidth = 260;
   let left = state.x - popoverWidth / 2;
   let top = state.y + 10;
 
-  // 防止左右溢出
   if (left < 8) left = 8;
   if (left + popoverWidth > window.innerWidth - 8) {
     left = window.innerWidth - popoverWidth - 8;
   }
   // 如果下方空间不够，显示在上方
-  if (top + popoverMaxHeight > window.innerHeight - 8) {
-    top = state.y - popoverMaxHeight - 10;
+  if (top + 200 > window.innerHeight - 8) {
+    top = state.y - 200;
     if (top < 8) top = 8;
   }
 
@@ -298,36 +300,25 @@ function DictPopover({
       </div>
       <div className="reader-dict-popover-body">
         {state.loading ? (
-          <div style={{ textAlign: "center", padding: 24 }}>
+          <div style={{ textAlign: "center", padding: 12 }}>
             <Spin size="small" />
           </div>
-        ) : state.result && state.result.total > 0 ? (
-          <>
-            {state.result.groups.slice(0, 2).map((group) => (
-              <div key={group.source_code} className="reader-dict-popover-group">
-                <div className="reader-dict-popover-source">{group.source_name}</div>
-                {group.entries.slice(0, 1).map((entry) => (
-                  <div key={entry.id} className="reader-dict-popover-entry">
-                    {entry.headword !== state.text && (
-                      <div className="reader-dict-popover-headword">{entry.headword}</div>
-                    )}
-                    <div className="reader-dict-popover-def">
-                      {entry.definition.length > 80
-                        ? entry.definition.slice(0, 80) + "…"
-                        : entry.definition}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </>
+        ) : firstEntry ? (
+          <div className="reader-dict-popover-entry">
+            <div className="reader-dict-popover-def">
+              {firstEntry.definition.length > 60
+                ? firstEntry.definition.slice(0, 60) + "…"
+                : firstEntry.definition}
+            </div>
+            {sourceName && <div className="reader-dict-popover-source">—— {sourceName}</div>}
+          </div>
         ) : (
           <div className="reader-dict-popover-empty">未找到释义</div>
         )}
       </div>
       <div className="reader-dict-popover-footer">
         <Link to={`/dictionary?q=${encodeURIComponent(state.text)}`} onClick={onClose}>
-          在辞典页查看更多 →
+          查看全部释义 →
         </Link>
       </div>
     </div>
