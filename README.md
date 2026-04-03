@@ -314,7 +314,7 @@ FoJin is built on the generous work of the global Buddhist digital humanities co
 
 ## Community
 
-- [LINUX DO](https://linux.do) — 感谢 LINUX DO 社区的支持与反馈
+- [LINUX DO](https://linux.do) — Thanks to the LINUX DO community for support and feedback
 
 ## Related Projects
 
