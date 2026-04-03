@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Typography, Spin, Button, Select, Breadcrumb, Row, Col, message } from "antd";
@@ -13,7 +13,8 @@ import {
   HeartOutlined,
   HeartFilled,
 } from "@ant-design/icons";
-import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBookmark, addBookmark, removeBookmark } from "../api/client";
+import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBookmark, addBookmark, removeBookmark, searchDictionaryGrouped } from "../api/client";
+import type { DictGroupedSearchResponse } from "../api/client";
 import { useAuthStore } from "../stores/authStore";
 import CitationGenerator from "../components/CitationGenerator";
 import AnnotationPanel from "../components/AnnotationPanel";
@@ -239,6 +240,98 @@ function getInitialFontSize(): number {
   return 18;
 }
 
+/** 划词查辞典浮层状态 */
+interface DictPopoverState {
+  visible: boolean;
+  text: string;
+  x: number;
+  y: number;
+  loading: boolean;
+  result: DictGroupedSearchResponse | null;
+}
+
+const DICT_POPOVER_INIT: DictPopoverState = {
+  visible: false,
+  text: "",
+  x: 0,
+  y: 0,
+  loading: false,
+  result: null,
+};
+
+/** 划词查辞典浮层组件 */
+function DictPopover({
+  state,
+  onClose,
+}: {
+  state: DictPopoverState;
+  onClose: () => void;
+}) {
+  if (!state.visible) return null;
+
+  // 计算浮层位置，防止超出视口
+  const popoverWidth = 340;
+  const popoverMaxHeight = 360;
+  let left = state.x - popoverWidth / 2;
+  let top = state.y + 10;
+
+  // 防止左右溢出
+  if (left < 8) left = 8;
+  if (left + popoverWidth > window.innerWidth - 8) {
+    left = window.innerWidth - popoverWidth - 8;
+  }
+  // 如果下方空间不够，显示在上方
+  if (top + popoverMaxHeight > window.innerHeight - 8) {
+    top = state.y - popoverMaxHeight - 10;
+    if (top < 8) top = 8;
+  }
+
+  return (
+    <div
+      className="reader-dict-popover"
+      style={{ left, top }}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <div className="reader-dict-popover-header">
+        <span className="reader-dict-popover-keyword">{state.text}</span>
+        <button className="reader-dict-popover-close" onClick={onClose}>✕</button>
+      </div>
+      <div className="reader-dict-popover-body">
+        {state.loading ? (
+          <div style={{ textAlign: "center", padding: 24 }}>
+            <Spin size="small" />
+          </div>
+        ) : state.result && state.result.total > 0 ? (
+          <>
+            {state.result.groups.slice(0, 3).map((group) => (
+              <div key={group.source_code} className="reader-dict-popover-group">
+                <div className="reader-dict-popover-source">{group.source_name}</div>
+                {group.entries.slice(0, 1).map((entry) => (
+                  <div key={entry.id} className="reader-dict-popover-entry">
+                    <div className="reader-dict-popover-headword">{entry.headword}</div>
+                    <div className="reader-dict-popover-def">
+                      {entry.definition.length > 150
+                        ? entry.definition.slice(0, 150) + "…"
+                        : entry.definition}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </>
+        ) : (
+          <div className="reader-dict-popover-empty">未找到释义</div>
+        )}
+      </div>
+      <div className="reader-dict-popover-footer">
+        <Link to={`/dictionary?q=${encodeURIComponent(state.text)}`} onClick={onClose}>
+          在辞典页查看更多 →
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export default function TextReaderPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -252,6 +345,74 @@ export default function TextReaderPage() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const readerContentRef = useRef<HTMLDivElement>(null);
+
+  // 划词查辞典
+  const [dictPopover, setDictPopover] = useState<DictPopoverState>(DICT_POPOVER_INIT);
+  const closeDictPopover = useCallback(() => setDictPopover(DICT_POPOVER_INIT), []);
+
+  const handleTextSelect = useCallback(async () => {
+    const sel = window.getSelection();
+    const text = sel?.toString().trim() || "";
+    if (text.length < 1 || text.length > 20) return;
+
+    // 获取选中文字的位置
+    const range = sel?.getRangeAt(0);
+    if (!range) return;
+    const rect = range.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.bottom;
+
+    setDictPopover({ visible: true, text, x, y, loading: true, result: null });
+
+    try {
+      const result = await searchDictionaryGrouped({ q: text });
+      setDictPopover((prev) =>
+        prev.text === text ? { ...prev, loading: false, result } : prev,
+      );
+    } catch {
+      setDictPopover((prev) =>
+        prev.text === text ? { ...prev, loading: false, result: { total: 0, groups: [] } } : prev,
+      );
+    }
+  }, []);
+
+  // 监听 mouseup / touchend 划词事件
+  useEffect(() => {
+    const container = readerContentRef.current;
+    if (!container) return;
+
+    const onMouseUp = (e: MouseEvent) => {
+      // 点击浮层内部不处理
+      const target = e.target as HTMLElement;
+      if (target.closest(".reader-dict-popover")) return;
+      handleTextSelect();
+    };
+
+    const onTouchEnd = () => {
+      // 延迟以确保 selection 已更新
+      setTimeout(handleTextSelect, 100);
+    };
+
+    container.addEventListener("mouseup", onMouseUp);
+    container.addEventListener("touchend", onTouchEnd);
+    return () => {
+      container.removeEventListener("mouseup", onMouseUp);
+      container.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [handleTextSelect]);
+
+  // 点击浮层外部关闭
+  useEffect(() => {
+    if (!dictPopover.visible) return;
+    const onDocClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(".reader-dict-popover")) {
+        closeDictPopover();
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [dictPopover.visible, closeDictPopover]);
 
   const { data: bookmarked = false } = useQuery({
     queryKey: ["bookmark", textId],
@@ -513,6 +674,7 @@ export default function TextReaderPage() {
         containerRef={readerContentRef}
         source={`${content?.title_zh || ""}第${juanNum}卷`}
       />
+      <DictPopover state={dictPopover} onClose={closeDictPopover} />
       </div>
 
       {/* Bottom navigation */}
