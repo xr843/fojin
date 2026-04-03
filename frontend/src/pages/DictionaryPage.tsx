@@ -187,7 +187,7 @@ export default function DictionaryPage() {
                     {src.entry_count.toLocaleString()} 词条
                   </div>
                   <div className="dict-source-card-langs">
-                    {src.languages.map((lang) => (
+                    {[...new Map(src.languages.map((l) => [LANG_LABELS[l] || l, l])).values()].map((lang) => (
                       <Tag
                         key={lang}
                         color={LANG_COLORS[lang] || "default"}
