@@ -117,40 +117,58 @@ async def search_dictionary_grouped(
     """Search dictionary entries grouped by source. Supports simplified/traditional Chinese interconversion.
 
     按来源分组搜索辞典词条，支持简繁互搜。
-    Two-phase search: first exact+prefix (fast), then substring if needed."""
-    variants = _zh_variants(q)
-    relevance = _build_relevance(variants)
+    Two-phase search: first exact+prefix (fast), then substring if needed.
+    When source is specified and q is '*', browse mode: return entries from that source."""
+    browse_mode = q == "*" and source is not None
 
-    # Phase 1: exact + prefix match (fast, uses btree index)
-    fast_cond = _build_exact_prefix_conditions(variants)
     base_filters = []
     if lang:
         base_filters.append(DictionaryEntry.lang == lang)
     if source:
         base_filters.append(DataSource.code == source)
 
-    stmt = select(DictionaryEntry).where(fast_cond, *base_filters).options(joinedload(DictionaryEntry.source))
-    if source:
-        stmt = stmt.join(DictionaryEntry.source)
-    stmt = stmt.order_by(relevance.desc(), func.length(DictionaryEntry.headword), DictionaryEntry.headword).limit(200)
-    result = await db.execute(stmt)
-    entries = list(result.unique().scalars().all())
-    total = len(entries)
-
-    # Phase 2: substring match only if phase 1 found very few results
-    if total < 5:
-        sub_cond = _build_substring_conditions(variants)
-        stmt2 = select(DictionaryEntry).where(sub_cond, *base_filters).options(joinedload(DictionaryEntry.source))
-        if source:
-            stmt2 = stmt2.join(DictionaryEntry.source)
-        stmt2 = stmt2.order_by(relevance.desc(), func.length(DictionaryEntry.headword)).limit(200)
-        result2 = await db.execute(stmt2)
-        seen_ids = {e.id for e in entries}
-        for e in result2.unique().scalars().all():
-            if e.id not in seen_ids:
-                entries.append(e)
-                seen_ids.add(e.id)
+    if browse_mode:
+        # Browse mode: return entries from a specific source, sorted by headword
+        stmt = (
+            select(DictionaryEntry)
+            .join(DictionaryEntry.source)
+            .where(*base_filters)
+            .options(joinedload(DictionaryEntry.source))
+            .order_by(func.length(DictionaryEntry.headword), DictionaryEntry.headword)
+            .limit(200)
+        )
+        result = await db.execute(stmt)
+        entries = list(result.unique().scalars().all())
         total = len(entries)
+    else:
+        variants = _zh_variants(q)
+        relevance = _build_relevance(variants)
+
+        # Phase 1: exact + prefix match (fast, uses btree index)
+        fast_cond = _build_exact_prefix_conditions(variants)
+
+        stmt = select(DictionaryEntry).where(fast_cond, *base_filters).options(joinedload(DictionaryEntry.source))
+        if source:
+            stmt = stmt.join(DictionaryEntry.source)
+        stmt = stmt.order_by(relevance.desc(), func.length(DictionaryEntry.headword), DictionaryEntry.headword).limit(200)
+        result = await db.execute(stmt)
+        entries = list(result.unique().scalars().all())
+        total = len(entries)
+
+        # Phase 2: substring match only if phase 1 found very few results
+        if total < 5:
+            sub_cond = _build_substring_conditions(variants)
+            stmt2 = select(DictionaryEntry).where(sub_cond, *base_filters).options(joinedload(DictionaryEntry.source))
+            if source:
+                stmt2 = stmt2.join(DictionaryEntry.source)
+            stmt2 = stmt2.order_by(relevance.desc(), func.length(DictionaryEntry.headword)).limit(200)
+            result2 = await db.execute(stmt2)
+            seen_ids = {e.id for e in entries}
+            for e in result2.unique().scalars().all():
+                if e.id not in seen_ids:
+                    entries.append(e)
+                    seen_ids.add(e.id)
+            total = len(entries)
 
     # Group by source
     groups_map: dict[str, dict] = {}

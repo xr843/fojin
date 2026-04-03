@@ -127,9 +127,11 @@ export default function DictionaryPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialQ = searchParams.get("q") || "";
+  const initialSource = searchParams.get("source") || "";
   const [inputValue, setInputValue] = useState(initialQ);
   const [query, setQuery] = useState(initialQ);
   const [langFilter, setLangFilter] = useState<string>("all");
+  const [sourceFilter, setSourceFilter] = useState<string>(initialSource);
 
   const { data: sources, isLoading: loadingSources } = useQuery({
     queryKey: ["dict-sources"],
@@ -138,11 +140,12 @@ export default function DictionaryPage() {
   });
 
   const { data: searchResult, isLoading: searching } = useQuery({
-    queryKey: ["dict-search-grouped", query, langFilter],
+    queryKey: ["dict-search-grouped", query, langFilter, sourceFilter],
     queryFn: () =>
       searchDictionaryGrouped({
         q: query,
         lang: langFilter === "all" ? undefined : langFilter,
+        source: sourceFilter || undefined,
       }),
     enabled: query.length > 0,
   });
@@ -151,7 +154,15 @@ export default function DictionaryPage() {
     const trimmed = value.trim();
     if (!trimmed) return;
     setQuery(trimmed);
+    setSourceFilter("");
     setSearchParams({ q: trimmed });
+  };
+
+  const handleSourceClick = (code: string, nameZh: string) => {
+    setInputValue(nameZh);
+    setQuery("*");
+    setSourceFilter(code);
+    setSearchParams({ q: "*", source: code });
   };
 
 
@@ -226,17 +237,11 @@ export default function DictionaryPage() {
                   role="button"
                   tabIndex={0}
                   style={{ cursor: "pointer" }}
-                  onClick={() => {
-                    setInputValue(src.name_zh);
-                    setQuery(src.name_zh);
-                    setSearchParams({ q: src.name_zh });
-                  }}
+                  onClick={() => handleSourceClick(src.code, src.name_zh)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
-                      setInputValue(src.name_zh);
-                      setQuery(src.name_zh);
-                      setSearchParams({ q: src.name_zh });
+                      handleSourceClick(src.code, src.name_zh);
                     }
                   }}
                 >

@@ -695,6 +695,7 @@ export interface DictGroupedSearchResponse {
 export async function searchDictionaryGrouped(params: {
   q: string;
   lang?: string;
+  source?: string;
 }): Promise<DictGroupedSearchResponse> {
   const { data } = await api.get<DictGroupedSearchResponse>("/dictionary/search/grouped", { params });
   return data;
