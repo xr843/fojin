@@ -270,8 +270,8 @@ function DictPopover({
   if (!state.visible) return null;
 
   // 计算浮层位置，防止超出视口
-  const popoverWidth = 340;
-  const popoverMaxHeight = 360;
+  const popoverWidth = 300;
+  const popoverMaxHeight = 280;
   let left = state.x - popoverWidth / 2;
   let top = state.y + 10;
 
@@ -303,15 +303,17 @@ function DictPopover({
           </div>
         ) : state.result && state.result.total > 0 ? (
           <>
-            {state.result.groups.slice(0, 3).map((group) => (
+            {state.result.groups.slice(0, 2).map((group) => (
               <div key={group.source_code} className="reader-dict-popover-group">
                 <div className="reader-dict-popover-source">{group.source_name}</div>
                 {group.entries.slice(0, 1).map((entry) => (
                   <div key={entry.id} className="reader-dict-popover-entry">
-                    <div className="reader-dict-popover-headword">{entry.headword}</div>
+                    {entry.headword !== state.text && (
+                      <div className="reader-dict-popover-headword">{entry.headword}</div>
+                    )}
                     <div className="reader-dict-popover-def">
-                      {entry.definition.length > 150
-                        ? entry.definition.slice(0, 150) + "…"
+                      {entry.definition.length > 80
+                        ? entry.definition.slice(0, 80) + "…"
                         : entry.definition}
                     </div>
                   </div>
