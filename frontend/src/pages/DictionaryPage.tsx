@@ -3,13 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { Input, Tag, Spin, Empty, Badge, Button, Select } from "antd";
-import { SearchOutlined, RobotOutlined } from "@ant-design/icons";
+import { SearchOutlined, RobotOutlined, DownOutlined, UpOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import {
   getDictionarySources,
   searchDictionaryGrouped,
 } from "../api/client";
-import type { DictEntry } from "../api/client";
+import type { DictEntry, DictGroupedResult } from "../api/client";
 import "../styles/dictionary.css";
 
 const LANG_COLORS: Record<string, string> = {
@@ -77,6 +77,45 @@ function EntryItem({ entry }: { entry: DictEntry }) {
       ) : (
         <div className="dict-entry-def-preview">
           {truncate(entry.definition, 200)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const COLLAPSE_THRESHOLD = 3;
+
+function DictGroup({ group }: { group: DictGroupedResult }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasMore = group.entries.length > COLLAPSE_THRESHOLD;
+  const visibleEntries = expanded ? group.entries : group.entries.slice(0, COLLAPSE_THRESHOLD);
+
+  return (
+    <div className="dict-group">
+      <div className="dict-group-header">
+        <span className="dict-group-name">{group.source_name}</span>
+        <Badge
+          count={group.total}
+          style={{ backgroundColor: "var(--fj-gold)" }}
+          overflowCount={9999}
+        />
+      </div>
+      <div className="dict-entry-list">
+        {visibleEntries.map((entry) => (
+          <EntryItem key={entry.id} entry={entry} />
+        ))}
+      </div>
+      {hasMore && (
+        <div style={{ textAlign: "center", padding: "8px 0" }}>
+          <Button
+            type="link"
+            size="small"
+            icon={expanded ? <UpOutlined /> : <DownOutlined />}
+            onClick={() => setExpanded(!expanded)}
+            style={{ color: "var(--fj-accent)", fontSize: 13 }}
+          >
+            {expanded ? "收起" : `展开全部 ${group.entries.length} 条`}
+          </Button>
         </div>
       )}
     </div>
@@ -237,21 +276,7 @@ export default function DictionaryPage() {
                 共找到 <strong>{searchResult.total}</strong> 条结果
               </div>
               {searchResult.groups.map((group) => (
-                <div key={group.source_code} className="dict-group">
-                  <div className="dict-group-header">
-                    <span className="dict-group-name">{group.source_name}</span>
-                    <Badge
-                      count={group.total}
-                      style={{ backgroundColor: "var(--fj-gold)" }}
-                      overflowCount={9999}
-                    />
-                  </div>
-                  <div className="dict-entry-list">
-                    {group.entries.map((entry) => (
-                      <EntryItem key={entry.id} entry={entry} />
-                    ))}
-                  </div>
-                </div>
+                <DictGroup key={group.source_code} group={group} />
               ))}
             </>
           ) : (

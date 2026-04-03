@@ -157,18 +157,26 @@ async def search_dictionary_grouped(
     for e in entries:
         code = e.source.code if e.source else "_unknown"
         if code not in groups_map:
+            name = e.source.name_zh if e.source else None
             groups_map[code] = {
                 "source_code": code,
-                "source_name_zh": e.source.name_zh if e.source else None,
+                "source_name": name,
+                "source_name_zh": name,
+                "sort_order": e.source.sort_order if e.source else 9999,
                 "entries": [],
+                "total": 0,
             }
+        groups_map[code]["total"] += 1
         if len(groups_map[code]["entries"]) < size:
             groups_map[code]["entries"].append(_entry_to_dict(e))
+
+    # Sort groups by source sort_order (lower = higher priority)
+    sorted_groups = sorted(groups_map.values(), key=lambda g: g["sort_order"])
 
     return {
         "query": q,
         "total": total,
-        "groups": list(groups_map.values()),
+        "groups": sorted_groups,
     }
 
 
