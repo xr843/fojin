@@ -210,12 +210,16 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
         if tag == f"{{{CB_NS}}}juan":
             fun = elem.get("fun", "")
             if fun == "open":
-                flush_juan()
+                # Only use cb:juan to set juan_num if no milestone preceded it.
+                # When milestone already set current_juan, cb:juan just provides title text.
                 n = elem.get("n", "")
-                try:
-                    current_juan = int(n)
-                except ValueError:
-                    current_juan += 1
+                n_clean = re.sub(r"[^0-9]", "", n)  # "001a" → "1"
+                if n_clean:
+                    juan_int = int(n_clean)
+                    if juan_int != current_juan:
+                        # Different juan — flush and update
+                        flush_juan()
+                        current_juan = juan_int
                 # Extract juan title text (e.g. "阿毘達磨俱舍論卷第一")
                 juan_text = _extract_text(elem).strip()
                 if juan_text:
