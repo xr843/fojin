@@ -154,8 +154,9 @@ export default function DictionaryPage() {
     const trimmed = value.trim();
     if (!trimmed) return;
     setQuery(trimmed);
-    setSourceFilter("");
-    setSearchParams({ q: trimmed });
+    const params: Record<string, string> = { q: trimmed };
+    if (sourceFilter) params.source = sourceFilter;
+    setSearchParams(params);
   };
 
   const handleSourceClick = (code: string) => {
