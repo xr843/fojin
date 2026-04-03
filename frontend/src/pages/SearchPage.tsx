@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
@@ -7,9 +7,10 @@ import {
   Pagination, Empty, Checkbox, Input, Tag, Button, Tabs, Result, Select, Typography, Skeleton, AutoComplete, Alert,
 } from "antd";
 import {
-  SearchOutlined, BookOutlined, VerticalAlignTopOutlined, TranslationOutlined, ThunderboltOutlined,
+  SearchOutlined, BookOutlined, VerticalAlignTopOutlined, TranslationOutlined, ThunderboltOutlined, CloseOutlined,
 } from "@ant-design/icons";
-import { searchTexts, searchContent, searchDictionary, searchCrossLanguage, searchSemantic, getSources, getSearchSuggestions } from "../api/client";
+import { searchTexts, searchContent, searchDictionary, searchCrossLanguage, searchSemantic, getSources, getSearchSuggestions, searchDictionaryGrouped } from "../api/client";
+import type { DictGroupedSearchResponse } from "../api/client";
 import { hasDirectSearchUrl } from "../utils/sourceUrls";
 import { addSearchHistory, getSearchHistory, type SearchHistoryItem } from "../utils/history";
 import { ResultCard, ExternalCard, DictCard, ContentCard, CrossLangCard, SemanticCard } from "../components/search";
@@ -115,6 +116,20 @@ export default function SearchPage() {
     queryFn: () => searchSemantic({ q: query, size: 20, dynasty, category, lang: langFilter || undefined, sources: selectedSources || undefined }),
     enabled: query.length > 0 && tab === "semantic",
   });
+
+  // Dictionary knowledge card (parallel, non-blocking)
+  const [dictCardDismissed, setDictCardDismissed] = useState(false);
+  const { data: dictKnowledge } = useQuery<DictGroupedSearchResponse>({
+    queryKey: ["dictKnowledge", query],
+    queryFn: () => searchDictionaryGrouped({ q: query }),
+    enabled: query.length > 0 && tab !== "dictionary",
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Reset dismissed state when query changes
+  useEffect(() => {
+    setDictCardDismissed(false);
+  }, [query]);
 
   const { data: sources } = useQuery({ queryKey: ["sources"], queryFn: getSources });
 
@@ -404,6 +419,41 @@ export default function SearchPage() {
               )}
               </div>
             </div>
+
+            {/* Dictionary knowledge card */}
+            {!dictCardDismissed && dictKnowledge && dictKnowledge.groups.length > 0 && tab !== "dictionary" && (
+              <div className="s-dict-knowledge">
+                <div className="s-dict-knowledge-header">
+                  <span className="s-dict-knowledge-title">{"\uD83D\uDCD6"} 辞典释义「{query}」</span>
+                  <button
+                    className="s-dict-knowledge-close"
+                    onClick={() => setDictCardDismissed(true)}
+                    aria-label="关闭辞典释义"
+                  >
+                    <CloseOutlined />
+                  </button>
+                </div>
+                <div className="s-dict-knowledge-body">
+                  {dictKnowledge.groups.slice(0, 2).map((group) => (
+                    <div key={group.source_code} className="s-dict-knowledge-entry">
+                      <span className="s-dict-knowledge-source">{group.source_name}</span>
+                      <span className="s-dict-knowledge-def">
+                        {group.entries[0]?.definition
+                          ? group.entries[0].definition.length > 150
+                            ? group.entries[0].definition.slice(0, 150) + "..."
+                            : group.entries[0].definition
+                          : ""}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="s-dict-knowledge-footer">
+                  <Link to={`/dictionary?q=${encodeURIComponent(query)}`}>
+                    查看全部辞典释义 →
+                  </Link>
+                </div>
+              </div>
+            )}
 
             {/* "Did you mean..." suggestion */}
             {!loading && tab === "catalog" && data && data.suggestion && data.total < 3 && (
