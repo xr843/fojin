@@ -18,9 +18,8 @@ import {
   HomeOutlined,
   BookOutlined,
 } from "@ant-design/icons";
-import { getTextDetail, getTextManifests, getTextIdentifiers } from "../api/client";
+import { getTextDetail, getTextManifests } from "../api/client";
 import { buildCbetaReadUrl } from "../utils/sourceUrls";
-import ResourceList from "../components/ResourceList";
 import BookmarkButton from "../components/BookmarkButton";
 import { RelatedTextsStandalone as RelatedTexts } from "../components/RelatedTexts";
 import CitationGenerator from "../components/CitationGenerator";
@@ -42,12 +41,6 @@ export default function TextDetailPage() {
   const { data: manifests } = useQuery({
     queryKey: ["manifests", id],
     queryFn: () => getTextManifests(Number(id)),
-    enabled: !!id,
-  });
-
-  const { data: identifiers } = useQuery({
-    queryKey: ["identifiers", id],
-    queryFn: () => getTextIdentifiers(Number(id)),
     enabled: !!id,
   });
 
@@ -73,24 +66,7 @@ export default function TextDetailPage() {
     );
   }
 
-  const resources = [];
-  // CBETA 在线阅读链接
   const cbetaUrl = text.cbeta_url || buildCbetaReadUrl(text.cbeta_id);
-  if (cbetaUrl) {
-    resources.push({ label: "CBETA 在线阅读", url: cbetaUrl });
-  }
-  // 多数据源链接（来自 TextIdentifier），去重 CBETA
-  if (identifiers) {
-    for (const ident of identifiers) {
-      if (!ident.source_url) continue;
-      // 跳过与 CBETA 在线阅读重复的链接
-      if (cbetaUrl && ident.source_url === cbetaUrl) continue;
-      resources.push({
-        label: `${ident.source_name} (${ident.source_uid})`,
-        url: ident.source_url,
-      });
-    }
-  }
 
   return (
     <div className="text-detail-page">
@@ -246,8 +222,6 @@ export default function TextDetailPage() {
           open={citationOpen}
           onClose={() => setCitationOpen(false)}
         />
-
-        <ResourceList resources={resources} />
 
         <RelatedTexts textId={text.id} />
       </Space>
