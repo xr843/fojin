@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { Input, Tag, Spin, Empty, Badge, Button, Select } from "antd";
-import { SearchOutlined, RobotOutlined, DownOutlined, UpOutlined } from "@ant-design/icons";
+import { SearchOutlined, RobotOutlined, DownOutlined, UpOutlined, ArrowLeftOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import {
   getDictionarySources,
@@ -278,8 +278,21 @@ export default function DictionaryPage() {
       {/* Search results state */}
       {isSearching && (
         <>
-          {/* Filter bar */}
+          {/* Back + Filter bar */}
           <div className="dict-filter-bar">
+            <Button
+              type="link"
+              icon={<ArrowLeftOutlined />}
+              onClick={() => {
+                setQuery("");
+                setInputValue("");
+                setSourceFilter("");
+                setSearchParams({});
+              }}
+              style={{ color: "var(--fj-accent)", fontSize: 13, padding: 0, marginRight: 16 }}
+            >
+              返回辞典列表
+            </Button>
             <span style={{ fontSize: 13, color: "var(--fj-ink-muted)" }}>语言:</span>
             <Select
               value={langFilter}
