@@ -269,8 +269,21 @@ function DictPopover({
 }) {
   if (!state.visible) return null;
 
-  // 取第一条释义用于紧凑展示
-  const firstEntry = state.result?.groups?.[0]?.entries?.[0];
+  // 选最佳释义：优先中文释义类辞典（definition 最长的），排除多语对照类短释义
+  const HIGH_QUALITY_SOURCES = [
+    "dila-dfb", "foguang", "nti-reader", "bs-faxiang", "bs-changjianci",
+    "zhonghua-baike", "bs-yiqiejing-yinyi", "bs-agama", "weishi",
+    "abhidharma", "tiantai", "sanzang-fashu",
+  ];
+  let bestEntry = state.result?.groups?.[0]?.entries?.[0];
+  if (state.result?.groups) {
+    for (const g of state.result.groups) {
+      if (HIGH_QUALITY_SOURCES.includes(g.source_code) && g.entries[0]) {
+        bestEntry = g.entries[0];
+        break;
+      }
+    }
+  }
 
   // 计算浮层位置
   const popW = 220;
@@ -299,12 +312,12 @@ function DictPopover({
           <div style={{ textAlign: "center", padding: 12 }}>
             <Spin size="small" />
           </div>
-        ) : firstEntry ? (
+        ) : bestEntry ? (
           <div className="reader-dict-popover-entry">
             <div className="reader-dict-popover-def">
-              {firstEntry.definition.length > 30
-                ? firstEntry.definition.slice(0, 30) + "…"
-                : firstEntry.definition}
+              {bestEntry.definition.length > 30
+                ? bestEntry.definition.slice(0, 30) + "…"
+                : bestEntry.definition}
             </div>
           </div>
         ) : (
