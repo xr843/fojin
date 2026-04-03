@@ -1,17 +1,18 @@
 """
-Import 9 Buddhist dictionaries from buddhaspace.org/dict/.
+Import 7 Buddhist dictionaries from buddhaspace.org/dict/.
 
 Source: https://buddhaspace.org/dict/ (台大獅子吼佛學專站)
 Dictionaries:
-  1. 佛光大辭典 (fk)           ~25K entries
-  2. 中華佛教百科全書 (ch)      ~6K entries
-  3. 一切經音義 慧琳音義 (ecg)   ~10K entries
-  4. 翻梵語 (ffy)              ~3K entries
-  5. 法相辭典 朱芾煌 (fxcd)     ~5K entries
-  6. 佛學常見詞彙 陳義孝 (cxy)   ~4K entries
-  7. 阿含辭典 莊春江 (ccj)      ~2K entries
-  8. 續一切經音義 希麟 (secg)    ~5K entries
-  9. 新集藏經音義隨函錄 (gjg)    ~3K entries
+  1. 一切經音義 慧琳音義 (ecg)   ~31K entries
+  2. 翻梵語 (ffy)              ~4.7K entries
+  3. 法相辭典 朱芾煌 (fxcd)     ~14.7K entries
+  4. 佛學常見詞彙 陳義孝 (cxy)   ~5.9K entries
+  5. 阿含辭典 莊春江 (ccj)      ~4.6K entries
+  6. 續一切經音義 希麟 (secg)    ~1.5K entries
+  7. 新集藏經音義隨函錄 (gjg)    ~72K entries
+
+Note: 佛光大辭典 and 中華佛教百科全書 are NOT included here because
+they are already imported from higher-quality sources (foguang, zhonghua-baike).
 
 Each dictionary has an index page at /dict/{code}/data/ listing all entries as links,
 and individual entry pages at /dict/{code}/data/{double-url-encoded-headword}.html.
@@ -40,20 +41,8 @@ BASE_URL = "https://buddhaspace.org/dict/"
 
 # Dictionary configs: (path_code, source_code, name_zh, name_en, description)
 DICTIONARIES = [
-    {
-        "path": "fk",
-        "source_code": "bs-foguang",
-        "name_zh": "佛光大辭典",
-        "name_en": "Foguang Buddhist Dictionary",
-        "description": "佛光大辭典，慈怡法師主編，佛光山出版。via buddhaspace.org",
-    },
-    {
-        "path": "ch",
-        "source_code": "bs-zhonghua-baike",
-        "name_zh": "中華佛教百科全書",
-        "name_en": "Chinese Buddhist Encyclopedia",
-        "description": "中華佛教百科全書，藍吉富主編。via buddhaspace.org",
-    },
+    # Note: 佛光大辭典(fk) and 中華佛教百科全書(ch) removed — already in DB
+    # from higher-quality sources (foguang: 32K, zhonghua-baike: 6.4K).
     {
         "path": "ecg",
         "source_code": "bs-yiqiejing-yinyi",
