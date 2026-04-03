@@ -85,16 +85,20 @@ export default function KnowledgeGraphPage() {
   });
 
   // 搜索结果返回后自动选中第一个实体
-  const prevQueryRef = useRef(query);
+  const lastAutoSelectQuery = useRef("");
   useEffect(() => {
-    if (searchResults?.results.length && query !== prevQueryRef.current) {
-      prevQueryRef.current = query;
+    if (searchResults?.results.length && query && query !== lastAutoSelectQuery.current) {
+      lastAutoSelectQuery.current = query;
       setSelectedEntityId(searchResults.results[0].id);
     }
-  }, [searchResults, query]);
+  }, [searchResults]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSearch = (value: string) => {
-    setQuery(value.trim());
+    const q = value.trim();
+    if (q !== query) {
+      lastAutoSelectQuery.current = "";  // 重置，允许下次自动选中
+    }
+    setQuery(q);
     setSelectedEntityId(null);
   };
 
