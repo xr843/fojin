@@ -128,6 +128,7 @@ export default function ChatPage() {
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const messagesTopRef = useRef<HTMLDivElement>(null);
 
   const { data: sessions, refetch: refetchSessions } = useQuery({
     queryKey: ["chatSessions"],
@@ -194,7 +195,8 @@ export default function ChatPage() {
       setMessages(data.messages);
       setCurrentPage(1);
       setHasOlderMessages(data.total > data.messages.length);
-      scrollToBottom();
+      // 加载历史会话时滚到顶部，让用户先看到问题
+      setTimeout(() => messagesTopRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
     } catch {
       message.error("加载会话失败");
     }
@@ -557,6 +559,7 @@ export default function ChatPage() {
           </div>
           {/* Messages */}
           <div style={{ flex: 1, overflow: "auto", padding: "16px 0" }}>
+            <div ref={messagesTopRef} />
             {hasOlderMessages && (
               <div style={{ textAlign: "center", marginBottom: 12 }}>
                 <Button size="small" type="text" loading={loadingOlder} onClick={loadOlderMessages}
