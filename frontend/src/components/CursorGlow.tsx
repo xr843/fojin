@@ -23,9 +23,8 @@ export default function CursorGlow() {
     const animate = () => {
       const dx = pos.current.x - rendered.current.x;
       const dy = pos.current.y - rendered.current.y;
-      // Smooth lerp (0.15 = responsive but not jittery)
-      rendered.current.x += dx * 0.15;
-      rendered.current.y += dy * 0.15;
+      rendered.current.x += dx * 0.35;
+      rendered.current.y += dy * 0.35;
 
       if (dotRef.current) {
         dotRef.current.style.transform = `translate(${rendered.current.x}px, ${rendered.current.y}px)`;
