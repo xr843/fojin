@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 
 /**
  * A green glowing circle that follows the mouse cursor.
@@ -41,23 +42,24 @@ export default function CursorGlow() {
     };
   }, []);
 
-  return (
+  return createPortal(
     <div
       ref={dotRef}
       aria-hidden="true"
       style={{
         position: "fixed",
-        top: -10,
-        left: -10,
-        width: 20,
-        height: 20,
+        top: -6,
+        left: -6,
+        width: 12,
+        height: 12,
         borderRadius: "50%",
-        background: "radial-gradient(circle, rgba(76,175,80,0.7) 0%, rgba(76,175,80,0) 70%)",
+        background: "#2e7d32",
+        boxShadow: "0 0 8px 2px rgba(46,125,50,0.5)",
         pointerEvents: "none",
         zIndex: 9999,
         willChange: "transform",
-        mixBlendMode: "screen",
       }}
-    />
+    />,
+    document.body,
   );
 }
