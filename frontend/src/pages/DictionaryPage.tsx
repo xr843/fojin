@@ -158,8 +158,8 @@ export default function DictionaryPage() {
     setSearchParams({ q: trimmed });
   };
 
-  const handleSourceClick = (code: string, nameZh: string) => {
-    setInputValue(nameZh);
+  const handleSourceClick = (code: string) => {
+    setInputValue("");
     setQuery("*");
     setSourceFilter(code);
     setSearchParams({ q: "*", source: code });
@@ -237,11 +237,11 @@ export default function DictionaryPage() {
                   role="button"
                   tabIndex={0}
                   style={{ cursor: "pointer" }}
-                  onClick={() => handleSourceClick(src.code, src.name_zh)}
+                  onClick={() => handleSourceClick(src.code)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
-                      handleSourceClick(src.code, src.name_zh);
+                      handleSourceClick(src.code);
                     }
                   }}
                 >
