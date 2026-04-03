@@ -25,7 +25,7 @@ const LANG_COLORS: Record<string, string> = {
 
 const LANG_LABELS: Record<string, string> = {
   zh: "中文",
-  lzh: "文言文",
+  lzh: "中文",
   pi: "巴利文",
   sa: "梵文",
   bo: "藏文",
