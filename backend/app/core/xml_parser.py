@@ -4,12 +4,18 @@ CBETA TEI P5 XML parser.
 Parses CBETA XML files and extracts plain text content split by juan (fascicle).
 Handles <milestone unit="juan">, <cb:juan>, <p>, <lg>/<l>, <head> elements.
 Skips <note>, <app> (critical apparatus) elements.
+Resolves gaiji (缺字) via cbeta_gaiji.json for PUA characters.
 """
 
+import json
+import logging
 import re
 from pathlib import Path
 
+import httpx
 from lxml import etree
+
+logger = logging.getLogger(__name__)
 
 # CBETA TEI namespace
 TEI_NS = "http://www.tei-c.org/ns/1.0"
@@ -33,6 +39,88 @@ SKIP_TAGS = {
     f"{{{CB_NS}}}mulu",     # table of contents entry (e.g. "2" in juan heading)
 }
 
+# CBETA gaiji (缺字) mapping: CB ID → best available character
+_GAIJI_MAP: dict[str, str] = {}
+_GAIJI_LOADED = False
+
+GAIJI_JSON_URL = "https://raw.githubusercontent.com/cbeta-org/cbeta_gaiji/master/cbeta_gaiji.json"
+GAIJI_CACHE_PATH = Path(__file__).parent.parent.parent / "data" / "cbeta_gaiji.json"
+
+
+def _is_pua(c: str) -> bool:
+    """Check if a character is in a Private Use Area (displays as □)."""
+    cp = ord(c)
+    return (0xE000 <= cp <= 0xF8FF) or (0xF0000 <= cp <= 0xFFFFD) or (0x100000 <= cp <= 0x10FFFD)
+
+
+def _load_gaiji():
+    """Load CBETA gaiji mapping from local cache or remote."""
+    global _GAIJI_MAP, _GAIJI_LOADED
+    if _GAIJI_LOADED:
+        return
+
+    # Try local cache first
+    if GAIJI_CACHE_PATH.exists():
+        try:
+            raw = json.loads(GAIJI_CACHE_PATH.read_text(encoding="utf-8"))
+            _build_gaiji_map(raw)
+            _GAIJI_LOADED = True
+            logger.info("Loaded %d gaiji entries from cache", len(_GAIJI_MAP))
+            return
+        except Exception:
+            logger.warning("Failed to load gaiji cache, will download", exc_info=True)
+
+    # Download from GitHub
+    try:
+        resp = httpx.get(GAIJI_JSON_URL, timeout=30, follow_redirects=True)
+        resp.raise_for_status()
+        raw = resp.json()
+        # Save cache
+        GAIJI_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        GAIJI_CACHE_PATH.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+        _build_gaiji_map(raw)
+        _GAIJI_LOADED = True
+        logger.info("Downloaded and cached %d gaiji entries", len(_GAIJI_MAP))
+    except Exception:
+        logger.warning("Failed to download gaiji mapping", exc_info=True)
+        _GAIJI_LOADED = True  # Don't retry on every call
+
+
+def _build_gaiji_map(raw: dict):
+    """Build CB ID → best character mapping from cbeta_gaiji.json."""
+    for cb_id, info in raw.items():
+        # Priority: uni_char > norm_uni_char > norm_big5_char > composition
+        char = info.get("uni_char") or ""
+        if char and not any(_is_pua(c) for c in char):
+            _GAIJI_MAP[cb_id] = char
+            continue
+        norm = info.get("norm_uni_char") or info.get("norm_big5_char") or ""
+        if norm:
+            _GAIJI_MAP[cb_id] = norm
+            continue
+        comp = info.get("composition") or ""
+        if comp:
+            _GAIJI_MAP[cb_id] = comp
+
+
+def _resolve_gaiji(elem) -> str:
+    """Resolve a <g ref="#CBxxxxx"> element to its best Unicode character."""
+    _load_gaiji()
+    ref = elem.get("ref", "")
+    cb_id = ref.lstrip("#") if ref.startswith("#") else ref
+
+    # Try gaiji map
+    if cb_id and cb_id in _GAIJI_MAP:
+        return _GAIJI_MAP[cb_id]
+
+    # Fallback: use the element's text content if it's not PUA
+    text = elem.text or ""
+    if text and not any(_is_pua(c) for c in text):
+        return text
+
+    # Last resort: try to extract from the charDecl in the same document
+    return "□"
+
 
 def _extract_text(elem) -> str:
     """Recursively extract text from an element, skipping note/app elements."""
@@ -47,6 +135,11 @@ def _extract_text(elem) -> str:
     for child in elem:
         if child.tag in SKIP_TAGS:
             # Skip this child but get its tail
+            if child.tail:
+                parts.append(child.tail)
+        elif child.tag == f"{{{TEI_NS}}}g":
+            # Resolve gaiji (缺字) to best available character
+            parts.append(_resolve_gaiji(child))
             if child.tail:
                 parts.append(child.tail)
         else:
