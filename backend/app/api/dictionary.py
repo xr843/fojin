@@ -86,7 +86,7 @@ async def list_sources(db: AsyncSession = Depends(get_db)):
     stmt = (
         select(DataSource, entry_counts.c.entry_count)
         .join(entry_counts, DataSource.id == entry_counts.c.source_id)
-        .order_by(entry_counts.c.entry_count.desc())
+        .order_by(DataSource.sort_order, entry_counts.c.entry_count.desc())
     )
     result = await db.execute(stmt)
     rows = result.all()
