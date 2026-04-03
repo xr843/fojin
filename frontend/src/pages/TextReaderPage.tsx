@@ -271,20 +271,16 @@ function DictPopover({
 
   // 取第一条释义用于紧凑展示
   const firstEntry = state.result?.groups?.[0]?.entries?.[0];
-  const sourceName = state.result?.groups?.[0]?.source_name;
 
-  // 计算浮层位置，防止超出视口
-  const popoverWidth = 260;
-  let left = state.x - popoverWidth / 2;
-  let top = state.y + 10;
+  // 计算浮层位置
+  const popW = 220;
+  let left = state.x - popW / 2;
+  let top = state.y + 8;
 
   if (left < 8) left = 8;
-  if (left + popoverWidth > window.innerWidth - 8) {
-    left = window.innerWidth - popoverWidth - 8;
-  }
-  // 如果下方空间不够，显示在上方
-  if (top + 200 > window.innerHeight - 8) {
-    top = state.y - 200;
+  if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
+  if (top + 120 > window.innerHeight - 8) {
+    top = state.y - 120;
     if (top < 8) top = 8;
   }
 
@@ -306,11 +302,10 @@ function DictPopover({
         ) : firstEntry ? (
           <div className="reader-dict-popover-entry">
             <div className="reader-dict-popover-def">
-              {firstEntry.definition.length > 60
-                ? firstEntry.definition.slice(0, 60) + "…"
+              {firstEntry.definition.length > 30
+                ? firstEntry.definition.slice(0, 30) + "…"
                 : firstEntry.definition}
             </div>
-            {sourceName && <div className="reader-dict-popover-source">—— {sourceName}</div>}
           </div>
         ) : (
           <div className="reader-dict-popover-empty">未找到释义</div>
