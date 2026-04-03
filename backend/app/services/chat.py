@@ -231,7 +231,7 @@ async def get_history_paginated(
     result = await session.execute(
         select(ChatMessage)
         .where(ChatMessage.session_id == session_id)
-        .order_by(ChatMessage.created_at.desc())
+        .order_by(ChatMessage.created_at.desc(), ChatMessage.id.desc())
         .offset((page - 1) * size)
         .limit(size)
     )
