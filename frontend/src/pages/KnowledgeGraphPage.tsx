@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Input, Select, Spin, Empty, Slider, Checkbox, Alert, Tooltip } from "antd";
 import { ApartmentOutlined, SearchOutlined, BarChartOutlined } from "@ant-design/icons";
@@ -85,11 +85,13 @@ export default function KnowledgeGraphPage() {
   });
 
   // 搜索结果返回后自动选中第一个实体
+  const prevQueryRef = useRef(query);
   useEffect(() => {
-    if (searchResults?.results.length && !selectedEntityId) {
+    if (searchResults?.results.length && query !== prevQueryRef.current) {
+      prevQueryRef.current = query;
       setSelectedEntityId(searchResults.results[0].id);
     }
-  }, [searchResults]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [searchResults, query]);
 
   const handleSearch = (value: string) => {
     setQuery(value.trim());
