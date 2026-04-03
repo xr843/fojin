@@ -6,7 +6,7 @@
 
 **503 sources. 30 languages. 30 countries. 23,500+ full-text volumes. One search.**
 
-Aggregating the world's Buddhist digital heritage — 10,500+ texts with 23,500+ volumes of full content in Pali, Classical Chinese, Tibetan, and Sanskrit from 503 data sources — with CBETA-style reading, AI-powered Q&A (RAG + reranking + citations + data source recommendations), knowledge graph with 31K+ entities and 28K+ relations (including 23K teacher-student lineage chains), 19 dictionaries with 436K entries, timeline visualization, collections, citations, annotations, bookmarks, and multi-language parallel reading.
+Aggregating the world's Buddhist digital heritage — 10,500+ texts with 23,500+ volumes of full content in Pali, Classical Chinese, Tibetan, and Sanskrit from 503 data sources — with CBETA-style reading, AI-powered Q&A (RAG + reranking + citations + data source recommendations), knowledge graph with 31K+ entities and 28K+ relations (including 23K teacher-student lineage chains), 31 dictionaries with 679K entries across 6 languages, timeline visualization, collections, citations, annotations, bookmarks, and multi-language parallel reading.
 
 [Live Demo](https://fojin.app) &nbsp;&middot;&nbsp; [API Docs](https://fojin.app/docs) &nbsp;&middot;&nbsp; [中文文档](./docs/README_zh.md) &nbsp;&middot;&nbsp; [Discussions](https://github.com/xr843/fojin/discussions) &nbsp;&middot;&nbsp; [Discord](https://discord.gg/76SZeuJekq) &nbsp;&middot;&nbsp; [Report Bug](https://github.com/xr843/fojin/issues)
 
@@ -32,7 +32,7 @@ Buddhist texts are scattered across hundreds of databases worldwide — CBETA, S
 | Find a sutra across databases | **Multi-dimensional search** across 10,500+ texts from 503 sources |
 | Read the full text online | **8,900+ texts** with 23,500+ volumes of full content, CBETA-style layout |
 | Compare translations | **Parallel reading** in 30 languages side by side |
-| Look up Buddhist terms | **19 dictionaries**, 436K entries (Chinese/Sanskrit/Pali/Tibetan/English) |
+| Look up Buddhist terms | **31 dictionaries**, 679K entries (Chinese/Sanskrit/Pali/Tibetan/English) |
 | Explore relationships | **Knowledge graph** with 31K+ entities and 28K+ relations (23K lineage chains) |
 | Discover similar texts | **Semantic similarity** powered by 678K+ embedding vectors (pgvector + HNSW) |
 | View original manuscripts | **IIIF manuscript viewer** connected to BDRC and more |
@@ -93,26 +93,50 @@ Compare translations side by side — Classical Chinese, Sanskrit, Pali, Tibetan
 
 ### Dictionary Lookup
 
-19 authoritative dictionaries with 436,000+ entries:
-- **Ding Fubao** (丁福保佛学大辞典)
-- **Soothill-Hodous** (A Dictionary of Chinese Buddhist Terms)
-- **Hopkins** (Tibetan-Sanskrit-English Dictionary)
-- **DDB** (Digital Dictionary of Buddhism)
-- **NTI** (Nan Tien Institute Buddhist Dictionary)
-- **SuttaCentral Glossary** (Pali)
-- **NCPED** (New Concise Pali-English Dictionary)
-- **PTS PED** (Pali Text Society Pali-English Dictionary)
-- **Edgerton BHS** (Buddhist Hybrid Sanskrit Dictionary)
-- **Monier-Williams** (Sanskrit-English Dictionary)
-- **Rangjung Yeshe** (Tibetan-English Dictionary)
-- **Nanshan Vinaya** (南山律学辞典)
-- **Fo Guang** (佛光大辭典)
-- **Yogācāra Glossary** (唯識名詞白話新解)
-- **Sanzang Fashu** (三藏法數)
-- **Abhidharma Dictionary** (阿毗達磨辭典)
-- **Fanyi Mingyi Ji** (翻譯名義集)
-- **Tiantai Dictionary** (天台教學辭典)
-- **Buddhist Origins of Idioms** (俗語佛源)
+31 authoritative dictionaries with 679,000+ entries across Chinese, Pali, Sanskrit, Tibetan, and English:
+
+**Chinese Buddhist Dictionaries (14)**
+- **NTI Reader** (佛学辞典) — 161K entries, Chinese↔English
+- **Suihan Lu** (新集藏經音義隨函錄) — 72K entries, Tang dynasty phonetic glossary
+- **Fo Guang** (佛光大辭典) — 32K entries
+- **Ding Fubao** (丁福保佛学大辞典) — 31K entries
+- **Yiqiejing Yinyi** (一切經音義, 慧琳音義) — 23K entries, Buddhist scriptural phonetics
+- **Faxiang Dictionary** (法相辭典, 朱芾煌) — 15K entries, Yogācāra terminology
+- **Zhonghua Encyclopedia** (中華佛教百科全書) — 6K entries
+- **Common Buddhist Terms** (佛學常見詞彙, 陳義孝) — 6K entries
+- **Agama Dictionary** (阿含辭典, 莊春江) — 5K entries
+- **Fanfanyu** (翻梵語) — 4K entries, Sanskrit-Chinese translation glossary
+- **Xu Yinyi** (續一切經音義, 希麟) — 2K entries
+- **Yogācāra Glossary** (唯識名詞白話新解) — 2K entries
+- **Sanzang Fashu** (三藏法數) — 1K entries
+- **Buddhist Origins of Idioms** (俗語佛源) — 567 entries
+
+**Pali Dictionaries (5)**
+- **Digital Pali Dictionary** (DPD) — 89K entries, grammar + etymology + examples
+- **NCPED** (New Concise Pali-English Dictionary) — 21K entries
+- **PTS PED** (Pali Text Society) — 16K entries
+- **Buddhadatta** (巴利語辭典, 達摩比丘中譯) — 11K entries, Pali→Chinese
+- **SuttaCentral Glossary** — 6K entries
+
+**Sanskrit Dictionaries (3)**
+- **Monier-Williams** (Sanskrit-English Dictionary) — 32K entries
+- **Edgerton BHS** (Buddhist Hybrid Sanskrit Dictionary) — 18K entries
+- **Fanyi Mingyi Ji** (翻譯名義集) — 1K entries
+
+**Tibetan Dictionaries (2)**
+- **Rangjung Yeshe** (Tibetan-English Dictionary) — 74K entries
+- **Hopkins** (Tibetan-Sanskrit-English Dictionary) — 18K entries
+
+**Multilingual Reference (4)**
+- **Soothill-Hodous** (Chinese Buddhist Terms, Chinese↔English) — 17K entries
+- **Mahāvyutpatti** (翻譯名義大集, Sanskrit↔Tibetan↔Chinese) — 9K entries
+- **Nanshan Vinaya** (南山律学辞典) — 3K entries
+- **Pentaglot** (五體清文鑑, Manchu-Mongolian-Tibetan-Chinese-Sanskrit) — 1K entries
+
+**Specialized (3)**
+- **Abhidharma Dictionary** (阿毗達磨辭典) — 1K entries
+- **Tiantai Dictionary** (天台教學辭典) — 1K entries
+- **DDB** (Digital Dictionary of Buddhism) — CJK Buddhist terminology
 
 ### Knowledge Graph
 
@@ -289,6 +313,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 - [x] DILA catalog associations (contributors, places for 2,300+ texts)
 - [x] Nanshan Vinaya Dictionary (3,200+ Buddhist precept terms)
 - [x] CBETA full-text import — Taishō (T) + Xuzangjing (X): 3,600+ texts, 143M characters, 432K embedding vectors
+- [x] Dictionary expansion — 31 dictionaries, 679K entries (DPD, Mahāvyutpatti, Buddhadatta, Pentaglot, buddhaspace 7 dicts)
 - [ ] Topic ontology browsing page
 - [ ] Cross-lingual search (query in Chinese, find Sanskrit/Pali/Tibetan results)
 - [ ] Open data export (JSON/CSV for researchers)
