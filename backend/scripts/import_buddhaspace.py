@@ -223,8 +223,8 @@ class BuddhaspaceImporter(BaseImporter):
     SOURCE_NAME_EN = ""
     SOURCE_BASE_URL = "https://buddhaspace.org/dict/"
     SOURCE_DESCRIPTION = ""
-    RATE_LIMIT_DELAY = 0.05  # fast: 50ms between requests
-    CONCURRENCY = 10  # parallel fetches
+    RATE_LIMIT_DELAY = 0.15  # 150ms between requests (avoid rate limiting)
+    CONCURRENCY = 5  # parallel fetches
 
     def __init__(self, dict_configs: list[dict], limit: int = 0, concurrency: int = 0):
         super().__init__()
