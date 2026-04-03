@@ -220,11 +220,35 @@ export default function DictionaryPage() {
           ) : sources && sources.length > 0 ? (
             <div className="dict-sources-grid">
               {sources.map((src) => (
-                <div key={src.id} className="dict-source-card">
+                <div
+                  key={src.id}
+                  className="dict-source-card"
+                  role="button"
+                  tabIndex={0}
+                  style={{ cursor: "pointer" }}
+                  onClick={() => {
+                    setInputValue(src.name_zh);
+                    setQuery(src.name_zh);
+                    setSearchParams({ q: src.name_zh });
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setInputValue(src.name_zh);
+                      setQuery(src.name_zh);
+                      setSearchParams({ q: src.name_zh });
+                    }
+                  }}
+                >
                   <div className="dict-source-card-name">{src.name_zh}</div>
                   <div className="dict-source-card-count">
                     {src.entry_count.toLocaleString()} 词条
                   </div>
+                  {src.description && (
+                    <div style={{ fontSize: 12, color: "var(--fj-ink-muted)", marginTop: 4, lineHeight: 1.5 }}>
+                      {src.description.length > 50 ? src.description.slice(0, 50) + "..." : src.description}
+                    </div>
+                  )}
                   <div className="dict-source-card-langs">
                     {[...new Map(src.languages.map((l) => [LANG_LABELS[l] || l, l])).values()].map((lang) => (
                       <Tag

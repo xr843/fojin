@@ -668,6 +668,7 @@ export interface DictSourceInfo {
   code: string;
   name_zh: string;
   name_en: string | null;
+  description?: string;
   entry_count: number;
   languages: string[];
   base_url: string | null;
