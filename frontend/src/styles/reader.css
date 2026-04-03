@@ -190,10 +190,10 @@
   position: fixed;
   z-index: 1050;
   max-width: 220px;
-  background: var(--fj-card-bg, #fffef8);
-  border: 1px solid var(--fj-border, #d9d0c1);
+  background: #fffef8;
+  border: 1px solid #d9d0c1;
   border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
   font-family: "Noto Serif SC", "Source Han Serif SC", serif;
   padding: 8px 10px;
 }
