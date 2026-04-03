@@ -65,11 +65,22 @@ export default function KnowledgeGraphPage() {
     staleTime: 60_000,
   });
 
+  // 标记是否需要自动选中下一次搜索结果
+  const autoSelectRef = useRef(true);
+
   const { data: searchResults, isLoading: searching } = useQuery({
     queryKey: ["kg-search", query, entityType],
     queryFn: () => searchKGEntities(query, entityType || undefined),
     enabled: query.length > 0,
   });
+
+  // 搜索结果到达后自动选中第一条
+  useEffect(() => {
+    if (autoSelectRef.current && searchResults?.results.length) {
+      autoSelectRef.current = false;
+      setSelectedEntityId(searchResults.results[0].id);
+    }
+  }, [searchResults]);
 
   const { data: entityDetail } = useQuery({
     queryKey: ["kg-entity", selectedEntityId],
@@ -84,22 +95,10 @@ export default function KnowledgeGraphPage() {
     enabled: !!selectedEntityId,
   });
 
-  // 搜索结果返回后自动选中第一个实体
-  const lastAutoSelectQuery = useRef("");
-  useEffect(() => {
-    if (searchResults?.results.length && query && query !== lastAutoSelectQuery.current) {
-      lastAutoSelectQuery.current = query;
-      setSelectedEntityId(searchResults.results[0].id);
-    }
-  }, [searchResults]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const handleSearch = (value: string) => {
-    const q = value.trim();
-    if (q !== query) {
-      lastAutoSelectQuery.current = "";  // 重置，允许下次自动选中
-    }
-    setQuery(q);
+    setQuery(value.trim());
     setSelectedEntityId(null);
+    autoSelectRef.current = true;  // 允许自动选中下次搜索结果
   };
 
   const handleEntitySelect = (entity: KGEntity) => {
