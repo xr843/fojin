@@ -223,12 +223,16 @@ class BuddhaspaceImporter(BaseImporter):
     SOURCE_NAME_EN = ""
     SOURCE_BASE_URL = "https://buddhaspace.org/dict/"
     SOURCE_DESCRIPTION = ""
-    RATE_LIMIT_DELAY = 0.5  # polite: 0.5s between requests
+    RATE_LIMIT_DELAY = 0.05  # fast: 50ms between requests
+    CONCURRENCY = 10  # parallel fetches
 
-    def __init__(self, dict_configs: list[dict], limit: int = 0):
+    def __init__(self, dict_configs: list[dict], limit: int = 0, concurrency: int = 0):
         super().__init__()
         self.dict_configs = dict_configs
         self.limit = limit
+        if concurrency > 0:
+            self.CONCURRENCY = concurrency
+        self._semaphore = asyncio.Semaphore(self.CONCURRENCY)
         # Override SOURCE_CODE for checkpoint naming
         if len(dict_configs) == 1:
             self.SOURCE_CODE = dict_configs[0]["source_code"]
@@ -236,8 +240,8 @@ class BuddhaspaceImporter(BaseImporter):
             self.SOURCE_NAME_EN = dict_configs[0]["name_en"]
         else:
             self.SOURCE_CODE = "buddhaspace-all"
-            self.SOURCE_NAME_ZH = "Buddhaspace 七部辞典"
-            self.SOURCE_NAME_EN = "Buddhaspace 7 Dictionaries"
+            self.SOURCE_NAME_ZH = "Buddhaspace 九部辞典"
+            self.SOURCE_NAME_EN = "Buddhaspace 9 Dictionaries"
 
     async def _fetch_index(self, dict_path: str) -> list[tuple[str, str]]:
         """Fetch the index page for a dictionary and parse entry links."""
@@ -251,18 +255,27 @@ class BuddhaspaceImporter(BaseImporter):
         return entries
 
     async def _fetch_entry(self, dict_path: str, href: str) -> str | None:
-        """Fetch a single dictionary entry page and return raw HTML."""
+        """Fetch a single dictionary entry page with concurrency control."""
         entry_url = urljoin(f"{BASE_URL}{dict_path}/data/", href)
-        try:
-            resp = await self.rate_limited_get(entry_url)
-            return resp.text
-        except Exception as e:
-            print(f"    Error fetching {entry_url}: {e}")
-            self.stats.errors += 1
-            return None
+        async with self._semaphore:
+            try:
+                resp = await self.rate_limited_get(entry_url)
+                return resp.text
+            except Exception as e:
+                print(f"    Error fetching {entry_url}: {e}")
+                self.stats.errors += 1
+                return None
+
+    async def _fetch_batch(self, dict_path: str, batch: list[tuple[str, str]]) -> list[tuple[str, str, str | None]]:
+        """Fetch a batch of entries concurrently. Returns [(headword, href, html), ...]."""
+        tasks = []
+        for headword, href in batch:
+            tasks.append(self._fetch_entry(dict_path, href))
+        results = await asyncio.gather(*tasks)
+        return [(hw, href, html) for (hw, href), html in zip(batch, results)]
 
     async def _import_one_dict(self, config: dict):
-        """Import a single dictionary."""
+        """Import a single dictionary with concurrent fetching."""
         path = config["path"]
         source_code = config["source_code"]
         name_zh = config["name_zh"]
@@ -284,9 +297,27 @@ class BuddhaspaceImporter(BaseImporter):
             print(f"  WARNING: No entries found for {name_zh}, skipping.")
             return
 
+        # Filter out already-done entries
+        todo = []
+        skipped = 0
+        for headword, href in entries:
+            external_id = f"{source_code}-{headword}"
+            if external_id in done_ids:
+                skipped += 1
+            else:
+                todo.append((headword, href))
+
+        if not todo:
+            print(f"  {name_zh}: all {skipped} entries already done, skipping.")
+            return
+
+        if self.limit > 0:
+            todo = todo[:self.limit]
+
+        print(f"  {len(todo)} entries to fetch ({skipped} already done), concurrency={self.CONCURRENCY}")
+
         async with self.session_factory() as session:
-            # Ensure source exists
-            self._source = None  # reset cached source
+            self._source = None
             self.SOURCE_CODE = source_code
             self.SOURCE_NAME_ZH = name_zh
             self.SOURCE_NAME_EN = name_en
@@ -295,72 +326,61 @@ class BuddhaspaceImporter(BaseImporter):
             source_id = source.id
 
             imported = 0
-            skipped = 0
+            batch_size = self.CONCURRENCY * 5  # fetch 50 at a time
 
-            for headword, href in entries:
-                # Build external_id from source code + headword
-                external_id = f"{source_code}-{headword}"
+            for i in range(0, len(todo), batch_size):
+                batch = todo[i:i + batch_size]
+                results = await self._fetch_batch(path, batch)
 
-                # Skip if already done (checkpoint resume)
-                if external_id in done_ids:
-                    skipped += 1
-                    continue
+                for headword, href, entry_html in results:
+                    if not entry_html:
+                        continue
 
-                # Fetch entry content
-                entry_html = await self._fetch_entry(path, href)
-                if not entry_html:
-                    continue
+                    definition = _extract_definition(entry_html, headword)
+                    external_id = f"{source_code}-{headword}"
 
-                # Extract definition
-                definition = _extract_definition(entry_html, headword)
-                if not definition:
-                    print(f"    Empty definition for '{headword}', skipping.")
-                    skipped += 1
-                    continue
+                    if not definition:
+                        skipped += 1
+                        done_ids.add(external_id)
+                        continue
 
-                # Insert/update
-                await session.execute(
-                    text("""
-                        INSERT INTO dictionary_entries
-                            (headword, reading, definition, source_id, lang, external_id, entry_data)
-                        VALUES (:headword, :reading, :definition, :source_id, :lang, :external_id,
-                                CAST(:entry_data AS jsonb))
-                        ON CONFLICT ON CONSTRAINT uq_dict_entry_source_external DO UPDATE SET
-                            headword = EXCLUDED.headword,
-                            reading = EXCLUDED.reading,
-                            definition = EXCLUDED.definition,
-                            entry_data = EXCLUDED.entry_data
-                    """),
-                    {
-                        "headword": headword[:500],
-                        "reading": None,
-                        "definition": definition,
-                        "source_id": source_id,
-                        "lang": "zh",
-                        "external_id": external_id[:200],
-                        "entry_data": json.dumps(
-                            {"source_url": f"{BASE_URL}{path}/data/{href}"},
-                            ensure_ascii=False,
-                        ),
-                    },
-                )
-                imported += 1
-                done_ids.add(external_id)
+                    await session.execute(
+                        text("""
+                            INSERT INTO dictionary_entries
+                                (headword, reading, definition, source_id, lang, external_id, entry_data)
+                            VALUES (:headword, :reading, :definition, :source_id, :lang, :external_id,
+                                    CAST(:entry_data AS jsonb))
+                            ON CONFLICT ON CONSTRAINT uq_dict_entry_source_external DO UPDATE SET
+                                headword = EXCLUDED.headword,
+                                reading = EXCLUDED.reading,
+                                definition = EXCLUDED.definition,
+                                entry_data = EXCLUDED.entry_data
+                        """),
+                        {
+                            "headword": headword[:500],
+                            "reading": None,
+                            "definition": definition,
+                            "source_id": source_id,
+                            "lang": "zh",
+                            "external_id": external_id[:200],
+                            "entry_data": json.dumps(
+                                {"source_url": f"{BASE_URL}{path}/data/{href}"},
+                                ensure_ascii=False,
+                            ),
+                        },
+                    )
+                    imported += 1
+                    done_ids.add(external_id)
 
-                if imported % 500 == 0:
-                    await session.commit()
-                    # Save checkpoint periodically
-                    checkpoint[checkpoint_key] = list(done_ids)
-                    self.save_checkpoint(checkpoint)
+                await session.commit()
+                checkpoint[checkpoint_key] = list(done_ids)
+                self.save_checkpoint(checkpoint)
+
+                if imported % 500 < batch_size:
                     print(f"    ... {imported} entries imported ({skipped} skipped)")
-
-                if self.limit > 0 and imported >= self.limit:
-                    print(f"    Limit of {self.limit} reached.")
-                    break
 
             await session.commit()
 
-        # Final checkpoint save
         checkpoint[checkpoint_key] = list(done_ids)
         self.save_checkpoint(checkpoint)
 
@@ -381,6 +401,7 @@ async def main():
     parser.add_argument("--dict", type=str, default=None,
                         help="Import only this dictionary (path code: fk, ch, ecg, ffy, fxcd, cxy, ccj)")
     parser.add_argument("--limit", type=int, default=0, help="Limit entries per dictionary (0 = no limit)")
+    parser.add_argument("--concurrency", type=int, default=0, help="Concurrent fetches (default: 10)")
     parser.add_argument("--list", action="store_true", help="List available dictionaries and exit")
     args = parser.parse_args()
 
@@ -401,7 +422,7 @@ async def main():
     else:
         configs = DICTIONARIES
 
-    importer = BuddhaspaceImporter(dict_configs=configs, limit=args.limit)
+    importer = BuddhaspaceImporter(dict_configs=configs, limit=args.limit, concurrency=args.concurrency)
     await importer.execute()
 
 

@@ -23,6 +23,7 @@ import { useAuthStore } from "../stores/authStore";
 import { getPendingSuggestionCount, getPendingFeedbackCount } from "../api/client";
 import FeedbackButton from "./FeedbackButton";
 import NotificationBell from "./NotificationBell";
+import CursorGlow from "./CursorGlow";
 
 const { Header, Content, Footer } = AntLayout;
 
@@ -367,6 +368,7 @@ export default function Layout() {
         </Space>
       </Drawer>
       {isHome && <FeedbackButton />}
+      <CursorGlow />
     </AntLayout>
   );
 }
