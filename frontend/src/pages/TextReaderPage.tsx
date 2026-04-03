@@ -23,7 +23,7 @@ import ReaderSidebar from "../components/ReaderSidebar";
 import "../styles/reader.css";
 
 const LANG_LABELS: Record<string, string> = {
-  lzh: "文言文",
+  lzh: "中文",
   pi: "巴利文",
   en: "English",
   sa: "梵文",
