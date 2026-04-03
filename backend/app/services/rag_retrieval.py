@@ -145,6 +145,12 @@ MAX_DICT_DEF_CHARS = 200
 
 # Pattern to extract CJK terms (2-8 chars) from user message
 _CJK_TERM_RE = re.compile(r"[\u4e00-\u9fff\u3400-\u4dbf]{2,8}")
+# Common question words to strip before extracting terms
+_QUESTION_WORDS = re.compile(
+    r"什么是|是什么|什么叫|什么意思|怎么理解|如何理解|何谓|何为|"
+    r"请问|请解释|解释一下|介绍一下|简述|详解|含义|意思|概念|定义|"
+    r"的意思|是指|指的是|讲的是|说的是"
+)
 
 
 def _zh_variants(q: str) -> list[str]:
@@ -158,8 +164,13 @@ async def _lookup_dictionary_terms(db: AsyncSession, query: str) -> str:
     Extracts CJK terms from the query and searches for exact headword matches,
     falling back to prefix matches. Returns formatted text block or empty string.
     """
-    # Extract candidate terms from query (CJK sequences of 2-8 chars)
-    terms = _CJK_TERM_RE.findall(query)
+    # Strip common question words to isolate the actual term
+    cleaned = _QUESTION_WORDS.sub("", query).strip()
+    # Extract candidate terms from cleaned query (CJK sequences of 2-8 chars)
+    terms = _CJK_TERM_RE.findall(cleaned)
+    # Also try the original query as fallback
+    if not terms:
+        terms = _CJK_TERM_RE.findall(query)
     if not terms:
         return ""
 
