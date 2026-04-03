@@ -1,12 +1,17 @@
 """RAG retrieval: pgvector semantic similarity search + reranking."""
 
 import logging
+import re
 import time
 
 import httpx
+from opencc import OpenCC
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from app.config import settings
+from app.models.dictionary import DictionaryEntry
 from app.schemas.chat import ChatSource
 from app.services.embedding import generate_embedding, similarity_search, source_similarity_search
 
@@ -130,6 +135,97 @@ async def _rerank(query: str, results: list[dict]) -> list[dict]:
     return reranked
 
 
+_s2t = OpenCC("s2t")
+_t2s = OpenCC("t2s")
+
+# Maximum dictionary definitions to include in RAG context
+MAX_DICT_ENTRIES = 3
+# Maximum characters per dictionary definition
+MAX_DICT_DEF_CHARS = 200
+
+# Pattern to extract CJK terms (2-8 chars) from user message
+_CJK_TERM_RE = re.compile(r"[\u4e00-\u9fff\u3400-\u4dbf]{2,8}")
+
+
+def _zh_variants(q: str) -> list[str]:
+    """Return deduplicated [original, simplified, traditional] variants."""
+    return list({q, _t2s.convert(q), _s2t.convert(q)})
+
+
+async def _lookup_dictionary_terms(db: AsyncSession, query: str) -> str:
+    """Look up Buddhist dictionary entries matching terms in the user query.
+
+    Extracts CJK terms from the query and searches for exact headword matches,
+    falling back to prefix matches. Returns formatted text block or empty string.
+    """
+    # Extract candidate terms from query (CJK sequences of 2-8 chars)
+    terms = _CJK_TERM_RE.findall(query)
+    if not terms:
+        return ""
+
+    # Deduplicate while preserving order, limit to first 5 terms
+    seen: set[str] = set()
+    unique_terms: list[str] = []
+    for t in terms:
+        if t not in seen:
+            seen.add(t)
+            unique_terms.append(t)
+        if len(unique_terms) >= 5:
+            break
+
+    # Collect all variants for all terms
+    all_variants: list[str] = []
+    for term in unique_terms:
+        all_variants.extend(_zh_variants(term))
+    all_variants = list(set(all_variants))
+
+    try:
+        # Phase 1: exact headword match
+        exact_conds = [DictionaryEntry.headword == v for v in all_variants]
+        stmt = (
+            select(DictionaryEntry)
+            .where(or_(*exact_conds))
+            .options(joinedload(DictionaryEntry.source))
+            .limit(MAX_DICT_ENTRIES)
+        )
+        result = await db.execute(stmt)
+        entries = list(result.unique().scalars().all())
+
+        # Phase 2: prefix match if exact found too few
+        if len(entries) < MAX_DICT_ENTRIES:
+            prefix_conds = [DictionaryEntry.headword.startswith(v) for v in all_variants]
+            seen_ids = {e.id for e in entries}
+            stmt2 = (
+                select(DictionaryEntry)
+                .where(or_(*prefix_conds))
+                .options(joinedload(DictionaryEntry.source))
+                .limit(MAX_DICT_ENTRIES)
+            )
+            result2 = await db.execute(stmt2)
+            for e in result2.unique().scalars().all():
+                if e.id not in seen_ids and len(entries) < MAX_DICT_ENTRIES:
+                    entries.append(e)
+                    seen_ids.add(e.id)
+
+        if not entries:
+            return ""
+
+        # Format dictionary entries
+        lines: list[str] = []
+        for e in entries:
+            source_name = e.source.name_zh if e.source else "未知辞典"
+            definition = (e.definition or "")[:MAX_DICT_DEF_CHARS]
+            if e.definition and len(e.definition) > MAX_DICT_DEF_CHARS:
+                definition += "…"
+            lines.append(f"「{e.headword}」—— {source_name}：{definition}")
+
+        return "【辞典参考】\n" + "\n".join(lines)
+
+    except Exception:
+        logger.warning("Dictionary lookup failed, skipping", exc_info=True)
+        return ""
+
+
 async def retrieve_rag_context(
     db: AsyncSession,
     query: str,
@@ -196,6 +292,13 @@ async def retrieve_rag_context(
                 url = s["base_url"] or ""
                 source_lines.append(f"- {s['name_zh']}：{desc}（{url}）")
             context_text += "\n\n[相关数据源推荐]\n" + "\n".join(source_lines)
+
+        # Dictionary term lookup for authoritative definitions
+        t_dict = time.monotonic()
+        dict_text = await _lookup_dictionary_terms(db, query)
+        if dict_text:
+            context_text += "\n\n" + dict_text
+            logger.debug("TIMING: Dictionary lookup took %.2fs", time.monotonic() - t_dict)
     except Exception:
         logger.exception("Embedding/search failed, proceeding without RAG context")
         await db.rollback()
