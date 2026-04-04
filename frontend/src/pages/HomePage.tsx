@@ -172,7 +172,7 @@ export default function HomePage() {
             <div className="home-feature-title">{t("home.feature_chat_title")}</div>
             <div className="home-feature-desc">{t("home.feature_chat_desc")}</div>
           </div>
-          <div className="home-feature-card" onClick={() => navigate("/collections")}>
+          <div className="home-feature-card" onClick={() => navigate("/topics")}>
             <BookOutlined className="home-feature-icon" />
             <div className="home-feature-title">{t("home.feature_collections_title")}</div>
             <div className="home-feature-desc">{t("home.feature_collections_desc")}</div>

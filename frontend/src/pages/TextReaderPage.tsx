@@ -372,7 +372,7 @@ export default function TextReaderPage() {
       );
     } catch {
       setDictPopover((prev) =>
-        prev.text === text ? { ...prev, loading: false, result: { total: 0, groups: [] } } : prev,
+        prev.text === text ? { ...prev, loading: false, result: { total: 0, page: null, page_size: null, groups: [] } } : prev,
       );
     }
   }, []);

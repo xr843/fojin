@@ -112,6 +112,7 @@ async def search_dictionary_grouped(
     lang: str | None = Query(None, description="语言筛选"),
     source: str | None = Query(None, description="数据源 code 筛选"),
     size: int = Query(10, ge=1, le=50, description="每个来源返回的最大条数"),
+    page: int = Query(1, ge=1, description="页码（浏览模式）"),
     db: AsyncSession = Depends(get_db),
 ):
     """Search dictionary entries grouped by source. Supports simplified/traditional Chinese interconversion.
@@ -120,6 +121,7 @@ async def search_dictionary_grouped(
     Two-phase search: first exact+prefix (fast), then substring if needed.
     When source is specified and q is '*', browse mode: return entries from that source."""
     browse_mode = q == "*" and source is not None
+    page_size = 50
 
     base_filters = []
     if lang:
@@ -128,18 +130,22 @@ async def search_dictionary_grouped(
         base_filters.append(DataSource.code == source)
 
     if browse_mode:
-        # Browse mode: return entries from a specific source, sorted by headword
+        # Browse mode: return entries from a specific source, sorted by headword with pagination
         stmt = (
             select(DictionaryEntry)
             .join(DictionaryEntry.source)
             .where(*base_filters)
             .options(joinedload(DictionaryEntry.source))
-            .order_by(func.length(DictionaryEntry.headword), DictionaryEntry.headword)
-            .limit(200)
+            .order_by(DictionaryEntry.headword)
+            .offset((page - 1) * page_size)
+            .limit(page_size)
         )
         result = await db.execute(stmt)
         entries = list(result.unique().scalars().all())
-        total = len(entries)
+
+        # Get total count for this source
+        count_stmt = select(func.count()).select_from(DictionaryEntry).join(DictionaryEntry.source).where(*base_filters)
+        total = (await db.execute(count_stmt)).scalar() or 0
     else:
         variants = _zh_variants(q)
         relevance = _build_relevance(variants)
@@ -194,6 +200,8 @@ async def search_dictionary_grouped(
     return {
         "query": q,
         "total": total,
+        "page": page if browse_mode else None,
+        "page_size": page_size if browse_mode else None,
         "groups": sorted_groups,
     }
 

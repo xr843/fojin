@@ -36,6 +36,12 @@ function seoPages(): Plugin {
       noscript:
         '<h1>佛津 — 藏经收藏</h1><p>浏览和管理您的佛教古籍收藏集合。</p><a href="/">返回首页</a>',
     },
+    topics: {
+      title: "经典专题 — 佛津 FoJin",
+      desc: "按主题浏览佛教经典：般若系、净土五经、法华系、禅宗典籍、律藏、阿含经、唯识经论、华严系。",
+      noscript:
+        '<h1>佛津 — 经典专题</h1><p>按主题浏览佛教经典，帮助您找到入门路径。</p><a href="/">返回首页</a>',
+    },
     dictionary: {
       title: "佛学辞典 — 佛津 FoJin",
       desc: "38 部权威佛学辞典，712,000+ 词条，覆盖中梵巴藏英五语。在线查询佛光大辞典、丁福保佛学大辞典、Digital Pali Dictionary 等权威辞典。",
