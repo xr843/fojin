@@ -16,13 +16,13 @@ function seoPages(): Plugin {
       title: "搜索 | 佛津 FoJin",
       desc: "搜索全球佛教古籍数字资源 — 支持按经名、编号、译者检索",
       noscript:
-        '<h1>佛津 — 典籍搜索</h1><p>跨 40+ 数据源检索佛教古籍，支持按经名、编号、译者查询。</p><a href="/">返回首页</a>',
+        '<h1>佛津 — 典籍搜索</h1><p>跨 503 个数据源检索佛教古籍，支持按经名、编号、译者查询。</p><a href="/">返回首页</a>',
     },
     sources: {
       title: "数据源导航 | 佛津 FoJin",
-      desc: "聚合全球 40+ 佛教数字资源，覆盖图书馆、大学、研究机构、数字项目等。",
+      desc: "聚合全球 503 个佛教数字资源，覆盖图书馆、大学、研究机构、数字项目等。",
       noscript:
-        '<h1>佛津 — 数据源导航</h1><p>聚合 CBETA、BDRC、SAT、SuttaCentral 等全球 40 余个佛教数字资源。</p><a href="/">返回首页</a>',
+        '<h1>佛津 — 数据源导航</h1><p>聚合 CBETA、BDRC、SAT、SuttaCentral 等全球 503 个佛教数字资源。</p><a href="/">返回首页</a>',
     },
     kg: {
       title: "知识图谱 | 佛津 FoJin",
@@ -35,6 +35,12 @@ function seoPages(): Plugin {
       desc: "浏览和管理您的佛教古籍收藏集合",
       noscript:
         '<h1>佛津 — 藏经收藏</h1><p>浏览和管理您的佛教古籍收藏集合。</p><a href="/">返回首页</a>',
+    },
+    dictionary: {
+      title: "佛学辞典 — 佛津 FoJin",
+      desc: "38 部权威佛学辞典，712,000+ 词条，覆盖中梵巴藏英五语。在线查询佛光大辞典、丁福保佛学大辞典、Digital Pali Dictionary 等权威辞典。",
+      noscript:
+        '<h1>佛津 — 佛学辞典</h1><p>聚合 38 部权威佛学辞典，超过 712,000 条词条，覆盖中文、梵文、巴利文、藏文、英文五种语言。</p><h2>收录辞典</h2><ul><li>佛光大辞典</li><li>丁福保佛学大辞典</li><li>Digital Pali Dictionary (DPD)</li><li>Sanskrit Heritage Dictionary</li><li>Monier-Williams Sanskrit-English Dictionary</li><li>Buddhist Hybrid Sanskrit Dictionary</li><li>翻译名义集</li><li>一切经音义</li></ul><a href="/">返回首页</a>',
     },
     // Sutra landing pages
     "sutras/heart-sutra": {
