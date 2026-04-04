@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Card, Col, Row, Statistic, Spin, message } from "antd";
+import { Card, Col, Row, Statistic, Spin, Segmented, Empty, message } from "antd";
 import {
   UserOutlined,
   MessageOutlined,
@@ -7,6 +7,8 @@ import {
   WarningOutlined,
 } from "@ant-design/icons";
 import { Helmet } from "react-helmet-async";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { Line } from "@ant-design/charts";
 import {
   getAdminOverview,
@@ -14,6 +16,7 @@ import {
   type AdminOverview,
   type AdminTrends,
 } from "../api/client";
+import { getPlatformActivity } from "../api/feed";
 
 export default function AdminDashboardPage() {
   const [overview, setOverview] = useState<AdminOverview | null>(null);
@@ -110,7 +113,48 @@ export default function AdminDashboardPage() {
         <Card title="最近 30 天趋势" style={{ marginTop: 16 }}>
           <Line {...lineConfig} />
         </Card>
+
+        <PlatformActivityCard />
       </div>
     </>
+  );
+}
+
+function PlatformActivityCard() {
+  const [days, setDays] = useState<number>(7);
+  const { data, isLoading } = useQuery({
+    queryKey: ["platformActivity", days],
+    queryFn: () => getPlatformActivity({ days }),
+    staleTime: 300000,
+  });
+
+  return (
+    <Card title="平台活跃度" style={{ marginTop: 16 }} extra={
+      <Segmented value={days} onChange={(v) => setDays(v as number)}
+        options={[{ label: "7天", value: 7 }, { label: "14天", value: 14 }, { label: "30天", value: 30 }]}
+      />
+    }>
+      {isLoading ? <Spin /> : !data ? <Empty /> : (
+        <>
+          <Row gutter={[16, 16]}>
+            <Col xs={12} sm={6}><Statistic title="阅读次数" value={data.reading.total_reads} /></Col>
+            <Col xs={12} sm={6}><Statistic title="阅读经文数" value={data.reading.unique_texts_read} /></Col>
+            <Col xs={12} sm={6}><Statistic title="新增用户" value={data.users.new_users} /></Col>
+            <Col xs={12} sm={6}><Statistic title="活跃用户" value={data.users.active_users} /></Col>
+          </Row>
+          {data.reading.top_texts.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <h4>热门阅读经文</h4>
+              {data.reading.top_texts.map((t) => (
+                <div key={t.text_id} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
+                  <Link to={`/texts/${t.text_id}`}>{t.title_zh}</Link>
+                  <span style={{ color: "#999" }}>{t.read_count} 次</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </Card>
   );
 }

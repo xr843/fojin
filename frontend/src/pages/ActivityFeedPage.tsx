@@ -1,14 +1,12 @@
 import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { useQuery } from "@tanstack/react-query";
-import { Tabs, Spin, Empty, Tag, Pagination, Select, Slider, Segmented } from "antd";
+import { Tabs, Spin, Empty, Tag, Pagination, Select, Slider } from "antd";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
 import {
   getFeedSummary,
   getSourceUpdates,
   getAcademicFeeds,
-  getPlatformActivity,
 } from "../api/feed";
 import type { SourceUpdateItem, AcademicFeedItem } from "../api/feed";
 import "../styles/activity-feed.css";
@@ -328,111 +326,6 @@ function AcademicTab() {
   );
 }
 
-/* ---------- Tab 4: Platform Stats ---------- */
-function PlatformStatsTab() {
-  const { t } = useTranslation();
-  const [days, setDays] = useState<number>(7);
-
-  const { data, isLoading } = useQuery({
-    queryKey: ["platformActivity", days],
-    queryFn: () => getPlatformActivity({ days }),
-    staleTime: 300000,
-  });
-
-  if (isLoading) return <div style={{ textAlign: "center", padding: 40 }}><Spin size="large" /></div>;
-  if (!data) return <Empty description={t("common.noData")} />;
-
-  return (
-    <>
-      <div style={{ marginBottom: 20 }}>
-        <Segmented
-          value={days}
-          onChange={(v) => setDays(v as number)}
-          options={[
-            { label: `7 ${t("activity.days")}`, value: 7 },
-            { label: `14 ${t("activity.days")}`, value: 14 },
-            { label: `30 ${t("activity.days")}`, value: 30 },
-          ]}
-        />
-      </div>
-
-      <div className="platform-stats-grid">
-        <div className="platform-stat-card">
-          <h3>{t("activity.readingStats")}</h3>
-          <div className="stat-row">
-            <span className="stat-label">{t("activity.totalReads")}</span>
-            <span className="stat-value">{data.reading.total_reads}</span>
-          </div>
-          <div className="stat-row">
-            <span className="stat-label">{t("activity.uniqueTextsRead")}</span>
-            <span className="stat-value">{data.reading.unique_texts_read}</span>
-          </div>
-        </div>
-
-        <div className="platform-stat-card">
-          <h3>{t("activity.chatStats")}</h3>
-          <div className="stat-row">
-            <span className="stat-label">{t("activity.totalMessages")}</span>
-            <span className="stat-value">{data.chat.total_messages}</span>
-          </div>
-          <div className="stat-row">
-            <span className="stat-label">{t("activity.totalSessions")}</span>
-            <span className="stat-value">{data.chat.total_sessions}</span>
-          </div>
-          <div className="stat-row">
-            <span className="stat-label">{t("activity.positiveFeedback")}</span>
-            <span className="stat-value">{data.chat.positive_feedback}</span>
-          </div>
-        </div>
-
-        <div className="platform-stat-card">
-          <h3>{t("activity.userStats")}</h3>
-          <div className="stat-row">
-            <span className="stat-label">{t("activity.newUsers")}</span>
-            <span className="stat-value">{data.users.new_users}</span>
-          </div>
-          <div className="stat-row">
-            <span className="stat-label">{t("activity.activeUsers")}</span>
-            <span className="stat-value">{data.users.active_users}</span>
-          </div>
-        </div>
-
-        <div className="platform-stat-card">
-          <h3>{t("activity.contentStats")}</h3>
-          <div className="stat-row">
-            <span className="stat-label">{t("activity.newTexts")}</span>
-            <span className="stat-value">{data.content.new_texts}</span>
-          </div>
-          <div className="stat-row">
-            <span className="stat-label">{t("activity.totalTexts")}</span>
-            <span className="stat-value">{data.content.total_texts}</span>
-          </div>
-          <div className="stat-row">
-            <span className="stat-label">{t("activity.totalSources")}</span>
-            <span className="stat-value">{data.content.total_sources}</span>
-          </div>
-        </div>
-      </div>
-
-      {data.reading.top_texts.length > 0 && (
-        <div className="feed-card" style={{ marginTop: 16 }}>
-          <h3>{t("activity.topReadTexts")}</h3>
-          <div className="top-texts-list">
-            {data.reading.top_texts.map((text) => (
-              <div key={text.text_id} className="top-text-item">
-                <Link to={`/texts/${text.text_id}`}>{text.title_zh}</Link>
-                <span className="read-count">
-                  {text.read_count} {t("activity.reads")}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
-
 /* ---------- Main Page ---------- */
 export default function ActivityFeedPage() {
   const { t } = useTranslation();
@@ -441,7 +334,6 @@ export default function ActivityFeedPage() {
     { key: "overview", label: t("activity.overview"), children: <OverviewTab /> },
     { key: "source-updates", label: t("activity.sourceUpdates"), children: <SourceUpdatesTab /> },
     { key: "academic", label: t("activity.academic"), children: <AcademicTab /> },
-    { key: "platform-stats", label: t("activity.platformStats"), children: <PlatformStatsTab /> },
   ];
 
   return (
