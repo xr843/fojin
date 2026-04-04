@@ -32,6 +32,8 @@ const LANG_LABELS: Record<string, string> = {
   en: "英文",
   ja: "日文",
   ko: "韩文",
+  mn: "蒙古文",
+  mnc: "满文",
 };
 
 function truncate(text: string, max: number): string {
