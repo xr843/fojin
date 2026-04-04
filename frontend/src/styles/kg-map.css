@@ -1,0 +1,337 @@
+/* ========================================
+   KGMapPage — 佛教地理 · 古典水墨风格
+   ======================================== */
+
+.kg-map-page {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+/* ---------- 标题 ---------- */
+.kg-map-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.kg-map-header h3 {
+  font-family: "Noto Serif SC", serif;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--fj-ink);
+  margin: 0;
+  letter-spacing: 2px;
+}
+
+.kg-map-header .anticon {
+  font-size: 18px;
+  color: var(--fj-accent);
+}
+
+.kg-map-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  color: var(--fj-ink-muted);
+  font-size: 13px;
+}
+
+.kg-map-stats .anticon {
+  font-size: 14px;
+}
+
+/* ---------- 工具栏 ---------- */
+.kg-map-toolbar {
+  background: #fff;
+  border: 1px solid var(--fj-border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.kg-map-toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.kg-map-filter-label {
+  font-family: "Noto Serif SC", serif;
+  font-size: 12px;
+  color: var(--fj-ink-muted);
+  flex-shrink: 0;
+}
+
+.kg-map-toolbar-row .ant-checkbox-wrapper {
+  font-size: 12px;
+  color: var(--fj-ink-light);
+}
+
+.kg-map-toolbar-row .ant-checkbox-checked .ant-checkbox-inner {
+  background-color: var(--fj-accent);
+  border-color: var(--fj-accent);
+}
+
+/* ---------- 地图容器 ---------- */
+.kg-map-container {
+  position: relative;
+  height: calc(100vh - 220px);
+  min-height: 400px;
+  overflow: hidden;
+  border: 1px solid var(--fj-border);
+  border-radius: 8px;
+}
+
+.kg-map-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+/* ---------- 地图 Tooltip ---------- */
+.kg-map-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--fj-border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  max-width: 220px;
+  z-index: 10;
+  font-size: 12px;
+  color: var(--fj-ink);
+}
+
+.kg-map-tooltip .tooltip-name {
+  font-family: "Noto Serif SC", serif;
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+
+.kg-map-tooltip .tooltip-en {
+  font-size: 11px;
+  color: var(--fj-ink-muted);
+  font-style: italic;
+  margin-bottom: 4px;
+}
+
+.kg-map-tooltip .tooltip-type {
+  font-size: 10px;
+  color: var(--fj-ink-light);
+}
+
+.kg-map-tooltip .tooltip-year {
+  font-size: 10px;
+  color: var(--fj-ink-muted);
+  margin-top: 2px;
+}
+
+/* ---------- 实体弹出卡片 ---------- */
+.kg-map-popup-container {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 20;
+}
+
+.kg-map-popup {
+  width: 260px;
+  background: #fff;
+  border: 1px solid var(--fj-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+}
+
+.kg-map-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--fj-bg-alt);
+}
+
+.kg-map-popup-name {
+  font-family: "Noto Serif SC", serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fj-ink);
+  line-height: 1.4;
+}
+
+.kg-map-popup-en {
+  font-size: 12px;
+  color: var(--fj-ink-muted);
+  font-style: italic;
+  padding: 0 14px;
+  margin-top: 4px;
+}
+
+.kg-map-popup-desc {
+  font-size: 12px;
+  color: #7a6e5c;
+  padding: 8px 14px;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.kg-map-popup-year {
+  font-size: 11px;
+  color: var(--fj-ink-muted);
+  padding: 0 14px 8px;
+}
+
+.kg-map-popup-actions {
+  display: flex;
+  gap: 8px;
+  padding: 8px 14px 12px;
+  border-top: 1px solid var(--fj-bg-alt);
+}
+
+/* ---------- 时间轴覆盖层 ---------- */
+.kg-map-time-overlay {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  right: 16px;
+  z-index: 15;
+}
+
+.kg-time-slider {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--fj-border);
+  border-radius: 8px;
+  padding: 10px 16px;
+}
+
+.kg-time-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.kg-time-slider-label {
+  font-family: "Noto Serif SC", serif;
+  font-size: 12px;
+  color: var(--fj-ink-muted);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.kg-time-current {
+  font-family: "Noto Serif SC", serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fj-ink);
+  min-width: 80px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.kg-time-play-btn {
+  flex-shrink: 0;
+}
+
+.kg-time-slider-track {
+  flex: 1;
+  min-width: 0;
+}
+
+.kg-time-slider-track .ant-slider .ant-slider-track {
+  background: var(--fj-gold);
+}
+
+.kg-time-slider-track .ant-slider .ant-slider-handle::after {
+  box-shadow: 0 0 0 2px var(--fj-gold);
+}
+
+/* ---------- 地图图例 ---------- */
+.kg-map-legend {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 15;
+  display: flex;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #e8e0d4;
+  border-radius: 6px;
+  padding: 6px 12px;
+  backdrop-filter: blur(4px);
+}
+
+.kg-map-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--fj-ink-light);
+  font-family: "Noto Serif SC", serif;
+}
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 768px) {
+  .kg-map-page {
+    padding: 0 8px;
+  }
+
+  .kg-map-header h3 {
+    font-size: 17px;
+  }
+
+  .kg-map-container {
+    height: calc(100vh - 280px);
+    min-height: 300px;
+  }
+
+  .kg-map-toolbar {
+    padding: 8px 10px;
+  }
+
+  .kg-map-toolbar-row {
+    gap: 8px;
+  }
+
+  .kg-map-toolbar-row .ant-checkbox-wrapper {
+    font-size: 11px;
+  }
+
+  .kg-map-popup-container {
+    top: 8px;
+    right: 8px;
+  }
+
+  .kg-map-popup {
+    width: 220px;
+  }
+
+  .kg-map-time-overlay {
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+  }
+
+  .kg-time-slider {
+    padding: 8px 10px;
+  }
+
+  .kg-time-slider-row {
+    gap: 8px;
+  }
+
+  .kg-time-current {
+    font-size: 11px;
+    min-width: 60px;
+  }
+}

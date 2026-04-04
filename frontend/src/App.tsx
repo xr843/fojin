@@ -39,6 +39,7 @@ const AdminFeedbacksPage = lazy(() => import("./pages/AdminFeedbacksPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 const TimelinePage = lazy(() => import("./pages/TimelinePage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+const KGMapPage = lazy(() => import("./pages/KGMapPage"));
 const ActivityFeedPage = lazy(() => import("./pages/ActivityFeedPage"));
 
 function Loading() {
@@ -87,6 +88,7 @@ function App() {
             <Route path="/exports" element={<ExportsPage />} />
             <Route path="/timeline" element={<TimelinePage />} />
             <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/map" element={<RouteErrorBoundary><KGMapPage /></RouteErrorBoundary>} />
             <Route path="/activity" element={<ActivityFeedPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>

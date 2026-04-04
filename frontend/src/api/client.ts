@@ -596,6 +596,65 @@ export async function getKGStats(): Promise<KGStats> {
   return data;
 }
 
+export interface KGGeoEntity {
+  id: number;
+  entity_type: string;
+  name_zh: string;
+  name_en: string | null;
+  description: string | null;
+  latitude: number;
+  longitude: number;
+  year_start: number | null;
+  year_end: number | null;
+}
+
+export interface KGGeoResponse {
+  entities: KGGeoEntity[];
+  total: number;
+}
+
+export interface KGLineageArc {
+  teacher_id: number;
+  teacher_name: string;
+  teacher_lat: number;
+  teacher_lng: number;
+  student_id: number;
+  student_name: string;
+  student_lat: number;
+  student_lng: number;
+  year: number | null;
+  school: string | null;
+}
+
+export interface KGLineageArcsResponse {
+  arcs: KGLineageArc[];
+  total: number;
+}
+
+export async function getKGGeoEntities(params?: {
+  entity_type?: string;
+  year_start?: number;
+  year_end?: number;
+  south?: number;
+  west?: number;
+  north?: number;
+  east?: number;
+  limit?: number;
+}): Promise<KGGeoResponse> {
+  const { data } = await api.get<KGGeoResponse>("/kg/geo", { params });
+  return data;
+}
+
+export async function getKGLineageArcs(params?: {
+  school?: string;
+  year_start?: number;
+  year_end?: number;
+  limit?: number;
+}): Promise<KGLineageArcsResponse> {
+  const { data } = await api.get<KGLineageArcsResponse>("/kg/lineage-arcs", { params });
+  return data;
+}
+
 // Dictionary
 export interface DictEntry {
   id: DictEntryId;

@@ -68,3 +68,38 @@ class KGGraphResponse(BaseModel):
 class KGSearchResponse(BaseModel):
     total: int
     results: list[KGEntityResponse]
+
+
+class KGGeoEntity(BaseModel):
+    id: int
+    entity_type: str
+    name_zh: str
+    name_en: str | None = None
+    description: str | None = None
+    latitude: float
+    longitude: float
+    year_start: int | None = None
+    year_end: int | None = None
+
+
+class KGGeoResponse(BaseModel):
+    entities: list[KGGeoEntity]
+    total: int
+
+
+class KGLineageArc(BaseModel):
+    teacher_id: int
+    teacher_name: str
+    teacher_lat: float
+    teacher_lng: float
+    student_id: int
+    student_name: str
+    student_lat: float
+    student_lng: float
+    year: int | None = None
+    school: str | None = None
+
+
+class KGLineageArcsResponse(BaseModel):
+    arcs: list[KGLineageArc]
+    total: int
