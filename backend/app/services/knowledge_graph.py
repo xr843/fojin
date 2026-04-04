@@ -254,3 +254,198 @@ async def get_text_entities(session: AsyncSession, text_id: int) -> list[KGEntit
         select(KGEntity).where(KGEntity.text_id == text_id)
     )
     return list(result.scalars().all())
+
+
+async def get_geo_entities(
+    session: AsyncSession,
+    entity_types: list[str] | None = None,
+    year_start: int | None = None,
+    year_end: int | None = None,
+    bounds: tuple[float, float, float, float] | None = None,
+    limit: int = 5000,
+) -> tuple[list[dict], int]:
+    """Get entities with geographic coordinates, with optional filtering.
+
+    获取具有地理坐标的实体，支持类型/时间/边界框过滤。"""
+    conditions = [
+        "(e.properties->>'latitude') IS NOT NULL",
+        "(e.properties->>'longitude') IS NOT NULL",
+    ]
+    params: dict = {"limit": limit}
+
+    if entity_types:
+        conditions.append("e.entity_type = ANY(:entity_types)")
+        params["entity_types"] = entity_types
+
+    if year_start is not None:
+        conditions.append(
+            "COALESCE((e.properties->>'year_end')::int, 9999) >= :year_start"
+        )
+        params["year_start"] = year_start
+
+    if year_end is not None:
+        conditions.append(
+            "COALESCE((e.properties->>'year_start')::int, -9999) <= :year_end"
+        )
+        params["year_end"] = year_end
+
+    if bounds:
+        south, west, north, east = bounds
+        conditions.append(
+            "(e.properties->>'latitude')::float BETWEEN :south AND :north"
+        )
+        conditions.append(
+            "(e.properties->>'longitude')::float BETWEEN :west AND :east"
+        )
+        params.update(south=south, west=west, north=north, east=east)
+
+    where_clause = " AND ".join(conditions)
+
+    count_sql = text(  # nosec B608
+        f"SELECT COUNT(*) FROM kg_entities e WHERE {where_clause}"
+    )
+    count_result = await session.execute(count_sql, params)
+    total = count_result.scalar() or 0
+
+    sql = text(  # nosec B608
+        f"""
+        SELECT
+            e.id,
+            e.entity_type,
+            e.name_zh,
+            e.name_en,
+            e.description,
+            (e.properties->>'latitude')::float AS latitude,
+            (e.properties->>'longitude')::float AS longitude,
+            (e.properties->>'year_start')::int AS year_start,
+            (e.properties->>'year_end')::int AS year_end
+        FROM kg_entities e
+        WHERE {where_clause}
+        ORDER BY e.entity_type, e.name_zh
+        LIMIT :limit
+        """
+    )
+    result = await session.execute(sql, params)
+    entities = [
+        {
+            "id": row[0],
+            "entity_type": row[1],
+            "name_zh": row[2],
+            "name_en": row[3],
+            "description": row[4],
+            "latitude": row[5],
+            "longitude": row[6],
+            "year_start": row[7],
+            "year_end": row[8],
+        }
+        for row in result.fetchall()
+    ]
+    return entities, total
+
+
+async def get_lineage_arcs(
+    session: AsyncSession,
+    school: str | None = None,
+    year_start: int | None = None,
+    year_end: int | None = None,
+    limit: int = 5000,
+) -> tuple[list[dict], int]:
+    """Get teacher-student lineage arcs with geographic coordinates.
+
+    获取具有地理坐标的师承传法弧线。"""
+    conditions = [
+        "r.predicate = 'teacher_of'",
+        "(t.properties->>'latitude') IS NOT NULL",
+        "(t.properties->>'longitude') IS NOT NULL",
+        "(s.properties->>'latitude') IS NOT NULL",
+        "(s.properties->>'longitude') IS NOT NULL",
+    ]
+    params: dict = {"limit": limit}
+
+    if school:
+        conditions.append("""
+            EXISTS (
+                SELECT 1 FROM kg_relations r2
+                WHERE r2.predicate = 'member_of_school'
+                AND r2.subject_id = s.id
+                AND r2.object_id IN (
+                    SELECT id FROM kg_entities WHERE name_zh = :school
+                )
+            )
+        """)
+        params["school"] = school
+
+    if year_start is not None:
+        conditions.append(
+            "COALESCE((s.properties->>'year_start')::int,"
+            " (t.properties->>'year_end')::int, 9999) >= :year_start"
+        )
+        params["year_start"] = year_start
+
+    if year_end is not None:
+        conditions.append(
+            "COALESCE((s.properties->>'year_start')::int,"
+            " (t.properties->>'year_end')::int, -9999) <= :year_end"
+        )
+        params["year_end"] = year_end
+
+    where_clause = " AND ".join(conditions)
+
+    count_sql = text(  # nosec B608
+        f"""
+        SELECT COUNT(*) FROM kg_relations r
+        JOIN kg_entities t ON t.id = r.subject_id
+        JOIN kg_entities s ON s.id = r.object_id
+        WHERE {where_clause}
+        """
+    )
+    count_result = await session.execute(count_sql, params)
+    total = count_result.scalar() or 0
+
+    sql = text(  # nosec B608
+        f"""
+        SELECT
+            t.id AS teacher_id,
+            t.name_zh AS teacher_name,
+            (t.properties->>'latitude')::float AS teacher_lat,
+            (t.properties->>'longitude')::float AS teacher_lng,
+            s.id AS student_id,
+            s.name_zh AS student_name,
+            (s.properties->>'latitude')::float AS student_lat,
+            (s.properties->>'longitude')::float AS student_lng,
+            COALESCE(
+                (s.properties->>'year_start')::int,
+                (t.properties->>'year_end')::int
+            ) AS year,
+            (
+                SELECT e2.name_zh FROM kg_relations r2
+                JOIN kg_entities e2 ON e2.id = r2.object_id
+                WHERE r2.predicate = 'member_of_school'
+                AND r2.subject_id = s.id
+                LIMIT 1
+            ) AS school
+        FROM kg_relations r
+        JOIN kg_entities t ON t.id = r.subject_id
+        JOIN kg_entities s ON s.id = r.object_id
+        WHERE {where_clause}
+        ORDER BY year NULLS LAST
+        LIMIT :limit
+        """
+    )
+    result = await session.execute(sql, params)
+    arcs = [
+        {
+            "teacher_id": row[0],
+            "teacher_name": row[1],
+            "teacher_lat": row[2],
+            "teacher_lng": row[3],
+            "student_id": row[4],
+            "student_name": row[5],
+            "student_lat": row[6],
+            "student_lng": row[7],
+            "year": row[8],
+            "school": row[9],
+        }
+        for row in result.fetchall()
+    ]
+    return arcs, total

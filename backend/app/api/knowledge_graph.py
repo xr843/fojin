@@ -6,14 +6,19 @@ from app.database import get_db
 from app.schemas.knowledge_graph import (
     KGEntityDetailResponse,
     KGEntityResponse,
+    KGGeoEntity,
+    KGGeoResponse,
     KGGraphResponse,
+    KGLineageArcsResponse,
     KGSearchResponse,
 )
 from app.services.knowledge_graph import (
     get_entity,
     get_entity_graph,
     get_entity_relations,
+    get_geo_entities,
     get_kg_stats,
+    get_lineage_arcs,
     get_text_entities,
     search_entities,
 )
@@ -82,6 +87,53 @@ async def kg_stats(db: AsyncSession = Depends(get_db)):
 
     获取知识图谱统计信息（各类型实体与关系数量）。"""
     return await get_kg_stats(db)
+
+
+@router.get("/geo", response_model=KGGeoResponse)
+async def get_kg_geo_entities(
+    entity_type: str | None = Query(None, description="Comma-separated entity types"),
+    year_start: int | None = None,
+    year_end: int | None = None,
+    south: float | None = None,
+    west: float | None = None,
+    north: float | None = None,
+    east: float | None = None,
+    limit: int = Query(5000, le=10000),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get geo-located knowledge graph entities for map display.
+
+    获取具有地理坐标的知识图谱实体，用于地图展示。"""
+    entity_types = (
+        [t.strip() for t in entity_type.split(",") if t.strip()]
+        if entity_type
+        else None
+    )
+    bounds = None
+    if all(v is not None for v in (south, west, north, east)):
+        bounds = (south, west, north, east)  # type: ignore[arg-type]
+    entities, total = await get_geo_entities(
+        db, entity_types, year_start, year_end, bounds, limit
+    )
+    return KGGeoResponse(
+        entities=[KGGeoEntity(**e) for e in entities],
+        total=total,
+    )
+
+
+@router.get("/lineage-arcs", response_model=KGLineageArcsResponse)
+async def get_kg_lineage_arcs(
+    school: str | None = None,
+    year_start: int | None = None,
+    year_end: int | None = None,
+    limit: int = Query(5000, le=10000),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get teacher-student lineage arcs with coordinates for map visualization.
+
+    获取师承传法弧线及坐标，用于地图可视化。"""
+    arcs, total = await get_lineage_arcs(db, school, year_start, year_end, limit)
+    return KGLineageArcsResponse(arcs=arcs, total=total)
 
 
 @router.get("/texts/{text_id}/entities", response_model=list[KGEntityResponse])
