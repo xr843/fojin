@@ -95,7 +95,7 @@ function OverviewTab() {
   });
 
   if (isLoading) return <div style={{ textAlign: "center", padding: 40 }}><Spin size="large" /></div>;
-  if (!data) return <Empty description={t("common.noData")} />;
+  if (!data) return <Empty description={t("activity.noData")} />;
 
   return (
     <>
@@ -118,7 +118,7 @@ function OverviewTab() {
         <h3>{t("activity.recentSourceUpdates")}</h3>
         <div className="feed-list">
           {data.recent_source_updates.length === 0 ? (
-            <Empty description={t("common.noData")} />
+            <Empty description={t("activity.noData")} />
           ) : (
             data.recent_source_updates.map((item) => (
               <SourceUpdateRow key={item.id} item={item} t={t} />
@@ -131,7 +131,7 @@ function OverviewTab() {
         <h3>{t("activity.recentAcademic")}</h3>
         <div className="feed-list">
           {data.recent_academic.length === 0 ? (
-            <Empty description={t("common.noData")} />
+            <Empty description={t("activity.noData")} />
           ) : (
             data.recent_academic.map((item) => (
               <AcademicRow key={item.id} item={item} />
@@ -204,7 +204,7 @@ function SourceUpdatesTab() {
       {isLoading ? (
         <div style={{ textAlign: "center", padding: 40 }}><Spin size="large" /></div>
       ) : !data || data.items.length === 0 ? (
-        <Empty description={t("common.noData")} />
+        <Empty description={t("activity.noData")} />
       ) : (
         <>
           <div className="feed-card">
@@ -301,7 +301,7 @@ function AcademicTab() {
       {isLoading ? (
         <div style={{ textAlign: "center", padding: 40 }}><Spin size="large" /></div>
       ) : !data || data.items.length === 0 ? (
-        <Empty description={t("common.noData")} />
+        <Empty description={t("activity.noData")} />
       ) : (
         <>
           <div className="feed-card">
