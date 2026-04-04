@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Map } from "react-map-gl/maplibre";
 import DeckGL from "@deck.gl/react";
 import { ScatterplotLayer, ArcLayer } from "@deck.gl/layers";
@@ -26,7 +26,7 @@ const INITIAL_VIEW_STATE = {
   bearing: 0,
 };
 
-/** Light basemap — CARTO Voyager (warm light theme with subtle labels) */
+/** Light basemap — CARTO Voyager */
 const MAP_STYLE = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
 
 interface DeckGLMapProps {
@@ -53,25 +53,7 @@ export default function DeckGLMap({
   onEntityClick,
 }: DeckGLMapProps) {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
-  const [pulsePhase, setPulsePhase] = useState(0);
-  const rafRef = useRef<number>(0);
 
-  /** Pulse animation loop — drives the outer glow ring */
-  useEffect(() => {
-    let frame = 0;
-    const animate = () => {
-      frame++;
-      // Update every 3 frames (~20fps) to save CPU
-      if (frame % 3 === 0) {
-        setPulsePhase(Date.now() * 0.001);
-      }
-      rafRef.current = requestAnimationFrame(animate);
-    };
-    rafRef.current = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, []);
-
-  /** Filter entities by type and time (client-side) */
   const filteredEntities = useMemo(() => {
     return geoEntities.filter((e) => {
       if (!entityTypeFilter.includes(e.entity_type)) return false;
@@ -84,7 +66,6 @@ export default function DeckGLMap({
     });
   }, [geoEntities, entityTypeFilter, currentYear]);
 
-  /** Filter arcs by time */
   const filteredArcs = useMemo(() => {
     if (!showArcs) return [];
     return lineageArcs.filter((a) => {
@@ -104,80 +85,39 @@ export default function DeckGLMap({
 
   const handleClick = useCallback(
     (info: PickingInfo) => {
-      if (info.object) {
-        onEntityClick(info.object as KGGeoEntity);
-      }
+      if (info.object) onEntityClick(info.object as KGGeoEntity);
     },
     [onEntityClick],
   );
 
-  /** Compute animated pulse multiplier (0.8 — 2.5) */
-  const pulseScale = 1.5 + Math.sin(pulsePhase * 2) * 0.8;
-  const pulseOpacity = Math.max(0, 0.4 - Math.sin(pulsePhase * 2) * 0.3);
-
   const layers = useMemo(() => {
     const result = [];
 
-    // Layer 1: Outer glow ring (animated pulse)
+    // Single scatter layer — small static dots, no animation
     result.push(
       new ScatterplotLayer<KGGeoEntity>({
-        id: "entities-glow",
+        id: "entities",
         data: filteredEntities,
         getPosition: (d) => [d.longitude, d.latitude],
         getFillColor: (d) => {
           const c = TYPE_COLORS[d.entity_type] ?? [128, 128, 128];
-          return [c[0], c[1], c[2], Math.round(pulseOpacity * 255)];
+          return [c[0], c[1], c[2], 180];
         },
-        getRadius: 12000 * pulseScale,
-        radiusMinPixels: 8 * pulseScale,
-        radiusMaxPixels: 40,
-        pickable: false,
-        updateTriggers: {
-          getRadius: [pulseScale],
-          getFillColor: [pulseOpacity],
-        },
-      }),
-    );
-
-    // Layer 2: Mid glow (softer, slightly animated)
-    result.push(
-      new ScatterplotLayer<KGGeoEntity>({
-        id: "entities-mid-glow",
-        data: filteredEntities,
-        getPosition: (d) => [d.longitude, d.latitude],
-        getFillColor: (d) => {
-          const c = TYPE_COLORS[d.entity_type] ?? [128, 128, 128];
-          return [c[0], c[1], c[2], 60];
-        },
-        getRadius: 9000,
-        radiusMinPixels: 7,
-        radiusMaxPixels: 28,
-        pickable: false,
-      }),
-    );
-
-    // Layer 3: Core dot (solid, bright)
-    result.push(
-      new ScatterplotLayer<KGGeoEntity>({
-        id: "entities-core",
-        data: filteredEntities,
-        getPosition: (d) => [d.longitude, d.latitude],
-        getFillColor: (d) => {
-          const c = TYPE_COLORS[d.entity_type] ?? [128, 128, 128];
-          return [c[0], c[1], c[2], 240];
-        },
-        getRadius: 4000,
+        getLineColor: [255, 255, 255, 160],
+        lineWidthMinPixels: 0.5,
+        stroked: true,
+        getRadius: 3000,
         radiusMinPixels: 3,
-        radiusMaxPixels: 12,
+        radiusMaxPixels: 10,
         pickable: true,
         autoHighlight: true,
-        highlightColor: [255, 255, 200, 180],
+        highlightColor: [255, 200, 60, 160],
         onHover: handleHover,
         onClick: handleClick,
       }),
     );
 
-    // Layer 4: Lineage arcs (glowing)
+    // Lineage arcs
     if (showArcs && filteredArcs.length > 0) {
       result.push(
         new ArcLayer<KGLineageArc>({
@@ -185,16 +125,16 @@ export default function DeckGLMap({
           data: filteredArcs,
           getSourcePosition: (d) => [d.teacher_lng, d.teacher_lat],
           getTargetPosition: (d) => [d.student_lng, d.student_lat],
-          getSourceColor: [200, 140, 45, 180],   // 赭石 — teacher
-          getTargetColor: [210, 60, 50, 180],     // 朱砂 — student
-          getWidth: 2,
+          getSourceColor: [200, 140, 45, 180],
+          getTargetColor: [210, 60, 50, 180],
+          getWidth: 1.5,
           greatCircle: true,
         }),
       );
     }
 
     return result;
-  }, [filteredEntities, filteredArcs, showArcs, pulseScale, pulseOpacity, handleHover, handleClick]);
+  }, [filteredEntities, filteredArcs, showArcs, handleHover, handleClick]);
 
   return (
     <>
@@ -235,8 +175,6 @@ export default function DeckGLMap({
     </>
   );
 }
-
-/* ---------- helpers ---------- */
 
 function formatYear(year: number): string {
   if (year < 0) return `公元前${Math.abs(year)}年`;
