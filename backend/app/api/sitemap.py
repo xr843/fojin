@@ -17,6 +17,7 @@ STATIC_PAGES = [
     ("/", "daily", "1.0"),
     ("/search", "daily", "0.9"),
     ("/sources", "weekly", "0.8"),
+    ("/dictionary", "weekly", "0.8"),
     ("/collections", "weekly", "0.7"),
     ("/kg", "weekly", "0.7"),
     ("/chat", "weekly", "0.6"),
