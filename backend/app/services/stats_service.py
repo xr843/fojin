@@ -3,15 +3,18 @@
 import hashlib
 import json
 import logging
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dynasty_config import resolve_dynasty
+from app.models.chat import ChatMessage, ChatSession
 from app.models.dictionary import DictionaryEntry
 from app.models.knowledge_graph import KGEntity, KGRelation
 from app.models.source import DataSource
 from app.models.text import BuddhistText
+from app.models.user import ReadingHistory, User
 
 logger = logging.getLogger(__name__)
 
@@ -295,4 +298,125 @@ async def get_timeline(
 
     result = await handler(db, category, language, source_id, page, page_size)
     await _cache_set(redis, cache_key, result)
+    return result
+
+
+PLATFORM_ACTIVITY_CACHE_TTL = 300  # 5 minutes
+
+
+async def get_platform_activity(db: AsyncSession, redis=None, days: int = 7) -> dict:
+    """Return platform activity metrics for the given period."""
+    cache_key = f"stats:platform_activity:{days}"
+    cached = await _cache_get(redis, cache_key)
+    if cached is not None:
+        return cached
+
+    cutoff = datetime.now(UTC) - timedelta(days=days)
+
+    # --- Reading ---
+    total_reads = (
+        await db.execute(
+            select(func.count(ReadingHistory.id)).where(ReadingHistory.last_read_at >= cutoff)
+        )
+    ).scalar() or 0
+
+    unique_texts_read = (
+        await db.execute(
+            select(func.count(func.distinct(ReadingHistory.text_id))).where(
+                ReadingHistory.last_read_at >= cutoff
+            )
+        )
+    ).scalar() or 0
+
+    top_texts_q = (
+        select(
+            ReadingHistory.text_id,
+            BuddhistText.title_zh,
+            func.count(ReadingHistory.id).label("read_count"),
+        )
+        .join(BuddhistText, BuddhistText.id == ReadingHistory.text_id)
+        .where(ReadingHistory.last_read_at >= cutoff)
+        .group_by(ReadingHistory.text_id, BuddhistText.title_zh)
+        .order_by(func.count(ReadingHistory.id).desc())
+        .limit(10)
+    )
+    top_texts_rows = (await db.execute(top_texts_q)).all()
+    top_texts = [
+        {"text_id": r[0], "title_zh": r[1], "read_count": r[2]} for r in top_texts_rows
+    ]
+
+    # --- Chat ---
+    total_messages = (
+        await db.execute(
+            select(func.count(ChatMessage.id)).where(ChatMessage.created_at >= cutoff)
+        )
+    ).scalar() or 0
+
+    total_sessions = (
+        await db.execute(
+            select(func.count(ChatSession.id)).where(ChatSession.created_at >= cutoff)
+        )
+    ).scalar() or 0
+
+    positive_feedback = (
+        await db.execute(
+            select(func.count(ChatMessage.id)).where(
+                ChatMessage.created_at >= cutoff,
+                ChatMessage.feedback == "thumbs_up",
+            )
+        )
+    ).scalar() or 0
+
+    # --- Users ---
+    new_users = (
+        await db.execute(
+            select(func.count(User.id)).where(User.created_at >= cutoff)
+        )
+    ).scalar() or 0
+
+    active_users = (
+        await db.execute(
+            select(func.count(User.id)).where(User.last_active_at >= cutoff)
+        )
+    ).scalar() or 0
+
+    # --- Content ---
+    new_texts = (
+        await db.execute(
+            select(func.count(BuddhistText.id)).where(BuddhistText.created_at >= cutoff)
+        )
+    ).scalar() or 0
+
+    total_texts = (await db.execute(select(func.count(BuddhistText.id)))).scalar() or 0
+
+    total_sources = (
+        await db.execute(
+            select(func.count(DataSource.id)).where(DataSource.is_active.is_(True))
+        )
+    ).scalar() or 0
+
+    result = {
+        "period_days": days,
+        "reading": {
+            "total_reads": total_reads,
+            "unique_texts_read": unique_texts_read,
+            "top_texts": top_texts,
+        },
+        "chat": {
+            "total_messages": total_messages,
+            "total_sessions": total_sessions,
+            "positive_feedback": positive_feedback,
+        },
+        "users": {
+            "new_users": new_users,
+            "active_users": active_users,
+        },
+        "content": {
+            "new_texts": new_texts,
+            "total_texts": total_texts,
+            "total_sources": total_sources,
+        },
+    }
+
+    await _cache_set(redis, cache_key, result, PLATFORM_ACTIVITY_CACHE_TTL)
     return result

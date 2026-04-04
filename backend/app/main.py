@@ -33,6 +33,7 @@ from app.api import (
     citations,
     dictionary,
     exports,
+    feed,
     feedback,
     history,
     iiif,
@@ -183,6 +184,10 @@ _OPENAPI_TAGS = [
     {
         "name": "stats",
         "description": "Platform statistics and timeline data / 平台统计数据与时间线",
+    },
+    {
+        "name": "feed",
+        "description": "Activity feed: source updates and academic publications / 动态：数据源更新与学术动态",
     },
     {
         "name": "dianjin",
@@ -363,6 +368,9 @@ if dianjin is not None:
 
 # Stats (dashboard + timeline)
 app.include_router(stats.router, prefix="/api")
+
+# Feed (source updates + academic publications)
+app.include_router(feed.router, prefix="/api")
 
 # Source suggestions (public)
 app.include_router(source_suggestions.router, prefix="/api")
