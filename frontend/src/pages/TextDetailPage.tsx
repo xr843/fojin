@@ -175,7 +175,7 @@ export default function TextDetailPage() {
           </Descriptions>
         </Card>
 
-        <Space>
+        <Space wrap>
           {text.has_content && (
             <Button
               type="primary"

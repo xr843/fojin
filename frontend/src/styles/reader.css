@@ -320,6 +320,15 @@
 
   .reader-nav .nav-btn-group .ant-btn {
     flex: 1;
+    font-size: 13px;
+    padding: 4px 8px;
+  }
+
+  /* 收藏/标注/引用按钮缩小，允许换行 */
+  .reader-nav > .ant-btn {
+    font-size: 12px;
+    padding: 2px 8px;
+    height: 28px;
   }
 
   .reader-font-controls {
@@ -354,6 +363,27 @@
 @media (max-width: 480px) {
   .reader-container {
     padding: 0 8px;
+  }
+
+  .reader-nav {
+    gap: 4px;
+  }
+
+  .reader-nav .nav-btn-group {
+    width: 100%;
+    order: 0;
+  }
+
+  .reader-nav .nav-btn-group .ant-btn {
+    font-size: 12px;
+    padding: 2px 6px;
+    height: 28px;
+  }
+
+  .reader-nav > .ant-btn {
+    font-size: 12px;
+    padding: 2px 6px;
+    height: 26px;
   }
 
   .reader-body {

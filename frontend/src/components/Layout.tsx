@@ -237,7 +237,7 @@ export default function Layout() {
             }}
           >
             <Button type="text" icon={<GlobalOutlined />} style={{ color: inkMuted, fontSize: 13 }}>
-              {t(`language.${i18n.resolvedLanguage ?? i18n.language}`)}
+              <span className="header-lang-text">{t(`language.${i18n.resolvedLanguage ?? i18n.language}`)}</span>
             </Button>
           </Dropdown>
           {user ? (
@@ -271,7 +271,7 @@ export default function Layout() {
                 icon={<UserOutlined />}
                 style={{ color: inkMuted, fontSize: 13 }}
               >
-                {user.display_name || user.username}
+                <span className="header-username">{user.display_name || user.username}</span>
               </Button>
             </Dropdown>
           ) : (
@@ -290,7 +290,7 @@ export default function Layout() {
               }}
               onClick={() => navigate("/login")}
             >
-              {t("auth.login")}
+              <span className="header-login-text">{t("auth.login")}</span>
             </Button>
           )}
         </Space>
@@ -323,7 +323,7 @@ export default function Layout() {
       <Drawer
         title={t("nav.drawer_title")}
         placement="left"
-        width={240}
+        width="100%"
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
       >

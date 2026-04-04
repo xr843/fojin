@@ -433,4 +433,15 @@
     width: 36px;
     font-size: 10px;
   }
+  /* 搜索 tab 移动端：缩小字号与间距，允许横向滚动 */
+  .s-mode-bar .ant-tabs-nav-list {
+    flex-wrap: nowrap;
+  }
+  .s-mode-bar .ant-tabs-tab {
+    font-size: 13px;
+    padding: 8px 6px;
+  }
+  .s-mode-bar .ant-tabs-tab + .ant-tabs-tab {
+    margin-left: 8px;
+  }
 }

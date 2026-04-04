@@ -70,6 +70,14 @@ export default function SearchPage() {
   const [showTop, setShowTop] = useState(false);
   const [regionFilter, setRegionFilter] = useState<Set<string>>(new Set());
   const [institutionFilter, setInstitutionFilter] = useState<Set<string>>(new Set());
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
+
+  useEffect(() => {
+    const mql = window.matchMedia("(max-width: 768px)");
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, []);
   const sortBy = searchParams.get("sort") || "relevance";
 
   useEffect(() => {
@@ -288,9 +296,9 @@ export default function SearchPage() {
           items={[
             { key: "catalog", label: "经典检索" },
             { key: "content", label: "全文检索" },
-            { key: "semantic", label: <><ThunderboltOutlined /> 智能搜索</> },
-            { key: "crosslang", label: <><TranslationOutlined /> 跨语言搜索</> },
-            { key: "dictionary", label: <><BookOutlined /> 辞典检索</> },
+            { key: "semantic", label: <><ThunderboltOutlined /> {isMobile ? "智能" : "智能搜索"}</> },
+            { key: "crosslang", label: <><TranslationOutlined /> {isMobile ? "跨语言" : "跨语言搜索"}</> },
+            { key: "dictionary", label: <><BookOutlined /> {isMobile ? "辞典" : "辞典检索"}</> },
           ]}
           size="small"
         />

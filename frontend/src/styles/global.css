@@ -61,6 +61,13 @@ em {
   /* Header / Footer 移动端 padding */
   .ant-layout-header { padding: 0 12px !important; }
   .ant-layout-footer { padding: 12px 16px !important; }
+
+  /* 移动端隐藏 Header 文字，只保留图标 */
+  .header-lang-text,
+  .header-username,
+  .header-login-text {
+    display: none;
+  }
 }
 
 /* ========== Chat Thinking Animation ========== */
@@ -207,6 +214,11 @@ em {
 @media (max-width: 480px) {
   .text-detail-page {
     margin: 4px auto;
+  }
+
+  .text-detail-page .ant-btn-lg {
+    font-size: 13px;
+    padding: 4px 10px;
   }
 
   .text-detail-page .ant-descriptions-item-label {

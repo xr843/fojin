@@ -54,7 +54,8 @@ export default function KnowledgeGraphPage() {
   const [query, setQuery] = useState("玄奘");
   const [entityType, setEntityType] = useState("");
   const [selectedEntityId, setSelectedEntityId] = useState<number | null>(null);
-  const [graphDepth, setGraphDepth] = useState(2);
+  const isMobile = typeof window !== "undefined" && window.innerWidth <= 768;
+  const [graphDepth, setGraphDepth] = useState(isMobile ? 1 : 2);
   const [selectedPredicates, setSelectedPredicates] =
     useState<string[]>(ALL_PREDICATE_VALUES);
   const [showStats, setShowStats] = useState(false);
@@ -121,8 +122,10 @@ export default function KnowledgeGraphPage() {
     [graphData]
   );
 
-  // Graph height: fill viewport
-  const graphHeight = Math.max(500, typeof window !== "undefined" ? window.innerHeight - 260 : 600);
+  // Graph height: fill viewport; on mobile use a shorter but still usable height
+  const graphHeight = isMobile
+    ? Math.max(300, typeof window !== "undefined" ? window.innerHeight * 0.5 : 350)
+    : Math.max(500, typeof window !== "undefined" ? window.innerHeight - 260 : 600);
 
   return (
     <div className="kg-page">
@@ -173,11 +176,11 @@ export default function KnowledgeGraphPage() {
       <div className="kg-toolbar">
         <div className="kg-toolbar-main">
           <Search
-            placeholder="搜索实体（人物、典籍、宗派…）"
+            placeholder={isMobile ? "搜索实体…" : "搜索实体（人物、典籍、宗派…）"}
             allowClear
             enterButton={<SearchOutlined />}
             onSearch={handleSearch}
-            style={{ width: 340 }}
+            style={{ width: isMobile ? "100%" : 340 }}
           />
           <Select
             style={{ width: 110 }}
@@ -291,7 +294,11 @@ export default function KnowledgeGraphPage() {
                   <Alert
                     type="warning"
                     showIcon
-                    message={`图谱节点超出（${graphData.nodes.length} 节点 / ${graphData.links.length} 边），可减小深度或过滤关系类型`}
+                    message={
+                      isMobile
+                        ? `节点过多（${graphData.nodes.length}），请减小深度`
+                        : `图谱节点超出（${graphData.nodes.length} 节点 / ${graphData.links.length} 边），可减小深度或过滤关系类型`
+                    }
                     closable
                   />
                 </div>
