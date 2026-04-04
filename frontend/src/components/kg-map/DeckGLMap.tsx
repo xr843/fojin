@@ -19,9 +19,9 @@ const TYPE_COLORS: Record<string, [number, number, number]> = {
 };
 
 const INITIAL_VIEW_STATE = {
-  longitude: 90,
-  latitude: 28,
-  zoom: 3.5,
+  longitude: 115,
+  latitude: 35,
+  zoom: 4.2,
   pitch: 0,
   bearing: 0,
 };
@@ -93,7 +93,7 @@ export default function DeckGLMap({
   const layers = useMemo(() => {
     const result = [];
 
-    // Single scatter layer — small static dots, no animation
+    // Scatter layer — semi-transparent dots that blend into density gradients
     result.push(
       new ScatterplotLayer<KGGeoEntity>({
         id: "entities",
@@ -101,17 +101,14 @@ export default function DeckGLMap({
         getPosition: (d) => [d.longitude, d.latitude],
         getFillColor: (d) => {
           const c = TYPE_COLORS[d.entity_type] ?? [128, 128, 128];
-          return [c[0], c[1], c[2], 180];
+          return [c[0], c[1], c[2], 70];
         },
-        getLineColor: [255, 255, 255, 160],
-        lineWidthMinPixels: 0.5,
-        stroked: true,
-        getRadius: 3000,
-        radiusMinPixels: 3,
-        radiusMaxPixels: 10,
+        getRadius: 2000,
+        radiusMinPixels: 2.5,
+        radiusMaxPixels: 8,
         pickable: true,
         autoHighlight: true,
-        highlightColor: [255, 200, 60, 160],
+        highlightColor: [255, 200, 60, 180],
         onHover: handleHover,
         onClick: handleClick,
       }),
