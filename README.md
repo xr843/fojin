@@ -6,7 +6,7 @@
 
 **503 sources. 30 languages. 30 countries. 23,500+ full-text volumes. One search.**
 
-Aggregating the world's Buddhist digital heritage — 10,500+ texts with 23,500+ volumes of full content in Pali, Classical Chinese, Tibetan, and Sanskrit from 503 data sources — with CBETA-style reading, AI-powered Q&A (RAG + reranking + citations + data source recommendations), knowledge graph with 31K+ entities and 28K+ relations (including 23K teacher-student lineage chains), 31 dictionaries with 679K entries across 6 languages, timeline visualization, collections, citations, annotations, bookmarks, and multi-language parallel reading.
+Aggregating the world's Buddhist digital heritage — 10,500+ texts with 23,500+ volumes of full content in Pali, Classical Chinese, Tibetan, and Sanskrit from 503 data sources — with CBETA-style reading, AI-powered Q&A (RAG + reranking + citations + data source recommendations), knowledge graph with 31K+ entities and 28K+ relations (including 23K teacher-student lineage chains), 32 dictionaries with 748K entries across 6 languages, timeline visualization, collections, citations, annotations, bookmarks, and multi-language parallel reading.
 
 [Live Demo](https://fojin.app) &nbsp;&middot;&nbsp; [API Docs](https://fojin.app/docs) &nbsp;&middot;&nbsp; [中文文档](./docs/README_zh.md) &nbsp;&middot;&nbsp; [Discussions](https://github.com/xr843/fojin/discussions) &nbsp;&middot;&nbsp; [Discord](https://discord.gg/76SZeuJekq) &nbsp;&middot;&nbsp; [Report Bug](https://github.com/xr843/fojin/issues)
 
@@ -32,7 +32,7 @@ Buddhist texts are scattered across hundreds of databases worldwide — CBETA, S
 | Find a sutra across databases | **Multi-dimensional search** across 10,500+ texts from 503 sources |
 | Read the full text online | **8,900+ texts** with 23,500+ volumes of full content, CBETA-style layout |
 | Compare translations | **Parallel reading** in 30 languages side by side |
-| Look up Buddhist terms | **31 dictionaries**, 679K entries (Chinese/Sanskrit/Pali/Tibetan/English) |
+| Look up Buddhist terms | **32 dictionaries**, 748K entries (Chinese/Sanskrit/Pali/Tibetan/English) |
 | Explore relationships | **Knowledge graph** with 31K+ entities and 28K+ relations (23K lineage chains) |
 | Discover similar texts | **Semantic similarity** powered by 678K+ embedding vectors (pgvector + HNSW) |
 | View original manuscripts | **IIIF manuscript viewer** connected to BDRC and more |
@@ -93,7 +93,7 @@ Compare translations side by side — Classical Chinese, Sanskrit, Pali, Tibetan
 
 ### Dictionary Lookup
 
-31 authoritative dictionaries with 679,000+ entries across Chinese, Pali, Sanskrit, Tibetan, and English:
+32 authoritative dictionaries with 748,000+ entries across Chinese, Pali, Sanskrit, Tibetan, and English:
 
 **Chinese Buddhist Dictionaries (14)**
 - **NTI Reader** (佛学辞典) — 161K entries, Chinese↔English
@@ -118,7 +118,8 @@ Compare translations side by side — Classical Chinese, Sanskrit, Pali, Tibetan
 - **Buddhadatta** (巴利語辭典, 達摩比丘中譯) — 11K entries, Pali→Chinese
 - **SuttaCentral Glossary** — 6K entries
 
-**Sanskrit Dictionaries (3)**
+**Sanskrit Dictionaries (4)**
+- **Apte** (Practical Sanskrit-English Dictionary) — 35K entries
 - **Monier-Williams** (Sanskrit-English Dictionary) — 32K entries
 - **Edgerton BHS** (Buddhist Hybrid Sanskrit Dictionary) — 18K entries
 - **Fanyi Mingyi Ji** (翻譯名義集) — 1K entries
@@ -313,7 +314,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 - [x] DILA catalog associations (contributors, places for 2,300+ texts)
 - [x] Nanshan Vinaya Dictionary (3,200+ Buddhist precept terms)
 - [x] CBETA full-text import — Taishō (T) + Xuzangjing (X): 3,600+ texts, 143M characters, 432K embedding vectors
-- [x] Dictionary expansion — 31 dictionaries, 679K entries (DPD, Mahāvyutpatti, Buddhadatta, Pentaglot, buddhaspace 7 dicts)
+- [x] Dictionary expansion — 32 dictionaries, 748K entries (DPD, Apte, Mahāvyutpatti, Buddhadatta, Pentaglot, buddhaspace 7 dicts)
 - [ ] Topic ontology browsing page
 - [ ] Cross-lingual search (query in Chinese, find Sanskrit/Pali/Tibetan results)
 - [ ] Open data export (JSON/CSV for researchers)
