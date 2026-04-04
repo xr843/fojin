@@ -1,11 +1,12 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Checkbox, Spin, Empty, Tooltip } from "antd";
+import { Checkbox, Spin, Empty, Tooltip, Radio, Select } from "antd";
 import { GlobalOutlined, BarChartOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import DeckGLMap from "../components/kg-map/DeckGLMap";
 import MapEntityPopup from "../components/kg-map/MapEntityPopup";
 import TimeSlider from "../components/kg-map/TimeSlider";
+import LineageGraph from "../components/kg-map/LineageGraph";
 import { getKGStats, getKGGeoEntities, getKGLineageArcs } from "../api/client";
 import type { KGGeoEntity } from "../api/client";
 import "../styles/kg-map.css";
@@ -29,6 +30,13 @@ export default function KGMapPage() {
   const [currentYear, setCurrentYear] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<KGGeoEntity | null>(null);
+  const [viewMode, setViewMode] = useState<"map" | "network">("map");
+  const [schoolFilter, setSchoolFilter] = useState<string | null>(null);
+
+  // Auto-enable arcs when switching to network mode
+  useEffect(() => {
+    if (viewMode === "network" && !showArcs) setShowArcs(true);
+  }, [viewMode, showArcs]);
 
   /* ---------- Queries ---------- */
 
@@ -119,6 +127,35 @@ export default function KGMapPage() {
           >
             师承传线
           </Checkbox>
+          <Radio.Group
+            value={viewMode}
+            onChange={(e) => setViewMode(e.target.value)}
+            size="small"
+            style={{ marginLeft: "auto" }}
+          >
+            <Radio.Button value="map">地图</Radio.Button>
+            <Radio.Button value="network">网络图</Radio.Button>
+          </Radio.Group>
+          {viewMode === "network" && (
+            <Select
+              value={schoolFilter}
+              onChange={(val) => setSchoolFilter(val)}
+              allowClear
+              placeholder="宗派筛选"
+              size="small"
+              style={{ width: 120, marginLeft: 8 }}
+              options={[
+                { value: "中观", label: "中观" },
+                { value: "唯识", label: "唯识" },
+                { value: "天台", label: "天台" },
+                { value: "华严", label: "华严" },
+                { value: "禅宗", label: "禅宗" },
+                { value: "净土", label: "净土" },
+                { value: "律宗", label: "律宗" },
+                { value: "密宗", label: "密宗" },
+              ]}
+            />
+          )}
         </div>
       </div>
 
@@ -137,33 +174,44 @@ export default function KGMapPage() {
           </div>
         ) : (
           <>
-            <DeckGLMap
-              geoEntities={geoData.entities}
-              lineageArcs={arcData?.arcs ?? []}
-              showArcs={showArcs}
-              currentYear={currentYear}
-              entityTypeFilter={entityTypes}
-              onEntityClick={handleEntityClick}
-            />
+            {viewMode === "map" ? (
+              <>
+                <DeckGLMap
+                  geoEntities={geoData.entities}
+                  lineageArcs={arcData?.arcs ?? []}
+                  showArcs={showArcs}
+                  currentYear={currentYear}
+                  entityTypeFilter={entityTypes}
+                  onEntityClick={handleEntityClick}
+                />
 
-            {/* Time Slider overlay */}
-            <div className="kg-map-time-overlay">
-              <TimeSlider
-                min={yearRange.min}
-                max={yearRange.max}
-                value={currentYear}
-                isPlaying={isPlaying}
-                onChange={handleYearChange}
-                onPlayToggle={handlePlayToggle}
-              />
-            </div>
+                {/* Time Slider overlay */}
+                <div className="kg-map-time-overlay">
+                  <TimeSlider
+                    min={yearRange.min}
+                    max={yearRange.max}
+                    value={currentYear}
+                    isPlaying={isPlaying}
+                    onChange={handleYearChange}
+                    onPlayToggle={handlePlayToggle}
+                  />
+                </div>
 
-            {/* Entity Popup */}
-            {selectedEntity && (
-              <MapEntityPopup
-                entity={selectedEntity}
-                onClose={() => setSelectedEntity(null)}
-                onViewInGraph={handleViewInGraph}
+                {/* Entity Popup */}
+                {selectedEntity && (
+                  <MapEntityPopup
+                    entity={selectedEntity}
+                    onClose={() => setSelectedEntity(null)}
+                    onViewInGraph={handleViewInGraph}
+                  />
+                )}
+              </>
+            ) : (
+              <LineageGraph
+                arcs={arcData?.arcs ?? []}
+                schoolFilter={schoolFilter}
+                height={600}
+                onNodeClick={handleViewInGraph}
               />
             )}
           </>
