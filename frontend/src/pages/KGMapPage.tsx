@@ -7,7 +7,7 @@ import DeckGLMap from "../components/kg-map/DeckGLMap";
 import MapEntityPopup from "../components/kg-map/MapEntityPopup";
 import TimeSlider from "../components/kg-map/TimeSlider";
 import LineageGraph from "../components/kg-map/LineageGraph";
-import { getKGStats, getKGGeoEntities, getKGLineageArcs } from "../api/client";
+import { getKGGeoEntities, getKGLineageArcs } from "../api/client";
 import type { KGGeoEntity } from "../api/client";
 import "../styles/kg-map.css";
 
@@ -46,12 +46,6 @@ export default function KGMapPage() {
   }, [viewMode, showArcs]);
 
   /* ---------- Queries ---------- */
-
-  const { data: kgStats } = useQuery({
-    queryKey: ["kg-stats"],
-    queryFn: getKGStats,
-    staleTime: 60_000,
-  });
 
   const { data: geoData, isLoading: geoLoading } = useQuery({
     queryKey: ["kg-geo"],
@@ -106,14 +100,11 @@ export default function KGMapPage() {
       <div className="kg-map-header">
         <GlobalOutlined />
         <h3>佛教地理</h3>
-        {kgStats && (
-          <Tooltip title="数据统计">
+        {geoData && (
+          <Tooltip title="含坐标的实体数量">
             <span className="kg-map-stats">
               <BarChartOutlined />
-              <span>
-                {kgStats.total_entities.toLocaleString()} 实体 /{" "}
-                {kgStats.total_relations.toLocaleString()} 关系
-              </span>
+              <span>{geoData.total.toLocaleString()} 个地点</span>
             </span>
           </Tooltip>
         )}
