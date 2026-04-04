@@ -1,24 +1,4 @@
-import axios from "axios";
-
-const api = axios.create({
-  baseURL: "/api",
-  timeout: 15000,
-});
-
-api.interceptors.request.use((config) => {
-  try {
-    const raw = localStorage.getItem("fojin-auth");
-    if (raw) {
-      const { state } = JSON.parse(raw);
-      if (state?.token) {
-        config.headers.Authorization = `Bearer ${state.token}`;
-      }
-    }
-  } catch {
-    // ignore
-  }
-  return config;
-});
+import { api } from "./client";
 
 export interface StatsSummary {
   total_texts: number;

@@ -5,8 +5,9 @@ from enum import StrEnum
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.role_guard import require_role
 from app.database import get_db
-from app.services.stats_service import get_overview, get_timeline
+from app.services.stats_service import get_overview, get_platform_activity, get_timeline
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 
@@ -41,3 +42,15 @@ async def stats_timeline(
 
     redis = getattr(app.state, "redis", None)
     return await get_timeline(db, redis, dimension.value, category, language, source_id, page, page_size)
+
+
+@router.get("/platform-activity", dependencies=[Depends(require_role("admin"))])
+async def stats_platform_activity(
+    days: int = Query(7, ge=1, le=90, description="Number of days to look back"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return platform activity metrics (admin only)."""
+    from app.main import app
+
+    redis = getattr(app.state, "redis", None)
+    return await get_platform_activity(db, redis, days)

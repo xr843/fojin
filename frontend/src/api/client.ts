@@ -13,7 +13,7 @@ import type {
   IIIFManifestId,
 } from "../types/branded";
 
-const api = axios.create({
+export const api = axios.create({
   baseURL: "/api",
   timeout: 15000,
 });
