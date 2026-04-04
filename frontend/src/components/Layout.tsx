@@ -15,6 +15,7 @@ import {
   RobotOutlined,
   GithubOutlined,
   GlobalOutlined,
+  NotificationOutlined,
   // FieldTimeOutlined,
   // BarChartOutlined,
 } from "@ant-design/icons";
@@ -76,6 +77,7 @@ export default function Layout() {
     { icon: <FileTextOutlined />, label: t("nav.dictionary"), path: "/dictionary" },
     { icon: <ApartmentOutlined />, label: t("nav.kg"), path: "/kg" },
     { icon: <BookOutlined />, label: t("nav.collections"), path: "/collections" },
+    { icon: <NotificationOutlined />, label: t("nav.activity"), path: "/activity" },
     // TODO: 时间线和数据总览暂时隐藏，待优化后重新上线
     // { icon: <FieldTimeOutlined />, label: t("nav.timeline"), path: "/timeline" },
     // { icon: <BarChartOutlined />, label: t("nav.dashboard"), path: "/dashboard" },
