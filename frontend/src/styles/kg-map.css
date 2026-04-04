@@ -1,5 +1,5 @@
 /* ========================================
-   KGMapPage — 佛教地理 · 暗色星图风格
+   KGMapPage — 佛教地理 · 浅色发光风格
    ======================================== */
 
 .kg-map-page {
@@ -45,9 +45,9 @@
 
 /* ---------- 工具栏 ---------- */
 .kg-map-toolbar {
-  background: #1a1a1a;
-  border: 1px solid #333;
-  border-radius: 8px;
+  background: #fff;
+  border: 1px solid var(--fj-border);
+  border-radius: 8px 8px 0 0;
   padding: 12px 16px;
   margin-bottom: 0;
 }
@@ -62,30 +62,18 @@
 .kg-map-filter-label {
   font-family: "Noto Serif SC", serif;
   font-size: 12px;
-  color: #999;
+  color: var(--fj-ink-muted);
   flex-shrink: 0;
 }
 
 .kg-map-toolbar-row .ant-checkbox-wrapper {
   font-size: 12px;
-  color: #ccc;
+  color: var(--fj-ink-light);
 }
 
 .kg-map-toolbar-row .ant-checkbox-checked .ant-checkbox-inner {
-  background-color: #c08b3e;
-  border-color: #c08b3e;
-}
-
-.kg-map-toolbar-row .ant-radio-button-wrapper {
-  background: #222;
-  border-color: #444;
-  color: #aaa;
-}
-
-.kg-map-toolbar-row .ant-radio-button-wrapper-checked {
-  background: #333 !important;
-  border-color: #c08b3e !important;
-  color: #f0d080 !important;
+  background-color: var(--fj-accent);
+  border-color: var(--fj-accent);
 }
 
 /* ---------- 地图容器 ---------- */
@@ -94,9 +82,10 @@
   height: calc(100vh - 180px);
   min-height: 400px;
   overflow: hidden;
-  border: 1px solid #333;
+  border: 1px solid var(--fj-border);
+  border-top: none;
   border-radius: 0 0 8px 8px;
-  background: #0a0a0a;
+  background: #f5f3ef;
 }
 
 .kg-map-loading {
@@ -104,48 +93,47 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  background: #0a0a0a;
 }
 
 /* ---------- 地图 Tooltip ---------- */
 .kg-map-tooltip {
   position: absolute;
   pointer-events: none;
-  background: rgba(20, 20, 20, 0.92);
-  border: 1px solid rgba(192, 139, 62, 0.4);
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid var(--fj-border);
   border-radius: 6px;
   padding: 8px 12px;
-  box-shadow: 0 0 20px rgba(192, 139, 62, 0.15), 0 2px 8px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
   max-width: 220px;
   z-index: 10;
   font-size: 12px;
-  color: #e0d8c8;
-  backdrop-filter: blur(8px);
+  color: var(--fj-ink);
+  backdrop-filter: blur(6px);
 }
 
 .kg-map-tooltip .tooltip-name {
   font-family: "Noto Serif SC", serif;
   font-weight: 600;
   font-size: 13px;
-  color: #f0e0c0;
+  color: var(--fj-ink);
   margin-bottom: 2px;
 }
 
 .kg-map-tooltip .tooltip-en {
   font-size: 11px;
-  color: #888;
+  color: var(--fj-ink-muted);
   font-style: italic;
   margin-bottom: 4px;
 }
 
 .kg-map-tooltip .tooltip-type {
   font-size: 10px;
-  color: #999;
+  color: var(--fj-ink-light);
 }
 
 .kg-map-tooltip .tooltip-year {
   font-size: 10px;
-  color: #c08b3e;
+  color: #b08d57;
   margin-top: 2px;
 }
 
@@ -159,12 +147,11 @@
 
 .kg-map-popup {
   width: 260px;
-  background: rgba(20, 20, 20, 0.95);
-  border: 1px solid rgba(192, 139, 62, 0.3);
+  background: #fff;
+  border: 1px solid var(--fj-border);
   border-radius: 8px;
-  box-shadow: 0 0 30px rgba(192, 139, 62, 0.1), 0 4px 16px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   overflow: hidden;
-  backdrop-filter: blur(12px);
 }
 
 .kg-map-popup-header {
@@ -172,18 +159,14 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px 14px;
-  border-bottom: 1px solid #333;
-}
-
-.kg-map-popup-header .ant-btn {
-  color: #888;
+  border-bottom: 1px solid var(--fj-bg-alt);
 }
 
 .kg-map-popup-name {
   font-family: "Noto Serif SC", serif;
   font-size: 15px;
   font-weight: 600;
-  color: #f0e0c0;
+  color: var(--fj-ink);
   line-height: 1.4;
   padding: 0 14px;
   margin-top: 8px;
@@ -191,7 +174,7 @@
 
 .kg-map-popup-en {
   font-size: 12px;
-  color: #888;
+  color: var(--fj-ink-muted);
   font-style: italic;
   padding: 0 14px;
   margin-top: 4px;
@@ -199,7 +182,7 @@
 
 .kg-map-popup-desc {
   font-size: 12px;
-  color: #aaa;
+  color: #7a6e5c;
   padding: 8px 14px;
   line-height: 1.5;
   display: -webkit-box;
@@ -210,7 +193,7 @@
 
 .kg-map-popup-year {
   font-size: 11px;
-  color: #c08b3e;
+  color: #b08d57;
   padding: 0 14px 8px;
 }
 
@@ -218,11 +201,7 @@
   display: flex;
   gap: 8px;
   padding: 8px 14px 12px;
-  border-top: 1px solid #333;
-}
-
-.kg-map-popup-actions .ant-btn {
-  color: #c08b3e !important;
+  border-top: 1px solid var(--fj-bg-alt);
 }
 
 /* ---------- 时间轴覆盖层 ---------- */
@@ -235,11 +214,12 @@
 }
 
 .kg-time-slider {
-  background: rgba(15, 15, 15, 0.88);
-  backdrop-filter: blur(12px);
-  border: 1px solid #333;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--fj-border);
   border-radius: 8px;
   padding: 10px 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
 }
 
 .kg-time-slider-row {
@@ -251,7 +231,7 @@
 .kg-time-slider-label {
   font-family: "Noto Serif SC", serif;
   font-size: 12px;
-  color: #888;
+  color: var(--fj-ink-muted);
   flex-shrink: 0;
   white-space: nowrap;
 }
@@ -260,7 +240,7 @@
   font-family: "Noto Serif SC", serif;
   font-size: 13px;
   font-weight: 600;
-  color: #f0d080;
+  color: var(--fj-ink);
   min-width: 80px;
   text-align: center;
   flex-shrink: 0;
@@ -268,7 +248,6 @@
 
 .kg-time-play-btn {
   flex-shrink: 0;
-  color: #c08b3e !important;
 }
 
 .kg-time-slider-track {
@@ -276,24 +255,12 @@
   min-width: 0;
 }
 
-.kg-time-slider .ant-switch {
-  background: #444;
-}
-
-.kg-time-slider .ant-switch-checked {
-  background: #c08b3e !important;
-}
-
-.kg-time-slider-track .ant-slider .ant-slider-rail {
-  background: #333;
-}
-
 .kg-time-slider-track .ant-slider .ant-slider-track {
-  background: #c08b3e;
+  background: var(--fj-gold);
 }
 
 .kg-time-slider-track .ant-slider .ant-slider-handle::after {
-  box-shadow: 0 0 0 2px #c08b3e;
+  box-shadow: 0 0 0 2px var(--fj-gold);
 }
 
 /* ---------- 地图图例 ---------- */
@@ -304,11 +271,12 @@
   z-index: 15;
   display: flex;
   gap: 14px;
-  background: rgba(15, 15, 15, 0.85);
-  border: 1px solid #333;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--fj-border);
   border-radius: 6px;
   padding: 6px 14px;
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .kg-map-legend-item {
@@ -316,7 +284,7 @@
   align-items: center;
   gap: 5px;
   font-size: 11px;
-  color: #aaa;
+  color: var(--fj-ink-light);
   font-family: "Noto Serif SC", serif;
 }
 
@@ -324,14 +292,13 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  box-shadow: 0 0 6px currentColor;
+  box-shadow: 0 0 4px currentColor;
 }
 
 .kg-map-legend-item .kg-legend-line {
   width: 16px;
   height: 2px;
   border-radius: 1px;
-  box-shadow: 0 0 4px currentColor;
 }
 
 /* ---------- 响应式 ---------- */
