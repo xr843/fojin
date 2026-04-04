@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { Map } from "react-map-gl/maplibre";
 import DeckGL from "@deck.gl/react";
 import { ScatterplotLayer, ArcLayer } from "@deck.gl/layers";
@@ -7,26 +7,27 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { escapeHtml } from "../../utils/sanitize";
 import type { KGGeoEntity, KGLineageArc } from "../../api/client";
 
-/** FoJin classical color palette — RGB tuples for deck.gl */
+/** FoJin classical palette — brighter for dark background */
 const TYPE_COLORS: Record<string, [number, number, number]> = {
-  person: [199, 84, 80],       // 朱砂
-  text: [74, 124, 155],        // 靛青
-  monastery: [107, 142, 91],   // 松绿
-  school: [123, 94, 167],      // 紫藤
-  place: [192, 139, 62],       // 赭石
-  concept: [61, 138, 138],     // 青碧
-  dynasty: [179, 92, 138],     // 洋紫
+  person:    [255, 110, 100],  // 朱砂 (brighter)
+  text:      [100, 170, 220],  // 靛青
+  monastery: [140, 200, 120],  // 松绿
+  school:    [170, 130, 230],  // 紫藤
+  place:     [240, 180, 80],   // 赭石
+  concept:   [80, 200, 200],   // 青碧
+  dynasty:   [220, 120, 180],  // 洋紫
 };
 
 const INITIAL_VIEW_STATE = {
-  longitude: 85,
-  latitude: 25,
-  zoom: 3,
+  longitude: 90,
+  latitude: 28,
+  zoom: 3.5,
   pitch: 0,
   bearing: 0,
 };
 
-const MAP_STYLE = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
+/** Dark basemap — CARTO dark-matter (no labels variant for cleaner look) */
+const MAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-nolabels-gl-style/style.json";
 
 interface DeckGLMapProps {
   geoEntities: KGGeoEntity[];
@@ -52,6 +53,23 @@ export default function DeckGLMap({
   onEntityClick,
 }: DeckGLMapProps) {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const [pulsePhase, setPulsePhase] = useState(0);
+  const rafRef = useRef<number>(0);
+
+  /** Pulse animation loop — drives the outer glow ring */
+  useEffect(() => {
+    let frame = 0;
+    const animate = () => {
+      frame++;
+      // Update every 3 frames (~20fps) to save CPU
+      if (frame % 3 === 0) {
+        setPulsePhase(Date.now() * 0.001);
+      }
+      rafRef.current = requestAnimationFrame(animate);
+    };
+    rafRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, []);
 
   /** Filter entities by type and time (client-side) */
   const filteredEntities = useMemo(() => {
@@ -93,30 +111,73 @@ export default function DeckGLMap({
     [onEntityClick],
   );
 
+  /** Compute animated pulse multiplier (0.8 — 2.5) */
+  const pulseScale = 1.5 + Math.sin(pulsePhase * 2) * 0.8;
+  const pulseOpacity = Math.max(0, 0.4 - Math.sin(pulsePhase * 2) * 0.3);
+
   const layers = useMemo(() => {
     const result = [];
 
+    // Layer 1: Outer glow ring (animated pulse)
     result.push(
       new ScatterplotLayer<KGGeoEntity>({
-        id: "entities",
+        id: "entities-glow",
         data: filteredEntities,
         getPosition: (d) => [d.longitude, d.latitude],
-        getFillColor: (d) => TYPE_COLORS[d.entity_type] ?? [128, 128, 128],
-        getRadius: 6000,
-        radiusMinPixels: 4,
-        radiusMaxPixels: 16,
-        pickable: true,
-        autoHighlight: true,
-        highlightColor: [255, 200, 60, 160],
-        onHover: handleHover,
-        onClick: handleClick,
+        getFillColor: (d) => {
+          const c = TYPE_COLORS[d.entity_type] ?? [128, 128, 128];
+          return [c[0], c[1], c[2], Math.round(pulseOpacity * 255)];
+        },
+        getRadius: 12000 * pulseScale,
+        radiusMinPixels: 8 * pulseScale,
+        radiusMaxPixels: 40,
+        pickable: false,
         updateTriggers: {
-          getPosition: [filteredEntities],
-          getFillColor: [filteredEntities],
+          getRadius: [pulseScale],
+          getFillColor: [pulseOpacity],
         },
       }),
     );
 
+    // Layer 2: Mid glow (softer, slightly animated)
+    result.push(
+      new ScatterplotLayer<KGGeoEntity>({
+        id: "entities-mid-glow",
+        data: filteredEntities,
+        getPosition: (d) => [d.longitude, d.latitude],
+        getFillColor: (d) => {
+          const c = TYPE_COLORS[d.entity_type] ?? [128, 128, 128];
+          return [c[0], c[1], c[2], 60];
+        },
+        getRadius: 9000,
+        radiusMinPixels: 7,
+        radiusMaxPixels: 28,
+        pickable: false,
+      }),
+    );
+
+    // Layer 3: Core dot (solid, bright)
+    result.push(
+      new ScatterplotLayer<KGGeoEntity>({
+        id: "entities-core",
+        data: filteredEntities,
+        getPosition: (d) => [d.longitude, d.latitude],
+        getFillColor: (d) => {
+          const c = TYPE_COLORS[d.entity_type] ?? [128, 128, 128];
+          return [c[0], c[1], c[2], 240];
+        },
+        getRadius: 4000,
+        radiusMinPixels: 3,
+        radiusMaxPixels: 12,
+        pickable: true,
+        autoHighlight: true,
+        highlightColor: [255, 255, 200, 180],
+        onHover: handleHover,
+        onClick: handleClick,
+      }),
+    );
+
+    // Layer 4: Lineage arcs (glowing)
     if (showArcs && filteredArcs.length > 0) {
       result.push(
         new ArcLayer<KGLineageArc>({
@@ -124,16 +185,16 @@ export default function DeckGLMap({
           data: filteredArcs,
           getSourcePosition: (d) => [d.teacher_lng, d.teacher_lat],
           getTargetPosition: (d) => [d.student_lng, d.student_lat],
-          getSourceColor: [192, 139, 62, 180],  // 赭石
-          getTargetColor: [199, 84, 80, 180],    // 朱砂
-          getWidth: 1.5,
+          getSourceColor: [240, 180, 80, 200],   // 赭石 — teacher
+          getTargetColor: [255, 110, 100, 200],   // 朱砂 — student
+          getWidth: 2,
           greatCircle: true,
         }),
       );
     }
 
     return result;
-  }, [filteredEntities, filteredArcs, showArcs, handleHover, handleClick]);
+  }, [filteredEntities, filteredArcs, showArcs, pulseScale, pulseOpacity, handleHover, handleClick]);
 
   return (
     <>
