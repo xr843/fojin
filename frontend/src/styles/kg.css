@@ -458,3 +458,101 @@
     position: static;
   }
 }
+
+/* ---------- 移动端适配 ---------- */
+@media (max-width: 768px) {
+  .kg-page {
+    padding: 0 8px;
+  }
+
+  .kg-header h3 {
+    font-size: 17px;
+  }
+
+  .kg-stats-summary {
+    display: none;
+  }
+
+  .kg-stats-panel {
+    gap: 16px;
+    padding: 8px 12px;
+  }
+
+  .kg-toolbar {
+    padding: 8px 10px;
+  }
+
+  .kg-toolbar-main {
+    gap: 8px;
+  }
+
+  .kg-toolbar-main .ant-input-search {
+    max-width: none;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .kg-depth-control {
+    margin-left: 0;
+  }
+
+  .kg-predicate-bar {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .kg-predicate-bar .ant-checkbox-wrapper {
+    font-size: 11px;
+  }
+
+  .kg-layout {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .kg-sidebar {
+    width: 100%;
+    position: static;
+    order: 2;
+  }
+
+  .kg-sidebar-body {
+    max-height: 150px;
+  }
+
+  .kg-graph-area {
+    width: 100%;
+    order: 1;
+  }
+
+  .kg-graph-container svg {
+    min-height: 50vh;
+  }
+
+  .kg-graph-empty {
+    min-height: 40vh;
+  }
+
+  .kg-detail-panel {
+    width: 100%;
+    position: static;
+    order: 3;
+  }
+
+  .kg-legend {
+    gap: 8px;
+    padding: 6px 10px;
+  }
+
+  .kg-legend-section {
+    gap: 6px;
+  }
+
+  .kg-truncated-bar .ant-alert {
+    font-size: 11px;
+  }
+
+  .kg-truncated-bar .ant-alert .ant-alert-message {
+    font-size: 11px;
+  }
+}
