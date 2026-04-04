@@ -175,6 +175,14 @@ function SourceUpdatesTab() {
           style={{ width: 180 }}
           value={sourceId}
           onChange={(v) => { setSourceId(v); setPage(1); }}
+          options={[
+            { value: 1, label: "CBETA" },
+            { value: 161, label: "SuttaCentral" },
+            { value: 7, label: "84000" },
+            { value: 2, label: "BDRC" },
+            { value: 4, label: "GRETIL" },
+            { value: 6, label: "SAT" },
+          ]}
         />
         <span className="filter-label">{t("activity.filterType")}:</span>
         <Select
