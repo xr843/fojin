@@ -155,7 +155,7 @@ def _strip_html(raw: str | None) -> str | None:
     return text if text else None
 
 
-def _parse_rss_items(root: ET.Element, feed_config: dict) -> list[dict]:  # type: ignore[name-defined]
+def _parse_rss_items(root: _stdlib_ET.Element, feed_config: dict) -> list[dict]:  # type: ignore[name-defined]
     """Parse RSS 2.0 <item> elements."""
     entries = []
     for item in root.iter("item"):
@@ -191,7 +191,7 @@ def _parse_rss_items(root: ET.Element, feed_config: dict) -> list[dict]:  # type
     return entries
 
 
-def _parse_atom_entries(root: ET.Element, feed_config: dict) -> list[dict]:  # type: ignore[name-defined]
+def _parse_atom_entries(root: _stdlib_ET.Element, feed_config: dict) -> list[dict]:  # type: ignore[name-defined]
     """Parse Atom <entry> elements."""
     entries = []
     for entry in root.iter(f"{{{ATOM_NS}}}entry"):
