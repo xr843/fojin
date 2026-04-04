@@ -30,6 +30,7 @@ const DictionaryPage = lazy(() => import("./pages/DictionaryPage"));
 const SutraLandingPage = lazy(() => import("./pages/SutraLandingPage"));
 const ExportsPage = lazy(() => import("./pages/ExportsPage"));
 const CollectionsPage = lazy(() => import("./pages/CollectionsPage"));
+const TopicsPage = lazy(() => import("./pages/TopicsPage"));
 const AdminSuggestionsPage = lazy(() => import("./pages/AdminSuggestionsPage"));
 const AdminDashboardPage = lazy(() => import("./pages/AdminDashboardPage"));
 const AdminUsersPage = lazy(() => import("./pages/AdminUsersPage"));
@@ -64,6 +65,7 @@ function App() {
             <Route path="/texts/:id/read" element={<TextReaderPage />} />
             <Route path="/sources" element={<SourcesPage />} />
             <Route path="/collections" element={<CollectionsPage />} />
+            <Route path="/topics" element={<TopicsPage />} />
             <Route path="/sutras/:slug" element={<SutraLandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/dictionary" element={<DictionaryPage />} />

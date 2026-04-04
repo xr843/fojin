@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
-import { Input, Tag, Spin, Empty, Badge, Button, Select } from "antd";
+import { Input, Tag, Spin, Empty, Badge, Button, Select, Pagination } from "antd";
 import { SearchOutlined, RobotOutlined, DownOutlined, UpOutlined, ArrowLeftOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import {
@@ -136,6 +136,7 @@ export default function DictionaryPage() {
   const [query, setQuery] = useState(initialQ);
   const [langFilter, setLangFilter] = useState<string>("all");
   const [sourceFilter, setSourceFilter] = useState<string>(initialSource);
+  const [page, setPage] = useState(1);
 
   const { data: sources, isLoading: loadingSources } = useQuery({
     queryKey: ["dict-sources"],
@@ -144,12 +145,13 @@ export default function DictionaryPage() {
   });
 
   const { data: searchResult, isLoading: searching } = useQuery({
-    queryKey: ["dict-search-grouped", query, langFilter, sourceFilter],
+    queryKey: ["dict-search-grouped", query, langFilter, sourceFilter, page],
     queryFn: () =>
       searchDictionaryGrouped({
         q: query,
         lang: langFilter === "all" ? undefined : langFilter,
         source: sourceFilter || undefined,
+        page,
       }),
     enabled: query.length > 0,
   });
@@ -167,6 +169,7 @@ export default function DictionaryPage() {
     setInputValue("");
     setQuery("*");
     setSourceFilter(code);
+    setPage(1);
     setSearchParams({ q: "*", source: code });
   };
 
@@ -201,7 +204,7 @@ export default function DictionaryPage() {
         <h1 className="dict-title">{t("nav.dictionary")}</h1>
         <p className="dict-subtitle">
           {sources
-            ? `${sources.length} 部权威辞典 · ${totalEntries.toLocaleString()}+ 词条 · 中梵巴藏英蒙满七语`
+            ? `${sources.length} 部权威辞典 · ${totalEntries.toLocaleString()}+ 词条 · 中梵巴藏英五语`
             : "佛学辞典综合检索"}
         </p>
 
@@ -297,6 +300,12 @@ export default function DictionaryPage() {
             >
               返回辞典列表
             </Button>
+            {sourceFilter && sources && (
+              <span style={{ fontSize: 14, color: "var(--fj-ink)", fontWeight: 500 }}>
+                正在浏览：{sources.find(s => s.code === sourceFilter)?.name_zh}
+                （{sources.find(s => s.code === sourceFilter)?.entry_count.toLocaleString()} 条）
+              </span>
+            )}
             <span style={{ fontSize: 13, color: "var(--fj-ink-muted)" }}>语言:</span>
             <Select
               value={langFilter}
@@ -325,6 +334,18 @@ export default function DictionaryPage() {
               {searchResult.groups.map((group) => (
                 <DictGroup key={group.source_code} group={group} />
               ))}
+              {searchResult.page_size && (
+                <div style={{ textAlign: "center", padding: "16px 0" }}>
+                  <Pagination
+                    current={page}
+                    pageSize={searchResult.page_size}
+                    total={searchResult.total}
+                    onChange={(p) => setPage(p)}
+                    showSizeChanger={false}
+                    showTotal={(total) => `共 ${total} 条`}
+                  />
+                </div>
+              )}
             </>
           ) : (
             <Empty description={`未找到"${query}"的相关词条`} />

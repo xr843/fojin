@@ -1,0 +1,137 @@
+/* 经典专题（策展式）页面样式 */
+
+.topic-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.topic-card {
+  background: #fff;
+  border: 1px solid rgba(217, 208, 193, 0.5);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: box-shadow 0.2s;
+}
+
+.topic-card:hover {
+  box-shadow: 0 2px 12px rgba(139, 37, 0, 0.08);
+}
+
+.topic-card-header {
+  padding: 20px 24px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.topic-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.topic-card-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.topic-card-name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--fj-ink, #2c2417);
+  font-family: "Noto Serif SC", serif;
+}
+
+.topic-card-count {
+  font-size: 12px;
+  color: var(--fj-ink-muted, #9a8e7a);
+  margin-left: auto;
+}
+
+.topic-card-desc {
+  margin: 8px 0 4px;
+  font-size: 13px;
+  color: var(--fj-ink-muted, #9a8e7a);
+  line-height: 1.6;
+}
+
+.topic-card-toggle {
+  display: inline-block;
+  font-size: 12px;
+  color: var(--fj-accent, #8b2500);
+  margin-top: 4px;
+}
+
+.topic-card-body {
+  border-top: 1px solid rgba(217, 208, 193, 0.4);
+  padding: 16px 24px 20px;
+}
+
+.topic-text-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.topic-text-item {
+  padding: 10px 14px;
+  background: rgba(245, 241, 235, 0.5);
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.topic-text-item:hover {
+  background: rgba(245, 241, 235, 0.9);
+}
+
+.topic-text-clickable {
+  cursor: pointer;
+}
+
+.topic-text-clickable:hover {
+  border-left: 3px solid var(--fj-accent, #8b2500);
+  padding-left: 11px;
+}
+
+.topic-text-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fj-ink, #2c2417);
+  font-family: "Noto Serif SC", serif;
+}
+
+.topic-text-clickable .topic-text-title {
+  color: var(--fj-accent, #8b2500);
+}
+
+.topic-text-desc {
+  font-size: 12px;
+  color: var(--fj-ink-muted, #9a8e7a);
+  margin-top: 3px;
+  line-height: 1.5;
+}
+
+.topic-card-actions {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(217, 208, 193, 0.3);
+}
+
+/* 响应式 */
+@media (max-width: 640px) {
+  .topic-card-header {
+    padding: 16px;
+  }
+  .topic-card-body {
+    padding: 12px 16px 16px;
+  }
+  .topic-card-name {
+    font-size: 16px;
+  }
+  .topic-card-count {
+    margin-left: 0;
+  }
+}

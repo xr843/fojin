@@ -689,6 +689,8 @@ export interface DictGroupedResult {
 
 export interface DictGroupedSearchResponse {
   total: number;
+  page: number | null;
+  page_size: number | null;
   groups: DictGroupedResult[];
 }
 
@@ -696,6 +698,7 @@ export async function searchDictionaryGrouped(params: {
   q: string;
   lang?: string;
   source?: string;
+  page?: number;
 }): Promise<DictGroupedSearchResponse> {
   const { data } = await api.get<DictGroupedSearchResponse>("/dictionary/search/grouped", { params });
   return data;

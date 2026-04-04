@@ -19,6 +19,7 @@ STATIC_PAGES = [
     ("/sources", "weekly", "0.8"),
     ("/dictionary", "weekly", "0.8"),
     ("/collections", "weekly", "0.7"),
+    ("/topics", "weekly", "0.8"),
     ("/kg", "weekly", "0.7"),
     ("/chat", "weekly", "0.6"),
     # Sutra landing pages
