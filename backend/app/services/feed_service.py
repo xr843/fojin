@@ -3,7 +3,7 @@
 import hashlib
 import json
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -67,7 +67,7 @@ async def get_source_updates(
     if cached is not None:
         return cached
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff = datetime.now(UTC) - timedelta(days=days)
 
     q = (
         select(
@@ -132,7 +132,7 @@ async def get_academic_feeds(
     if cached is not None:
         return cached
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff = datetime.now(UTC) - timedelta(days=days)
 
     q = select(AcademicFeed).where(
         or_(AcademicFeed.published_at >= cutoff, AcademicFeed.published_at.is_(None))
@@ -179,7 +179,7 @@ async def get_activity_summary(db: AsyncSession, redis=None) -> dict:
     if cached is not None:
         return cached
 
-    cutoff_30d = datetime.now(timezone.utc) - timedelta(days=30)
+    cutoff_30d = datetime.now(UTC) - timedelta(days=30)
 
     # Recent source updates (top 5)
     su_q = (
