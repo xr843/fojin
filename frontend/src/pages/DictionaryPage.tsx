@@ -89,8 +89,8 @@ function EntryItem({ entry }: { entry: DictEntry }) {
 
 const COLLAPSE_THRESHOLD = 3;
 
-function DictGroup({ group }: { group: DictGroupedResult }) {
-  const [expanded, setExpanded] = useState(false);
+function DictGroup({ group, defaultExpanded = false }: { group: DictGroupedResult; defaultExpanded?: boolean }) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const hasMore = group.entries.length > COLLAPSE_THRESHOLD;
   const visibleEntries = expanded ? group.entries : group.entries.slice(0, COLLAPSE_THRESHOLD);
 
@@ -332,7 +332,7 @@ export default function DictionaryPage() {
                 共找到 <strong>{searchResult.total}</strong> 条结果
               </div>
               {searchResult.groups.map((group) => (
-                <DictGroup key={group.source_code} group={group} />
+                <DictGroup key={group.source_code} group={group} defaultExpanded={!!sourceFilter} />
               ))}
               {searchResult.page_size && (
                 <div style={{ textAlign: "center", padding: "16px 0" }}>
