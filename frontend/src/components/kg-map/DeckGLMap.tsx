@@ -7,15 +7,15 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { escapeHtml } from "../../utils/sanitize";
 import type { KGGeoEntity, KGLineageArc } from "../../api/client";
 
-/** FoJin classical palette — brighter for dark background */
+/** FoJin classical palette — vivid for light background */
 const TYPE_COLORS: Record<string, [number, number, number]> = {
-  person:    [255, 110, 100],  // 朱砂 (brighter)
-  text:      [100, 170, 220],  // 靛青
-  monastery: [140, 200, 120],  // 松绿
-  school:    [170, 130, 230],  // 紫藤
-  place:     [240, 180, 80],   // 赭石
-  concept:   [80, 200, 200],   // 青碧
-  dynasty:   [220, 120, 180],  // 洋紫
+  person:    [210, 60, 50],    // 朱砂
+  text:      [55, 110, 170],   // 靛青
+  monastery: [90, 160, 70],    // 松绿
+  school:    [130, 80, 190],   // 紫藤
+  place:     [200, 140, 45],   // 赭石
+  concept:   [45, 150, 150],   // 青碧
+  dynasty:   [190, 80, 145],   // 洋紫
 };
 
 const INITIAL_VIEW_STATE = {
@@ -26,8 +26,8 @@ const INITIAL_VIEW_STATE = {
   bearing: 0,
 };
 
-/** Dark basemap — CARTO dark-matter (no labels variant for cleaner look) */
-const MAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-nolabels-gl-style/style.json";
+/** Light basemap — CARTO Voyager (warm light theme with subtle labels) */
+const MAP_STYLE = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
 
 interface DeckGLMapProps {
   geoEntities: KGGeoEntity[];
@@ -185,8 +185,8 @@ export default function DeckGLMap({
           data: filteredArcs,
           getSourcePosition: (d) => [d.teacher_lng, d.teacher_lat],
           getTargetPosition: (d) => [d.student_lng, d.student_lat],
-          getSourceColor: [240, 180, 80, 200],   // 赭石 — teacher
-          getTargetColor: [255, 110, 100, 200],   // 朱砂 — student
+          getSourceColor: [200, 140, 45, 180],   // 赭石 — teacher
+          getTargetColor: [210, 60, 50, 180],     // 朱砂 — student
           getWidth: 2,
           greatCircle: true,
         }),
