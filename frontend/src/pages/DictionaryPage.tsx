@@ -201,7 +201,7 @@ export default function DictionaryPage() {
         <h1 className="dict-title">{t("nav.dictionary")}</h1>
         <p className="dict-subtitle">
           {sources
-            ? `${sources.length} 部权威辞典 · ${totalEntries.toLocaleString()}+ 词条 · 中梵巴藏英五语`
+            ? `${sources.length} 部权威辞典 · ${totalEntries.toLocaleString()}+ 词条 · 中梵巴藏英蒙满七语`
             : "佛学辞典综合检索"}
         </p>
 
