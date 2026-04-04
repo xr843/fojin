@@ -262,6 +262,7 @@ function AcademicTab() {
           value={feedSource}
           onChange={(v) => { setFeedSource(v); setPage(1); }}
           options={[
+            { value: "cbeta", label: "CBETA" },
             { value: "84000_blog", label: "84000" },
             { value: "bdrc_news", label: "BDRC" },
             { value: "bdk_america", label: "BDK America" },
