@@ -21,6 +21,8 @@ const LANG_COLORS: Record<string, string> = {
   en: "purple",
   ja: "cyan",
   ko: "geekblue",
+  mn: "volcano",
+  mnc: "magenta",
 };
 
 const LANG_LABELS: Record<string, string> = {
