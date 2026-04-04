@@ -38,6 +38,12 @@ logger = logging.getLogger(__name__)
 
 FEED_REGISTRY: list[dict] = [
     {
+        "name": "cbeta",
+        "url": "https://www.cbeta.org/cbreader/feed.php",
+        "category": "digitization",
+        "language": "zh",
+    },
+    {
         "name": "84000_blog",
         "url": "https://84000.co/feed/",
         "category": "translation",
