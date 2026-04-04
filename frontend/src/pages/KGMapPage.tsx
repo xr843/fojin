@@ -18,6 +18,13 @@ const ENTITY_TYPE_OPTIONS = [
   { value: "school", label: "宗派" },
 ];
 
+const TYPE_CSS_COLORS: Record<string, string> = {
+  person: "#c75450",
+  monastery: "#6b8e5b",
+  place: "#c08b3e",
+  school: "#7b5ea7",
+};
+
 export default function KGMapPage() {
   const navigate = useNavigate();
 
@@ -184,6 +191,24 @@ export default function KGMapPage() {
                   entityTypeFilter={entityTypes}
                   onEntityClick={handleEntityClick}
                 />
+
+                {/* Legend overlay */}
+                {viewMode === "map" && (
+                  <div className="kg-map-legend">
+                    {ENTITY_TYPE_OPTIONS.filter((t) => entityTypes.includes(t.value)).map((t) => (
+                      <span key={t.value} className="kg-map-legend-item">
+                        <span className="kg-legend-dot" style={{ background: TYPE_CSS_COLORS[t.value] || "#888" }} />
+                        {t.label}
+                      </span>
+                    ))}
+                    {showArcs && (
+                      <span className="kg-map-legend-item">
+                        <span className="kg-legend-line" style={{ background: "#c08b3e" }} />
+                        师承
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 {/* Time Slider overlay */}
                 <div className="kg-map-time-overlay">

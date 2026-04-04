@@ -256,6 +256,30 @@
   box-shadow: 0 0 0 2px var(--fj-gold);
 }
 
+/* ---------- 地图图例 ---------- */
+.kg-map-legend {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 15;
+  display: flex;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #e8e0d4;
+  border-radius: 6px;
+  padding: 6px 12px;
+  backdrop-filter: blur(4px);
+}
+
+.kg-map-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--fj-ink-light);
+  font-family: "Noto Serif SC", serif;
+}
+
 /* ---------- 响应式 ---------- */
 @media (max-width: 768px) {
   .kg-map-page {
