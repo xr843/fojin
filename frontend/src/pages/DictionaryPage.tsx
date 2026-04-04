@@ -22,7 +22,7 @@ const LANG_COLORS: Record<string, string> = {
   ja: "cyan",
   ko: "geekblue",
   mn: "volcano",
-  mnc: "magenta",
+  mnc: "lime",
 };
 
 const LANG_LABELS: Record<string, string> = {
