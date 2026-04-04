@@ -3,19 +3,21 @@ import * as d3 from "d3";
 import { escapeHtml } from "../../utils/sanitize";
 import type { KGLineageArc } from "../../api/client";
 
-interface LineageNode {
+interface LineageNode extends d3.SimulationNodeDatum {
   id: number;
   name: string;
   school: string | null;
-  x?: number;
-  y?: number;
-  fx?: number | null;
-  fy?: number | null;
 }
 
-interface LineageLink {
-  source: number | LineageNode;
-  target: number | LineageNode;
+interface LineageLink extends d3.SimulationLinkDatum<LineageNode> {
+  school: string | null;
+  year: number | null;
+}
+
+/** Resolved link after simulation tick — source/target are objects, not IDs */
+interface ResolvedLink {
+  source: LineageNode;
+  target: LineageNode;
   school: string | null;
   year: number | null;
 }
@@ -163,12 +165,12 @@ export default function LineageGraph({
     const linkDist = nodeCount > 100 ? 90 : nodeCount > 50 ? 110 : 140;
 
     const simulation = d3
-      .forceSimulation(simNodes as d3.SimulationNodeDatum[])
+      .forceSimulation<LineageNode>(simNodes)
       .force(
         "link",
         d3
-          .forceLink(simLinks as d3.SimulationLinkDatum<d3.SimulationNodeDatum>[])
-          .id((d: any) => d.id)
+          .forceLink<LineageNode, LineageLink>(simLinks)
+          .id((d) => d.id)
           .distance(linkDist),
       )
       .force("charge", d3.forceManyBody().strength(chargeStrength))
@@ -183,7 +185,7 @@ export default function LineageGraph({
       .selectAll("line")
       .data(simLinks)
       .join("line")
-      .attr("stroke", (d: any) => getSchoolColor(d.school))
+      .attr("stroke", (d: LineageLink) => getSchoolColor(d.school))
       .attr("stroke-opacity", 0.35)
       .attr("stroke-width", 1.5)
       .attr("marker-end", "url(#lineage-arrow)");
@@ -197,20 +199,21 @@ export default function LineageGraph({
       .style("cursor", "pointer")
       .call(
         d3
-          .drag<any, any>()
-          .on("start", (event, d: any) => {
+          .drag<SVGGElement, LineageNode>()
+          .on("start", (event: d3.D3DragEvent<SVGGElement, LineageNode, LineageNode>, d) => {
             if (!event.active) simulation.alphaTarget(0.3).restart();
             d.fx = d.x;
             d.fy = d.y;
           })
-          .on("drag", (event, d: any) => {
+          .on("drag", (event: d3.D3DragEvent<SVGGElement, LineageNode, LineageNode>, d) => {
             d.fx = event.x;
             d.fy = event.y;
           })
-          .on("end", (event, d: any) => {
+          .on("end", (event: d3.D3DragEvent<SVGGElement, LineageNode, LineageNode>, d) => {
             if (!event.active) simulation.alphaTarget(0);
             d.fx = null;
             d.fy = null;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           }) as any,
       );
 
@@ -218,7 +221,7 @@ export default function LineageGraph({
     node
       .append("circle")
       .attr("r", 12)
-      .attr("fill", (d: any) => getSchoolColor(d.school))
+      .attr("fill", (d: LineageNode) => getSchoolColor(d.school))
       .attr("stroke", "#fff")
       .attr("stroke-width", 1.5)
       .attr("filter", "drop-shadow(0 1px 2px rgba(0,0,0,0.12))");
@@ -226,7 +229,7 @@ export default function LineageGraph({
     // 1-char label inside node
     node
       .append("text")
-      .text((d: any) => d.name.slice(0, 1))
+      .text((d: LineageNode) => d.name.slice(0, 1))
       .attr("text-anchor", "middle")
       .attr("dy", "0.35em")
       .attr("font-size", 10)
@@ -237,7 +240,7 @@ export default function LineageGraph({
     // Full name below node (truncate at 5 chars)
     node
       .append("text")
-      .text((d: any) =>
+      .text((d: LineageNode) =>
         d.name.length > 5 ? d.name.slice(0, 5) + "\u2026" : d.name,
       )
       .attr("text-anchor", "middle")
@@ -249,12 +252,13 @@ export default function LineageGraph({
 
     // Hover highlight
     node
-      .on("mouseover", function (event: any, d: any) {
+      .on("mouseover", function (event: MouseEvent, d: LineageNode) {
         const connectedIds = new Set<number>();
         connectedIds.add(d.id);
-        simLinks.forEach((l: any) => {
-          const sid = typeof l.source === "object" ? l.source.id : l.source;
-          const tid = typeof l.target === "object" ? l.target.id : l.target;
+        simLinks.forEach((l) => {
+          const resolved = l as unknown as ResolvedLink;
+          const sid = typeof resolved.source === "object" ? resolved.source.id : (resolved.source as unknown as number);
+          const tid = typeof resolved.target === "object" ? resolved.target.id : (resolved.target as unknown as number);
           if (sid === d.id) connectedIds.add(tid);
           if (tid === d.id) connectedIds.add(sid);
         });
@@ -262,18 +266,20 @@ export default function LineageGraph({
         node
           .transition()
           .duration(150)
-          .style("opacity", (n: any) => (connectedIds.has(n.id) ? 1 : 0.15));
+          .style("opacity", (n: LineageNode) => (connectedIds.has(n.id) ? 1 : 0.15));
         link
           .transition()
           .duration(150)
-          .attr("stroke-opacity", (l: any) => {
-            const sid = typeof l.source === "object" ? l.source.id : l.source;
-            const tid = typeof l.target === "object" ? l.target.id : l.target;
+          .attr("stroke-opacity", (l: LineageLink) => {
+            const resolved = l as unknown as ResolvedLink;
+            const sid = typeof resolved.source === "object" ? resolved.source.id : (resolved.source as unknown as number);
+            const tid = typeof resolved.target === "object" ? resolved.target.id : (resolved.target as unknown as number);
             return sid === d.id || tid === d.id ? 0.8 : 0.05;
           })
-          .attr("stroke-width", (l: any) => {
-            const sid = typeof l.source === "object" ? l.source.id : l.source;
-            const tid = typeof l.target === "object" ? l.target.id : l.target;
+          .attr("stroke-width", (l: LineageLink) => {
+            const resolved = l as unknown as ResolvedLink;
+            const sid = typeof resolved.source === "object" ? resolved.source.id : (resolved.source as unknown as number);
+            const tid = typeof resolved.target === "object" ? resolved.target.id : (resolved.target as unknown as number);
             return sid === d.id || tid === d.id ? 2.5 : 0.5;
           });
 
@@ -294,18 +300,18 @@ export default function LineageGraph({
           .attr("stroke-width", 1.5);
         hideTooltip();
       })
-      .on("click", (_event: any, d: any) => {
+      .on("click", (_event: MouseEvent, d: LineageNode) => {
         if (onNodeClick) onNodeClick(d.id);
       });
 
     // Tick
     simulation.on("tick", () => {
       link
-        .attr("x1", (d: any) => d.source.x)
-        .attr("y1", (d: any) => d.source.y)
-        .attr("x2", (d: any) => d.target.x)
-        .attr("y2", (d: any) => d.target.y);
-      node.attr("transform", (d: any) => `translate(${d.x},${d.y})`);
+        .attr("x1", (d) => (d as unknown as ResolvedLink).source.x ?? 0)
+        .attr("y1", (d) => (d as unknown as ResolvedLink).source.y ?? 0)
+        .attr("x2", (d) => (d as unknown as ResolvedLink).target.x ?? 0)
+        .attr("y2", (d) => (d as unknown as ResolvedLink).target.y ?? 0);
+      node.attr("transform", (d) => `translate(${d.x},${d.y})`);
     });
 
     return () => {

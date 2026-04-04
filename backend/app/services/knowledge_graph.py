@@ -301,13 +301,13 @@ async def get_geo_entities(
 
     where_clause = " AND ".join(conditions)
 
-    count_sql = text(  # nosec B608
-        f"SELECT COUNT(*) FROM kg_entities e WHERE {where_clause}"
+    count_sql = text(
+        f"SELECT COUNT(*) FROM kg_entities e WHERE {where_clause}"  # nosec B608
     )
     count_result = await session.execute(count_sql, params)
     total = count_result.scalar() or 0
 
-    sql = text(  # nosec B608
+    sql = text(
         f"""
         SELECT
             e.id,
@@ -323,7 +323,7 @@ async def get_geo_entities(
         WHERE {where_clause}
         ORDER BY e.entity_type, e.name_zh
         LIMIT :limit
-        """
+        """  # nosec B608
     )
     result = await session.execute(sql, params)
     entities = [
@@ -391,18 +391,18 @@ async def get_lineage_arcs(
 
     where_clause = " AND ".join(conditions)
 
-    count_sql = text(  # nosec B608
+    count_sql = text(
         f"""
         SELECT COUNT(*) FROM kg_relations r
         JOIN kg_entities t ON t.id = r.subject_id
         JOIN kg_entities s ON s.id = r.object_id
         WHERE {where_clause}
-        """
+        """  # nosec B608
     )
     count_result = await session.execute(count_sql, params)
     total = count_result.scalar() or 0
 
-    sql = text(  # nosec B608
+    sql = text(
         f"""
         SELECT
             t.id AS teacher_id,
@@ -430,7 +430,7 @@ async def get_lineage_arcs(
         WHERE {where_clause}
         ORDER BY year NULLS LAST
         LIMIT :limit
-        """
+        """  # nosec B608
     )
     result = await session.execute(sql, params)
     arcs = [
