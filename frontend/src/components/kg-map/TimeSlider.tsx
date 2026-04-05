@@ -31,9 +31,12 @@ export default function TimeSlider({
   const tick = useCallback(() => {
     const cur = valueRef.current;
     if (cur === null) return;
-    const next = cur + 25 > max ? min : cur + 25;
-    onChange(next);
-  }, [min, max, onChange]);
+    if (cur + 25 > max) {
+      onPlayToggle();
+      return;
+    }
+    onChange(cur + 25);
+  }, [max, onChange, onPlayToggle]);
 
   const enabled = value !== null;
 
