@@ -184,37 +184,54 @@ export default function DeckGLMap({
         <Map ref={mapRef} mapStyle={MAP_STYLE} onLoad={handleMapLoad} />
       </DeckGL>
 
-      {tooltip && (
-        <div
-          className="kg-map-tooltip"
-          style={{ left: tooltip.x + 12, top: tooltip.y - 12 }}
-        >
+      {tooltip && (() => {
+        const e = tooltip.entity;
+        const flag = detectCountryFlag(e.description, e.name_en, e.name_zh);
+        const countryName = detectCountryName(e.description, e.name_en, e.name_zh);
+        const script = detectScript(e.name_zh);
+        const isLocalName = script !== 'cjk';
+        const source = detectSource(e.description);
+        return (
           <div
-            className="tooltip-name"
-            dangerouslySetInnerHTML={{ __html: escapeHtml(tooltip.entity.name_zh) }}
-          />
-          {tooltip.entity.name_en && (
-            <div
-              className="tooltip-en"
-              dangerouslySetInnerHTML={{ __html: escapeHtml(tooltip.entity.name_en) }}
-            />
-          )}
-          <div className="tooltip-type">
-            {TYPE_LABEL_MAP[tooltip.entity.entity_type] || tooltip.entity.entity_type}
-          </div>
-          {(tooltip.entity.year_start !== null || tooltip.entity.year_end !== null) && (
-            <div className="tooltip-year">
-              {formatYearRange(tooltip.entity.year_start, tooltip.entity.year_end)}
+            className="kg-map-tooltip"
+            style={{ left: tooltip.x + 12, top: tooltip.y - 12 }}
+          >
+            <div className="tooltip-header">
+              <span className="tooltip-flag">{flag}</span>
+              <span className="tooltip-type">
+                {TYPE_LABEL_MAP[e.entity_type] || e.entity_type}
+              </span>
             </div>
-          )}
-          {tooltip.entity.description && (
             <div
-              className="tooltip-desc"
-              dangerouslySetInnerHTML={{ __html: escapeHtml(tooltip.entity.description) }}
+              className="tooltip-name"
+              dangerouslySetInnerHTML={{ __html: escapeHtml(e.name_zh) }}
             />
-          )}
-        </div>
-      )}
+            {e.name_en && (
+              <div
+                className="tooltip-en"
+                dangerouslySetInnerHTML={{ __html: escapeHtml(e.name_en) }}
+              />
+            )}
+            {isLocalName && countryName && (
+              <div className="tooltip-local-notice">
+                💡 本地名称 · 国家: {countryName}
+              </div>
+            )}
+            {(e.year_start !== null || e.year_end !== null) && (
+              <div className="tooltip-meta">
+                📜 {formatYearRange(e.year_start, e.year_end)}
+              </div>
+            )}
+            {e.description && (
+              <div
+                className="tooltip-desc"
+                dangerouslySetInnerHTML={{ __html: escapeHtml(e.description) }}
+              />
+            )}
+            {source && <div className="tooltip-source">数据: {source}</div>}
+          </div>
+        );
+      })()}
     </>
   );
 }
@@ -229,6 +246,92 @@ function formatYearRange(start: number | null, end: number | null): string {
   if (start !== null) return `${formatYear(start)} —`;
   if (end !== null) return `— ${formatYear(end)}`;
   return "";
+}
+
+const COUNTRY_FLAGS: Record<string, string> = {
+  "中国": "🇨🇳", "China": "🇨🇳", "Chinese": "🇨🇳",
+  "日本": "🇯🇵", "Japan": "🇯🇵", "Japanese": "🇯🇵",
+  "韩国": "🇰🇷", "Korea": "🇰🇷", "Korean": "🇰🇷",
+  "印度": "🇮🇳", "India": "🇮🇳", "Indian": "🇮🇳",
+  "泰国": "🇹🇭", "Thailand": "🇹🇭", "Thai": "🇹🇭",
+  "越南": "🇻🇳", "Vietnam": "🇻🇳", "Vietnamese": "🇻🇳",
+  "缅甸": "🇲🇲", "Myanmar": "🇲🇲", "Burmese": "🇲🇲",
+  "斯里兰卡": "🇱🇰", "Sri Lanka": "🇱🇰",
+  "柬埔寨": "🇰🇭", "Cambodia": "🇰🇭",
+  "西藏": "🏔️", "Tibet": "🏔️", "Tibetan": "🏔️",
+  "蒙古": "🇲🇳", "Mongolia": "🇲🇳",
+  "不丹": "🇧🇹", "Bhutan": "🇧🇹",
+  "尼泊尔": "🇳🇵", "Nepal": "🇳🇵",
+  "美国": "🇺🇸", "United States": "🇺🇸", "American": "🇺🇸",
+  "德国": "🇩🇪", "Germany": "🇩🇪", "German": "🇩🇪",
+  "法国": "🇫🇷", "France": "🇫🇷", "French": "🇫🇷",
+  "英国": "🇬🇧", "British": "🇬🇧",
+  "台湾": "🇹🇼", "Taiwan": "🇹🇼",
+  "巴西": "🇧🇷", "Brazil": "🇧🇷",
+  "澳大利亚": "🇦🇺", "Australia": "🇦🇺",
+};
+
+const COUNTRY_NAMES_ZH: Record<string, string> = {
+  "中国": "中国", "China": "中国", "Chinese": "中国",
+  "日本": "日本", "Japan": "日本", "Japanese": "日本",
+  "韩国": "韩国", "Korea": "韩国", "Korean": "韩国",
+  "印度": "印度", "India": "印度", "Indian": "印度",
+  "泰国": "泰国", "Thailand": "泰国", "Thai": "泰国",
+  "越南": "越南", "Vietnam": "越南", "Vietnamese": "越南",
+  "缅甸": "缅甸", "Myanmar": "缅甸", "Burmese": "缅甸",
+  "斯里兰卡": "斯里兰卡", "Sri Lanka": "斯里兰卡",
+  "柬埔寨": "柬埔寨", "Cambodia": "柬埔寨",
+  "西藏": "西藏", "Tibet": "西藏", "Tibetan": "西藏",
+  "蒙古": "蒙古", "Mongolia": "蒙古",
+  "不丹": "不丹", "Bhutan": "不丹",
+  "尼泊尔": "尼泊尔", "Nepal": "尼泊尔",
+  "美国": "美国", "United States": "美国", "American": "美国",
+  "德国": "德国", "Germany": "德国", "German": "德国",
+  "法国": "法国", "France": "法国", "French": "法国",
+  "英国": "英国", "British": "英国",
+  "台湾": "台湾", "Taiwan": "台湾",
+  "巴西": "巴西", "Brazil": "巴西",
+  "澳大利亚": "澳大利亚", "Australia": "澳大利亚",
+};
+
+function detectCountryFlag(
+  desc: string | null,
+  nameEn: string | null,
+  nameZh: string,
+): string {
+  const haystack = `${desc ?? ""} ${nameEn ?? ""} ${nameZh}`;
+  for (const key of Object.keys(COUNTRY_FLAGS)) {
+    if (haystack.includes(key)) return COUNTRY_FLAGS[key];
+  }
+  return "🏛️";
+}
+
+function detectCountryName(
+  desc: string | null,
+  nameEn: string | null,
+  nameZh: string,
+): string | null {
+  const haystack = `${desc ?? ""} ${nameEn ?? ""} ${nameZh}`;
+  for (const key of Object.keys(COUNTRY_NAMES_ZH)) {
+    if (haystack.includes(key)) return COUNTRY_NAMES_ZH[key];
+  }
+  return null;
+}
+
+function detectScript(s: string): 'cjk' | 'hangul' | 'latin' | 'other' {
+  if (/[\uAC00-\uD7AF]/.test(s)) return 'hangul';
+  if (/[\u4E00-\u9FFF\u3040-\u30FF]/.test(s)) return 'cjk';
+  if (/[a-zA-Z]/.test(s)) return 'latin';
+  return 'other';
+}
+
+function detectSource(desc: string | null): string | null {
+  if (!desc) return null;
+  const sources = ["OSM", "OpenStreetMap", "Wikidata", "DILA", "BDRC", "GeoNames"];
+  for (const s of sources) {
+    if (desc.includes(s)) return s === "OpenStreetMap" ? "OSM" : s;
+  }
+  return null;
 }
 
 const TYPE_LABEL_MAP: Record<string, string> = {
