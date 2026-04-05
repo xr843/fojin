@@ -7,15 +7,15 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { escapeHtml } from "../../utils/sanitize";
 import type { KGGeoEntity, KGLineageArc } from "../../api/client";
 
-/** FoJin classical palette — vivid for light background */
+/** Bright, highly-distinct palette for light background */
 const TYPE_COLORS: Record<string, [number, number, number]> = {
-  person:    [210, 60, 50],    // 朱砂
-  text:      [55, 110, 170],   // 靛青
-  monastery: [90, 160, 70],    // 松绿
-  school:    [130, 80, 190],   // 紫藤
-  place:     [200, 140, 45],   // 赭石
-  concept:   [45, 150, 150],   // 青碧
-  dynasty:   [190, 80, 145],   // 洋紫
+  person:    [220, 38, 38],    // 鲜红 (red-600)
+  monastery: [34, 197, 94],    // 鲜绿 (green-500)
+  place:     [124, 58, 237],   // 鲜紫 (violet-600)
+  school:    [234, 88, 12],    // 橙 (orange-600)
+  text:      [37, 99, 235],    // 蓝 (blue-600)
+  concept:   [8, 145, 178],    // 青 (cyan-600)
+  dynasty:   [219, 39, 119],   // 洋红 (pink-600)
 };
 
 const INITIAL_VIEW_STATE = {
@@ -93,26 +93,42 @@ export default function DeckGLMap({
   const layers = useMemo(() => {
     const result = [];
 
-    // Scatter layer — semi-transparent dots that blend into density gradients
-    result.push(
+    // Layered rendering: monastery (bottom) → place (middle) → person (top)
+    // So minority categories remain visible above the majority
+    const monasteries = filteredEntities.filter((e) => e.entity_type === "monastery");
+    const places = filteredEntities.filter((e) => e.entity_type === "place");
+    const persons = filteredEntities.filter((e) => e.entity_type === "person");
+    const others = filteredEntities.filter(
+      (e) => !["monastery", "place", "person"].includes(e.entity_type)
+    );
+
+    const makeLayer = (id: string, data: KGGeoEntity[]) =>
       new ScatterplotLayer<KGGeoEntity>({
-        id: "entities",
-        data: filteredEntities,
+        id,
+        data,
         getPosition: (d) => [d.longitude, d.latitude],
         getFillColor: (d) => {
           const c = TYPE_COLORS[d.entity_type] ?? [128, 128, 128];
-          return [c[0], c[1], c[2], 70];
+          return [c[0], c[1], c[2], 200];
         },
-        getRadius: 2000,
-        radiusMinPixels: 2.5,
-        radiusMaxPixels: 8,
+        getLineColor: [255, 255, 255, 220],
+        lineWidthMinPixels: 0.5,
+        stroked: true,
+        getRadius: 2500,
+        radiusMinPixels: 3,
+        radiusMaxPixels: 9,
         pickable: true,
         autoHighlight: true,
-        highlightColor: [255, 200, 60, 180],
+        highlightColor: [255, 215, 0, 220],
         onHover: handleHover,
         onClick: handleClick,
-      }),
-    );
+      });
+
+    // Z-order: monastery (bottom) → others → place → person (top)
+    if (monasteries.length) result.push(makeLayer("entities-monastery", monasteries));
+    if (others.length) result.push(makeLayer("entities-others", others));
+    if (places.length) result.push(makeLayer("entities-place", places));
+    if (persons.length) result.push(makeLayer("entities-person", persons));
 
     // Lineage arcs
     if (showArcs && filteredArcs.length > 0) {

@@ -19,10 +19,10 @@ const ENTITY_TYPE_OPTIONS = [
 ];
 
 const TYPE_CSS_COLORS: Record<string, string> = {
-  person: "#d23c32",
-  monastery: "#5aa046",
-  place: "#c88c2d",
-  school: "#8250be",
+  person: "#dc2626",
+  monastery: "#22c55e",
+  place: "#7c3aed",
+  school: "#ea580c",
 };
 
 export default function KGMapPage() {
