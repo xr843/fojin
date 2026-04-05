@@ -321,7 +321,7 @@ async def get_geo_entities(
             (e.properties->>'year_end')::int AS year_end
         FROM kg_entities e
         WHERE {where_clause}
-        ORDER BY e.entity_type, e.name_zh
+        ORDER BY e.id
         LIMIT :limit
         """  # nosec B608
     )
