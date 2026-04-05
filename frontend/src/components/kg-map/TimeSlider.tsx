@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from "react";
-import { Slider, Button, Switch } from "antd";
-import { CaretRightOutlined, PauseOutlined } from "@ant-design/icons";
+import { Slider, Button, Switch, Tooltip } from "antd";
+import { CaretRightOutlined, PauseOutlined, InfoCircleOutlined } from "@ant-design/icons";
 
 interface TimeSliderProps {
   min: number;
@@ -66,6 +66,9 @@ export default function TimeSlider({
           onChange={handleSwitchChange}
         />
         <span className="kg-time-slider-label">时间筛选</span>
+        <Tooltip title="仅对有年代数据的实体生效（约 300 个人物/寺院）。无年代的实体始终显示。">
+          <InfoCircleOutlined style={{ color: "#999", fontSize: 12, cursor: "help" }} />
+        </Tooltip>
 
         {enabled && (
           <>

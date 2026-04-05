@@ -89,11 +89,13 @@ export default function DeckGLMap({
     return geoEntities.filter((e) => {
       if (!entityTypeFilter.includes(e.entity_type)) return false;
       if (currentYear !== null) {
-        // When time filter is active, hide entities without year data
-        if (e.year_start === null && e.year_end === null) return false;
-        const start = e.year_start ?? e.year_end ?? -Infinity;
-        const end = e.year_end ?? e.year_start ?? Infinity;
-        if (currentYear < start || currentYear > end) return false;
+        // Entities without year data are always shown (timeless features).
+        // Only filter entities that explicitly fall outside the current year.
+        if (e.year_start !== null || e.year_end !== null) {
+          const start = e.year_start ?? e.year_end ?? -Infinity;
+          const end = e.year_end ?? e.year_start ?? Infinity;
+          if (currentYear < start || currentYear > end) return false;
+        }
       }
       return true;
     });
