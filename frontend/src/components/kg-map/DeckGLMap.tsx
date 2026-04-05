@@ -1,5 +1,5 @@
-import { useState, useMemo, useCallback } from "react";
-import { Map } from "react-map-gl/maplibre";
+import { useState, useMemo, useCallback, useRef } from "react";
+import { Map, type MapRef } from "react-map-gl/maplibre";
 import DeckGL from "@deck.gl/react";
 import { ScatterplotLayer, ArcLayer } from "@deck.gl/layers";
 import type { PickingInfo } from "@deck.gl/core";
@@ -53,6 +53,30 @@ export default function DeckGLMap({
   onEntityClick,
 }: DeckGLMapProps) {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const mapRef = useRef<MapRef>(null);
+
+  /** Switch map labels to Chinese (prefer name:zh, fallback to name) */
+  const handleMapLoad = useCallback(() => {
+    const map = mapRef.current?.getMap();
+    if (!map) return;
+    const layers = map.getStyle().layers || [];
+    for (const layer of layers) {
+      if (layer.type === "symbol" && layer.layout && "text-field" in layer.layout) {
+        try {
+          map.setLayoutProperty(layer.id, "text-field", [
+            "coalesce",
+            ["get", "name:zh"],
+            ["get", "name_zh"],
+            ["get", "name:zh-Hans"],
+            ["get", "name_int"],
+            ["get", "name"],
+          ]);
+        } catch {
+          // skip layers that don't support this
+        }
+      }
+    }
+  }, []);
 
   const filteredEntities = useMemo(() => {
     return geoEntities.filter((e) => {
@@ -157,7 +181,7 @@ export default function DeckGLMap({
         layers={layers}
         style={{ position: "absolute", inset: "0" }}
       >
-        <Map mapStyle={MAP_STYLE} />
+        <Map ref={mapRef} mapStyle={MAP_STYLE} onLoad={handleMapLoad} />
       </DeckGL>
 
       {tooltip && (
