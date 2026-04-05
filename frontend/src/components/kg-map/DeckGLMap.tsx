@@ -63,8 +63,31 @@ export default function DeckGLMap({
   const [arcTooltip, setArcTooltip] = useState<ArcTooltipState | null>(null);
   const mapRef = useRef<MapRef>(null);
 
-  /** MapTiler handles language via URL param; no post-load override needed */
-  const handleMapLoad = useCallback(() => {}, []);
+  /** Force Chinese labels after style loads */
+  const handleMapLoad = useCallback(() => {
+    const map = mapRef.current?.getMap();
+    if (!map) return;
+    const layers = map.getStyle().layers || [];
+    for (const layer of layers) {
+      if (layer.type === "symbol" && layer.layout && "text-field" in layer.layout) {
+        try {
+          map.setLayoutProperty(layer.id, "text-field", [
+            "coalesce",
+            ["get", "name:zh-Hans"],
+            ["get", "name:zh"],
+            ["get", "name:zh-Hant"],
+            ["get", "name:ja"],
+            ["get", "name_int"],
+            ["get", "name:latin"],
+            ["get", "name:en"],
+            ["get", "name"],
+          ]);
+        } catch {
+          // skip layers that don't support this
+        }
+      }
+    }
+  }, []);
 
   const filteredEntities = useMemo(() => {
     return geoEntities.filter((e) => {
