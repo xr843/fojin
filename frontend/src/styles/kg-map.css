@@ -147,6 +147,51 @@
   max-width: 260px;
 }
 
+.kg-map-tooltip .tooltip-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.kg-map-tooltip .tooltip-flag {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.kg-map-tooltip .tooltip-header .tooltip-type {
+  font-size: 10px;
+  color: var(--fj-ink-light);
+  background: #f0ebe2;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.kg-map-tooltip .tooltip-meta {
+  font-size: 10px;
+  color: #b08d57;
+  margin-top: 3px;
+}
+
+.kg-map-tooltip .tooltip-source {
+  font-size: 9px;
+  color: var(--fj-ink-light);
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px dashed #f0ebe2;
+  opacity: 0.75;
+}
+
+.kg-map-tooltip .tooltip-local-notice {
+  font-size: 10px;
+  color: #8a7355;
+  background: #faf6ee;
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-top: 3px;
+  margin-bottom: 2px;
+}
+
 /* ---------- 实体弹出卡片 ---------- */
 .kg-map-popup-container {
   position: absolute;
@@ -366,3 +411,9 @@
     min-width: 60px;
   }
 }
+
+.kg-map-stats-filter {
+  color: var(--fj-accent);
+  font-weight: 500;
+}
+

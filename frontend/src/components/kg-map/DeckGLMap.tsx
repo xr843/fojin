@@ -1,11 +1,16 @@
 import { useState, useMemo, useCallback, useRef } from "react";
 import { Map, type MapRef } from "react-map-gl/maplibre";
 import DeckGL from "@deck.gl/react";
-import { ScatterplotLayer, ArcLayer } from "@deck.gl/layers";
+import { ScatterplotLayer, ArcLayer, TextLayer } from "@deck.gl/layers";
 import type { PickingInfo } from "@deck.gl/core";
+import Supercluster from "supercluster";
+import type { PointFeature, ClusterFeature } from "supercluster";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { escapeHtml } from "../../utils/sanitize";
 import type { KGGeoEntity, KGLineageArc } from "../../api/client";
+
+type EntityProps = { entity: KGGeoEntity };
+type AnyFeature = PointFeature<EntityProps> | ClusterFeature<EntityProps>;
 
 /** Bright, highly-distinct palette for light background */
 const TYPE_COLORS: Record<string, [number, number, number]> = {
@@ -53,6 +58,7 @@ export default function DeckGLMap({
   onEntityClick,
 }: DeckGLMapProps) {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const [viewState, setViewState] = useState<typeof INITIAL_VIEW_STATE & { transitionDuration?: number }>(INITIAL_VIEW_STATE);
   const mapRef = useRef<MapRef>(null);
 
   /** Switch map labels to Chinese (prefer name:zh, fallback to name) */
@@ -114,16 +120,102 @@ export default function DeckGLMap({
     [onEntityClick],
   );
 
+  // Build supercluster index from filtered entities
+  const clusterIndex = useMemo(() => {
+    const index = new Supercluster<EntityProps, Record<string, never>>({
+      radius: 40,
+      maxZoom: 12,
+      minPoints: 3,
+    });
+    const points: PointFeature<EntityProps>[] = filteredEntities.map((e) => ({
+      type: "Feature" as const,
+      geometry: { type: "Point" as const, coordinates: [e.longitude, e.latitude] },
+      properties: { entity: e },
+    }));
+    index.load(points);
+    return index;
+  }, [filteredEntities]);
+
+  // Get clusters at current zoom
+  const clusters = useMemo(() => {
+    const bbox: [number, number, number, number] = [-180, -85, 180, 85];
+    return clusterIndex.getClusters(bbox, Math.floor(viewState.zoom)) as AnyFeature[];
+  }, [clusterIndex, viewState.zoom]);
+
+  const handleClusterClick = useCallback(
+    (info: PickingInfo) => {
+      const obj = info.object as ClusterFeature<EntityProps> | undefined;
+      if (!obj || !obj.properties.cluster) return;
+      const clusterId = obj.properties.cluster_id;
+      const expansionZoom = clusterIndex.getClusterExpansionZoom(clusterId);
+      const [lng, lat] = obj.geometry.coordinates;
+      setViewState({
+        ...viewState,
+        longitude: lng,
+        latitude: lat,
+        zoom: Math.min(expansionZoom, 15),
+        transitionDuration: 500,
+      });
+    },
+    [clusterIndex, viewState],
+  );
+
   const layers = useMemo(() => {
     const result = [];
 
-    // Layered rendering: monastery (bottom) → place (middle) → person (top)
-    // So minority categories remain visible above the majority
-    const monasteries = filteredEntities.filter((e) => e.entity_type === "monastery");
-    const places = filteredEntities.filter((e) => e.entity_type === "place");
-    const persons = filteredEntities.filter((e) => e.entity_type === "person");
-    const others = filteredEntities.filter(
-      (e) => !["monastery", "place", "person"].includes(e.entity_type)
+    // Separate clusters from individual points
+    const clusterPoints = clusters.filter(
+      (c): c is ClusterFeature<EntityProps> => Boolean(c.properties && (c.properties as { cluster?: boolean }).cluster),
+    );
+    const individualEntities: KGGeoEntity[] = clusters
+      .filter((c) => !(c.properties as { cluster?: boolean }).cluster)
+      .map((c) => (c.properties as EntityProps).entity);
+
+    // Cluster circle layer
+    if (clusterPoints.length) {
+      result.push(
+        new ScatterplotLayer<ClusterFeature<EntityProps>>({
+          id: "clusters",
+          data: clusterPoints,
+          getPosition: (d) => d.geometry.coordinates as [number, number],
+          getRadius: (d) => {
+            const count = d.properties.point_count;
+            return 10000 + Math.log(count) * 4000;
+          },
+          getFillColor: [124, 58, 237, 180],
+          getLineColor: [255, 255, 255, 220],
+          lineWidthMinPixels: 2,
+          stroked: true,
+          radiusMinPixels: 20,
+          radiusMaxPixels: 60,
+          pickable: true,
+          onClick: handleClusterClick,
+        }),
+      );
+
+      result.push(
+        new TextLayer<ClusterFeature<EntityProps>>({
+          id: "cluster-labels",
+          data: clusterPoints,
+          getPosition: (d) => d.geometry.coordinates as [number, number],
+          getText: (d) => String(d.properties.point_count_abbreviated ?? d.properties.point_count),
+          getSize: 14,
+          getColor: [255, 255, 255, 255],
+          fontFamily: "system-ui, sans-serif",
+          fontWeight: 700,
+          getTextAnchor: "middle",
+          getAlignmentBaseline: "center",
+          pickable: false,
+        }),
+      );
+    }
+
+    // Layered rendering (individual points only): monastery → place → person
+    const monasteries = individualEntities.filter((e) => e.entity_type === "monastery");
+    const places = individualEntities.filter((e) => e.entity_type === "place");
+    const persons = individualEntities.filter((e) => e.entity_type === "person");
+    const others = individualEntities.filter(
+      (e) => !["monastery", "place", "person"].includes(e.entity_type),
     );
 
     const makeLayer = (id: string, data: KGGeoEntity[]) =>
@@ -171,12 +263,13 @@ export default function DeckGLMap({
     }
 
     return result;
-  }, [filteredEntities, filteredArcs, showArcs, handleHover, handleClick]);
+  }, [clusters, filteredArcs, showArcs, handleHover, handleClick, handleClusterClick]);
 
   return (
     <>
       <DeckGL
-        initialViewState={INITIAL_VIEW_STATE}
+        viewState={viewState}
+        onViewStateChange={({ viewState: vs }) => setViewState(vs as typeof INITIAL_VIEW_STATE)}
         controller
         layers={layers}
         style={{ position: "absolute", inset: "0" }}
@@ -184,37 +277,54 @@ export default function DeckGLMap({
         <Map ref={mapRef} mapStyle={MAP_STYLE} onLoad={handleMapLoad} />
       </DeckGL>
 
-      {tooltip && (
-        <div
-          className="kg-map-tooltip"
-          style={{ left: tooltip.x + 12, top: tooltip.y - 12 }}
-        >
+      {tooltip && (() => {
+        const e = tooltip.entity;
+        const flag = detectCountryFlag(e.description, e.name_en, e.name_zh);
+        const countryName = detectCountryName(e.description, e.name_en, e.name_zh);
+        const script = detectScript(e.name_zh);
+        const isLocalName = script !== 'cjk';
+        const source = detectSource(e.description);
+        return (
           <div
-            className="tooltip-name"
-            dangerouslySetInnerHTML={{ __html: escapeHtml(tooltip.entity.name_zh) }}
-          />
-          {tooltip.entity.name_en && (
-            <div
-              className="tooltip-en"
-              dangerouslySetInnerHTML={{ __html: escapeHtml(tooltip.entity.name_en) }}
-            />
-          )}
-          <div className="tooltip-type">
-            {TYPE_LABEL_MAP[tooltip.entity.entity_type] || tooltip.entity.entity_type}
-          </div>
-          {(tooltip.entity.year_start !== null || tooltip.entity.year_end !== null) && (
-            <div className="tooltip-year">
-              {formatYearRange(tooltip.entity.year_start, tooltip.entity.year_end)}
+            className="kg-map-tooltip"
+            style={{ left: tooltip.x + 12, top: tooltip.y - 12 }}
+          >
+            <div className="tooltip-header">
+              <span className="tooltip-flag">{flag}</span>
+              <span className="tooltip-type">
+                {TYPE_LABEL_MAP[e.entity_type] || e.entity_type}
+              </span>
             </div>
-          )}
-          {tooltip.entity.description && (
             <div
-              className="tooltip-desc"
-              dangerouslySetInnerHTML={{ __html: escapeHtml(tooltip.entity.description) }}
+              className="tooltip-name"
+              dangerouslySetInnerHTML={{ __html: escapeHtml(e.name_zh) }}
             />
-          )}
-        </div>
-      )}
+            {e.name_en && (
+              <div
+                className="tooltip-en"
+                dangerouslySetInnerHTML={{ __html: escapeHtml(e.name_en) }}
+              />
+            )}
+            {isLocalName && countryName && (
+              <div className="tooltip-local-notice">
+                💡 本地名称 · 国家: {countryName}
+              </div>
+            )}
+            {(e.year_start !== null || e.year_end !== null) && (
+              <div className="tooltip-meta">
+                📜 {formatYearRange(e.year_start, e.year_end)}
+              </div>
+            )}
+            {e.description && (
+              <div
+                className="tooltip-desc"
+                dangerouslySetInnerHTML={{ __html: escapeHtml(e.description) }}
+              />
+            )}
+            {source && <div className="tooltip-source">数据: {source}</div>}
+          </div>
+        );
+      })()}
     </>
   );
 }
@@ -229,6 +339,92 @@ function formatYearRange(start: number | null, end: number | null): string {
   if (start !== null) return `${formatYear(start)} —`;
   if (end !== null) return `— ${formatYear(end)}`;
   return "";
+}
+
+const COUNTRY_FLAGS: Record<string, string> = {
+  "中国": "🇨🇳", "China": "🇨🇳", "Chinese": "🇨🇳",
+  "日本": "🇯🇵", "Japan": "🇯🇵", "Japanese": "🇯🇵",
+  "韩国": "🇰🇷", "Korea": "🇰🇷", "Korean": "🇰🇷",
+  "印度": "🇮🇳", "India": "🇮🇳", "Indian": "🇮🇳",
+  "泰国": "🇹🇭", "Thailand": "🇹🇭", "Thai": "🇹🇭",
+  "越南": "🇻🇳", "Vietnam": "🇻🇳", "Vietnamese": "🇻🇳",
+  "缅甸": "🇲🇲", "Myanmar": "🇲🇲", "Burmese": "🇲🇲",
+  "斯里兰卡": "🇱🇰", "Sri Lanka": "🇱🇰",
+  "柬埔寨": "🇰🇭", "Cambodia": "🇰🇭",
+  "西藏": "🏔️", "Tibet": "🏔️", "Tibetan": "🏔️",
+  "蒙古": "🇲🇳", "Mongolia": "🇲🇳",
+  "不丹": "🇧🇹", "Bhutan": "🇧🇹",
+  "尼泊尔": "🇳🇵", "Nepal": "🇳🇵",
+  "美国": "🇺🇸", "United States": "🇺🇸", "American": "🇺🇸",
+  "德国": "🇩🇪", "Germany": "🇩🇪", "German": "🇩🇪",
+  "法国": "🇫🇷", "France": "🇫🇷", "French": "🇫🇷",
+  "英国": "🇬🇧", "British": "🇬🇧",
+  "台湾": "🇹🇼", "Taiwan": "🇹🇼",
+  "巴西": "🇧🇷", "Brazil": "🇧🇷",
+  "澳大利亚": "🇦🇺", "Australia": "🇦🇺",
+};
+
+const COUNTRY_NAMES_ZH: Record<string, string> = {
+  "中国": "中国", "China": "中国", "Chinese": "中国",
+  "日本": "日本", "Japan": "日本", "Japanese": "日本",
+  "韩国": "韩国", "Korea": "韩国", "Korean": "韩国",
+  "印度": "印度", "India": "印度", "Indian": "印度",
+  "泰国": "泰国", "Thailand": "泰国", "Thai": "泰国",
+  "越南": "越南", "Vietnam": "越南", "Vietnamese": "越南",
+  "缅甸": "缅甸", "Myanmar": "缅甸", "Burmese": "缅甸",
+  "斯里兰卡": "斯里兰卡", "Sri Lanka": "斯里兰卡",
+  "柬埔寨": "柬埔寨", "Cambodia": "柬埔寨",
+  "西藏": "西藏", "Tibet": "西藏", "Tibetan": "西藏",
+  "蒙古": "蒙古", "Mongolia": "蒙古",
+  "不丹": "不丹", "Bhutan": "不丹",
+  "尼泊尔": "尼泊尔", "Nepal": "尼泊尔",
+  "美国": "美国", "United States": "美国", "American": "美国",
+  "德国": "德国", "Germany": "德国", "German": "德国",
+  "法国": "法国", "France": "法国", "French": "法国",
+  "英国": "英国", "British": "英国",
+  "台湾": "台湾", "Taiwan": "台湾",
+  "巴西": "巴西", "Brazil": "巴西",
+  "澳大利亚": "澳大利亚", "Australia": "澳大利亚",
+};
+
+function detectCountryFlag(
+  desc: string | null,
+  nameEn: string | null,
+  nameZh: string,
+): string {
+  const haystack = `${desc ?? ""} ${nameEn ?? ""} ${nameZh}`;
+  for (const key of Object.keys(COUNTRY_FLAGS)) {
+    if (haystack.includes(key)) return COUNTRY_FLAGS[key];
+  }
+  return "🏛️";
+}
+
+function detectCountryName(
+  desc: string | null,
+  nameEn: string | null,
+  nameZh: string,
+): string | null {
+  const haystack = `${desc ?? ""} ${nameEn ?? ""} ${nameZh}`;
+  for (const key of Object.keys(COUNTRY_NAMES_ZH)) {
+    if (haystack.includes(key)) return COUNTRY_NAMES_ZH[key];
+  }
+  return null;
+}
+
+function detectScript(s: string): 'cjk' | 'hangul' | 'latin' | 'other' {
+  if (/[\uAC00-\uD7AF]/.test(s)) return 'hangul';
+  if (/[\u4E00-\u9FFF\u3040-\u30FF]/.test(s)) return 'cjk';
+  if (/[a-zA-Z]/.test(s)) return 'latin';
+  return 'other';
+}
+
+function detectSource(desc: string | null): string | null {
+  if (!desc) return null;
+  const sources = ["OSM", "OpenStreetMap", "Wikidata", "DILA", "BDRC", "GeoNames"];
+  for (const s of sources) {
+    if (desc.includes(s)) return s === "OpenStreetMap" ? "OSM" : s;
+  }
+  return null;
 }
 
 const TYPE_LABEL_MAP: Record<string, string> = {

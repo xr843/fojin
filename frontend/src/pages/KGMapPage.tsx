@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Checkbox, Spin, Empty, Tooltip, Radio, Select } from "antd";
+import { Checkbox, Spin, Empty, Tooltip, Radio, Select, Switch } from "antd";
 import { GlobalOutlined, BarChartOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import DeckGLMap from "../components/kg-map/DeckGLMap";
@@ -39,6 +39,7 @@ export default function KGMapPage() {
   const [selectedEntity, setSelectedEntity] = useState<KGGeoEntity | null>(null);
   const [viewMode, setViewMode] = useState<"map" | "network">("map");
   const [schoolFilter, setSchoolFilter] = useState<string | null>(null);
+  const [chineseOnly, setChineseOnly] = useState(false);
 
   // Auto-enable arcs when switching to network mode
   useEffect(() => {
@@ -61,6 +62,18 @@ export default function KGMapPage() {
   });
 
   /* ---------- Derived ---------- */
+
+  const filteredEntities = useMemo(() => {
+    const CJK_REGEX = /[\u4E00-\u9FFF\u3040-\u30FF]/;
+    const HANGUL_REGEX = /[\uAC00-\uD7AF]/;
+    const isChineseName = (name: string | null | undefined): boolean => {
+      if (!name) return false;
+      if (HANGUL_REGEX.test(name)) return false;
+      return CJK_REGEX.test(name);
+    };
+    if (!chineseOnly) return geoData?.entities ?? [];
+    return (geoData?.entities ?? []).filter((e) => isChineseName(e.name_zh));
+  }, [geoData, chineseOnly]);
 
   const yearRange = useMemo(() => {
     const entities = geoData?.entities ?? [];
@@ -101,10 +114,13 @@ export default function KGMapPage() {
         <GlobalOutlined />
         <h3>佛教地理</h3>
         {geoData && (
-          <Tooltip title="含坐标的实体数量">
+          <Tooltip title={chineseOnly ? "中文名实体" : "所有实体"}>
             <span className="kg-map-stats">
               <BarChartOutlined />
-              <span>{geoData.total.toLocaleString()} 个地点</span>
+              <span>
+                {filteredEntities.length.toLocaleString()} 个地点
+                {chineseOnly && <span className="kg-map-stats-filter"> · 纯中文</span>}
+              </span>
             </span>
           </Tooltip>
         )}
@@ -125,6 +141,12 @@ export default function KGMapPage() {
           >
             师承传线
           </Checkbox>
+          <span className="kg-map-filter-label">纯中文:</span>
+          <Switch
+            size="small"
+            checked={chineseOnly}
+            onChange={setChineseOnly}
+          />
           <Radio.Group
             value={viewMode}
             onChange={(e) => setViewMode(e.target.value)}
@@ -175,7 +197,7 @@ export default function KGMapPage() {
             {viewMode === "map" ? (
               <>
                 <DeckGLMap
-                  geoEntities={geoData.entities}
+                  geoEntities={filteredEntities}
                   lineageArcs={arcData?.arcs ?? []}
                   showArcs={showArcs}
                   currentYear={currentYear}
