@@ -1,0 +1,10 @@
+node_modules
+dist
+coverage
+playwright-report
+test-results
+.env
+.env.local
+.DS_Store
+tsconfig.tsbuildinfo
+e2e
