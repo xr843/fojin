@@ -207,6 +207,12 @@ export default function DeckGLMap({
               {formatYearRange(tooltip.entity.year_start, tooltip.entity.year_end)}
             </div>
           )}
+          {tooltip.entity.description && (
+            <div
+              className="tooltip-desc"
+              dangerouslySetInnerHTML={{ __html: escapeHtml(tooltip.entity.description) }}
+            />
+          )}
         </div>
       )}
     </>
