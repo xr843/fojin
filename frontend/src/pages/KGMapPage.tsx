@@ -229,7 +229,7 @@ export default function KGMapPage() {
               ))}
               {showArcs && (
                 <span className="kg-map-legend-item">
-                  <span className="kg-legend-line" style={{ background: "linear-gradient(90deg, #06b6d4, #db2777)" }} />
+                  <span className="kg-legend-line" style={{ background: "#eab308" }} />
                   师承
                 </span>
               )}
