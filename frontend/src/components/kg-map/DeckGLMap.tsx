@@ -1,5 +1,6 @@
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { Map, type MapRef } from "react-map-gl/maplibre";
+import type { StyleSpecification } from "maplibre-gl";
 import DeckGL from "@deck.gl/react";
 import { ScatterplotLayer, ArcLayer } from "@deck.gl/layers";
 import type { PickingInfo } from "@deck.gl/core";
@@ -12,9 +13,9 @@ const TYPE_COLORS: Record<string, [number, number, number]> = {
   person:    [220, 38, 38],    // 鲜红 (red-600)
   monastery: [34, 197, 94],    // 鲜绿 (green-500)
   place:     [124, 58, 237],   // 鲜紫 (violet-600)
-  school:    [234, 88, 12],    // 橙 (orange-600)
-  text:      [37, 99, 235],    // 蓝 (blue-600)
-  concept:   [8, 145, 178],    // 青 (cyan-600)
+  school:    [37, 99, 235],    // 蓝 (blue-600)
+  text:      [6, 182, 212],    // 青 (cyan-500)
+  concept:   [8, 145, 178],    // 深青
   dynasty:   [219, 39, 119],   // 洋红 (pink-600)
 };
 
@@ -37,6 +38,7 @@ interface DeckGLMapProps {
   currentYear: number | null;
   entityTypeFilter: string[];
   onEntityClick: (entity: KGGeoEntity) => void;
+  focusEntity?: KGGeoEntity | null;
 }
 
 interface TooltipState {
@@ -58,39 +60,81 @@ export default function DeckGLMap({
   currentYear,
   entityTypeFilter,
   onEntityClick,
+  focusEntity,
 }: DeckGLMapProps) {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [arcTooltip, setArcTooltip] = useState<ArcTooltipState | null>(null);
+  const [viewState, setViewState] = useState<typeof INITIAL_VIEW_STATE & { transitionDuration?: number }>(INITIAL_VIEW_STATE);
   const mapRef = useRef<MapRef>(null);
 
-  /** Force Chinese labels after style loads */
-  const handleMapLoad = useCallback(() => {
-    const map = mapRef.current?.getMap();
-    if (!map) return;
-    const layers = map.getStyle().layers || [];
-    for (const layer of layers) {
-      if (layer.type !== "symbol" || !layer.layout || !("text-field" in layer.layout)) {
-        continue;
-      }
-      // Skip layers that render road shields, elevation, house numbers, etc.
-      const original = JSON.stringify(layer.layout["text-field"] ?? "");
-      if (!original.includes("name")) continue;
-      try {
-        map.setLayoutProperty(layer.id, "text-field", [
-          "coalesce",
-          ["get", "name:zh-Hans"],
-          ["get", "name:zh"],
-          ["get", "name:zh-Hant"],
-          ["get", "name:ja"],
-          ["get", "name_int"],
-          ["get", "name:latin"],
-          ["get", "name:en"],
-          ["get", "name"],
-        ]);
-      } catch {
-        // skip layers that don't support this
-      }
-    }
+  // Fly to focused entity when it changes
+  useEffect(() => {
+    if (!focusEntity || focusEntity.longitude == null || focusEntity.latitude == null) return;
+    setViewState((prev) => ({
+      ...prev,
+      longitude: focusEntity.longitude,
+      latitude: focusEntity.latitude,
+      zoom: Math.max(prev.zoom, 9),
+      transitionDuration: 1200,
+    }));
+  }, [focusEntity]);
+
+  /** Fetch + patch MapTiler style to force zh labels and replace Taiwan name */
+  const [patchedStyle, setPatchedStyle] = useState<StyleSpecification | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(MAP_STYLE)
+      .then((r) => r.json())
+      .then((style: { layers?: Array<{ id: string; type: string; layout?: Record<string, unknown> }> }) => {
+        if (cancelled || !style.layers) return;
+        const twReplace = [
+          "case",
+          ["==", ["get", "iso_a2"], "TW"], "台灣省",
+          ["==", ["get", "ISO_A2"], "TW"], "台灣省",
+          ["==", ["get", "iso_3166_1"], "TW"], "台灣省",
+          ["==", ["get", "iso_3166_1_alpha_2"], "TW"], "台灣省",
+          ["==", ["get", "name"], "中華民國"], "台灣省",
+          ["==", ["get", "name"], "中华民国"], "台灣省",
+          ["==", ["get", "name"], "Taiwan"], "台灣省",
+          ["==", ["get", "name"], "Republic of China"], "台灣省",
+          ["==", ["get", "name:zh"], "中華民國"], "台灣省",
+          ["==", ["get", "name:zh"], "中华民国"], "台灣省",
+          ["==", ["get", "name:zh-Hant"], "中華民國"], "台灣省",
+          ["==", ["get", "name:zh-Hant"], "臺灣"], "台灣省",
+          ["==", ["get", "name:zh-Hant"], "台灣"], "台灣省",
+          ["==", ["get", "name:zh-Hans"], "中华民国"], "台灣省",
+          ["==", ["get", "name:zh-Hans"], "台湾"], "台灣省",
+          ["==", ["get", "name:en"], "Taiwan"], "台灣省",
+          ["==", ["get", "name:en"], "Republic of China"], "台灣省",
+          [
+            "coalesce",
+            ["get", "name:zh-Hans"],
+            ["get", "name:zh"],
+            ["get", "name:zh-Hant"],
+            ["get", "name:ja"],
+            ["get", "name_int"],
+            ["get", "name:latin"],
+            ["get", "name:en"],
+            ["get", "name"],
+          ],
+        ];
+        for (const layer of style.layers) {
+          if (layer.type !== "symbol" || !layer.layout) continue;
+          if (!("text-field" in layer.layout)) continue;
+          const orig = JSON.stringify(layer.layout["text-field"] ?? "");
+          if (!orig.includes("name")) continue;
+          layer.layout["text-field"] = twReplace;
+        }
+        setPatchedStyle(style as unknown as StyleSpecification);
+      })
+      .catch((e) => {
+        // eslint-disable-next-line no-console
+        console.error("[style fetch err]", e);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const filteredEntities = useMemo(() => {
@@ -180,8 +224,8 @@ export default function DeckGLMap({
           data: filteredArcs,
           getSourcePosition: (d) => [d.teacher_lng, d.teacher_lat],
           getTargetPosition: (d) => [d.student_lng, d.student_lat],
-          getSourceColor: [200, 140, 45, 180],
-          getTargetColor: [210, 60, 50, 180],
+          getSourceColor: [6, 182, 212, 200],
+          getTargetColor: [219, 39, 119, 200],
           getWidth: 1.5,
           greatCircle: true,
           pickable: true,
@@ -204,13 +248,14 @@ export default function DeckGLMap({
   return (
     <>
       <DeckGL
-        initialViewState={INITIAL_VIEW_STATE}
+        viewState={viewState}
+        onViewStateChange={(e) => setViewState(e.viewState as typeof viewState)}
         controller
         layers={layers}
         useDevicePixels={true}
         style={{ position: "absolute", inset: "0" }}
       >
-        <Map ref={mapRef} mapStyle={MAP_STYLE} onLoad={handleMapLoad} />
+        {patchedStyle && <Map ref={mapRef} mapStyle={patchedStyle} />}
       </DeckGL>
 
       {tooltip && (() => {
