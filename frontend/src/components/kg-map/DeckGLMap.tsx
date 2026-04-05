@@ -27,6 +27,7 @@ const INITIAL_VIEW_STATE = {
 };
 
 /** Light basemap — CARTO Voyager */
+/** Use Voyager style; raster tiles rendered at @2x for retina sharpness. */
 const MAP_STYLE = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
 
 interface DeckGLMapProps {
@@ -199,6 +200,7 @@ export default function DeckGLMap({
         initialViewState={INITIAL_VIEW_STATE}
         controller
         layers={layers}
+        useDevicePixels={true}
         style={{ position: "absolute", inset: "0" }}
       >
         <Map ref={mapRef} mapStyle={MAP_STYLE} onLoad={handleMapLoad} />

@@ -5,7 +5,6 @@ import { GlobalOutlined, BarChartOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import DeckGLMap from "../components/kg-map/DeckGLMap";
 import MapEntityPopup from "../components/kg-map/MapEntityPopup";
-import TimeSlider from "../components/kg-map/TimeSlider";
 import { getKGGeoEntities, getKGLineageArcs } from "../api/client";
 import type { KGGeoEntity } from "../api/client";
 import "../styles/kg-map.css";
@@ -33,8 +32,6 @@ export default function KGMapPage() {
     "person",
   ]);
   const [showArcs, setShowArcs] = useState(false);
-  const [currentYear, setCurrentYear] = useState<number | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<KGGeoEntity | null>(null);
   const [chineseOnly, setChineseOnly] = useState(false);
 
@@ -67,17 +64,6 @@ export default function KGMapPage() {
     return (geoData?.entities ?? []).filter((e) => isChineseName(e.name_zh));
   }, [geoData, chineseOnly]);
 
-  const yearRange = useMemo(() => {
-    const entities = geoData?.entities ?? [];
-    let min = -500;
-    let max = 2000;
-    for (const e of entities) {
-      if (e.year_start !== null && e.year_start < min) min = e.year_start;
-      if (e.year_end !== null && e.year_end > max) max = e.year_end;
-    }
-    return { min, max };
-  }, [geoData]);
-
   /* ---------- Handlers ---------- */
 
   const handleEntityClick = (entity: KGGeoEntity) => {
@@ -86,15 +72,6 @@ export default function KGMapPage() {
 
   const handleViewInGraph = (entityId: number) => {
     navigate(`/kg?entity=${entityId}`);
-  };
-
-  const handlePlayToggle = () => {
-    setIsPlaying((p) => !p);
-  };
-
-  const handleYearChange = (year: number | null) => {
-    setCurrentYear(year);
-    if (year === null) setIsPlaying(false);
   };
 
   /* ---------- Render ---------- */
@@ -161,7 +138,7 @@ export default function KGMapPage() {
               geoEntities={filteredEntities}
               lineageArcs={arcData?.arcs ?? []}
               showArcs={showArcs}
-              currentYear={currentYear}
+              currentYear={null}
               entityTypeFilter={entityTypes}
               onEntityClick={handleEntityClick}
             />
@@ -181,16 +158,7 @@ export default function KGMapPage() {
               )}
             </div>
 
-            <div className="kg-map-time-overlay">
-              <TimeSlider
-                min={yearRange.min}
-                max={yearRange.max}
-                value={currentYear}
-                isPlaying={isPlaying}
-                onChange={handleYearChange}
-                onPlayToggle={handlePlayToggle}
-              />
-            </div>
+            {/* Time filter hidden: only 0.7% of entities have year data (see issue tracker) */}
 
             {selectedEntity && (
               <MapEntityPopup
