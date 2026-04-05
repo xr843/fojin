@@ -44,6 +44,12 @@ interface TooltipState {
   entity: KGGeoEntity;
 }
 
+interface ArcTooltipState {
+  x: number;
+  y: number;
+  arc: KGLineageArc;
+}
+
 export default function DeckGLMap({
   geoEntities,
   lineageArcs,
@@ -53,6 +59,7 @@ export default function DeckGLMap({
   onEntityClick,
 }: DeckGLMapProps) {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const [arcTooltip, setArcTooltip] = useState<ArcTooltipState | null>(null);
   const mapRef = useRef<MapRef>(null);
 
   /** Switch map labels to Chinese (prefer name:zh, fallback to name) */
@@ -82,9 +89,13 @@ export default function DeckGLMap({
     return geoEntities.filter((e) => {
       if (!entityTypeFilter.includes(e.entity_type)) return false;
       if (currentYear !== null) {
-        const start = e.year_start ?? -Infinity;
-        const end = e.year_end ?? Infinity;
-        if (currentYear < start || currentYear > end) return false;
+        // Entities without year data are always shown (timeless features).
+        // Only filter entities that explicitly fall outside the current year.
+        if (e.year_start !== null || e.year_end !== null) {
+          const start = e.year_start ?? e.year_end ?? -Infinity;
+          const end = e.year_end ?? e.year_start ?? Infinity;
+          if (currentYear < start || currentYear > end) return false;
+        }
       }
       return true;
     });
@@ -165,6 +176,16 @@ export default function DeckGLMap({
           getTargetColor: [210, 60, 50, 180],
           getWidth: 1.5,
           greatCircle: true,
+          pickable: true,
+          autoHighlight: true,
+          highlightColor: [255, 215, 0, 220],
+          onHover: (info: PickingInfo) => {
+            if (info.object && info.x !== undefined && info.y !== undefined) {
+              setArcTooltip({ x: info.x, y: info.y, arc: info.object as KGLineageArc });
+            } else {
+              setArcTooltip(null);
+            }
+          },
         }),
       );
     }
@@ -231,6 +252,32 @@ export default function DeckGLMap({
           </div>
         );
       })()}
+
+      {arcTooltip && (
+        <div
+          className="kg-map-tooltip"
+          style={{ left: arcTooltip.x + 12, top: arcTooltip.y - 12 }}
+        >
+          <div className="tooltip-header">
+            <span className="tooltip-type">师承</span>
+          </div>
+          <div
+            className="tooltip-name"
+            dangerouslySetInnerHTML={{
+              __html: `${escapeHtml(arcTooltip.arc.teacher_name)} → ${escapeHtml(arcTooltip.arc.student_name)}`,
+            }}
+          />
+          {arcTooltip.arc.year !== null && (
+            <div className="tooltip-meta">📜 {formatYear(arcTooltip.arc.year)}</div>
+          )}
+          {arcTooltip.arc.school && (
+            <div
+              className="tooltip-desc"
+              dangerouslySetInnerHTML={{ __html: `宗派: ${escapeHtml(arcTooltip.arc.school)}` }}
+            />
+          )}
+        </div>
+      )}
     </>
   );
 }
