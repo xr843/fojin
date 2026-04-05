@@ -1,16 +1,11 @@
 import { useState, useMemo, useCallback, useRef } from "react";
 import { Map, type MapRef } from "react-map-gl/maplibre";
 import DeckGL from "@deck.gl/react";
-import { ScatterplotLayer, ArcLayer, TextLayer } from "@deck.gl/layers";
+import { ScatterplotLayer, ArcLayer } from "@deck.gl/layers";
 import type { PickingInfo } from "@deck.gl/core";
-import Supercluster from "supercluster";
-import type { PointFeature, ClusterFeature } from "supercluster";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { escapeHtml } from "../../utils/sanitize";
 import type { KGGeoEntity, KGLineageArc } from "../../api/client";
-
-type EntityProps = { entity: KGGeoEntity };
-type AnyFeature = PointFeature<EntityProps> | ClusterFeature<EntityProps>;
 
 /** Bright, highly-distinct palette for light background */
 const TYPE_COLORS: Record<string, [number, number, number]> = {
@@ -58,7 +53,6 @@ export default function DeckGLMap({
   onEntityClick,
 }: DeckGLMapProps) {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
-  const [viewState, setViewState] = useState<typeof INITIAL_VIEW_STATE & { transitionDuration?: number }>(INITIAL_VIEW_STATE);
   const mapRef = useRef<MapRef>(null);
 
   /** Switch map labels to Chinese (prefer name:zh, fallback to name) */
@@ -120,101 +114,14 @@ export default function DeckGLMap({
     [onEntityClick],
   );
 
-  // Build supercluster index from filtered entities
-  const clusterIndex = useMemo(() => {
-    const index = new Supercluster<EntityProps, Record<string, never>>({
-      radius: 40,
-      maxZoom: 12,
-      minPoints: 3,
-    });
-    const points: PointFeature<EntityProps>[] = filteredEntities.map((e) => ({
-      type: "Feature" as const,
-      geometry: { type: "Point" as const, coordinates: [e.longitude, e.latitude] },
-      properties: { entity: e },
-    }));
-    index.load(points);
-    return index;
-  }, [filteredEntities]);
-
-  // Get clusters at current zoom
-  const clusters = useMemo(() => {
-    const bbox: [number, number, number, number] = [-180, -85, 180, 85];
-    return clusterIndex.getClusters(bbox, Math.floor(viewState.zoom)) as AnyFeature[];
-  }, [clusterIndex, viewState.zoom]);
-
-  const handleClusterClick = useCallback(
-    (info: PickingInfo) => {
-      const obj = info.object as ClusterFeature<EntityProps> | undefined;
-      if (!obj || !obj.properties.cluster) return;
-      const clusterId = obj.properties.cluster_id;
-      const expansionZoom = clusterIndex.getClusterExpansionZoom(clusterId);
-      const [lng, lat] = obj.geometry.coordinates;
-      setViewState({
-        ...viewState,
-        longitude: lng,
-        latitude: lat,
-        zoom: Math.min(expansionZoom, 15),
-        transitionDuration: 500,
-      });
-    },
-    [clusterIndex, viewState],
-  );
-
   const layers = useMemo(() => {
     const result = [];
 
-    // Separate clusters from individual points
-    const clusterPoints = clusters.filter(
-      (c): c is ClusterFeature<EntityProps> => Boolean(c.properties && (c.properties as { cluster?: boolean }).cluster),
-    );
-    const individualEntities: KGGeoEntity[] = clusters
-      .filter((c) => !(c.properties as { cluster?: boolean }).cluster)
-      .map((c) => (c.properties as EntityProps).entity);
-
-    // Cluster circle layer
-    if (clusterPoints.length) {
-      result.push(
-        new ScatterplotLayer<ClusterFeature<EntityProps>>({
-          id: "clusters",
-          data: clusterPoints,
-          getPosition: (d) => d.geometry.coordinates as [number, number],
-          getRadius: (d) => {
-            const count = d.properties.point_count;
-            return 10000 + Math.log(count) * 4000;
-          },
-          getFillColor: [124, 58, 237, 180],
-          getLineColor: [255, 255, 255, 220],
-          lineWidthMinPixels: 2,
-          stroked: true,
-          radiusMinPixels: 20,
-          radiusMaxPixels: 60,
-          pickable: true,
-          onClick: handleClusterClick,
-        }),
-      );
-
-      result.push(
-        new TextLayer<ClusterFeature<EntityProps>>({
-          id: "cluster-labels",
-          data: clusterPoints,
-          getPosition: (d) => d.geometry.coordinates as [number, number],
-          getText: (d) => String(d.properties.point_count_abbreviated ?? d.properties.point_count),
-          getSize: 14,
-          getColor: [255, 255, 255, 255],
-          fontFamily: "system-ui, sans-serif",
-          fontWeight: 700,
-          getTextAnchor: "middle",
-          getAlignmentBaseline: "center",
-          pickable: false,
-        }),
-      );
-    }
-
-    // Layered rendering (individual points only): monastery → place → person
-    const monasteries = individualEntities.filter((e) => e.entity_type === "monastery");
-    const places = individualEntities.filter((e) => e.entity_type === "place");
-    const persons = individualEntities.filter((e) => e.entity_type === "person");
-    const others = individualEntities.filter(
+    // Layered rendering: monastery → others → place → person (minority on top)
+    const monasteries = filteredEntities.filter((e) => e.entity_type === "monastery");
+    const places = filteredEntities.filter((e) => e.entity_type === "place");
+    const persons = filteredEntities.filter((e) => e.entity_type === "person");
+    const others = filteredEntities.filter(
       (e) => !["monastery", "place", "person"].includes(e.entity_type),
     );
 
@@ -263,13 +170,12 @@ export default function DeckGLMap({
     }
 
     return result;
-  }, [clusters, filteredArcs, showArcs, handleHover, handleClick, handleClusterClick]);
+  }, [filteredEntities, filteredArcs, showArcs, handleHover, handleClick]);
 
   return (
     <>
       <DeckGL
-        viewState={viewState}
-        onViewStateChange={({ viewState: vs }) => setViewState(vs as typeof INITIAL_VIEW_STATE)}
+        initialViewState={INITIAL_VIEW_STATE}
         controller
         layers={layers}
         style={{ position: "absolute", inset: "0" }}
