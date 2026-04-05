@@ -73,10 +73,14 @@ export default function DeckGLMap({
         try {
           map.setLayoutProperty(layer.id, "text-field", [
             "coalesce",
-            ["get", "name:zh"],
-            ["get", "name_zh"],
             ["get", "name:zh-Hans"],
+            ["get", "name:zh"],
+            ["get", "name:zh-Hant"],
+            ["get", "name_zh"],
+            ["get", "name:ja"],
             ["get", "name_int"],
+            ["get", "name:en"],
+            ["get", "name:latin"],
             ["get", "name"],
           ]);
         } catch {
