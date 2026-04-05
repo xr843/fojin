@@ -1,5 +1,6 @@
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { Map, type MapRef } from "react-map-gl/maplibre";
+import type { StyleSpecification } from "maplibre-gl";
 import DeckGL from "@deck.gl/react";
 import { ScatterplotLayer, ArcLayer } from "@deck.gl/layers";
 import type { PickingInfo } from "@deck.gl/core";
@@ -12,9 +13,9 @@ const TYPE_COLORS: Record<string, [number, number, number]> = {
   person:    [220, 38, 38],    // 鲜红 (red-600)
   monastery: [34, 197, 94],    // 鲜绿 (green-500)
   place:     [124, 58, 237],   // 鲜紫 (violet-600)
-  school:    [234, 88, 12],    // 橙 (orange-600)
-  text:      [37, 99, 235],    // 蓝 (blue-600)
-  concept:   [8, 145, 178],    // 青 (cyan-600)
+  school:    [37, 99, 235],    // 蓝 (blue-600)
+  text:      [6, 182, 212],    // 青 (cyan-500)
+  concept:   [8, 145, 178],    // 深青
   dynasty:   [219, 39, 119],   // 洋红 (pink-600)
 };
 
@@ -26,8 +27,9 @@ const INITIAL_VIEW_STATE = {
   bearing: 0,
 };
 
-/** Light basemap — CARTO Voyager */
-const MAP_STYLE = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
+/** Light basemap — MapTiler Streets with Chinese labels */
+const MAPTILER_KEY = "sBS5GCqJuftwymqkp64I";
+const MAP_STYLE = `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_KEY}&language=zh`;
 
 interface DeckGLMapProps {
   geoEntities: KGGeoEntity[];
@@ -36,12 +38,19 @@ interface DeckGLMapProps {
   currentYear: number | null;
   entityTypeFilter: string[];
   onEntityClick: (entity: KGGeoEntity) => void;
+  focusEntity?: KGGeoEntity | null;
 }
 
 interface TooltipState {
   x: number;
   y: number;
   entity: KGGeoEntity;
+}
+
+interface ArcTooltipState {
+  x: number;
+  y: number;
+  arc: KGLineageArc;
 }
 
 export default function DeckGLMap({
@@ -51,40 +60,94 @@ export default function DeckGLMap({
   currentYear,
   entityTypeFilter,
   onEntityClick,
+  focusEntity,
 }: DeckGLMapProps) {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const [arcTooltip, setArcTooltip] = useState<ArcTooltipState | null>(null);
+  const [viewState, setViewState] = useState<typeof INITIAL_VIEW_STATE & { transitionDuration?: number }>(INITIAL_VIEW_STATE);
   const mapRef = useRef<MapRef>(null);
 
-  /** Switch map labels to Chinese (prefer name:zh, fallback to name) */
-  const handleMapLoad = useCallback(() => {
-    const map = mapRef.current?.getMap();
-    if (!map) return;
-    const layers = map.getStyle().layers || [];
-    for (const layer of layers) {
-      if (layer.type === "symbol" && layer.layout && "text-field" in layer.layout) {
-        try {
-          map.setLayoutProperty(layer.id, "text-field", [
+  // Fly to focused entity when it changes
+  useEffect(() => {
+    if (!focusEntity || focusEntity.longitude == null || focusEntity.latitude == null) return;
+    setViewState((prev) => ({
+      ...prev,
+      longitude: focusEntity.longitude,
+      latitude: focusEntity.latitude,
+      zoom: Math.max(prev.zoom, 9),
+      transitionDuration: 1200,
+    }));
+  }, [focusEntity]);
+
+  /** Fetch + patch MapTiler style to force zh labels and replace Taiwan name */
+  const [patchedStyle, setPatchedStyle] = useState<StyleSpecification | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(MAP_STYLE)
+      .then((r) => r.json())
+      .then((style: { layers?: Array<{ id: string; type: string; layout?: Record<string, unknown> }> }) => {
+        if (cancelled || !style.layers) return;
+        const twReplace = [
+          "case",
+          ["==", ["get", "iso_a2"], "TW"], "台灣省",
+          ["==", ["get", "ISO_A2"], "TW"], "台灣省",
+          ["==", ["get", "iso_3166_1"], "TW"], "台灣省",
+          ["==", ["get", "iso_3166_1_alpha_2"], "TW"], "台灣省",
+          ["==", ["get", "name"], "中華民國"], "台灣省",
+          ["==", ["get", "name"], "中华民国"], "台灣省",
+          ["==", ["get", "name"], "Taiwan"], "台灣省",
+          ["==", ["get", "name"], "Republic of China"], "台灣省",
+          ["==", ["get", "name:zh"], "中華民國"], "台灣省",
+          ["==", ["get", "name:zh"], "中华民国"], "台灣省",
+          ["==", ["get", "name:zh-Hant"], "中華民國"], "台灣省",
+          ["==", ["get", "name:zh-Hant"], "臺灣"], "台灣省",
+          ["==", ["get", "name:zh-Hant"], "台灣"], "台灣省",
+          ["==", ["get", "name:zh-Hans"], "中华民国"], "台灣省",
+          ["==", ["get", "name:zh-Hans"], "台湾"], "台灣省",
+          ["==", ["get", "name:en"], "Taiwan"], "台灣省",
+          ["==", ["get", "name:en"], "Republic of China"], "台灣省",
+          [
             "coalesce",
-            ["get", "name:zh"],
-            ["get", "name_zh"],
             ["get", "name:zh-Hans"],
+            ["get", "name:zh"],
+            ["get", "name:zh-Hant"],
+            ["get", "name:ja"],
             ["get", "name_int"],
+            ["get", "name:latin"],
+            ["get", "name:en"],
             ["get", "name"],
-          ]);
-        } catch {
-          // skip layers that don't support this
+          ],
+        ];
+        for (const layer of style.layers) {
+          if (layer.type !== "symbol" || !layer.layout) continue;
+          if (!("text-field" in layer.layout)) continue;
+          const orig = JSON.stringify(layer.layout["text-field"] ?? "");
+          if (!orig.includes("name")) continue;
+          layer.layout["text-field"] = twReplace;
         }
-      }
-    }
+        setPatchedStyle(style as unknown as StyleSpecification);
+      })
+      .catch((e) => {
+        // eslint-disable-next-line no-console
+        console.error("[style fetch err]", e);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const filteredEntities = useMemo(() => {
     return geoEntities.filter((e) => {
       if (!entityTypeFilter.includes(e.entity_type)) return false;
       if (currentYear !== null) {
-        const start = e.year_start ?? -Infinity;
-        const end = e.year_end ?? Infinity;
-        if (currentYear < start || currentYear > end) return false;
+        // Entities without year data are always shown (timeless features).
+        // Only filter entities that explicitly fall outside the current year.
+        if (e.year_start !== null || e.year_end !== null) {
+          const start = e.year_start ?? e.year_end ?? -Infinity;
+          const end = e.year_end ?? e.year_start ?? Infinity;
+          if (currentYear < start || currentYear > end) return false;
+        }
       }
       return true;
     });
@@ -161,10 +224,20 @@ export default function DeckGLMap({
           data: filteredArcs,
           getSourcePosition: (d) => [d.teacher_lng, d.teacher_lat],
           getTargetPosition: (d) => [d.student_lng, d.student_lat],
-          getSourceColor: [200, 140, 45, 180],
-          getTargetColor: [210, 60, 50, 180],
+          getSourceColor: [6, 182, 212, 200],
+          getTargetColor: [219, 39, 119, 200],
           getWidth: 1.5,
           greatCircle: true,
+          pickable: true,
+          autoHighlight: true,
+          highlightColor: [255, 215, 0, 220],
+          onHover: (info: PickingInfo) => {
+            if (info.object && info.x !== undefined && info.y !== undefined) {
+              setArcTooltip({ x: info.x, y: info.y, arc: info.object as KGLineageArc });
+            } else {
+              setArcTooltip(null);
+            }
+          },
         }),
       );
     }
@@ -175,12 +248,14 @@ export default function DeckGLMap({
   return (
     <>
       <DeckGL
-        initialViewState={INITIAL_VIEW_STATE}
+        viewState={viewState}
+        onViewStateChange={(e) => setViewState(e.viewState as typeof viewState)}
         controller
         layers={layers}
+        useDevicePixels={true}
         style={{ position: "absolute", inset: "0" }}
       >
-        <Map ref={mapRef} mapStyle={MAP_STYLE} onLoad={handleMapLoad} />
+        {patchedStyle && <Map ref={mapRef} mapStyle={patchedStyle} />}
       </DeckGL>
 
       {tooltip && (() => {
@@ -231,6 +306,32 @@ export default function DeckGLMap({
           </div>
         );
       })()}
+
+      {arcTooltip && (
+        <div
+          className="kg-map-tooltip"
+          style={{ left: arcTooltip.x + 12, top: arcTooltip.y - 12 }}
+        >
+          <div className="tooltip-header">
+            <span className="tooltip-type">师承</span>
+          </div>
+          <div
+            className="tooltip-name"
+            dangerouslySetInnerHTML={{
+              __html: `${escapeHtml(arcTooltip.arc.teacher_name)} → ${escapeHtml(arcTooltip.arc.student_name)}`,
+            }}
+          />
+          {arcTooltip.arc.year !== null && (
+            <div className="tooltip-meta">📜 {formatYear(arcTooltip.arc.year)}</div>
+          )}
+          {arcTooltip.arc.school && (
+            <div
+              className="tooltip-desc"
+              dangerouslySetInnerHTML={{ __html: `宗派: ${escapeHtml(arcTooltip.arc.school)}` }}
+            />
+          )}
+        </div>
+      )}
     </>
   );
 }

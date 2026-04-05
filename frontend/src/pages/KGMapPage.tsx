@@ -1,12 +1,11 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Checkbox, Spin, Empty, Tooltip, Radio, Select, Switch } from "antd";
-import { GlobalOutlined, BarChartOutlined } from "@ant-design/icons";
+import { Checkbox, Spin, Empty, Tooltip, Switch, AutoComplete } from "antd";
+import { GlobalOutlined, BarChartOutlined, SearchOutlined } from "@ant-design/icons";
+import * as OpenCC from "opencc-js";
 import { useNavigate } from "react-router-dom";
 import DeckGLMap from "../components/kg-map/DeckGLMap";
 import MapEntityPopup from "../components/kg-map/MapEntityPopup";
-import TimeSlider from "../components/kg-map/TimeSlider";
-import LineageGraph from "../components/kg-map/LineageGraph";
 import { getKGGeoEntities, getKGLineageArcs } from "../api/client";
 import type { KGGeoEntity } from "../api/client";
 import "../styles/kg-map.css";
@@ -18,11 +17,21 @@ const ENTITY_TYPE_OPTIONS = [
   { value: "school", label: "宗派" },
 ];
 
+const s2t = OpenCC.Converter({ from: "cn", to: "tw" });
+const t2s = OpenCC.Converter({ from: "tw", to: "cn" });
+
+const TYPE_LABEL: Record<string, string> = {
+  monastery: "寺院",
+  place: "地点",
+  person: "人物",
+  school: "宗派",
+};
+
 const TYPE_CSS_COLORS: Record<string, string> = {
   person: "#dc2626",
   monastery: "#22c55e",
   place: "#7c3aed",
-  school: "#ea580c",
+  school: "#2563eb",
 };
 
 export default function KGMapPage() {
@@ -34,17 +43,10 @@ export default function KGMapPage() {
     "person",
   ]);
   const [showArcs, setShowArcs] = useState(false);
-  const [currentYear, setCurrentYear] = useState<number | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<KGGeoEntity | null>(null);
-  const [viewMode, setViewMode] = useState<"map" | "network">("map");
-  const [schoolFilter, setSchoolFilter] = useState<string | null>(null);
   const [chineseOnly, setChineseOnly] = useState(false);
-
-  // Auto-enable arcs when switching to network mode
-  useEffect(() => {
-    if (viewMode === "network" && !showArcs) setShowArcs(true);
-  }, [viewMode, showArcs]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [focusEntity, setFocusEntity] = useState<KGGeoEntity | null>(null);
 
   /* ---------- Queries ---------- */
 
@@ -75,16 +77,56 @@ export default function KGMapPage() {
     return (geoData?.entities ?? []).filter((e) => isChineseName(e.name_zh));
   }, [geoData, chineseOnly]);
 
-  const yearRange = useMemo(() => {
-    const entities = geoData?.entities ?? [];
-    let min = -500;
-    let max = 2000;
-    for (const e of entities) {
-      if (e.year_start !== null && e.year_start < min) min = e.year_start;
-      if (e.year_end !== null && e.year_end > max) max = e.year_end;
+  const searchOptions = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (q.length < 1) return [];
+    // Generate both simplified and traditional variants of the query
+    const qSimp = t2s(q);
+    const qTrad = s2t(q);
+    const queries = Array.from(new Set([q, qSimp, qTrad]));
+    const pool = geoData?.entities ?? [];
+    const matches: KGGeoEntity[] = [];
+    for (const e of pool) {
+      const zh = (e.name_zh || "").toLowerCase();
+      const en = (e.name_en || "").toLowerCase();
+      const hit = queries.some((qv) => zh.includes(qv) || en.includes(qv));
+      if (hit) {
+        matches.push(e);
+        if (matches.length >= 30) break;
+      }
     }
-    return { min, max };
-  }, [geoData]);
+    return matches.map((e) => ({
+      value: String(e.id),
+      label: (
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: "50%",
+              background: TYPE_CSS_COLORS[e.entity_type] || "#888",
+              flexShrink: 0,
+            }}
+          />
+          <span style={{ fontWeight: 500 }}>{e.name_zh}</span>
+          {e.name_en && (
+            <span style={{ color: "#999", fontSize: 11, fontStyle: "italic" }}>{e.name_en}</span>
+          )}
+          <span style={{ color: "#bbb", fontSize: 10, marginLeft: "auto" }}>
+            {TYPE_LABEL[e.entity_type] || e.entity_type}
+          </span>
+        </div>
+      ),
+      entity: e,
+    }));
+  }, [searchQuery, geoData]);
+
+  const handleSearchSelect = (_value: string, option: { entity: KGGeoEntity }) => {
+    const e = option.entity;
+    setFocusEntity(e);
+    setSelectedEntity(e);
+    setSearchQuery(e.name_zh);
+  };
 
   /* ---------- Handlers ---------- */
 
@@ -94,15 +136,6 @@ export default function KGMapPage() {
 
   const handleViewInGraph = (entityId: number) => {
     navigate(`/kg?entity=${entityId}`);
-  };
-
-  const handlePlayToggle = () => {
-    setIsPlaying((p) => !p);
-  };
-
-  const handleYearChange = (year: number | null) => {
-    setCurrentYear(year);
-    if (year === null) setIsPlaying(false);
   };
 
   /* ---------- Render ---------- */
@@ -147,35 +180,18 @@ export default function KGMapPage() {
             checked={chineseOnly}
             onChange={setChineseOnly}
           />
-          <Radio.Group
-            value={viewMode}
-            onChange={(e) => setViewMode(e.target.value)}
-            size="small"
-            style={{ marginLeft: "auto" }}
-          >
-            <Radio.Button value="map">地图</Radio.Button>
-            <Radio.Button value="network">网络图</Radio.Button>
-          </Radio.Group>
-          {viewMode === "network" && (
-            <Select
-              value={schoolFilter}
-              onChange={(val) => setSchoolFilter(val)}
-              allowClear
-              placeholder="宗派筛选"
-              size="small"
-              style={{ width: 120, marginLeft: 8 }}
-              options={[
-                { value: "中观", label: "中观" },
-                { value: "唯识", label: "唯识" },
-                { value: "天台", label: "天台" },
-                { value: "华严", label: "华严" },
-                { value: "禅宗", label: "禅宗" },
-                { value: "净土", label: "净土" },
-                { value: "律宗", label: "律宗" },
-                { value: "密宗", label: "密宗" },
-              ]}
-            />
-          )}
+          <AutoComplete
+            value={searchQuery}
+            options={searchOptions}
+            onSearch={setSearchQuery}
+            onChange={setSearchQuery}
+            onSelect={handleSearchSelect}
+            placeholder="搜索实体（中/英文名）"
+            allowClear
+            style={{ width: 280, marginLeft: "auto" }}
+            popupMatchSelectWidth={380}
+            suffixIcon={<SearchOutlined style={{ color: "#999" }} />}
+          />
         </div>
       </div>
 
@@ -194,62 +210,38 @@ export default function KGMapPage() {
           </div>
         ) : (
           <>
-            {viewMode === "map" ? (
-              <>
-                <DeckGLMap
-                  geoEntities={filteredEntities}
-                  lineageArcs={arcData?.arcs ?? []}
-                  showArcs={showArcs}
-                  currentYear={currentYear}
-                  entityTypeFilter={entityTypes}
-                  onEntityClick={handleEntityClick}
-                />
+            <DeckGLMap
+              geoEntities={filteredEntities}
+              lineageArcs={arcData?.arcs ?? []}
+              showArcs={showArcs}
+              currentYear={null}
+              entityTypeFilter={entityTypes}
+              onEntityClick={handleEntityClick}
+              focusEntity={focusEntity}
+            />
 
-                {/* Legend overlay */}
-                {viewMode === "map" && (
-                  <div className="kg-map-legend">
-                    {ENTITY_TYPE_OPTIONS.filter((t) => entityTypes.includes(t.value)).map((t) => (
-                      <span key={t.value} className="kg-map-legend-item">
-                        <span className="kg-legend-dot" style={{ background: TYPE_CSS_COLORS[t.value] || "#888" }} />
-                        {t.label}
-                      </span>
-                    ))}
-                    {showArcs && (
-                      <span className="kg-map-legend-item">
-                        <span className="kg-legend-line" style={{ background: "#c08b3e" }} />
-                        师承
-                      </span>
-                    )}
-                  </div>
-                )}
+            <div className="kg-map-legend">
+              {ENTITY_TYPE_OPTIONS.filter((t) => entityTypes.includes(t.value)).map((t) => (
+                <span key={t.value} className="kg-map-legend-item">
+                  <span className="kg-legend-dot" style={{ background: TYPE_CSS_COLORS[t.value] || "#888" }} />
+                  {t.label}
+                </span>
+              ))}
+              {showArcs && (
+                <span className="kg-map-legend-item">
+                  <span className="kg-legend-line" style={{ background: "linear-gradient(90deg, #06b6d4, #db2777)" }} />
+                  师承
+                </span>
+              )}
+            </div>
 
-                {/* Time Slider overlay */}
-                <div className="kg-map-time-overlay">
-                  <TimeSlider
-                    min={yearRange.min}
-                    max={yearRange.max}
-                    value={currentYear}
-                    isPlaying={isPlaying}
-                    onChange={handleYearChange}
-                    onPlayToggle={handlePlayToggle}
-                  />
-                </div>
+            {/* Time filter hidden: only 0.7% of entities have year data (see issue tracker) */}
 
-                {/* Entity Popup */}
-                {selectedEntity && (
-                  <MapEntityPopup
-                    entity={selectedEntity}
-                    onClose={() => setSelectedEntity(null)}
-                    onViewInGraph={handleViewInGraph}
-                  />
-                )}
-              </>
-            ) : (
-              <LineageGraph
-                arcs={arcData?.arcs ?? []}
-                schoolFilter={schoolFilter}
-                height={600}
-                onNodeClick={handleViewInGraph}
+            {selectedEntity && (
+              <MapEntityPopup
+                entity={selectedEntity}
+                onClose={() => setSelectedEntity(null)}
+                onViewInGraph={handleViewInGraph}
               />
             )}
           </>

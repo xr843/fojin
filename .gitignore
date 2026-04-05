@@ -51,3 +51,12 @@ redisdata/
 node_modules/
 .venv/
 .gstack/
+
+# AI tooling / local config
+.claude/
+.codex
+CLAUDE.md
+
+# Local backups
+*.bak
+data/
