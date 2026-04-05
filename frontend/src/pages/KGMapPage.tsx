@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Checkbox, Spin, Empty, Tooltip, Switch } from "antd";
-import { GlobalOutlined, BarChartOutlined } from "@ant-design/icons";
+import { Checkbox, Spin, Empty, Tooltip, Switch, AutoComplete } from "antd";
+import { GlobalOutlined, BarChartOutlined, SearchOutlined } from "@ant-design/icons";
+import * as OpenCC from "opencc-js";
 import { useNavigate } from "react-router-dom";
 import DeckGLMap from "../components/kg-map/DeckGLMap";
 import MapEntityPopup from "../components/kg-map/MapEntityPopup";
@@ -16,11 +17,21 @@ const ENTITY_TYPE_OPTIONS = [
   { value: "school", label: "宗派" },
 ];
 
+const s2t = OpenCC.Converter({ from: "cn", to: "tw" });
+const t2s = OpenCC.Converter({ from: "tw", to: "cn" });
+
+const TYPE_LABEL: Record<string, string> = {
+  monastery: "寺院",
+  place: "地点",
+  person: "人物",
+  school: "宗派",
+};
+
 const TYPE_CSS_COLORS: Record<string, string> = {
   person: "#dc2626",
   monastery: "#22c55e",
   place: "#7c3aed",
-  school: "#ea580c",
+  school: "#2563eb",
 };
 
 export default function KGMapPage() {
@@ -34,6 +45,8 @@ export default function KGMapPage() {
   const [showArcs, setShowArcs] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<KGGeoEntity | null>(null);
   const [chineseOnly, setChineseOnly] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [focusEntity, setFocusEntity] = useState<KGGeoEntity | null>(null);
 
   /* ---------- Queries ---------- */
 
@@ -63,6 +76,57 @@ export default function KGMapPage() {
     if (!chineseOnly) return geoData?.entities ?? [];
     return (geoData?.entities ?? []).filter((e) => isChineseName(e.name_zh));
   }, [geoData, chineseOnly]);
+
+  const searchOptions = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (q.length < 1) return [];
+    // Generate both simplified and traditional variants of the query
+    const qSimp = t2s(q);
+    const qTrad = s2t(q);
+    const queries = Array.from(new Set([q, qSimp, qTrad]));
+    const pool = geoData?.entities ?? [];
+    const matches: KGGeoEntity[] = [];
+    for (const e of pool) {
+      const zh = (e.name_zh || "").toLowerCase();
+      const en = (e.name_en || "").toLowerCase();
+      const hit = queries.some((qv) => zh.includes(qv) || en.includes(qv));
+      if (hit) {
+        matches.push(e);
+        if (matches.length >= 30) break;
+      }
+    }
+    return matches.map((e) => ({
+      value: String(e.id),
+      label: (
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: "50%",
+              background: TYPE_CSS_COLORS[e.entity_type] || "#888",
+              flexShrink: 0,
+            }}
+          />
+          <span style={{ fontWeight: 500 }}>{e.name_zh}</span>
+          {e.name_en && (
+            <span style={{ color: "#999", fontSize: 11, fontStyle: "italic" }}>{e.name_en}</span>
+          )}
+          <span style={{ color: "#bbb", fontSize: 10, marginLeft: "auto" }}>
+            {TYPE_LABEL[e.entity_type] || e.entity_type}
+          </span>
+        </div>
+      ),
+      entity: e,
+    }));
+  }, [searchQuery, geoData]);
+
+  const handleSearchSelect = (_value: string, option: { entity: KGGeoEntity }) => {
+    const e = option.entity;
+    setFocusEntity(e);
+    setSelectedEntity(e);
+    setSearchQuery(e.name_zh);
+  };
 
   /* ---------- Handlers ---------- */
 
@@ -116,6 +180,18 @@ export default function KGMapPage() {
             checked={chineseOnly}
             onChange={setChineseOnly}
           />
+          <AutoComplete
+            value={searchQuery}
+            options={searchOptions}
+            onSearch={setSearchQuery}
+            onChange={setSearchQuery}
+            onSelect={handleSearchSelect}
+            placeholder="搜索实体（中/英文名）"
+            allowClear
+            style={{ width: 280, marginLeft: "auto" }}
+            popupMatchSelectWidth={380}
+            suffixIcon={<SearchOutlined style={{ color: "#999" }} />}
+          />
         </div>
       </div>
 
@@ -141,6 +217,7 @@ export default function KGMapPage() {
               currentYear={null}
               entityTypeFilter={entityTypes}
               onEntityClick={handleEntityClick}
+              focusEntity={focusEntity}
             />
 
             <div className="kg-map-legend">
@@ -152,7 +229,7 @@ export default function KGMapPage() {
               ))}
               {showArcs && (
                 <span className="kg-map-legend-item">
-                  <span className="kg-legend-line" style={{ background: "#c08b3e" }} />
+                  <span className="kg-legend-line" style={{ background: "linear-gradient(90deg, #06b6d4, #db2777)" }} />
                   师承
                 </span>
               )}
