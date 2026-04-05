@@ -366,3 +366,9 @@
     min-width: 60px;
   }
 }
+
+.kg-map-stats-filter {
+  color: var(--fj-accent);
+  font-weight: 500;
+}
+
