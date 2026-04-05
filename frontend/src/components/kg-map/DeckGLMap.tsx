@@ -26,8 +26,8 @@ const INITIAL_VIEW_STATE = {
   bearing: 0,
 };
 
-/** Light basemap — OpenFreeMap Liberty (free, no API key, OSM-based vector tiles) */
-const MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
+/** Light basemap — CARTO Voyager (fast CDN, stable) */
+const MAP_STYLE = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
 
 interface DeckGLMapProps {
   geoEntities: KGGeoEntity[];
