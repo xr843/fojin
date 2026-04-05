@@ -27,7 +27,7 @@ const INITIAL_VIEW_STATE = {
 };
 
 /** Light basemap — MapTiler Streets with Chinese labels */
-const MAPTILER_KEY = "sBS5GCqJuftwymqkp64l";
+const MAPTILER_KEY = "sBS5GCqJuftwymqkp64I";
 const MAP_STYLE = `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_KEY}&language=zh`;
 
 interface DeckGLMapProps {
