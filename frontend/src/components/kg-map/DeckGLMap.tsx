@@ -69,22 +69,26 @@ export default function DeckGLMap({
     if (!map) return;
     const layers = map.getStyle().layers || [];
     for (const layer of layers) {
-      if (layer.type === "symbol" && layer.layout && "text-field" in layer.layout) {
-        try {
-          map.setLayoutProperty(layer.id, "text-field", [
-            "coalesce",
-            ["get", "name:zh-Hans"],
-            ["get", "name:zh"],
-            ["get", "name:zh-Hant"],
-            ["get", "name:ja"],
-            ["get", "name_int"],
-            ["get", "name:latin"],
-            ["get", "name:en"],
-            ["get", "name"],
-          ]);
-        } catch {
-          // skip layers that don't support this
-        }
+      if (layer.type !== "symbol" || !layer.layout || !("text-field" in layer.layout)) {
+        continue;
+      }
+      // Skip layers that render road shields, elevation, house numbers, etc.
+      const original = JSON.stringify(layer.layout["text-field"] ?? "");
+      if (!original.includes("name")) continue;
+      try {
+        map.setLayoutProperty(layer.id, "text-field", [
+          "coalesce",
+          ["get", "name:zh-Hans"],
+          ["get", "name:zh"],
+          ["get", "name:zh-Hant"],
+          ["get", "name:ja"],
+          ["get", "name_int"],
+          ["get", "name:latin"],
+          ["get", "name:en"],
+          ["get", "name"],
+        ]);
+      } catch {
+        // skip layers that don't support this
       }
     }
   }, []);
