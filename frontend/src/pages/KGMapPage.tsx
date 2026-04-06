@@ -19,13 +19,6 @@ const ENTITY_TYPE_OPTIONS = [
 const s2t = OpenCC.Converter({ from: "cn", to: "tw" });
 const t2s = OpenCC.Converter({ from: "tw", to: "cn" });
 
-const TYPE_LABEL: Record<string, string> = {
-  monastery: "寺院",
-  place: "地点",
-  person: "人物",
-  school: "宗派",
-};
-
 const TYPE_CSS_COLORS: Record<string, string> = {
   person: "#dc2626",
   monastery: "#22c55e",
@@ -78,46 +71,45 @@ export default function KGMapPage() {
   const searchOptions = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (q.length < 1) return [];
-    // Generate both simplified and traditional variants of the query
     const qSimp = t2s(q);
     const qTrad = s2t(q);
     const queries = Array.from(new Set([q, qSimp, qTrad]));
+    // Split query into tokens for multi-part matching
+    const tokenize = (s: string): string[][] => {
+      const parts = s.split(/\s+/).filter(Boolean);
+      if (parts.length > 1) return [parts];
+      const combos: string[][] = [[s]];
+      for (let i = 1; i < s.length; i++) {
+        combos.push([s.slice(0, i), s.slice(i)]);
+      }
+      return combos;
+    };
+    const allTokenSets = queries.flatMap(tokenize);
     const pool = geoData?.entities ?? [];
     const matches: KGGeoEntity[] = [];
     for (const e of pool) {
       const zh = (e.name_zh || "").toLowerCase();
       const en = (e.name_en || "").toLowerCase();
       const addr = [e.province || "", e.city || "", e.district || ""].join("").toLowerCase();
-      const full = zh + addr;
-      const hit = queries.some((qv) => full.includes(qv) || en.includes(qv));
+      const full = zh + " " + en + " " + addr;
+      const hit = allTokenSets.some((tokens) =>
+        tokens.every((t) => full.includes(t)),
+      );
       if (hit) {
         matches.push(e);
         if (matches.length >= 30) break;
       }
     }
+    const addr = (e: KGGeoEntity) =>
+      [e.province, e.city, e.district].filter(Boolean).join(" ");
     return matches.map((e) => ({
       value: String(e.id),
       label: (
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: "50%",
-              background: TYPE_CSS_COLORS[e.entity_type] || "#888",
-              flexShrink: 0,
-            }}
-          />
-          <span style={{ fontWeight: 500 }}>{e.name_zh}</span>
-          {(e.province || e.city || e.district) ? (
-            <span style={{ color: "#999", fontSize: 11 }}>
-              {[e.province, e.city, e.district].filter(Boolean).join("")}
-            </span>
-          ) : e.name_en ? (
-            <span style={{ color: "#999", fontSize: 11, fontStyle: "italic" }}>{e.name_en}</span>
-          ) : null}
-          <span style={{ color: "#bbb", fontSize: 10, marginLeft: "auto", flexShrink: 0 }}>
-            {TYPE_LABEL[e.entity_type] || e.entity_type}
+        <div style={{ display: "flex", alignItems: "baseline", gap: 6, padding: "2px 0" }}>
+          <SearchOutlined style={{ color: "#bbb", fontSize: 12, flexShrink: 0, position: "relative", top: 2 }} />
+          <span style={{ fontWeight: 600, color: "#1677ff", flexShrink: 0 }}>{e.name_zh}</span>
+          <span style={{ color: "#999", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {addr(e) || e.name_en || ""}
           </span>
         </div>
       ),
@@ -187,7 +179,7 @@ export default function KGMapPage() {
             onSearch={setSearchQuery}
             onChange={setSearchQuery}
             onSelect={handleSearchSelect}
-            placeholder="搜索（名称/地址，如：福建崇恩）"
+            placeholder="搜索（名称/地址）"
             allowClear
             style={{ width: 280, marginLeft: "auto" }}
             popupMatchSelectWidth={380}
