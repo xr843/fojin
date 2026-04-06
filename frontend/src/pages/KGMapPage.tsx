@@ -43,7 +43,7 @@ export default function KGMapPage() {
 
   const { data: geoData, isLoading: geoLoading } = useQuery({
     queryKey: ["kg-geo"],
-    queryFn: () => getKGGeoEntities({ limit: 50000 }),
+    queryFn: () => getKGGeoEntities({ limit: 80000 }),
     staleTime: 5 * 60_000,
   });
 
