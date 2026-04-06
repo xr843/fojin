@@ -6,7 +6,7 @@
 
 **503 sources. 30 languages. 30 countries. 23,500+ full-text volumes. One search.**
 
-Aggregating the world's Buddhist digital heritage — 10,500+ texts with 23,500+ volumes of full content in Pali, Classical Chinese, Tibetan, and Sanskrit from 503 data sources — with CBETA-style reading, AI-powered Q&A (RAG + reranking + citations + data source recommendations), knowledge graph with 31K+ entities and 28K+ relations (including 23K teacher-student lineage chains), 32 dictionaries with 748K entries across 6 languages, timeline visualization, collections, citations, annotations, bookmarks, and multi-language parallel reading.
+Aggregating the world's Buddhist digital heritage — 10,500+ texts with 23,500+ volumes of full content in Pali, Classical Chinese, Tibetan, and Sanskrit from 503 data sources — with CBETA-style reading, AI-powered Q&A with 8 Buddhist master personas (RAG + tradition-scoped retrieval + citations), knowledge graph with 31K+ entities and 28K+ relations visualized on a 50K-entity Deck.GL geo map, 32 dictionaries with 748K entries across 6 languages, timeline visualization, activity feed, collections, citations, annotations, bookmarks, and multi-language parallel reading.
 
 [Live Demo](https://fojin.app) &nbsp;&middot;&nbsp; [API Docs](https://fojin.app/docs) &nbsp;&middot;&nbsp; [中文文档](./docs/README_zh.md) &nbsp;&middot;&nbsp; [Discussions](https://github.com/xr843/fojin/discussions) &nbsp;&middot;&nbsp; [Discord](https://discord.gg/76SZeuJekq) &nbsp;&middot;&nbsp; [Report Bug](https://github.com/xr843/fojin/issues)
 
@@ -37,6 +37,9 @@ Buddhist texts are scattered across hundreds of databases worldwide — CBETA, S
 | Discover similar texts | **Semantic similarity** powered by 678K+ embedding vectors (pgvector + HNSW) |
 | View original manuscripts | **IIIF manuscript viewer** connected to BDRC and more |
 | Ask questions about texts | **AI Q&A** ("XiaoJin") with RAG, reranking, clickable citations, and follow-up suggestions |
+| Learn from a specific master | **Master Persona Mode** — 8 historical Buddhist masters, each with tradition-specific RAG scope |
+| Explore Buddhist geography | **Knowledge Graph Map** — 50K+ geo entities, monastery locations, lineage arcs on Deck.GL |
+| Track source updates | **Activity Feed** — real-time updates from 503 data sources |
 | Explore history visually | **Timeline & Dashboard** — dynasty charts, translation trends, category analytics |
 | Save and organize | **Collections, bookmarks, annotations** for personal study |
 | Cite in research | **Citation export** (BibTeX, RIS, APA) for academic use |
@@ -158,6 +161,39 @@ Ask questions in natural language. XiaoJin answers based on canonical Buddhist t
 
 <p align="center"><img src="./docs/screenshots/ai-chat-answer.png" alt="AI Q&A answering about Xuanzang's disciples" width="800"></p>
 
+### Master Persona Mode (法师模式)
+
+Select a specific Buddhist master to receive answers in their teaching style, grounded in their tradition's core scriptures. 8 historical masters available:
+
+| Master | Tradition | Core Teachings |
+|--------|-----------|----------------|
+| 智顗 Zhiyi | 天台宗 | 一念三千、三谛圆融、五时八教、止观双修 |
+| 慧能 Huineng | 禅宗 | 直指人心、见性成佛、无念无相无住 |
+| 玄奘 Xuanzang | 法相唯识宗 | 八识、三性、五位百法、转识成智 |
+| 法藏 Fazang | 华严宗 | 法界缘起、四法界、十玄门、六相圆融 |
+| 鸠摩罗什 Kumarajiva | 三论宗/中观 | 八不中道、缘起性空、不二法门 |
+| 印光 Yinguang | 净土宗 | 信愿行、持名念佛、敦伦尽分 |
+| 蕅益 Ouyi | 天台/净土·跨宗派 | 教宗天台行归净土、六信、性相融会 |
+| 虚云 Xuyun | 禅宗·五宗兼嗣 | 参话头、起疑情、老实修行 |
+
+Each master has a 100-150 line enriched system prompt with lineage, core doctrines, speaking style, teaching methods, key allusions, and terminology table. When a master is selected, RAG retrieval is **scoped to their core scriptures** (e.g., selecting Zhiyi only searches 《摩诃止观》《法华玄义》 etc.), providing more precise citations.
+
+Powered by [Master-skill](https://github.com/xr843/Master-skill) — the open-source Buddhist master AI persona framework.
+
+### Knowledge Graph Map (知识图谱地图)
+
+Visualize 50,000+ geo-enabled Buddhist entities on an interactive world map — monasteries, historical places, persons, and schools. Built with Deck.GL + MapLibre.
+
+- **Entity types**: Monasteries (green), Places (purple), Persons (red), Schools (blue)
+- **Lineage arcs**: Toggle 8,000+ teacher-student lineage relations as animated arcs on the map
+- **Chinese-only filter**: Quickly filter to show only Chinese-named entities
+- **Entity search**: Find entities by name with simplified/traditional Chinese conversion (OpenCC)
+- **Interactive tooltips**: Hover to see metadata, country flags, and source attribution
+
+### Activity Feed (佛学动态)
+
+Track real-time updates from 503 data sources — new texts added, translation releases, manuscript scans, and schema changes. Includes academic content aggregation and platform-wide activity summary.
+
 ### Similar Passages Discovery
 
 When reading any text, the sidebar automatically finds semantically similar passages from other texts using pgvector cosine similarity. Discover cross-textual parallels, related commentaries, and thematic connections across the entire canon.
@@ -207,12 +243,12 @@ FoJin aggregates data from major Buddhist digital projects worldwide. Sources ar
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React 18, TypeScript, Vite, Ant Design 5, Zustand, TanStack Query, D3.js |
+| Frontend | React 18, TypeScript, Vite, Ant Design 5, Zustand, TanStack Query, D3.js, Deck.GL + MapLibre (geo map) |
 | Backend | FastAPI, SQLAlchemy (async), Pydantic v2, SSE streaming |
 | Database | PostgreSQL 15 + pgvector (HNSW index) + pg_trgm |
 | Search | Elasticsearch 8 (ICU tokenizer) |
 | Cache | Redis 7 |
-| AI | RAG (678K+ text vectors + 503 source vectors, BGE-M3 embeddings, HNSW) + multi-provider LLM (OpenAI/DashScope/DeepSeek/SiliconFlow) |
+| AI | RAG (678K+ vectors, BGE-M3, HNSW) + 8 master personas + multi-provider LLM (OpenAI/Anthropic/DeepSeek/DashScope/Gemini/+10 more) |
 | Deploy | Docker Compose, Nginx (gzip, security headers), Cloudflare CDN |
 | CI | GitHub Actions (lint, test, security scan) |
 
@@ -315,6 +351,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 - [x] Nanshan Vinaya Dictionary (3,200+ Buddhist precept terms)
 - [x] CBETA full-text import — Taishō (T) + Xuzangjing (X): 3,600+ texts, 143M characters, 432K embedding vectors
 - [x] Dictionary expansion — 32 dictionaries, 748K entries (DPD, Apte, Mahāvyutpatti, Buddhadatta, Pentaglot, buddhaspace 7 dicts)
+- [x] Master Persona Mode — 8 Buddhist masters with tradition-scoped RAG (powered by [Master-skill](https://github.com/xr843/Master-skill))
+- [x] Knowledge Graph Map — 50K+ geo entities, Deck.GL + MapLibre, lineage arcs
+- [x] Activity Feed — real-time source update tracking, academic feeds
 - [ ] Topic ontology browsing page
 - [ ] Cross-lingual search (query in Chinese, find Sanskrit/Pali/Tibetan results)
 - [ ] Open data export (JSON/CSV for researchers)
@@ -344,6 +383,7 @@ FoJin is built on the generous work of the global Buddhist digital humanities co
 
 ## Related Projects
 
+- [Master-skill](https://github.com/xr843/Master-skill) — Buddhist master AI persona framework (powers FoJin's master mode)
 - [The Open Buddhist University](https://buddhistuniversity.net) — Free courses, books, and encyclopaedia for Buddhist studies
 
 ---
