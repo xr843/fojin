@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Checkbox, Spin, Empty, Tooltip, Switch, AutoComplete } from "antd";
 import { GlobalOutlined, BarChartOutlined, SearchOutlined } from "@ant-design/icons";
 import * as OpenCC from "opencc-js";
-import { useNavigate } from "react-router-dom";
 import DeckGLMap from "../components/kg-map/DeckGLMap";
 import MapEntityPopup from "../components/kg-map/MapEntityPopup";
 import { getKGGeoEntities, getKGLineageArcs } from "../api/client";
@@ -35,7 +34,6 @@ const TYPE_CSS_COLORS: Record<string, string> = {
 };
 
 export default function KGMapPage() {
-  const navigate = useNavigate();
 
   const [entityTypes, setEntityTypes] = useState<string[]>([
     "monastery",
@@ -89,7 +87,9 @@ export default function KGMapPage() {
     for (const e of pool) {
       const zh = (e.name_zh || "").toLowerCase();
       const en = (e.name_en || "").toLowerCase();
-      const hit = queries.some((qv) => zh.includes(qv) || en.includes(qv));
+      const addr = [e.province || "", e.city || "", e.district || ""].join("").toLowerCase();
+      const full = zh + addr;
+      const hit = queries.some((qv) => full.includes(qv) || en.includes(qv));
       if (hit) {
         matches.push(e);
         if (matches.length >= 30) break;
@@ -138,9 +138,6 @@ export default function KGMapPage() {
     setSelectedEntity(entity);
   };
 
-  const handleViewInGraph = (entityId: number) => {
-    navigate(`/kg?entity=${entityId}`);
-  };
 
   /* ---------- Render ---------- */
 
@@ -190,7 +187,7 @@ export default function KGMapPage() {
             onSearch={setSearchQuery}
             onChange={setSearchQuery}
             onSelect={handleSearchSelect}
-            placeholder="搜索实体（中/英文名）"
+            placeholder="搜索（名称/地址，如：福建崇恩）"
             allowClear
             style={{ width: 280, marginLeft: "auto" }}
             popupMatchSelectWidth={380}
@@ -245,7 +242,6 @@ export default function KGMapPage() {
               <MapEntityPopup
                 entity={selectedEntity}
                 onClose={() => setSelectedEntity(null)}
-                onViewInGraph={handleViewInGraph}
               />
             )}
           </>
