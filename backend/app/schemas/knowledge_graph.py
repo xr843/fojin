@@ -80,6 +80,9 @@ class KGGeoEntity(BaseModel):
     longitude: float
     year_start: int | None = None
     year_end: int | None = None
+    province: str | None = None
+    city: str | None = None
+    district: str | None = None
 
 
 class KGGeoResponse(BaseModel):

@@ -606,6 +606,9 @@ export interface KGGeoEntity {
   longitude: number;
   year_start: number | null;
   year_end: number | null;
+  province: string | null;
+  city: string | null;
+  district: string | null;
 }
 
 export interface KGGeoResponse {
@@ -1139,6 +1142,7 @@ export interface StreamCallbacks {
 export function sendChatMessageStream(
   message: string,
   sessionId: number | undefined,
+  masterId: string | null,
   callbacks: StreamCallbacks,
   signal?: AbortSignal,
 ): Promise<void> {
@@ -1254,7 +1258,7 @@ export function sendChatMessageStream(
       });
     }
 
-    xhr.send(JSON.stringify({ message, session_id: sessionId ?? null }));
+    xhr.send(JSON.stringify({ message, session_id: sessionId ?? null, master_id: masterId }));
   });
 }
 

@@ -19,6 +19,7 @@ from app.core.exceptions import (
 from app.models.chat import ChatMessage, ChatSession
 from app.models.user import User
 from app.schemas.chat import ChatResponse, ChatSource
+from app.services.master_profiles import get_master
 from app.services.rag_retrieval import retrieve_rag_context
 
 logger = logging.getLogger(__name__)
@@ -346,10 +347,15 @@ _MAX_INPUT_TOKENS = 6000
 
 
 def _build_llm_messages(
-    history: list[ChatMessage], context_text: str, message: str
+    history: list[ChatMessage], context_text: str, message: str,
+    master_id: str | None = None,
 ) -> list[dict[str, str]]:
     """Build the message list for the LLM call, trimming if too long."""
-    enhanced_prompt = _classify_and_enhance_prompt(message)
+    master = get_master(master_id) if master_id else None
+    if master:
+        enhanced_prompt = master.system_prompt
+    else:
+        enhanced_prompt = _classify_and_enhance_prompt(message)
     llm_messages: list[dict[str, str]] = [{"role": "system", "content": enhanced_prompt}]
     budget = _MAX_INPUT_TOKENS - _estimate_tokens(enhanced_prompt) - _estimate_tokens(message)
 
@@ -447,6 +453,7 @@ async def _prepare_chat(
     user: User | None = None,
     client_ip: str | None = None,
     redis=None,
+    master_id: str | None = None,
 ) -> tuple[ChatSession | None, str, str, str, bool, str, list[ChatSource], list[dict[str, str]]]:
     """Shared setup for send_message and send_message_stream.
 
@@ -484,8 +491,13 @@ async def _prepare_chat(
             break
 
     # RAG: hybrid retrieval (context-aware with conversation history)
-    sources, context_text = await retrieve_rag_context(db, message, prev_query=prev_user_msg)
-    llm_messages = _build_llm_messages(history, context_text, message)
+    # When a master is selected, scope RAG to their core texts
+    master = get_master(master_id) if master_id else None
+    scope_text_ids = master.fojin_text_ids if master and master.fojin_text_ids else None
+    sources, context_text = await retrieve_rag_context(
+        db, message, prev_query=prev_user_msg, scope_text_ids=scope_text_ids,
+    )
+    llm_messages = _build_llm_messages(history, context_text, message, master_id=master_id)
 
     return chat_session, api_url, api_key, model, is_byok, provider, sources, llm_messages
 
@@ -498,10 +510,11 @@ async def send_message(
     user: User | None = None,
     client_ip: str | None = None,
     redis=None,
+    master_id: str | None = None,
 ) -> ChatResponse:
     _t0 = _time.monotonic()
     chat_session, api_url, api_key, model, is_byok, provider, sources, llm_messages = await _prepare_chat(
-        db, user_id, message, session_id, user, client_ip=client_ip, redis=redis,
+        db, user_id, message, session_id, user, client_ip=client_ip, redis=redis, master_id=master_id,
     )
     _t1 = _time.monotonic()
     logger.debug("TIMING: _prepare_chat took %.2fs", _t1 - _t0)
@@ -564,6 +577,7 @@ async def send_message_stream(
     user: User | None = None,
     client_ip: str | None = None,
     redis=None,
+    master_id: str | None = None,
 ):
     """Async generator yielding SSE events for streaming chat responses.
 
@@ -579,7 +593,7 @@ async def send_message_stream(
 
     try:
         chat_session, api_url, api_key, model, is_byok, provider, sources, llm_messages = await _prepare_chat(
-            db, user_id, message, session_id, user, client_ip=client_ip, redis=redis,
+            db, user_id, message, session_id, user, client_ip=client_ip, redis=redis, master_id=master_id,
         )
     except (ValidationError, QuotaExceededError, AccessDeniedError, ServiceError) as exc:
         yield f"data: {json.dumps({'type': 'error', 'message': str(exc)}, ensure_ascii=False)}\n\n"

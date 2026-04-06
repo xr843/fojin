@@ -28,6 +28,7 @@ from app.services.chat import (
     send_message_stream,
     update_message_feedback,
 )
+from app.services.master_profiles import list_masters
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -52,7 +53,7 @@ async def chat(
     user_id = user.id if user else None
     client_ip = _get_client_ip(request) if not user else None
     redis = getattr(request.app.state, "redis", None)
-    return await send_message(db, user_id, data.message, data.session_id, user=user, client_ip=client_ip, redis=redis)
+    return await send_message(db, user_id, data.message, data.session_id, user=user, client_ip=client_ip, redis=redis, master_id=data.master_id)
 
 
 @router.post("/stream")
@@ -69,7 +70,7 @@ async def chat_stream(
     client_ip = _get_client_ip(request) if not user else None
     redis = getattr(request.app.state, "redis", None)
     return StreamingResponse(
-        send_message_stream(db, user_id, data.message, data.session_id, user=user, client_ip=client_ip, redis=redis),
+        send_message_stream(db, user_id, data.message, data.session_id, user=user, client_ip=client_ip, redis=redis, master_id=data.master_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache, no-transform",
@@ -78,6 +79,14 @@ async def chat_stream(
             "Connection": "keep-alive",
         },
     )
+
+
+@router.get("/masters")
+async def get_masters():
+    """List available Buddhist master personas for the AI chat.
+
+    获取可用的法师模式列表。"""
+    return {"masters": list_masters()}
 
 
 @router.get("/quota")

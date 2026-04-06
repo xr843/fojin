@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useMemo, useEffect, type ReactNode } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
-import { Input, Button, Space, message, Alert, Tooltip, Modal } from "antd";
+import { Input, Button, Space, message, Alert, Tooltip, Modal, Select } from "antd";
 import Markdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
 import {
@@ -118,6 +118,7 @@ export default function ChatPage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const [input, setInput] = useState("");
+  const [masterId, setMasterId] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<number | undefined>();
   const [messages, setMessages] = useState<ChatMessageItem[]>([]);
   const [sending, setSending] = useState(false);
@@ -290,7 +291,7 @@ export default function ChatPage() {
     // Auto-timeout after 90 seconds
     const timeoutId = setTimeout(() => abortController.abort(), 90_000);
 
-    await sendChatMessageStream(msg, sessionId, {
+    await sendChatMessageStream(msg, sessionId, masterId, {
       onToken: (content: string) => {
         setMessages((prev) =>
           prev.map((m) => {
@@ -335,7 +336,7 @@ export default function ChatPage() {
         refetchQuota();
       },
     }, abortController.signal);
-  }, [sending, sessionId, user, refetchSessions, refetchQuota]);
+  }, [sending, sessionId, masterId, user, refetchSessions, refetchQuota]);
 
   const handleSend = useCallback(async () => {
     await handleSendMessage(input);
@@ -844,6 +845,28 @@ export default function ChatPage() {
 
           {/* Input */}
           <div style={{ padding: "12px 0", borderTop: "1px solid rgba(217,208,193,0.5)" }}>
+            <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 13, color: "#8b7355", whiteSpace: "nowrap" }}>法师模式</span>
+              <Select
+                allowClear
+                placeholder="通用助手"
+                value={masterId}
+                onChange={(v) => setMasterId(v ?? null)}
+                style={{ width: 200, fontSize: 13 }}
+                size="small"
+                options={[
+                  { value: "zhiyi", label: "🪷 智顗（天台宗）" },
+                  { value: "huineng", label: "🪷 慧能（禅宗）" },
+                  { value: "xuanzang", label: "🪷 玄奘（唯识宗）" },
+                  { value: "fazang", label: "🪷 法藏（华严宗）" },
+                  { value: "kumarajiva", label: "🪷 鸠摩罗什（中观）" },
+                  { value: "yinguang", label: "🪷 印光（净土宗）" },
+                  { value: "ouyi", label: "🪷 蕅益（跨宗派）" },
+                  { value: "xuyun", label: "🪷 虚云（禅宗）" },
+                ]}
+              />
+              {masterId && <span style={{ fontSize: 11, color: "#a09070" }}>RAG 将限定于该法师核心经典</span>}
+            </div>
             {!keyStatus?.has_api_key && quota && quota.remaining >= 0 && (
               <Alert
                 message={<span>每日免费 {quota.limit} 次问答，今日剩余 {quota.remaining} 次。{user
