@@ -79,6 +79,21 @@ export default function DeckGLMap({
     }));
   }, [focusEntity]);
 
+  // Pulse animation for highlight ring
+  const [pulseScale, setPulseScale] = useState(1.0);
+  useEffect(() => {
+    if (!focusEntity) return;
+    let frame: number;
+    const start = performance.now();
+    const animate = () => {
+      const t = ((performance.now() - start) % 1200) / 1200;
+      setPulseScale(1.0 + 0.5 * Math.sin(t * Math.PI * 2));
+      frame = requestAnimationFrame(animate);
+    };
+    frame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frame);
+  }, [focusEntity]);
+
   /** Fetch + patch MapTiler style to force zh labels and replace Taiwan name */
   const [patchedStyle, setPatchedStyle] = useState<StyleSpecification | null>(null);
 
@@ -216,6 +231,30 @@ export default function DeckGLMap({
     if (places.length) result.push(makeLayer("entities-place", places));
     if (persons.length) result.push(makeLayer("entities-person", persons));
 
+    // Highlight ring for focused/selected entity (pulsing)
+    if (focusEntity) {
+      result.push(
+        new ScatterplotLayer<KGGeoEntity>({
+          id: "highlight-pulse",
+          data: [focusEntity],
+          getPosition: (d) => [d.longitude, d.latitude],
+          getFillColor: [255, 69, 0, 40],
+          getLineColor: [255, 69, 0, Math.round(120 + 80 * (pulseScale - 1))],
+          stroked: true,
+          lineWidthMinPixels: 2.5,
+          getRadius: 8000,
+          radiusScale: pulseScale,
+          radiusMinPixels: Math.round(12 * pulseScale),
+          radiusMaxPixels: Math.round(22 * pulseScale),
+          pickable: false,
+          updateTriggers: {
+            getLineColor: [pulseScale],
+            radiusScale: [pulseScale],
+          },
+        }),
+      );
+    }
+
     // Lineage arcs
     if (showArcs && filteredArcs.length > 0) {
       result.push(
@@ -243,7 +282,7 @@ export default function DeckGLMap({
     }
 
     return result;
-  }, [filteredEntities, filteredArcs, showArcs, handleHover, handleClick]);
+  }, [filteredEntities, filteredArcs, showArcs, handleHover, handleClick, focusEntity, pulseScale]);
 
   return (
     <>

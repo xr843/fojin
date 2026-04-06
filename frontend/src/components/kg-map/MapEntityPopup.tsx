@@ -1,11 +1,10 @@
 import { Button } from "antd";
-import { CloseOutlined, ApartmentOutlined, BookOutlined } from "@ant-design/icons";
+import { CloseOutlined, EnvironmentOutlined } from "@ant-design/icons";
 import type { KGGeoEntity } from "../../api/client";
 
 interface MapEntityPopupProps {
   entity: KGGeoEntity;
   onClose: () => void;
-  onViewInGraph: (entityId: number) => void;
 }
 
 const TYPE_LABEL_MAP: Record<string, string> = {
@@ -33,9 +32,9 @@ function formatYearRange(start: number | null, end: number | null): string {
 export default function MapEntityPopup({
   entity,
   onClose,
-  onViewInGraph,
 }: MapEntityPopupProps) {
   const yearText = formatYearRange(entity.year_start, entity.year_end);
+  const address = [entity.province, entity.city, entity.district].filter(Boolean).join("");
 
   return (
     <div className="kg-map-popup-container">
@@ -59,6 +58,13 @@ export default function MapEntityPopup({
           )}
         </div>
 
+        {address && (
+          <div style={{ fontSize: 12, color: "#999", padding: "4px 14px 0", display: "flex", alignItems: "center", gap: 4 }}>
+            <EnvironmentOutlined style={{ fontSize: 11 }} />
+            {address}
+          </div>
+        )}
+
         {entity.description && (
           <div className="kg-map-popup-desc">{entity.description}</div>
         )}
@@ -66,23 +72,6 @@ export default function MapEntityPopup({
         {yearText && (
           <div className="kg-map-popup-year">{yearText}</div>
         )}
-
-        <div className="kg-map-popup-actions">
-          <Button
-            size="small"
-            icon={<ApartmentOutlined />}
-            onClick={() => onViewInGraph(entity.id)}
-          >
-            知识图谱
-          </Button>
-          <Button
-            size="small"
-            icon={<BookOutlined />}
-            onClick={() => onViewInGraph(entity.id)}
-          >
-            详情
-          </Button>
-        </div>
       </div>
     </div>
   );
