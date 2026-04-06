@@ -243,6 +243,7 @@ async def retrieve_rag_context(
     *,
     prev_query: str | None = None,
     pgvector_limit: int = 10,
+    scope_text_ids: list[int] | None = None,
 ) -> tuple[list[ChatSource], str]:
     """Run pgvector similarity search and return (sources, context_text).
 
@@ -267,7 +268,7 @@ async def retrieve_rag_context(
         logger.debug("TIMING: Embedding took %.2fs", t1 - t0)
 
         # Search text chunks, then data sources (sequential to avoid session conflicts)
-        text_results = await similarity_search(db, query_embedding, limit=pgvector_limit)
+        text_results = await similarity_search(db, query_embedding, limit=pgvector_limit, scope_text_ids=scope_text_ids)
         source_results = await source_similarity_search(db, query_embedding, limit=3, min_score=0.5)
         logger.debug("TIMING: pgvector search took %.2fs", time.monotonic() - t1)
 

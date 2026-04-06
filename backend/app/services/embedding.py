@@ -118,21 +118,40 @@ async def similarity_search(
     session: AsyncSession,
     query_embedding: list[float],
     limit: int = 5,
+    scope_text_ids: list[int] | None = None,
 ) -> list[dict]:
-    """Find most similar text chunks using pgvector cosine distance."""
+    """Find most similar text chunks using pgvector cosine distance.
+
+    When scope_text_ids is provided, only search within those texts
+    (used for master persona mode to restrict RAG to the master's core scriptures).
+    """
     embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
     raw_conn = await session.connection()
-    result = await raw_conn.exec_driver_sql(
-        "SELECT te.text_id, te.juan_num, te.chunk_text, "
-        "1 - (te.embedding <=> $1::vector) AS score, "
-        "COALESCE(bt.title_zh, '') AS title_zh "
-        "FROM text_embeddings te "
-        "LEFT JOIN buddhist_texts bt ON bt.id = te.text_id "
-        "WHERE te.embedding IS NOT NULL "
-        "ORDER BY te.embedding <=> $1::vector "
-        "LIMIT $2",
-        (embedding_str, limit),
-    )
+    if scope_text_ids:
+        placeholders = ",".join(str(tid) for tid in scope_text_ids)
+        result = await raw_conn.exec_driver_sql(
+            "SELECT te.text_id, te.juan_num, te.chunk_text, "
+            "1 - (te.embedding <=> $1::vector) AS score, "
+            "COALESCE(bt.title_zh, '') AS title_zh "
+            "FROM text_embeddings te "
+            "LEFT JOIN buddhist_texts bt ON bt.id = te.text_id "
+            f"WHERE te.embedding IS NOT NULL AND te.text_id IN ({placeholders}) "
+            "ORDER BY te.embedding <=> $1::vector "
+            "LIMIT $2",
+            (embedding_str, limit),
+        )
+    else:
+        result = await raw_conn.exec_driver_sql(
+            "SELECT te.text_id, te.juan_num, te.chunk_text, "
+            "1 - (te.embedding <=> $1::vector) AS score, "
+            "COALESCE(bt.title_zh, '') AS title_zh "
+            "FROM text_embeddings te "
+            "LEFT JOIN buddhist_texts bt ON bt.id = te.text_id "
+            "WHERE te.embedding IS NOT NULL "
+            "ORDER BY te.embedding <=> $1::vector "
+            "LIMIT $2",
+            (embedding_str, limit),
+        )
     rows = result.fetchall()
     return [
         {
