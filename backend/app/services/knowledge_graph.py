@@ -318,7 +318,10 @@ async def get_geo_entities(
             (e.properties->>'latitude')::float AS latitude,
             (e.properties->>'longitude')::float AS longitude,
             (e.properties->>'year_start')::int AS year_start,
-            (e.properties->>'year_end')::int AS year_end
+            (e.properties->>'year_end')::int AS year_end,
+            e.properties->>'province' AS province,
+            e.properties->>'city' AS city,
+            e.properties->>'district' AS district
         FROM kg_entities e
         WHERE {where_clause}
         ORDER BY e.id
@@ -337,6 +340,9 @@ async def get_geo_entities(
             "longitude": row[6],
             "year_start": row[7],
             "year_end": row[8],
+            "province": row[9],
+            "city": row[10],
+            "district": row[11],
         }
         for row in result.fetchall()
     ]

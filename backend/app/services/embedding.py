@@ -135,7 +135,7 @@ async def similarity_search(
             "COALESCE(bt.title_zh, '') AS title_zh "
             "FROM text_embeddings te "
             "LEFT JOIN buddhist_texts bt ON bt.id = te.text_id "
-            f"WHERE te.embedding IS NOT NULL AND te.text_id IN ({placeholders}) "
+            f"WHERE te.embedding IS NOT NULL AND te.text_id IN ({placeholders}) "  # nosec B608 — IDs from hardcoded MasterProfile, not user input
             "ORDER BY te.embedding <=> $1::vector "
             "LIMIT $2",
             (embedding_str, limit),

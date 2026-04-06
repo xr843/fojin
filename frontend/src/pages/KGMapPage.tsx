@@ -109,10 +109,14 @@ export default function KGMapPage() {
             }}
           />
           <span style={{ fontWeight: 500 }}>{e.name_zh}</span>
-          {e.name_en && (
+          {(e.province || e.city || e.district) ? (
+            <span style={{ color: "#999", fontSize: 11 }}>
+              {[e.province, e.city, e.district].filter(Boolean).join("")}
+            </span>
+          ) : e.name_en ? (
             <span style={{ color: "#999", fontSize: 11, fontStyle: "italic" }}>{e.name_en}</span>
-          )}
-          <span style={{ color: "#bbb", fontSize: 10, marginLeft: "auto" }}>
+          ) : null}
+          <span style={{ color: "#bbb", fontSize: 10, marginLeft: "auto", flexShrink: 0 }}>
             {TYPE_LABEL[e.entity_type] || e.entity_type}
           </span>
         </div>

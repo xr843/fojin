@@ -336,7 +336,7 @@ export default function ChatPage() {
         refetchQuota();
       },
     }, abortController.signal);
-  }, [sending, sessionId, user, refetchSessions, refetchQuota]);
+  }, [sending, sessionId, masterId, user, refetchSessions, refetchQuota]);
 
   const handleSend = useCallback(async () => {
     await handleSendMessage(input);

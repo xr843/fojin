@@ -606,6 +606,9 @@ export interface KGGeoEntity {
   longitude: number;
   year_start: number | null;
   year_end: number | null;
+  province: string | null;
+  city: string | null;
+  district: string | null;
 }
 
 export interface KGGeoResponse {

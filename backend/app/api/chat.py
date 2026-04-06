@@ -14,8 +14,6 @@ from app.schemas.chat import (
     FeedbackRequest,
     SessionListItem,
 )
-from app.services.master_profiles import list_masters
-
 from app.services.chat import (
     FREE_DAILY_LIMIT_ANONYMOUS,
     FREE_DAILY_LIMIT_USER,
@@ -30,6 +28,7 @@ from app.services.chat import (
     send_message_stream,
     update_message_feedback,
 )
+from app.services.master_profiles import list_masters
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
