@@ -49,6 +49,8 @@ const PROPERTY_LABELS: Record<string, string> = {
   language: "语言",
   author: "作者",
   translator: "译者",
+  year_start: "生年",
+  year_end: "卒年",
 };
 
 interface Entity {
@@ -169,7 +171,9 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
             marginBottom: 10,
           }}
         >
-          {Object.entries(entity.properties).map(([key, value]) => (
+          {Object.entries(entity.properties)
+            .filter(([key]) => key in PROPERTY_LABELS)
+            .map(([key, value]) => (
             <div
               key={key}
               style={{ fontSize: 12, color: "#5c4f3d", marginBottom: 2 }}

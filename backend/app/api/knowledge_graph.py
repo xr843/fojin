@@ -98,7 +98,7 @@ async def get_kg_geo_entities(
     west: float | None = None,
     north: float | None = None,
     east: float | None = None,
-    limit: int = Query(5000, le=50000),
+    limit: int = Query(200000, le=500000),
     db: AsyncSession = Depends(get_db),
 ):
     """Get geo-located knowledge graph entities for map display.
@@ -126,7 +126,7 @@ async def get_kg_lineage_arcs(
     school: str | None = None,
     year_start: int | None = None,
     year_end: int | None = None,
-    limit: int = Query(5000, le=50000),
+    limit: int = Query(200000, le=500000),
     db: AsyncSession = Depends(get_db),
 ):
     """Get teacher-student lineage arcs with coordinates for map visualization.

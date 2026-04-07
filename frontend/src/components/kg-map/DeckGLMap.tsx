@@ -179,17 +179,35 @@ export default function DeckGLMap({
 
   const handleHover = useCallback((info: PickingInfo) => {
     if (info.object && info.x !== undefined && info.y !== undefined) {
-      setTooltip({ x: info.x, y: info.y, entity: info.object as KGGeoEntity });
+      const hovered = info.object as KGGeoEntity;
+      // If a focused entity exists and the hovered entity is at the same location,
+      // show the focused entity in tooltip to avoid confusion
+      if (focusEntity && focusEntity.id !== hovered.id &&
+          Math.abs(hovered.latitude - focusEntity.latitude) < 0.001 &&
+          Math.abs(hovered.longitude - focusEntity.longitude) < 0.001) {
+        setTooltip({ x: info.x, y: info.y, entity: focusEntity });
+      } else {
+        setTooltip({ x: info.x, y: info.y, entity: hovered });
+      }
     } else {
       setTooltip(null);
     }
-  }, []);
+  }, [focusEntity]);
 
   const handleClick = useCallback(
     (info: PickingInfo) => {
-      if (info.object) onEntityClick(info.object as KGGeoEntity);
+      if (!info.object) return;
+      const clicked = info.object as KGGeoEntity;
+      // If focused entity is at the same location, select the focused one
+      if (focusEntity && focusEntity.id !== clicked.id &&
+          Math.abs(clicked.latitude - focusEntity.latitude) < 0.001 &&
+          Math.abs(clicked.longitude - focusEntity.longitude) < 0.001) {
+        onEntityClick(focusEntity);
+      } else {
+        onEntityClick(clicked);
+      }
     },
-    [onEntityClick],
+    [onEntityClick, focusEntity],
   );
 
   const layers = useMemo(() => {
