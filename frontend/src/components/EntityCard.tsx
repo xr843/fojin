@@ -169,7 +169,9 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
             marginBottom: 10,
           }}
         >
-          {Object.entries(entity.properties).map(([key, value]) => (
+          {Object.entries(entity.properties)
+            .filter(([key]) => !["latitude", "longitude", "geo_source", "province", "city", "district"].includes(key) && !key.startsWith("wikidata:"))
+            .map(([key, value]) => (
             <div
               key={key}
               style={{ fontSize: 12, color: "#5c4f3d", marginBottom: 2 }}
