@@ -20,6 +20,8 @@ import CitationGenerator from "../components/CitationGenerator";
 import AnnotationPanel from "../components/AnnotationPanel";
 import AskXiaojinButton from "../components/AskXiaojinButton";
 import ReaderSidebar from "../components/ReaderSidebar";
+import TextVersionsPanel from "../components/TextVersionsPanel";
+import "../styles/versions-panel.css";
 import "../styles/reader.css";
 
 const LANG_LABELS: Record<string, string> = {
@@ -715,6 +717,7 @@ export default function TextReaderPage() {
       />
     </div>
     <ReaderSidebar textId={textId} juanNum={juanNum} />
+    <TextVersionsPanel textId={textId} />
     </div>
   );
 }

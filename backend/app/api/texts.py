@@ -184,3 +184,122 @@ async def similar_passages(
     )[:limit]
 
     return SimilarPassagesResponse(text_id=text_id, juan_num=juan_num, passages=passages)
+
+
+# ── Version aggregation (IIIF + cross-source) ──────────────────────
+
+
+class VersionTranslation(BaseModel):
+    text_id: int
+    title_zh: str | None = None
+    title_en: str | None = None
+    translator: str | None = None
+    dynasty: str | None = None
+    lang: str | None = None
+    source_name: str | None = None
+    relation_type: str | None = None
+
+
+class VersionIIIF(BaseModel):
+    id: int
+    label: str | None = None
+    manifest_url: str
+    thumbnail_url: str | None = None
+    provider: str | None = None
+
+
+class VersionSourceLink(BaseModel):
+    source_name: str
+    source_url: str | None = None
+
+
+class TextVersionsResponse(BaseModel):
+    text_id: int
+    title_zh: str | None = None
+    translations: list[VersionTranslation]
+    iiif_manifests: list[VersionIIIF]
+    source_links: list[VersionSourceLink]
+
+
+@router.get("/texts/{text_id}/versions", response_model=TextVersionsResponse)
+async def get_text_versions(text_id: int, db: AsyncSession = Depends(get_db)):
+    """Get all versions of a text: translations, parallel texts, IIIF manifests, and source links.
+
+    获取经典的所有版本：不同译本、平行文本、IIIF写本图像、各数据源链接。"""
+    text = await get_text_by_id(db, text_id)
+    if not text:
+        raise TextNotFoundError(text_id=text_id)
+
+    raw = await db.connection()
+
+    # 1. Related translations and parallel texts
+    tr_rows = await raw.exec_driver_sql(
+        "SELECT bt.id, bt.title_zh, bt.title_en, bt.translator, bt.dynasty, bt.lang, "
+        "ds.name_zh as source_name, tr.relation_type "
+        "FROM text_relations tr "
+        "JOIN buddhist_texts bt ON bt.id = (CASE WHEN tr.text_a_id = $1 THEN tr.text_b_id ELSE tr.text_a_id END) "
+        "LEFT JOIN data_sources ds ON bt.source_id = ds.id "
+        "WHERE (tr.text_a_id = $1 OR tr.text_b_id = $1) "
+        "ORDER BY tr.relation_type, bt.lang, bt.dynasty",
+        (text_id,),
+    )
+    tr_rows_data = list(tr_rows.fetchall())
+
+    # Also find same-title texts (different translations of same sutra)
+    title_rows = await raw.exec_driver_sql(
+        "SELECT bt.id, bt.title_zh, bt.title_en, bt.translator, bt.dynasty, bt.lang, "
+        "ds.name_zh as source_name, NULL as relation_type "
+        "FROM buddhist_texts bt "
+        "LEFT JOIN data_sources ds ON bt.source_id = ds.id "
+        "WHERE bt.title_zh = (SELECT title_zh FROM buddhist_texts WHERE id = $1) "
+        "AND bt.id != $1 "
+        "ORDER BY bt.dynasty, bt.translator",
+        (text_id,),
+    )
+    existing_ids = {r[0] for r in tr_rows_data}
+    for r in title_rows.fetchall():
+        if r[0] not in existing_ids:
+            tr_rows_data.append(r)
+
+    translations = [
+        VersionTranslation(
+            text_id=r[0], title_zh=r[1], title_en=r[2],
+            translator=r[3], dynasty=r[4], lang=r[5],
+            source_name=r[6], relation_type=r[7],
+        )
+        for r in tr_rows_data
+    ]
+
+    # 2. IIIF manifests
+    iiif_rows = await raw.exec_driver_sql(
+        """SELECT id, label, manifest_url, thumbnail_url, provider
+           FROM iiif_manifests WHERE text_id = $1
+           ORDER BY provider""",
+        (text_id,),
+    )
+    iiif = [
+        VersionIIIF(id=r[0], label=r[1], manifest_url=r[2], thumbnail_url=r[3], provider=r[4])
+        for r in iiif_rows.fetchall()
+    ]
+
+    # 3. Source links (where this text can be read)
+    link_rows = await raw.exec_driver_sql(
+        """SELECT ds.name_zh, ti.source_url
+           FROM text_identifiers ti
+           JOIN data_sources ds ON ti.source_id = ds.id
+           WHERE ti.text_id = $1
+           ORDER BY ds.sort_order""",
+        (text_id,),
+    )
+    links = [
+        VersionSourceLink(source_name=r[0], source_url=r[1])
+        for r in link_rows.fetchall()
+    ]
+
+    return TextVersionsResponse(
+        text_id=text_id,
+        title_zh=text.title_zh,
+        translations=translations,
+        iiif_manifests=iiif,
+        source_links=links,
+    )

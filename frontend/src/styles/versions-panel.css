@@ -1,0 +1,148 @@
+/* Text Versions Panel */
+.versions-panel {
+  margin-top: 16px;
+  border: 1px solid var(--fj-border, #e8e0d4);
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.versions-section {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--fj-bg-alt, #f5f0e8);
+}
+.versions-section:last-child {
+  border-bottom: none;
+}
+
+.versions-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #5a4e3c;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.versions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.version-item {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--fj-bg-alt, #faf7f2);
+  transition: background 0.15s;
+}
+.version-item--clickable {
+  cursor: pointer;
+}
+.version-item--clickable:hover {
+  background: #f0ebe0;
+}
+
+.version-item-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.version-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: #3a3226;
+}
+
+.version-item-meta {
+  font-size: 11px;
+  color: #999;
+  margin-top: 2px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.version-dynasty {
+  color: #b5a07a;
+}
+
+.version-source {
+  color: #aaa;
+}
+
+/* IIIF grid */
+.versions-iiif-grid {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.version-iiif-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 80px;
+  text-decoration: none;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #e8e0d4;
+  transition: box-shadow 0.15s;
+}
+.version-iiif-card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.version-iiif-thumb {
+  width: 80px;
+  height: 60px;
+  object-fit: cover;
+}
+
+.version-iiif-placeholder {
+  width: 80px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f0e8;
+}
+
+.version-iiif-label {
+  font-size: 10px;
+  color: #999;
+  padding: 3px 4px;
+  text-align: center;
+  width: 100%;
+  background: #faf7f2;
+}
+
+/* Source links */
+.versions-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.version-source-link {
+  font-size: 12px;
+  color: #8b7355;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  background: var(--fj-bg-alt, #faf7f2);
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.version-source-link:hover {
+  background: #f0ebe0;
+  color: #5a4e3c;
+}
+.version-source-link--disabled {
+  color: #ccc;
+  cursor: default;
+}

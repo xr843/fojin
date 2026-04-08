@@ -1291,3 +1291,41 @@ export async function deleteApiKey(): Promise<void> {
 }
 
 export default api;
+
+// Text Versions (aggregated view)
+export interface VersionTranslation {
+  text_id: number;
+  title_zh: string | null;
+  title_en: string | null;
+  translator: string | null;
+  dynasty: string | null;
+  lang: string | null;
+  source_name: string | null;
+  relation_type: string | null;
+}
+
+export interface VersionIIIF {
+  id: number;
+  label: string | null;
+  manifest_url: string;
+  thumbnail_url: string | null;
+  provider: string | null;
+}
+
+export interface VersionSourceLink {
+  source_name: string;
+  source_url: string | null;
+}
+
+export interface TextVersionsResponse {
+  text_id: number;
+  title_zh: string | null;
+  translations: VersionTranslation[];
+  iiif_manifests: VersionIIIF[];
+  source_links: VersionSourceLink[];
+}
+
+export async function getTextVersions(textId: number): Promise<TextVersionsResponse> {
+  const { data } = await api.get<TextVersionsResponse>(`/texts/${textId}/versions`);
+  return data;
+}
