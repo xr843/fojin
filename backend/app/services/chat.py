@@ -176,6 +176,34 @@ def _classify_and_enhance_prompt(message: str) -> str:
     return SYSTEM_PROMPT
 
 
+def _build_reader_context_prompt(
+    base_prompt: str, text_title: str, juan_num: int | None, selected_text: str | None,
+) -> str:
+    """Enhance the system prompt with reading context when user asks from the reader page."""
+    ctx = f"\n\n## 阅读上下文\n用户正在阅读《{text_title}》"
+    if juan_num:
+        ctx += f"第{juan_num}卷"
+    ctx += "。请结合该经文的内容回答问题。\n"
+    if selected_text:
+        ctx += f"\n用户选中的经文原文：\n「{selected_text[:500]}」\n"
+    ctx += (
+        "\n## 阅读模式特别要求\n"
+        "- 优先解释用户选中的经文段落\n"
+        "- 提供白话翻译（如果原文是文言文）\n"
+        "- 解释段落中的关键佛学术语\n"
+        "- 说明该段落在整部经典中的位置和意义\n"
+        "- 引用相关的注疏或其他经典进行对照\n"
+    )
+    return base_prompt + ctx
+
+
+async def _get_text_title(db: AsyncSession, text_id: int) -> str | None:
+    """Get the Chinese title of a text by ID."""
+    from app.models.text import BuddhistText
+    result = await db.execute(select(BuddhistText.title_zh).where(BuddhistText.id == text_id))
+    return result.scalar_one_or_none()
+
+
 async def create_session(session: AsyncSession, user_id: int | None, title: str | None = None) -> ChatSession:
     cs = ChatSession(user_id=user_id, title=title)
     session.add(cs)
@@ -349,6 +377,7 @@ _MAX_INPUT_TOKENS = 6000
 def _build_llm_messages(
     history: list[ChatMessage], context_text: str, message: str,
     master_id: str | None = None,
+    reading_context: dict | None = None,
 ) -> list[dict[str, str]]:
     """Build the message list for the LLM call, trimming if too long."""
     master = get_master(master_id) if master_id else None
@@ -356,6 +385,15 @@ def _build_llm_messages(
         enhanced_prompt = master.system_prompt
     else:
         enhanced_prompt = _classify_and_enhance_prompt(message)
+
+    # Enhance with reading context when user is asking from the reader page
+    if reading_context:
+        enhanced_prompt = _build_reader_context_prompt(
+            enhanced_prompt,
+            reading_context["title"],
+            reading_context.get("juan_num"),
+            reading_context.get("selected_text"),
+        )
     llm_messages: list[dict[str, str]] = [{"role": "system", "content": enhanced_prompt}]
     budget = _MAX_INPUT_TOKENS - _estimate_tokens(enhanced_prompt) - _estimate_tokens(message)
 
@@ -454,6 +492,9 @@ async def _prepare_chat(
     client_ip: str | None = None,
     redis=None,
     master_id: str | None = None,
+    text_id: int | None = None,
+    juan_num: int | None = None,
+    selected_text: str | None = None,
 ) -> tuple[ChatSession | None, str, str, str, bool, str, list[ChatSource], list[dict[str, str]]]:
     """Shared setup for send_message and send_message_stream.
 
@@ -497,7 +538,22 @@ async def _prepare_chat(
     sources, context_text = await retrieve_rag_context(
         db, message, prev_query=prev_user_msg, scope_text_ids=scope_text_ids,
     )
-    llm_messages = _build_llm_messages(history, context_text, message, master_id=master_id)
+
+    # Reading context: enhance prompt when user is reading a specific text
+    reading_context = None
+    if text_id:
+        text_title = await _get_text_title(db, text_id)
+        if text_title:
+            reading_context = {
+                "title": text_title,
+                "juan_num": juan_num,
+                "selected_text": selected_text,
+            }
+
+    llm_messages = _build_llm_messages(
+        history, context_text, message, master_id=master_id,
+        reading_context=reading_context,
+    )
 
     return chat_session, api_url, api_key, model, is_byok, provider, sources, llm_messages
 
@@ -511,10 +567,14 @@ async def send_message(
     client_ip: str | None = None,
     redis=None,
     master_id: str | None = None,
+    text_id: int | None = None,
+    juan_num: int | None = None,
+    selected_text: str | None = None,
 ) -> ChatResponse:
     _t0 = _time.monotonic()
     chat_session, api_url, api_key, model, is_byok, provider, sources, llm_messages = await _prepare_chat(
         db, user_id, message, session_id, user, client_ip=client_ip, redis=redis, master_id=master_id,
+        text_id=text_id, juan_num=juan_num, selected_text=selected_text,
     )
     _t1 = _time.monotonic()
     logger.debug("TIMING: _prepare_chat took %.2fs", _t1 - _t0)
@@ -578,6 +638,9 @@ async def send_message_stream(
     client_ip: str | None = None,
     redis=None,
     master_id: str | None = None,
+    text_id: int | None = None,
+    juan_num: int | None = None,
+    selected_text: str | None = None,
 ):
     """Async generator yielding SSE events for streaming chat responses.
 
@@ -594,6 +657,7 @@ async def send_message_stream(
     try:
         chat_session, api_url, api_key, model, is_byok, provider, sources, llm_messages = await _prepare_chat(
             db, user_id, message, session_id, user, client_ip=client_ip, redis=redis, master_id=master_id,
+            text_id=text_id, juan_num=juan_num, selected_text=selected_text,
         )
     except (ValidationError, QuotaExceededError, AccessDeniedError, ServiceError) as exc:
         yield f"data: {json.dumps({'type': 'error', 'message': str(exc)}, ensure_ascii=False)}\n\n"

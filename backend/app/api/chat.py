@@ -53,7 +53,11 @@ async def chat(
     user_id = user.id if user else None
     client_ip = _get_client_ip(request) if not user else None
     redis = getattr(request.app.state, "redis", None)
-    return await send_message(db, user_id, data.message, data.session_id, user=user, client_ip=client_ip, redis=redis, master_id=data.master_id)
+    return await send_message(
+        db, user_id, data.message, data.session_id, user=user,
+        client_ip=client_ip, redis=redis, master_id=data.master_id,
+        text_id=data.text_id, juan_num=data.juan_num, selected_text=data.selected_text,
+    )
 
 
 @router.post("/stream")
@@ -70,7 +74,11 @@ async def chat_stream(
     client_ip = _get_client_ip(request) if not user else None
     redis = getattr(request.app.state, "redis", None)
     return StreamingResponse(
-        send_message_stream(db, user_id, data.message, data.session_id, user=user, client_ip=client_ip, redis=redis, master_id=data.master_id),
+        send_message_stream(
+            db, user_id, data.message, data.session_id, user=user,
+            client_ip=client_ip, redis=redis, master_id=data.master_id,
+            text_id=data.text_id, juan_num=data.juan_num, selected_text=data.selected_text,
+        ),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache, no-transform",

@@ -347,6 +347,17 @@ export default function TextReaderPage() {
   const queryClient = useQueryClient();
   const readerContentRef = useRef<HTMLDivElement>(null);
 
+  // AI sidebar state
+  const [aiSelectedText, setAiSelectedText] = useState<string | undefined>();
+  const [sidebarTab, setSidebarTab] = useState("ai");
+  const handleAskXiaojin = useCallback((text: string) => {
+    setAiSelectedText(text);
+    setSidebarTab("ai");
+  }, []);
+  const handleSelectedTextConsumed = useCallback(() => {
+    setAiSelectedText(undefined);
+  }, []);
+
   // 划词查辞典
   const [dictPopover, setDictPopover] = useState<DictPopoverState>(DICT_POPOVER_INIT);
   const closeDictPopover = useCallback(() => setDictPopover(DICT_POPOVER_INIT), []);
@@ -673,7 +684,7 @@ export default function TextReaderPage() {
       )}
       <AskXiaojinButton
         containerRef={readerContentRef}
-        source={`${content?.title_zh || ""}第${juanNum}卷`}
+        onAsk={handleAskXiaojin}
       />
       <DictPopover state={dictPopover} onClose={closeDictPopover} />
       </div>
@@ -714,7 +725,15 @@ export default function TextReaderPage() {
         onClose={() => setAnnotationOpen(false)}
       />
     </div>
-    <ReaderSidebar textId={textId} juanNum={juanNum} />
+    <ReaderSidebar
+      textId={textId}
+      juanNum={juanNum}
+      textTitle={content?.title_zh || textDetail?.title_zh || ""}
+      selectedText={aiSelectedText}
+      onSelectedTextConsumed={handleSelectedTextConsumed}
+      activeTab={sidebarTab}
+      onTabChange={setSidebarTab}
+    />
     </div>
   );
 }
