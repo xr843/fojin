@@ -426,7 +426,7 @@ export default function ChatPage() {
     a.download = `${sessionTitle}-${new Date().toISOString().slice(0, 10)}.md`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [messages, sessions, sessionId]);
+  }, [messages, sessions, sessionId, t]);
 
   return (
     <>
