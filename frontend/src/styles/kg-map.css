@@ -206,7 +206,8 @@
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
+  max-height: 80vh;
+  overflow: visible;
 }
 
 .kg-map-popup-header {
@@ -240,10 +241,8 @@
   color: #7a6e5c;
   padding: 8px 14px;
   line-height: 1.5;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  overflow-y: auto;
+  max-height: 200px;
 }
 
 .kg-map-popup-year {

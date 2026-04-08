@@ -378,6 +378,10 @@ async def get_lineage_arcs(
         "(t.properties->>'longitude') IS NOT NULL",
         "(s.properties->>'latitude') IS NOT NULL",
         "(s.properties->>'longitude') IS NOT NULL",
+        "(t.properties->>'latitude') != ''",
+        "(s.properties->>'latitude') != ''",
+        "COALESCE(t.properties->>'geo_source', '') NOT LIKE 'teacher_hop%%'",
+        "COALESCE(s.properties->>'geo_source', '') NOT LIKE 'teacher_hop%%'",
     ]
     params: dict = {"limit": limit}
 

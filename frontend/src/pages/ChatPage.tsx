@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useMemo, useEffect, type ReactNode } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
+import { useTranslation } from "react-i18next";
 import { Input, Button, Space, message, Alert, Tooltip, Modal, Select } from "antd";
 import Markdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
@@ -116,6 +117,7 @@ function groupSessionsByDate(sessions: ChatSessionItem[]): { label: string; item
 
 export default function ChatPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { user } = useAuthStore();
   const [input, setInput] = useState("");
   const [masterId, setMasterId] = useState<string | null>(null);
@@ -353,13 +355,8 @@ export default function ChatPage() {
       }
     }
     // Fallback to hot questions (same defaults as the welcome card)
-    return hotQuestionsData?.questions ?? [
-      "《心经》中「色不异空」的含义是什么？",
-      "鸠摩罗什与玄奘的翻译风格有何不同？",
-      "四圣谛的核心教义是什么？",
-      "禅宗的「不立文字」思想源自哪些经典？",
-    ];
-  }, [messages, hotQuestionsData]);
+    return hotQuestionsData?.questions ?? (t("chat.hot_questions", { returnObjects: true }) as string[]);
+  }, [messages, hotQuestionsData, t]);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -404,7 +401,7 @@ export default function ChatPage() {
       message.warning("暂无对话内容可导出");
       return;
     }
-    const sessionTitle = sessions?.find((s) => s.id === sessionId)?.title || "新对话";
+    const sessionTitle = sessions?.find((s) => s.id === sessionId)?.title || t("chat.new_chat");
     const now = new Date().toLocaleString("zh-CN");
     let md = `# ${sessionTitle}\n导出时间: ${now}\n\n`;
     for (const m of messages) {
@@ -433,7 +430,7 @@ export default function ChatPage() {
 
   return (
     <>
-      <Helmet><title>小津 AI 佛典问答 — 佛津 FoJin</title></Helmet>
+      <Helmet><title>{t("chat.page_title")}</title></Helmet>
       <div style={{ display: "flex", height: "calc(100vh - 120px)", maxWidth: 1100, margin: "0 auto", gap: 16 }}>
 
         {/* Mobile sidebar drawer (logged in only) */}
@@ -441,11 +438,11 @@ export default function ChatPage() {
           <>
             <div className="chat-sidebar-overlay" onClick={() => setSidebarOpen(false)} />
             <div className="chat-sidebar-drawer">
-              <Button icon={<PlusOutlined />} block onClick={() => { handleNewChat(); setSidebarOpen(false); }}>新对话</Button>
+              <Button icon={<PlusOutlined />} block onClick={() => { handleNewChat(); setSidebarOpen(false); }}>{t("chat.new_chat")}</Button>
               <Button icon={<SettingOutlined />} block type="text" size="small"
                 style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
                 onClick={() => { navigate("/profile?tab=apikey"); setSidebarOpen(false); }}>
-                {keyStatus?.has_api_key ? `已配置 Key (${keyStatus.provider})` : "配置 API Key"}
+                {keyStatus?.has_api_key ? `${t("chat.key_configured")} (${keyStatus.provider})` : t("chat.configure_key")}
               </Button>
               <div style={{ flex: 1, overflow: "auto", marginTop: 8 }}>
                 {groupedSessions.map((group) => (
@@ -464,7 +461,7 @@ export default function ChatPage() {
                         onClick={() => { loadSession(s.id); setSidebarOpen(false); }}
                       >
                         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-                          {s.title || "新对话"}
+                          {s.title || t("chat.new_chat")}
                         </span>
                         <DeleteOutlined
                           style={{ fontSize: 11, color: "var(--fj-ink-muted)", marginLeft: 4 }}
@@ -482,11 +479,11 @@ export default function ChatPage() {
         {/* Sidebar (desktop, logged in only) */}
         {user && <div style={{ width: 220, flexShrink: 0, display: "flex", flexDirection: "column", gap: 8 }}
              className="chat-sidebar">
-          <Button icon={<PlusOutlined />} block onClick={handleNewChat}>新对话</Button>
+          <Button icon={<PlusOutlined />} block onClick={handleNewChat}>{t("chat.new_chat")}</Button>
           <Button icon={<SettingOutlined />} block type="text" size="small"
             style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
             onClick={() => navigate("/profile?tab=apikey")}>
-            {keyStatus?.has_api_key ? `已配置 Key (${keyStatus.provider})` : "配置 API Key"}
+            {keyStatus?.has_api_key ? `${t("chat.key_configured")} (${keyStatus.provider})` : t("chat.configure_key")}
           </Button>
           {sessions && sessions.length > 5 && (
             <Input
@@ -520,7 +517,7 @@ export default function ChatPage() {
                     onClick={() => loadSession(s.id)}
                   >
                     <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-                      {s.title || "新对话"}
+                      {s.title || t("chat.new_chat")}
                     </span>
                     <DeleteOutlined
                       style={{ fontSize: 11, color: "var(--fj-ink-muted)", marginLeft: 4 }}
@@ -565,7 +562,7 @@ export default function ChatPage() {
               <div style={{ textAlign: "center", marginBottom: 12 }}>
                 <Button size="small" type="text" loading={loadingOlder} onClick={loadOlderMessages}
                   style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}>
-                  加载更早的消息
+                  {t("chat.load_older")}
                 </Button>
               </div>
             )}
@@ -573,11 +570,11 @@ export default function ChatPage() {
               <div style={{ textAlign: "center", padding: "60px 24px", color: "var(--fj-ink-muted)" }}>
                 <RobotOutlined style={{ fontSize: 48, marginBottom: 16, color: "var(--fj-accent)" }} />
                 <div style={{ fontSize: 18, fontFamily: '"Noto Serif SC", serif', marginBottom: 8 }}>
-                  小津 AI 佛典问答
+                  {t("chat.title")}
                 </div>
                 <div style={{ fontSize: 13, lineHeight: 1.8 }}>
-                  可以问我关于佛经内容、佛教历史、经典翻译等问题
-                  <br />每条回答均附经文原文引用
+                  {t("chat.subtitle")}
+                  <br />{t("chat.subtitle2")}
                 </div>
                 <div style={{
                   display: "grid",
@@ -588,12 +585,7 @@ export default function ChatPage() {
                   marginLeft: "auto",
                   marginRight: "auto",
                 }}>
-                  {(hotQuestionsData?.questions ?? [
-                    "《心经》中「色不异空」的含义是什么？",
-                    "鸠摩罗什与玄奘的翻译风格有何不同？",
-                    "四圣谛的核心教义是什么？",
-                    "禅宗的「不立文字」思想源自哪些经典？",
-                  ]).map((q) => (
+                  {(hotQuestionsData?.questions ?? (t("chat.hot_questions", { returnObjects: true }) as string[])).map((q) => (
                     <div
                       key={q}
                       onClick={() => handleSendMessage(q)}
@@ -846,10 +838,10 @@ export default function ChatPage() {
           {/* Input */}
           <div style={{ padding: "12px 0", borderTop: "1px solid rgba(217,208,193,0.5)" }}>
             <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 13, color: "#8b7355", whiteSpace: "nowrap" }}>法师模式</span>
+              <span style={{ fontSize: 13, color: "#8b7355", whiteSpace: "nowrap" }}>{t("chat.master_mode")}</span>
               <Select
                 allowClear
-                placeholder="通用助手"
+                placeholder={t("chat.general_assistant")}
                 value={masterId}
                 onChange={(v) => setMasterId(v ?? null)}
                 style={{ width: 200, fontSize: 13 }}
@@ -865,13 +857,13 @@ export default function ChatPage() {
                   { value: "xuyun", label: "🪷 虚云（禅宗）" },
                 ]}
               />
-              {masterId && <span style={{ fontSize: 11, color: "#a09070" }}>RAG 将限定于该法师核心经典</span>}
+              {masterId && <span style={{ fontSize: 11, color: "#a09070" }}>{t("chat.rag_scope_hint")}</span>}
             </div>
             {!keyStatus?.has_api_key && quota && quota.remaining >= 0 && (
               <Alert
-                message={<span>每日免费 {quota.limit} 次问答，今日剩余 {quota.remaining} 次。{user
-                  ? <><a onClick={() => navigate("/profile?tab=apikey")}>配置 API Key</a> 可无限使用。</>
-                  : <><a onClick={() => navigate("/login")}>登录</a>后每日可用 30 次。配置自己的 API Key 可无限使用。</>}</span>}
+                message={<span>{t("chat.quota_info", { limit: quota.limit, remaining: quota.remaining })}{user
+                  ? <><a onClick={() => navigate("/profile?tab=apikey")}>{t("chat.configure_key")}</a> {t("chat.unlimited_usage")}</>
+                  : <><a onClick={() => navigate("/login")}>{t("chat.login")}</a>{t("chat.login_quota_hint")}</>}</span>}
                 type={quota.remaining <= 2 ? "warning" : "info"} showIcon closable
                 style={{ marginBottom: 8, fontSize: 12 }}
               />
@@ -882,7 +874,7 @@ export default function ChatPage() {
                 value={input}
                 onChange={(e) => { setInput(e.target.value); tabIndexRef.current = -1; }}
                 onPressEnter={handleSend}
-                placeholder={tabSuggestions.length > 0 ? `${tabSuggestions[(tabIndexRef.current + 1) % tabSuggestions.length]}    ⇥ Tab` : "输入佛学问题，如：《心经》的核心思想是什么？"}
+                placeholder={tabSuggestions.length > 0 ? `${tabSuggestions[(tabIndexRef.current + 1) % tabSuggestions.length]}    ⇥ Tab` : t("chat.input_placeholder")}
                 disabled={sending}
                 size="large"
                 style={{ fontFamily: '"Noto Serif SC", serif' }}
@@ -894,7 +886,7 @@ export default function ChatPage() {
                   onClick={handleCancel}
                   size="large"
                 >
-                  停止
+                  {t("chat.stop")}
                 </Button>
               ) : (
                 <Button
