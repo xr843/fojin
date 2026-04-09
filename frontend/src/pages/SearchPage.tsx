@@ -7,7 +7,7 @@ import {
   Pagination, Empty, Checkbox, Input, Tag, Button, Tabs, Result, Select, Typography, Skeleton, AutoComplete, Alert,
 } from "antd";
 import {
-  SearchOutlined, BookOutlined, VerticalAlignTopOutlined, TranslationOutlined, ThunderboltOutlined, CloseOutlined,
+  SearchOutlined, BookOutlined, VerticalAlignTopOutlined, CloseOutlined,
 } from "@ant-design/icons";
 import { searchTexts, searchContent, searchDictionary, searchCrossLanguage, searchSemantic, getSources, getSearchSuggestions, searchDictionaryGrouped } from "../api/client";
 import type { DictGroupedSearchResponse } from "../api/client";
@@ -23,7 +23,8 @@ export default function SearchPage() {
 
   // Derive state from URL — these are the source of truth
   const query = searchParams.get("q") ?? "";
-  const tab = searchParams.get("tab") ?? "catalog";
+  const rawTab = searchParams.get("tab") ?? "catalog";
+  const tab = rawTab === "crosslang" ? "catalog" : rawTab === "semantic" ? "content" : rawTab;
   const selectedSources = searchParams.get("sources") ?? "";
 
   const [page, setPage] = useState(1);
@@ -70,14 +71,8 @@ export default function SearchPage() {
   const [showTop, setShowTop] = useState(false);
   const [regionFilter, setRegionFilter] = useState<Set<string>>(new Set());
   const [institutionFilter, setInstitutionFilter] = useState<Set<string>>(new Set());
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
 
-  useEffect(() => {
-    const mql = window.matchMedia("(max-width: 768px)");
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mql.addEventListener("change", handler);
-    return () => mql.removeEventListener("change", handler);
-  }, []);
+
   const sortBy = searchParams.get("sort") || "relevance";
 
   useEffect(() => {
@@ -116,13 +111,13 @@ export default function SearchPage() {
   const { data: crossLangData, isLoading: crossLangLoading } = useQuery({
     queryKey: ["searchCrossLang", query, page, dynasty, category, selectedSources],
     queryFn: () => searchCrossLanguage({ q: query, page, size: 20, dynasty, category, sources: selectedSources || undefined }),
-    enabled: query.length > 0 && tab === "crosslang",
+    enabled: query.length > 0 && tab === "catalog",
   });
 
   const { data: semanticData, isLoading: semanticLoading } = useQuery({
     queryKey: ["searchSemantic", query, selectedSources, langFilter, dynasty, category],
     queryFn: () => searchSemantic({ q: query, size: 20, dynasty, category, lang: langFilter || undefined, sources: selectedSources || undefined }),
-    enabled: query.length > 0 && tab === "semantic",
+    enabled: query.length > 0 && tab === "content",
   });
 
   // Dictionary knowledge card (parallel, non-blocking)
@@ -222,8 +217,8 @@ export default function SearchPage() {
     setInstitutionFilter(next);
   };
 
-  const loading = tab === "catalog" ? isLoading : tab === "content" ? contentLoading : tab === "crosslang" ? crossLangLoading : tab === "semantic" ? semanticLoading : dictLoading;
-  const localTotal = tab === "catalog" ? (data?.total || 0) : tab === "content" ? (contentData?.total || 0) : tab === "crosslang" ? (crossLangData?.total || 0) : tab === "semantic" ? (semanticData?.total || 0) : (dictData?.total || 0);
+  const loading = tab === "catalog" ? (isLoading || crossLangLoading) : tab === "content" ? (contentLoading || semanticLoading) : dictLoading;
+  const localTotal = tab === "catalog" ? (data?.total || 0) : tab === "content" ? (contentData?.total || 0) : (dictData?.total || 0);
   const extTotal = query.length > 0 ? filteredExtSources.length : 0;
 
   const sortedRegions = useMemo(() => {
@@ -294,24 +289,18 @@ export default function SearchPage() {
           activeKey={tab}
           onChange={(k) => { setPage(1); updateUrl({ tab: k }); }}
           items={[
-            { key: "catalog", label: "经典检索" },
-            { key: "content", label: "全文检索" },
-            { key: "semantic", label: <><ThunderboltOutlined /> {isMobile ? "智能" : "智能搜索"}</> },
-            { key: "crosslang", label: <><TranslationOutlined /> {isMobile ? "跨语言" : "跨语言搜索"}</> },
-            { key: "dictionary", label: <><BookOutlined /> {isMobile ? "辞典" : "辞典检索"}</> },
+            { key: "catalog", label: "搜经典" },
+            { key: "content", label: <>⚡ 搜经文</> },
+            { key: "dictionary", label: <><BookOutlined /> 搜辞典</> },
           ]}
           size="small"
         />
         <div className="s-mode-hint">
           {tab === "catalog"
-            ? "按经名、译者、编号检索经典目录"
+            ? "按经名、译者、编号检索，自动匹配所有语种标题与翻译版本"
             : tab === "content"
-            ? "在经文正文中检索关键词"
-            : tab === "semantic"
-            ? "基于 AI 向量语义理解，在 34.7 万段经文中检索最相关内容"
-            : tab === "crosslang"
-            ? "同时搜索所有语种标题，自动关联翻译版本"
-            : "在 393,624 条多语种辞典词条中检索词头与释义"}
+            ? "AI 语义理解 + 关键词精确匹配，在 34.7 万段经文中检索"
+            : "在 393,624 条多语种佛学辞典词条中检索词头与释义"}
         </div>
       </div>
 
@@ -382,7 +371,7 @@ export default function SearchPage() {
                 }
               </span>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                {(tab === "catalog" || tab === "content" || tab === "semantic") && (
+                {(tab === "catalog" || tab === "content") && (
                   <Select
                     size="small"
                     value={langFilter || "all"}
@@ -530,7 +519,7 @@ export default function SearchPage() {
             ))}
 
             {/* 语义搜索错误提示 */}
-            {!loading && tab === "semantic" && semanticData?.error && (
+            {!loading && tab === "content" && semanticData?.error && (
               <Alert
                 type="warning"
                 message={semanticData.error}
@@ -541,14 +530,14 @@ export default function SearchPage() {
             )}
 
             {/* 语义搜索结果 */}
-            {!loading && tab === "semantic" && semanticData && semanticData.results.map((hit, i) => (
+            {!loading && tab === "content" && semanticData && semanticData.results.length > 0 && (<><div style={{margin: "16px 0 8px", fontSize: 13, color: "#9a8e7a"}}>⚡ AI 语义匹配</div>{semanticData.results.map((hit, i) => (
               <SemanticCard key={`${hit.text_id}_${hit.juan_num}`} hit={hit} rank={i + 1} />
-            ))}
+            ))}</>)}
 
             {/* 跨语言结果 */}
-            {!loading && tab === "crosslang" && crossLangData && crossLangData.results.map((hit, i) => (
+            {!loading && tab === "catalog" && crossLangData && crossLangData.results.length > 0 && (<><div style={{margin: "16px 0 8px", fontSize: 13, color: "#9a8e7a", borderTop: "1px solid #e8e0d4", paddingTop: 12}}>🌐 跨语言匹配</div>{crossLangData.results.map((hit, i) => (
               <CrossLangCard key={hit.id} hit={hit} rank={i + 1 + (page - 1) * 20} />
-            ))}
+            ))}</>)}
 
             {/* 辞典结果 */}
             {!loading && tab === "dictionary" && dictData && dictData.results.map((hit, i) => (
