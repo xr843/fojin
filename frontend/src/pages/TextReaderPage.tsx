@@ -532,7 +532,7 @@ export default function TextReaderPage() {
   };
 
   return (
-    <div className="reader-with-sidebar">
+    <div className={`reader-with-sidebar${aiPanelOpen ? " reader-ai-active" : ""}`}>
     <div className={`reader-container${compareLang ? " reader-bilingual" : ""}`}>
       <Helmet>
         <title>
