@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Typography, Spin, Button, Select, Breadcrumb, Row, Col, Drawer, message } from "antd";
+import { Typography, Spin, Button, Select, Breadcrumb, Row, Col, message } from "antd";
 import {
   HomeOutlined,
   LeftOutlined,
@@ -350,33 +350,14 @@ export default function TextReaderPage() {
   const queryClient = useQueryClient();
   const readerContentRef = useRef<HTMLDivElement>(null);
 
-  // AI Drawer state
-  const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
-  const [aiDrawerWidth, setAiDrawerWidth] = useState(480);
+  // AI panel state
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [aiSelectedText, setAiSelectedText] = useState<string | undefined>();
-
-  const openAiDrawer = useCallback(() => {
-    // Align drawer left edge: with versions-panel if present, otherwise with reader-container right edge
-    const vp = document.querySelector(".versions-panel");
-    if (vp) {
-      const w = window.innerWidth - vp.getBoundingClientRect().left;
-      setAiDrawerWidth(Math.max(w, 360));
-    } else {
-      const rc = document.querySelector(".reader-container");
-      if (rc) {
-        const w = window.innerWidth - rc.getBoundingClientRect().right - 8;
-        setAiDrawerWidth(Math.max(w, 360));
-      } else {
-        setAiDrawerWidth(400);
-      }
-    }
-    setAiDrawerOpen(true);
-  }, []);
 
   const handleAskXiaojin = useCallback((text: string) => {
     setAiSelectedText(text);
-    openAiDrawer();
-  }, [openAiDrawer]);
+    setAiPanelOpen(true);
+  }, []);
   const handleSelectedTextConsumed = useCallback(() => {
     setAiSelectedText(undefined);
   }, []);
@@ -750,36 +731,32 @@ export default function TextReaderPage() {
     </div>
     <TextVersionsPanel textId={textId} />
 
-    {/* AI 解读浮动按钮 */}
-    <Button
-      className="reader-ai-fab"
-      type="primary"
-      shape="circle"
-      size="large"
-      icon={<RobotOutlined />}
-      onClick={openAiDrawer}
-    />
-
-    {/* AI 解读抽屉面板 */}
-    <Drawer
-      title="AI 解读"
-      placement="right"
-      width={aiDrawerWidth}
-      mask={false}
-      open={aiDrawerOpen}
-      onClose={() => setAiDrawerOpen(false)}
-      className="reader-ai-drawer"
-      styles={{ body: { padding: 0 } }}
-    >
-      <ReaderAIPanel
-        textId={textId}
-        juanNum={juanNum}
-        textTitle={content?.title_zh || textDetail?.title_zh || ""}
-        juanContent={content?.content}
-        selectedText={aiSelectedText}
-        onSelectedTextConsumed={handleSelectedTextConsumed}
+    {/* AI 解读：右侧内联面板 */}
+    {aiPanelOpen ? (
+      <div className="reader-ai-sidebar">
+        <div className="reader-ai-sidebar-header">
+          <span className="reader-ai-sidebar-title"><RobotOutlined /> AI 解读</span>
+          <Button type="text" size="small" onClick={() => setAiPanelOpen(false)}>✕</Button>
+        </div>
+        <ReaderAIPanel
+          textId={textId}
+          juanNum={juanNum}
+          textTitle={content?.title_zh || textDetail?.title_zh || ""}
+          juanContent={content?.content}
+          selectedText={aiSelectedText}
+          onSelectedTextConsumed={handleSelectedTextConsumed}
+        />
+      </div>
+    ) : (
+      <Button
+        className="reader-ai-fab"
+        type="primary"
+        shape="circle"
+        size="large"
+        icon={<RobotOutlined />}
+        onClick={() => setAiPanelOpen(true)}
       />
-    </Drawer>
+    )}
     </div>
   );
 }

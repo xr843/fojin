@@ -254,7 +254,7 @@
   text-decoration: underline;
 }
 
-/* ── AI Drawer FAB ── */
+/* ── AI FAB button ── */
 .reader-ai-fab {
   position: fixed;
   bottom: 24px;
@@ -273,15 +273,41 @@
   box-shadow: 0 6px 16px rgba(139, 105, 20, 0.4);
 }
 
-/* ── AI Drawer Panel ── */
-.reader-ai-drawer .ant-drawer-body {
-  padding: 0 !important;
+/* ── AI inline sidebar panel ── */
+.reader-ai-sidebar {
+  width: 420px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid var(--fj-border, #e8e0d4);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.reader-ai-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--fj-border, #e8e0d4);
+  flex-shrink: 0;
+}
+
+.reader-ai-sidebar-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fj-accent, #8b6914);
 }
 
 .reader-ai-panel {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   padding: 12px 16px;
 }
 
@@ -436,8 +462,11 @@
     display: block;
   }
 
-  .reader-ai-fab {
-    bottom: 84px; /* Above the sidebar FAB */
+  .reader-ai-sidebar {
+    width: 100%;
+    position: relative;
+    top: 0;
+    max-height: 60vh;
   }
 
   .reader-container {
