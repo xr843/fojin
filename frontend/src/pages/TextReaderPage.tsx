@@ -21,7 +21,6 @@ import CitationGenerator from "../components/CitationGenerator";
 import AnnotationPanel from "../components/AnnotationPanel";
 import AskXiaojinButton from "../components/AskXiaojinButton";
 import ReaderAIPanel from "../components/ReaderAIPanel";
-import ReaderSidebar from "../components/ReaderSidebar";
 import TextVersionsPanel from "../components/TextVersionsPanel";
 import "../styles/versions-panel.css";
 import "../styles/reader.css";
@@ -729,7 +728,6 @@ export default function TextReaderPage() {
         onClose={() => setAnnotationOpen(false)}
       />
     </div>
-    <ReaderSidebar textId={textId} juanNum={juanNum} />
     <TextVersionsPanel textId={textId} />
 
     {/* AI 解读浮动按钮 */}
