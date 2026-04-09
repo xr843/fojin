@@ -288,10 +288,17 @@ async def search_texts(
 
     # Deduplicate: same title+translator → keep best version (smallest taisho_id)
     # Different translators of the same sutra are preserved as separate results
+    import re as _re
+    _DYNASTY_PREFIX = _re.compile(r"^(魏|隋|唐|宋|元|明|清|南朝|北朝|十六國|東晉|西晉|後秦|後漢|姚秦|劉宋|蕭齊|梁|陳|北魏|北齊|北周|東魏|西魏|南齊|蜀|吳)\s*")
+    def _norm_translator(t):
+        if not t:
+            return ""
+        return _DYNASTY_PREFIX.sub("", t).strip()
+
     seen_keys: dict[str, int] = {}
     deduped: list = []
     for r in results:
-        key = (r.title_zh or "") + "|" + (r.translator or "")
+        key = (r.title_zh or "") + "|" + _norm_translator(r.translator)
         if key in seen_keys:
             existing = deduped[seen_keys[key]]
             existing_tid = existing.taisho_id or "ZZZZ"
