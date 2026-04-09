@@ -352,11 +352,23 @@ export default function TextReaderPage() {
 
   // AI Drawer state
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
+  const [aiDrawerWidth, setAiDrawerWidth] = useState(480);
   const [aiSelectedText, setAiSelectedText] = useState<string | undefined>();
-  const handleAskXiaojin = useCallback((text: string) => {
-    setAiSelectedText(text);
+
+  const openAiDrawer = useCallback(() => {
+    // Align drawer left edge with versions-panel left edge
+    const vp = document.querySelector(".versions-panel");
+    if (vp) {
+      const w = window.innerWidth - vp.getBoundingClientRect().left;
+      setAiDrawerWidth(Math.max(w, 360));
+    }
     setAiDrawerOpen(true);
   }, []);
+
+  const handleAskXiaojin = useCallback((text: string) => {
+    setAiSelectedText(text);
+    openAiDrawer();
+  }, [openAiDrawer]);
   const handleSelectedTextConsumed = useCallback(() => {
     setAiSelectedText(undefined);
   }, []);
@@ -737,14 +749,14 @@ export default function TextReaderPage() {
       shape="circle"
       size="large"
       icon={<RobotOutlined />}
-      onClick={() => setAiDrawerOpen(true)}
+      onClick={openAiDrawer}
     />
 
     {/* AI 解读抽屉面板 */}
     <Drawer
       title="AI 解读"
       placement="right"
-      width={480}
+      width={aiDrawerWidth}
       mask={false}
       open={aiDrawerOpen}
       onClose={() => setAiDrawerOpen(false)}
