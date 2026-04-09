@@ -767,6 +767,7 @@ export default function TextReaderPage() {
         textId={textId}
         juanNum={juanNum}
         textTitle={content?.title_zh || textDetail?.title_zh || ""}
+        juanContent={content?.content}
         selectedText={aiSelectedText}
         onSelectedTextConsumed={handleSelectedTextConsumed}
       />
