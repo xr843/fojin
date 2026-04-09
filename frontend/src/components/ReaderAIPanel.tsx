@@ -19,6 +19,8 @@ interface ReaderAIPanelProps {
   textId: number;
   juanNum: number;
   textTitle: string;
+  /** Raw text content of the current juan/page */
+  juanContent?: string;
   /** Text selected by the user in the reader */
   selectedText?: string;
   /** Called after selectedText is consumed */
@@ -64,10 +66,15 @@ function tightenLists(md: string): string {
   return md.replace(/^(\d+\.)\s*\n\n+/gm, "$1 ").replace(/\n\n+(?=\d+\.\s)/g, "\n");
 }
 
-function getQuickActions(textTitle: string, juanNum: number) {
+const MAX_CONTENT_FOR_PROMPT = 8000;
+
+function getQuickActions(textTitle: string, juanNum: number, juanContent?: string) {
+  const contentSnippet = juanContent
+    ? `\n\n以下是经文原文：\n${juanContent.slice(0, MAX_CONTENT_FOR_PROMPT)}${juanContent.length > MAX_CONTENT_FOR_PROMPT ? "\n…（原文过长，已截取前部分）" : ""}`
+    : "";
   return [
-    { key: "explain", icon: <ReadOutlined />, label: "全文解读", prompt: `请对当前页面显示的《${textTitle}》第${juanNum}卷全文进行解读，提供白话翻译和重点术语解释。` },
-    { key: "summary", icon: <FileTextOutlined />, label: "全文概要", prompt: `请概括当前页面显示的《${textTitle}》第${juanNum}卷的主要内容和核心思想。` },
+    { key: "explain", icon: <ReadOutlined />, label: "全文解读", prompt: `请对《${textTitle}》第${juanNum}卷进行逐段解读，提供白话翻译和重点术语解释。${contentSnippet}` },
+    { key: "summary", icon: <FileTextOutlined />, label: "全文概要", prompt: `请概括《${textTitle}》第${juanNum}卷的主要内容和核心思想。${contentSnippet}` },
   ];
 }
 
@@ -75,6 +82,7 @@ export default function ReaderAIPanel({
   textId,
   juanNum,
   textTitle,
+  juanContent,
   selectedText,
   onSelectedTextConsumed,
 }: ReaderAIPanelProps) {
@@ -218,7 +226,7 @@ export default function ReaderAIPanel({
       {/* Quick actions */}
       {messages.length === 0 && (
         <div className="reader-ai-quick-actions">
-          {getQuickActions(textTitle, juanNum).map((action) => (
+          {getQuickActions(textTitle, juanNum, juanContent).map((action) => (
             <Button
               key={action.key}
               size="small"
