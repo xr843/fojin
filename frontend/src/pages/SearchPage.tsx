@@ -7,7 +7,7 @@ import {
   Pagination, Empty, Checkbox, Input, Tag, Button, Tabs, Result, Select, Typography, Skeleton, AutoComplete, Alert,
 } from "antd";
 import {
-  SearchOutlined, BookOutlined, VerticalAlignTopOutlined, CloseOutlined,
+  SearchOutlined, VerticalAlignTopOutlined, CloseOutlined,
 } from "@ant-design/icons";
 import { searchTexts, searchContent, searchDictionary, searchCrossLanguage, searchSemantic, getSources, getSearchSuggestions, searchDictionaryGrouped } from "../api/client";
 import type { DictGroupedSearchResponse } from "../api/client";
@@ -290,8 +290,8 @@ export default function SearchPage() {
           onChange={(k) => { setPage(1); updateUrl({ tab: k }); }}
           items={[
             { key: "catalog", label: "搜经典" },
-            { key: "content", label: <>⚡ 搜经文</> },
-            { key: "dictionary", label: <><BookOutlined /> 搜辞典</> },
+            { key: "content", label: "搜经文" },
+            { key: "dictionary", label: "搜辞典" },
           ]}
           size="small"
         />

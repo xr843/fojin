@@ -148,6 +148,29 @@ async def search_texts(
     must = []
     filter_clauses = []
 
+    # Expand common sutra abbreviations to full titles
+    ABBREV = {
+        "金刚经": "金剛般若波羅蜜經", "金剛經": "金剛般若波羅蜜經",
+        "心经": "般若波羅蜜多心經", "心經": "般若波羅蜜多心經",
+        "法华经": "妙法蓮華經", "法華經": "妙法蓮華經",
+        "华严经": "大方廣佛華嚴經", "華嚴經": "大方廣佛華嚴經",
+        "楞严经": "大佛頂如來密因修證了義諸菩薩萬行首楞嚴經", "楞嚴經": "大佛頂如來密因修證了義諸菩薩萬行首楞嚴經",
+        "圆觉经": "大方廣圓覺修多羅了義經", "圓覺經": "大方廣圓覺修多羅了義經",
+        "楞伽经": "入楞伽經", "楞伽經": "入楞伽經",
+        "维摩经": "維摩詰所說經", "維摩經": "維摩詰所說經",
+        "地藏经": "地藏菩薩本願經", "地藏經": "地藏菩薩本願經",
+        "药师经": "藥師琉璃光如來本願功德經", "藥師經": "藥師琉璃光如來本願功德經",
+        "阿弥陀经": "佛說阿彌陀經", "阿彌陀經": "佛說阿彌陀經",
+        "无量寿经": "佛說無量壽經", "無量壽經": "佛說無量壽經",
+        "涅盘经": "大般涅槃經", "涅槃經": "大般涅槃經",
+        "般若经": "大般若波羅蜜多經", "般若經": "大般若波羅蜜多經",
+        "长阿含经": "長阿含經", "长阿含經": "長阿含經",
+        "中阿含经": "中阿含經", "杂阿含经": "雜阿含經",
+        "增一阿含经": "增壹阿含經",
+        "坛经": "六祖大師法寶壇經", "壇經": "六祖大師法寶壇經",
+    }
+    full_title = ABBREV.get(query.strip())
+
     if query:
         must.append(
             {
@@ -168,6 +191,16 @@ async def search_texts(
                 }
             }
         )
+        # Boost the full title if query is a known abbreviation (in should, not must)
+        should_boosts = [
+            {"match_phrase": {"title_zh": {"query": query, "boost": 15}}},
+            {"match_phrase": {"title_en": {"query": query, "boost": 8}}},
+        ]
+        if full_title:
+            should_boosts.append(
+                {"match_phrase": {"title_zh": {"query": full_title, "boost": 30}}}
+            )
+        must.append({"bool": {"should": should_boosts, "minimum_should_match": 0}})
     else:
         must.append({"match_all": {}})
 
