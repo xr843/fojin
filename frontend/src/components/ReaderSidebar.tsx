@@ -1,54 +1,25 @@
-import { useState, useEffect, memo } from "react";
+import { useState, memo } from "react";
 import { Tabs, Drawer, Button, Badge } from "antd";
 import {
   SwapOutlined,
   SearchOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
-  RobotOutlined,
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { getTextRelations, getSimilarPassages } from "../api/client";
 import RelatedTexts from "./RelatedTexts";
 import SimilarPassages from "./SimilarPassages";
-import ReaderAIPanel from "./ReaderAIPanel";
 
 function ReaderSidebarInner({
   textId,
   juanNum,
-  textTitle,
-  selectedText,
-  onSelectedTextConsumed,
-  activeTab,
-  onTabChange,
 }: {
   textId: number;
   juanNum: number;
-  textTitle: string;
-  selectedText?: string;
-  onSelectedTextConsumed?: () => void;
-  activeTab?: string;
-  onTabChange?: (key: string) => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [localActiveTab, setLocalActiveTab] = useState("ai");
-
-  const currentTab = activeTab ?? localActiveTab;
-  const handleTabChange = (key: string) => {
-    if (onTabChange) onTabChange(key);
-    else setLocalActiveTab(key);
-  };
-
-  // Auto-expand sidebar and switch to AI tab when selectedText is set
-  useEffect(() => {
-    if (selectedText) {
-      setCollapsed(false);
-      handleTabChange("ai");
-      setMobileOpen(true);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedText]);
 
   // Prefetch counts for badge display
   const { data: relData } = useQuery({
@@ -66,25 +37,13 @@ function ReaderSidebarInner({
 
   const relCount = relData?.relations.length || 0;
   const simCount = simData?.passages.length || 0;
+  const totalCount = relCount + simCount;
+
+  if (totalCount === 0 && relData && simData) {
+    return null; // No data to show
+  }
 
   const tabItems = [
-    {
-      key: "ai",
-      label: (
-        <span>
-          <RobotOutlined /> AI 解读
-        </span>
-      ),
-      children: (
-        <ReaderAIPanel
-          textId={textId}
-          juanNum={juanNum}
-          textTitle={textTitle}
-          selectedText={selectedText}
-          onSelectedTextConsumed={onSelectedTextConsumed}
-        />
-      ),
-    },
     {
       key: "related",
       label: (
@@ -121,8 +80,7 @@ function ReaderSidebarInner({
 
   const sidebarContent = (
     <Tabs
-      activeKey={currentTab}
-      onChange={handleTabChange}
+      defaultActiveKey="similar"
       items={tabItems}
       size="small"
       style={{ height: "100%" }}
@@ -161,12 +119,21 @@ function ReaderSidebarInner({
         <Button
           shape="circle"
           type="primary"
-          icon={<RobotOutlined />}
+          icon={<SearchOutlined />}
           className="reader-sidebar-fab"
           onClick={() => setMobileOpen(true)}
-        />
+        >
+          {totalCount > 0 && (
+            <Badge
+              count={totalCount}
+              size="small"
+              offset={[8, -8]}
+              style={{ backgroundColor: "var(--fj-accent)" }}
+            />
+          )}
+        </Button>
         <Drawer
-          title="AI 解读 & 相关内容"
+          title="相关内容"
           placement="bottom"
           height="70vh"
           open={mobileOpen}

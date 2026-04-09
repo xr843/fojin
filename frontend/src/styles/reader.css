@@ -18,7 +18,7 @@
 
 /* ── Desktop sidebar ── */
 .reader-sidebar-desktop {
-  width: 380px;
+  width: 320px;
   flex-shrink: 0;
   margin-top: 24px;
 }
@@ -254,12 +254,35 @@
   text-decoration: underline;
 }
 
-/* ── AI Reader Panel ── */
+/* ── AI Drawer FAB ── */
+.reader-ai-fab {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 100;
+  width: 48px !important;
+  height: 48px !important;
+  box-shadow: 0 4px 12px rgba(139, 105, 20, 0.3);
+  background: var(--fj-accent, #8b6914) !important;
+  border-color: var(--fj-accent, #8b6914) !important;
+}
+
+.reader-ai-fab:hover {
+  background: #a07a1a !important;
+  border-color: #a07a1a !important;
+  box-shadow: 0 6px 16px rgba(139, 105, 20, 0.4);
+}
+
+/* ── AI Drawer Panel ── */
+.reader-ai-drawer .ant-drawer-body {
+  padding: 0 !important;
+}
+
 .reader-ai-panel {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 180px);
-  min-height: 400px;
+  height: 100%;
+  padding: 12px 16px;
 }
 
 .reader-ai-context {
@@ -411,6 +434,10 @@
 
   .reader-sidebar-mobile {
     display: block;
+  }
+
+  .reader-ai-fab {
+    bottom: 84px; /* Above the sidebar FAB */
   }
 
   .reader-container {

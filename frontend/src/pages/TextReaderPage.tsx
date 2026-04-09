@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Typography, Spin, Button, Select, Breadcrumb, Row, Col, message } from "antd";
+import { Typography, Spin, Button, Select, Breadcrumb, Row, Col, Drawer, message } from "antd";
 import {
   HomeOutlined,
   LeftOutlined,
@@ -12,6 +12,7 @@ import {
   EditOutlined,
   HeartOutlined,
   HeartFilled,
+  RobotOutlined,
 } from "@ant-design/icons";
 import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBookmark, addBookmark, removeBookmark, searchDictionaryGrouped } from "../api/client";
 import type { DictGroupedSearchResponse } from "../api/client";
@@ -19,6 +20,7 @@ import { useAuthStore } from "../stores/authStore";
 import CitationGenerator from "../components/CitationGenerator";
 import AnnotationPanel from "../components/AnnotationPanel";
 import AskXiaojinButton from "../components/AskXiaojinButton";
+import ReaderAIPanel from "../components/ReaderAIPanel";
 import ReaderSidebar from "../components/ReaderSidebar";
 import TextVersionsPanel from "../components/TextVersionsPanel";
 import "../styles/versions-panel.css";
@@ -349,12 +351,12 @@ export default function TextReaderPage() {
   const queryClient = useQueryClient();
   const readerContentRef = useRef<HTMLDivElement>(null);
 
-  // AI sidebar state
+  // AI Drawer state
+  const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   const [aiSelectedText, setAiSelectedText] = useState<string | undefined>();
-  const [sidebarTab, setSidebarTab] = useState("ai");
   const handleAskXiaojin = useCallback((text: string) => {
     setAiSelectedText(text);
-    setSidebarTab("ai");
+    setAiDrawerOpen(true);
   }, []);
   const handleSelectedTextConsumed = useCallback(() => {
     setAiSelectedText(undefined);
@@ -727,16 +729,37 @@ export default function TextReaderPage() {
         onClose={() => setAnnotationOpen(false)}
       />
     </div>
-    <ReaderSidebar
-      textId={textId}
-      juanNum={juanNum}
-      textTitle={content?.title_zh || textDetail?.title_zh || ""}
-      selectedText={aiSelectedText}
-      onSelectedTextConsumed={handleSelectedTextConsumed}
-      activeTab={sidebarTab}
-      onTabChange={setSidebarTab}
-    />
+    <ReaderSidebar textId={textId} juanNum={juanNum} />
     <TextVersionsPanel textId={textId} />
+
+    {/* AI 解读浮动按钮 */}
+    <Button
+      className="reader-ai-fab"
+      type="primary"
+      shape="circle"
+      size="large"
+      icon={<RobotOutlined />}
+      onClick={() => setAiDrawerOpen(true)}
+    />
+
+    {/* AI 解读抽屉面板 */}
+    <Drawer
+      title="AI 解读"
+      placement="right"
+      width={480}
+      open={aiDrawerOpen}
+      onClose={() => setAiDrawerOpen(false)}
+      className="reader-ai-drawer"
+      styles={{ body: { padding: 0 } }}
+    >
+      <ReaderAIPanel
+        textId={textId}
+        juanNum={juanNum}
+        textTitle={content?.title_zh || textDetail?.title_zh || ""}
+        selectedText={aiSelectedText}
+        onSelectedTextConsumed={handleSelectedTextConsumed}
+      />
+    </Drawer>
     </div>
   );
 }
