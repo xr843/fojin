@@ -4,16 +4,27 @@
 .reader-with-sidebar {
   display: flex;
   gap: 0;
-  padding: 0 0 0 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* When AI panel is open: lock height, each side scrolls independently */
+.reader-with-sidebar.reader-ai-active {
+  max-width: none;
+  height: 100vh;
+  overflow: hidden;
+  padding-right: 0;
+}
+
+.reader-with-sidebar.reader-ai-active .reader-container {
+  overflow-y: auto;
 }
 
 .reader-container {
-  margin: 24px auto;
   padding: 0;
   flex: 1;
   min-width: 0;
-  max-width: 900px;
-  padding-right: 24px;
 }
 
 /* ── Desktop sidebar ── */
@@ -276,25 +287,29 @@
 /* ── AI inline sidebar panel ── */
 .reader-ai-sidebar {
   flex-shrink: 0;
-  align-self: flex-start;
-  position: sticky;
-  top: 0;
-  height: 100vh;
+  height: 100%;
   display: flex;
   flex-direction: column;
   background: #fff;
-  border-left: 1px solid var(--fj-border, #e8e0d4);
   overflow: hidden;
 }
 
-/* Drag handle / divider */
+/* Drag handle / divider — full height visible line like alphaxiv */
 .reader-ai-divider {
-  width: 6px;
+  width: 8px;
   flex-shrink: 0;
   cursor: col-resize;
   align-self: stretch;
   position: relative;
   z-index: 10;
+  background: var(--fj-bg-alt, #f5f0e8);
+  border-left: 1px solid var(--fj-border, #e8e0d4);
+  border-right: 1px solid var(--fj-border, #e8e0d4);
+  transition: background 0.15s;
+}
+
+.reader-ai-divider:hover {
+  background: rgba(139, 105, 20, 0.12);
 }
 
 .reader-ai-divider::after {
@@ -304,7 +319,7 @@
   left: 50%;
   transform: translate(-50%, -50%);
   width: 4px;
-  height: 40px;
+  height: 32px;
   background: var(--fj-border, #d9d0c1);
   border-radius: 2px;
   transition: background 0.15s;
