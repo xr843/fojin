@@ -1143,6 +1143,7 @@ export interface ReadingContext {
   text_id: number;
   juan_num: number;
   selected_text?: string;
+  page_content?: string;
 }
 
 export function sendChatMessageStream(
@@ -1273,6 +1274,7 @@ export function sendChatMessageStream(
         text_id: readingContext.text_id,
         juan_num: readingContext.juan_num,
         selected_text: readingContext.selected_text ?? null,
+        page_content: readingContext.page_content ?? null,
       } : {}),
     }));
   });

@@ -177,18 +177,24 @@ def _classify_and_enhance_prompt(message: str) -> str:
 
 
 def _build_reader_context_prompt(
-    base_prompt: str, text_title: str, juan_num: int | None, selected_text: str | None,
+    base_prompt: str, text_title: str, juan_num: int | None,
+    selected_text: str | None, page_content: str | None = None,
 ) -> str:
     """Enhance the system prompt with reading context when user asks from the reader page."""
     ctx = f"\n\n## 阅读上下文\n用户正在阅读《{text_title}》"
     if juan_num:
         ctx += f"第{juan_num}卷"
     ctx += "。请结合该经文的内容回答问题。\n"
+    if page_content:
+        truncated = page_content[:10000]
+        ctx += f"\n当前页面经文全文：\n{truncated}\n"
+        if len(page_content) > 10000:
+            ctx += "…（原文过长，已截取前部分）\n"
     if selected_text:
         ctx += f"\n用户选中的经文原文：\n「{selected_text[:500]}」\n"
     ctx += (
         "\n## 阅读模式特别要求\n"
-        "- 优先解释用户选中的经文段落\n"
+        "- 基于上方提供的经文全文进行解读\n"
         "- 提供白话翻译（如果原文是文言文）\n"
         "- 解释段落中的关键佛学术语\n"
         "- 说明该段落在整部经典中的位置和意义\n"
@@ -393,6 +399,7 @@ def _build_llm_messages(
             reading_context["title"],
             reading_context.get("juan_num"),
             reading_context.get("selected_text"),
+            reading_context.get("page_content"),
         )
     llm_messages: list[dict[str, str]] = [{"role": "system", "content": enhanced_prompt}]
     budget = _MAX_INPUT_TOKENS - _estimate_tokens(enhanced_prompt) - _estimate_tokens(message)
@@ -495,6 +502,7 @@ async def _prepare_chat(
     text_id: int | None = None,
     juan_num: int | None = None,
     selected_text: str | None = None,
+    page_content: str | None = None,
 ) -> tuple[ChatSession | None, str, str, str, bool, str, list[ChatSource], list[dict[str, str]]]:
     """Shared setup for send_message and send_message_stream.
 
@@ -548,6 +556,7 @@ async def _prepare_chat(
                 "title": text_title,
                 "juan_num": juan_num,
                 "selected_text": selected_text,
+                "page_content": page_content,
             }
 
     llm_messages = _build_llm_messages(
@@ -570,11 +579,12 @@ async def send_message(
     text_id: int | None = None,
     juan_num: int | None = None,
     selected_text: str | None = None,
+    page_content: str | None = None,
 ) -> ChatResponse:
     _t0 = _time.monotonic()
     chat_session, api_url, api_key, model, is_byok, provider, sources, llm_messages = await _prepare_chat(
         db, user_id, message, session_id, user, client_ip=client_ip, redis=redis, master_id=master_id,
-        text_id=text_id, juan_num=juan_num, selected_text=selected_text,
+        text_id=text_id, juan_num=juan_num, selected_text=selected_text, page_content=page_content,
     )
     _t1 = _time.monotonic()
     logger.debug("TIMING: _prepare_chat took %.2fs", _t1 - _t0)
@@ -641,6 +651,7 @@ async def send_message_stream(
     text_id: int | None = None,
     juan_num: int | None = None,
     selected_text: str | None = None,
+    page_content: str | None = None,
 ):
     """Async generator yielding SSE events for streaming chat responses.
 
@@ -657,7 +668,7 @@ async def send_message_stream(
     try:
         chat_session, api_url, api_key, model, is_byok, provider, sources, llm_messages = await _prepare_chat(
             db, user_id, message, session_id, user, client_ip=client_ip, redis=redis, master_id=master_id,
-            text_id=text_id, juan_num=juan_num, selected_text=selected_text,
+            text_id=text_id, juan_num=juan_num, selected_text=selected_text, page_content=page_content,
         )
     except (ValidationError, QuotaExceededError, AccessDeniedError, ServiceError) as exc:
         yield f"data: {json.dumps({'type': 'error', 'message': str(exc)}, ensure_ascii=False)}\n\n"

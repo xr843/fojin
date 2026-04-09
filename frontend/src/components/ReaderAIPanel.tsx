@@ -66,15 +66,10 @@ function tightenLists(md: string): string {
   return md.replace(/^(\d+\.)\s*\n\n+/gm, "$1 ").replace(/\n\n+(?=\d+\.\s)/g, "\n");
 }
 
-const MAX_CONTENT_FOR_PROMPT = 8000;
-
-function getQuickActions(textTitle: string, juanNum: number, juanContent?: string) {
-  const contentSnippet = juanContent
-    ? `\n\n以下是经文原文：\n${juanContent.slice(0, MAX_CONTENT_FOR_PROMPT)}${juanContent.length > MAX_CONTENT_FOR_PROMPT ? "\n…（原文过长，已截取前部分）" : ""}`
-    : "";
+function getQuickActions(textTitle: string, juanNum: number) {
   return [
-    { key: "explain", icon: <ReadOutlined />, label: "全文解读", prompt: `请对《${textTitle}》第${juanNum}卷进行逐段解读，提供白话翻译和重点术语解释。${contentSnippet}` },
-    { key: "summary", icon: <FileTextOutlined />, label: "全文概要", prompt: `请概括《${textTitle}》第${juanNum}卷的主要内容和核心思想。${contentSnippet}` },
+    { key: "explain", icon: <ReadOutlined />, label: "全文解读", prompt: `请对《${textTitle}》第${juanNum}卷进行逐段解读，提供白话翻译和重点术语解释。` },
+    { key: "summary", icon: <FileTextOutlined />, label: "全文概要", prompt: `请概括《${textTitle}》第${juanNum}卷的主要内容和核心思想。` },
   ];
 }
 
@@ -114,7 +109,8 @@ export default function ReaderAIPanel({
     text_id: textId,
     juan_num: juanNum,
     selected_text: selectedText,
-  }), [textId, juanNum, selectedText]);
+    page_content: juanContent,
+  }), [textId, juanNum, selectedText, juanContent]);
 
   const handleSendMessage = useCallback(async (msg: string) => {
     msg = msg.trim();
@@ -226,7 +222,7 @@ export default function ReaderAIPanel({
       {/* Quick actions */}
       {messages.length === 0 && (
         <div className="reader-ai-quick-actions">
-          {getQuickActions(textTitle, juanNum, juanContent).map((action) => (
+          {getQuickActions(textTitle, juanNum).map((action) => (
             <Button
               key={action.key}
               size="small"
