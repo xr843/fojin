@@ -1,9 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Spin, Tag, Tooltip } from "antd";
 import {
-  GlobalOutlined,
   PictureOutlined,
-  LinkOutlined,
   BookOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
@@ -43,9 +41,8 @@ export default function TextVersionsPanel({ textId }: Props) {
   if (isLoading) return <Spin size="small" />;
   if (!data) return null;
 
-  const { translations, iiif_manifests, source_links: rawLinks } = data;
-  const source_links = rawLinks.filter(l => l.source_url);
-  const hasContent = translations.length > 0 || iiif_manifests.length > 0 || source_links.length > 0;
+  const { translations, iiif_manifests } = data;
+  const hasContent = translations.length > 0 || iiif_manifests.length > 0;
 
   if (!hasContent) return null;
 
@@ -124,30 +121,6 @@ export default function TextVersionsPanel({ textId }: Props) {
         </div>
       )}
 
-      {/* Source Links */}
-      {source_links.length > 0 && (
-        <div className="versions-section">
-          <div className="versions-section-title">
-            <GlobalOutlined /> 可阅读来源 ({source_links.length})
-          </div>
-          <div className="versions-links">
-            {source_links.map((link, i) => (
-              <span key={i}>
-                {link.source_url ? (
-                  <a
-                    href={link.source_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="version-source-link"
-                  >
-                    <LinkOutlined /> {link.source_name}
-                  </a>
-                ) : null}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

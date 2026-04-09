@@ -261,13 +261,30 @@ async def get_text_versions(text_id: int, db: AsyncSession = Depends(get_db)):
         if r[0] not in existing_ids:
             tr_rows_data.append(r)
 
+    # Deduplicate by translator: same translator = same translation, keep first
+    # Also skip entries whose translator matches the current text's translator
+    seen_translators: set[str] = set()
+    current_translator = (text.translator or "").strip()
+    if current_translator:
+        seen_translators.add(current_translator)
+    deduped: list = []
+    for r in tr_rows_data:
+        translator = (r[3] or "").strip()
+        # Normalize: "魏 菩提流支" and "菩提流支" are the same
+        norm_translator = translator.split()[-1] if translator else ""
+        if norm_translator and norm_translator in seen_translators:
+            continue
+        if norm_translator:
+            seen_translators.add(norm_translator)
+        deduped.append(r)
+
     translations = [
         VersionTranslation(
             text_id=r[0], title_zh=r[1], title_en=r[2],
             translator=r[3], dynasty=r[4], lang=r[5],
             source_name=r[6], relation_type=r[7],
         )
-        for r in tr_rows_data
+        for r in deduped
     ]
 
     # 2. IIIF manifests
