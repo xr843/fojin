@@ -1,18 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
 import { MessageOutlined } from "@ant-design/icons";
 
 interface AskXiaojinButtonProps {
   /** CSS selector or ref for the container to listen for text selection */
   containerRef: React.RefObject<HTMLElement | null>;
-  /** Source label, e.g. "心经第1卷" */
-  source: string;
+  /** Callback when user wants to ask about selected text */
+  onAsk: (selectedText: string) => void;
 }
 
 const MAX_CONTEXT_LENGTH = 500;
 
-export default function AskXiaojinButton({ containerRef, source }: AskXiaojinButtonProps) {
-  const navigate = useNavigate();
+export default function AskXiaojinButton({ containerRef, onAsk }: AskXiaojinButtonProps) {
   const [visible, setVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const selectedTextRef = useRef("");
@@ -113,16 +111,10 @@ export default function AskXiaojinButton({ containerRef, source }: AskXiaojinBut
     const context = selectedTextRef.current;
     if (!context) return;
 
-    const params = new URLSearchParams({
-      q: "这段经文是什么意思？",
-      context,
-      source,
-    });
-
     setVisible(false);
     clickingRef.current = false;
-    navigate(`/chat?${params.toString()}`);
-  }, [navigate, source]);
+    onAsk(context);
+  }, [onAsk]);
 
   if (!visible) return null;
 

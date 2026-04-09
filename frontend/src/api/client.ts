@@ -1139,12 +1139,19 @@ export interface StreamCallbacks {
   onDone: () => void;
 }
 
+export interface ReadingContext {
+  text_id: number;
+  juan_num: number;
+  selected_text?: string;
+}
+
 export function sendChatMessageStream(
   message: string,
   sessionId: number | undefined,
   masterId: string | null,
   callbacks: StreamCallbacks,
   signal?: AbortSignal,
+  readingContext?: ReadingContext,
 ): Promise<void> {
   return new Promise<void>((resolve) => {
     // Get auth token from localStorage (same pattern as axios interceptor)
@@ -1258,7 +1265,16 @@ export function sendChatMessageStream(
       });
     }
 
-    xhr.send(JSON.stringify({ message, session_id: sessionId ?? null, master_id: masterId }));
+    xhr.send(JSON.stringify({
+      message,
+      session_id: sessionId ?? null,
+      master_id: masterId,
+      ...(readingContext ? {
+        text_id: readingContext.text_id,
+        juan_num: readingContext.juan_num,
+        selected_text: readingContext.selected_text ?? null,
+      } : {}),
+    }));
   });
 }
 
