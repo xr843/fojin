@@ -56,7 +56,7 @@ async def chat(
     return await send_message(
         db, user_id, data.message, data.session_id, user=user,
         client_ip=client_ip, redis=redis, master_id=data.master_id,
-        text_id=data.text_id, juan_num=data.juan_num, selected_text=data.selected_text,
+        text_id=data.text_id, juan_num=data.juan_num, selected_text=data.selected_text, page_content=data.page_content,
     )
 
 
@@ -77,7 +77,7 @@ async def chat_stream(
         send_message_stream(
             db, user_id, data.message, data.session_id, user=user,
             client_ip=client_ip, redis=redis, master_id=data.master_id,
-            text_id=data.text_id, juan_num=data.juan_num, selected_text=data.selected_text,
+            text_id=data.text_id, juan_num=data.juan_num, selected_text=data.selected_text, page_content=data.page_content,
         ),
         media_type="text/event-stream",
         headers={

@@ -12,6 +12,7 @@ class ChatRequest(BaseModel):
     text_id: int | None = None
     juan_num: int | None = None
     selected_text: str | None = Field(None, max_length=1000)
+    page_content: str | None = Field(None, max_length=15000)
 
 
 class FeedbackRequest(BaseModel):
