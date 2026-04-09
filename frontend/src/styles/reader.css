@@ -3,8 +3,8 @@
 /* ── Reader + Sidebar layout ── */
 .reader-with-sidebar {
   display: flex;
-  gap: 20px;
-  max-width: 1400px;
+  gap: 0;
+  max-width: 1800px;
   margin: 0 auto;
   padding: 0 24px;
 }
@@ -275,17 +275,46 @@
 
 /* ── AI inline sidebar panel ── */
 .reader-ai-sidebar {
-  width: 420px;
   flex-shrink: 0;
+  align-self: flex-start;
   position: sticky;
   top: 16px;
-  max-height: calc(100vh - 32px);
+  height: calc(100vh - 32px);
   display: flex;
   flex-direction: column;
   background: #fff;
   border: 1px solid var(--fj-border, #e8e0d4);
   border-radius: 8px;
   overflow: hidden;
+  margin-top: 24px;
+}
+
+/* Drag handle / divider */
+.reader-ai-divider {
+  width: 6px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  align-self: stretch;
+  margin-top: 24px;
+  position: relative;
+  z-index: 10;
+}
+
+.reader-ai-divider::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 4px;
+  height: 40px;
+  background: var(--fj-border, #d9d0c1);
+  border-radius: 2px;
+  transition: background 0.15s;
+}
+
+.reader-ai-divider:hover::after {
+  background: var(--fj-accent, #8b6914);
 }
 
 .reader-ai-sidebar-header {
@@ -463,10 +492,14 @@
   }
 
   .reader-ai-sidebar {
-    width: 100%;
+    width: 100% !important;
     position: relative;
     top: 0;
-    max-height: 60vh;
+    height: 60vh;
+  }
+
+  .reader-ai-divider {
+    display: none;
   }
 
   .reader-container {

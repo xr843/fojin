@@ -352,12 +352,39 @@ export default function TextReaderPage() {
 
   // AI panel state
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const [aiPanelWidth, setAiPanelWidth] = useState(420);
   const [aiSelectedText, setAiSelectedText] = useState<string | undefined>();
+  const isDraggingRef = useRef(false);
 
   const handleAskXiaojin = useCallback((text: string) => {
     setAiSelectedText(text);
     setAiPanelOpen(true);
   }, []);
+
+  // Drag to resize AI panel
+  const handleDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingRef.current = true;
+    const startX = e.clientX;
+    const startWidth = aiPanelWidth;
+
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!isDraggingRef.current) return;
+      const delta = startX - ev.clientX;
+      setAiPanelWidth(Math.max(300, Math.min(startWidth + delta, 700)));
+    };
+    const onMouseUp = () => {
+      isDraggingRef.current = false;
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, [aiPanelWidth]);
   const handleSelectedTextConsumed = useCallback(() => {
     setAiSelectedText(undefined);
   }, []);
@@ -731,22 +758,25 @@ export default function TextReaderPage() {
     </div>
     <TextVersionsPanel textId={textId} />
 
-    {/* AI 解读：右侧内联面板 */}
+    {/* AI 解读：右侧内联面板 + 拖拽分割条 */}
     {aiPanelOpen ? (
-      <div className="reader-ai-sidebar">
-        <div className="reader-ai-sidebar-header">
-          <span className="reader-ai-sidebar-title"><RobotOutlined /> AI 解读</span>
-          <Button type="text" size="small" onClick={() => setAiPanelOpen(false)}>✕</Button>
+      <>
+        <div className="reader-ai-divider" onMouseDown={handleDragStart} />
+        <div className="reader-ai-sidebar" style={{ width: aiPanelWidth }}>
+          <div className="reader-ai-sidebar-header">
+            <span className="reader-ai-sidebar-title"><RobotOutlined /> AI 解读</span>
+            <Button type="text" size="small" onClick={() => setAiPanelOpen(false)}>✕</Button>
+          </div>
+          <ReaderAIPanel
+            textId={textId}
+            juanNum={juanNum}
+            textTitle={content?.title_zh || textDetail?.title_zh || ""}
+            juanContent={content?.content}
+            selectedText={aiSelectedText}
+            onSelectedTextConsumed={handleSelectedTextConsumed}
+          />
         </div>
-        <ReaderAIPanel
-          textId={textId}
-          juanNum={juanNum}
-          textTitle={content?.title_zh || textDetail?.title_zh || ""}
-          juanContent={content?.content}
-          selectedText={aiSelectedText}
-          onSelectedTextConsumed={handleSelectedTextConsumed}
-        />
-      </div>
+      </>
     ) : (
       <Button
         className="reader-ai-fab"
