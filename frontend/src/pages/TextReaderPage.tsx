@@ -356,11 +356,19 @@ export default function TextReaderPage() {
   const [aiSelectedText, setAiSelectedText] = useState<string | undefined>();
 
   const openAiDrawer = useCallback(() => {
-    // Align drawer left edge with versions-panel left edge
+    // Align drawer left edge: with versions-panel if present, otherwise with reader-container right edge
     const vp = document.querySelector(".versions-panel");
     if (vp) {
       const w = window.innerWidth - vp.getBoundingClientRect().left;
       setAiDrawerWidth(Math.max(w, 360));
+    } else {
+      const rc = document.querySelector(".reader-container");
+      if (rc) {
+        const w = window.innerWidth - rc.getBoundingClientRect().right - 8;
+        setAiDrawerWidth(Math.max(w, 360));
+      } else {
+        setAiDrawerWidth(400);
+      }
     }
     setAiDrawerOpen(true);
   }, []);
