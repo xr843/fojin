@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Input, Button, Select, message, Spin } from "antd";
+import { Input, Button, message, Spin } from "antd";
 import {
   SendOutlined,
   RobotOutlined,
@@ -80,7 +80,6 @@ export default function ReaderAIPanel({
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [sessionId, setSessionId] = useState<number | undefined>();
-  const [masterId, setMasterId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const streamingIdRef = useRef(0);
@@ -140,7 +139,7 @@ export default function ReaderAIPanel({
     abortRef.current = abortController;
     const timeoutId = setTimeout(() => abortController.abort(), 90_000);
 
-    await sendChatMessageStream(msg, sessionId, masterId, {
+    await sendChatMessageStream(msg, sessionId, null, {
       onToken: (content: string) => {
         setMessages((prev) =>
           prev.map((m) => {
@@ -177,7 +176,7 @@ export default function ReaderAIPanel({
         setSending(false);
       },
     }, abortController.signal, readingContext);
-  }, [sending, sessionId, masterId, selectedText, onSelectedTextConsumed, scrollToBottom, readingContext]);
+  }, [sending, sessionId, selectedText, onSelectedTextConsumed, scrollToBottom, readingContext]);
 
   const handleClearChat = useCallback(() => {
     if (sending) {
@@ -314,25 +313,6 @@ export default function ReaderAIPanel({
           />
         </div>
         <div className="reader-ai-input-footer">
-          <Select
-            allowClear
-            placeholder="通用助手"
-            value={masterId}
-            onChange={(v) => setMasterId(v || null)}
-            size="small"
-            style={{ width: 140, fontSize: 12 }}
-            options={[
-              { value: "", label: "🟢 通用助手" },
-              { value: "zhiyi", label: "🪷 智顗" },
-              { value: "huineng", label: "🪷 慧能" },
-              { value: "xuanzang", label: "🪷 玄奘" },
-              { value: "yinguang", label: "🪷 印光" },
-              { value: "xuyun", label: "🪷 虚云" },
-              { value: "ouyi", label: "🪷 蕅益" },
-              { value: "kumarajiva", label: "🪷 鸠摩罗什" },
-              { value: "fazang", label: "🪷 法藏" },
-            ]}
-          />
           {messages.length > 0 && (
             <Button
               size="small"

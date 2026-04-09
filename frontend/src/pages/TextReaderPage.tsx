@@ -747,6 +747,7 @@ export default function TextReaderPage() {
       title="AI 解读"
       placement="right"
       width={480}
+      mask={false}
       open={aiDrawerOpen}
       onClose={() => setAiDrawerOpen(false)}
       className="reader-ai-drawer"
