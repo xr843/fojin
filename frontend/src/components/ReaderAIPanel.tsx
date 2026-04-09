@@ -337,7 +337,8 @@ export default function ReaderAIPanel({
                 onClick={() => {
                   const lastAssistant = [...messages].reverse().find(m => m.role === "assistant");
                   if (lastAssistant) {
-                    navigator.clipboard.writeText(lastAssistant.content);
+                    const { cleanContent } = parseFollowUps(lastAssistant.content);
+                    navigator.clipboard.writeText(cleanContent);
                     message.success("已复制");
                   }
                 }}
