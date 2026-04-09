@@ -144,7 +144,7 @@ export default function KGMapPage() {
             <span className="kg-map-stats">
               <BarChartOutlined />
               <span>
-                {filteredEntities.length.toLocaleString()} 个地点
+                {filteredEntities.length.toLocaleString()} 个标注
                 {chineseOnly && <span className="kg-map-stats-filter"> · 纯中文</span>}
               </span>
             </span>
@@ -179,7 +179,7 @@ export default function KGMapPage() {
             onSearch={setSearchQuery}
             onChange={setSearchQuery}
             onSelect={handleSearchSelect}
-            placeholder="搜索（名称/地址）"
+            placeholder="搜索/寺院、地点、人物"
             allowClear
             style={{ width: 280, marginLeft: "auto" }}
             popupMatchSelectWidth={380}

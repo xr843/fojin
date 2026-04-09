@@ -10,6 +10,7 @@ import {
   ApartmentOutlined,
   RobotOutlined,
   BookOutlined,
+  FileTextOutlined,
 } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { InfoCircleOutlined, CloseOutlined } from "@ant-design/icons";
@@ -162,15 +163,20 @@ export default function HomePage() {
             <div className="home-feature-title">{t("home.feature_sources_title")}</div>
             <div className="home-feature-desc">{t("home.feature_sources_desc")}</div>
           </div>
-          <div className="home-feature-card" onClick={() => navigate("/kg")}>
-            <ApartmentOutlined className="home-feature-icon" />
-            <div className="home-feature-title">{t("home.feature_kg_title")}</div>
-            <div className="home-feature-desc">{t("home.feature_kg_desc")}</div>
-          </div>
           <div className="home-feature-card" onClick={() => navigate("/chat")}>
             <RobotOutlined className="home-feature-icon" />
             <div className="home-feature-title">{t("home.feature_chat_title")}</div>
             <div className="home-feature-desc">{t("home.feature_chat_desc")}</div>
+          </div>
+          <div className="home-feature-card" onClick={() => navigate("/dictionary")}>
+            <FileTextOutlined className="home-feature-icon" />
+            <div className="home-feature-title">{t("home.feature_dict_title")}</div>
+            <div className="home-feature-desc">{t("home.feature_dict_desc")}</div>
+          </div>
+          <div className="home-feature-card" onClick={() => navigate("/kg")}>
+            <ApartmentOutlined className="home-feature-icon" />
+            <div className="home-feature-title">{t("home.feature_kg_title")}</div>
+            <div className="home-feature-desc">{t("home.feature_kg_desc")}</div>
           </div>
           <div className="home-feature-card" onClick={() => navigate("/collections")}>
             <BookOutlined className="home-feature-icon" />

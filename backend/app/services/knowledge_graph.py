@@ -42,6 +42,18 @@ async def search_entities(
     if entity_type:
         stmt = stmt.where(KGEntity.entity_type == entity_type)
 
+    # Exclude entities without any KG relations — they add no value to the graph
+    stmt = stmt.where(
+        exists(
+            select(KGRelation.id).where(
+                or_(
+                    KGRelation.subject_id == KGEntity.id,
+                    KGRelation.object_id == KGEntity.id,
+                )
+            )
+        )
+    )
+
     if has_relations is True:
         stmt = stmt.where(
             exists(
@@ -270,6 +282,7 @@ async def get_geo_entities(
     conditions = [
         "(e.properties->>'latitude') IS NOT NULL",
         "(e.properties->>'longitude') IS NOT NULL",
+        "e.entity_type != 'sub_entity'",
     ]
     params: dict = {"limit": limit}
 
@@ -365,6 +378,10 @@ async def get_lineage_arcs(
         "(t.properties->>'longitude') IS NOT NULL",
         "(s.properties->>'latitude') IS NOT NULL",
         "(s.properties->>'longitude') IS NOT NULL",
+        "(t.properties->>'latitude') != ''",
+        "(s.properties->>'latitude') != ''",
+        "COALESCE(t.properties->>'geo_source', '') NOT LIKE 'teacher_hop%%'",
+        "COALESCE(s.properties->>'geo_source', '') NOT LIKE 'teacher_hop%%'",
     ]
     params: dict = {"limit": limit}
 
