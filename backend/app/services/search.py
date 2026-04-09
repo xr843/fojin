@@ -286,19 +286,20 @@ async def search_texts(
         for r in results:
             r.related_translations = rel_map.get(r.id, [])
 
-    # Deduplicate: same title → keep the one with smallest taisho_id (original sutra)
-    seen_titles: dict[str, int] = {}
+    # Deduplicate: same title+translator → keep best version (smallest taisho_id)
+    # Different translators of the same sutra are preserved as separate results
+    seen_keys: dict[str, int] = {}
     deduped: list = []
     for r in results:
-        title = r.title_zh or ""
-        if title in seen_titles:
-            existing = deduped[seen_titles[title]]
+        key = (r.title_zh or "") + "|" + (r.translator or "")
+        if key in seen_keys:
+            existing = deduped[seen_keys[key]]
             existing_tid = existing.taisho_id or "ZZZZ"
             new_tid = r.taisho_id or "ZZZZ"
             if (r.has_content and not existing.has_content) or new_tid < existing_tid:
-                deduped[seen_titles[title]] = r
+                deduped[seen_keys[key]] = r
         else:
-            seen_titles[title] = len(deduped)
+            seen_keys[key] = len(deduped)
             deduped.append(r)
     results = deduped
 
