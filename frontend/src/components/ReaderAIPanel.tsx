@@ -64,10 +64,12 @@ function tightenLists(md: string): string {
   return md.replace(/^(\d+\.)\s*\n\n+/gm, "$1 ").replace(/\n\n+(?=\d+\.\s)/g, "\n");
 }
 
-const QUICK_ACTIONS = [
-  { key: "explain", icon: <ReadOutlined />, label: "解读此段", prompt: "请解读这段经文的含义，提供白话翻译和重点术语解释。" },
-  { key: "summary", icon: <FileTextOutlined />, label: "全卷概要", prompt: "请概括本卷的主要内容和核心思想。" },
-];
+function getQuickActions(textTitle: string, juanNum: number) {
+  return [
+    { key: "explain", icon: <ReadOutlined />, label: "解读此段", prompt: `请解读《${textTitle}》第${juanNum}卷的经文含义，提供白话翻译和重点术语解释。` },
+    { key: "summary", icon: <FileTextOutlined />, label: "全卷概要", prompt: `请概括《${textTitle}》第${juanNum}卷的主要内容和核心思想。` },
+  ];
+}
 
 export default function ReaderAIPanel({
   textId,
@@ -216,7 +218,7 @@ export default function ReaderAIPanel({
       {/* Quick actions */}
       {messages.length === 0 && (
         <div className="reader-ai-quick-actions">
-          {QUICK_ACTIONS.map((action) => (
+          {getQuickActions(textTitle, juanNum).map((action) => (
             <Button
               key={action.key}
               size="small"
