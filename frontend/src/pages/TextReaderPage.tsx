@@ -13,6 +13,7 @@ import {
   HeartOutlined,
   HeartFilled,
   RobotOutlined,
+  SwapOutlined,
 } from "@ant-design/icons";
 import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBookmark, addBookmark, removeBookmark, searchDictionaryGrouped } from "../api/client";
 import type { DictGroupedSearchResponse } from "../api/client";
@@ -626,6 +627,14 @@ export default function TextReaderPage() {
             onClick={() => setCitationOpen(true)}
           >
             引用
+          </Button>
+          <Button
+            size="small"
+            icon={<SwapOutlined />}
+            type={versionsOpen ? "primary" : "default"}
+            onClick={() => setVersionsOpen(!versionsOpen)}
+          >
+            异本
           </Button>
           <div className="reader-font-controls">
             <Button
