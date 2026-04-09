@@ -8,6 +8,7 @@ import {
   FileTextOutlined,
   ReadOutlined,
   ClearOutlined,
+  CopyOutlined,
 } from "@ant-design/icons";
 import Markdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
@@ -320,14 +321,30 @@ export default function ReaderAIPanel({
         </div>
         <div className="reader-ai-input-footer">
           {messages.length > 0 && (
-            <Button
-              size="small"
-              type="text"
-              icon={<ClearOutlined />}
-              onClick={handleClearChat}
-            >
-              清空
-            </Button>
+            <>
+              <Button
+                size="small"
+                type="text"
+                icon={<ClearOutlined />}
+                onClick={handleClearChat}
+              >
+                清空
+              </Button>
+              <Button
+                size="small"
+                type="text"
+                icon={<CopyOutlined />}
+                onClick={() => {
+                  const lastAssistant = [...messages].reverse().find(m => m.role === "assistant");
+                  if (lastAssistant) {
+                    navigator.clipboard.writeText(lastAssistant.content);
+                    message.success("已复制");
+                  }
+                }}
+              >
+                复制
+              </Button>
+            </>
           )}
         </div>
       </div>
