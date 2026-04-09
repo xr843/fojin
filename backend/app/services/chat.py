@@ -593,7 +593,7 @@ async def send_message(
     try:
         async with httpx.AsyncClient(timeout=60) as client:
             if _is_anthropic(api_url, provider):
-                body = _build_anthropic_body(model, llm_messages)
+                body = _build_anthropic_body(model, llm_messages, max_tokens=8000 if page_content else 2000)
                 resp = await client.post(
                     f"{api_url}/messages", headers=_build_anthropic_headers(api_key), json=body,
                 )
@@ -603,7 +603,7 @@ async def send_message(
                 resp = await client.post(
                     f"{api_url}/chat/completions",
                     headers={"Authorization": f"Bearer {api_key}"},
-                    json={"model": model, "messages": llm_messages, "temperature": 0.7, "max_tokens": 2000},
+                    json={"model": model, "messages": llm_messages, "temperature": 0.7, "max_tokens": 8000 if page_content else 2000},
                 )
                 resp.raise_for_status()
                 answer = resp.json()["choices"][0]["message"]["content"]
@@ -683,8 +683,8 @@ async def send_message_stream(
     try:
         if _is_anthropic(api_url, provider):
             # Anthropic streaming: different event format
-            body = _build_anthropic_body(model, llm_messages, stream=True)
-            async with httpx.AsyncClient(timeout=60) as client, client.stream(
+            body = _build_anthropic_body(model, llm_messages, stream=True, max_tokens=8000 if page_content else 2000)
+            async with httpx.AsyncClient(timeout=120 if page_content else 60) as client, client.stream(
                 "POST", f"{api_url}/messages", headers=_build_anthropic_headers(api_key), json=body,
             ) as resp:
                 resp.raise_for_status()
@@ -706,7 +706,7 @@ async def send_message_stream(
                         continue
         else:
             # OpenAI-compatible streaming
-            async with httpx.AsyncClient(timeout=60) as client, client.stream(
+            async with httpx.AsyncClient(timeout=120 if page_content else 60) as client, client.stream(
                 "POST",
                 f"{api_url}/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}"},
@@ -714,7 +714,7 @@ async def send_message_stream(
                     "model": model,
                     "messages": llm_messages,
                     "temperature": 0.7,
-                    "max_tokens": 2000,
+                    "max_tokens": 8000 if page_content else 2000,
                     "stream": True,
                 },
             ) as resp:
