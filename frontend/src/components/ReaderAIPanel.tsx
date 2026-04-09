@@ -66,8 +66,8 @@ function tightenLists(md: string): string {
 
 function getQuickActions(textTitle: string, juanNum: number) {
   return [
-    { key: "explain", icon: <ReadOutlined />, label: "解读此段", prompt: `请解读《${textTitle}》第${juanNum}卷的经文含义，提供白话翻译和重点术语解释。` },
-    { key: "summary", icon: <FileTextOutlined />, label: "全卷概要", prompt: `请概括《${textTitle}》第${juanNum}卷的主要内容和核心思想。` },
+    { key: "explain", icon: <ReadOutlined />, label: "全文解读", prompt: `请对当前页面显示的《${textTitle}》第${juanNum}卷全文进行解读，提供白话翻译和重点术语解释。` },
+    { key: "summary", icon: <FileTextOutlined />, label: "全文概要", prompt: `请概括当前页面显示的《${textTitle}》第${juanNum}卷的主要内容和核心思想。` },
   ];
 }
 
