@@ -24,7 +24,7 @@ export default function SearchPage() {
   // Derive state from URL — these are the source of truth
   const query = searchParams.get("q") ?? "";
   const rawTab = searchParams.get("tab") ?? "catalog";
-  const tab = rawTab === "crosslang" ? "catalog" : rawTab === "semantic" ? "content" : rawTab;
+  const tab = rawTab === "crosslang" ? "catalog" : rawTab === "semantic" ? "content" : rawTab === "dictionary" ? "catalog" : rawTab;
   const selectedSources = searchParams.get("sources") ?? "";
 
   const [page, setPage] = useState(1);
@@ -291,7 +291,6 @@ export default function SearchPage() {
           items={[
             { key: "catalog", label: "搜经典" },
             { key: "content", label: "搜经文" },
-            { key: "dictionary", label: "搜辞典" },
           ]}
           size="small"
         />
@@ -300,7 +299,7 @@ export default function SearchPage() {
             ? "按经名、译者、编号检索，自动匹配所有语种标题与翻译版本"
             : tab === "content"
             ? "AI 语义理解 + 关键词精确匹配，在 34.7 万段经文中检索"
-            : "在 393,624 条多语种佛学辞典词条中检索词头与释义"}
+            : "AI 语义理解 + 关键词精确匹配，在 34.7 万段经文中检索"}
         </div>
       </div>
 
