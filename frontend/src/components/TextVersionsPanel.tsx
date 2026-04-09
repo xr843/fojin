@@ -43,7 +43,8 @@ export default function TextVersionsPanel({ textId }: Props) {
   if (isLoading) return <Spin size="small" />;
   if (!data) return null;
 
-  const { translations, iiif_manifests, source_links } = data;
+  const { translations, iiif_manifests, source_links: rawLinks } = data;
+  const source_links = rawLinks.filter(l => l.source_url);
   const hasContent = translations.length > 0 || iiif_manifests.length > 0 || source_links.length > 0;
 
   if (!hasContent) return null;
@@ -141,11 +142,7 @@ export default function TextVersionsPanel({ textId }: Props) {
                   >
                     <LinkOutlined /> {link.source_name}
                   </a>
-                ) : (
-                  <span className="version-source-link version-source-link--disabled">
-                    {link.source_name}
-                  </span>
-                )}
+                ) : null}
               </span>
             ))}
           </div>
