@@ -12,7 +12,7 @@
 /* When AI panel is open: lock height, each side scrolls independently */
 .reader-with-sidebar.reader-ai-active {
   max-width: none;
-  height: 100vh;
+  height: calc(100vh - 64px);
   overflow: hidden;
   padding-right: 0;
 }
