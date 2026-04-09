@@ -352,7 +352,7 @@ export default function TextReaderPage() {
   const readerContentRef = useRef<HTMLDivElement>(null);
 
   // AI panel state
-  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const [aiPanelOpen, setAiPanelOpen] = useState(true);
   const [aiPanelWidth, setAiPanelWidth] = useState(420);
   const [aiSelectedText, setAiSelectedText] = useState<string | undefined>();
   const isDraggingRef = useRef(false);
