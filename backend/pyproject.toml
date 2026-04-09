@@ -1,10 +1,11 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+anyio_backend = "asyncio"
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
-    "anyio[trio]==4.9.0",
+    "anyio>=4.0",
     "pytest-anyio==0.0.0",
 ]
 
