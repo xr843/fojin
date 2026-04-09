@@ -318,10 +318,11 @@ export default function ReaderAIPanel({
             allowClear
             placeholder="通用助手"
             value={masterId}
-            onChange={(v) => setMasterId(v ?? null)}
+            onChange={(v) => setMasterId(v || null)}
             size="small"
             style={{ width: 140, fontSize: 12 }}
             options={[
+              { value: "", label: "🟢 通用助手" },
               { value: "zhiyi", label: "🪷 智顗" },
               { value: "huineng", label: "🪷 慧能" },
               { value: "xuanzang", label: "🪷 玄奘" },

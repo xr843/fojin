@@ -843,10 +843,11 @@ export default function ChatPage() {
                 allowClear
                 placeholder={t("chat.general_assistant")}
                 value={masterId}
-                onChange={(v) => setMasterId(v ?? null)}
+                onChange={(v) => setMasterId(v || null)}
                 style={{ width: 200, fontSize: 13 }}
                 size="small"
                 options={[
+                  { value: "", label: `🟢 ${t("chat.general_assistant")}` },
                   { value: "zhiyi", label: "🪷 智顗（天台宗）" },
                   { value: "huineng", label: "🪷 慧能（禅宗）" },
                   { value: "xuanzang", label: "🪷 玄奘（唯识宗）" },
