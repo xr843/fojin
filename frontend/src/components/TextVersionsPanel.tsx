@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Spin, Tag, Tooltip } from "antd";
+import { Button, Spin, Tag, Tooltip } from "antd";
 import {
   PictureOutlined,
   BookOutlined,
@@ -29,9 +29,10 @@ const LANG_LABELS: Record<string, string> = {
 
 interface Props {
   textId: number;
+  onClose?: () => void;
 }
 
-export default function TextVersionsPanel({ textId }: Props) {
+export default function TextVersionsPanel({ textId, onClose }: Props) {
   const navigate = useNavigate();
   const { data, isLoading } = useQuery({
     queryKey: ["textVersions", textId],
@@ -48,6 +49,10 @@ export default function TextVersionsPanel({ textId }: Props) {
 
   return (
     <div className="versions-panel">
+      <div className="versions-panel-header">
+        <span className="versions-panel-title"><BookOutlined /> 不同异本</span>
+        {onClose && <Button type="text" size="small" onClick={onClose}>✕</Button>}
+      </div>
       {/* Translations / Parallel Texts */}
       {translations.length > 0 && (
         <div className="versions-section">

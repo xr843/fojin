@@ -344,6 +344,7 @@ export default function TextReaderPage() {
   const [fontSize, setFontSize] = useState(getInitialFontSize);
   const [citationOpen, setCitationOpen] = useState(false);
   const [annotationOpen, setAnnotationOpen] = useState(false);
+  const [versionsOpen, setVersionsOpen] = useState(true);
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
   const [compareLang, setCompareLang] = useState<string | null>(null);
   const { user } = useAuthStore();
@@ -756,7 +757,7 @@ export default function TextReaderPage() {
         onClose={() => setAnnotationOpen(false)}
       />
     </div>
-    <TextVersionsPanel textId={textId} />
+    {versionsOpen && <TextVersionsPanel textId={textId} onClose={() => setVersionsOpen(false)} />}
 
     {/* AI 解读：右侧内联面板 + 拖拽分割条 */}
     {aiPanelOpen ? (

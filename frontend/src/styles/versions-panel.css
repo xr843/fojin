@@ -7,6 +7,23 @@
   overflow: hidden;
 }
 
+.versions-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px 8px 16px;
+  border-bottom: 1px solid var(--fj-bg-alt, #f5f0e8);
+}
+
+.versions-panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #5a4e3c;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .versions-section {
   padding: 12px 16px;
   border-bottom: 1px solid var(--fj-bg-alt, #f5f0e8);
