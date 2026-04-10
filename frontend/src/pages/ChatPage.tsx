@@ -407,7 +407,8 @@ export default function ChatPage() {
       if (m.role === "user") {
         md += `## 用户\n${m.content}\n\n`;
       } else {
-        md += `## AI 助手\n${m.content}\n\n`;
+        const { cleanContent } = parseFollowUps(m.content);
+        md += `## AI 助手\n${cleanContent}\n\n`;
         if (m.sources && m.sources.length > 0) {
           md += "**引用来源:**\n";
           for (const s of m.sources) {
@@ -707,7 +708,13 @@ export default function ChatPage() {
                       <Button
                         type="text" size="small" icon={<CopyOutlined />}
                         style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
-                        onClick={() => { navigator.clipboard.writeText(m.content); message.success("已复制"); }}
+                        onClick={() => {
+                          const textToCopy = m.role === "assistant"
+                            ? parseFollowUps(m.content).cleanContent
+                            : m.content;
+                          navigator.clipboard.writeText(textToCopy);
+                          message.success("已复制");
+                        }}
                       />
                     </Tooltip>
                       {m.role === "assistant" && user && (
