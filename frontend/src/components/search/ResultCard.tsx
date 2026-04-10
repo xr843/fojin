@@ -86,7 +86,7 @@ export default function ResultCard({ hit, rank }: { hit: SearchHit; rank: number
               CBETA 阅读
             </Button>
           )}
-          <Button size="small" icon={<EyeOutlined />}
+          <Button type="primary" size="small" icon={<EyeOutlined />}
             onClick={() => navigate(`/texts/${hit.id}`)}>
             查看详情
           </Button>

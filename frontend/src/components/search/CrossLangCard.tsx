@@ -109,7 +109,7 @@ export default function CrossLangCard({ hit, rank }: { hit: CrossLanguageSearchH
               CBETA 阅读
             </Button>
           )}
-          <Button size="small" icon={<EyeOutlined />}
+          <Button type="primary" size="small" icon={<EyeOutlined />}
             onClick={() => navigate(`/texts/${hit.id}`)}>
             查看详情
           </Button>
