@@ -155,6 +155,8 @@ Ask questions in natural language. XiaoJin answers based on canonical Buddhist t
 - **Clickable citations** in 【《经名》第N卷】 format — click to jump to the text reader
 - **Progressive follow-up suggestions** (concept → related texts → practice)
 - **Smart data source recommendations** — when users ask about finding databases, AI automatically recommends relevant sources from 503 data sources via semantic similarity
+- **Meta-question handling** — detects self-introduction queries ("who are you" / "what can you do") and skips RAG to give a clean functional overview, instead of randomly citing scriptures
+- **Inline split-view in reader** — AI panel opens by default beside the text with a draggable divider; independent scrolling on each side, resizable width persisted to localStorage
 - **"Ask XiaoJin" button** on the reader page — select text to ask about it
 - **Tab key** cycles through suggested questions in the input box
 - BYOK (Bring Your Own Key) support for multiple LLM providers
@@ -354,6 +356,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 - [x] Master Persona Mode — 8 Buddhist masters with tradition-scoped RAG (powered by [Master-skill](https://github.com/xr843/Master-skill))
 - [x] Knowledge Graph Map — 50K+ geo entities, Deck.GL + MapLibre, lineage arcs
 - [x] Activity Feed — real-time source update tracking, academic feeds
+- [x] Inline split-view AI reader panel with draggable divider and independent scrolling
+- [x] AI panel auto-open in reader for one-click access to interpretation
+- [x] Meta-question detection in chat — recognizes "who are you / what can you do" and skips RAG
 - [ ] Topic ontology browsing page
 - [ ] Cross-lingual search (query in Chinese, find Sanskrit/Pali/Tibetan results)
 - [ ] Open data export (JSON/CSV for researchers)
