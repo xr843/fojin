@@ -138,8 +138,48 @@ SYSTEM_PROMPT = (
 )
 
 
+META_INTRO_PROMPT = (
+    "你是佛津（FoJin）——由佛津团队打造的佛教古籍研习 AI 助手。\n\n"
+    "当用户询问你是谁、你能做什么、请你自我介绍时，严格按以下格式回复，"
+    "**不要引用任何具体经文**，**不要使用【《经名》第N卷】格式**，"
+    "**不要在正文中列出示例问题**：\n\n"
+    "你好！我是 **佛津（FoJin）**，一个专为佛教古籍研习者打造的 AI 助手。\n\n"
+    "我的主要功能是帮助你深入理解佛教经典和教理，包括：\n\n"
+    "- **解读经文**：帮你梳理复杂的佛典段落，提炼核心义理和修行要点\n"
+    "- **查证出处**：根据你的问题，精准定位经名、卷数和原文段落\n"
+    "- **辨析教理**：比较不同宗派、不同经论对同一概念的理解差异\n"
+    "- **连接脉络**：帮你理清经典之间、人物与思想之间的传承与关联\n\n"
+    "我基于完整的佛教经典语料库（涵盖汉文大藏经、巴利三藏、藏文甘珠尔/丹珠尔等）"
+    "回答从基础术语到宗派义理的各类问题。\n\n"
+    "你可以在这里直接提问，也可以在任意经典的「在线阅读」页面通过 AI 解读面板与我互动。\n\n"
+    "有什么我可以帮你的吗？\n\n"
+    "回答结束后，另起一行输出 3 个追问建议，格式严格如下：\n"
+    "[追问] 问题1\n"
+    "[追问] 问题2\n"
+    "[追问] 问题3\n"
+    "这 3 个追问会以可点击按钮的形式展示给用户，所以正文里不要重复列出示例问题。"
+)
+
+_META_KEYWORDS = (
+    "介绍你自己", "介绍一下你自己", "你是谁", "你叫什么", "你是什么",
+    "你能做什么", "你能干什么", "你有什么功能", "你的功能",
+    "你会做什么", "self-introduction", "introduce yourself", "who are you",
+    "what can you do", "你好吗", "你是啥",
+)
+
+
+def _is_meta_question(message: str) -> bool:
+    """Detect meta questions about the assistant itself (vs. Buddhist content)."""
+    msg = message.strip().lower()
+    if len(msg) > 40:
+        return False
+    return any(kw in msg for kw in _META_KEYWORDS)
+
+
 def _classify_and_enhance_prompt(message: str) -> str:
     """Detect question type and append type-specific instructions to system prompt."""
+    if _is_meta_question(message):
+        return META_INTRO_PROMPT
     msg = message.lower()
 
     # 经文查证型：问"出自""出处""哪部经""原文"
@@ -541,11 +581,15 @@ async def _prepare_chat(
 
     # RAG: hybrid retrieval (context-aware with conversation history)
     # When a master is selected, scope RAG to their core texts
+    # Skip RAG entirely for meta questions about the assistant itself
     master = get_master(master_id) if master_id else None
-    scope_text_ids = master.fojin_text_ids if master and master.fojin_text_ids else None
-    sources, context_text = await retrieve_rag_context(
-        db, message, prev_query=prev_user_msg, scope_text_ids=scope_text_ids,
-    )
+    if _is_meta_question(message) and not master_id and not text_id:
+        sources, context_text = [], ""
+    else:
+        scope_text_ids = master.fojin_text_ids if master and master.fojin_text_ids else None
+        sources, context_text = await retrieve_rag_context(
+            db, message, prev_query=prev_user_msg, scope_text_ids=scope_text_ids,
+        )
 
     # Reading context: enhance prompt when user is reading a specific text
     reading_context = None

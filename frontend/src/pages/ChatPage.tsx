@@ -21,7 +21,6 @@ import {
   LikeFilled,
   DislikeOutlined,
   DislikeFilled,
-  ReadOutlined,
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -700,73 +699,6 @@ export default function ChatPage() {
                   ) : (
                     m.content
                   )}
-                  {m.sources && m.sources.length > 0 && (
-                    <div style={{
-                      marginTop: 8,
-                      paddingTop: 8,
-                      borderTop: `1px solid ${m.role === "user" ? "rgba(255,255,255,0.2)" : "rgba(217,208,193,0.5)"}`,
-                      fontSize: 12,
-                      opacity: 0.8,
-                    }}>
-                      {m.sources.map((s, i) => (
-                        <div key={i} style={{ marginBottom: 4 }}>
-                          <Tooltip title={s.chunk_text} placement="top" overlayStyle={{ maxWidth: 400 }}>
-                            <a
-                              onClick={() => s.text_id > 0 && navigate(`/texts/${s.text_id}/read?juan=${s.juan_num}`)}
-                              style={{
-                                cursor: s.text_id > 0 ? "pointer" : "default",
-                                color: "inherit",
-                                textDecoration: s.text_id > 0 ? "underline" : "none",
-                                borderRadius: 4,
-                                padding: "1px 4px",
-                                transition: "background 0.2s",
-                              }}
-                              onMouseEnter={(e) => { if (s.text_id > 0) e.currentTarget.style.background = "rgba(176,141,87,0.15)"; }}
-                              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                            >
-                              {"📖"}{" "}
-                              {s.title_zh
-                                ? `《${s.title_zh}》第${s.juan_num}卷`
-                                : `文本#${s.text_id} 第${s.juan_num}卷`}
-                              {" "}({Math.round(s.score * 100)}%)
-                            </a>
-                          </Tooltip>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {/* Related reading cards */}
-                  {m.role === "assistant" && m.sources && m.sources.length > 0 && streamingIdRef.current !== m.id && (() => {
-                    const seen = new Set<number>();
-                    const unique = m.sources!.filter((s) => {
-                      if (s.text_id <= 0 || seen.has(s.text_id)) return false;
-                      seen.add(s.text_id);
-                      return true;
-                    }).slice(0, 3);
-                    return unique.length > 0 ? (
-                      <div style={{
-                        marginTop: 8, padding: "6px 10px", borderRadius: 8,
-                        background: "rgba(176,141,87,0.08)", border: "1px solid rgba(176,141,87,0.2)",
-                      }}>
-                        {unique.map((s) => (
-                          <div key={s.text_id} style={{
-                            display: "flex", alignItems: "center", gap: 6, padding: "3px 0", fontSize: 12,
-                          }}>
-                            <ReadOutlined style={{ color: "var(--fj-accent)", fontSize: 13 }} />
-                            <span style={{ fontFamily: '"Noto Serif SC", serif', color: "var(--fj-ink)" }}>
-                              {s.title_zh ? `《${s.title_zh}》` : `文本#${s.text_id}`}
-                            </span>
-                            <a
-                              onClick={() => navigate(`/texts/${s.text_id}/read`)}
-                              style={{ color: "var(--fj-accent)", cursor: "pointer", marginLeft: "auto", whiteSpace: "nowrap" }}
-                            >
-                              阅读全文 →
-                            </a>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null;
-                  })()}
                 </div>
                 {/* Action buttons outside bubble */}
                 {m.content !== "正在检索经文并生成回答..." && streamingIdRef.current !== m.id && (
