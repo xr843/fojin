@@ -1,9 +1,9 @@
 import { useNavigate } from "react-router-dom";
 import { Tag, Button } from "antd";
-import { EyeOutlined, LinkOutlined, TranslationOutlined } from "@ant-design/icons";
+import { EyeOutlined, TranslationOutlined } from "@ant-design/icons";
 import BookmarkButton from "../BookmarkButton";
 import { sanitizeHighlight } from "../../utils/sanitize";
-import { getSourceLabel, buildCbetaReadUrl } from "../../utils/sourceUrls";
+import { getSourceLabel } from "../../utils/sourceUrls";
 import type { SearchHit } from "../../api/client";
 
 const LANG_LABELS: Record<string, string> = {
@@ -28,7 +28,6 @@ export default function ResultCard({ hit, rank }: { hit: SearchHit; rank: number
   const navigate = useNavigate();
   const titleHtml = hit.highlight?.title_zh?.[0] ?? hit.title_zh;
   const sourceName = hit.source_code ? getSourceLabel(hit.source_code) : null;
-  const cbetaUrl = buildCbetaReadUrl(hit.cbeta_id);
   const relatedTranslations = hit.related_translations || [];
 
   return (
@@ -79,13 +78,6 @@ export default function ResultCard({ hit, rank }: { hit: SearchHit; rank: number
           </div>
         )}
         <div className="s-card-actions">
-          {cbetaUrl && (
-            <Button type="primary" size="small" icon={<LinkOutlined />}
-              style={{ background: "#8b2500", borderColor: "#8b2500" }}
-              href={cbetaUrl} target="_blank" rel="noopener noreferrer">
-              CBETA 阅读
-            </Button>
-          )}
           <Button type="primary" size="small" icon={<EyeOutlined />}
             onClick={() => navigate(`/texts/${hit.id}`)}>
             查看详情
