@@ -46,7 +46,13 @@ def api_call(url):
 
 def get_all_cities():
     """Get all prefecture-level cities from Amap district API."""
-    url = f"https://restapi.amap.com/v3/config/district?key={AMAP_KEY}&keywords=中国&subdistrict=2&extensions=base"
+    params = urllib.parse.urlencode({
+        'key': AMAP_KEY,
+        'keywords': '中国',
+        'subdistrict': 2,
+        'extensions': 'base',
+    })
+    url = f"https://restapi.amap.com/v3/config/district?{params}"
     data = api_call(url)
     cities = []
     if data.get('status') == '1':

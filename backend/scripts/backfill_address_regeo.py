@@ -112,6 +112,7 @@ async def main():
               AND (properties->>'country' = 'CN' OR properties->>'country' = '中国'
                    OR properties->>'geo_source' LIKE 'osm:CN%' OR properties->>'geo_source' LIKE 'osm:中国%'
                    OR properties->>'geo_source' LIKE 'osm_ext%')
+              AND COALESCE(properties->>'geo_source', '') <> 'bdrc'
               AND (properties->>'province' IS NULL OR properties->>'province' = '')
               AND properties->>'latitude' IS NOT NULL
             LIMIT :limit
