@@ -7,10 +7,9 @@ import { addBookmark, removeBookmark, checkBookmark } from "../api/client";
 interface BookmarkButtonProps {
   textId: number;
   size?: "small" | "middle" | "large";
-  solid?: boolean;
 }
 
-export default function BookmarkButton({ textId, size, solid }: BookmarkButtonProps) {
+export default function BookmarkButton({ textId, size }: BookmarkButtonProps) {
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
 
@@ -33,21 +32,6 @@ export default function BookmarkButton({ textId, size, solid }: BookmarkButtonPr
   });
 
   if (!user) return null;
-
-  if (solid) {
-    return (
-      <Button
-        type="primary"
-        size={size}
-        icon={bookmarked ? <HeartFilled /> : <HeartOutlined />}
-        loading={mutation.isPending}
-        onClick={() => mutation.mutate()}
-        style={{ background: "#7c3aed", borderColor: "#7c3aed", color: "#fff" }}
-      >
-        {bookmarked ? "已收藏" : "收藏"}
-      </Button>
-    );
-  }
 
   return (
     <Button
