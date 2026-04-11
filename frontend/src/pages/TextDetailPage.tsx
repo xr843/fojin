@@ -213,7 +213,7 @@ export default function TextDetailPage() {
               手稿影像 ({manifests.length})
             </Button>
           )}
-          <BookmarkButton textId={text.id} solid />
+          <BookmarkButton textId={text.id} />
         </Space>
 
         <CitationGenerator
