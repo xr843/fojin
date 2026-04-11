@@ -11,7 +11,9 @@ Rate limit: 5000 calls/day (free key). ~340 cities × 3 keywords × 2 pages avg 
 import json, math, time, os, sys
 import urllib.parse, urllib.request
 
-AMAP_KEY = "7971e9b134c4684c3b43b6e442475d0e"
+AMAP_KEY = os.environ.get("AMAP_KEY")
+if not AMAP_KEY:
+    sys.exit("ERROR: AMAP_KEY environment variable is not set (check .env)")
 OUTPUT = "data/amap_temples_v3.json"
 PROGRESS_FILE = "data/amap_v3_progress.json"
 

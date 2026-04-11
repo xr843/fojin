@@ -22,7 +22,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.config import settings
 
-AMAP_KEY = "7971e9b134c4684c3b43b6e442475d0e"
+AMAP_KEY = os.environ.get("AMAP_KEY")
+if not AMAP_KEY:
+    sys.exit("ERROR: AMAP_KEY environment variable is not set (check .env)")
 AMAP_REGEO_URL = "https://restapi.amap.com/v3/geocode/regeo"
 USER_AGENT = "FoJinBot/1.0"
 
