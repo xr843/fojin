@@ -198,7 +198,13 @@ export default function TextDetailPage() {
               CBETA 阅读
             </Button>
           )}
-          <BookmarkButton textId={text.id} />
+          <Button
+            icon={<BookOutlined />}
+            onClick={() => setCitationOpen(true)}
+            style={{ background: "#5b8c6b", borderColor: "#5b8c6b", color: "#fff" }}
+          >
+            导出引用
+          </Button>
           {manifests && manifests.length > 0 && (
             <Button
               icon={<FileImageOutlined />}
@@ -207,13 +213,7 @@ export default function TextDetailPage() {
               手稿影像 ({manifests.length})
             </Button>
           )}
-          <Button
-            icon={<BookOutlined />}
-            onClick={() => setCitationOpen(true)}
-            style={{ background: "#5b8c6b", borderColor: "#5b8c6b", color: "#fff" }}
-          >
-            导出引用
-          </Button>
+          <BookmarkButton textId={text.id} solid />
         </Space>
 
         <CitationGenerator
