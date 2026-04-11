@@ -283,6 +283,7 @@ async def get_geo_entities(
         "(e.properties->>'latitude') IS NOT NULL",
         "(e.properties->>'longitude') IS NOT NULL",
         "e.entity_type != 'sub_entity'",
+        "COALESCE(e.properties->>'is_buddhist', 'true') != 'false'",
     ]
     params: dict = {"limit": limit}
 
@@ -382,6 +383,8 @@ async def get_lineage_arcs(
         "(s.properties->>'latitude') != ''",
         "COALESCE(t.properties->>'geo_source', '') NOT LIKE 'teacher_hop%%'",
         "COALESCE(s.properties->>'geo_source', '') NOT LIKE 'teacher_hop%%'",
+        "COALESCE(t.properties->>'is_buddhist', 'true') != 'false'",
+        "COALESCE(s.properties->>'is_buddhist', 'true') != 'false'",
     ]
     params: dict = {"limit": limit}
 
