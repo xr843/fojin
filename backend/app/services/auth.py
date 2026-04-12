@@ -28,11 +28,13 @@ async def register_user(db: AsyncSession, data: UserRegister) -> User:
     if result.scalar_one_or_none():
         raise DuplicateEmailError()
 
+    now = datetime.now(UTC)
     user = User(
         username=data.username,
         email=data.email,
         hashed_password=hash_password(data.password),
         display_name=data.display_name or data.username,
+        last_active_at=now,
     )
     db.add(user)
     await db.commit()
@@ -53,6 +55,9 @@ async def login_user(db: AsyncSession, username: str, password: str) -> TokenRes
 
     if not user.is_active:
         raise AccountDisabledError()
+
+    user.last_active_at = datetime.now(UTC)
+    await db.commit()
 
     token = create_access_token(user.id, user.password_version)
     return TokenResponse(access_token=token)

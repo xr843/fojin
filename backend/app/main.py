@@ -291,9 +291,10 @@ class LastActiveMiddleware(BaseHTTPMiddleware):
         try:
             from app.core.auth import verify_token
             token = auth_header[7:]
-            user_id = verify_token(token)
-            if user_id is None:
+            result = verify_token(token)
+            if result is None:
                 return response
+            user_id, _pwd_v = result
 
             redis_client = getattr(request.app.state, "redis", None)
             if redis_client is None:

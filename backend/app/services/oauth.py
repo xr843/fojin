@@ -7,6 +7,7 @@ import json
 import logging
 import secrets
 import string
+from datetime import UTC, datetime
 
 import httpx
 from sqlalchemy import select
@@ -39,9 +40,11 @@ async def _find_or_create_user(
     social = result.scalar_one_or_none()
 
     if social:
-        # Existing link — fetch the user
+        # Existing link — fetch the user and update last_active_at
         user_result = await db.execute(select(User).where(User.id == social.user_id))
         user = user_result.scalar_one()
+        user.last_active_at = datetime.now(UTC)
+        await db.commit()
         return user
 
     # If we have an email, check if a user with that email already exists
@@ -68,6 +71,7 @@ async def _find_or_create_user(
             email=email or f"{provider}_{provider_user_id}@noreply.fojin.app",
             hashed_password=hash_password(random_pw),
             display_name=display_name or username,
+            last_active_at=datetime.now(UTC),
         )
         db.add(user)
         await db.flush()  # Get user.id
