@@ -349,7 +349,18 @@ export default function ProfilePage() {
                   <Space direction="vertical" size="middle" style={{ width: "100%" }}>
                     <Alert
                       message="修改登录密码"
-                      description="修改成功后，所有已登录的其他设备（浏览器/手机）会立刻失效，需要用新密码重新登录。若您通过 GitHub / Google / 手机验证码登录，此功能不适用，请使用原渠道登录。"
+                      description={
+                        <div>
+                          <div style={{ marginBottom: 8 }}>
+                            修改成功后，其他设备（浏览器 / 手机）上的登录会立刻失效，需要用新密码重新登录。
+                          </div>
+                          <div style={{ color: "#8c6e3e" }}>
+                            只有使用 <strong>用户名 + 密码</strong> 注册的账号可以在这里修改密码。如果你当初是通过
+                            <strong> GitHub 登录</strong>、<strong>Google 登录</strong> 或 <strong>手机验证码</strong> 进入 fojin
+                            的，你的账号没有独立密码——下次登录时，请继续在登录页点击对应的 GitHub / Google 按钮，或使用手机验证码即可。
+                          </div>
+                        </div>
+                      }
                       type="info"
                       showIcon
                     />
