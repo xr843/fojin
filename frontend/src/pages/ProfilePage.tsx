@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
 import { Typography, Card, Tabs, List, Tag, Empty, Spin, Descriptions, Button, Space, Pagination, Input, Select, message, Alert, Form } from "antd";
 import { BookOutlined, HistoryOutlined, UserOutlined, ReadOutlined, KeyOutlined, DeleteOutlined, CheckCircleOutlined, LockOutlined } from "@ant-design/icons";
 import { useAuthStore } from "../stores/authStore";
@@ -69,8 +70,12 @@ export default function ProfilePage() {
       setApiKey("");
       refetchKey();
       queryClient.invalidateQueries({ queryKey: ["apiKeyStatus"] });
-    } catch (err: any) {
-      message.error(err?.response?.data?.detail || "保存失败");
+    } catch (err) {
+      const detail =
+        axios.isAxiosError(err) && typeof err.response?.data?.detail === "string"
+          ? err.response.data.detail
+          : "保存失败";
+      message.error(detail);
     } finally {
       setSaving(false);
     }
@@ -102,12 +107,11 @@ export default function ProfilePage() {
       setAuth(access_token, user);
       pwForm.resetFields();
       message.success("密码已修改，其他设备上的登录已失效");
-    } catch (err: any) {
-      const status = err?.response?.status;
-      if (status === 429) {
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 429) {
         message.error("操作过于频繁，请稍后再试");
       } else {
-        message.error(err?.response?.data?.detail || "当前密码不正确或新密码不合要求");
+        message.error("当前密码不正确或新密码不合要求");
       }
     } finally {
       setChangingPw(false);
