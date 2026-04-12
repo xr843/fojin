@@ -55,7 +55,16 @@
   "home.selected_sources": "{{count}} selected",
   "home.select_source": "Select source",
   "home.hot_label": "Popular",
-  "home.hot_tags": ["Diamond Sutra", "Heart Sutra", "Avatamsaka", "Shurangama", "Xuanzang", "Kumarajiva", "Chan", "Tiantai"],
+  "home.hot_tags": [
+    "Diamond Sutra",
+    "Heart Sutra",
+    "Avatamsaka",
+    "Shurangama",
+    "Xuanzang",
+    "Kumarajiva",
+    "Chan",
+    "Tiantai"
+  ],
   "home.stat_texts": "Texts",
   "home.stat_sources": "Sources",
   "home.stat_langs": "Languages",
@@ -78,12 +87,6 @@
   "search.did_you_mean": "Did you mean",
   "language.zh": "中文",
   "language.en": "English",
-  "language.ja": "日本語",
-  "language.ko": "한국어",
-  "language.th": "ไทย",
-  "language.vi": "Tiếng Việt",
-  "language.si": "සිංහල",
-  "language.my": "မြန်မာ",
   "nav.activity": "Activity",
   "nav.timeline": "Timeline",
   "nav.dashboard": "Dashboard",
@@ -177,5 +180,10 @@
   "chat.unlimited_usage": "for unlimited usage.",
   "chat.login": "Log in",
   "chat.login_quota_hint": " for 30 daily questions. Configure your own API Key for unlimited usage.",
-  "chat.hot_questions": ["What does 'form is emptiness' mean in the Heart Sutra?", "How do Kumārajīva and Xuanzang's translation styles differ?", "What are the core teachings of the Four Noble Truths?", "Which scriptures gave rise to Chan Buddhism's 'beyond words' doctrine?"]
+  "chat.hot_questions": [
+    "What does 'form is emptiness' mean in the Heart Sutra?",
+    "How do Kumārajīva and Xuanzang's translation styles differ?",
+    "What are the core teachings of the Four Noble Truths?",
+    "Which scriptures gave rise to Chan Buddhism's 'beyond words' doctrine?"
+  ]
 }

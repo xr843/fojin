@@ -11,7 +11,7 @@ i18n
   .use(initReactI18next)
   .init({
     fallbackLng: "zh",
-    supportedLngs: ["zh", "zh-Hant", "en", "ja", "ko", "th", "vi", "si", "my"],
+    supportedLngs: ["zh", "zh-Hant", "en"],
     load: "currentOnly",
     keySeparator: false,
     nsSeparator: false,

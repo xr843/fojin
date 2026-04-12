@@ -53,7 +53,16 @@
   "home.selected_sources": "已选 {{count}} 源",
   "home.select_source": "选择数据源",
   "home.hot_label": "热门检索",
-  "home.hot_tags": ["金刚经", "心经", "华严经", "楞严经", "玄奘", "鸠摩罗什", "禅宗", "天台宗"],
+  "home.hot_tags": [
+    "金刚经",
+    "心经",
+    "华严经",
+    "楞严经",
+    "玄奘",
+    "鸠摩罗什",
+    "禅宗",
+    "天台宗"
+  ],
   "home.stat_texts": "收录典籍",
   "home.stat_sources": "数据来源",
   "home.stat_langs": "关联语种",
@@ -79,12 +88,6 @@
   "language.zh": "中文简体",
   "language.zh-Hant": "中文繁體",
   "language.en": "English",
-  "language.ja": "日本語",
-  "language.ko": "한국어",
-  "language.th": "ไทย",
-  "language.vi": "Tiếng Việt",
-  "language.si": "සිංහල",
-  "language.my": "မြန်မာ",
   "nav.activity": "佛学动态",
   "nav.timeline": "历史时间线",
   "nav.dashboard": "数据总览",
@@ -178,5 +181,10 @@
   "chat.unlimited_usage": "可无限使用。",
   "chat.login": "登录",
   "chat.login_quota_hint": "后每日可用 30 次。配置自己的 API Key 可无限使用。",
-  "chat.hot_questions": ["《心经》中「色不异空」的含义是什么？", "鸠摩罗什与玄奘的翻译风格有何不同？", "四圣谛的核心教义是什么？", "禅宗的「不立文字」思想源自哪些经典？"]
+  "chat.hot_questions": [
+    "《心经》中「色不异空」的含义是什么？",
+    "鸠摩罗什与玄奘的翻译风格有何不同？",
+    "四圣谛的核心教义是什么？",
+    "禅宗的「不立文字」思想源自哪些经典？"
+  ]
 }
