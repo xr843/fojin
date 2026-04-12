@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Typography, Spin, Button, Select, Breadcrumb, Row, Col, message } from "antd";
+import { Typography, Spin, Button, Select, Breadcrumb, Row, Col, message, Tooltip } from "antd";
 import {
   HomeOutlined,
   LeftOutlined,
@@ -778,14 +778,17 @@ export default function TextReaderPage() {
         </div>
       </>
     ) : (
-      <Button
-        className="reader-ai-fab"
-        type="primary"
-        shape="circle"
-        size="large"
-        icon={<RobotOutlined />}
-        onClick={() => setAiPanelOpen(true)}
-      />
+      <Tooltip title="AI 解读" placement="left">
+        <Button
+          className="reader-ai-fab"
+          type="primary"
+          shape="circle"
+          size="large"
+          icon={<RobotOutlined />}
+          onClick={() => setAiPanelOpen(true)}
+          aria-label="AI 解读"
+        />
+      </Tooltip>
     )}
     </div>
   );
