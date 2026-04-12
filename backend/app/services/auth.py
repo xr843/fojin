@@ -1,3 +1,6 @@
+import logging
+from datetime import UTC, datetime
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +13,8 @@ from app.core.exceptions import (
 )
 from app.models.user import User
 from app.schemas.user import TokenResponse, UserRegister
+
+logger = logging.getLogger(__name__)
 
 
 async def register_user(db: AsyncSession, data: UserRegister) -> User:
@@ -49,5 +54,55 @@ async def login_user(db: AsyncSession, username: str, password: str) -> TokenRes
     if not user.is_active:
         raise AccountDisabledError()
 
-    token = create_access_token(user.id)
+    token = create_access_token(user.id, user.password_version)
+    return TokenResponse(access_token=token)
+
+
+async def change_user_password(
+    db: AsyncSession,
+    user: User,
+    old_password: str,
+    new_password: str,
+    client_ip: str | None = None,
+) -> TokenResponse:
+    """Change the password for an authenticated user.
+
+    Security properties:
+    - Old password is verified with constant-time bcrypt comparison.
+    - New password strength is validated upstream via Pydantic schema.
+    - New password must differ from the old one (prevents accidental no-ops
+      and casual forwarding of the old password as the new one).
+    - password_version is incremented, which invalidates every previously
+      issued JWT for this user via the get_current_user dependency check.
+    - OAuth-only users naturally cannot pass the old_password check because
+      their hashed_password was seeded from a server-generated random value
+      that they never learned; no special-casing needed in the backend.
+    - Old/new passwords are never logged.
+    """
+
+    if not verify_password(old_password, user.hashed_password):
+        logger.warning(
+            "change_password_failed user_id=%s reason=wrong_old ip=%s",
+            user.id,
+            client_ip,
+        )
+        raise InvalidCredentialsError("当前密码不正确")
+
+    if verify_password(new_password, user.hashed_password):
+        raise InvalidCredentialsError("新密码不能与当前密码相同")
+
+    user.hashed_password = hash_password(new_password)
+    user.password_version = (user.password_version or 0) + 1
+    user.password_changed_at = datetime.now(UTC)
+    await db.commit()
+    await db.refresh(user)
+
+    logger.info(
+        "change_password_success user_id=%s new_version=%s ip=%s",
+        user.id,
+        user.password_version,
+        client_ip,
+    )
+
+    token = create_access_token(user.id, user.password_version)
     return TokenResponse(access_token=token)

@@ -10,8 +10,16 @@ from app.core.crypto import decrypt_api_key, encrypt_api_key
 from app.core.deps import get_current_user
 from app.database import get_db
 from app.models.user import User
-from app.schemas.user import ApiKeyRequest, ApiKeyStatus, TokenResponse, UserLogin, UserProfile, UserRegister
-from app.services.auth import login_user, register_user
+from app.schemas.user import (
+    ApiKeyRequest,
+    ApiKeyStatus,
+    ChangePasswordRequest,
+    TokenResponse,
+    UserLogin,
+    UserProfile,
+    UserRegister,
+)
+from app.services.auth import change_user_password, login_user, register_user
 from app.services.oauth import (
     github_authorize_url,
     github_callback,
@@ -51,6 +59,35 @@ async def register(data: UserRegister, db: AsyncSession = Depends(get_db)):
 async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
     """用户登录，返回 JWT token。"""
     return await login_user(db, data.username, data.password)
+
+
+@router.post("/change-password", response_model=TokenResponse)
+async def change_password(
+    data: ChangePasswordRequest,
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """修改当前登录用户的密码。
+
+    成功后返回一张全新的 JWT（原 JWT 因 password_version 递增而失效），
+    前端应立刻用返回的新 token 替换本地存储的旧 token。
+    同一用户在其他设备上的所有旧 JWT 都会在下一次请求时变成 401。
+    """
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        client_ip = forwarded.split(",")[0].strip()
+    elif request.client:
+        client_ip = request.client.host
+    else:
+        client_ip = None
+    return await change_user_password(
+        db,
+        user,
+        old_password=data.old_password,
+        new_password=data.new_password,
+        client_ip=client_ip,
+    )
 
 
 @router.get("/me", response_model=UserProfile)

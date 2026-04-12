@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 STRICT_PATHS: dict[str, int] = {
     "/api/auth/login": settings.rate_limit_login,
     "/api/auth/register": settings.rate_limit_register,
+    "/api/auth/change-password": 5,
     "/api/search": 60,
     "/api/search/content": 30,
 }

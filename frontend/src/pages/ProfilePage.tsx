@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Typography, Card, Tabs, List, Tag, Empty, Spin, Descriptions, Button, Space, Pagination, Input, Select, message, Alert } from "antd";
-import { BookOutlined, HistoryOutlined, UserOutlined, ReadOutlined, KeyOutlined, DeleteOutlined, CheckCircleOutlined } from "@ant-design/icons";
+import { Typography, Card, Tabs, List, Tag, Empty, Spin, Descriptions, Button, Space, Pagination, Input, Select, message, Alert, Form } from "antd";
+import { BookOutlined, HistoryOutlined, UserOutlined, ReadOutlined, KeyOutlined, DeleteOutlined, CheckCircleOutlined, LockOutlined } from "@ant-design/icons";
 import { useAuthStore } from "../stores/authStore";
-import { getBookmarks, getHistory, getApiKeyStatus, saveApiKey, deleteApiKey } from "../api/client";
+import { getBookmarks, getHistory, getApiKeyStatus, saveApiKey, deleteApiKey, changePassword } from "../api/client";
 
 const { Title } = Typography;
 
@@ -35,7 +35,7 @@ const PROVIDERS = [
 export default function ProfilePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user } = useAuthStore();
+  const { user, token, setAuth } = useAuthStore();
   const queryClient = useQueryClient();
   const [bmPage, setBmPage] = useState(1);
   const [histPage, setHistPage] = useState(1);
@@ -44,6 +44,8 @@ export default function ProfilePage() {
   const [apiModel, setApiModel] = useState("");
   const [apiCustomUrl, setApiCustomUrl] = useState("");
   const [saving, setSaving] = useState(false);
+  const [pwForm] = Form.useForm();
+  const [changingPw, setChangingPw] = useState(false);
 
   const defaultTab = searchParams.get("tab") || "profile";
 
@@ -82,6 +84,33 @@ export default function ProfilePage() {
       queryClient.invalidateQueries({ queryKey: ["apiKeyStatus"] });
     } catch {
       message.error("删除失败");
+    }
+  };
+
+  const handleChangePassword = async (values: {
+    old_password: string;
+    new_password: string;
+    confirm_password: string;
+  }) => {
+    if (!user || !token) return;
+    setChangingPw(true);
+    try {
+      const { access_token } = await changePassword({
+        old_password: values.old_password,
+        new_password: values.new_password,
+      });
+      setAuth(access_token, user);
+      pwForm.resetFields();
+      message.success("密码已修改，其他设备上的登录已失效");
+    } catch (err: any) {
+      const status = err?.response?.status;
+      if (status === 429) {
+        message.error("操作过于频繁，请稍后再试");
+      } else {
+        message.error(err?.response?.data?.detail || "当前密码不正确或新密码不合要求");
+      }
+    } finally {
+      setChangingPw(false);
     }
   };
 
@@ -300,6 +329,75 @@ export default function ProfilePage() {
                     <Button type="primary" loading={saving} onClick={handleSaveKey}>
                       保存 API Key
                     </Button>
+                  </Space>
+                </Card>
+              ),
+            },
+            {
+              key: "security",
+              label: (
+                <span>
+                  <LockOutlined /> 账户安全
+                </span>
+              ),
+              children: (
+                <Card>
+                  <Space direction="vertical" size="middle" style={{ width: "100%" }}>
+                    <Alert
+                      message="修改登录密码"
+                      description="修改成功后，所有已登录的其他设备（浏览器/手机）会立刻失效，需要用新密码重新登录。若您通过 GitHub / Google / 手机验证码登录，此功能不适用，请使用原渠道登录。"
+                      type="info"
+                      showIcon
+                    />
+                    <Form
+                      form={pwForm}
+                      layout="vertical"
+                      onFinish={handleChangePassword}
+                      autoComplete="off"
+                    >
+                      <Form.Item
+                        label="当前密码"
+                        name="old_password"
+                        rules={[{ required: true, message: "请输入当前密码" }]}
+                      >
+                        <Input.Password autoComplete="current-password" size="large" />
+                      </Form.Item>
+                      <Form.Item
+                        label="新密码"
+                        name="new_password"
+                        rules={[
+                          { required: true, message: "请输入新密码" },
+                          { min: 8, message: "密码至少 8 位" },
+                          { pattern: /[a-zA-Z]/, message: "密码必须包含字母" },
+                          { pattern: /\d/, message: "密码必须包含数字" },
+                        ]}
+                      >
+                        <Input.Password autoComplete="new-password" size="large" />
+                      </Form.Item>
+                      <Form.Item
+                        label="确认新密码"
+                        name="confirm_password"
+                        dependencies={["new_password"]}
+                        rules={[
+                          { required: true, message: "请再次输入新密码" },
+                          ({ getFieldValue }) => ({
+                            validator(_, value) {
+                              if (!value || getFieldValue("new_password") === value) {
+                                return Promise.resolve();
+                              }
+                              return Promise.reject(new Error("两次输入的新密码不一致"));
+                            },
+                          }),
+                        ]}
+                      >
+                        <Input.Password autoComplete="new-password" size="large" />
+                      </Form.Item>
+                      <Form.Item>
+                        <Button type="primary" htmlType="submit" loading={changingPw}>
+                          修改密码
+                        </Button>
+                      </Form.Item>
+                    </Form>
                   </Space>
                 </Card>
               ),

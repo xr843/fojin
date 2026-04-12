@@ -142,7 +142,7 @@ async def github_callback(code: str, db: AsyncSession) -> TokenResponse:
         display_name=gh_user.get("name") or gh_user.get("login"),
         provider_data={"login": gh_user.get("login"), "avatar_url": gh_user.get("avatar_url")},
     )
-    token = create_access_token(user.id)
+    token = create_access_token(user.id, user.password_version)
     return TokenResponse(access_token=token)
 
 
@@ -195,7 +195,7 @@ async def google_callback(code: str, db: AsyncSession) -> TokenResponse:
         display_name=g_user.get("name"),
         provider_data={"picture": g_user.get("picture")},
     )
-    token = create_access_token(user.id)
+    token = create_access_token(user.id, user.password_version)
     return TokenResponse(access_token=token)
 
 
@@ -250,5 +250,5 @@ async def sms_login(phone: str, db: AsyncSession) -> TokenResponse:
         email=None,
         display_name=f"用户{phone[-4:]}",
     )
-    token = create_access_token(user.id)
+    token = create_access_token(user.id, user.password_version)
     return TokenResponse(access_token=token)
