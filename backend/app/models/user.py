@@ -13,6 +13,10 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(50), unique=True, index=True)
     email: Mapped[str] = mapped_column(String(200), unique=True, index=True)
     hashed_password: Mapped[str] = mapped_column(String(200))
+    password_version: Mapped[int] = mapped_column(Integer, server_default="0")
+    password_changed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     display_name: Mapped[str | None] = mapped_column(String(100))
     role: Mapped[str] = mapped_column(String(20), server_default="user")
     is_active: Mapped[bool] = mapped_column(Boolean, server_default="true")

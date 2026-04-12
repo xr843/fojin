@@ -144,7 +144,6 @@ export default function DeckGLMap({
         setPatchedStyle(style as unknown as StyleSpecification);
       })
       .catch((e) => {
-        // eslint-disable-next-line no-console
         console.error("[style fetch err]", e);
       });
     return () => {

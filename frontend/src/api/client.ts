@@ -1308,6 +1308,22 @@ export async function deleteApiKey(): Promise<void> {
   await api.delete("/auth/api-key");
 }
 
+export interface ChangePasswordResponse {
+  access_token: string;
+  token_type: string;
+}
+
+export async function changePassword(payload: {
+  old_password: string;
+  new_password: string;
+}): Promise<ChangePasswordResponse> {
+  const { data } = await api.post<ChangePasswordResponse>(
+    "/auth/change-password",
+    payload,
+  );
+  return data;
+}
+
 export default api;
 
 // Text Versions (aggregated view)
