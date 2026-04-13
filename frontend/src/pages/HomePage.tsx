@@ -129,9 +129,9 @@ export default function HomePage() {
           <div className="home-tip">
             <InfoCircleOutlined style={{ marginRight: 6, flexShrink: 0 }} />
             <span>
-              无需注册即可搜索与浏览。
+              无需注册即可搜索、浏览并体验 AI 佛典问答。
               <a onClick={() => navigate("/login")} style={{ cursor: "pointer", textDecoration: "underline" }}>注册登录</a>
-              后可使用收藏夹、AI 问答、阅读历史、标注笔记、自定义 API Key 等功能。
+              后可畅享 AI 问答，并解锁收藏夹、阅读历史、标注笔记、自定义 API Key 等功能。
             </span>
             <CloseOutlined
               onClick={() => setTipDismissed(true)}
