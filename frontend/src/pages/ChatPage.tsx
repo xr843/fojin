@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo, useEffect, type ReactNode } from "react";
+import { useState, useRef, useCallback, useMemo, useEffect, lazy, Suspense, type ReactNode } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
@@ -21,7 +21,9 @@ import {
   LikeFilled,
   DislikeOutlined,
   DislikeFilled,
+  ShareAltOutlined,
 } from "@ant-design/icons";
+const ShareCard = lazy(() => import("../components/ShareCard"));
 import { useQuery } from "@tanstack/react-query";
 import {
   sendChatMessageStream,
@@ -129,6 +131,11 @@ export default function ChatPage() {
   const [hasOlderMessages, setHasOlderMessages] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [shareTarget, setShareTarget] = useState<{
+    question: string;
+    answer: string;
+    sources: ChatSource[] | null;
+  } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const messagesTopRef = useRef<HTMLDivElement>(null);
 
@@ -717,6 +724,29 @@ export default function ChatPage() {
                         }}
                       />
                     </Tooltip>
+                      {m.role === "assistant" && m.content !== "请求失败，请重试" && (
+                        <Tooltip title="生成分享卡片">
+                          <Button
+                            type="text" size="small" icon={<ShareAltOutlined />}
+                            style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
+                            onClick={() => {
+                              const idx = messages.findIndex((x) => x.id === m.id);
+                              let question = "";
+                              for (let i = idx - 1; i >= 0; i--) {
+                                if (messages[i].role === "user") {
+                                  question = messages[i].content;
+                                  break;
+                                }
+                              }
+                              setShareTarget({
+                                question: question || "佛典问答",
+                                answer: parseFollowUps(m.content).cleanContent,
+                                sources: m.sources,
+                              });
+                            }}
+                          />
+                        </Tooltip>
+                      )}
                       {m.role === "assistant" && user && (
                         <>
                           <Tooltip title="有帮助">
@@ -839,6 +869,17 @@ export default function ChatPage() {
           </div>
         </div>
       </div>
+      {shareTarget !== null && (
+        <Suspense fallback={null}>
+          <ShareCard
+            open={shareTarget !== null}
+            onClose={() => setShareTarget(null)}
+            question={shareTarget.question}
+            answer={shareTarget.answer}
+            sources={shareTarget.sources}
+          />
+        </Suspense>
+      )}
     </>
   );
 }
