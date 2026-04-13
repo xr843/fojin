@@ -25,7 +25,7 @@ from app.services.rag_retrieval import retrieve_rag_context
 logger = logging.getLogger(__name__)
 
 # Free daily limits for users without their own API key
-FREE_DAILY_LIMIT_USER = 30       # Logged-in users
+FREE_DAILY_LIMIT_USER = 200      # Logged-in users — effectively unlimited for normal use, caps abuse
 FREE_DAILY_LIMIT_ANONYMOUS = 10  # Anonymous users (encourage registration)
 
 # Provider → base URL mapping (most are OpenAI-compatible; Anthropic uses its own format)
@@ -125,14 +125,15 @@ SYSTEM_PROMPT = (
     "4. 当检索片段真的能佐证或丰富答案时，用格式【《经名》第N卷】引用。\n"
     "5. 如果通识和检索都不足以回答，如实告知，不要编造内容。\n"
     "6. 使用用户的语言回答。只回答佛学、佛教文献、佛教历史和佛教文化相关问题；"
-    "非佛学问题请礼貌引导回佛学话题。\n"
+    "非佛学问题请礼貌引导回佛学话题，**拒绝时不要推荐任何网址或链接**。\n"
     "7. 每次回答结束后，另起一行输出 3 个递进式追问建议，格式严格如下：\n"
     "[追问] 问题1（深入当前回答的某个核心概念）\n"
     "[追问] 问题2（关联到相关经典或人物）\n"
     "[追问] 问题3（延伸到修行实践或现代意义）\n"
     "三个追问应形成由浅入深、从理论到实践的递进关系，引导用户逐步深入探索。\n"
     "8. 如果参考资料中包含[相关数据源推荐]，在回答末尾自然推荐相关数据源，"
-    "格式如「您可以访问 XXX（链接）查阅相关资料」。如果没有数据源推荐则不提及。\n\n"
+    "格式如「您可以访问 XXX（链接）查阅相关资料」。**只使用参考资料中实际出现的链接，"
+    "绝不要自行编造或猜测任何 URL**。如果没有数据源推荐则不提及任何链接。\n\n"
     "## 回答示例\n"
     "用户问：般若波罗蜜多心经的核心思想是什么？\n"
     "助手：《心经》的核心思想是「色不异空，空不异色」【《般若波罗蜜多心经》第1卷】，"
