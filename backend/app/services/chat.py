@@ -25,7 +25,7 @@ from app.services.rag_retrieval import retrieve_rag_context
 logger = logging.getLogger(__name__)
 
 # Free daily limits for users without their own API key
-FREE_DAILY_LIMIT_USER = 30       # Logged-in users
+FREE_DAILY_LIMIT_USER = 200      # Logged-in users — effectively unlimited for normal use, caps abuse
 FREE_DAILY_LIMIT_ANONYMOUS = 10  # Anonymous users (encourage registration)
 
 # Provider → base URL mapping (most are OpenAI-compatible; Anthropic uses its own format)

@@ -799,11 +799,9 @@ export default function ChatPage() {
               />
               {masterId && <span style={{ fontSize: 11, color: "#a09070" }}>{t("chat.rag_scope_hint")}</span>}
             </div>
-            {!keyStatus?.has_api_key && quota && quota.remaining >= 0 && (
+            {!user && !keyStatus?.has_api_key && quota && quota.remaining >= 0 && (
               <Alert
-                message={<span>{t("chat.quota_info", { limit: quota.limit, remaining: quota.remaining })}{user
-                  ? <><a onClick={() => navigate("/profile?tab=apikey")}>{t("chat.configure_key")}</a> {t("chat.unlimited_usage")}</>
-                  : <><a onClick={() => navigate("/login")}>{t("chat.login")}</a>{t("chat.login_quota_hint")}</>}</span>}
+                message={<span>{t("chat.quota_info", { limit: quota.limit, remaining: quota.remaining })}<a onClick={() => navigate("/login")}>{t("chat.login")}</a>{t("chat.login_quota_hint")}</span>}
                 type={quota.remaining <= 2 ? "warning" : "info"} showIcon closable
                 style={{ marginBottom: 8, fontSize: 12 }}
               />

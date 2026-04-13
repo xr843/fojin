@@ -180,7 +180,7 @@
   "chat.quota_info": "每日免費 {{limit}} 次問答，今日剩餘 {{remaining}} 次。",
   "chat.unlimited_usage": "可無限使用。",
   "chat.login": "登入",
-  "chat.login_quota_hint": "後每日可用 30 次。配置自己的 API Key 可無限使用。",
+  "chat.login_quota_hint": "後即可暢享 AI 佛典問答。配置自己的 API Key 可無限使用。",
   "chat.hot_questions": [
     "《心經》中「色不異空」的含義是什麼？",
     "鳩摩羅什與玄奘的翻譯風格有何不同？",

@@ -180,7 +180,7 @@
   "chat.quota_info": "{{limit}} free questions per day, {{remaining}} remaining today. ",
   "chat.unlimited_usage": "for unlimited usage.",
   "chat.login": "Log in",
-  "chat.login_quota_hint": " for 30 daily questions. Configure your own API Key for unlimited usage.",
+  "chat.login_quota_hint": " to enjoy the AI Buddhist assistant. Configure your own API Key for unlimited usage.",
   "chat.hot_questions": [
     "What does 'form is emptiness' mean in the Heart Sutra?",
     "How do Kumārajīva and Xuanzang's translation styles differ?",
