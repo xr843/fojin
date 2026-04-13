@@ -366,6 +366,11 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
           onClick={handleCopyImage}
           size="large"
           loading={generating}
+          style={{
+            background: "#f6ead0",
+            borderColor: "#c9a85e",
+            color: "#6e5217",
+          }}
         >
           复制图片
         </Button>
@@ -375,6 +380,11 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
           size="large"
           loading={creatingShare}
           disabled={creatingShare}
+          style={{
+            background: "#ece4d3",
+            borderColor: "#a89878",
+            color: "#5c4f3d",
+          }}
         >
           {creatingShare ? "生成链接中…" : "复制链接"}
         </Button>
