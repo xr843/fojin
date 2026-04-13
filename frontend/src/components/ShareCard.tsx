@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Modal, Button, message, Spin } from "antd";
-import { DownloadOutlined, CopyOutlined } from "@ant-design/icons";
+import { DownloadOutlined, CopyOutlined, PictureOutlined } from "@ant-design/icons";
 import html2canvas from "html2canvas-pro";
 import QRCode from "qrcode";
 import { createSharedQA, type ChatSource } from "../api/client";
@@ -113,16 +113,21 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
     .filter((s) => s.title_zh)
     .slice(0, 3);
 
+  const renderCardCanvas = async (): Promise<HTMLCanvasElement | null> => {
+    if (!cardRef.current) return null;
+    return html2canvas(cardRef.current, {
+      backgroundColor: "#f8f5ef",
+      scale: 2,
+      useCORS: true,
+      logging: false,
+    });
+  };
+
   const handleDownload = async () => {
-    if (!cardRef.current) return;
     setGenerating(true);
     try {
-      const canvas = await html2canvas(cardRef.current, {
-        backgroundColor: "#f8f5ef",
-        scale: 2,
-        useCORS: true,
-        logging: false,
-      });
+      const canvas = await renderCardCanvas();
+      if (!canvas) return;
       const dataUrl = canvas.toDataURL("image/png");
       const link = document.createElement("a");
       link.download = buildFilename(question);
@@ -132,6 +137,32 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
     } catch (e) {
       console.error("share card render failed", e);
       message.error("生成图片失败，请重试");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleCopyImage = async () => {
+    if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
+      message.warning("此浏览器不支持复制图片，请改用「下载图片」");
+      return;
+    }
+    setGenerating(true);
+    try {
+      const canvas = await renderCardCanvas();
+      if (!canvas) return;
+      const blob: Blob | null = await new Promise((resolve) =>
+        canvas.toBlob((b) => resolve(b), "image/png"),
+      );
+      if (!blob) {
+        message.error("生成图片失败，请重试");
+        return;
+      }
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      message.success("图片已复制，可粘贴到微信/微博/聊天窗口");
+    } catch (e) {
+      console.error("copy image failed", e);
+      message.error("复制图片失败，请改用「下载图片」");
     } finally {
       setGenerating(false);
     }
@@ -319,7 +350,7 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 20 }}>
+      <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 20, flexWrap: "wrap" }}>
         <Button
           type="primary"
           icon={<DownloadOutlined />}
@@ -329,6 +360,14 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
           style={{ background: "#8b2500", borderColor: "#8b2500" }}
         >
           下载图片
+        </Button>
+        <Button
+          icon={<PictureOutlined />}
+          onClick={handleCopyImage}
+          size="large"
+          loading={generating}
+        >
+          复制图片
         </Button>
         <Button
           icon={<CopyOutlined />}
