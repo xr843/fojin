@@ -17,10 +17,15 @@ const CARD_WIDTH = 720;
 const FALLBACK_SHARE_URL = "https://fojin.app/chat";
 
 function sanitizeFilenameSegment(text: string): string {
-  return text
-    .replace(/["《》【】「」『』〈〉()（）<>:"/\\|?*\u0000-\u001F]/g, "")
-    .replace(/\s+/g, "")
-    .slice(0, 18);
+  const blocked = new Set('"《》【】「」『』〈〉()（）<>:"/\\|?*');
+  let out = "";
+  for (const ch of text) {
+    const code = ch.charCodeAt(0);
+    if (code < 0x20) continue;
+    if (blocked.has(ch)) continue;
+    out += ch;
+  }
+  return out.replace(/\s+/g, "").slice(0, 18);
 }
 
 function buildFilename(question: string): string {
