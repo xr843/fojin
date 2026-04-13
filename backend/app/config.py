@@ -28,10 +28,16 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 8  # 8 hours
 
-    # LLM (OpenAI-compatible API)
+    # LLM (OpenAI-compatible API) — primary model
     llm_api_url: str = "https://api.openai.com/v1"
     llm_api_key: str = ""
     llm_model: str = "gpt-4o-mini"
+
+    # LLM fallback — platform secondary model used when the primary provider
+    # fails before any tokens have been streamed. Leave empty to disable.
+    llm_fallback_api_url: str = ""
+    llm_fallback_api_key: str = ""
+    llm_fallback_model: str = ""
 
     # Embedding (can use a separate provider)
     embedding_api_url: str = ""  # Falls back to llm_api_url if empty
