@@ -350,6 +350,23 @@ def _resolve_llm_config(user: User | None) -> tuple[str, str, str, bool, str]:
     return url, settings.llm_api_key, model, False, "openai"
 
 
+def _resolve_fallback_llm_config() -> tuple[str, str, str, str] | None:
+    """Platform fallback LLM, used only when the primary platform model fails
+    before any tokens have been streamed. Returns (url, key, model, provider)
+    or None if fallback is not configured. BYOK users never hit this path.
+    """
+    if not settings.llm_fallback_api_key:
+        return None
+    url = settings.llm_fallback_api_url or "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    model = settings.llm_fallback_model or _detect_model_from_url(url)
+    provider = "openai"
+    for p, u in PROVIDER_URLS.items():
+        if u in url or url in u:
+            provider = p
+            break
+    return url, settings.llm_fallback_api_key, model, provider
+
+
 async def _check_daily_quota(db: AsyncSession, user: User) -> None:
     """Check and increment daily free chat quota. Raises QuotaExceededError if exceeded."""
     today = date.today()
@@ -649,35 +666,55 @@ async def send_message(
     _t1 = _time.monotonic()
     logger.debug("TIMING: _prepare_chat took %.2fs", _t1 - _t0)
 
-    # Call LLM
-    try:
+    # Call LLM (with fallback for platform users only)
+    async def _call_once(u: str, k: str, m: str, p: str) -> str:
         async with httpx.AsyncClient(timeout=60) as client:
-            if _is_anthropic(api_url, provider):
-                body = _build_anthropic_body(model, llm_messages, max_tokens=8000 if page_content else 2000)
-                resp = await client.post(
-                    f"{api_url}/messages", headers=_build_anthropic_headers(api_key), json=body,
-                )
+            if _is_anthropic(u, p):
+                body = _build_anthropic_body(m, llm_messages, max_tokens=8000 if page_content else 2000)
+                resp = await client.post(f"{u}/messages", headers=_build_anthropic_headers(k), json=body)
                 resp.raise_for_status()
-                answer = resp.json()["content"][0]["text"]
-            else:
-                resp = await client.post(
-                    f"{api_url}/chat/completions",
-                    headers={"Authorization": f"Bearer {api_key}"},
-                    json={"model": model, "messages": llm_messages, "temperature": 0.7, "max_tokens": 8000 if page_content else 2000},
-                )
-                resp.raise_for_status()
-                answer = resp.json()["choices"][0]["message"]["content"]
+                return resp.json()["content"][0]["text"]
+            resp = await client.post(
+                f"{u}/chat/completions",
+                headers={"Authorization": f"Bearer {k}"},
+                json={"model": m, "messages": llm_messages, "temperature": 0.7, "max_tokens": 8000 if page_content else 2000},
+            )
+            resp.raise_for_status()
+            return resp.json()["choices"][0]["message"]["content"]
+
+    answer: str
+    try:
+        answer = await _call_once(api_url, api_key, model, provider)
         logger.debug("TIMING: LLM call took %.2fs", _time.monotonic() - _t1)
-    except httpx.TimeoutException:
-        logger.warning("LLM call timed out")
-        answer = "抱歉，AI 服务响应超时，请稍后重试。"
-    except httpx.HTTPStatusError as exc:
-        resp_body = exc.response.text[:500] if exc.response else "N/A"
-        logger.warning("LLM returned HTTP %s: %s | url=%s model=%s", exc.response.status_code, resp_body, api_url, model)
-        if is_byok and exc.response.status_code == 401:
+    except (httpx.TimeoutException, httpx.HTTPStatusError, httpx.RequestError) as primary_exc:
+        status = getattr(getattr(primary_exc, "response", None), "status_code", None)
+        if is_byok and status == 401:
             answer = "您的 API Key 无效或已过期，请在个人中心重新配置。"
         else:
-            answer = f"抱歉，AI 服务返回错误（HTTP {exc.response.status_code}），请稍后重试。"
+            fb = None if is_byok else _resolve_fallback_llm_config()
+            if fb is not None:
+                fb_url, fb_key, fb_model, fb_provider = fb
+                logger.warning(
+                    "Primary LLM failed (%s), falling back | primary=%s/%s fallback=%s/%s",
+                    type(primary_exc).__name__, provider, model, fb_provider, fb_model,
+                )
+                try:
+                    answer = await _call_once(fb_url, fb_key, fb_model, fb_provider)
+                    # Record that this request was served by the fallback
+                    api_url, api_key, model, provider = fb_url, fb_key, fb_model, fb_provider
+                except (httpx.TimeoutException, httpx.HTTPStatusError, httpx.RequestError) as fb_exc:
+                    logger.warning("Fallback LLM also failed: %s", fb_exc)
+                    answer = "抱歉，AI 服务暂时不可用，请稍后重试。"
+            elif isinstance(primary_exc, httpx.TimeoutException):
+                logger.warning("LLM call timed out")
+                answer = "抱歉，AI 服务响应超时，请稍后重试。"
+            elif isinstance(primary_exc, httpx.HTTPStatusError):
+                resp_body = primary_exc.response.text[:500] if primary_exc.response else "N/A"
+                logger.warning("LLM returned HTTP %s: %s | url=%s model=%s", status, resp_body, api_url, model)
+                answer = f"抱歉，AI 服务返回错误（HTTP {status}），请稍后重试。"
+            else:
+                logger.warning("LLM request error: %s", primary_exc)
+                answer = "抱歉，AI 服务暂时不可用，请稍后重试。"
     except Exception:
         logger.exception("LLM call failed")
         answer = "抱歉，AI 服务暂时不可用，请稍后重试。"
@@ -738,14 +775,13 @@ async def send_message_stream(
     # Yield session_id immediately so frontend gets a fast response
     yield f"data: {json.dumps({'type': 'session_id', 'session_id': chat_session.id if chat_session else 0}, ensure_ascii=False)}\n\n"
 
-    # --- Phase 3: stream LLM ---
-    full_answer = ""
-    try:
-        if _is_anthropic(api_url, provider):
-            # Anthropic streaming: different event format
-            body = _build_anthropic_body(model, llm_messages, stream=True, max_tokens=8000 if page_content else 2000)
+    # --- Phase 3: stream LLM (with fallback on connect-before-first-token failures) ---
+    async def _stream_llm_once(u: str, k: str, m: str, p: str):
+        """Inner generator that yields content chunks. Raises httpx errors on failure."""
+        if _is_anthropic(u, p):
+            body = _build_anthropic_body(m, llm_messages, stream=True, max_tokens=8000 if page_content else 2000)
             async with httpx.AsyncClient(timeout=120 if page_content else 60) as client, client.stream(
-                "POST", f"{api_url}/messages", headers=_build_anthropic_headers(api_key), json=body,
+                "POST", f"{u}/messages", headers=_build_anthropic_headers(k), json=body,
             ) as resp:
                 resp.raise_for_status()
                 async for line in resp.aiter_lines():
@@ -758,25 +794,17 @@ async def send_message_stream(
                         if event_type == "content_block_delta":
                             content = chunk.get("delta", {}).get("text", "")
                             if content:
-                                full_answer += content
-                                yield f"data: {json.dumps({'type': 'token', 'content': content}, ensure_ascii=False)}\n\n"
+                                yield content
                         elif event_type == "message_stop":
                             break
                     except (json.JSONDecodeError, KeyError):
                         continue
         else:
-            # OpenAI-compatible streaming
             async with httpx.AsyncClient(timeout=120 if page_content else 60) as client, client.stream(
-                "POST",
-                f"{api_url}/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}"},
-                json={
-                    "model": model,
-                    "messages": llm_messages,
-                    "temperature": 0.7,
-                    "max_tokens": 8000 if page_content else 2000,
-                    "stream": True,
-                },
+                "POST", f"{u}/chat/completions",
+                headers={"Authorization": f"Bearer {k}"},
+                json={"model": m, "messages": llm_messages, "temperature": 0.7,
+                      "max_tokens": 8000 if page_content else 2000, "stream": True},
             ) as resp:
                 resp.raise_for_status()
                 async for line in resp.aiter_lines():
@@ -790,24 +818,65 @@ async def send_message_stream(
                         delta = chunk.get("choices", [{}])[0].get("delta", {})
                         content = delta.get("content", "")
                         if content:
-                            full_answer += content
-                            yield f"data: {json.dumps({'type': 'token', 'content': content}, ensure_ascii=False)}\n\n"
+                            yield content
                     except (json.JSONDecodeError, IndexError, KeyError):
                         continue
-    except httpx.TimeoutException:
-        logger.warning("LLM stream timed out")
-        error_msg = "抱歉，AI 服务响应超时，请稍后重试。"
-        yield f"data: {json.dumps({'type': 'error', 'message': error_msg}, ensure_ascii=False)}\n\n"
-        full_answer = full_answer or error_msg
-    except httpx.HTTPStatusError as exc:
-        resp_body = exc.response.text[:500] if exc.response else "N/A"
-        logger.warning("LLM stream returned HTTP %s: %s | url=%s model=%s", exc.response.status_code, resp_body, api_url, model)
-        if is_byok and exc.response.status_code == 401:
-            error_msg = "您的 API Key 无效或已过期，请在个人中心重新配置。"
-        else:
-            error_msg = f"抱歉，AI 服务返回错误（HTTP {exc.response.status_code}），请稍后重试。"
-        yield f"data: {json.dumps({'type': 'error', 'message': error_msg}, ensure_ascii=False)}\n\n"
-        full_answer = full_answer or error_msg
+
+    # Build attempt list: primary first, then platform fallback (only for non-BYOK)
+    attempts: list[tuple[str, str, str, str, bool]] = [(api_url, api_key, model, provider, False)]
+    if not is_byok:
+        fb = _resolve_fallback_llm_config()
+        if fb is not None:
+            attempts.append((fb[0], fb[1], fb[2], fb[3], True))
+
+    full_answer = ""
+    received_first_token = False
+    try:
+        for idx, (att_url, att_key, att_model, att_provider, is_fb) in enumerate(attempts):
+            try:
+                async for content in _stream_llm_once(att_url, att_key, att_model, att_provider):
+                    if not received_first_token:
+                        received_first_token = True
+                        if is_fb:
+                            logger.info(
+                                "Serving via fallback LLM: %s/%s (primary %s/%s failed)",
+                                att_provider, att_model, provider, model,
+                            )
+                    full_answer += content
+                    yield f"data: {json.dumps({'type': 'token', 'content': content}, ensure_ascii=False)}\n\n"
+                # Stream completed successfully — record which model actually answered
+                api_url, api_key, model, provider = att_url, att_key, att_model, att_provider
+                break
+            except (httpx.TimeoutException, httpx.HTTPStatusError, httpx.RequestError) as exc:
+                status = getattr(getattr(exc, "response", None), "status_code", None)
+                if received_first_token:
+                    logger.warning("LLM stream broke mid-stream: %s", exc)
+                    error_msg = "抱歉，AI 回答中途中断，请稍后重试。"
+                    yield f"data: {json.dumps({'type': 'error', 'message': error_msg}, ensure_ascii=False)}\n\n"
+                    full_answer = full_answer or error_msg
+                    break
+                # Pre-first-token failure: try fallback if any remain
+                if idx < len(attempts) - 1:
+                    logger.warning(
+                        "Primary LLM stream failed (%s, status=%s), trying fallback",
+                        type(exc).__name__, status,
+                    )
+                    continue
+                # Final attempt failed — surface the error
+                if is_byok and status == 401:
+                    error_msg = "您的 API Key 无效或已过期，请在个人中心重新配置。"
+                elif isinstance(exc, httpx.TimeoutException):
+                    logger.warning("LLM stream timed out")
+                    error_msg = "抱歉，AI 服务响应超时，请稍后重试。"
+                elif isinstance(exc, httpx.HTTPStatusError):
+                    resp_body = exc.response.text[:500] if exc.response else "N/A"
+                    logger.warning("LLM stream returned HTTP %s: %s | url=%s model=%s", status, resp_body, att_url, att_model)
+                    error_msg = f"抱歉，AI 服务返回错误（HTTP {status}），请稍后重试。"
+                else:
+                    logger.warning("LLM stream request error: %s", exc)
+                    error_msg = "抱歉，AI 服务暂时不可用，请稍后重试。"
+                yield f"data: {json.dumps({'type': 'error', 'message': error_msg}, ensure_ascii=False)}\n\n"
+                full_answer = full_answer or error_msg
     except Exception:
         logger.exception("LLM stream failed")
         error_msg = "抱歉，AI 服务暂时不可用，请稍后重试。"
