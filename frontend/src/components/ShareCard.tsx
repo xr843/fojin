@@ -159,7 +159,7 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
         return;
       }
       await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-      message.success("图片已复制，可粘贴到微信/微博/聊天窗口");
+      message.success("图片已复制");
     } catch (e) {
       console.error("copy image failed", e);
       message.error("复制图片失败，请改用「下载图片」");
