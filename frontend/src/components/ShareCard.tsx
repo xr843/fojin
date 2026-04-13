@@ -367,9 +367,9 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
           size="large"
           loading={generating}
           style={{
-            background: "#f6ead0",
-            borderColor: "#c9a85e",
-            color: "#6e5217",
+            background: "#e1d3ee",
+            borderColor: "#8e6fb8",
+            color: "#4a2d6e",
           }}
         >
           复制图片
@@ -381,9 +381,9 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
           loading={creatingShare}
           disabled={creatingShare}
           style={{
-            background: "#ece4d3",
-            borderColor: "#a89878",
-            color: "#5c4f3d",
+            background: "#d6d2c0",
+            borderColor: "#6d6858",
+            color: "#2d2920",
           }}
         >
           {creatingShare ? "生成链接中…" : "复制链接"}
