@@ -42,6 +42,7 @@ from app.api import (
     relations,
     rss,
     search,
+    share,
     sitemap,
     source_suggestions,
     sources,
@@ -352,6 +353,7 @@ app.include_router(iiif.router, prefix="/api")
 
 # Phase 3 routers
 app.include_router(chat.router, prefix="/api")
+app.include_router(share.router, prefix="/api")
 app.include_router(annotations.router, prefix="/api")
 
 # Dictionary

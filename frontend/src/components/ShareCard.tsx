@@ -3,7 +3,7 @@ import { Modal, Button, message, Spin } from "antd";
 import { DownloadOutlined, CopyOutlined } from "@ant-design/icons";
 import html2canvas from "html2canvas-pro";
 import QRCode from "qrcode";
-import type { ChatSource } from "../api/client";
+import { createSharedQA, type ChatSource } from "../api/client";
 
 interface ShareCardProps {
   open: boolean;
@@ -14,7 +14,27 @@ interface ShareCardProps {
 }
 
 const CARD_WIDTH = 720;
-const SHARE_URL = "https://fojin.app/chat";
+const FALLBACK_SHARE_URL = "https://fojin.app/chat";
+
+function sanitizeFilenameSegment(text: string): string {
+  const blocked = new Set('"《》【】「」『』〈〉()（）<>:"/\\|?*');
+  let out = "";
+  for (const ch of text) {
+    const code = ch.charCodeAt(0);
+    if (code < 0x20) continue;
+    if (blocked.has(ch)) continue;
+    out += ch;
+  }
+  return out.replace(/\s+/g, "").slice(0, 18);
+}
+
+function buildFilename(question: string): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const datePart = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const titlePart = sanitizeFilenameSegment(question || "佛典问答") || "佛典问答";
+  return `fojin-${datePart}-${titlePart}.png`;
+}
 
 function stripMarkdown(md: string): string {
   return md
@@ -52,17 +72,39 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
   const cardRef = useRef<HTMLDivElement>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
   const [generating, setGenerating] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string>(FALLBACK_SHARE_URL);
+  const [creatingShare, setCreatingShare] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-    QRCode.toDataURL(SHARE_URL, {
+    let cancelled = false;
+    setCreatingShare(true);
+    setShareUrl(FALLBACK_SHARE_URL);
+    createSharedQA({ question, answer, sources })
+      .then((res) => {
+        if (!cancelled) setShareUrl(res.url);
+      })
+      .catch((e) => {
+        console.error("create shared QA failed", e);
+      })
+      .finally(() => {
+        if (!cancelled) setCreatingShare(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, question, answer, sources]);
+
+  useEffect(() => {
+    if (!open) return;
+    QRCode.toDataURL(shareUrl, {
       width: 140,
       margin: 1,
       color: { dark: "#2b2318", light: "#f8f5ef" },
     })
       .then(setQrDataUrl)
       .catch(() => setQrDataUrl(""));
-  }, [open]);
+  }, [open, shareUrl]);
 
   const cleanAnswer = stripMarkdown(answer);
   const { text: answerText, truncated } = truncate(cleanAnswer, 420);
@@ -83,7 +125,7 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
       });
       const dataUrl = canvas.toDataURL("image/png");
       const link = document.createElement("a");
-      link.download = `fojin-qa-${Date.now()}.png`;
+      link.download = buildFilename(question);
       link.href = dataUrl;
       link.click();
       message.success("图片已保存");
@@ -96,7 +138,7 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
   };
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(SHARE_URL).then(() => {
+    navigator.clipboard.writeText(shareUrl).then(() => {
       message.success("链接已复制");
     });
   };
@@ -288,8 +330,14 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
         >
           下载图片
         </Button>
-        <Button icon={<CopyOutlined />} onClick={handleCopyLink} size="large">
-          复制链接
+        <Button
+          icon={<CopyOutlined />}
+          onClick={handleCopyLink}
+          size="large"
+          loading={creatingShare}
+          disabled={creatingShare}
+        >
+          {creatingShare ? "生成链接中…" : "复制链接"}
         </Button>
       </div>
       {generating && (

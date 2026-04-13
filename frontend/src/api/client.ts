@@ -1063,6 +1063,34 @@ export interface ChatMessageItem {
   created_at: string;
 }
 
+export interface SharedQA {
+  id: string;
+  question: string;
+  answer: string;
+  sources: ChatSource[] | null;
+  view_count: number;
+  created_at: string;
+}
+
+export interface SharedQACreated {
+  id: string;
+  url: string;
+}
+
+export async function createSharedQA(payload: {
+  question: string;
+  answer: string;
+  sources: ChatSource[] | null;
+}): Promise<SharedQACreated> {
+  const { data } = await api.post<SharedQACreated>("/share/qa", payload);
+  return data;
+}
+
+export async function getSharedQA(id: string): Promise<SharedQA> {
+  const { data } = await api.get<SharedQA>(`/share/qa/${id}`);
+  return data;
+}
+
 export async function sendChatMessage(
   message: string,
   sessionId?: number,

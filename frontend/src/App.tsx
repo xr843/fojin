@@ -41,6 +41,7 @@ const TimelinePage = lazy(() => import("./pages/TimelinePage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const KGMapPage = lazy(() => import("./pages/KGMapPage"));
 const ActivityFeedPage = lazy(() => import("./pages/ActivityFeedPage"));
+const SharedQAPage = lazy(() => import("./pages/SharedQAPage"));
 
 function Loading() {
   return (
@@ -72,6 +73,7 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/dictionary" element={<DictionaryPage />} />
             <Route path="/chat" element={<RouteErrorBoundary><ChatPage /></RouteErrorBoundary>} />
+            <Route path="/share/qa/:id" element={<RouteErrorBoundary><SharedQAPage /></RouteErrorBoundary>} />
             <Route element={<ProtectedRoute />}>
               <Route path="/profile" element={<ProfilePage />} />
             </Route>
