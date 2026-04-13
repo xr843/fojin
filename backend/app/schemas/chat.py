@@ -59,3 +59,25 @@ class SessionListItem(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class ShareQARequest(BaseModel):
+    question: str = Field(..., min_length=1, max_length=2000)
+    answer: str = Field(..., min_length=1, max_length=20000)
+    sources: list[ChatSource] | None = None
+
+
+class ShareQACreateResponse(BaseModel):
+    id: str
+    url: str
+
+
+class ShareQAResponse(BaseModel):
+    id: str
+    question: str
+    answer: str
+    sources: list[ChatSource] | None
+    view_count: int
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
