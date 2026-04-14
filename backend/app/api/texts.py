@@ -50,6 +50,23 @@ class SimilarPassagesResponse(BaseModel):
     passages: list[SimilarPassageItem]
 
 
+class ChunkContextItem(BaseModel):
+    chunk_index: int
+    chunk_text: str
+    is_center: bool
+
+
+class ChunkContextResponse(BaseModel):
+    text_id: int
+    juan_num: int
+    title_zh: str
+    center_chunk_index: int
+    radius: int
+    chunks: list[ChunkContextItem]
+    has_more_before: bool
+    has_more_after: bool
+
+
 @router.get("/texts/{text_id}", response_model=TextResponseBase)
 async def get_text(text_id: int, db: AsyncSession = Depends(get_db)):
     """Get text metadata by ID, including title, translator, dynasty, and source.
@@ -184,6 +201,88 @@ async def similar_passages(
     )[:limit]
 
     return SimilarPassagesResponse(text_id=text_id, juan_num=juan_num, passages=passages)
+
+
+@router.get(
+    "/texts/{text_id}/juans/{juan_num}/chunks/{chunk_index}/context",
+    response_model=ChunkContextResponse,
+)
+async def get_chunk_context(
+    text_id: int,
+    juan_num: int,
+    chunk_index: int,
+    radius: int = Query(2, ge=0, le=5),
+    db: AsyncSession = Depends(get_db),
+):
+    """Fetch a cited chunk plus ``radius`` adjacent chunks from the same juan.
+
+    Powers the in-chat citation drawer so users can verify an AI answer
+    against the original passage without leaving the conversation. The
+    response is pure data — the frontend handles the 50-char overlap
+    dedup when it stitches chunks for display.
+
+    取得指定 chunk 及其前后 radius 个同卷相邻 chunk，用于 AI 回答引文的
+    即时原文对照侧栏。"""
+    raw_conn = await db.connection()
+
+    # Title lookup — single row
+    title_row = (
+        await raw_conn.exec_driver_sql(
+            "SELECT COALESCE(title_zh, '') FROM buddhist_texts WHERE id = $1",
+            (text_id,),
+        )
+    ).fetchone()
+    if title_row is None:
+        raise TextNotFoundError(text_id=text_id)
+    title_zh = title_row[0]
+
+    low = max(chunk_index - radius, 0)
+    high = chunk_index + radius
+
+    chunk_rows = (
+        await raw_conn.exec_driver_sql(
+            "SELECT chunk_index, chunk_text FROM text_embeddings "
+            "WHERE text_id = $1 AND juan_num = $2 "
+            "AND chunk_index BETWEEN $3 AND $4 "
+            "ORDER BY chunk_index",
+            (text_id, juan_num, low, high),
+        )
+    ).fetchall()
+
+    chunks = [
+        ChunkContextItem(
+            chunk_index=row[0],
+            chunk_text=row[1],
+            is_center=(row[0] == chunk_index),
+        )
+        for row in chunk_rows
+    ]
+
+    # Boundary detection. Chunks within a juan are contiguous (0..max) per
+    # the ingestion pipeline in scripts/generate_embeddings.py, so
+    # has_more_before reduces to low > 0. has_more_after needs one existence
+    # probe because we don't know the juan's max chunk_index up front.
+    has_more_before = low > 0
+    after_probe = (
+        await raw_conn.exec_driver_sql(
+            "SELECT 1 FROM text_embeddings "
+            "WHERE text_id = $1 AND juan_num = $2 AND chunk_index > $3 "
+            "LIMIT 1",
+            (text_id, juan_num, high),
+        )
+    ).fetchone()
+    has_more_after = after_probe is not None
+
+    return ChunkContextResponse(
+        text_id=text_id,
+        juan_num=juan_num,
+        title_zh=title_zh,
+        center_chunk_index=chunk_index,
+        radius=radius,
+        chunks=chunks,
+        has_more_before=has_more_before,
+        has_more_after=has_more_after,
+    )
 
 
 # ── Version aggregation (IIIF + cross-source) ──────────────────────

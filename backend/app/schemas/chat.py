@@ -36,6 +36,7 @@ class FeedbackRequest(BaseModel):
 class ChatSource(BaseModel):
     text_id: int
     juan_num: int
+    chunk_index: int = 0
     chunk_text: str
     score: float
     title_zh: str = ""
