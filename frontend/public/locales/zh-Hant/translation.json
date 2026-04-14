@@ -186,5 +186,10 @@
     "鳩摩羅什與玄奘的翻譯風格有何不同？",
     "四聖諦的核心教義是什麼？",
     "禪宗的「不立文字」思想源自哪些經典？"
-  ]
+  ],
+  "chat.refresh_hot_questions": "換一批",
+  "chat.hot_question_category_plain_translation": "白話翻譯",
+  "chat.hot_question_category_scripture_exegesis": "經文解讀",
+  "chat.hot_question_category_comparison": "對比辨析",
+  "chat.hot_question_category_buddhist_history": "佛教史話"
 }

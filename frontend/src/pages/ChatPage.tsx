@@ -33,10 +33,13 @@ import {
   getApiKeyStatus,
   getChatQuota,
   getHotQuestions,
+  getRandomHotQuestions,
   updateChatMessageFeedback,
   type ChatMessageItem,
   type ChatSource,
   type ChatSessionItem,
+  type HotQuestionCard,
+  type HotQuestionCategory,
 } from "../api/client";
 import { useAuthStore } from "../stores/authStore";
 
@@ -47,6 +50,13 @@ function tightenLists(md: string): string {
     // "内容\n\n2." → "内容\n2." (列表项之间的空行)
     .replace(/\n\n+(?=\d+\.\s)/g, "\n");
 }
+
+const HOT_QUESTION_CATEGORY_SLUGS: Record<HotQuestionCategory, string> = {
+  "白话翻译": "plain_translation",
+  "经文解读": "scripture_exegesis",
+  "对比辨析": "comparison",
+  "佛教史话": "buddhist_history",
+};
 
 /** Extract [追问] follow-up suggestions from assistant message text. */
 function parseFollowUps(content: string): { cleanContent: string; suggestions: string[] } {
@@ -150,6 +160,41 @@ export default function ChatPage() {
     queryFn: getHotQuestions,
     staleTime: 3600_000,
   });
+
+  // Welcome-screen categorized cards: fetched fresh each mount, with
+  // localStorage-backed FIFO exclusion so users don't see the same four
+  // questions when they refresh the page or hit "换一批".
+  const SEEN_STORAGE_KEY = "fojin-hot-questions-seen";
+  const SEEN_CAP = 40;
+  const readSeenIds = useCallback((): number[] => {
+    try {
+      const raw = localStorage.getItem(SEEN_STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.filter((n) => typeof n === "number") : [];
+    } catch { return []; }
+  }, []);
+  const pushSeenIds = useCallback((ids: number[]) => {
+    if (!ids.length) return;
+    try {
+      const current = readSeenIds();
+      const next = [...current, ...ids].slice(-SEEN_CAP);
+      localStorage.setItem(SEEN_STORAGE_KEY, JSON.stringify(next));
+    } catch { /* ignore storage errors */ }
+  }, [readSeenIds]);
+
+  const { data: welcomeCardsData, refetch: refetchWelcomeCards, isFetching: welcomeCardsLoading } = useQuery({
+    queryKey: ["hotQuestionCards"],
+    queryFn: () => getRandomHotQuestions(readSeenIds()),
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+  });
+
+  useEffect(() => {
+    if (welcomeCardsData?.questions?.length) {
+      pushSeenIds(welcomeCardsData.questions.map((q) => q.id));
+    }
+  }, [welcomeCardsData, pushSeenIds]);
 
   const { data: keyStatus } = useQuery({
     queryKey: ["apiKeyStatus"],
@@ -261,9 +306,13 @@ export default function ChatPage() {
     abortRef.current = null;
   }, []);
 
-  const handleSendMessage = useCallback(async (text: string) => {
+  const handleSendMessage = useCallback(async (
+    text: string,
+    options?: { hotQuestionId?: number | null },
+  ) => {
     const msg = text.trim();
     if (!msg || sending) return;
+    const hotQuestionId = options?.hotQuestionId ?? null;
 
     // Umami: track chat question (truncated to 30 chars for privacy)
     if (typeof umami !== "undefined") {
@@ -343,7 +392,7 @@ export default function ChatPage() {
         setSending(false);
         refetchQuota();
       },
-    }, abortController.signal);
+    }, abortController.signal, undefined, hotQuestionId);
   }, [sending, sessionId, masterId, user, refetchSessions, refetchQuota]);
 
   const handleSend = useCallback(async () => {
@@ -592,12 +641,12 @@ export default function ChatPage() {
                   marginLeft: "auto",
                   marginRight: "auto",
                 }}>
-                  {(hotQuestionsData?.questions ?? (t("chat.hot_questions", { returnObjects: true }) as string[])).map((q) => (
+                  {(welcomeCardsData?.questions ?? []).map((card: HotQuestionCard) => (
                     <div
-                      key={q}
-                      onClick={() => handleSendMessage(q)}
+                      key={card.id}
+                      onClick={() => handleSendMessage(card.display_text, { hotQuestionId: card.id })}
                       style={{
-                        padding: "10px 14px",
+                        padding: "12px 14px 10px",
                         borderRadius: 8,
                         border: "1px solid rgba(217,208,193,0.6)",
                         fontSize: 13,
@@ -605,6 +654,11 @@ export default function ChatPage() {
                         lineHeight: 1.6,
                         transition: "all 0.2s",
                         color: "var(--fj-ink-muted)",
+                        textAlign: "left",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "flex-start",
+                        gap: 6,
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.borderColor = "var(--fj-accent)";
@@ -617,10 +671,35 @@ export default function ChatPage() {
                         e.currentTarget.style.background = "transparent";
                       }}
                     >
-                      {q}
+                      <span style={{
+                        fontSize: 11,
+                        padding: "2px 8px",
+                        borderRadius: 10,
+                        background: "rgba(176,141,87,0.1)",
+                        color: "var(--fj-accent)",
+                        fontFamily: '"Noto Serif SC", serif',
+                        letterSpacing: "0.02em",
+                      }}>
+                        {t(`chat.hot_question_category_${HOT_QUESTION_CATEGORY_SLUGS[card.category]}`, card.category)}
+                      </span>
+                      <span>{card.display_text}</span>
                     </div>
                   ))}
                 </div>
+                {(welcomeCardsData?.questions?.length ?? 0) > 0 && (
+                  <div style={{ marginTop: 14 }}>
+                    <Button
+                      size="small"
+                      type="text"
+                      icon={<ReloadOutlined />}
+                      loading={welcomeCardsLoading}
+                      onClick={() => refetchWelcomeCards()}
+                      style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
+                    >
+                      {t("chat.refresh_hot_questions", "换一批")}
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
             {messages.map((m) => (
