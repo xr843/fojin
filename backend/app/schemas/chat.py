@@ -13,6 +13,20 @@ class ChatRequest(BaseModel):
     juan_num: int | None = None
     selected_text: str | None = Field(None, max_length=1000)
     page_content: str | None = Field(None, max_length=15000)
+    # Welcome-card shortcut: when set, backend swaps the user turn sent to
+    # the LLM for the matching hot-question prompt template, keeping the
+    # natural display_text in history/RAG.
+    hot_question_id: int | None = None
+
+
+class HotQuestionCard(BaseModel):
+    id: int
+    category: str
+    display_text: str
+
+
+class HotQuestionCardsResponse(BaseModel):
+    questions: list[HotQuestionCard]
 
 
 class FeedbackRequest(BaseModel):

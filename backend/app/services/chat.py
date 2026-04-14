@@ -1,7 +1,7 @@
 import json
 import logging
 import time as _time
-from datetime import UTC, date, datetime, timedelta
+from datetime import date
 
 import httpx
 from sqlalchemy import delete, func, select
@@ -17,6 +17,7 @@ from app.core.exceptions import (
     ValidationError,
 )
 from app.models.chat import ChatMessage, ChatSession
+from app.models.hot_question import HotQuestion
 from app.models.user import User
 from app.schemas.chat import ChatResponse, ChatSource
 from app.services.master_profiles import get_master
@@ -448,8 +449,15 @@ def _build_llm_messages(
     history: list[ChatMessage], context_text: str, message: str,
     master_id: str | None = None,
     reading_context: dict | None = None,
+    llm_message_override: str | None = None,
 ) -> list[dict[str, str]]:
-    """Build the message list for the LLM call, trimming if too long."""
+    """Build the message list for the LLM call, trimming if too long.
+
+    When llm_message_override is provided, it replaces ``message`` as the
+    final user turn sent to the LLM. The caller keeps ``message`` as the
+    user-visible question (used for RAG, history, titles), while the
+    override carries the expanded prompt template for richer guidance.
+    """
     master = get_master(master_id) if master_id else None
     if master:
         enhanced_prompt = master.system_prompt
@@ -491,6 +499,7 @@ def _build_llm_messages(
     for msg in trimmed_history:
         llm_messages.append({"role": msg.role, "content": msg.content})
 
+    final_user_message = llm_message_override or message
     if context_text:
         llm_messages.append({
             "role": "user",
@@ -502,11 +511,11 @@ def _build_llm_messages(
                 "- 如果不切题，请**忽略这些片段**，仅用你的佛学通识回答，不要强行引用无关内容；\n"
                 "- **绝不要**说「您提供的原文」——这些不是用户提供的。\n\n"
                 f"{context_text}\n\n"
-                f"用户问题：{message}"
+                f"用户问题：{final_user_message}"
             ),
         })
     else:
-        llm_messages.append({"role": "user", "content": message})
+        llm_messages.append({"role": "user", "content": final_user_message})
     return llm_messages
 
 
@@ -576,6 +585,7 @@ async def _prepare_chat(
     juan_num: int | None = None,
     selected_text: str | None = None,
     page_content: str | None = None,
+    hot_question_id: int | None = None,
 ) -> tuple[ChatSession | None, str, str, str, bool, str, list[ChatSource], list[dict[str, str]]]:
     """Shared setup for send_message and send_message_stream.
 
@@ -583,6 +593,18 @@ async def _prepare_chat(
     chat_session is None for anonymous users.
     """
     _validate_message(message)
+
+    # Hot-question shortcut: if the client sent a card id, load the structured
+    # prompt template but KEEP the caller's display message for RAG / history
+    # / session-title generation. Only the final LLM turn uses the template.
+    llm_message_override: str | None = None
+    if hot_question_id is not None:
+        hq = await get_hot_question_prompt(db, hot_question_id)
+        if hq is not None:
+            # Client may send a stale display_text — trust the DB copy so the
+            # stored history always matches the currently active card.
+            message = hq[0]
+            llm_message_override = hq[1]
 
     # Resolve session first so ownership checks (403) come before config checks (503)
     chat_session = None
@@ -639,6 +661,7 @@ async def _prepare_chat(
     llm_messages = _build_llm_messages(
         history, context_text, message, master_id=master_id,
         reading_context=reading_context,
+        llm_message_override=llm_message_override,
     )
 
     return chat_session, api_url, api_key, model, is_byok, provider, sources, llm_messages
@@ -657,11 +680,13 @@ async def send_message(
     juan_num: int | None = None,
     selected_text: str | None = None,
     page_content: str | None = None,
+    hot_question_id: int | None = None,
 ) -> ChatResponse:
     _t0 = _time.monotonic()
     chat_session, api_url, api_key, model, is_byok, provider, sources, llm_messages = await _prepare_chat(
         db, user_id, message, session_id, user, client_ip=client_ip, redis=redis, master_id=master_id,
         text_id=text_id, juan_num=juan_num, selected_text=selected_text, page_content=page_content,
+        hot_question_id=hot_question_id,
     )
     _t1 = _time.monotonic()
     logger.debug("TIMING: _prepare_chat took %.2fs", _t1 - _t0)
@@ -749,6 +774,7 @@ async def send_message_stream(
     juan_num: int | None = None,
     selected_text: str | None = None,
     page_content: str | None = None,
+    hot_question_id: int | None = None,
 ):
     """Async generator yielding SSE events for streaming chat responses.
 
@@ -766,6 +792,7 @@ async def send_message_stream(
         chat_session, api_url, api_key, model, is_byok, provider, sources, llm_messages = await _prepare_chat(
             db, user_id, message, session_id, user, client_ip=client_ip, redis=redis, master_id=master_id,
             text_id=text_id, juan_num=juan_num, selected_text=selected_text, page_content=page_content,
+            hot_question_id=hot_question_id,
         )
     except (ValidationError, QuotaExceededError, AccessDeniedError, ServiceError) as exc:
         yield f"data: {json.dumps({'type': 'error', 'message': str(exc)}, ensure_ascii=False)}\n\n"
@@ -899,54 +926,113 @@ DEFAULT_HOT_QUESTIONS = [
     "禅宗的「不立文字」思想源自哪些经典？",
 ]
 
-HOT_QUESTIONS_CACHE_KEY = "chat:hot_questions"
-HOT_QUESTIONS_CACHE_TTL = 3600  # 1 hour
+HOT_QUESTION_CATEGORIES = ["白话翻译", "经文解读", "对比辨析", "佛教史话"]
 
 
 async def get_hot_questions(db: AsyncSession, redis=None) -> list[str]:
-    """Return top 8 most frequently asked questions from the last 7 days."""
-    if redis:
-        try:
-            cached = await redis.get(HOT_QUESTIONS_CACHE_KEY)
-            if cached:
-                return json.loads(cached)
-        except Exception:
-            logger.debug("Failed to read hot questions cache", exc_info=True)
+    """Legacy string-list endpoint — used by the Tab-cycling suggestion fallback.
 
-    since = datetime.now(UTC) - timedelta(days=7)
+    Returns up to 8 display_text strings drawn from the active hot_questions
+    table, spreading across all categories so the Tab suggestions feel varied.
+    Falls back to DEFAULT_HOT_QUESTIONS if the table is empty.
+    """
     stmt = (
-        select(
-            func.left(ChatMessage.content, 20).label("prefix"),
-            func.min(ChatMessage.content).label("example"),
-            func.count().label("cnt"),
-        )
-        .where(ChatMessage.role == "user", ChatMessage.created_at >= since)
-        .group_by(func.left(ChatMessage.content, 20))
-        .order_by(func.count().desc())
-        .limit(8)
+        select(HotQuestion.display_text, HotQuestion.category)
+        .where(HotQuestion.is_active.is_(True))
+        .order_by(func.random())
+        .limit(24)
     )
-    result = await db.execute(stmt)
-    rows = result.all()
-    questions = [row.example for row in rows if row.example and len(row.example.strip()) >= 4]
+    rows = (await db.execute(stmt)).all()
+    per_category: dict[str, list[str]] = {}
+    for display_text, category in rows:
+        per_category.setdefault(category, []).append(display_text)
 
-    if len(questions) < 4:
-        seen = set(questions)
-        for q in DEFAULT_HOT_QUESTIONS:
-            if q not in seen:
-                questions.append(q)
-                seen.add(q)
+    # Round-robin across categories so all four are represented
+    questions: list[str] = []
+    while len(questions) < 8 and per_category:
+        for cat in list(per_category.keys()):
+            if not per_category[cat]:
+                del per_category[cat]
+                continue
+            questions.append(per_category[cat].pop(0))
             if len(questions) >= 8:
                 break
 
-    questions = questions[:8]
+    if not questions:
+        questions = list(DEFAULT_HOT_QUESTIONS)
+    return questions[:8]
 
-    if redis:
-        try:
-            await redis.set(HOT_QUESTIONS_CACHE_KEY, json.dumps(questions, ensure_ascii=False), ex=HOT_QUESTIONS_CACHE_TTL)
-        except Exception:
-            logger.debug("Failed to cache hot questions", exc_info=True)
 
-    return questions
+async def get_random_hot_questions(
+    db: AsyncSession,
+    exclude_ids: list[int] | None = None,
+) -> list[dict]:
+    """Return one random active question per category for the welcome cards.
+
+    Never exposes prompt_template to the frontend — only the id needed to
+    echo back on click, the category label, and the display_text shown on
+    the card. When exclude_ids is provided, each per-category pick first
+    tries to avoid those ids; it only falls back to them if a category has
+    no other active questions left.
+    """
+    exclude_set = set(exclude_ids or [])
+    results: list[dict] = []
+    for category in HOT_QUESTION_CATEGORIES:
+        stmt = (
+            select(HotQuestion.id, HotQuestion.category, HotQuestion.display_text)
+            .where(
+                HotQuestion.is_active.is_(True),
+                HotQuestion.category == category,
+            )
+        )
+        if exclude_set:
+            stmt = stmt.where(~HotQuestion.id.in_(exclude_set))
+        stmt = stmt.order_by(func.random()).limit(1)
+
+        row = (await db.execute(stmt)).first()
+        if row is None and exclude_set:
+            # Category exhausted under the exclusion — relax and re-pick.
+            stmt = (
+                select(HotQuestion.id, HotQuestion.category, HotQuestion.display_text)
+                .where(
+                    HotQuestion.is_active.is_(True),
+                    HotQuestion.category == category,
+                )
+                .order_by(func.random())
+                .limit(1)
+            )
+            row = (await db.execute(stmt)).first()
+        if row is None:
+            continue
+        results.append(
+            {
+                "id": row.id,
+                "category": row.category,
+                "display_text": row.display_text,
+            }
+        )
+    return results
+
+
+async def get_hot_question_prompt(
+    db: AsyncSession, hot_question_id: int
+) -> tuple[str, str] | None:
+    """Fetch (display_text, prompt_template) for the given hot question id.
+
+    Returns None if the id is unknown or inactive — the caller should then
+    fall back to treating the user's message as-is.
+    """
+    row = (
+        await db.execute(
+            select(HotQuestion.display_text, HotQuestion.prompt_template).where(
+                HotQuestion.id == hot_question_id,
+                HotQuestion.is_active.is_(True),
+            )
+        )
+    ).first()
+    if row is None:
+        return None
+    return row.display_text, row.prompt_template
 
 
 async def update_message_feedback(

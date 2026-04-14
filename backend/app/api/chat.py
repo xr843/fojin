@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +12,8 @@ from app.schemas.chat import (
     ChatSessionResponse,
     ChatSource,
     FeedbackRequest,
+    HotQuestionCard,
+    HotQuestionCardsResponse,
     SessionListItem,
 )
 from app.services.chat import (
@@ -22,6 +24,7 @@ from app.services.chat import (
     get_history,
     get_history_paginated,
     get_hot_questions,
+    get_random_hot_questions,
     get_session_for_user,
     list_sessions,
     send_message,
@@ -57,6 +60,7 @@ async def chat(
         db, user_id, data.message, data.session_id, user=user,
         client_ip=client_ip, redis=redis, master_id=data.master_id,
         text_id=data.text_id, juan_num=data.juan_num, selected_text=data.selected_text, page_content=data.page_content,
+        hot_question_id=data.hot_question_id,
     )
 
 
@@ -78,6 +82,7 @@ async def chat_stream(
             db, user_id, data.message, data.session_id, user=user,
             client_ip=client_ip, redis=redis, master_id=data.master_id,
             text_id=data.text_id, juan_num=data.juan_num, selected_text=data.selected_text, page_content=data.page_content,
+            hot_question_id=data.hot_question_id,
         ),
         media_type="text/event-stream",
         headers={
@@ -136,12 +141,39 @@ async def hot_questions(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """Get recommended hot questions for the AI Q&A feature.
+    """Legacy flat list used by the Tab-cycling suggestions.
 
-    获取热门问题推荐列表。"""
+    获取热门问题推荐列表（扁平列表，用于 Tab 建议补全）。"""
     redis = getattr(request.app.state, "redis", None)
     questions = await get_hot_questions(db, redis=redis)
     return {"questions": questions}
+
+
+@router.get("/hot-questions/random", response_model=HotQuestionCardsResponse)
+async def hot_questions_random(
+    exclude_ids: str = Query(
+        "",
+        description="Comma-separated list of hot_question ids to avoid repeating.",
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return one active question per category for the welcome cards.
+
+    为首屏分类卡片各抽 1 条问题（白话翻译/经文解读/对比辨析/佛教史话），
+    支持 exclude_ids 做同一次会话的去重轮换。"""
+    parsed: list[int] = []
+    for part in exclude_ids.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            parsed.append(int(part))
+        except ValueError:
+            continue
+    rows = await get_random_hot_questions(db, exclude_ids=parsed or None)
+    return HotQuestionCardsResponse(
+        questions=[HotQuestionCard(**row) for row in rows]
+    )
 
 
 @router.get("/sessions", response_model=list[SessionListItem])

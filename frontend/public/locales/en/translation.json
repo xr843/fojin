@@ -186,5 +186,10 @@
     "How do Kumārajīva and Xuanzang's translation styles differ?",
     "What are the core teachings of the Four Noble Truths?",
     "Which scriptures gave rise to Chan Buddhism's 'beyond words' doctrine?"
-  ]
+  ],
+  "chat.refresh_hot_questions": "Shuffle",
+  "chat.hot_question_category_plain_translation": "Plain translation",
+  "chat.hot_question_category_scripture_exegesis": "Scripture exegesis",
+  "chat.hot_question_category_comparison": "Comparison",
+  "chat.hot_question_category_buddhist_history": "Buddhist history"
 }

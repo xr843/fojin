@@ -1158,6 +1158,35 @@ export async function getHotQuestions(): Promise<HotQuestionsResponse> {
   return data;
 }
 
+export type HotQuestionCategory =
+  | "白话翻译"
+  | "经文解读"
+  | "对比辨析"
+  | "佛教史话";
+
+export interface HotQuestionCard {
+  id: number;
+  category: HotQuestionCategory;
+  display_text: string;
+}
+
+export interface HotQuestionCardsResponse {
+  questions: HotQuestionCard[];
+}
+
+export async function getRandomHotQuestions(
+  excludeIds: number[] = [],
+): Promise<HotQuestionCardsResponse> {
+  const params = excludeIds.length
+    ? { exclude_ids: excludeIds.join(",") }
+    : undefined;
+  const { data } = await api.get<HotQuestionCardsResponse>(
+    "/chat/hot-questions/random",
+    { params },
+  );
+  return data;
+}
+
 export interface StreamCallbacks {
   onToken: (content: string) => void;
   onSources: (sources: ChatSource[]) => void;
@@ -1181,6 +1210,7 @@ export function sendChatMessageStream(
   callbacks: StreamCallbacks,
   signal?: AbortSignal,
   readingContext?: ReadingContext,
+  hotQuestionId?: number | null,
 ): Promise<void> {
   return new Promise<void>((resolve) => {
     // Get auth token from localStorage (same pattern as axios interceptor)
@@ -1298,6 +1328,7 @@ export function sendChatMessageStream(
       message,
       session_id: sessionId ?? null,
       master_id: masterId,
+      ...(hotQuestionId != null ? { hot_question_id: hotQuestionId } : {}),
       ...(readingContext ? {
         text_id: readingContext.text_id,
         juan_num: readingContext.juan_num,

@@ -60,3 +60,4 @@ CLAUDE.md
 # Local backups
 *.bak
 data/
+!backend/app/data/
