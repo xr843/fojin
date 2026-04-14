@@ -42,6 +42,7 @@ from app.api import (
     relations,
     rss,
     search,
+    seo,
     share,
     sitemap,
     source_suggestions,
@@ -392,6 +393,11 @@ app.include_router(sitemap.router)
 
 # SEO: RSS feed at root (no /api prefix)
 app.include_router(rss.router)
+
+# SEO: per-text HTML with injected meta tags (intercepts /texts/{id}
+# and /texts/{id}/read so Google's no-JS crawler sees real titles
+# instead of the homepage default).
+app.include_router(seo.router)
 
 
 @app.get("/api/health")
