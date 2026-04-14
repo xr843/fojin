@@ -1037,9 +1037,40 @@ export async function getSimilarPassages(
 export interface ChatSource {
   text_id: TextId;
   juan_num: number;
+  chunk_index?: number;
   chunk_text: string;
   score: number;
   title_zh?: string;
+}
+
+export interface ChunkContextItem {
+  chunk_index: number;
+  chunk_text: string;
+  is_center: boolean;
+}
+
+export interface ChunkContextResponse {
+  text_id: TextId;
+  juan_num: number;
+  title_zh: string;
+  center_chunk_index: number;
+  radius: number;
+  chunks: ChunkContextItem[];
+  has_more_before: boolean;
+  has_more_after: boolean;
+}
+
+export async function getChunkContext(
+  textId: TextId | number,
+  juanNum: number,
+  chunkIndex: number,
+  radius: number = 2,
+): Promise<ChunkContextResponse> {
+  const { data } = await api.get<ChunkContextResponse>(
+    `/texts/${textId}/juans/${juanNum}/chunks/${chunkIndex}/context`,
+    { params: { radius } },
+  );
+  return data;
 }
 
 export interface ChatResponse {

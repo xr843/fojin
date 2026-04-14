@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Typography, Spin, Button, Select, Breadcrumb, Row, Col, message, Tooltip } from "antd";
@@ -339,8 +339,13 @@ function DictPopover({
 export default function TextReaderPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const textId = Number(id);
-  const [juanNum, setJuanNum] = useState(1);
+  const initialJuanParam = searchParams.get("juan");
+  const initialJuan = initialJuanParam ? parseInt(initialJuanParam, 10) : 1;
+  const highlightChunkParam = searchParams.get("highlight_chunk");
+  const highlightChunkIndex = highlightChunkParam ? parseInt(highlightChunkParam, 10) : null;
+  const [juanNum, setJuanNum] = useState(Number.isFinite(initialJuan) && initialJuan > 0 ? initialJuan : 1);
   const [fontSize, setFontSize] = useState(getInitialFontSize);
   const [citationOpen, setCitationOpen] = useState(false);
   const [annotationOpen, setAnnotationOpen] = useState(false);
@@ -516,6 +521,39 @@ export default function TextReaderPage() {
       umami.track("read", { id: String(textId), title: textDetail.title_zh || "" });
     }
   }, [textId, textDetail]);
+
+  // Deep-link from the chat citation drawer: ?highlight_chunk=N
+  // Chunks are 500 chars wide with 50-char overlap (see scripts/generate_embeddings.py),
+  // so chunk N starts at approximately char N * 450 in the juan body. After the
+  // juan content paints, scroll the reader container to the matching fraction of
+  // its scrollable height. Precision is ±1 paragraph, which is close enough for
+  // the user to visually confirm — the drawer already showed them the exact text.
+  const lastHighlightedChunkRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (highlightChunkIndex === null || !Number.isFinite(highlightChunkIndex) || highlightChunkIndex < 0) return;
+    if (!content?.content) return;
+    const key = `${textId}-${juanNum}-${highlightChunkIndex}`;
+    if (lastHighlightedChunkRef.current === key) return;
+    lastHighlightedChunkRef.current = key;
+
+    const chunkCharOffset = highlightChunkIndex * 450;
+    const totalChars = content.content.length;
+    if (totalChars <= 0) return;
+    const ratio = Math.min(chunkCharOffset / totalChars, 0.95);
+
+    // Wait for paint so the DOM reflects the juan's full rendered height.
+    // The reader content div is not itself scrollable — the document is —
+    // so compute an absolute page-level y offset from the div's bounding rect.
+    const raf = requestAnimationFrame(() => {
+      const el = readerContentRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const divTopAbs = rect.top + window.scrollY;
+      const target = Math.max(divTopAbs + rect.height * ratio - window.innerHeight / 3, 0);
+      window.scrollTo({ top: target, behavior: "smooth" });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [highlightChunkIndex, content, textId, juanNum]);
 
   const { data: compareContent, isLoading: compareLoading } = useQuery({
     queryKey: ["juanContent", textId, juanNum, compareLang],
