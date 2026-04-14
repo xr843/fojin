@@ -138,9 +138,6 @@ export default function CitationDrawer({ target, onClose }: Props) {
       </div>
 
       <div className="chat-citation-panel-footer">
-        <Button onClick={onClose} size="middle">
-          关闭
-        </Button>
         <Link to={readerUrl} onClick={onClose}>
           <Button
             type="primary"
