@@ -689,18 +689,7 @@ export default function ChatPage() {
       <Helmet><title>{t("chat.page_title")}</title></Helmet>
       <div style={{
         display: "flex",
-        // When the chat has no messages yet, the welcome splash can exceed
-        // the messages container at high browser zoom (125% / 150%) because
-        // 100vh shrinks but the welcome's static content does not. Switching
-        // `height` → `minHeight` lets the outer container grow to fit the
-        // welcome and hand scrolling off to the browser's page scrollbar
-        // (where it belongs). When an actual chat is in progress we lock
-        // back to a fixed height so the messages div can internal-scroll
-        // as new bubbles stream in — that's the only place scroll makes
-        // sense to live inside the page.
-        ...(messages.length === 0
-          ? { minHeight: "calc(100vh - 120px)" }
-          : { height: "calc(100vh - 120px)" }),
+        height: "calc(100vh - 120px)",
         maxWidth: citationTarget ? undefined : 1100,
         margin: citationTarget ? "0 16px" : "0 auto",
         gap: 16,
@@ -829,20 +818,7 @@ export default function ChatPage() {
             )}
           </div>
           {/* Messages */}
-          <div style={{
-            // Welcome state: natural height (`flex: 0 0 auto`) so the
-            // container sizes to the welcome content instead of being
-            // locked to the flex-remainder of the 100vh-120 box. Combined
-            // with the outer `minHeight` switch, this lets the browser's
-            // page scrollbar take over at extreme zoom — no more ugly
-            // inner scrollbar on the splash.
-            // Chat state: restore `flex: 1` + `overflow: auto` so the
-            // message list scrolls internally and the input bar stays
-            // pinned during an actual conversation.
-            flex: messages.length === 0 ? "0 0 auto" : 1,
-            overflow: messages.length === 0 ? "visible" : "auto",
-            padding: "16px 0",
-          }}>
+          <div style={{ flex: 1, overflow: "auto", padding: "16px 0" }}>
             <div ref={messagesTopRef} />
             {hasOlderMessages && (
               <div style={{ textAlign: "center", marginBottom: 12 }}>
