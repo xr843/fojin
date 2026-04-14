@@ -413,7 +413,7 @@ export default function ChatPage() {
     return hotQuestionsData?.questions ?? (t("chat.hot_questions", { returnObjects: true }) as string[]);
   }, [messages, hotQuestionsData, t]);
 
-  const inputRef = useRef<HTMLInputElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Attach native keydown listener to capture Tab before Ant Design / browser handles it
   useEffect(() => {
@@ -421,7 +421,7 @@ export default function ChatPage() {
     if (!el) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key !== "Tab" || tabSuggestions.length === 0) return;
-      const val = (e.target as HTMLInputElement).value || "";
+      const val = (e.target as HTMLTextAreaElement).value || "";
       if (val && !tabSuggestions.includes(val)) return;
       e.preventDefault();
       e.stopPropagation();
@@ -915,16 +915,20 @@ export default function ChatPage() {
                 style={{ marginBottom: 8, fontSize: 12 }}
               />
             )}
-            <Space.Compact style={{ width: "100%" }}>
-              <Input
-                ref={(instance) => { inputRef.current = instance?.input ?? null; }}
+            <Space.Compact style={{ width: "100%", alignItems: "stretch" }}>
+              <Input.TextArea
+                ref={(instance) => { inputRef.current = instance?.resizableTextArea?.textArea ?? null; }}
                 value={input}
                 onChange={(e) => { setInput(e.target.value); tabIndexRef.current = -1; }}
-                onPressEnter={handleSend}
-                placeholder={tabSuggestions.length > 0 ? `${tabSuggestions[(tabIndexRef.current + 1) % tabSuggestions.length]}    ⇥ Tab` : t("chat.input_placeholder")}
+                onPressEnter={(e) => {
+                  if (e.shiftKey) return;
+                  e.preventDefault();
+                  handleSend();
+                }}
+                placeholder={tabSuggestions.length > 0 ? `${tabSuggestions[(tabIndexRef.current + 1) % tabSuggestions.length]}    ⇥ Tab    ⇧⏎ 换行` : t("chat.input_placeholder")}
                 disabled={sending}
-                size="large"
-                style={{ fontFamily: '"Noto Serif SC", serif' }}
+                autoSize={{ minRows: 1, maxRows: 6 }}
+                style={{ fontFamily: '"Noto Serif SC", serif', fontSize: 16, resize: "none" }}
               />
               {sending ? (
                 <Button
