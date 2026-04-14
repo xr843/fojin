@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Input, Button, Space, message, Alert, Tooltip, Modal, Select } from "antd";
 import Markdown, { defaultUrlTransform } from "react-markdown";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
+import * as OpenCC from "opencc-js";
 import {
   SendOutlined,
   RobotOutlined,
@@ -81,6 +82,15 @@ function parseFollowUps(content: string): { cleanContent: string; suggestions: s
 
 const CITATION_URL_SCHEME = "fojin-citation";
 
+// CBETA stores sutra titles in traditional Chinese; LLM answers come back in
+// simplified Chinese whenever the user's question was simplified. Normalizing
+// both sides to simplified via opencc-js lets injectCitationLinks actually
+// find matches in the RAG source map.
+const _t2s = OpenCC.Converter({ from: "tw", to: "cn" });
+const toSimplified = (s: string): string => {
+  try { return _t2s(s); } catch { return s; }
+};
+
 // rehype-sanitize's defaultSchema strips any <a href> whose protocol is not
 // in its allowlist (http, https, mailto, tel, …). We add our custom citation
 // scheme so the citation-drawer machinery below can intercept it instead of
@@ -123,12 +133,17 @@ const chatUrlTransform = (url: string): string => {
 function injectCitationLinks(content: string, sources: ChatSource[] | null): string {
   if (!sources || sources.length === 0) return content;
 
+  // Key on the simplified form so titles coming back from CBETA in
+  // traditional characters can be matched against simplified-Chinese
+  // answer text. Multiple traditional sources that collapse to the same
+  // simplified key keep the highest-scoring one.
   const titleMap = new Map<string, ChatSource>();
   for (const s of sources) {
     if (!s.title_zh || s.text_id <= 0) continue;
-    const existing = titleMap.get(s.title_zh);
+    const key = toSimplified(s.title_zh);
+    const existing = titleMap.get(key);
     if (!existing || s.score > existing.score) {
-      titleMap.set(s.title_zh, s);
+      titleMap.set(key, s);
     }
   }
   if (titleMap.size === 0) return content;
@@ -138,16 +153,22 @@ function injectCitationLinks(content: string, sources: ChatSource[] | null): str
     return `${CITATION_URL_SCHEME}://${source.text_id}/${juan}/${chunkIdx}/${encodeURIComponent(title)}`;
   };
 
-  // Pass 1 — explicit 【《title》第N卷】 markers.
+  // Pass 1 — explicit 【《title》…】 markers. Previously the tail was locked to
+  // "第(\d+)卷", which dropped perfectly-valid variants like "卷上" or
+  // "第十八愿" on the floor. Now we accept any qualifier up to the close
+  // bracket and only parse a juan number out of it when we can.
   let withExplicit = content.replace(
-    /【《([^》]+)》(?:第(\d+)卷)?】/g,
-    (_match, title: string, juanStr: string | undefined) => {
-      const source = titleMap.get(title);
+    /【《([^》]+)》([^】]*)】/g,
+    (_match, rawTitle: string, tail: string) => {
+      const title = rawTitle.trim();
+      const simplifiedTitle = toSimplified(title);
+      const source = titleMap.get(simplifiedTitle);
       if (!source) return _match;
-      const juan = juanStr ? parseInt(juanStr, 10) : source.juan_num;
-      const url = buildUrl(source, title, juan);
-      const label = juanStr ? `【《${title}》第${juanStr}卷】` : `【《${title}》】`;
-      return `[${label}](${url})`;
+      const juanMatch = tail.match(/第(\d+)卷/);
+      const juan = juanMatch ? parseInt(juanMatch[1], 10) : source.juan_num;
+      const url = buildUrl(source, simplifiedTitle, juan);
+      const labelTail = tail ? tail : "";
+      return `[【《${title}》${labelTail}】](${url})`;
     },
   );
 
@@ -160,10 +181,12 @@ function injectCitationLinks(content: string, sources: ChatSource[] | null): str
   withExplicit = parts
     .map((part, i) => {
       if (i % 2 === 1) return part; // preserved markdown link
-      return part.replace(/《([^》]+)》/g, (bareMatch, title: string) => {
-        const source = titleMap.get(title);
+      return part.replace(/《([^》]+)》/g, (bareMatch, rawTitle: string) => {
+        const title = rawTitle.trim();
+        const simplifiedTitle = toSimplified(title);
+        const source = titleMap.get(simplifiedTitle);
         if (!source) return bareMatch;
-        const url = buildUrl(source, title, source.juan_num);
+        const url = buildUrl(source, simplifiedTitle, source.juan_num);
         return `[《${title}》](${url})`;
       });
     })
