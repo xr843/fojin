@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import { Drawer, Button, Spin, Alert } from "antd";
-import { BookOutlined, ArrowRightOutlined } from "@ant-design/icons";
+import { useMemo } from "react";
+import { Button, Spin, Alert } from "antd";
+import { BookOutlined, ArrowRightOutlined, CloseOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { getChunkContext, type ChunkContextItem } from "../api/client";
@@ -13,12 +13,10 @@ export interface CitationTarget {
 }
 
 interface Props {
-  open: boolean;
   target: CitationTarget | null;
   onClose: () => void;
 }
 
-const MOBILE_BREAKPOINT = 768;
 const CHUNK_OVERLAP_CHARS = 50;
 
 /**
@@ -40,28 +38,19 @@ function dedupeOverlap(chunks: ChunkContextItem[]): ChunkContextItem[] {
   });
 }
 
-function useIsMobile(): boolean {
-  const [isMobile, setIsMobile] = useState(
-    () => typeof window !== "undefined" && window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches,
-  );
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mq = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`);
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-  return isMobile;
-}
-
-export default function CitationDrawer({ open, target, onClose }: Props) {
-  const isMobile = useIsMobile();
-
+/**
+ * Inline citation panel: a sibling of the main chat column inside a flex
+ * row, sized by the parent via an explicit width passed through the CSS
+ * class (see .chat-citation-panel in global.css). Not an antd Drawer —
+ * we deliberately avoid the modal overlay so users can keep interacting
+ * with the chat on the left while verifying the cited passage.
+ */
+export default function CitationDrawer({ target, onClose }: Props) {
   const { data, isLoading, error } = useQuery({
     queryKey: ["citation-context", target?.textId, target?.juanNum, target?.chunkIndex],
     queryFn: () =>
       getChunkContext(target!.textId, target!.juanNum, target!.chunkIndex, 2),
-    enabled: open && target !== null,
+    enabled: target !== null,
     staleTime: 15 * 60 * 1000,
   });
 
@@ -69,11 +58,6 @@ export default function CitationDrawer({ open, target, onClose }: Props) {
     () => (data ? dedupeOverlap(data.chunks) : []),
     [data],
   );
-
-  const drawerPlacement = isMobile ? "bottom" : "right";
-  const drawerSize = isMobile
-    ? { height: "70vh" as const, width: "100%" as const }
-    : { width: 480 };
 
   const readerUrl = target
     ? `/texts/${target.textId}/read?juan=${target.juanNum}&highlight_chunk=${target.chunkIndex}`
@@ -84,25 +68,22 @@ export default function CitationDrawer({ open, target, onClose }: Props) {
     : "原文对照";
 
   return (
-    <Drawer
-      open={open}
-      onClose={onClose}
-      placement={drawerPlacement}
-      {...drawerSize}
-      title={
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <BookOutlined style={{ color: "var(--fj-accent)" }} />
-          <span style={{ fontFamily: '"Noto Serif SC", serif', fontSize: 16 }}>
-            {titleText}
-          </span>
-        </div>
-      }
-      styles={{
-        body: { padding: 0, display: "flex", flexDirection: "column" },
-      }}
-      destroyOnHidden={false}
-    >
-      <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px" }}>
+    <>
+      <div className="chat-citation-panel-header">
+        <span className="chat-citation-panel-title">
+          <BookOutlined />
+          <span style={{ fontFamily: '"Noto Serif SC", serif' }}>{titleText}</span>
+        </span>
+        <Button
+          type="text"
+          size="small"
+          icon={<CloseOutlined />}
+          onClick={onClose}
+          aria-label="关闭原文对照"
+        />
+      </div>
+
+      <div className="chat-citation-panel-body">
         {isLoading && (
           <div style={{ textAlign: "center", padding: "40px 0" }}>
             <Spin />
@@ -124,15 +105,7 @@ export default function CitationDrawer({ open, target, onClose }: Props) {
         {data && !isLoading && !error && (
           <>
             {data.has_more_before && (
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "var(--fj-ink-muted)",
-                  textAlign: "center",
-                  marginBottom: 12,
-                  fontStyle: "italic",
-                }}
-              >
+              <div className="chat-citation-boundary-hint">
                 … 前文（本卷第 {data.chunks[0]?.chunk_index ?? 0} 段之前）
               </div>
             )}
@@ -148,14 +121,7 @@ export default function CitationDrawer({ open, target, onClose }: Props) {
               {dedupedChunks.map((c) => (
                 <div
                   key={c.chunk_index}
-                  style={{
-                    padding: "8px 12px",
-                    marginBottom: 6,
-                    borderRadius: 4,
-                    borderLeft: c.is_center ? "3px solid var(--fj-accent)" : "3px solid transparent",
-                    background: c.is_center ? "rgba(255, 220, 90, 0.15)" : "transparent",
-                    transition: "all 0.2s",
-                  }}
+                  className={`chat-citation-chunk${c.is_center ? " chat-citation-chunk-center" : ""}`}
                 >
                   {c.chunk_text}
                 </div>
@@ -163,15 +129,7 @@ export default function CitationDrawer({ open, target, onClose }: Props) {
             </div>
 
             {data.has_more_after && (
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "var(--fj-ink-muted)",
-                  textAlign: "center",
-                  marginTop: 12,
-                  fontStyle: "italic",
-                }}
-              >
+              <div className="chat-citation-boundary-hint">
                 … 后文（本卷第 {data.chunks[data.chunks.length - 1]?.chunk_index ?? 0} 段之后）
               </div>
             )}
@@ -179,16 +137,7 @@ export default function CitationDrawer({ open, target, onClose }: Props) {
         )}
       </div>
 
-      <div
-        style={{
-          borderTop: "1px solid rgba(217,208,193,0.5)",
-          padding: "12px 20px",
-          display: "flex",
-          justifyContent: "flex-end",
-          gap: 8,
-          background: "rgba(249, 246, 239, 0.6)",
-        }}
-      >
+      <div className="chat-citation-panel-footer">
         <Button onClick={onClose} size="middle">
           关闭
         </Button>
@@ -203,6 +152,6 @@ export default function CitationDrawer({ open, target, onClose }: Props) {
           </Button>
         </Link>
       </div>
-    </Drawer>
+    </>
   );
 }
