@@ -2,6 +2,7 @@ from app.models.annotation import Annotation, AnnotationReview
 from app.models.chat import ChatMessage, ChatSession, TextEmbedding
 from app.models.dictionary import DictionaryEntry
 from app.models.feed import AcademicFeed, SourceUpdate
+from app.models.hot_question import HotQuestion
 from app.models.iiif import IIIFManifest
 from app.models.knowledge_graph import KGEntity, KGRelation
 from app.models.relation import TextRelation
@@ -19,6 +20,7 @@ __all__ = [
     "ChatSession",
     "DataSource",
     "DictionaryEntry",
+    "HotQuestion",
     "IIIFManifest",
     "KGEntity",
     "KGRelation",
