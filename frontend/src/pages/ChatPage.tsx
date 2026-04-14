@@ -24,7 +24,9 @@ import {
   ShareAltOutlined,
 } from "@ant-design/icons";
 const ShareCard = lazy(() => import("../components/ShareCard"));
-import { useQuery } from "@tanstack/react-query";
+const CitationDrawer = lazy(() => import("../components/CitationDrawer"));
+import type { CitationTarget } from "../components/CitationDrawer";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   sendChatMessageStream,
   getChatSessions,
@@ -32,6 +34,7 @@ import {
   deleteChatSession,
   getApiKeyStatus,
   getChatQuota,
+  getChunkContext,
   getHotQuestions,
   getRandomHotQuestions,
   updateChatMessageFeedback,
@@ -76,9 +79,15 @@ function parseFollowUps(content: string): { cleanContent: string; suggestions: s
   return { cleanContent: cleaned, suggestions };
 }
 
+const CITATION_URL_SCHEME = "fojin-citation";
+
 /**
- * Replace citation patterns like 【《心经》第1卷】 in markdown content
- * with clickable markdown links using source data to map title -> text_id.
+ * Replace citation patterns like 【《心经》第1卷】 with markdown links whose
+ * href is a custom `fojin-citation://{text_id}/{juan_num}/{chunk_index}`
+ * URL. The markdown renderer intercepts this scheme to pop the citation
+ * drawer instead of navigating away. When no chunk_index is available
+ * (history from before chunk_index was wired through), we fall back to
+ * -1 and the drawer component handles the missing-data case.
  */
 function injectCitationLinks(content: string, sources: ChatSource[] | null): string {
   if (!sources || sources.length === 0) return content;
@@ -97,10 +106,33 @@ function injectCitationLinks(content: string, sources: ChatSource[] | null): str
     const source = titleMap.get(title);
     if (!source) return _match;
     const juan = juanStr ? parseInt(juanStr, 10) : source.juan_num;
-    const url = `/texts/${source.text_id}/read?juan=${juan}`;
+    const chunkIdx = source.chunk_index ?? -1;
+    const url = `${CITATION_URL_SCHEME}://${source.text_id}/${juan}/${chunkIdx}/${encodeURIComponent(title)}`;
     const label = juanStr ? `【《${title}》第${juanStr}卷】` : `【《${title}》】`;
     return `[${label}](${url})`;
   });
+}
+
+interface ParsedCitation {
+  textId: number;
+  juanNum: number;
+  chunkIndex: number;
+  titleZh: string;
+}
+
+function parseCitationHref(href: string): ParsedCitation | null {
+  if (!href.startsWith(`${CITATION_URL_SCHEME}://`)) return null;
+  const rest = href.slice(`${CITATION_URL_SCHEME}://`.length);
+  const parts = rest.split("/");
+  if (parts.length < 3) return null;
+  const textId = parseInt(parts[0], 10);
+  const juanNum = parseInt(parts[1], 10);
+  const chunkIndex = parseInt(parts[2], 10);
+  const titleZh = parts[3] ? decodeURIComponent(parts[3]) : "";
+  if (!Number.isFinite(textId) || !Number.isFinite(juanNum) || !Number.isFinite(chunkIndex)) {
+    return null;
+  }
+  return { textId, juanNum, chunkIndex, titleZh };
 }
 
 function groupSessionsByDate(sessions: ChatSessionItem[]): { label: string; items: ChatSessionItem[] }[] {
@@ -146,6 +178,8 @@ export default function ChatPage() {
     answer: string;
     sources: ChatSource[] | null;
   } | null>(null);
+  const [citationTarget, setCitationTarget] = useState<CitationTarget | null>(null);
+  const queryClient = useQueryClient();
   const bottomRef = useRef<HTMLDivElement>(null);
   const messagesTopRef = useRef<HTMLDivElement>(null);
 
@@ -216,9 +250,43 @@ export default function ChatPage() {
     [filteredSessions],
   );
 
-  // Custom markdown components: render internal citation links with react-router Link
+  // Custom markdown components: intercept `fojin-citation://` scheme to
+  // open the citation drawer, render `/texts/...` links via react-router,
+  // and treat everything else as an external link.
   const markdownComponents = useMemo(() => ({
     a: ({ href, children }: { href?: string; children?: ReactNode }) => {
+      if (href) {
+        const parsed = parseCitationHref(href);
+        if (parsed) {
+          return (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                if (parsed.chunkIndex < 0) {
+                  // Legacy history message without chunk_index — fall back
+                  // to navigating to the reader page as before.
+                  navigate(`/texts/${parsed.textId}/read?juan=${parsed.juanNum}`);
+                  return;
+                }
+                setCitationTarget(parsed);
+              }}
+              style={{
+                background: "none",
+                border: 0,
+                padding: 0,
+                font: "inherit",
+                color: "var(--fj-accent)",
+                borderBottom: "1px dashed var(--fj-accent)",
+                fontWeight: 500,
+                cursor: "pointer",
+              }}
+            >
+              {children}
+            </button>
+          );
+        }
+      }
       if (href && href.startsWith("/texts/")) {
         return (
           <Link
@@ -236,7 +304,7 @@ export default function ChatPage() {
       }
       return <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>;
     },
-  }), []);
+  }), [navigate]);
 
   const scrollToBottom = () => {
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
@@ -365,6 +433,16 @@ export default function ChatPage() {
             m.id === assistantId ? { ...m, sources } : m,
           ),
         );
+        // Prefetch each citation's chunk context so the drawer opens instantly.
+        for (const s of sources) {
+          if (s.text_id == null || s.juan_num == null || s.chunk_index == null) continue;
+          if (s.chunk_index < 0) continue;
+          queryClient.prefetchQuery({
+            queryKey: ["citation-context", s.text_id, s.juan_num, s.chunk_index],
+            queryFn: () => getChunkContext(s.text_id, s.juan_num, s.chunk_index ?? 0, 2),
+            staleTime: 15 * 60 * 1000,
+          });
+        }
       },
       onSearching: (_searchMsg: string) => {
         // 搜索状态由初始占位符 "正在检索经文并生成回答..." 显示，不覆盖 content
@@ -393,7 +471,7 @@ export default function ChatPage() {
         refetchQuota();
       },
     }, abortController.signal, undefined, hotQuestionId);
-  }, [sending, sessionId, masterId, user, refetchSessions, refetchQuota]);
+  }, [sending, sessionId, masterId, user, refetchSessions, refetchQuota, queryClient]);
 
   const handleSend = useCallback(async () => {
     await handleSendMessage(input);
@@ -963,6 +1041,13 @@ export default function ChatPage() {
           />
         </Suspense>
       )}
+      <Suspense fallback={null}>
+        <CitationDrawer
+          open={citationTarget !== null}
+          target={citationTarget}
+          onClose={() => setCitationTarget(null)}
+        />
+      </Suspense>
     </>
   );
 }

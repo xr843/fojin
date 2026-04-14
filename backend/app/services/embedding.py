@@ -130,7 +130,7 @@ async def similarity_search(
     if scope_text_ids:
         placeholders = ",".join(str(tid) for tid in scope_text_ids)
         result = await raw_conn.exec_driver_sql(
-            "SELECT te.text_id, te.juan_num, te.chunk_text, "
+            "SELECT te.text_id, te.juan_num, te.chunk_index, te.chunk_text, "
             "1 - (te.embedding <=> $1::vector) AS score, "
             "COALESCE(bt.title_zh, '') AS title_zh "
             "FROM text_embeddings te "
@@ -142,7 +142,7 @@ async def similarity_search(
         )
     else:
         result = await raw_conn.exec_driver_sql(
-            "SELECT te.text_id, te.juan_num, te.chunk_text, "
+            "SELECT te.text_id, te.juan_num, te.chunk_index, te.chunk_text, "
             "1 - (te.embedding <=> $1::vector) AS score, "
             "COALESCE(bt.title_zh, '') AS title_zh "
             "FROM text_embeddings te "
@@ -157,9 +157,10 @@ async def similarity_search(
         {
             "text_id": row[0],
             "juan_num": row[1],
-            "chunk_text": row[2],
-            "score": float(row[3]),
-            "title_zh": row[4],
+            "chunk_index": row[2],
+            "chunk_text": row[3],
+            "score": float(row[4]),
+            "title_zh": row[5],
         }
         for row in rows
     ]
