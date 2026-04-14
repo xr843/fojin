@@ -829,12 +829,12 @@ export default function ChatPage() {
               </div>
             )}
             {messages.length === 0 && (
-              <div style={{ textAlign: "center", padding: "60px 24px", color: "var(--fj-ink-muted)" }}>
-                <RobotOutlined style={{ fontSize: 48, marginBottom: 16, color: "var(--fj-accent)" }} />
-                <div style={{ fontSize: 18, fontFamily: '"Noto Serif SC", serif', marginBottom: 8 }}>
+              <div style={{ textAlign: "center", padding: "clamp(16px, 4vh, 60px) 24px", color: "var(--fj-ink-muted)" }}>
+                <RobotOutlined style={{ fontSize: 44, marginBottom: 12, color: "var(--fj-accent)" }} />
+                <div style={{ fontSize: 18, fontFamily: '"Noto Serif SC", serif', marginBottom: 6 }}>
                   {t("chat.title")}
                 </div>
-                <div style={{ fontSize: 13, lineHeight: 1.8 }}>
+                <div style={{ fontSize: 13, lineHeight: 1.7 }}>
                   {t("chat.subtitle")}
                   <br />{t("chat.subtitle2")}
                 </div>
@@ -842,7 +842,7 @@ export default function ChatPage() {
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr",
                   gap: 10,
-                  marginTop: 24,
+                  marginTop: 18,
                   maxWidth: 480,
                   marginLeft: "auto",
                   marginRight: "auto",
@@ -893,7 +893,7 @@ export default function ChatPage() {
                   ))}
                 </div>
                 {(welcomeCardsData?.questions?.length ?? 0) > 0 && (
-                  <div style={{ marginTop: 14 }}>
+                  <div style={{ marginTop: 10 }}>
                     <Button
                       size="small"
                       type="text"
