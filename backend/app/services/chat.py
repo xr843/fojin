@@ -1,7 +1,7 @@
 import json
 import logging
 import time as _time
-from datetime import UTC, date, datetime, timedelta
+from datetime import date
 
 import httpx
 from sqlalchemy import delete, func, select
