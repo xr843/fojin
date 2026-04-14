@@ -238,6 +238,46 @@ export default function ChatPage() {
     sources: ChatSource[] | null;
   } | null>(null);
   const [citationTarget, setCitationTarget] = useState<CitationTarget | null>(null);
+  const [citationPanelWidth, setCitationPanelWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem("fojin-citation-panel-width");
+      const n = saved ? parseInt(saved, 10) : NaN;
+      return Number.isFinite(n) && n >= 360 && n <= 900 ? n : 560;
+    } catch {
+      return 560;
+    }
+  });
+  const citationDragRef = useRef(false);
+  const handleCitationDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    citationDragRef.current = true;
+    const startX = e.clientX;
+    const startWidth = citationPanelWidth;
+    const onMove = (ev: MouseEvent) => {
+      if (!citationDragRef.current) return;
+      const delta = startX - ev.clientX;
+      const next = Math.max(360, Math.min(startWidth + delta, 900));
+      setCitationPanelWidth(next);
+    };
+    const onUp = () => {
+      citationDragRef.current = false;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      try {
+        localStorage.setItem("fojin-citation-panel-width", String(citationPanelWidth));
+      } catch { /* ignore */ }
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, [citationPanelWidth]);
+  // Persist width after state settles (separate effect so latest value is saved)
+  useEffect(() => {
+    try { localStorage.setItem("fojin-citation-panel-width", String(citationPanelWidth)); } catch { /* ignore */ }
+  }, [citationPanelWidth]);
   const queryClient = useQueryClient();
   const bottomRef = useRef<HTMLDivElement>(null);
   const messagesTopRef = useRef<HTMLDivElement>(null);
@@ -624,7 +664,13 @@ export default function ChatPage() {
   return (
     <>
       <Helmet><title>{t("chat.page_title")}</title></Helmet>
-      <div style={{ display: "flex", height: "calc(100vh - 120px)", maxWidth: 1100, margin: "0 auto", gap: 16 }}>
+      <div style={{
+        display: "flex",
+        height: "calc(100vh - 120px)",
+        maxWidth: citationTarget ? undefined : 1100,
+        margin: citationTarget ? "0 16px" : "0 auto",
+        gap: 16,
+      }}>
 
         {/* Mobile sidebar drawer (logged in only) */}
         {user && sidebarOpen && (
@@ -1088,6 +1134,21 @@ export default function ChatPage() {
             </Space.Compact>
           </div>
         </div>
+
+        {/* Citation drawer — inline side panel, drag to resize */}
+        {citationTarget !== null && (
+          <>
+            <div className="chat-citation-divider" onMouseDown={handleCitationDragStart} />
+            <div className="chat-citation-panel" style={{ width: citationPanelWidth }}>
+              <Suspense fallback={<div style={{ padding: 40, textAlign: "center" }}>…</div>}>
+                <CitationDrawer
+                  target={citationTarget}
+                  onClose={() => setCitationTarget(null)}
+                />
+              </Suspense>
+            </div>
+          </>
+        )}
       </div>
       {shareTarget !== null && (
         <Suspense fallback={null}>
@@ -1100,13 +1161,6 @@ export default function ChatPage() {
           />
         </Suspense>
       )}
-      <Suspense fallback={null}>
-        <CitationDrawer
-          open={citationTarget !== null}
-          target={citationTarget}
-          onClose={() => setCitationTarget(null)}
-        />
-      </Suspense>
     </>
   );
 }
