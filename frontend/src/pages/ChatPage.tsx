@@ -104,12 +104,21 @@ const chatUrlTransform = (url: string): string => {
 };
 
 /**
- * Replace citation patterns like 【《心经》第1卷】 with markdown links whose
- * href is a custom `fojin-citation://{text_id}/{juan_num}/{chunk_index}`
- * URL. The markdown renderer intercepts this scheme to pop the citation
- * drawer instead of navigating away. When no chunk_index is available
- * (history from before chunk_index was wired through), we fall back to
- * -1 and the drawer component handles the missing-data case.
+ * Turn sutra references inside an AI answer into citation-drawer buttons.
+ *
+ * The LLM is wildly inconsistent about citation style — sometimes it emits the
+ * explicit 【《心经》第1卷】 marker, sometimes it just drops 《佛说无量寿经》
+ * inline as prose. We handle both:
+ *
+ *  1. First pass rewrites 【《title》第N卷】 into a markdown link pointing at
+ *     our custom `fojin-citation://{text_id}/{juan_num}/{chunk_index}` URL.
+ *  2. Second pass scans the remaining plaintext for bare 《title》 occurrences
+ *     and wraps them when `title` is in the RAG source map. Existing markdown
+ *     links from pass 1 are skipped so we never double-wrap.
+ *
+ * When a matched source lacks chunk_index (legacy chat history from before
+ * the chunk_index field was wired through) we emit chunk_index=-1; the click
+ * handler in the renderer falls back to reader-page navigation in that case.
  */
 function injectCitationLinks(content: string, sources: ChatSource[] | null): string {
   if (!sources || sources.length === 0) return content;
@@ -124,15 +133,43 @@ function injectCitationLinks(content: string, sources: ChatSource[] | null): str
   }
   if (titleMap.size === 0) return content;
 
-  return content.replace(/【《([^》]+)》(?:第(\d+)卷)?】/g, (_match, title: string, juanStr: string | undefined) => {
-    const source = titleMap.get(title);
-    if (!source) return _match;
-    const juan = juanStr ? parseInt(juanStr, 10) : source.juan_num;
+  const buildUrl = (source: ChatSource, title: string, juan: number): string => {
     const chunkIdx = source.chunk_index ?? -1;
-    const url = `${CITATION_URL_SCHEME}://${source.text_id}/${juan}/${chunkIdx}/${encodeURIComponent(title)}`;
-    const label = juanStr ? `【《${title}》第${juanStr}卷】` : `【《${title}》】`;
-    return `[${label}](${url})`;
-  });
+    return `${CITATION_URL_SCHEME}://${source.text_id}/${juan}/${chunkIdx}/${encodeURIComponent(title)}`;
+  };
+
+  // Pass 1 — explicit 【《title》第N卷】 markers.
+  let withExplicit = content.replace(
+    /【《([^》]+)》(?:第(\d+)卷)?】/g,
+    (_match, title: string, juanStr: string | undefined) => {
+      const source = titleMap.get(title);
+      if (!source) return _match;
+      const juan = juanStr ? parseInt(juanStr, 10) : source.juan_num;
+      const url = buildUrl(source, title, juan);
+      const label = juanStr ? `【《${title}》第${juanStr}卷】` : `【《${title}》】`;
+      return `[${label}](${url})`;
+    },
+  );
+
+  // Pass 2 — bare 《title》 in prose. Split on any markdown links already in
+  // the content (the ones pass 1 just produced, plus any pre-existing links)
+  // so we only process plaintext segments. Split with a capture group: JS
+  // interleaves the matches into the output array, so odd indices are the
+  // preserved link strings and even indices are plaintext we can rewrite.
+  const parts = withExplicit.split(/(\[[^\]]*\]\([^)]*\))/g);
+  withExplicit = parts
+    .map((part, i) => {
+      if (i % 2 === 1) return part; // preserved markdown link
+      return part.replace(/《([^》]+)》/g, (bareMatch, title: string) => {
+        const source = titleMap.get(title);
+        if (!source) return bareMatch;
+        const url = buildUrl(source, title, source.juan_num);
+        return `[《${title}》](${url})`;
+      });
+    })
+    .join("");
+
+  return withExplicit;
 }
 
 interface ParsedCitation {
