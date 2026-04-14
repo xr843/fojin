@@ -3,8 +3,8 @@ import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
 import { Input, Button, Space, message, Alert, Tooltip, Modal, Select } from "antd";
-import Markdown from "react-markdown";
-import rehypeSanitize from "rehype-sanitize";
+import Markdown, { defaultUrlTransform } from "react-markdown";
+import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import {
   SendOutlined,
   RobotOutlined,
@@ -80,6 +80,28 @@ function parseFollowUps(content: string): { cleanContent: string; suggestions: s
 }
 
 const CITATION_URL_SCHEME = "fojin-citation";
+
+// rehype-sanitize's defaultSchema strips any <a href> whose protocol is not
+// in its allowlist (http, https, mailto, tel, …). We add our custom citation
+// scheme so the citation-drawer machinery below can intercept it instead of
+// seeing href=undefined on every click.
+const CHAT_SANITIZE_SCHEMA = {
+  ...defaultSchema,
+  protocols: {
+    ...(defaultSchema.protocols ?? {}),
+    href: [...(defaultSchema.protocols?.href ?? []), CITATION_URL_SCHEME],
+  },
+};
+
+// react-markdown runs its own urlTransform before rehype plugins run; the
+// built-in one rewrites any non-(http|https|mailto|…) URL to an empty string,
+// which would nuke our fojin-citation:// scheme even before rehype-sanitize
+// gets a chance to allow it. Pass through our scheme explicitly and delegate
+// to the default for everything else.
+const chatUrlTransform = (url: string): string => {
+  if (url.startsWith(`${CITATION_URL_SCHEME}:`)) return url;
+  return defaultUrlTransform(url);
+};
 
 /**
  * Replace citation patterns like 【《心经》第1卷】 with markdown links whose
@@ -822,7 +844,7 @@ export default function ChatPage() {
                       return (
                         <>
                           <div className="chat-markdown">
-                            <Markdown rehypePlugins={[rehypeSanitize]} components={markdownComponents}>{tightenLists(injectCitationLinks(cleanContent, m.sources)) + (isStreaming ? " ▌" : "")}</Markdown>
+                            <Markdown rehypePlugins={[[rehypeSanitize, CHAT_SANITIZE_SCHEMA]]} urlTransform={chatUrlTransform} components={markdownComponents}>{tightenLists(injectCitationLinks(cleanContent, m.sources)) + (isStreaming ? " ▌" : "")}</Markdown>
                           </div>
                           {suggestions.length > 0 && !sending && (
                             <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>
