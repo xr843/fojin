@@ -14,11 +14,10 @@ import {
 } from "antd";
 import {
   ReadOutlined,
-  FileImageOutlined,
   HomeOutlined,
   BookOutlined,
 } from "@ant-design/icons";
-import { getTextDetail, getTextManifests } from "../api/client";
+import { getTextDetail } from "../api/client";
 import { buildCbetaReadUrl } from "../utils/sourceUrls";
 import BookmarkButton from "../components/BookmarkButton";
 import { RelatedTextsStandalone as RelatedTexts } from "../components/RelatedTexts";
@@ -35,12 +34,6 @@ export default function TextDetailPage() {
   const { data: text, isLoading } = useQuery({
     queryKey: ["text", id],
     queryFn: () => getTextDetail(Number(id)),
-    enabled: !!id,
-  });
-
-  const { data: manifests } = useQuery({
-    queryKey: ["manifests", id],
-    queryFn: () => getTextManifests(Number(id)),
     enabled: !!id,
   });
 
@@ -205,14 +198,6 @@ export default function TextDetailPage() {
           >
             导出引用
           </Button>
-          {manifests && manifests.length > 0 && (
-            <Button
-              icon={<FileImageOutlined />}
-              onClick={() => navigate(`/manuscripts/${text.id}`)}
-            >
-              手稿影像 ({manifests.length})
-            </Button>
-          )}
           <BookmarkButton textId={text.id} />
         </Space>
 

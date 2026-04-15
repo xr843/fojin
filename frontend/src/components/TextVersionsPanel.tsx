@@ -43,7 +43,7 @@ export default function TextVersionsPanel({ textId, onClose }: Props) {
   if (!data) return null;
 
   const { translations, iiif_manifests } = data;
-  const hasContent = translations.length > 0 || iiif_manifests.length > 0;
+  const hasContent = translations.length > 0 || iiif_manifests.length >= 3;
 
   if (!hasContent) return null;
 
@@ -90,8 +90,8 @@ export default function TextVersionsPanel({ textId, onClose }: Props) {
         </div>
       )}
 
-      {/* IIIF Manuscripts */}
-      {iiif_manifests.length > 0 && (
+      {/* IIIF Manuscripts — 仅在覆盖足够多时显示，避免 0.3% 佛典个别露出导致负面体验 */}
+      {iiif_manifests.length >= 3 && (
         <div className="versions-section">
           <div className="versions-section-title">
             <PictureOutlined /> 写本 / 刻本图像 ({iiif_manifests.length})
