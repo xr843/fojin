@@ -119,39 +119,46 @@ async def similarity_search(
     query_embedding: list[float],
     limit: int = 5,
     scope_text_ids: list[int] | None = None,
+    lang_list: list[str] | None = None,
 ) -> list[dict]:
     """Find most similar text chunks using pgvector cosine distance.
 
-    When scope_text_ids is provided, only search within those texts
-    (used for master persona mode to restrict RAG to the master's core scriptures).
+    Args:
+        scope_text_ids: restrict search to these text_ids (master persona mode)
+        lang_list: restrict search to these language codes ('lzh' | 'pi' | 'bo' | ...).
+                   Used by trilingual RAG to retrieve per-canon top-K separately.
+
+    Returns dicts including `lang` and `source_id` for downstream alignment-aware
+    merging in rag_retrieval._merge_with_alignment.
     """
     embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
     raw_conn = await session.connection()
+
+    base_select = (
+        "SELECT te.text_id, te.juan_num, te.chunk_index, te.chunk_text, "
+        "1 - (te.embedding <=> $1::vector) AS score, "
+        "COALESCE(bt.title_zh, '') AS title_zh, "
+        "bt.lang, bt.source_id "
+        "FROM text_embeddings te "
+        "LEFT JOIN buddhist_texts bt ON bt.id = te.text_id "
+        "WHERE te.embedding IS NOT NULL"
+    )
+    filters: list[str] = []
     if scope_text_ids:
         placeholders = ",".join(str(tid) for tid in scope_text_ids)
-        result = await raw_conn.exec_driver_sql(
-            "SELECT te.text_id, te.juan_num, te.chunk_index, te.chunk_text, "
-            "1 - (te.embedding <=> $1::vector) AS score, "
-            "COALESCE(bt.title_zh, '') AS title_zh "
-            "FROM text_embeddings te "
-            "LEFT JOIN buddhist_texts bt ON bt.id = te.text_id "
-            f"WHERE te.embedding IS NOT NULL AND te.text_id IN ({placeholders}) "  # nosec B608 — IDs from hardcoded MasterProfile, not user input
-            "ORDER BY te.embedding <=> $1::vector "
-            "LIMIT $2",
-            (embedding_str, limit),
-        )
-    else:
-        result = await raw_conn.exec_driver_sql(
-            "SELECT te.text_id, te.juan_num, te.chunk_index, te.chunk_text, "
-            "1 - (te.embedding <=> $1::vector) AS score, "
-            "COALESCE(bt.title_zh, '') AS title_zh "
-            "FROM text_embeddings te "
-            "LEFT JOIN buddhist_texts bt ON bt.id = te.text_id "
-            "WHERE te.embedding IS NOT NULL "
-            "ORDER BY te.embedding <=> $1::vector "
-            "LIMIT $2",
-            (embedding_str, limit),
-        )
+        filters.append(f"te.text_id IN ({placeholders})")  # nosec B608 — hardcoded MasterProfile IDs
+    if lang_list:
+        # Language codes are whitelist values from buddhist_texts.lang; inlining
+        # is safe because callers pass hardcoded lists like ['lzh','pi','bo'].
+        lang_placeholders = ",".join(f"'{_escape_lang(lang)}'" for lang in lang_list)
+        filters.append(f"bt.lang IN ({lang_placeholders})")  # nosec B608
+    where_clause = (" AND " + " AND ".join(filters)) if filters else ""
+
+    sql = (
+        base_select + where_clause
+        + " ORDER BY te.embedding <=> $1::vector LIMIT $2"
+    )
+    result = await raw_conn.exec_driver_sql(sql, (embedding_str, limit))
     rows = result.fetchall()
     return [
         {
@@ -161,9 +168,16 @@ async def similarity_search(
             "chunk_text": row[3],
             "score": float(row[4]),
             "title_zh": row[5],
+            "lang": row[6] or "lzh",
+            "source_id": row[7],
         }
         for row in rows
     ]
+
+
+def _escape_lang(lang: str) -> str:
+    """Defense-in-depth for lang_list inlining. Only alphanumeric + underscore allowed."""
+    return "".join(c for c in lang if c.isalnum() or c == "_")[:10]
 
 
 async def source_similarity_search(

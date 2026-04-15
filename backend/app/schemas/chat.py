@@ -33,6 +33,23 @@ class FeedbackRequest(BaseModel):
     feedback: Literal["up", "down"] | None = None
 
 
+class ParallelChunk(BaseModel):
+    """A cross-canon parallel passage linked via alignment_pairs.
+
+    Used in trilingual RAG: when the primary RAG hit is a 汉文 chunk that has
+    aligned Pali/Tibetan parallels in alignment_pairs, those parallels ride
+    along on the ChatSource so the LLM can reference them and the frontend
+    citation drawer can show side-by-side tabs.
+    """
+    text_id: int
+    juan_num: int
+    chunk_index: int
+    chunk_text: str
+    lang: str
+    title: str = ""
+    confidence: float = 1.0
+
+
 class ChatSource(BaseModel):
     text_id: int
     juan_num: int
@@ -40,6 +57,11 @@ class ChatSource(BaseModel):
     chunk_text: str
     score: float
     title_zh: str = ""
+    # Trilingual RAG additions (all optional for backward compat with stored
+    # chat history predating this migration).
+    lang: str = "lzh"
+    source_id: int | None = None
+    parallel_chunks: list[ParallelChunk] = []
 
 
 class ChatResponse(BaseModel):

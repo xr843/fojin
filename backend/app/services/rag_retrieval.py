@@ -7,6 +7,7 @@ import time
 import httpx
 from opencc import OpenCC
 from sqlalchemy import or_, select
+from sqlalchemy import text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -24,11 +25,142 @@ MIN_RELEVANCE_SCORE = 0.35
 # Maximum chunks to send to LLM after reranking (fewer but more relevant = better answers)
 MAX_CONTEXT_CHUNKS = 5
 
+# Trilingual RAG: enable per-language retrieval + alignment-aware merging.
+# When True, retrieve_rag_context fetches separately from lzh/pi/bo and then
+# attaches parallel_chunks to primary hits via alignment_pairs lookup.
+# Controlled by env var so it can be disabled in one place if needed.
+ENABLE_PARALLEL_RAG = settings.enable_parallel_rag if hasattr(settings, "enable_parallel_rag") else True
+
+# Per-lang top-k budgets for parallel mode. Total retrieved = LZH_K + PI_K + BO_K.
+# Keep larger for lzh since 95%+ users read Chinese and primary narrative stays in lzh.
+PARALLEL_LZH_K = 8
+PARALLEL_PI_K = 4
+PARALLEL_BO_K = 4
+
 
 def _format_source_label(result: dict) -> str:
     if result.get("title_zh"):
         return f"《{result['title_zh']}》第{result['juan_num']}卷"
     return f"文本#{result['text_id']} 第{result['juan_num']}卷"
+
+
+def _merge_with_alignment_sync(lzh_hits: list[dict], pi_hits: list[dict], bo_hits: list[dict]) -> list[dict]:
+    """Merge per-language RAG hits into a single score-ranked list.
+
+    Called in place of a single similarity_search when ENABLE_PARALLEL_RAG is on.
+    Primary source (highest-ranked lzh) is preserved; pi/bo hits are interleaved
+    by score so the LLM gets a cross-canon sampling. Alignment parallels are
+    attached later in _attach_parallel_chunks, not here — keeps responsibilities
+    separated.
+    """
+    merged: list[dict] = []
+    merged.extend(lzh_hits)
+    merged.extend(pi_hits)
+    merged.extend(bo_hits)
+    merged.sort(key=lambda r: r["score"], reverse=True)
+    return merged
+
+
+async def _attach_parallel_chunks(db: AsyncSession, results: list[dict]) -> None:
+    """For each result in-place, populate its parallel_chunks via alignment_pairs.
+
+    Looks up alignment_pairs for the (text_id, juan_num, chunk_index) tuple in
+    both directions (text_a and text_b sides). For each match, fetches the
+    aligned chunk's text from text_embeddings + title_zh from buddhist_texts.
+
+    Modifies `results` in place by setting result["parallel_chunks"] to a list
+    of ParallelChunk-compatible dicts.
+    """
+    if not results:
+        return
+    # Build a bulk query: "for any of these (text_id, juan, chunk) tuples, find
+    # alignment_pairs where text_a_* OR text_b_* matches, and return the other side"
+    for r in results:
+        r.setdefault("parallel_chunks", [])
+    try:
+        for r in results:
+            tid = r["text_id"]
+            juan = r["juan_num"]
+            cidx = r["chunk_index"]
+            sql = sql_text("""
+                SELECT
+                    CASE WHEN ap.text_a_id = :tid AND ap.text_a_juan_num = :juan AND ap.text_a_chunk_index = :cidx
+                         THEN ap.text_b_id ELSE ap.text_a_id END AS other_text_id,
+                    CASE WHEN ap.text_a_id = :tid AND ap.text_a_juan_num = :juan AND ap.text_a_chunk_index = :cidx
+                         THEN ap.text_b_juan_num ELSE ap.text_a_juan_num END AS other_juan,
+                    CASE WHEN ap.text_a_id = :tid AND ap.text_a_juan_num = :juan AND ap.text_a_chunk_index = :cidx
+                         THEN ap.text_b_chunk_index ELSE ap.text_a_chunk_index END AS other_chunk_idx,
+                    CASE WHEN ap.text_a_id = :tid AND ap.text_a_juan_num = :juan AND ap.text_a_chunk_index = :cidx
+                         THEN ap.text_b_lang ELSE ap.text_a_lang END AS other_lang,
+                    ap.confidence
+                FROM alignment_pairs ap
+                WHERE (
+                    (ap.text_a_id = :tid AND ap.text_a_juan_num = :juan AND ap.text_a_chunk_index = :cidx)
+                    OR
+                    (ap.text_b_id = :tid AND ap.text_b_juan_num = :juan AND ap.text_b_chunk_index = :cidx)
+                )
+                AND ap.text_a_chunk_index IS NOT NULL
+                ORDER BY ap.confidence DESC
+                LIMIT 5
+            """)
+            rows = (await db.execute(sql, {"tid": tid, "juan": juan, "cidx": cidx})).fetchall()
+            if not rows:
+                continue
+            # Fetch chunk_text + title for each parallel. Loop-per-row is fine
+            # for the expected small N (≤ 5 parallels × 5 primary results).
+            parallel_keys = [(row[0], row[1], row[2], row[3], float(row[4])) for row in rows]
+            text_map: dict[tuple[int, int, int], tuple[str, str]] = {}
+            for other_tid, other_juan, other_cidx, _lang, _conf in parallel_keys:
+                text_row = (await db.execute(
+                    sql_text(
+                        "SELECT te.chunk_text, "
+                        "COALESCE(bt.title_zh, bt.title_sa, bt.title_pi, bt.title_en, '') "
+                        "FROM text_embeddings te "
+                        "LEFT JOIN buddhist_texts bt ON bt.id = te.text_id "
+                        "WHERE te.text_id = :tid AND te.juan_num = :juan AND te.chunk_index = :cidx"
+                    ),
+                    {"tid": other_tid, "juan": other_juan, "cidx": other_cidx},
+                )).fetchone()
+                if text_row:
+                    text_map[(other_tid, other_juan, other_cidx)] = (text_row[0], text_row[1])
+            for other_tid, other_juan, other_cidx, other_lang, conf in parallel_keys:
+                key = (other_tid, other_juan, other_cidx)
+                if key not in text_map:
+                    continue
+                chunk_text, title = text_map[key]
+                r["parallel_chunks"].append({
+                    "text_id": other_tid,
+                    "juan_num": other_juan,
+                    "chunk_index": other_cidx,
+                    "chunk_text": chunk_text,
+                    "lang": other_lang or "lzh",
+                    "title": title,
+                    "confidence": conf,
+                })
+    except Exception:
+        logger.exception("Failed to attach parallel chunks")
+
+
+def _format_context_block(result: dict) -> str:
+    """Format a single RAG result into the LLM context string.
+
+    Adds [跨藏对读] annotations when parallel_chunks are present, so the LLM
+    knows it has cross-canon evidence available for the citation.
+    """
+    header = f"[出处: {_format_source_label(result)}]"
+    body = result["chunk_text"]
+    parallels = result.get("parallel_chunks") or []
+    if parallels:
+        parallel_lines = []
+        for p in parallels[:3]:  # cap at 3 parallels per primary source
+            lang_label = {"pi": "巴利", "bo": "藏", "sa": "梵", "en": "英", "lzh": "汉"}.get(p["lang"], p["lang"])
+            title = p.get("title", "") or "其他藏经"
+            parallel_lines.append(
+                f"  · [{lang_label}] 《{title}》 第{p['juan_num']}卷: {p['chunk_text'][:300]}"
+            )
+        parallel_block = "\n[跨藏对读 parallel_chunks]\n" + "\n".join(parallel_lines)
+        return f"{header}\n{body}{parallel_block}"
+    return f"{header}\n{body}"
 
 
 def _keyword_rerank(query: str, results: list[dict]) -> list[dict]:
@@ -267,8 +399,18 @@ async def retrieve_rag_context(
         t1 = time.monotonic()
         logger.debug("TIMING: Embedding took %.2fs", t1 - t0)
 
-        # Search text chunks, then data sources (sequential to avoid session conflicts)
-        text_results = await similarity_search(db, query_embedding, limit=pgvector_limit, scope_text_ids=scope_text_ids)
+        # Text chunk retrieval: two modes depending on ENABLE_PARALLEL_RAG
+        if ENABLE_PARALLEL_RAG and not scope_text_ids:
+            # Per-language top-k retrieval, then alignment-aware merging.
+            # scope_text_ids (master persona mode) bypasses parallel mode
+            # since master's scriptures are already filtered to a specific set.
+            lzh_hits = await similarity_search(db, query_embedding, limit=PARALLEL_LZH_K, lang_list=["lzh"])
+            pi_hits = await similarity_search(db, query_embedding, limit=PARALLEL_PI_K, lang_list=["pi"])
+            bo_hits = await similarity_search(db, query_embedding, limit=PARALLEL_BO_K, lang_list=["bo"])
+            text_results = _merge_with_alignment_sync(lzh_hits, pi_hits, bo_hits)
+        else:
+            text_results = await similarity_search(db, query_embedding, limit=pgvector_limit, scope_text_ids=scope_text_ids)
+
         source_results = await source_similarity_search(db, query_embedding, limit=3, min_score=0.5)
         logger.debug("TIMING: pgvector search took %.2fs", time.monotonic() - t1)
 
@@ -290,8 +432,14 @@ async def retrieve_rag_context(
         # Cap at MAX_CONTEXT_CHUNKS (fewer but more relevant after reranking)
         search_results = reranked[:MAX_CONTEXT_CHUNKS]
 
-        sources = [ChatSource(**r) for r in search_results]
-        context_parts = [f"[出处: {_format_source_label(r)}]\n{r['chunk_text']}" for r in search_results]
+        # Attach alignment parallels to sources (only if parallel mode on).
+        # Query alignment_pairs for each primary hit; if found, inject the
+        # aligned chunks' text into parallel_chunks for downstream use.
+        if ENABLE_PARALLEL_RAG and search_results:
+            await _attach_parallel_chunks(db, search_results)
+
+        sources = [ChatSource(**{k: v for k, v in r.items() if k not in ("source_id",)} | {"source_id": r.get("source_id")}) for r in search_results]
+        context_parts = [_format_context_block(r) for r in search_results]
         context_text = "\n\n".join(context_parts)
 
         # Append source recommendations if any matched
