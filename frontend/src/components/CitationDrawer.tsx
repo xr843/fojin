@@ -1,9 +1,9 @@
-import { useMemo } from "react";
-import { Button, Spin, Alert } from "antd";
-import { BookOutlined, ArrowRightOutlined, CloseOutlined } from "@ant-design/icons";
+import { useMemo, useState } from "react";
+import { Button, Spin, Alert, Tabs } from "antd";
+import { BookOutlined, ArrowRightOutlined, CloseOutlined, GlobalOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { getChunkContext, type ChunkContextItem } from "../api/client";
+import { getChunkContext, getChunkAlignment, type ChunkContextItem, type ParallelPair } from "../api/client";
 
 export interface CitationTarget {
   textId: number;
@@ -11,6 +11,17 @@ export interface CitationTarget {
   chunkIndex: number;
   titleZh: string;
 }
+
+// Map ISO language codes from alignment_pairs to display labels + font classes.
+// The CSS lang attribute styles (see global.css) pick font families based on
+// lang="pi" / lang="bo" etc so Devanagari and Tibetan render correctly.
+const LANG_CONFIG: Record<string, { label: string; tab: string }> = {
+  lzh: { label: "汉", tab: "汉文" },
+  pi: { label: "巴", tab: "巴利" },
+  sa: { label: "梵", tab: "梵文" },
+  bo: { label: "藏", tab: "藏文" },
+  en: { label: "英", tab: "English" },
+};
 
 interface Props {
   target: CitationTarget | null;
@@ -46,6 +57,8 @@ function dedupeOverlap(chunks: ChunkContextItem[]): ChunkContextItem[] {
  * with the chat on the left while verifying the cited passage.
  */
 export default function CitationDrawer({ target, onClose }: Props) {
+  const [activeLang, setActiveLang] = useState<string>("lzh");
+
   const { data, isLoading, error } = useQuery({
     queryKey: ["citation-context", target?.textId, target?.juanNum, target?.chunkIndex],
     queryFn: () =>
@@ -54,10 +67,44 @@ export default function CitationDrawer({ target, onClose }: Props) {
     staleTime: 15 * 60 * 1000,
   });
 
+  // Fetch cross-canon parallels (trilingual RAG). Independent from chunk context
+  // so the main 汉文 passage renders immediately while parallels load in background.
+  const { data: alignmentData } = useQuery({
+    queryKey: ["citation-alignment", target?.textId, target?.juanNum, target?.chunkIndex],
+    queryFn: () =>
+      getChunkAlignment(target!.textId, target!.juanNum, target!.chunkIndex, 5),
+    enabled: target !== null,
+    staleTime: 15 * 60 * 1000,
+    // parallels are optional — don't block rendering if this 404s or empty
+    retry: false,
+  });
+
   const dedupedChunks = useMemo(
     () => (data ? dedupeOverlap(data.chunks) : []),
     [data],
   );
+
+  // Group parallels by lang so each language becomes a tab.
+  // Primary source (汉文) is always the first tab; additional langs appended.
+  const parallelsByLang = useMemo(() => {
+    const groups: Record<string, ParallelPair[]> = {};
+    const parallels = alignmentData?.parallels || [];
+    for (const p of parallels) {
+      if (!groups[p.lang]) groups[p.lang] = [];
+      groups[p.lang].push(p);
+    }
+    return groups;
+  }, [alignmentData]);
+
+  const availableLangs = useMemo(() => {
+    const langs = ["lzh"];
+    for (const lang of Object.keys(parallelsByLang)) {
+      if (lang !== "lzh" && !langs.includes(lang)) langs.push(lang);
+    }
+    return langs;
+  }, [parallelsByLang]);
+
+  const hasParallels = availableLangs.length > 1;
 
   const readerUrl = target
     ? `/texts/${target.textId}/read?juan=${target.juanNum}&highlight_chunk=${target.chunkIndex}`
@@ -104,33 +151,109 @@ export default function CitationDrawer({ target, onClose }: Props) {
 
         {data && !isLoading && !error && (
           <>
-            {data.has_more_before && (
-              <div className="chat-citation-boundary-hint">
-                … 前文（本卷第 {data.chunks[0]?.chunk_index ?? 0} 段之前）
-              </div>
-            )}
-
-            <div
-              style={{
-                fontFamily: '"Noto Serif SC", "Source Han Serif", serif',
-                fontSize: 15,
-                lineHeight: 1.9,
-                color: "var(--fj-ink)",
-              }}
-            >
-              {dedupedChunks.map((c) => (
+            {hasParallels ? (
+              <Tabs
+                size="small"
+                activeKey={activeLang}
+                onChange={setActiveLang}
+                items={availableLangs.map((lang) => ({
+                  key: lang,
+                  label: (
+                    <span>
+                      {lang === "lzh" ? <BookOutlined /> : <GlobalOutlined />} {LANG_CONFIG[lang]?.tab || lang}
+                      {lang !== "lzh" && parallelsByLang[lang] && ` (${parallelsByLang[lang].length})`}
+                    </span>
+                  ),
+                  children: lang === "lzh" ? (
+                    <div lang="zh-Hans">
+                      {data.has_more_before && (
+                        <div className="chat-citation-boundary-hint">
+                          … 前文（本卷第 {data.chunks[0]?.chunk_index ?? 0} 段之前）
+                        </div>
+                      )}
+                      <div
+                        style={{
+                          fontFamily: '"Noto Serif SC", "Source Han Serif", serif',
+                          fontSize: 15,
+                          lineHeight: 1.9,
+                          color: "var(--fj-ink)",
+                        }}
+                      >
+                        {dedupedChunks.map((c) => (
+                          <div
+                            key={c.chunk_index}
+                            className={`chat-citation-chunk${c.is_center ? " chat-citation-chunk-center" : ""}`}
+                          >
+                            {c.chunk_text}
+                          </div>
+                        ))}
+                      </div>
+                      {data.has_more_after && (
+                        <div className="chat-citation-boundary-hint">
+                          … 后文（本卷第 {data.chunks[data.chunks.length - 1]?.chunk_index ?? 0} 段之后）
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div lang={lang}>
+                      {(parallelsByLang[lang] || []).map((p, idx) => (
+                        <div
+                          key={`${p.text_id}-${p.juan_num}-${p.chunk_index}-${idx}`}
+                          className="chat-citation-chunk"
+                          style={{
+                            fontSize: 15,
+                            lineHeight: 1.9,
+                            color: "var(--fj-ink)",
+                          }}
+                        >
+                          {p.title && (
+                            <div
+                              style={{
+                                fontSize: 12,
+                                color: "var(--fj-ink-muted)",
+                                marginBottom: 6,
+                                fontStyle: "italic",
+                              }}
+                            >
+                              《{p.title}》 第 {p.juan_num} 卷 · 置信度 {(p.confidence * 100).toFixed(0)}%
+                            </div>
+                          )}
+                          {p.chunk_text}
+                        </div>
+                      ))}
+                    </div>
+                  ),
+                }))}
+              />
+            ) : (
+              <div lang="zh-Hans">
+                {data.has_more_before && (
+                  <div className="chat-citation-boundary-hint">
+                    … 前文（本卷第 {data.chunks[0]?.chunk_index ?? 0} 段之前）
+                  </div>
+                )}
                 <div
-                  key={c.chunk_index}
-                  className={`chat-citation-chunk${c.is_center ? " chat-citation-chunk-center" : ""}`}
+                  style={{
+                    fontFamily: '"Noto Serif SC", "Source Han Serif", serif',
+                    fontSize: 15,
+                    lineHeight: 1.9,
+                    color: "var(--fj-ink)",
+                  }}
                 >
-                  {c.chunk_text}
+                  {dedupedChunks.map((c) => (
+                    <div
+                      key={c.chunk_index}
+                      className={`chat-citation-chunk${c.is_center ? " chat-citation-chunk-center" : ""}`}
+                    >
+                      {c.chunk_text}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-
-            {data.has_more_after && (
-              <div className="chat-citation-boundary-hint">
-                … 后文（本卷第 {data.chunks[data.chunks.length - 1]?.chunk_index ?? 0} 段之后）
+                {data.has_more_after && (
+                  <div className="chat-citation-boundary-hint">
+                    … 后文（本卷第 {data.chunks[data.chunks.length - 1]?.chunk_index ?? 0} 段之后）
+                  </div>
+                )}
               </div>
             )}
           </>
