@@ -68,16 +68,22 @@ MAX_PARALLEL_PER_CHUNK = 3           # stop after accepting this many targets fo
 COST_CEILING_USD = 50.0              # abort if estimated LLM spend exceeds
 AVG_TOKENS_PER_CALL = 500            # for cost estimation
 
-# Default LLM for verification: cheap + fast + strong at multilingual reasoning.
-# Override via env VERIFY_LLM_PROVIDER / VERIFY_LLM_MODEL / VERIFY_LLM_API_KEY.
-DEFAULT_VERIFY_PROVIDER = os.environ.get("VERIFY_LLM_PROVIDER", "anthropic")
-DEFAULT_VERIFY_MODEL = os.environ.get("VERIFY_LLM_MODEL", "claude-haiku-4-5-20251001")
-# Price per 1K tokens (approximate, used for cost ceiling only)
+# Verification LLM configuration.
+# Defaults: reuse FoJin's main LLM (settings.llm_api_url + llm_model), detect
+# Anthropic-vs-OpenAI format purely from URL. Override via env VERIFY_LLM_*.
+VERIFY_LLM_API_URL = os.environ.get("VERIFY_LLM_API_URL", "")  # falls back to settings.llm_api_url
+VERIFY_LLM_API_KEY = os.environ.get("VERIFY_LLM_API_KEY", "")  # falls back to settings.llm_api_key
+VERIFY_LLM_MODEL = os.environ.get("VERIFY_LLM_MODEL", "")      # falls back to settings.llm_model
+
+# Price per 1K tokens for cost ceiling (approximate; doesn't affect routing)
 LLM_PRICE_PER_1K = {
-    "claude-haiku-4-5-20251001": 0.0008,  # Haiku pricing
-    "gpt-4o-mini": 0.0006,
+    "claude-haiku-4-5-20251001": 0.0008,
+    "gpt-4o-mini": 0.00015,
     "qwen-plus": 0.0004,
+    "deepseek-chat": 0.00027,    # FoJin's current main LLM (DeepSeek V3)
+    "deepseek-reasoner": 0.0014,
 }
+DEFAULT_PRICE_PER_1K = 0.0008    # unknown model → use Haiku estimate
 
 
 # ============================================================================
@@ -138,9 +144,12 @@ MVP_PAIRS: list[AlignmentPair] = [
     AlignmentPair(
         key="heart",
         name="心经 汉藏",
-        text_a=TextResolver(source_code="cbeta", text_id=9),      # T0251, 3 chunks
+        # T0251 (text_id=9) has corrupted ingestion — only 明太祖御制序 + 唐慧忠序，
+        # 260-char 心经正文缺失. Using T0252 法月译广本 instead (2 chunks, 865 chars,
+        # includes 「观自在菩萨」opening and full 色空 section).
+        text_a=TextResolver(source_code="cbeta", text_id=10),     # T0252, 2 chunks
         text_b=TextResolver(source_code="84000", text_id=5175),   # Toh 21, 34 chunks
-        description="T0251《般若波罗蜜多心经》玄奘译 ↔ 84000 Toh 21 藏译",
+        description="T0252《普遍智藏般若波罗蜜多心经》法月译广本 ↔ 84000 Toh 21 藏译",
     ),
     AlignmentPair(
         key="satipatthana",
@@ -231,14 +240,14 @@ async def llm_verify_pair(
     tgt_lang: str,
 ) -> dict[str, Any]:
     """Call LLM to judge whether two segments are parallel. Returns dict or raises."""
-    api_url = settings.llm_api_url
-    api_key = settings.llm_api_key
-    provider = DEFAULT_VERIFY_PROVIDER
-    model = DEFAULT_VERIFY_MODEL
+    api_url = VERIFY_LLM_API_URL or settings.llm_api_url
+    api_key = VERIFY_LLM_API_KEY or settings.llm_api_key
+    model = VERIFY_LLM_MODEL or settings.llm_model
 
     user_msg = build_verify_user_message(src_text, tgt_text, src_lang, tgt_lang)
 
-    if provider == "anthropic" or "anthropic.com" in api_url:
+    # URL-based provider detection (matches chat.py:_is_anthropic pattern).
+    if "anthropic.com" in api_url:
         resp = await client.post(
             f"{api_url}/messages",
             headers={
@@ -630,8 +639,13 @@ async def main_async(pair_key: str, dry_run: bool, limit_chunks: int | None, thr
                      pair_key, [p.key for p in MVP_PAIRS])
         sys.exit(1)
 
-    price = LLM_PRICE_PER_1K.get(DEFAULT_VERIFY_MODEL, 0.001)
+    effective_model = VERIFY_LLM_MODEL or settings.llm_model
+    price = LLM_PRICE_PER_1K.get(effective_model, DEFAULT_PRICE_PER_1K)
     cost_guard = CostGuard(COST_CEILING_USD, price)
+    logger.info("Using verify LLM: %s @ %s (cost est $%.5f/1K tok)",
+                effective_model,
+                VERIFY_LLM_API_URL or settings.llm_api_url,
+                price)
 
     overall = {"accepted": 0, "rejected_llm": 0, "rejected_embed": 0, "errors": 0}
 
