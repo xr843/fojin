@@ -13,6 +13,7 @@ import {
   HeartOutlined,
   HeartFilled,
   RobotOutlined,
+  GlobalOutlined,
 } from "@ant-design/icons";
 import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBookmark, addBookmark, removeBookmark, searchDictionaryGrouped } from "../api/client";
 import type { DictGroupedSearchResponse } from "../api/client";
@@ -21,6 +22,7 @@ import CitationGenerator from "../components/CitationGenerator";
 import AnnotationPanel from "../components/AnnotationPanel";
 import AskXiaojinButton from "../components/AskXiaojinButton";
 import ReaderAIPanel from "../components/ReaderAIPanel";
+import ReaderParallelDrawer from "../components/ReaderParallelDrawer";
 
 import "../styles/versions-panel.css";
 import "../styles/reader.css";
@@ -349,6 +351,7 @@ export default function TextReaderPage() {
   const [fontSize, setFontSize] = useState(getInitialFontSize);
   const [citationOpen, setCitationOpen] = useState(false);
   const [annotationOpen, setAnnotationOpen] = useState(false);
+  const [parallelOpen, setParallelOpen] = useState(false);
 
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
   const [compareLang, setCompareLang] = useState<string | null>(null);
@@ -665,6 +668,15 @@ export default function TextReaderPage() {
           >
             引用
           </Button>
+          <Tooltip title="跨藏经对照阅读（MVP 首批支持 5 部经典）">
+            <Button
+              size="small"
+              icon={<GlobalOutlined />}
+              onClick={() => setParallelOpen(true)}
+            >
+              他藏对读
+            </Button>
+          </Tooltip>
           <div className="reader-font-controls">
             <Button
               size="small"
@@ -793,6 +805,14 @@ export default function TextReaderPage() {
         juanNum={juanNum}
         visible={annotationOpen}
         onClose={() => setAnnotationOpen(false)}
+      />
+
+      <ReaderParallelDrawer
+        textId={textId}
+        juanNum={juanNum}
+        textTitle={textDetail?.title_zh || ""}
+        open={parallelOpen}
+        onClose={() => setParallelOpen(false)}
       />
     </div>
 
