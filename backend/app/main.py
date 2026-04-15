@@ -26,6 +26,7 @@ from datetime import UTC
 
 from app.api import (
     admin,
+    alignment,
     annotations,
     auth,
     bookmarks,
@@ -351,6 +352,7 @@ app.include_router(sources.router, prefix="/api")
 app.include_router(relations.router, prefix="/api")
 app.include_router(knowledge_graph.router, prefix="/api")
 app.include_router(iiif.router, prefix="/api")
+app.include_router(alignment.router, prefix="/api")
 
 # Phase 3 routers
 app.include_router(chat.router, prefix="/api")
