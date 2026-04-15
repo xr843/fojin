@@ -1034,6 +1034,16 @@ export async function getSimilarPassages(
 
 // --- Chat (AI Q&A) ---
 
+export interface ParallelChunk {
+  text_id: number;
+  juan_num: number;
+  chunk_index: number;
+  chunk_text: string;
+  lang: string;  // "lzh" | "pi" | "sa" | "bo" | "en"
+  title?: string;
+  confidence?: number;
+}
+
 export interface ChatSource {
   text_id: TextId;
   juan_num: number;
@@ -1041,12 +1051,72 @@ export interface ChatSource {
   chunk_text: string;
   score: number;
   title_zh?: string;
+  // Trilingual RAG additions
+  lang?: string;
+  source_id?: number;
+  parallel_chunks?: ParallelChunk[];
 }
 
 export interface ChunkContextItem {
   chunk_index: number;
   chunk_text: string;
   is_center: boolean;
+}
+
+// --- Alignment API (trilingual cross-canon parallels) ---
+
+export interface ParallelPair {
+  text_id: number;
+  juan_num: number;
+  chunk_index: number;
+  chunk_text: string;
+  lang: string;
+  title: string;
+  confidence: number;
+}
+
+export interface ChunkAlignmentResponse {
+  source_text_id: number;
+  source_juan_num: number;
+  source_chunk_index: number;
+  parallels: ParallelPair[];
+}
+
+export interface JuanAlignmentEntry {
+  chunk_index: number;
+  chunk_text: string;
+  parallels: ParallelPair[];
+}
+
+export interface JuanAlignmentResponse {
+  text_id: number;
+  juan_num: number;
+  total_chunks: number;
+  chunks_with_parallels: number;
+  entries: JuanAlignmentEntry[];
+}
+
+export async function getChunkAlignment(
+  textId: number,
+  juanNum: number,
+  chunkIndex: number,
+  limit: number = 5,
+): Promise<ChunkAlignmentResponse> {
+  const { data } = await api.get<ChunkAlignmentResponse>(
+    `/alignment/chunks/${textId}/${juanNum}/${chunkIndex}`,
+    { params: { limit } },
+  );
+  return data;
+}
+
+export async function getJuanAlignment(
+  textId: number,
+  juanNum: number,
+): Promise<JuanAlignmentResponse> {
+  const { data } = await api.get<JuanAlignmentResponse>(
+    `/alignment/texts/${textId}/juans/${juanNum}`,
+  );
+  return data;
 }
 
 export interface ChunkContextResponse {

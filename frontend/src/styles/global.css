@@ -26,6 +26,28 @@ body {
   background: var(--fj-bg);
 }
 
+/* Trilingual RAG: font fallbacks for Pali / Sanskrit / Tibetan text.
+ * Used by CitationDrawer tabs and Reader "他藏对读" panel when showing
+ * cross-canon parallel passages. Browsers that don't have Noto Tibetan
+ * installed will fall back gracefully to their system Tibetan font or
+ * render as tofu boxes (acceptable for MVP).
+ */
+[lang="pi"], [lang="sa"] {
+  font-family: "Gentium Plus", "Noto Serif", "Charis SIL", Georgia, serif;
+  font-feature-settings: "liga" on, "clig" on;
+}
+
+[lang="bo"] {
+  font-family: "Noto Serif Tibetan", "Noto Sans Tibetan", "Himalaya",
+    "Tibetan Machine Uni", "Microsoft Himalaya", serif;
+  /* Tibetan needs a bit more line-height for stacked vowels */
+  line-height: 2.1;
+}
+
+[lang="en"] {
+  font-family: "Noto Serif", Georgia, serif;
+}
+
 #root {
   min-height: 100vh;
 }
