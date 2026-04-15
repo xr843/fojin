@@ -150,7 +150,7 @@ async def similarity_search(
     if lang_list:
         # Language codes are whitelist values from buddhist_texts.lang; inlining
         # is safe because callers pass hardcoded lists like ['lzh','pi','bo'].
-        lang_placeholders = ",".join(f"'{_escape_lang(l)}'" for l in lang_list)
+        lang_placeholders = ",".join(f"'{_escape_lang(lang)}'" for lang in lang_list)
         filters.append(f"bt.lang IN ({lang_placeholders})")  # nosec B608
     where_clause = (" AND " + " AND ".join(filters)) if filters else ""
 

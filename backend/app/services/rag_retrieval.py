@@ -7,14 +7,13 @@ import time
 import httpx
 from opencc import OpenCC
 from sqlalchemy import or_, select
+from sqlalchemy import text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from sqlalchemy import text as sql_text
-
 from app.config import settings
 from app.models.dictionary import DictionaryEntry
-from app.schemas.chat import ChatSource, ParallelChunk
+from app.schemas.chat import ChatSource
 from app.services.embedding import generate_embedding, similarity_search, source_similarity_search
 
 logger = logging.getLogger(__name__)
