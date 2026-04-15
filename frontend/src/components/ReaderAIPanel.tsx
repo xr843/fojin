@@ -11,6 +11,7 @@ import {
   CopyOutlined,
 } from "@ant-design/icons";
 import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import rehypeSanitize from "rehype-sanitize";
 import { sendChatMessageStream } from "../api/client";
 import type { ChatSource, ChatMessageItem, ReadingContext } from "../api/client";
@@ -267,7 +268,7 @@ export default function ReaderAIPanel({
                     </div>
                   ) : (
                     <>
-                      <Markdown rehypePlugins={[rehypeSanitize]} components={markdownComponents}>
+                      <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]} components={markdownComponents}>
                         {tightenLists(injectCitationLinks(cleanContent, m.sources)) + (isStreaming ? " ▌" : "")}
                       </Markdown>
                       {suggestions.length > 0 && !sending && (

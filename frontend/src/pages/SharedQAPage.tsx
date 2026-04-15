@@ -4,6 +4,7 @@ import { Helmet } from "react-helmet-async";
 import { Spin, Button, Result } from "antd";
 import { RobotOutlined, MessageOutlined, ShareAltOutlined } from "@ant-design/icons";
 import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import rehypeSanitize from "rehype-sanitize";
 import { getSharedQA, type SharedQA } from "../api/client";
 
@@ -144,7 +145,7 @@ export default function SharedQAPage() {
             fontFamily: '"Noto Serif SC", serif',
           }}
         >
-          <Markdown rehypePlugins={[rehypeSanitize]}>{data.answer}</Markdown>
+          <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>{data.answer}</Markdown>
         </div>
       </div>
 

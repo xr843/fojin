@@ -4,6 +4,7 @@ import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
 import { Input, Button, Space, message, Alert, Tooltip, Modal, Select } from "antd";
 import Markdown, { defaultUrlTransform } from "react-markdown";
+import remarkGfm from "remark-gfm";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import * as OpenCC from "opencc-js";
 import {
@@ -950,7 +951,7 @@ export default function ChatPage() {
                       return (
                         <>
                           <div className="chat-markdown">
-                            <Markdown rehypePlugins={[[rehypeSanitize, CHAT_SANITIZE_SCHEMA]]} urlTransform={chatUrlTransform} components={markdownComponents}>{tightenLists(injectCitationLinks(cleanContent, m.sources)) + (isStreaming ? " ▌" : "")}</Markdown>
+                            <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[[rehypeSanitize, CHAT_SANITIZE_SCHEMA]]} urlTransform={chatUrlTransform} components={markdownComponents}>{tightenLists(injectCitationLinks(cleanContent, m.sources)) + (isStreaming ? " ▌" : "")}</Markdown>
                           </div>
                           {suggestions.length > 0 && !sending && (
                             <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>
