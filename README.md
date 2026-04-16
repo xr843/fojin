@@ -6,7 +6,7 @@
 
 **503 sources. 30 languages. 30 countries. 23,500+ full-text volumes. One search.**
 
-Aggregating the world's Buddhist digital heritage — 10,500+ texts with 23,500+ volumes of full content in Pali, Classical Chinese, Tibetan, and Sanskrit from 503 data sources — with CBETA-style reading, AI-powered Q&A with 8 Buddhist master personas (RAG + tradition-scoped retrieval + citations), knowledge graph with 31K+ entities and 28K+ relations visualized on a 50K-entity Deck.GL geo map, 32 dictionaries with 748K entries across 6 languages, timeline visualization, activity feed, collections, citations, annotations, bookmarks, and multi-language parallel reading.
+Aggregating the world's Buddhist digital heritage — 10,500+ texts with 23,500+ volumes of full content in Pali, Classical Chinese, Tibetan, and Sanskrit from 503 data sources. **The first LLM-driven trilingual cross-canon parallel reading platform** (CBETA × SuttaCentral × 84000), with chunk-level alignment verified by LLM, plus CBETA-style reading, AI-powered Q&A with 8 Buddhist master personas (RAG + tradition-scoped retrieval + citations), knowledge graph with 31K+ entities and 28K+ relations visualized on a 50K-entity Deck.GL geo map, 32 dictionaries with 748K entries across 6 languages, timeline visualization, activity feed, collections, citations, annotations, bookmarks, and multi-language parallel reading.
 
 [Live Demo](https://fojin.app) &nbsp;&middot;&nbsp; [API Docs](https://fojin.app/docs) &nbsp;&middot;&nbsp; [中文文档](./docs/README_zh.md) &nbsp;&middot;&nbsp; [Discussions](https://github.com/xr843/fojin/discussions) &nbsp;&middot;&nbsp; [Discord](https://discord.gg/76SZeuJekq) &nbsp;&middot;&nbsp; [Report Bug](https://github.com/xr843/fojin/issues)
 
@@ -32,11 +32,11 @@ Buddhist texts are scattered across hundreds of databases worldwide — CBETA, S
 | Find a sutra across databases | **Multi-dimensional search** across 10,500+ texts from 503 sources |
 | Read the full text online | **8,900+ texts** with 23,500+ volumes of full content, CBETA-style layout |
 | Compare translations | **Parallel reading** in 30 languages side by side |
+| Compare sutras across Buddhist canons | **Trilingual cross-canon parallel reading** — 5 MVP sutras with 142 LLM-verified chunk alignments across Chinese / Pali / Tibetan (Heart Sutra, Satipaṭṭhāna, Dhammacakka, Dhammapada, Vimalakīrti) |
 | Look up Buddhist terms | **32 dictionaries**, 748K entries (Chinese/Sanskrit/Pali/Tibetan/English) |
 | Explore relationships | **Knowledge graph** with 31K+ entities and 28K+ relations (23K lineage chains) |
 | Discover similar texts | **Semantic similarity** powered by 678K+ embedding vectors (pgvector + HNSW) |
-| View original manuscripts | **IIIF manuscript viewer** connected to BDRC and more |
-| Ask questions about texts | **AI Q&A** ("XiaoJin") with RAG, reranking, clickable citations, and follow-up suggestions |
+| Ask questions about texts | **AI Q&A** ("XiaoJin") with RAG, reranking, clickable citations, multi-language citation drawer, and follow-up suggestions |
 | Learn from a specific master | **Master Persona Mode** — 8 historical Buddhist masters, each with tradition-specific RAG scope |
 | Explore Buddhist geography | **Knowledge Graph Map** — 50K+ geo entities, monastery locations, lineage arcs on Deck.GL |
 | Track source updates | **Activity Feed** — real-time updates from 503 data sources |
@@ -146,16 +146,50 @@ Compare translations side by side — Classical Chinese, Sanskrit, Pali, Tibetan
 
 31,000+ entities (persons, monasteries, texts, schools, concepts) and 28,000+ relationships — including 23,000 teacher-student lineage chains from the DILA Authority Database — visualized as an interactive force-directed graph. Click any node to explore connections.
 
+### Trilingual Cross-Canon Parallel Reading (三语对读)
+
+**The first LLM-driven cross-canon parallel reading system for Buddhist texts.** No other platform provides this: CBETA (汉文), SuttaCentral (Pali), and 84000 (Tibetan) each operate in their own language silo. FoJin bridges them via LLM-verified chunk-level alignment.
+
+**MVP (first 5 classics, 142 alignments):**
+
+| Sutra | Source | Target | Pairs | Type |
+|---|---|---|---:|---|
+| 《般若波羅蜜多心經》Heart Sutra | T0252 (Chinese) | Toh 21 Kangyur (Tibetan) | 6 | 汉 ↔ 藏 |
+| 《維摩詰所說經》Vimalakīrti | T0475 (Chinese, 罗什译) | Toh 176 (Tibetan) | 20 | 汉 ↔ 藏 |
+| Mahāsatipaṭṭhāna Sutta 念处经 | MN 10 (Pali) | T0026 中阿含 (Chinese) | 50 | 巴 ↔ 汉 |
+| Dhammacakkappavattana 转法轮经 | SN 56.11 (Pali) | T0099 杂阿含 (Chinese) | 17 | 巴 ↔ 汉 |
+| Dhammapada 法句经 | T0210 (Chinese) | SC 26 vaggas (Pali) | 49 | 汉 ↔ 巴 |
+
+Hand-verified precision on random 10-pair sample: **100%** (all pairs correctly identified across Chinese, Pali, and Tibetan).
+
+**How to use:**
+
+1. **In AI Q&A** — When XiaoJin cites one of the 5 MVP sutras, the citation drawer shows tabs `[ 汉文 ] [ 巴利 (5) ] [ 藏文 (3) ]`. Click a tab to see the corresponding passage in another canon, rendered with proper Devanagari / Tibetan fonts.
+
+2. **In the reader** — Click the 🌐 **「他藏对读」** button in the toolbar to open an inline side panel listing all aligned segments in the current juan. Collapse each entry to see the source Chinese + all cross-canon parallels with LLM confidence scores. The panel sits to the left of the AI reading panel; both can be open simultaneously and independently resized.
+
+**Pipeline (`backend/scripts/build_alignments.py`):**
+
+- pgvector top-20 candidate recall within target text's embeddings
+- LLM verification (DeepSeek V3) returns `{is_parallel, confidence, reason}` JSON per candidate
+- Pairs with `confidence ≥ 0.75` persisted to `alignment_pairs` with unique `(text_a, text_b)` chunk tuple for idempotent re-runs
+- `$50` cost ceiling guard (actual MVP spend: **~$0.15**)
+- Multi-target resolver supports cases where target is split across rows (e.g., SC Dhammapada's 26 separate vagga texts)
+
+RAG layer automatically includes parallel_chunks in the LLM context when a retrieved chunk has alignments, so answers can naturally reference "the Pali version says…" without hallucinating.
+
 ### AI Q&A — "XiaoJin"
 
 Ask questions in natural language. XiaoJin answers based on canonical Buddhist texts using RAG (Retrieval-Augmented Generation) with 678K+ embedding vectors and HNSW index for fast semantic search. Features include:
 
 - Multi-turn conversation with context awareness
 - Keyword + optional API cross-encoder **reranking** for higher answer quality
-- **Clickable citations** in 【《经名》第N卷】 format — click to jump to the text reader
+- **Clickable citations** in 【《经名》第N卷】 format — click to open a side drawer with surrounding context, plus **multi-language tabs for cross-canon parallels** when available (see Trilingual section above)
+- **GFM markdown tables** — comparative answers (e.g., "Madhyamaka vs Yogācāra") render as proper tables instead of raw pipe syntax
 - **Progressive follow-up suggestions** (concept → related texts → practice)
 - **Smart data source recommendations** — when users ask about finding databases, AI automatically recommends relevant sources from 503 data sources via semantic similarity
 - **Meta-question handling** — detects self-introduction queries ("who are you" / "what can you do") and skips RAG to give a clean functional overview, instead of randomly citing scriptures
+- **Anti-hallucination citation rules** — the system prompt strictly forbids wrapping a text name in 【…】 unless that exact source appeared in the retrieved context, preventing broken citation links
 - **Inline split-view in reader** — AI panel opens by default beside the text with a draggable divider; independent scrolling on each side, resizable width persisted to localStorage
 - **"Ask XiaoJin" button** on the reader page — select text to ask about it
 - **Tab key** cycles through suggested questions in the input box
@@ -211,10 +245,6 @@ Save texts to personal collections, bookmark specific passages, and add annotati
 ### Citation Export
 
 Export citations in BibTeX, RIS, and APA formats for academic papers and reference managers.
-
-### Manuscript Viewer
-
-Browse digitized manuscripts and rare editions from BDRC and other institutions via IIIF protocol.
 
 ### Multi-Language UI
 
@@ -359,6 +389,13 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 - [x] Inline split-view AI reader panel with draggable divider and independent scrolling
 - [x] AI panel auto-open in reader for one-click access to interpretation
 - [x] Meta-question detection in chat — recognizes "who are you / what can you do" and skips RAG
+- [x] **Trilingual cross-canon parallel reading (MVP)** — 5 sutras × 142 LLM-verified chunk alignments across CBETA / SuttaCentral / 84000
+- [x] Chat citation drawer with multi-language tabs (汉 / 巴 / 藏 side-by-side)
+- [x] Reader "他藏对读" inline sidebar — juan-level alignment index, coexists with AI panel, independent drag-resize
+- [x] GFM markdown tables in AI answers (remark-gfm) — comparative responses render as proper tables
+- [x] Anti-hallucination citation rules (Rule 4/4b) — forbid wrapping non-retrieved sutra names in 【…】
+- [x] Server-side SEO meta injection for `/texts/{id}` pages — proper `<title>` / `<description>` per sutra for search engines (SPA route crawlability)
+- [ ] Trilingual MVP v1.1 — expand to 20+ sutras (Lotus, Avataṃsaka, Madhyamakakārikā, Laṅkāvatāra, full Āgama↔Nikāya)
 - [ ] Topic ontology browsing page
 - [ ] Cross-lingual search (query in Chinese, find Sanskrit/Pali/Tibetan results)
 - [ ] Open data export (JSON/CSV for researchers)
