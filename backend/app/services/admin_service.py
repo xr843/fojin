@@ -50,12 +50,14 @@ async def _count_with_today(db: AsyncSession, model, created_field, today_start:
 
 
 async def get_trends(db: AsyncSession, days: int = 30) -> dict:
-    since = date.today() - timedelta(days=days - 1)
+    today = date.today()
+    since = today - timedelta(days=days - 1)
     since_dt = datetime(since.year, since.month, since.day, tzinfo=UTC)
+    date_grid = [since + timedelta(days=i) for i in range(days)]
 
-    registrations = await _daily_counts(db, User, User.created_at, since_dt)
-    messages = await _daily_counts(db, ChatMessage, ChatMessage.created_at, since_dt)
-    active_users = await _daily_active_users(db, since_dt)
+    registrations = await _daily_counts(db, User, User.created_at, since_dt, date_grid)
+    messages = await _daily_counts(db, ChatMessage, ChatMessage.created_at, since_dt, date_grid)
+    active_users = await _daily_active_users(db, since_dt, date_grid)
 
     return {
         "registrations": registrations,
@@ -64,7 +66,13 @@ async def get_trends(db: AsyncSession, days: int = 30) -> dict:
     }
 
 
-async def _daily_counts(db: AsyncSession, model, created_field, since: datetime) -> list[DailyCount]:
+def _fill_missing_days(rows: dict[date, int], date_grid: list[date]) -> list[DailyCount]:
+    return [DailyCount(date=d.isoformat(), count=rows.get(d, 0)) for d in date_grid]
+
+
+async def _daily_counts(
+    db: AsyncSession, model, created_field, since: datetime, date_grid: list[date]
+) -> list[DailyCount]:
     day_col = cast(created_field, Date)
     result = await db.execute(
         select(day_col, func.count())
@@ -73,10 +81,13 @@ async def _daily_counts(db: AsyncSession, model, created_field, since: datetime)
         .group_by(day_col)
         .order_by(day_col)
     )
-    return [DailyCount(date=str(row[0]), count=row[1]) for row in result.all()]
+    rows = {row[0]: row[1] for row in result.all()}
+    return _fill_missing_days(rows, date_grid)
 
 
-async def _daily_active_users(db: AsyncSession, since: datetime) -> list[DailyCount]:
+async def _daily_active_users(
+    db: AsyncSession, since: datetime, date_grid: list[date]
+) -> list[DailyCount]:
     """Active users = distinct users who sent chat messages OR read texts each day."""
     chat_day = cast(ChatSession.created_at, Date)
     read_day = cast(ReadingHistory.last_read_at, Date)
@@ -96,7 +107,8 @@ async def _daily_active_users(db: AsyncSession, since: datetime) -> list[DailyCo
         .group_by(union_q.c.day)
         .order_by(union_q.c.day)
     )
-    return [DailyCount(date=str(row[0]), count=row[1]) for row in result.all()]
+    rows = {row[0]: row[1] for row in result.all()}
+    return _fill_missing_days(rows, date_grid)
 
 
 async def list_users(
