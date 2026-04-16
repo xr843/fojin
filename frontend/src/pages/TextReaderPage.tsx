@@ -22,7 +22,7 @@ import CitationGenerator from "../components/CitationGenerator";
 import AnnotationPanel from "../components/AnnotationPanel";
 import AskXiaojinButton from "../components/AskXiaojinButton";
 import ReaderAIPanel from "../components/ReaderAIPanel";
-import ReaderParallelDrawer from "../components/ReaderParallelDrawer";
+import ReaderParallelPanel from "../components/ReaderParallelPanel";
 
 import "../styles/versions-panel.css";
 import "../styles/reader.css";
@@ -351,7 +351,7 @@ export default function TextReaderPage() {
   const [fontSize, setFontSize] = useState(getInitialFontSize);
   const [citationOpen, setCitationOpen] = useState(false);
   const [annotationOpen, setAnnotationOpen] = useState(false);
-  const [parallelOpen, setParallelOpen] = useState(false);
+  const [parallelPanelOpen, setParallelPanelOpen] = useState(false);
 
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
   const [compareLang, setCompareLang] = useState<string | null>(null);
@@ -365,10 +365,38 @@ export default function TextReaderPage() {
   const [aiSelectedText, setAiSelectedText] = useState<string | undefined>();
   const isDraggingRef = useRef(false);
 
+  // 他藏对读 panel state (inline flex sidebar, same pattern as AI panel)
+  const [parallelPanelWidth, setParallelPanelWidth] = useState(480);
+  const isDraggingParallelRef = useRef(false);
+
   const handleAskXiaojin = useCallback((text: string) => {
     setAiSelectedText(text);
     setAiPanelOpen(true);
   }, []);
+
+  // Drag to resize 他藏对读 panel
+  const handleParallelDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingParallelRef.current = true;
+    const startX = e.clientX;
+    const startWidth = parallelPanelWidth;
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!isDraggingParallelRef.current) return;
+      const delta = startX - ev.clientX;
+      setParallelPanelWidth(Math.max(320, Math.min(startWidth + delta, 720)));
+    };
+    const onMouseUp = () => {
+      isDraggingParallelRef.current = false;
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, [parallelPanelWidth]);
 
   // Drag to resize AI panel
   const handleDragStart = useCallback((e: React.MouseEvent) => {
@@ -574,7 +602,7 @@ export default function TextReaderPage() {
   };
 
   return (
-    <div className={`reader-with-sidebar${aiPanelOpen ? " reader-ai-active" : ""}`}>
+    <div className={`reader-with-sidebar${aiPanelOpen || parallelPanelOpen ? " reader-ai-active" : ""}`}>
     <div className={`reader-container${compareLang ? " reader-bilingual" : ""}`}>
       <Helmet>
         <title>
@@ -671,8 +699,9 @@ export default function TextReaderPage() {
           <Tooltip title="跨藏经对照阅读（MVP 首批支持 5 部经典）">
             <Button
               size="small"
+              type={parallelPanelOpen ? "primary" : "default"}
               icon={<GlobalOutlined />}
-              onClick={() => setParallelOpen(true)}
+              onClick={() => setParallelPanelOpen((v) => !v)}
             >
               他藏对读
             </Button>
@@ -807,16 +836,23 @@ export default function TextReaderPage() {
         onClose={() => setAnnotationOpen(false)}
       />
 
-      <ReaderParallelDrawer
-        textId={textId}
-        juanNum={juanNum}
-        textTitle={textDetail?.title_zh || ""}
-        open={parallelOpen}
-        onClose={() => setParallelOpen(false)}
-      />
     </div>
 
-    {/* AI 解读：右侧内联面板 + 拖拽分割条 */}
+    {/* 他藏对读：右侧内联面板 + 拖拽分割条（在 AI 面板左侧） */}
+    {parallelPanelOpen && (
+      <>
+        <div className="reader-ai-divider" onMouseDown={handleParallelDragStart} />
+        <div className="reader-ai-sidebar" style={{ width: parallelPanelWidth }}>
+          <div className="reader-ai-sidebar-header">
+            <span className="reader-ai-sidebar-title"><GlobalOutlined /> 他藏对读</span>
+            <Button type="text" size="small" onClick={() => setParallelPanelOpen(false)}>✕</Button>
+          </div>
+          <ReaderParallelPanel textId={textId} juanNum={juanNum} />
+        </div>
+      </>
+    )}
+
+    {/* AI 解读：最右侧内联面板 + 拖拽分割条 */}
     {aiPanelOpen ? (
       <>
         <div className="reader-ai-divider" onMouseDown={handleDragStart} />

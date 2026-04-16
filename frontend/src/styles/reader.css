@@ -352,6 +352,20 @@
   padding: 12px 16px;
 }
 
+/* ── 他藏对读 panel (same container shape as AI panel) ── */
+.reader-parallel-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Ensure Collapse inside parallel panel doesn't overflow horizontally */
+.reader-parallel-panel .ant-collapse-header {
+  align-items: flex-start !important;
+}
+
 .reader-ai-context {
   background: rgba(139, 105, 20, 0.06);
   border: 1px solid rgba(139, 105, 20, 0.15);
