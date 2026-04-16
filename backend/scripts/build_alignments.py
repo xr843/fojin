@@ -47,8 +47,8 @@ from sqlalchemy import text
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.config import settings  # noqa: E402
-from app.database import async_session  # noqa: E402
+from app.config import settings
+from app.database import async_session
 
 logging.basicConfig(
     level=logging.INFO,
@@ -183,6 +183,56 @@ MVP_PAIRS: list[AlignmentPair] = [
         text_a=TextResolver(source_code="cbeta", text_id=28),      # T0475 罗什译, 81 chunks
         text_b=TextResolver(source_code="84000", text_id=5330),    # Toh 176, 711 chunks
         description="T0475《维摩诘所说经》罗什译 ↔ 84000 Toh 176 藏译",
+    ),
+    # ========================================================================
+    # v1.1 阿含 ↔ Nikāya 全量扩展 (2026-04-16)
+    # text_a is multi-target via resolve_all=True. process_pair iterates each
+    # resolved Pali sutta as its own outer loop, sharing the single 汉文 阿含
+    # text_b for pgvector candidate search. Idempotent across runs (uq index).
+    # ========================================================================
+    AlignmentPair(
+        key="agama_mn",
+        name="MN 152 全量 ↔ 中阿含",
+        text_a=TextResolver(
+            source_code="suttacentral",
+            cbeta_id_like="SC-mn%",
+            resolve_all=True,
+        ),
+        text_b=TextResolver(source_code="cbeta", text_id=2),  # T0026 中阿含
+        description="所有 MN 152 部巴利经 ↔ T0026 中阿含 (~4995 outer-loop chunks)",
+    ),
+    AlignmentPair(
+        key="agama_dn",
+        name="DN 34 全量 ↔ 长阿含",
+        text_a=TextResolver(
+            source_code="suttacentral",
+            cbeta_id_like="SC-dn%",
+            resolve_all=True,
+        ),
+        text_b=TextResolver(source_code="cbeta", text_id=1),  # T0001 长阿含
+        description="所有 DN 34 部巴利经 ↔ T0001 长阿含 (~2910 outer-loop chunks)",
+    ),
+    AlignmentPair(
+        key="agama_sn56",
+        name="SN 56 谛相应 ↔ 杂阿含",
+        text_a=TextResolver(
+            source_code="suttacentral",
+            cbeta_id_like="SC-sn56%",
+            resolve_all=True,
+        ),
+        text_b=TextResolver(source_code="cbeta", text_id=3),  # T0099 杂阿含
+        description="SN 56 谛相应 (含转法轮经，~30 suttas) ↔ T0099 杂阿含",
+    ),
+    AlignmentPair(
+        key="agama_an4",
+        name="AN 4 四集 ↔ 增一阿含",
+        text_a=TextResolver(
+            source_code="suttacentral",
+            cbeta_id_like="SC-an4%",
+            resolve_all=True,
+        ),
+        text_b=TextResolver(source_code="cbeta", text_id=4),  # T0125 增壹阿含
+        description="AN 4 四法集 (~270 suttas, chunks≥5 后 ~150) ↔ T0125 增壹阿含",
     ),
 ]
 
@@ -350,7 +400,9 @@ async def resolve_texts(session, resolver: TextResolver) -> list[tuple[int, str]
         conditions.append("bt.title_en ILIKE :title_en_ilike")
         params["title_en_ilike"] = resolver.title_en_ilike
 
-    limit = 50 if resolver.resolve_all else 5
+    # Multi-target may include full Pali nikāya (MN 152, SN 1892, AN 1408, …).
+    # Cap high so v1.1 阿含 expansion fits.
+    limit = 2000 if resolver.resolve_all else 5
     sql = (
         "SELECT bt.id, bt.lang, bt.title_zh, bt.title_pi, bt.title_sa, "
         "(SELECT COUNT(*) FROM text_embeddings WHERE text_id=bt.id) AS chunks "
@@ -533,98 +585,100 @@ async def process_pair(
             stats["errors"] += 1
             return stats
 
-        # text_a is single-target (outer loop). If resolve_all was used for a,
-        # log warning and pick first.
-        if len(a_resolved) > 1:
-            logger.warning("Pair %s: text_a resolved to %d texts, using first", pair.key, len(a_resolved))
-        a_id, a_lang = a_resolved[0]
-
         # text_b may be multi-target (Dhammapada vagga case)
         b_ids = [bid for bid, _blang in b_resolved]
         b_lang_map = {bid: blang for bid, blang in b_resolved}
-        # Assume all b targets share the same lang (sane for our MVP pairs)
         b_lang_primary = b_resolved[0][1]
 
-        a_chunks = await fetch_chunks(session, a_id, pair.text_a_juan_filter)
-        if limit_chunks:
-            a_chunks = a_chunks[:limit_chunks]
-
+        # text_a may also be multi-target (v1.1 阿含 expansion: MN 152 / DN 34 etc.).
+        # Iterate each resolved text_a as its own outer loop so RAM stays bounded
+        # and progress can be committed per-sutta.
         logger.info(
-            "▶ Pair %s: %d chunks from text_id=%s (%s) against %d target text(s) (%s)",
-            pair.key, len(a_chunks), a_id, a_lang, len(b_ids), b_lang_primary,
+            "▶ Pair %s: %d source text(s) (text_a) ↔ %d target text(s) (text_b, lang=%s)",
+            pair.key, len(a_resolved), len(b_ids), b_lang_primary,
         )
 
         async with httpx.AsyncClient() as http_client:
-            for i, src in enumerate(a_chunks, 1):
-                candidates = await vector_topk_multi_target(
-                    session, a_id, src["juan_num"], src["chunk_index"], b_ids, EMBED_TOP_K,
+            for a_idx, (a_id, a_lang) in enumerate(a_resolved, 1):
+                a_chunks = await fetch_chunks(session, a_id, pair.text_a_juan_filter)
+                if limit_chunks:
+                    a_chunks = a_chunks[:limit_chunks]
+
+                if not a_chunks:
+                    continue
+
+                logger.info(
+                    "  [a:%d/%d] text_a_id=%s lang=%s — %d chunks to process",
+                    a_idx, len(a_resolved), a_id, a_lang, len(a_chunks),
                 )
-                candidates = [c for c in candidates if c["score"] >= 0.35]
 
-                if not candidates:
-                    stats["rejected_embed"] += 1
-                    if i % 10 == 0:
-                        logger.debug("  [%d/%d] no embedding candidates", i, len(a_chunks))
-                    continue
-
-                if dry_run:
-                    top = candidates[0]
-                    logger.info(
-                        "  [%d/%d] src='%s...' → top score=%.3f tgt=text_id=%s '%s...'",
-                        i, len(a_chunks),
-                        src["chunk_text"][:40],
-                        top["score"],
-                        top["text_id"],
-                        top["chunk_text"][:40],
+                for i, src in enumerate(a_chunks, 1):
+                    candidates = await vector_topk_multi_target(
+                        session, a_id, src["juan_num"], src["chunk_index"], b_ids, EMBED_TOP_K,
                     )
-                    continue
+                    candidates = [c for c in candidates if c["score"] >= 0.35]
 
-                accepted_for_chunk = 0
-                for cand in candidates:
-                    if accepted_for_chunk >= MAX_PARALLEL_PER_CHUNK:
-                        break
-
-                    cost_guard.add(AVG_TOKENS_PER_CALL)
-                    try:
-                        cost_guard.check()
-                    except RuntimeError as e:
-                        logger.error("🛑 %s", e)
-                        await session.commit()
-                        return stats
-
-                    try:
-                        verdict = await llm_verify_pair(
-                            http_client, src["chunk_text"], cand["chunk_text"], a_lang, b_lang_primary,
-                        )
-                    except (httpx.HTTPError, KeyError) as e:
-                        logger.warning("LLM call failed: %s", e)
-                        stats["errors"] += 1
+                    if not candidates:
+                        stats["rejected_embed"] += 1
                         continue
 
-                    if verdict.get("is_parallel") and verdict.get("confidence", 0.0) >= threshold:
-                        cand_text_id = cand["text_id"]
-                        cand_lang = b_lang_map.get(cand_text_id, b_lang_primary)
-                        await insert_alignment(
-                            session,
-                            a_id, src["juan_num"], src["chunk_index"], a_lang,
-                            cand_text_id, cand["juan_num"], cand["chunk_index"], cand_lang,
-                            float(verdict["confidence"]),
+                    if dry_run:
+                        top = candidates[0]
+                        logger.info(
+                            "    [%d/%d] src='%s...' → top score=%.3f tgt=text_id=%s '%s...'",
+                            i, len(a_chunks),
+                            src["chunk_text"][:40],
+                            top["score"],
+                            top["text_id"],
+                            top["chunk_text"][:40],
                         )
-                        stats["accepted"] += 1
-                        accepted_for_chunk += 1
-                    else:
-                        stats["rejected_llm"] += 1
+                        continue
 
-                if i % 5 == 0:
-                    await session.commit()
-                    logger.info(
-                        "  [%d/%d] ✓%d ✗llm=%d ✗embed=%d spent=$%.3f",
-                        i, len(a_chunks),
-                        stats["accepted"], stats["rejected_llm"], stats["rejected_embed"],
-                        cost_guard.spend_usd(),
-                    )
+                    accepted_for_chunk = 0
+                    for cand in candidates:
+                        if accepted_for_chunk >= MAX_PARALLEL_PER_CHUNK:
+                            break
 
-            await session.commit()
+                        cost_guard.add(AVG_TOKENS_PER_CALL)
+                        try:
+                            cost_guard.check()
+                        except RuntimeError as e:
+                            logger.error("🛑 %s", e)
+                            await session.commit()
+                            return stats
+
+                        try:
+                            verdict = await llm_verify_pair(
+                                http_client, src["chunk_text"], cand["chunk_text"],
+                                a_lang, b_lang_primary,
+                            )
+                        except (httpx.HTTPError, KeyError) as e:
+                            logger.warning("LLM call failed: %s", e)
+                            stats["errors"] += 1
+                            continue
+
+                        if verdict.get("is_parallel") and verdict.get("confidence", 0.0) >= threshold:
+                            cand_text_id = cand["text_id"]
+                            cand_lang = b_lang_map.get(cand_text_id, b_lang_primary)
+                            await insert_alignment(
+                                session,
+                                a_id, src["juan_num"], src["chunk_index"], a_lang,
+                                cand_text_id, cand["juan_num"], cand["chunk_index"], cand_lang,
+                                float(verdict["confidence"]),
+                            )
+                            stats["accepted"] += 1
+                            accepted_for_chunk += 1
+                        else:
+                            stats["rejected_llm"] += 1
+
+                # Commit + progress log after each source text completes
+                await session.commit()
+                logger.info(
+                    "  [a:%d/%d] done: ✓total=%d ✗llm=%d ✗embed=%d spent=$%.3f",
+                    a_idx, len(a_resolved),
+                    stats["accepted"], stats["rejected_llm"], stats["rejected_embed"],
+                    cost_guard.spend_usd(),
+                )
 
     return stats
 
@@ -667,7 +721,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--pair",
         required=True,
-        help="MVP pair key: heart|satipatthana|dhammacakka|dhamma_pali|vimalakirti|all",
+        help="Pair key: heart|satipatthana|dhammacakka|dhamma_pali|vimalakirti|agama_mn|agama_dn|agama_sn56|agama_an4|all",
     )
     parser.add_argument("--dry-run", action="store_true", help="Skip LLM calls, print embedding candidates only")
     parser.add_argument("--limit-chunks", type=int, default=None, help="Cap chunks per text (for smoke testing)")
