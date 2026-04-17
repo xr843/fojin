@@ -1121,6 +1121,32 @@ export async function getJuanAlignment(
   return data;
 }
 
+export interface CanonicalParallel {
+  related_text_id: number;
+  related_cbeta_id: string;
+  related_title: string;
+  related_lang: string;
+  relation_type: string;
+  note?: string | null;
+  pali_preview?: string | null;
+  english_preview?: string | null;
+}
+
+export interface CanonicalParallelsResponse {
+  text_id: number;
+  source_cbeta_id: string;
+  source_title: string;
+  total: number;
+  parallels: CanonicalParallel[];
+}
+
+export async function getCanonicalParallels(textId: number): Promise<CanonicalParallelsResponse> {
+  const { data } = await api.get<CanonicalParallelsResponse>(
+    `/alignment/canonical/${textId}`,
+  );
+  return data;
+}
+
 export interface ChunkContextResponse {
   text_id: TextId;
   juan_num: number;
