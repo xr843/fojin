@@ -284,6 +284,20 @@ async def get_geo_entities(
         "(e.properties->>'longitude') IS NOT NULL",
         "e.entity_type != 'sub_entity'",
         "COALESCE(e.properties->>'is_buddhist', 'true') != 'false'",
+        # person 只放高置信度 + 中国境内；teacher_hop / desc_match 有误匹配（中国僧人投海外同名寺）
+        # monastery / place 等不受影响
+        """(
+            e.entity_type != 'person'
+            OR (
+                (e.properties->>'latitude')::float BETWEEN 18 AND 54
+                AND (e.properties->>'longitude')::float BETWEEN 73 AND 135
+                AND (
+                    e.properties->>'geo_source' LIKE 'wikidata%'
+                    OR e.properties->>'geo_source' LIKE 'city_match%'
+                    OR e.properties->>'geo_source' LIKE 'province_match%'
+                )
+            )
+        )""",
     ]
     params: dict = {"limit": limit}
 

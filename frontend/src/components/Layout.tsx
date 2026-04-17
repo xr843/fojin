@@ -76,9 +76,7 @@ export default function Layout() {
     { icon: <RobotOutlined />, label: t("nav.chat"), path: "/chat" },
     { icon: <FileTextOutlined />, label: t("nav.dictionary"), path: "/dictionary" },
     { icon: <ApartmentOutlined />, label: t("nav.kg"), path: "/kg" },
-    // TODO: 佛教地理暂时隐藏，待人物 geocoding 数据质量问题解决后重新上线
-    // （~1000 条中国僧人因 desc_match 贪心匹配被错投到韩国同名寺院，见 session 2026-04-12）
-    // { icon: <GlobalOutlined />, label: t("nav.geo"), path: "/map" },
+    { icon: <GlobalOutlined />, label: t("nav.geo"), path: "/map" },
     { icon: <BookOutlined />, label: t("nav.collections"), path: "/collections" },
     // TODO: 佛学动态暂时隐藏，待加入cron定时抓取后重新上线
     // { icon: <NotificationOutlined />, label: t("nav.activity"), path: "/activity" },
