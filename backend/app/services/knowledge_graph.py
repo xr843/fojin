@@ -256,8 +256,8 @@ async def get_entity_graph(
             })
         visible_ids = {n["id"] for n in nodes}
         links = [
-            l for l in links
-            if l["source"] in visible_ids and l["target"] in visible_ids
+            link for link in links
+            if link["source"] in visible_ids and link["target"] in visible_ids
         ]
 
     return {"nodes": nodes, "links": links, "truncated": truncated}
