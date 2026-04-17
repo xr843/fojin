@@ -703,7 +703,7 @@ export default function TextReaderPage() {
               icon={<GlobalOutlined />}
               onClick={() => setParallelPanelOpen((v) => !v)}
             >
-              他藏对读
+              汉巴藏对读
             </Button>
           </Tooltip>
           <div className="reader-font-controls">
@@ -844,7 +844,7 @@ export default function TextReaderPage() {
         <div className="reader-ai-divider" onMouseDown={handleParallelDragStart} />
         <div className="reader-ai-sidebar" style={{ width: parallelPanelWidth }}>
           <div className="reader-ai-sidebar-header">
-            <span className="reader-ai-sidebar-title"><GlobalOutlined /> 他藏对读</span>
+            <span className="reader-ai-sidebar-title"><GlobalOutlined /> 汉巴藏对读</span>
             <Button type="text" size="small" onClick={() => setParallelPanelOpen(false)}>✕</Button>
           </div>
           <ReaderParallelPanel textId={textId} juanNum={juanNum} />
