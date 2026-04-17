@@ -427,6 +427,22 @@ async def get_lineage_arcs(
         "COALESCE(s.properties->>'is_buddhist', 'true') != 'false'",
         "COALESCE(t.properties->>'is_hidden', 'false') != 'true'",
         "COALESCE(s.properties->>'is_hidden', 'false') != 'true'",
+        # 与 person 图层同款白名单：中国 bbox + 高置信度坐标
+        # desc_match 贪心匹配会把中国僧人投到同名韩国/日本寺院，端点坐标不可信
+        "(t.properties->>'latitude')::float BETWEEN 18 AND 54",
+        "(t.properties->>'longitude')::float BETWEEN 73 AND 135",
+        "(s.properties->>'latitude')::float BETWEEN 18 AND 54",
+        "(s.properties->>'longitude')::float BETWEEN 73 AND 135",
+        """(
+            t.properties->>'geo_source' LIKE 'wikidata%'
+            OR t.properties->>'geo_source' LIKE 'city_match%'
+            OR t.properties->>'geo_source' LIKE 'province_match%'
+        )""",
+        """(
+            s.properties->>'geo_source' LIKE 'wikidata%'
+            OR s.properties->>'geo_source' LIKE 'city_match%'
+            OR s.properties->>'geo_source' LIKE 'province_match%'
+        )""",
     ]
     params: dict = {"limit": limit}
 
