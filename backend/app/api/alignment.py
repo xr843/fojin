@@ -171,7 +171,7 @@ async def get_juan_alignment(
 ) -> JuanAlignmentResponse:
     """Get all chunks of a juan that have any alignment parallels.
 
-    Used by Reader's "他藏对读" panel to show a segment-by-segment index of
+    Used by Reader's "多语对读" panel to show a segment-by-segment index of
     which paragraphs in this juan have parallel passages in other canons.
     Chunks without any alignment are omitted from entries but counted in
     total_chunks for UX progress display.

@@ -365,7 +365,7 @@ export default function TextReaderPage() {
   const [aiSelectedText, setAiSelectedText] = useState<string | undefined>();
   const isDraggingRef = useRef(false);
 
-  // 他藏对读 panel state (inline flex sidebar, same pattern as AI panel)
+  // 多语对读 panel state (inline flex sidebar, same pattern as AI panel)
   const [parallelPanelWidth, setParallelPanelWidth] = useState(480);
   const isDraggingParallelRef = useRef(false);
 
@@ -374,7 +374,7 @@ export default function TextReaderPage() {
     setAiPanelOpen(true);
   }, []);
 
-  // Drag to resize 他藏对读 panel
+  // Drag to resize 多语对读 panel
   const handleParallelDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     isDraggingParallelRef.current = true;
@@ -838,7 +838,7 @@ export default function TextReaderPage() {
 
     </div>
 
-    {/* 他藏对读：右侧内联面板 + 拖拽分割条（在 AI 面板左侧） */}
+    {/* 多语对读：右侧内联面板 + 拖拽分割条（在 AI 面板左侧） */}
     {parallelPanelOpen && (
       <>
         <div className="reader-ai-divider" onMouseDown={handleParallelDragStart} />

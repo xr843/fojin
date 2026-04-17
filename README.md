@@ -166,7 +166,7 @@ Hand-verified precision on random 10-pair sample: **100%** (all pairs correctly 
 
 1. **In AI Q&A** — When XiaoJin cites one of the 5 MVP sutras, the citation drawer shows tabs `[ 汉文 ] [ 巴利 (5) ] [ 藏文 (3) ]`. Click a tab to see the corresponding passage in another canon, rendered with proper Devanagari / Tibetan fonts.
 
-2. **In the reader** — Click the 🌐 **「他藏对读」** button in the toolbar to open an inline side panel listing all aligned segments in the current juan. Collapse each entry to see the source Chinese + all cross-canon parallels with LLM confidence scores. The panel sits to the left of the AI reading panel; both can be open simultaneously and independently resized.
+2. **In the reader** — Click the 🌐 **「多语对读」** (Multilingual Parallel) button in the toolbar. Default tab **「按经对读」** shows sutta-level parallels from SuttaCentral's authoritative Akanuma-style table (3,293 pairs covering all 4 Āgamas ↔ Nikāyas), with Pāli original + Sujato English previews and "read full text" links. Alternate tab **「按段对读」** retains the experimental embedding+LLM chunk-level alignment (pipeline-generated, known to have noise). The panel sits to the left of the AI reading panel; both can be open simultaneously and independently resized.
 
 **Pipeline (`backend/scripts/build_alignments.py`):**
 
@@ -391,7 +391,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 - [x] Meta-question detection in chat — recognizes "who are you / what can you do" and skips RAG
 - [x] **Trilingual cross-canon parallel reading (MVP)** — 5 sutras × 142 LLM-verified chunk alignments across CBETA / SuttaCentral / 84000
 - [x] Chat citation drawer with multi-language tabs (汉 / 巴 / 藏 side-by-side)
-- [x] Reader "他藏对读" inline sidebar — juan-level alignment index, coexists with AI panel, independent drag-resize
+- [x] Reader "多语对读" inline sidebar — dual tabs: sutta-level SC-authoritative parallels + legacy chunk-level RAG alignment; coexists with AI panel, independent drag-resize
 - [x] GFM markdown tables in AI answers (remark-gfm) — comparative responses render as proper tables
 - [x] Anti-hallucination citation rules (Rule 4/4b) — forbid wrapping non-retrieved sutra names in 【…】
 - [x] Server-side SEO meta injection for `/texts/{id}` pages — proper `<title>` / `<description>` per sutra for search engines (SPA route crawlability)

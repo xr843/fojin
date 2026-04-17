@@ -352,7 +352,7 @@
   padding: 12px 16px;
 }
 
-/* ── 他藏对读 panel (same container shape as AI panel) ── */
+/* ── 多语对读 panel (same container shape as AI panel) ── */
 .reader-parallel-panel {
   display: flex;
   flex-direction: column;

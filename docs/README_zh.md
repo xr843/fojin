@@ -98,7 +98,7 @@ ls backend/scripts/import_*.py
 **两个使用入口**：
 
 1. **AI 问答** — 当小津引用 MVP 经典时，引文抽屉显示 `[ 汉文 ] [ 巴利 (5) ] [ 藏文 (3) ]` 标签页，点切换即可对照不同语种段落（藏文显示 Noto Tibetan 字体）
-2. **阅读器** — 点工具栏 🌐 **「他藏对读」** 内联侧栏，列出当前卷所有有跨藏经对应的段落。每条可展开看汉文 + N 条对应 + 置信度。可与 AI 解读面板**同时打开**，各自拖拽调宽，**不遮挡经文**
+2. **阅读器** — 点工具栏 🌐 **「多语对读」** 内联侧栏，默认「按经对读」tab 展示 SuttaCentral 学术对应（Akanuma 级权威，四阿含↔尼柯耶 3293 条），每条附 Pāli 原文 + Sujato 英译预览 + 阅读全文链接。切换「按段对读」tab 查看 embedding+LLM 段级对齐（实验，有噪音）。可与 AI 解读面板**同时打开**，各自拖拽调宽
 
 **对齐管道**（`backend/scripts/build_alignments.py`）：
 - pgvector top-20 候选粗召回
@@ -263,7 +263,7 @@ cd backend && pytest tests/ -q
 
 - [x] **三语跨藏经对读 MVP** —— 5 部经典 × 142 条 LLM 验证对齐（CBETA / SuttaCentral / 84000）
 - [x] AI 问答多语引文抽屉（汉/巴/藏并列）
-- [x] Reader 他藏对读内联侧栏（与 AI 面板共存）
+- [x] Reader 多语对读内联侧栏（按经/按段双 tab，SC 权威 + 自家 RAG 双来源）
 - [x] AI 答案 GFM markdown 表格渲染
 - [x] 反伪造引用规则强化
 - [x] 服务端 SEO meta 注入（每部经典独立标题/描述）
