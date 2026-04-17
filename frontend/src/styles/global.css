@@ -27,7 +27,7 @@ body {
 }
 
 /* Trilingual RAG: font fallbacks for Pali / Sanskrit / Tibetan text.
- * Used by CitationDrawer tabs and Reader "他藏对读" panel when showing
+ * Used by CitationDrawer tabs and Reader "多语对读" panel when showing
  * cross-canon parallel passages. Browsers that don't have Noto Tibetan
  * installed will fall back gracefully to their system Tibetan font or
  * render as tofu boxes (acceptable for MVP).
