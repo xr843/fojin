@@ -65,8 +65,8 @@ logger = logging.getLogger(__name__)
 CONFIDENCE_THRESHOLD = 0.75          # only persist pairs with LLM confidence >= this
 EMBED_TOP_K = 20                     # pgvector candidates per source chunk
 MAX_PARALLEL_PER_CHUNK = 3           # stop after accepting this many targets for one src chunk
-COST_CEILING_USD = 50.0              # abort if estimated LLM spend exceeds
-AVG_TOKENS_PER_CALL = 500            # for cost estimation
+COST_CEILING_USD = 5.0               # abort if estimated LLM spend exceeds (override via --max-spend-usd)
+AVG_TOKENS_PER_CALL = 2000           # realistic for deepseek verify: ~1.5K input (bilingual chunks + prompt) + ~200 output
 
 # Verification LLM configuration.
 # Defaults: reuse FoJin's main LLM (settings.llm_api_url + llm_model), detect
@@ -683,7 +683,7 @@ async def process_pair(
     return stats
 
 
-async def main_async(pair_key: str, dry_run: bool, limit_chunks: int | None, threshold: float) -> None:
+async def main_async(pair_key: str, dry_run: bool, limit_chunks: int | None, threshold: float, max_spend_usd: float) -> None:
     pairs_to_run = (
         MVP_PAIRS if pair_key == "all"
         else [p for p in MVP_PAIRS if p.key == pair_key]
@@ -695,7 +695,7 @@ async def main_async(pair_key: str, dry_run: bool, limit_chunks: int | None, thr
 
     effective_model = VERIFY_LLM_MODEL or settings.llm_model
     price = LLM_PRICE_PER_1K.get(effective_model, DEFAULT_PRICE_PER_1K)
-    cost_guard = CostGuard(COST_CEILING_USD, price)
+    cost_guard = CostGuard(max_spend_usd, price)
     logger.info("Using verify LLM: %s @ %s (cost est $%.5f/1K tok)",
                 effective_model,
                 VERIFY_LLM_API_URL or settings.llm_api_url,
@@ -726,6 +726,13 @@ if __name__ == "__main__":
     parser.add_argument("--dry-run", action="store_true", help="Skip LLM calls, print embedding candidates only")
     parser.add_argument("--limit-chunks", type=int, default=None, help="Cap chunks per text (for smoke testing)")
     parser.add_argument("--threshold", type=float, default=CONFIDENCE_THRESHOLD)
+    parser.add_argument(
+        "--max-spend-usd",
+        type=float,
+        default=COST_CEILING_USD,
+        help=f"Abort if estimated LLM spend exceeds this (default ${COST_CEILING_USD}). "
+             "Raise explicitly for large batch runs (e.g. --max-spend-usd 20).",
+    )
     args = parser.parse_args()
 
-    asyncio.run(main_async(args.pair, args.dry_run, args.limit_chunks, args.threshold))
+    asyncio.run(main_async(args.pair, args.dry_run, args.limit_chunks, args.threshold, args.max_spend_usd))
