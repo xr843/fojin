@@ -42,6 +42,14 @@ async def search_entities(
     if entity_type:
         stmt = stmt.where(KGEntity.entity_type == entity_type)
 
+    # Exclude manually hidden entities (properties.is_hidden=true)
+    stmt = stmt.where(
+        func.coalesce(
+            KGEntity.properties.op("->>")("is_hidden"), "false"
+        )
+        != "true"
+    )
+
     # Exclude entities without any KG relations — they add no value to the graph
     stmt = stmt.where(
         exists(
@@ -91,7 +99,13 @@ async def search_entities(
 
 
 async def get_entity(session: AsyncSession, entity_id: int) -> KGEntity | None:
-    return await session.get(KGEntity, entity_id)
+    ent = await session.get(KGEntity, entity_id)
+    if ent is None:
+        return None
+    props = ent.properties or {}
+    if str(props.get("is_hidden", "false")).lower() == "true":
+        return None
+    return ent
 
 
 async def get_entity_relations(
@@ -225,7 +239,13 @@ async def get_entity_graph(
     nodes = []
     if node_ids:
         entities_result = await session.execute(
-            select(KGEntity).where(KGEntity.id.in_(node_ids))
+            select(KGEntity).where(
+                KGEntity.id.in_(node_ids),
+                func.coalesce(
+                    KGEntity.properties["is_hidden"].astext, "false"
+                )
+                != "true",
+            )
         )
         for e in entities_result.scalars().all():
             nodes.append({
@@ -234,6 +254,11 @@ async def get_entity_graph(
                 "entity_type": e.entity_type,
                 "description": e.description,
             })
+        visible_ids = {n["id"] for n in nodes}
+        links = [
+            l for l in links
+            if l["source"] in visible_ids and l["target"] in visible_ids
+        ]
 
     return {"nodes": nodes, "links": links, "truncated": truncated}
 
@@ -284,6 +309,7 @@ async def get_geo_entities(
         "(e.properties->>'longitude') IS NOT NULL",
         "e.entity_type != 'sub_entity'",
         "COALESCE(e.properties->>'is_buddhist', 'true') != 'false'",
+        "COALESCE(e.properties->>'is_hidden', 'false') != 'true'",
         # person 只放高置信度 + 中国境内；teacher_hop / desc_match 有误匹配（中国僧人投海外同名寺）
         # monastery / place 等不受影响
         """(
@@ -399,6 +425,8 @@ async def get_lineage_arcs(
         "COALESCE(s.properties->>'geo_source', '') NOT LIKE 'teacher_hop%%'",
         "COALESCE(t.properties->>'is_buddhist', 'true') != 'false'",
         "COALESCE(s.properties->>'is_buddhist', 'true') != 'false'",
+        "COALESCE(t.properties->>'is_hidden', 'false') != 'true'",
+        "COALESCE(s.properties->>'is_hidden', 'false') != 'true'",
     ]
     params: dict = {"limit": limit}
 
