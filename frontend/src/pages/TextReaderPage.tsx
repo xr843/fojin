@@ -696,14 +696,14 @@ export default function TextReaderPage() {
           >
             引用
           </Button>
-          <Tooltip title="跨藏经对照阅读（MVP 首批支持 5 部经典）">
+          <Tooltip title="多语对读（汉 · 英译 · 梵 · Pāli 原文）">
             <Button
               size="small"
               type={parallelPanelOpen ? "primary" : "default"}
               icon={<GlobalOutlined />}
               onClick={() => setParallelPanelOpen((v) => !v)}
             >
-              汉巴藏对读
+              多语对读
             </Button>
           </Tooltip>
           <div className="reader-font-controls">
@@ -844,7 +844,7 @@ export default function TextReaderPage() {
         <div className="reader-ai-divider" onMouseDown={handleParallelDragStart} />
         <div className="reader-ai-sidebar" style={{ width: parallelPanelWidth }}>
           <div className="reader-ai-sidebar-header">
-            <span className="reader-ai-sidebar-title"><GlobalOutlined /> 汉巴藏对读</span>
+            <span className="reader-ai-sidebar-title"><GlobalOutlined /> 多语对读</span>
             <Button type="text" size="small" onClick={() => setParallelPanelOpen(false)}>✕</Button>
           </div>
           <ReaderParallelPanel textId={textId} juanNum={juanNum} />

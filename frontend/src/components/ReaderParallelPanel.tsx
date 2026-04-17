@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Empty, Spin, Alert, Collapse, Tag, Progress } from "antd";
-import { LinkOutlined } from "@ant-design/icons";
+import { LinkOutlined, BookOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { getJuanAlignment } from "../api/client";
 
 interface Props {
@@ -11,9 +12,9 @@ interface Props {
 
 const LANG_LABEL: Record<string, string> = {
   lzh: "汉",
-  pi: "巴利",
+  pi: "巴利 · 英译",
   sa: "梵",
-  bo: "藏",
+  bo: "藏 · 英译",
   en: "英",
 };
 
@@ -61,8 +62,8 @@ export default function ReaderParallelPanel({ textId, juanNum }: Props) {
         <Alert
           type="info"
           showIcon
-          message="本卷暂无跨藏经对照数据"
-          description="当前只有 MVP 首批 5 部佛典（心经、念处经、转法轮经、法句经、维摩诘经）打通了汉巴/汉藏段落对照。未来会陆续扩展。"
+          message="本卷暂无多语对照数据"
+          description="当前仅 MVP 首批经典 + 长阿含/中阿含部分卷打通了跨语对照。覆盖会持续扩展。"
           style={{ margin: 12 }}
         />
       )}
@@ -169,6 +170,37 @@ export default function ReaderParallelPanel({ textId, juanNum }: Props) {
                           >
                             {p.chunk_text}
                           </div>
+                          {p.original_preview && p.original_lang && (
+                            <div
+                              lang={p.original_lang}
+                              style={{
+                                marginTop: 8,
+                                padding: "8px 10px",
+                                background: "#f6fafd",
+                                borderLeft: "3px solid #5b8c6b",
+                                fontSize: 12,
+                                lineHeight: 1.8,
+                                color: "#444",
+                              }}
+                            >
+                              <div style={{ fontSize: 11, color: "#5b8c6b", marginBottom: 4, fontWeight: 500 }}>
+                                {p.original_lang === "pi" ? "Pāli 原文（本卷前 500 字）" : "原文（本卷前 500 字）"}
+                              </div>
+                              {p.original_preview}
+                              {p.original_preview.length >= 500 && "…"}
+                            </div>
+                          )}
+                          <div style={{ marginTop: 8, fontSize: 12 }}>
+                            <Link
+                              to={`/texts/${p.text_id}/read?juan=${p.juan_num}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: "#5b8c6b" }}
+                            >
+                              <BookOutlined style={{ marginRight: 4 }} />
+                              阅读全文 →
+                            </Link>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -180,8 +212,9 @@ export default function ReaderParallelPanel({ textId, juanNum }: Props) {
             {data.entries.length > 0 && (
               <div style={{ marginTop: 20, padding: 12, background: "#fafafa", borderRadius: 4, fontSize: 12, color: "#666" }}>
                 <LinkOutlined style={{ marginRight: 6 }} />
-                对齐数据由 FoJin 跨藏经 RAG 对读管道生成，采用 embedding 粗召回 + LLM 精验证。
-                低置信度的对应可能需要人工审核。
+                对齐数据由 FoJin 多语 RAG 管道生成，采用 embedding 粗召回 + LLM 精验证。
+                巴利/藏文条目展示的匹配文本为 Sujato / 84000 英译本；Pāli 原文预览取自 text_contents。
+                低置信度对应可能需人工审核。
               </div>
             )}
           </div>

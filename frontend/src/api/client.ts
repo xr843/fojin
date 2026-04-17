@@ -1073,6 +1073,8 @@ export interface ParallelPair {
   lang: string;
   title: string;
   confidence: number;
+  original_preview?: string | null;
+  original_lang?: string | null;
 }
 
 export interface ChunkAlignmentResponse {

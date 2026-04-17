@@ -1,9 +1,14 @@
 """Cross-canon alignment API.
 
-Exposes the alignment_pairs table to the frontend Reader "他藏对读" tab.
+Exposes the alignment_pairs table to the frontend Reader "多语对读" panel.
 Given a chunk (text_id, juan_num, chunk_index), returns the aligned parallel
-passages in other canons (lzh ↔ pi ↔ bo), each with full chunk_text and
+passages in other canons (lzh ↔ pi ↔ bo ↔ sa), each with full chunk_text and
 source metadata for rendering.
+
+Note on data provenance: for pi (SuttaCentral) and bo (84000) entries, the
+chunk_text stored in text_embeddings is the English translation (Sujato /
+84000). The real Pāli / Tibetan source, when available in text_contents, is
+surfaced via original_preview so the panel can display both sides.
 """
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
@@ -24,6 +29,8 @@ class ParallelPair(BaseModel):
     lang: str
     title: str = ""
     confidence: float = 1.0
+    original_preview: str | None = None
+    original_lang: str | None = None
 
 
 class ChunkAlignmentResponse(BaseModel):
@@ -101,6 +108,21 @@ async def get_chunk_alignment(
             {"tid": other_tid, "juan": other_juan, "cidx": other_cidx},
         )).fetchone()
         if text_row:
+            original_preview: str | None = None
+            original_lang: str | None = None
+            if other_lang in ("pi", "sa"):
+                orig_row = (await db.execute(
+                    sql_text(
+                        "SELECT lang, LEFT(content, 500) FROM text_contents "
+                        "WHERE text_id = :tid AND juan_num = :juan AND lang = :lang "
+                        "LIMIT 1"
+                    ),
+                    {"tid": other_tid, "juan": other_juan, "lang": other_lang},
+                )).fetchone()
+                if orig_row and orig_row[1]:
+                    original_lang = orig_row[0]
+                    original_preview = orig_row[1]
+
             parallels.append(ParallelPair(
                 text_id=other_tid,
                 juan_num=other_juan,
@@ -109,6 +131,8 @@ async def get_chunk_alignment(
                 lang=other_lang or "lzh",
                 title=text_row[1] or "",
                 confidence=float(conf),
+                original_preview=original_preview,
+                original_lang=original_lang,
             ))
 
     return ChunkAlignmentResponse(
