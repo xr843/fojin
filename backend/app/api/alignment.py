@@ -56,6 +56,26 @@ class JuanAlignmentResponse(BaseModel):
     entries: list[JuanAlignmentEntry]
 
 
+class CanonicalParallel(BaseModel):
+    """Sutta-level academic parallel from SuttaCentral (stored in text_relations)."""
+    related_text_id: int
+    related_cbeta_id: str
+    related_title: str
+    related_lang: str
+    relation_type: str
+    note: str | None = None
+    pali_preview: str | None = None
+    english_preview: str | None = None
+
+
+class CanonicalParallelsResponse(BaseModel):
+    text_id: int
+    source_cbeta_id: str
+    source_title: str
+    total: int
+    parallels: list[CanonicalParallel]
+
+
 @router.get("/chunks/{text_id}/{juan_num}/{chunk_index}", response_model=ChunkAlignmentResponse)
 async def get_chunk_alignment(
     text_id: int,
@@ -201,4 +221,97 @@ async def get_juan_alignment(
         total_chunks=total_chunks,
         chunks_with_parallels=len(entries),
         entries=entries,
+    )
+
+
+@router.get("/canonical/{text_id}", response_model=CanonicalParallelsResponse)
+async def get_canonical_parallels(
+    text_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> CanonicalParallelsResponse:
+    """Sutta-level SC parallels for a whole text.
+
+    Reads text_relations (source='suttacentral') — authoritative Akanuma-style
+    correspondences, no inference noise. For each parallel, also pulls the
+    first ~240 chars of the related text's content (Pāli from text_contents,
+    English from text_embeddings chunk 0) to preview in the panel.
+    """
+    src_row = (await db.execute(
+        sql_text(
+            "SELECT cbeta_id, title_zh FROM buddhist_texts WHERE id = :tid"
+        ),
+        {"tid": text_id},
+    )).fetchone()
+    if not src_row:
+        return CanonicalParallelsResponse(
+            text_id=text_id, source_cbeta_id="", source_title="", total=0, parallels=[]
+        )
+
+    rows = (await db.execute(
+        sql_text("""
+            SELECT
+                CASE WHEN tr.text_a_id = :tid THEN tr.text_b_id ELSE tr.text_a_id END AS rel_id,
+                tr.relation_type, tr.note
+            FROM text_relations tr
+            WHERE tr.source = 'suttacentral'
+              AND (tr.text_a_id = :tid OR tr.text_b_id = :tid)
+        """),
+        {"tid": text_id},
+    )).fetchall()
+
+    parallels: list[CanonicalParallel] = []
+    for rel_id, rel_type, note in rows:
+        meta = (await db.execute(
+            sql_text(
+                "SELECT cbeta_id, "
+                "COALESCE(title_pi, title_sa, title_en, title_zh, '') AS title, "
+                "lang "
+                "FROM buddhist_texts WHERE id = :rid"
+            ),
+            {"rid": rel_id},
+        )).fetchone()
+        if not meta:
+            continue
+
+        pali_preview: str | None = None
+        english_preview: str | None = None
+        if meta[2] == "pi":
+            pi_row = (await db.execute(
+                sql_text(
+                    "SELECT LEFT(content, 240) FROM text_contents "
+                    "WHERE text_id = :rid AND lang = 'pi' ORDER BY juan_num LIMIT 1"
+                ),
+                {"rid": rel_id},
+            )).fetchone()
+            if pi_row and pi_row[0]:
+                pali_preview = pi_row[0]
+            en_row = (await db.execute(
+                sql_text(
+                    "SELECT LEFT(chunk_text, 240) FROM text_embeddings "
+                    "WHERE text_id = :rid ORDER BY juan_num, chunk_index LIMIT 1"
+                ),
+                {"rid": rel_id},
+            )).fetchone()
+            if en_row and en_row[0]:
+                english_preview = en_row[0]
+
+        parallels.append(CanonicalParallel(
+            related_text_id=rel_id,
+            related_cbeta_id=meta[0],
+            related_title=meta[1] or "",
+            related_lang=meta[2] or "",
+            relation_type=rel_type,
+            note=note,
+            pali_preview=pali_preview,
+            english_preview=english_preview,
+        ))
+
+    parallels.sort(key=lambda p: (0 if p.relation_type == "parallel" else 1, p.related_cbeta_id))
+
+    return CanonicalParallelsResponse(
+        text_id=text_id,
+        source_cbeta_id=src_row[0],
+        source_title=src_row[1] or "",
+        total=len(parallels),
+        parallels=parallels,
     )
