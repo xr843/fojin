@@ -16,6 +16,7 @@ import {
   ReadOutlined,
   HomeOutlined,
   BookOutlined,
+  ExportOutlined,
 } from "@ant-design/icons";
 import { getTextDetail } from "../api/client";
 import { buildCbetaReadUrl } from "../utils/sourceUrls";
@@ -191,14 +192,14 @@ export default function TextDetailPage() {
               CBETA 阅读
             </Button>
           )}
+          <BookmarkButton textId={text.id} />
           <Button
-            icon={<BookOutlined />}
+            type="text"
+            icon={<ExportOutlined />}
             onClick={() => setCitationOpen(true)}
-            style={{ background: "#5b8c6b", borderColor: "#5b8c6b", color: "#fff" }}
           >
             导出引用
           </Button>
-          <BookmarkButton textId={text.id} />
         </Space>
 
         <CitationGenerator
