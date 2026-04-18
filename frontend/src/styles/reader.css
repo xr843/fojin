@@ -656,3 +656,28 @@
     margin-bottom: 24px;
   }
 }
+/* ── 多语对读 panel: visible scrollbars for inner content blocks ── */
+.reader-parallel-panel .parallel-full-scroll::-webkit-scrollbar,
+.reader-parallel-panel::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.reader-parallel-panel .parallel-full-scroll::-webkit-scrollbar-track,
+.reader-parallel-panel::-webkit-scrollbar-track {
+  background: #f5f5f5;
+  border-radius: 5px;
+}
+.reader-parallel-panel .parallel-full-scroll::-webkit-scrollbar-thumb,
+.reader-parallel-panel::-webkit-scrollbar-thumb {
+  background: #c0c0c0;
+  border-radius: 5px;
+  border: 2px solid #f5f5f5;
+}
+.reader-parallel-panel .parallel-full-scroll::-webkit-scrollbar-thumb:hover,
+.reader-parallel-panel::-webkit-scrollbar-thumb:hover {
+  background: #a0a0a0;
+}
+.reader-parallel-panel .parallel-full-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #c0c0c0 #f5f5f5;
+}

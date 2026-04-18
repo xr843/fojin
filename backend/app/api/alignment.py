@@ -76,6 +76,17 @@ class CanonicalParallelsResponse(BaseModel):
     parallels: list[CanonicalParallel]
 
 
+class FullParallelContentResponse(BaseModel):
+    text_id: int
+    cbeta_id: str
+    title: str
+    lang: str
+    pali_full: str | None = None
+    english_full: str | None = None
+    pali_chars: int = 0
+    english_chars: int = 0
+
+
 @router.get("/chunks/{text_id}/{juan_num}/{chunk_index}", response_model=ChunkAlignmentResponse)
 async def get_chunk_alignment(
     text_id: int,
@@ -314,4 +325,61 @@ async def get_canonical_parallels(
         source_title=src_row[1] or "",
         total=len(parallels),
         parallels=parallels,
+    )
+
+
+@router.get("/canonical/full/{text_id}", response_model=FullParallelContentResponse)
+async def get_full_parallel_content(
+    text_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> FullParallelContentResponse:
+    """Lazy-load full Pāli + English for one parallel sutta.
+
+    Called when user expands a card in 按经对读 panel and wants to see the
+    complete alignment (not just 240-char preview).
+
+    Pāli: concatenates all text_contents.content rows (in juan order) for lang='pi'.
+    English: concatenates all text_embeddings.chunk_text rows in order.
+    """
+    meta = (await db.execute(
+        sql_text(
+            "SELECT cbeta_id, "
+            "COALESCE(title_pi, title_sa, title_en, title_zh, '') AS title, "
+            "lang "
+            "FROM buddhist_texts WHERE id = :tid"
+        ),
+        {"tid": text_id},
+    )).fetchone()
+    if not meta:
+        return FullParallelContentResponse(
+            text_id=text_id, cbeta_id="", title="", lang="",
+        )
+
+    pali_rows = (await db.execute(
+        sql_text(
+            "SELECT content FROM text_contents "
+            "WHERE text_id = :tid AND lang = 'pi' ORDER BY juan_num"
+        ),
+        {"tid": text_id},
+    )).fetchall()
+    pali_full = "\n\n".join(r[0] for r in pali_rows if r[0]) if pali_rows else None
+
+    en_rows = (await db.execute(
+        sql_text(
+            "SELECT chunk_text FROM text_embeddings "
+            "WHERE text_id = :tid ORDER BY juan_num, chunk_index"
+        ),
+        {"tid": text_id},
+    )).fetchall()
+    english_full = "\n\n".join(r[0] for r in en_rows if r[0]) if en_rows else None
+
+    return FullParallelContentResponse(
+        text_id=text_id,
+        cbeta_id=meta[0],
+        title=meta[1] or "",
+        lang=meta[2] or "",
+        pali_full=pali_full,
+        english_full=english_full,
+        pali_chars=len(pali_full) if pali_full else 0,
+        english_chars=len(english_full) if english_full else 0,
     )

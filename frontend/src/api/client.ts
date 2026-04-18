@@ -1147,6 +1147,24 @@ export async function getCanonicalParallels(textId: number): Promise<CanonicalPa
   return data;
 }
 
+export interface FullParallelContentResponse {
+  text_id: number;
+  cbeta_id: string;
+  title: string;
+  lang: string;
+  pali_full?: string | null;
+  english_full?: string | null;
+  pali_chars: number;
+  english_chars: number;
+}
+
+export async function getFullParallelContent(textId: number): Promise<FullParallelContentResponse> {
+  const { data } = await api.get<FullParallelContentResponse>(
+    `/alignment/canonical/full/${textId}`,
+  );
+  return data;
+}
+
 export interface ChunkContextResponse {
   text_id: TextId;
   juan_num: number;

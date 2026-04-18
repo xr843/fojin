@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Empty, Spin, Alert, Collapse, Tag, Progress, Tabs } from "antd";
-import { LinkOutlined, BookOutlined } from "@ant-design/icons";
+import { Empty, Spin, Alert, Collapse, Tag, Progress, Tabs, Button } from "antd";
+import { LinkOutlined, BookOutlined, ExpandAltOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { getJuanAlignment, getCanonicalParallels } from "../api/client";
+import { getJuanAlignment, getCanonicalParallels, getFullParallelContent } from "../api/client";
 
 interface Props {
   textId: number;
@@ -37,6 +37,87 @@ const RELATION_COLOR: Record<string, string> = {
   mention: "orange",
   retell: "purple",
 };
+
+function ParallelCardBody({ p }: { p: import("../api/client").CanonicalParallel }) {
+  const [showFull, setShowFull] = useState(false);
+  const { data: full, isLoading: loadingFull } = useQuery({
+    queryKey: ["canonical-parallel-full", p.related_text_id],
+    queryFn: () => getFullParallelContent(p.related_text_id),
+    enabled: showFull,
+    staleTime: 30 * 60 * 1000,
+  });
+
+  const paliDisplay = full?.pali_full ?? (p.pali_preview ? `${p.pali_preview}…` : null);
+  const englishDisplay = full?.english_full ?? (p.english_preview ? `${p.english_preview}…` : null);
+
+  return (
+    <div style={{ paddingLeft: 8, borderLeft: "2px solid #e8e8e8" }}>
+      {paliDisplay && (
+        <div style={{ marginBottom: 10, padding: "8px 10px", background: "#f6fafd", borderLeft: "3px solid #5b8c6b", borderRadius: 4 }}>
+          <div style={{ fontSize: 11, color: "#5b8c6b", marginBottom: 4, fontWeight: 500, display: "flex", justifyContent: "space-between" }}>
+            <span>Pāli 原文</span>
+            {full?.pali_chars ? <span style={{ color: "#999", fontWeight: 400 }}>{full.pali_chars.toLocaleString()} 字</span> : null}
+          </div>
+          <div
+            lang="pi"
+            className="parallel-full-scroll"
+            style={{
+              fontSize: 12, lineHeight: 1.8, color: "#333",
+              maxHeight: showFull ? 360 : undefined,
+              overflowY: showFull ? "auto" : undefined,
+              whiteSpace: "pre-wrap",
+            }}
+          >
+            {paliDisplay}
+          </div>
+        </div>
+      )}
+      {englishDisplay && (
+        <div style={{ marginBottom: 10, padding: "8px 10px", background: "#fafafa", borderRadius: 4 }}>
+          <div style={{ fontSize: 11, color: "#666", marginBottom: 4, fontWeight: 500, display: "flex", justifyContent: "space-between" }}>
+            <span>English (Sujato)</span>
+            {full?.english_chars ? <span style={{ color: "#999", fontWeight: 400 }}>{full.english_chars.toLocaleString()} chars</span> : null}
+          </div>
+          <div
+            lang="en"
+            className="parallel-full-scroll"
+            style={{
+              fontSize: 12, lineHeight: 1.8, color: "#333",
+              maxHeight: showFull ? 360 : undefined,
+              overflowY: showFull ? "auto" : undefined,
+              whiteSpace: "pre-wrap",
+            }}
+          >
+            {englishDisplay}
+          </div>
+        </div>
+      )}
+      <div style={{ marginTop: 8, fontSize: 12, display: "flex", gap: 12, flexWrap: "wrap" }}>
+        {!showFull && (
+          <Button
+            type="link"
+            size="small"
+            icon={<ExpandAltOutlined />}
+            onClick={() => setShowFull(true)}
+            loading={loadingFull}
+            style={{ padding: 0, height: "auto", color: "#5b8c6b" }}
+          >
+            展开完整对读
+          </Button>
+        )}
+        <Link
+          to={`/texts/${p.related_text_id}/read?juan=1`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: "#5b8c6b" }}
+        >
+          <BookOutlined style={{ marginRight: 4 }} />
+          在阅读器打开 →
+        </Link>
+      </div>
+    </div>
+  );
+}
 
 function CanonicalView({ textId }: { textId: number }) {
   const [activeKeys, setActiveKeys] = useState<string[]>([]);
@@ -99,41 +180,7 @@ function CanonicalView({ textId }: { textId: number }) {
                 )}
               </div>
             ),
-            children: (
-              <div style={{ paddingLeft: 8, borderLeft: "2px solid #e8e8e8" }}>
-                {p.pali_preview && (
-                  <div style={{ marginBottom: 10, padding: "8px 10px", background: "#f6fafd", borderLeft: "3px solid #5b8c6b", borderRadius: 4 }}>
-                    <div style={{ fontSize: 11, color: "#5b8c6b", marginBottom: 4, fontWeight: 500 }}>
-                      Pāli 原文
-                    </div>
-                    <div lang="pi" style={{ fontSize: 12, lineHeight: 1.8, color: "#333" }}>
-                      {p.pali_preview}…
-                    </div>
-                  </div>
-                )}
-                {p.english_preview && (
-                  <div style={{ marginBottom: 10, padding: "8px 10px", background: "#fafafa", borderRadius: 4 }}>
-                    <div style={{ fontSize: 11, color: "#666", marginBottom: 4, fontWeight: 500 }}>
-                      English (Sujato)
-                    </div>
-                    <div lang="en" style={{ fontSize: 12, lineHeight: 1.8, color: "#333" }}>
-                      {p.english_preview}…
-                    </div>
-                  </div>
-                )}
-                <div style={{ marginTop: 8, fontSize: 12 }}>
-                  <Link
-                    to={`/texts/${p.related_text_id}/read?juan=1`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ color: "#5b8c6b" }}
-                  >
-                    <BookOutlined style={{ marginRight: 4 }} />
-                    阅读全文 →
-                  </Link>
-                </div>
-              </div>
-            ),
+            children: <ParallelCardBody p={p} />,
           }))}
         />
         <div style={{ marginTop: 20, padding: 12, background: "#fafafa", borderRadius: 4, fontSize: 12, color: "#666" }}>
