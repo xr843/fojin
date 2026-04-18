@@ -92,6 +92,11 @@ export default function SourceCard({ source: s, searchQuery }: SourceCardProps) 
                 onClick={() =>
                   trackSourceClick(s.code, "distribution", { dist: d.code })
                 }
+                onAuxClick={(e) => {
+                  if (e.button === 1) {
+                    trackSourceClick(s.code, "distribution", { dist: d.code });
+                  }
+                }}
               >
                 <span className="source-dist-name">{d.name}</span>
                 <span className="source-dist-meta">
@@ -120,6 +125,9 @@ export default function SourceCard({ source: s, searchQuery }: SourceCardProps) 
             rel="noopener noreferrer"
             className="source-btn"
             onClick={() => trackSourceClick(s.code, "visit")}
+            onAuxClick={(e) => {
+              if (e.button === 1) trackSourceClick(s.code, "visit");
+            }}
           >
             <GlobalOutlined /> 访问网站
           </a>
@@ -133,6 +141,11 @@ export default function SourceCard({ source: s, searchQuery }: SourceCardProps) 
             onClick={() =>
               trackSourceClick(s.code, "search", { query: searchQuery.slice(0, 30) })
             }
+            onAuxClick={(e) => {
+              if (e.button === 1) {
+                trackSourceClick(s.code, "search", { query: searchQuery.slice(0, 30) });
+              }
+            }}
           >
             <LinkOutlined /> 搜索「{searchQuery}」
           </a>
