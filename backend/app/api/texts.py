@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_optional_user
 from app.core.exceptions import TextNotFoundError
 from app.database import get_db
-from app.models.text import Text
+from app.models.text import BuddhistText
 from app.models.user import ReadingHistory, User
 from app.schemas.text import JuanContentResponse, JuanLanguagesResponse, JuanListResponse, TextResponseBase
 from app.services.content import get_juan_content, get_juan_languages, get_juan_list
@@ -29,7 +29,7 @@ async def lookup_cbeta_ids(
     if not cbeta_ids:
         return {}
     result = await db.execute(
-        select(Text.cbeta_id, Text.id).where(Text.cbeta_id.in_(cbeta_ids))
+        select(BuddhistText.cbeta_id, BuddhistText.id).where(BuddhistText.cbeta_id.in_(cbeta_ids))
     )
     return dict(result.all())
 

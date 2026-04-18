@@ -242,7 +242,7 @@ async def get_entity_graph(
             select(KGEntity).where(
                 KGEntity.id.in_(node_ids),
                 func.coalesce(
-                    KGEntity.properties["is_hidden"].astext, "false"
+                    KGEntity.properties.op("->>")("is_hidden"), "false"
                 )
                 != "true",
             )

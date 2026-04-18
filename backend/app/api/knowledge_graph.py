@@ -1,8 +1,14 @@
-from fastapi import APIRouter, Depends, Query
+import hashlib
+import json
+
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import KGEntityNotFoundError
 from app.database import get_db
+
+KG_GEO_CACHE_TTL = 1800  # 30 min
+KG_LINEAGE_CACHE_TTL = 1800
 from app.schemas.knowledge_graph import (
     KGEntityDetailResponse,
     KGEntityResponse,
@@ -91,6 +97,7 @@ async def kg_stats(db: AsyncSession = Depends(get_db)):
 
 @router.get("/geo", response_model=KGGeoResponse)
 async def get_kg_geo_entities(
+    request: Request,
     entity_type: str | None = Query(None, description="Comma-separated entity types"),
     year_start: int | None = None,
     year_end: int | None = None,
@@ -112,17 +119,35 @@ async def get_kg_geo_entities(
     bounds = None
     if all(v is not None for v in (south, west, north, east)):
         bounds = (south, west, north, east)  # type: ignore[arg-type]
+
+    redis_client = getattr(request.app.state, "redis", None)
+    cache_key = None
+    if redis_client:
+        key_payload = json.dumps(
+            {"t": entity_types, "ys": year_start, "ye": year_end, "b": bounds, "l": limit},
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        cache_key = f"kg:geo:{hashlib.sha1(key_payload.encode()).hexdigest()}"  # nosec B324
+        cached = await redis_client.get(cache_key)
+        if cached:
+            return KGGeoResponse.model_validate_json(cached)
+
     entities, total = await get_geo_entities(
         db, entity_types, year_start, year_end, bounds, limit
     )
-    return KGGeoResponse(
+    response = KGGeoResponse(
         entities=[KGGeoEntity(**e) for e in entities],
         total=total,
     )
+    if redis_client and cache_key:
+        await redis_client.setex(cache_key, KG_GEO_CACHE_TTL, response.model_dump_json())
+    return response
 
 
 @router.get("/lineage-arcs", response_model=KGLineageArcsResponse)
 async def get_kg_lineage_arcs(
+    request: Request,
     school: str | None = None,
     year_start: int | None = None,
     year_end: int | None = None,
@@ -132,8 +157,24 @@ async def get_kg_lineage_arcs(
     """Get teacher-student lineage arcs with coordinates for map visualization.
 
     获取师承传法弧线及坐标，用于地图可视化。"""
+    redis_client = getattr(request.app.state, "redis", None)
+    cache_key = None
+    if redis_client:
+        key_payload = json.dumps(
+            {"s": school, "ys": year_start, "ye": year_end, "l": limit},
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        cache_key = f"kg:lineage:{hashlib.sha1(key_payload.encode()).hexdigest()}"  # nosec B324
+        cached = await redis_client.get(cache_key)
+        if cached:
+            return KGLineageArcsResponse.model_validate_json(cached)
+
     arcs, total = await get_lineage_arcs(db, school, year_start, year_end, limit)
-    return KGLineageArcsResponse(arcs=arcs, total=total)
+    response = KGLineageArcsResponse(arcs=arcs, total=total)
+    if redis_client and cache_key:
+        await redis_client.setex(cache_key, KG_LINEAGE_CACHE_TTL, response.model_dump_json())
+    return response
 
 
 @router.get("/texts/{text_id}/entities", response_model=list[KGEntityResponse])
