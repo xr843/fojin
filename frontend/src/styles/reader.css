@@ -361,6 +361,22 @@
   overflow: hidden;
 }
 
+/* Propagate flex height through antd Tabs so inner list can scroll */
+.reader-parallel-panel > .ant-tabs {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.reader-parallel-panel > .ant-tabs > .ant-tabs-content-holder,
+.reader-parallel-panel > .ant-tabs > .ant-tabs-content-holder > .ant-tabs-content,
+.reader-parallel-panel > .ant-tabs > .ant-tabs-content-holder > .ant-tabs-content > .ant-tabs-tabpane {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
 /* Ensure Collapse inside parallel panel doesn't overflow horizontally */
 .reader-parallel-panel .ant-collapse-header {
   align-items: flex-start !important;
