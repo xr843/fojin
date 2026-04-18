@@ -2,6 +2,7 @@ import hashlib
 import json
 
 from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import KGEntityNotFoundError
@@ -131,7 +132,7 @@ async def get_kg_geo_entities(
         cache_key = f"kg:geo:{hashlib.sha1(key_payload.encode()).hexdigest()}"  # nosec B324
         cached = await redis_client.get(cache_key)
         if cached:
-            return KGGeoResponse.model_validate_json(cached)
+            return Response(content=cached, media_type="application/json")
 
     entities, total = await get_geo_entities(
         db, entity_types, year_start, year_end, bounds, limit
@@ -140,9 +141,10 @@ async def get_kg_geo_entities(
         entities=[KGGeoEntity(**e) for e in entities],
         total=total,
     )
+    payload = response.model_dump_json()
     if redis_client and cache_key:
-        await redis_client.setex(cache_key, KG_GEO_CACHE_TTL, response.model_dump_json())
-    return response
+        await redis_client.setex(cache_key, KG_GEO_CACHE_TTL, payload)
+    return Response(content=payload, media_type="application/json")
 
 
 @router.get("/lineage-arcs", response_model=KGLineageArcsResponse)
@@ -168,13 +170,14 @@ async def get_kg_lineage_arcs(
         cache_key = f"kg:lineage:{hashlib.sha1(key_payload.encode()).hexdigest()}"  # nosec B324
         cached = await redis_client.get(cache_key)
         if cached:
-            return KGLineageArcsResponse.model_validate_json(cached)
+            return Response(content=cached, media_type="application/json")
 
     arcs, total = await get_lineage_arcs(db, school, year_start, year_end, limit)
     response = KGLineageArcsResponse(arcs=arcs, total=total)
+    payload = response.model_dump_json()
     if redis_client and cache_key:
-        await redis_client.setex(cache_key, KG_LINEAGE_CACHE_TTL, response.model_dump_json())
-    return response
+        await redis_client.setex(cache_key, KG_LINEAGE_CACHE_TTL, payload)
+    return Response(content=payload, media_type="application/json")
 
 
 @router.get("/texts/{text_id}/entities", response_model=list[KGEntityResponse])
