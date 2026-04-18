@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import Response
+from pydantic import TypeAdapter
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,14 +24,28 @@ from app.services.source import (
 
 router = APIRouter(prefix="/sources", tags=["sources"])
 
+SOURCES_LIST_CACHE_KEY = "sources:list:v1"
+SOURCES_LIST_CACHE_TTL = 1800  # 30 min; data only changes on manual admin edits
+
+_sources_list_adapter = TypeAdapter(list[DataSourceResponse])
+
 
 @router.get("", response_model=list[DataSourceResponse])
-async def list_sources(db: AsyncSession = Depends(get_db)):
+async def list_sources(request: Request, db: AsyncSession = Depends(get_db)):
     """List all data sources with metadata, license info, and language coverage.
 
     列出所有数据源及其元数据、许可协议和语言覆盖范围。"""
+    redis_client = getattr(request.app.state, "redis", None)
+    if redis_client:
+        cached = await redis_client.get(SOURCES_LIST_CACHE_KEY)
+        if cached:
+            return Response(content=cached, media_type="application/json")
+
     sources = await get_all_sources(db)
-    return sources
+    payload = _sources_list_adapter.dump_json(sources)
+    if redis_client:
+        await redis_client.setex(SOURCES_LIST_CACHE_KEY, SOURCES_LIST_CACHE_TTL, payload)
+    return Response(content=payload, media_type="application/json")
 
 
 @router.get("/stats")
