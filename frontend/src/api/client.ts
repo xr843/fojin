@@ -644,7 +644,12 @@ export async function getKGGeoEntities(params?: {
   east?: number;
   limit?: number;
 }): Promise<KGGeoResponse> {
-  const { data } = await api.get<KGGeoResponse>("/kg/geo", { params });
+  // Payload can exceed 16MB (65K+ entities); default 15s timeout trips on
+  // typical networks and leaves the map stuck on "暂无地理数据".
+  const { data } = await api.get<KGGeoResponse>("/kg/geo", {
+    params,
+    timeout: 120000,
+  });
   return data;
 }
 
