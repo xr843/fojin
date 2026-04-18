@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import { Empty, Input, Select, Spin } from "antd";
@@ -17,13 +18,92 @@ import "../styles/sources.css";
 
 type GroupBy = "region" | "field" | "lang";
 
+const VALID_GROUP_BY: readonly GroupBy[] = ["region", "field", "lang"] as const;
+
 export default function SourcesPage() {
-  const [search, setSearch] = useState("");
-  const [regionFilter, setRegionFilter] = useState("all");
-  const [langFilter, setLangFilter] = useState("all");
-  const [fieldFilter, setFieldFilter] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [groupBy, setGroupBy] = useState<GroupBy>("region");
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // URL params are the source of truth; defaults live here, not in state.
+  const search = searchParams.get("q") ?? "";
+  const regionFilter = searchParams.get("region") ?? "all";
+  const langFilter = searchParams.get("lang") ?? "all";
+  const fieldFilter = searchParams.get("field") ?? "all";
+  const searchQuery = searchParams.get("try") ?? "";
+  const rawGroupBy = searchParams.get("group") ?? "";
+  const groupBy: GroupBy = (VALID_GROUP_BY as readonly string[]).includes(rawGroupBy)
+    ? (rawGroupBy as GroupBy)
+    : "region";
+
+  const updateParam = useCallback(
+    (key: string, value: string, defaultValue: string) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (value === defaultValue || value === "") {
+            next.delete(key);
+          } else {
+            next.set(key, value);
+          }
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  const setSearch = useCallback((v: string) => updateParam("q", v, ""), [updateParam]);
+  const setRegionFilter = useCallback(
+    (v: string) => updateParam("region", v, "all"),
+    [updateParam],
+  );
+  const setLangFilter = useCallback(
+    (v: string) => updateParam("lang", v, "all"),
+    [updateParam],
+  );
+  const setFieldFilter = useCallback(
+    (v: string) => updateParam("field", v, "all"),
+    [updateParam],
+  );
+  const setSearchQuery = useCallback(
+    (v: string) => updateParam("try", v, ""),
+    [updateParam],
+  );
+  const setGroupBy = useCallback(
+    (v: GroupBy) => updateParam("group", v, "region"),
+    [updateParam],
+  );
+
+  // Local mirrors for free-text inputs so typing stays smooth; URL is written
+  // after a short debounce. useEffect resyncs when URL changes externally
+  // (back/forward, shared link landing).
+  const [searchInput, setSearchInput] = useState(search);
+  const [tryInput, setTryInput] = useState(searchQuery);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    setSearchInput(search);
+  }, [search]);
+
+  useEffect(() => {
+    setTryInput(searchQuery);
+  }, [searchQuery]);
+
+  const handleSearchInputChange = useCallback(
+    (v: string) => {
+      setSearchInput(v);
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = setTimeout(() => setSearch(v), 250);
+    },
+    [setSearch],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, []);
+
   const [showTop, setShowTop] = useState(false);
 
   useEffect(() => {
@@ -247,8 +327,8 @@ export default function SourcesPage() {
           prefix={<SearchOutlined style={{ color: "#9a8e7a" }} />}
           placeholder="搜索数据源名称、描述..."
           allowClear
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          value={searchInput}
+          onChange={(e) => handleSearchInputChange(e.target.value)}
           style={{ width: 260 }}
         />
         <Select
@@ -294,6 +374,8 @@ export default function SourcesPage() {
             placeholder="输入关键词试搜"
             size="small"
             allowClear
+            value={tryInput}
+            onChange={(e) => setTryInput(e.target.value)}
             onSearch={(v) => setSearchQuery(v)}
             style={{ width: 200 }}
           />
