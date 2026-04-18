@@ -370,7 +370,7 @@
 }
 .reader-parallel-panel > .ant-tabs > .ant-tabs-content-holder,
 .reader-parallel-panel > .ant-tabs > .ant-tabs-content-holder > .ant-tabs-content,
-.reader-parallel-panel > .ant-tabs > .ant-tabs-content-holder > .ant-tabs-content > .ant-tabs-tabpane {
+.reader-parallel-panel > .ant-tabs > .ant-tabs-content-holder > .ant-tabs-content > .ant-tabs-tabpane-active {
   display: flex;
   flex-direction: column;
   flex: 1;
