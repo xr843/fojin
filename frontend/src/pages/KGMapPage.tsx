@@ -140,8 +140,10 @@ export default function KGMapPage() {
         <GlobalOutlined />
         <h3>佛教地理</h3>
         {geoData && (
-          <Tooltip title={chineseOnly ? "中文名实体" : "所有实体"}>
-            <span className="kg-map-stats">
+          <Tooltip
+            title="人物：仅展示中国境内、来源为 Wikidata/城市匹配/省份匹配的高置信度坐标；师承推断与描述贪心匹配结果已剔除。寺院：来自高德 V3 全量抓取。"
+          >
+            <span className="kg-map-stats" style={{ cursor: "help" }}>
               <BarChartOutlined />
               <span>
                 {filteredEntities.length.toLocaleString()} 个标注
@@ -150,13 +152,6 @@ export default function KGMapPage() {
             </span>
           </Tooltip>
         )}
-        <Tooltip
-          title="人物数据仅展示中国境内、来源为 Wikidata/城市匹配/省份匹配的高置信度坐标；师承推断与描述贪心匹配的结果已剔除。寺院数据来自高德 V3 全量抓取。"
-        >
-          <span className="kg-map-stats" style={{ cursor: "help", opacity: 0.7 }}>
-            数据说明
-          </span>
-        </Tooltip>
       </div>
 
       {/* Toolbar */}
