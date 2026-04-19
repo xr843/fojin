@@ -57,7 +57,7 @@ function dedupeOverlap(chunks: ChunkContextItem[]): ChunkContextItem[] {
  * juan boundary and should show everything. Never touches the center
  * (highlighted) chunk.
  */
-const SENTENCE_END = /[。！？；][”’》」』）\)]*/g;
+const SENTENCE_END = /[。！？；][”’》」』）)]*/g;
 
 function snapSentenceBoundaries(
   chunks: ChunkContextItem[],
