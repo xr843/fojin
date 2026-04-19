@@ -50,6 +50,50 @@ function dedupeOverlap(chunks: ChunkContextItem[]): ChunkContextItem[] {
 }
 
 /**
+ * Snap the outer context edges to the nearest sentence boundary so the
+ * panel does not start or end mid-sentence. Only trims chunks[0] head
+ * and chunks[last] tail, and only when there is actually more text
+ * outside the window (has_more_before/after) — otherwise we are at the
+ * juan boundary and should show everything. Never touches the center
+ * (highlighted) chunk.
+ */
+const SENTENCE_END = /[。！？；][”’》」』）\)]*/g;
+
+function snapSentenceBoundaries(
+  chunks: ChunkContextItem[],
+  hasMoreBefore: boolean,
+  hasMoreAfter: boolean,
+): ChunkContextItem[] {
+  if (chunks.length === 0) return chunks;
+  const out = chunks.map((c) => ({ ...c }));
+
+  if (hasMoreBefore && !out[0].is_center) {
+    const text = out[0].chunk_text;
+    SENTENCE_END.lastIndex = 0;
+    const m = SENTENCE_END.exec(text);
+    if (m && m.index + m[0].length < text.length - 20) {
+      out[0].chunk_text = text.slice(m.index + m[0].length).replace(/^\s+/, '');
+    }
+  }
+
+  const lastIdx = out.length - 1;
+  if (hasMoreAfter && !out[lastIdx].is_center) {
+    const text = out[lastIdx].chunk_text;
+    let lastEnd = -1;
+    SENTENCE_END.lastIndex = 0;
+    let m;
+    while ((m = SENTENCE_END.exec(text)) !== null) {
+      lastEnd = m.index + m[0].length;
+    }
+    if (lastEnd > 20) {
+      out[lastIdx].chunk_text = text.slice(0, lastEnd).replace(/\s+$/, '');
+    }
+  }
+
+  return out;
+}
+
+/**
  * Inline citation panel: a sibling of the main chat column inside a flex
  * row, sized by the parent via an explicit width passed through the CSS
  * class (see .chat-citation-panel in global.css). Not an antd Drawer —
@@ -80,7 +124,14 @@ export default function CitationDrawer({ target, onClose }: Props) {
   });
 
   const dedupedChunks = useMemo(
-    () => (data ? dedupeOverlap(data.chunks) : []),
+    () =>
+      data
+        ? snapSentenceBoundaries(
+            dedupeOverlap(data.chunks),
+            data.has_more_before,
+            data.has_more_after,
+          )
+        : [],
     [data],
   );
 
