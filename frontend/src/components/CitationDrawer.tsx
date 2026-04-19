@@ -93,6 +93,36 @@ function snapSentenceBoundaries(
   return out;
 }
 
+
+interface CitationBlock {
+  key: string;
+  text: string;
+  isCenter: boolean;
+}
+
+/**
+ * Collapse consecutive non-center chunks into a single block so continuous
+ * text flows without the per-chunk padding/margin gap. At most 3 blocks
+ * are produced: leading context, the highlighted center, trailing context.
+ */
+function groupByCenter(chunks: ChunkContextItem[]): CitationBlock[] {
+  const out: CitationBlock[] = [];
+  for (const c of chunks) {
+    const last = out[out.length - 1];
+    if (last && last.isCenter === c.is_center) {
+      last.text += c.chunk_text;
+      last.key += "-" + String(c.chunk_index);
+    } else {
+      out.push({
+        key: String(c.chunk_index),
+        text: c.chunk_text,
+        isCenter: c.is_center,
+      });
+    }
+  }
+  return out;
+}
+
 /**
  * Inline citation panel: a sibling of the main chat column inside a flex
  * row, sized by the parent via an explicit width passed through the CSS
@@ -230,12 +260,12 @@ export default function CitationDrawer({ target, onClose }: Props) {
                           color: "var(--fj-ink)",
                         }}
                       >
-                        {dedupedChunks.map((c) => (
+                        {groupByCenter(dedupedChunks).map((b) => (
                           <div
-                            key={c.chunk_index}
-                            className={`chat-citation-chunk${c.is_center ? " chat-citation-chunk-center" : ""}`}
+                            key={b.key}
+                            className={`chat-citation-chunk${b.isCenter ? " chat-citation-chunk-center" : ""}`}
                           >
-                            {c.chunk_text}
+                            {b.text}
                           </div>
                         ))}
                       </div>
@@ -291,12 +321,12 @@ export default function CitationDrawer({ target, onClose }: Props) {
                     color: "var(--fj-ink)",
                   }}
                 >
-                  {dedupedChunks.map((c) => (
+                  {groupByCenter(dedupedChunks).map((b) => (
                     <div
-                      key={c.chunk_index}
-                      className={`chat-citation-chunk${c.is_center ? " chat-citation-chunk-center" : ""}`}
+                      key={b.key}
+                      className={`chat-citation-chunk${b.isCenter ? " chat-citation-chunk-center" : ""}`}
                     >
-                      {c.chunk_text}
+                      {b.text}
                     </div>
                   ))}
                 </div>
