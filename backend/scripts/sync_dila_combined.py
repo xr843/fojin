@@ -24,6 +24,41 @@ RDF_URL = "https://raw.githubusercontent.com/DILA-edu/lod/master/rdf/person.rdf"
 DILA_SEARCH = "https://authority.dila.edu.tw/person/search.php"
 HEADERS = {"User-Agent": "FoJinBot/1.0 (https://fojin.app)"}
 
+_ALIVE_KEYWORDS = re.compile(r"(現任|現爲|现任|现为|至今任|目前任|今任|現職|现职)")
+_DEATH_KEYWORDS = re.compile(
+    r"(圓寂|圆寂|示寂|逝世|辭世|辞世|去世|卒於|卒于|病逝|往生於|往生于|示滅|示灭|年卒|逝於)"
+)
+_POST_1920_YEAR = re.compile(r"(19[2-9][0-9]|20[0-2][0-9])年")
+_BORN_POST_1920_IN_DESC = re.compile(
+    r"(生於|出生於|生于|出生于)(19[2-9][0-9]|20[0-2][0-9])"
+)
+
+
+def is_contemporary(person: dict) -> bool:
+    """True when the person looks like a living modern figure we don't want in the Buddhist KG.
+
+    Rules:
+      - Known structured death_year → historical, keep.
+      - Structured birth_year >= 1920 without death_year → contemporary, skip.
+      - Description indicates 1920+ birth year and no death keyword → contemporary.
+      - Description has present-tense "現任/至今" + a 1920+ year reference and no death keyword → alive.
+    """
+    by = person.get("birth_year")
+    dy = person.get("death_year")
+    desc = person.get("desc") or ""
+
+    if dy:
+        return False
+    if _DEATH_KEYWORDS.search(desc):
+        return False
+    if by and str(by).isdigit() and int(by) >= 1920:
+        return True
+    if _BORN_POST_1920_IN_DESC.search(desc):
+        return True
+    if _ALIVE_KEYWORDS.search(desc) and _POST_1920_YEAR.search(desc):
+        return True
+    return False
+
 
 # ── Phase 1: RDF Bulk ──
 
@@ -182,7 +217,9 @@ async def sync_to_db(persons: dict):
         print(f"  Existing in DB: {len(existing)}")
 
         new = {k: v for k, v in persons.items() if k not in existing}
-        print(f"  New to import: {len(new)}")
+        skipped_contemporary = sum(1 for v in new.values() if is_contemporary(v))
+        new = {k: v for k, v in new.items() if not is_contemporary(v)}
+        print(f"  New to import: {len(new)} (skipped {skipped_contemporary} contemporary/living)")
 
         if not new:
             print("  Already up to date!")
