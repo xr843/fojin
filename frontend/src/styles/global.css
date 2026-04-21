@@ -156,6 +156,30 @@ em {
   font-weight: 600;
   margin: 0.3em 0 0.1em;
 }
+.chat-markdown table {
+  border-collapse: collapse;
+  margin: 0.5em 0;
+  width: 100%;
+  font-size: 0.95em;
+  display: block;
+  overflow-x: auto;
+}
+.chat-markdown thead {
+  background: rgba(217, 208, 193, 0.35);
+}
+.chat-markdown th, .chat-markdown td {
+  border: 1px solid rgba(217, 208, 193, 0.7);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+  line-height: 1.55;
+}
+.chat-markdown th {
+  font-weight: 600;
+}
+.chat-markdown tbody tr:nth-child(even) {
+  background: rgba(0, 0, 0, 0.02);
+}
 
 /* ========== Chat Sidebar Mobile ========== */
 @media (max-width: 768px) {
