@@ -31,7 +31,7 @@
     "html2canvas-pro": "^2.0.2",
     "i18next": "^25.8.18",
     "i18next-browser-languagedetector": "^8.2.1",
-    "i18next-http-backend": "^3.0.2",
+    "i18next-http-backend": "^3.0.5",
     "maplibre-gl": "^5.22.0",
     "opencc-js": "^1.0.5",
     "openseadragon": "^4.1.1",
