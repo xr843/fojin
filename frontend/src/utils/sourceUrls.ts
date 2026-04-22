@@ -20,21 +20,7 @@ export function buildSearchUrl(code: string, query: string): string | null {
 }
 
 /**
- * 为指定数据源和查询词生成搜索 URL，如果没有已知模板则回退到 Google site: 搜索
- */
-export function buildSearchUrlWithFallback(code: string, baseUrl: string | null, query: string): string | null {
-  const url = buildSearchUrl(code, query);
-  if (url) return url;
-  if (baseUrl) {
-    const domain = baseUrl.replace(/https?:\/\//, "").replace(/\/.*/, "");
-    const q = encodeURIComponent(query);
-    return `https://www.google.com/search?q=site:${domain}+${q}`;
-  }
-  return null;
-}
-
-/**
- * 判断数据源是否有直接搜索 URL（非 Google 回退）
+ * 判断数据源是否有直接搜索 URL（已注册的站内搜索模板）
  */
 export function hasDirectSearchUrl(code: string): boolean {
   return code in SEARCH_TEMPLATES;

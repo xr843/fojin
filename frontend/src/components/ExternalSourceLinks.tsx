@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Typography } from "antd";
 import { LinkOutlined, DownOutlined, UpOutlined } from "@ant-design/icons";
 import type { DataSource } from "../api/client";
-import { buildSearchUrlWithFallback } from "../utils/sourceUrls";
+import { buildSearchUrl } from "../utils/sourceUrls";
 
 interface ExternalSourceLinksProps {
   sources: DataSource[];
@@ -16,10 +16,12 @@ export default function ExternalSourceLinks({ sources, query }: ExternalSourceLi
 
   const externalSources = sources.filter((s) => s.access_type === "external" && s.base_url);
 
-  // Group by region
+  // Group by region. Only include sources with a registered direct-search
+  // template; the previous Google site: fallback returned 0 results for
+  // un-indexed mirror sites and misled users.
   const grouped: Record<string, Array<{ source: DataSource; url: string }>> = {};
   for (const s of externalSources) {
-    const url = buildSearchUrlWithFallback(s.code, s.base_url, query);
+    const url = buildSearchUrl(s.code, query);
     if (!url) continue;
     const region = s.region || "其他";
     if (!grouped[region]) grouped[region] = [];

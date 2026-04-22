@@ -5,7 +5,7 @@ import { Helmet } from "react-helmet-async";
 import { Empty, Input, Select, Skeleton } from "antd";
 import { SearchOutlined, ThunderboltOutlined, VerticalAlignTopOutlined } from "@ant-design/icons";
 import { getSources, type DataSource } from "../api/client";
-import { getLangName, normalizeLangCode } from "../utils/sourceUrls";
+import { getLangName, hasDirectSearchUrl, normalizeLangCode } from "../utils/sourceUrls";
 import SourceCard from "./sources/SourceCard";
 import SuggestSourceForm from "./sources/SuggestSourceForm";
 import {
@@ -270,7 +270,10 @@ export default function SourcesPage() {
     return {
       local: all.filter((s) => s.has_local_fulltext).length,
       remote: all.filter((s) => s.has_remote_fulltext).length,
-      directSearch: all.filter((s) => s.supports_search).length,
+      // Count sources with a registered direct-search template, not the DB
+      // `supports_search` flag — the flag means "site has a search page" but
+      // doesn't guarantee we know the query URL template.
+      directSearch: all.filter((s) => hasDirectSearchUrl(s.code)).length,
       iiif: all.filter((s) => s.supports_iiif).length,
       api: all.filter((s) => s.supports_api).length,
     };

@@ -8,7 +8,7 @@ import {
   SearchOutlined,
 } from "@ant-design/icons";
 import type { DataSource } from "../../api/client";
-import { buildSearchUrlWithFallback, getLangName } from "../../utils/sourceUrls";
+import { buildSearchUrl, getLangName } from "../../utils/sourceUrls";
 import { LANG_ORDER, getChannelLabel, trackSourceClick } from "./constants";
 
 interface SourceCardProps {
@@ -32,9 +32,11 @@ export default function SourceCard({ source: s, searchQuery }: SourceCardProps) 
   });
 
   const distributions = (s.distributions || []).filter((d) => d.is_active).slice(0, 5);
-  const searchUrl = searchQuery
-    ? buildSearchUrlWithFallback(s.code, s.base_url, searchQuery)
-    : null;
+  // Only offer the "搜索" button when we have a registered direct-search template
+  // for this source. The previous Google site: fallback produced empty results
+  // for download mirrors and un-indexed sites (e.g. archive.cbetaonline.cn),
+  // misleading users. If a source lacks a template, the button is hidden.
+  const searchUrl = searchQuery ? buildSearchUrl(s.code, searchQuery) : null;
 
   return (
     <div className="source-card">
