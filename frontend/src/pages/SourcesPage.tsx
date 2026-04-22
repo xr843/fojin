@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
-import { Empty, Input, Select, Spin } from "antd";
-import { SearchOutlined, VerticalAlignTopOutlined } from "@ant-design/icons";
+import { Empty, Input, Select, Skeleton } from "antd";
+import { SearchOutlined, ThunderboltOutlined, VerticalAlignTopOutlined } from "@ant-design/icons";
 import { getSources, type DataSource } from "../api/client";
 import { getLangName, normalizeLangCode } from "../utils/sourceUrls";
 import SourceCard from "./sources/SourceCard";
@@ -70,7 +70,13 @@ export default function SourcesPage() {
     [updateParam],
   );
   const setGroupBy = useCallback(
-    (v: GroupBy) => updateParam("group", v, "region"),
+    (v: GroupBy) => {
+      updateParam("group", v, "region");
+      // Reset expansion state: group names can collide across groupBy modes
+      // (e.g. "其他" exists in all three, "国际" is both a region and could be
+      // a bucket label), so a key like "其他" would carry over incorrectly.
+      setExpandedGroups({});
+    },
     [updateParam],
   );
 
@@ -79,7 +85,12 @@ export default function SourcesPage() {
   // (back/forward, shared link landing).
   const [searchInput, setSearchInput] = useState(search);
   const [tryInput, setTryInput] = useState(searchQuery);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const GROUP_COLLAPSE_LIMIT = 12;
+  const toggleGroup = useCallback((name: string) => {
+    setExpandedGroups((prev) => ({ ...prev, [name]: !prev[name] }));
+  }, []);
 
   useEffect(() => {
     setSearchInput(search);
@@ -267,11 +278,24 @@ export default function SourcesPage() {
 
   if (isLoading) {
     return (
-      <div style={{ textAlign: "center", padding: 80 }}>
-        <Spin size="large" />
+      <div className="sources-page">
+        <div className="sources-header">
+          <Skeleton.Input active size="large" style={{ width: 180, marginBottom: 12 }} />
+          <br />
+          <Skeleton.Input active size="small" style={{ width: 520 }} />
+        </div>
+        <div className="sources-skeleton-grid">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="source-card">
+              <Skeleton active paragraph={{ rows: 2 }} title />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
+
+  const total = sources?.length || 0;
 
   return (
     <div className="sources-page">
@@ -279,7 +303,11 @@ export default function SourcesPage() {
         <title>数据源导航 | 佛津</title>
         <meta
           name="description"
-          content={`聚合全球 ${sources?.length || 40}+ 佛教数字资源，覆盖图书馆、大学、研究机构、数字项目等。`}
+          content={
+            total > 0
+              ? `聚合全球 ${total} 个佛教数字资源，覆盖图书馆、大学、研究机构、数字项目等。`
+              : "聚合全球佛教数字资源，覆盖图书馆、大学、研究机构、数字项目等。"
+          }
         />
         <link rel="canonical" href="https://fojin.app/sources" />
         <link rel="alternate" hrefLang="x-default" href="https://fojin.app/sources" />
@@ -288,9 +316,30 @@ export default function SourcesPage() {
       <div className="sources-header">
         <h1 className="sources-title">数据源导航</h1>
         <p className="sources-desc">
-          聚合全球 {sources?.length || 0} 个佛教数字资源：
+          聚合全球 {total} 个佛教数字资源：
           {counters.directSearch} 可搜索 · {counters.local} 已入库全文 · {counters.remote} 外站全文 · {counters.iiif} 影像 · {counters.api} API
         </p>
+      </div>
+
+      <div className="sources-hero-search">
+        <div className="sources-hero-search-head">
+          <ThunderboltOutlined className="sources-hero-search-icon" />
+          <div className="sources-hero-search-copy">
+            <div className="sources-hero-search-title">一次输入，直达 {counters.directSearch} 个可搜索数据源</div>
+            <div className="sources-hero-search-sub">
+              敲入一个关键词，下方每张卡片会生成对应数据源的站内搜索直链
+            </div>
+          </div>
+        </div>
+        <Input.Search
+          placeholder="例：般若、涅槃、慈悲、阿含"
+          size="large"
+          enterButton="生成直达"
+          allowClear
+          value={tryInput}
+          onChange={(e) => setTryInput(e.target.value)}
+          onSearch={(v) => setSearchQuery(v)}
+        />
       </div>
 
       <div className="sources-trust">
@@ -368,42 +417,51 @@ export default function SourcesPage() {
             { value: "lang", label: "按语种" },
           ]}
         />
-
-        <div className="sources-try-search">
-          <Input.Search
-            placeholder="输入关键词试搜"
-            size="small"
-            allowClear
-            value={tryInput}
-            onChange={(e) => setTryInput(e.target.value)}
-            onSearch={(v) => setSearchQuery(v)}
-            style={{ width: 200 }}
-          />
-        </div>
       </div>
 
       <div className="sources-stats-bar">
-        当前显示 <strong>{filtered.length}</strong> / {sources?.length || 0} 个数据源
+        当前显示 <strong>{filtered.length}</strong> / {total} 个数据源
         {groupBy !== "region" && ` · ${grouped.length} 个分组`}
+        {groupBy !== "region" && (
+          <span className="sources-stats-hint">（一个数据源可归属多个{groupBy === "field" ? "研究领域" : "语种"}）</span>
+        )}
       </div>
 
       {filtered.length === 0 ? (
         <Empty description="无匹配数据源" style={{ marginTop: 60 }} />
       ) : (
         <div className="sources-groups">
-          {grouped.map(([groupName, items]) => (
-            <div key={groupName} className="sources-group">
-              <div className="sources-group-header">
-                <span className="sources-group-name">{groupName}</span>
-                <span className="sources-group-count">{items.length}</span>
+          {grouped.map(([groupName, items]) => {
+            const isExpanded = expandedGroups[groupName] ?? false;
+            const shouldCollapse = items.length > GROUP_COLLAPSE_LIMIT;
+            const visible =
+              shouldCollapse && !isExpanded ? items.slice(0, GROUP_COLLAPSE_LIMIT) : items;
+            return (
+              <div key={groupName} className="sources-group">
+                <div className="sources-group-header">
+                  <span className="sources-group-name">{groupName}</span>
+                  <span className="sources-group-count">{items.length}</span>
+                </div>
+                <div className="sources-grid">
+                  {visible.map((s) => (
+                    <SourceCard key={s.code} source={s} searchQuery={searchQuery} />
+                  ))}
+                </div>
+                {shouldCollapse && (
+                  <button
+                    type="button"
+                    className="sources-group-toggle"
+                    onClick={() => toggleGroup(groupName)}
+                    aria-expanded={isExpanded}
+                  >
+                    {isExpanded
+                      ? `收起 ${groupName}`
+                      : `展开全部 ${items.length} 个 (还有 ${items.length - GROUP_COLLAPSE_LIMIT} 个)`}
+                  </button>
+                )}
               </div>
-              <div className="sources-grid">
-                {items.map((s) => (
-                  <SourceCard key={s.code} source={s} searchQuery={searchQuery} />
-                ))}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
