@@ -348,15 +348,16 @@ export default function SourcesPage() {
               // on the hero — users don't see the per-card direct links and
               // think the button did nothing.
               requestAnimationFrame(() => {
+                const prefersReduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
                 document
                   .querySelector(".sources-toolbar")
-                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  ?.scrollIntoView({ behavior: prefersReduced ? "auto" : "smooth", block: "start" });
               });
             }
           }}
         />
         {searchQuery && (
-          <div className="sources-hero-search-result">
+          <div className="sources-hero-search-result" role="status" aria-live="polite">
             已为 {counters.directSearch} 个数据源生成「{searchQuery}」直达链接 —— 下滑查看每张卡片的「搜索」按钮
           </div>
         )}
