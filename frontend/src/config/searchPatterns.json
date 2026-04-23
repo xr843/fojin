@@ -151,5 +151,7 @@
   "utokyo-tobunken-nlc": "http://read.nlc.cn/allSearch/searchList?searchType=6&keyword={q}",
   "utokyo-shuanghong": "https://shuanghong.ioc.u-tokyo.ac.jp/search?q={q}",
   "russian-nel-guji": "https://rusneb.ru/search/?q={q}",
-  "hdcg-wenyuan": "https://wenyuan.aliyun.com/hdcg/search?q={q}"
+  "hdcg-wenyuan": "https://wenyuan.aliyun.com/hdcg/search?q={q}",
+  "dila-authority": "https://authority.dila.edu.tw/person/search.php?per={q}&isLikeSearch=1",
+  "dila-glossaries": "https://glossaries.dila.edu.tw/search?locale=zh-TW&term={q}"
 }
