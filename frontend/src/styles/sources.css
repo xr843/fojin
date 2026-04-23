@@ -71,6 +71,17 @@
   line-height: 1.5;
 }
 
+.sources-hero-search-result {
+  margin-top: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--fj-ink);
+  background: rgba(24, 144, 255, 0.08);
+  border-left: 3px solid #1890ff;
+  border-radius: 4px;
+  line-height: 1.5;
+}
+
 @media (max-width: 520px) {
   .sources-hero-search {
     padding: 14px 14px;
