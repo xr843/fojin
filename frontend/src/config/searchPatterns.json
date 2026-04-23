@@ -153,5 +153,7 @@
   "russian-nel-guji": "https://rusneb.ru/search/?q={q}",
   "hdcg-wenyuan": "https://wenyuan.aliyun.com/hdcg/search?q={q}",
   "dila-authority": "https://authority.dila.edu.tw/person/search.php?per={q}&isLikeSearch=1",
-  "dila-glossaries": "https://glossaries.dila.edu.tw/search?locale=zh-TW&term={q}"
+  "dila-glossaries": "https://glossaries.dila.edu.tw/search?locale=zh-TW&term={q}",
+  "vri": "https://search.tipitaka.org/solr/web?q={q}",
+  "vri-tipitaka": "https://www.vridhamma.org/search/site/{q}"
 }
