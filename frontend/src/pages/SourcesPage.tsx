@@ -341,8 +341,25 @@ export default function SourcesPage() {
           allowClear
           value={tryInput}
           onChange={(e) => setTryInput(e.target.value)}
-          onSearch={(v) => setSearchQuery(v)}
+          onSearch={(v) => {
+            setSearchQuery(v);
+            if (v) {
+              // Without this the URL updates silently but the viewport stays
+              // on the hero — users don't see the per-card direct links and
+              // think the button did nothing.
+              requestAnimationFrame(() => {
+                document
+                  .querySelector(".sources-toolbar")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
+              });
+            }
+          }}
         />
+        {searchQuery && (
+          <div className="sources-hero-search-result">
+            已为 {counters.directSearch} 个数据源生成「{searchQuery}」直达链接 —— 下滑查看每张卡片的「搜索」按钮
+          </div>
+        )}
       </div>
 
       <div className="sources-trust">
