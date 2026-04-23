@@ -320,7 +320,7 @@ export default function SourcesPage() {
         <h1 className="sources-title">数据源导航</h1>
         <p className="sources-desc">
           聚合全球 {total} 个佛教数字资源：
-          {counters.directSearch} 可搜索 · {counters.local} 已入库全文 · {counters.remote} 外站全文 · {counters.iiif} 影像 · {counters.api} API
+          {counters.directSearch} 可一键直达 · {counters.local} 已入库全文 · {counters.remote} 外站全文 · {counters.iiif} 影像 · {counters.api} API
         </p>
       </div>
 
@@ -328,9 +328,9 @@ export default function SourcesPage() {
         <div className="sources-hero-search-head">
           <ThunderboltOutlined className="sources-hero-search-icon" />
           <div className="sources-hero-search-copy">
-            <div className="sources-hero-search-title">一次输入，直达 {counters.directSearch} 个可搜索数据源</div>
+            <div className="sources-hero-search-title">一次输入，一键直达 {counters.directSearch} 个数据源</div>
             <div className="sources-hero-search-sub">
-              敲入一个关键词，下方每张卡片会生成对应数据源的站内搜索直链
+              敲入一个关键词，下方每张已接入模板的卡片会生成对应数据源的站内搜索直链
             </div>
           </div>
         </div>
