@@ -191,5 +191,7 @@
   "chat.hot_question_category_plain_translation": "白話翻譯",
   "chat.hot_question_category_scripture_exegesis": "經文解讀",
   "chat.hot_question_category_comparison": "對比辨析",
-  "chat.hot_question_category_buddhist_history": "佛教史話"
+  "chat.hot_question_category_buddhist_history": "佛教史話",
+  "chat.collapse_sidebar": "收起側欄",
+  "chat.expand_sidebar": "展開側欄"
 }
