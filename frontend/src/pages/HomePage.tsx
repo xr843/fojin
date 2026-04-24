@@ -31,7 +31,7 @@ export default function HomePage() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { data: stats } = useQuery({ queryKey: ["stats"], queryFn: getStats });
-  const { data: sources } = useQuery({ queryKey: ["sources"], queryFn: getSources });
+  const { data: sources } = useQuery({ queryKey: ["sources"], queryFn: getSources, enabled: sourceOpen });
   const { data: filters } = useQuery({ queryKey: ["filters"], queryFn: getFilters });
 
   const handleSearch = (q?: string) => {
@@ -52,7 +52,7 @@ export default function HomePage() {
   const langAllCount = filters?.languages_all
     ? new Set(filters.languages_all.map(getLangName)).size
     : 0;
-  const srcCount = sources?.length || 0;
+  const srcCount = stats?.source_count ?? 0;
   const srcLabel = selectedSources.size > 0
     ? t("home.selected_sources", { count: selectedSources.size })
     : t("home.all_sources");

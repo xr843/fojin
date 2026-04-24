@@ -2,12 +2,13 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_optional_user
 from app.core.exceptions import TextNotFoundError
 from app.database import get_db
+from app.models.source import DataSource
 from app.models.text import BuddhistText
 from app.models.user import ReadingHistory, User
 from app.schemas.text import JuanContentResponse, JuanLanguagesResponse, JuanListResponse, TextResponseBase
@@ -133,11 +134,16 @@ async def read_juan(
 
 @router.get("/stats")
 async def stats(db: AsyncSession = Depends(get_db)):
-    """Get platform-wide statistics (total text count).
+    """Get platform-wide statistics (total text count + active source count).
 
     获取平台统计数据。"""
     count = await get_text_count(db)
-    return {"total_texts": count}
+    source_count = (
+        await db.execute(
+            select(func.count(DataSource.id)).where(DataSource.is_active.is_(True))
+        )
+    ).scalar() or 0
+    return {"total_texts": count, "source_count": int(source_count)}
 
 
 @router.get("/texts/{text_id}/juans/{juan_num}/similar", response_model=SimilarPassagesResponse)

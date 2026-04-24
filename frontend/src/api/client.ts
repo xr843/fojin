@@ -218,6 +218,7 @@ export interface Filters {
 
 export interface Stats {
   total_texts: number;
+  source_count: number;
 }
 
 export interface TextIdentifierInfo {
