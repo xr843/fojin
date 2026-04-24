@@ -96,5 +96,6 @@
   "dila-authority": "https://authority.dila.edu.tw/person/search.php?per={q}&isLikeSearch=1",
   "dila-glossaries": "https://glossaries.dila.edu.tw/search?locale=zh-TW&term={q}",
   "vri": "https://search.tipitaka.org/solr/web?q={q}",
-  "vri-tipitaka": "https://www.vridhamma.org/search/site/{q}"
+  "vri-tipitaka": "https://www.vridhamma.org/search/site/{q}",
+  "dhammatalks": "https://www.dhammatalks.org/search/?q={q}"
 }
