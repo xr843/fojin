@@ -6,12 +6,16 @@ from pydantic import BaseModel, Field
 class AdminOverview(BaseModel):
     total_users: int
     new_users_today: int
+    new_users_yesterday: int
     total_sessions: int
     new_sessions_today: int
+    new_sessions_yesterday: int
     total_messages: int
     new_messages_today: int
+    new_messages_yesterday: int
     pending_suggestions: int
     pending_annotations: int
+    last_updated: datetime
 
 
 class DailyCount(BaseModel):

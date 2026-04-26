@@ -22,7 +22,10 @@ async def stats_overview(
     _user=Depends(require_role("admin")),
     db: AsyncSession = Depends(get_db),
 ):
-    return await get_overview(db)
+    from app.main import app
+
+    redis = getattr(app.state, "redis", None)
+    return await get_overview(db, redis)
 
 
 @router.get("/stats/trends", response_model=AdminTrends)
