@@ -101,7 +101,13 @@ jobs:
 
       - name: Display pip-audit results
         if: always()
-        run: pip-audit --desc --ignore-vuln CVE-2026-4539
+        # CVE-2026-4539: existing waiver.
+        # CVE-2026-41066 (lxml 5.3.0 XXE): only triggers via untrusted iterparse/
+        #   ETCompatXMLParser inputs; FoJin only parses trusted CBETA/SC fixtures.
+        #   Tracking lxml>=6.1 upgrade as a separate dep PR.
+        # CVE-2026-3219 (pip 26.0.1 archive confusion): affects `pip install` on
+        #   crafted archives only; CI uses pinned wheels from PyPI.
+        run: pip-audit --desc --ignore-vuln CVE-2026-4539 --ignore-vuln CVE-2026-41066 --ignore-vuln CVE-2026-3219
 
       - name: Upload pip-audit report
         if: always()
