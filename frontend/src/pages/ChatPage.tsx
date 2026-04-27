@@ -15,6 +15,8 @@ import {
   PlusOutlined,
   SettingOutlined,
   MenuOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
   DownloadOutlined,
   StopOutlined,
   CopyOutlined,
@@ -251,6 +253,17 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessageItem[]>([]);
   const [sending, setSending] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("fojin.chat.sidebarCollapsed") === "1";
+  });
+  const toggleSidebarCollapsed = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try { window.localStorage.setItem("fojin.chat.sidebarCollapsed", next ? "1" : "0"); } catch { /* ignore */ }
+      return next;
+    });
+  };
   const [sessionFilter, setSessionFilter] = useState("");
   const tabIndexRef = useRef(-1);
   const [hasOlderMessages, setHasOlderMessages] = useState(false);
@@ -740,15 +753,30 @@ export default function ChatPage() {
         )}
 
         {/* Sidebar (desktop, logged in only) */}
-        {user && <div style={{ width: 220, flexShrink: 0, display: "flex", flexDirection: "column", gap: 8 }}
-             className="chat-sidebar">
-          <Button icon={<PlusOutlined />} block onClick={handleNewChat}>{t("chat.new_chat")}</Button>
-          <Button icon={<SettingOutlined />} block type="text" size="small"
+        {user && <div style={{ width: sidebarCollapsed ? 48 : 220, flexShrink: 0, display: "flex", flexDirection: "column", gap: 8, transition: "width 0.18s ease" }}
+             className="chat-sidebar"
+             data-collapsed={sidebarCollapsed || undefined}>
+          <Tooltip title={sidebarCollapsed ? t("chat.expand_sidebar") : t("chat.collapse_sidebar")} placement="right">
+            <Button
+              type="text"
+              size="small"
+              icon={sidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+              onClick={toggleSidebarCollapsed}
+              aria-label={sidebarCollapsed ? t("chat.expand_sidebar") : t("chat.collapse_sidebar")}
+              style={{ alignSelf: sidebarCollapsed ? "center" : "flex-end", color: "var(--fj-ink-muted)" }}
+            />
+          </Tooltip>
+          <Tooltip title={sidebarCollapsed ? t("chat.new_chat") : ""} placement="right">
+            <Button icon={<PlusOutlined />} block={!sidebarCollapsed} onClick={handleNewChat} aria-label={t("chat.new_chat")}>
+              {!sidebarCollapsed && t("chat.new_chat")}
+            </Button>
+          </Tooltip>
+          {!sidebarCollapsed && <Button icon={<SettingOutlined />} block type="text" size="small"
             style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
             onClick={() => navigate("/profile?tab=apikey")}>
             {keyStatus?.has_api_key ? `${t("chat.key_configured")} (${keyStatus.provider})` : t("chat.configure_key")}
-          </Button>
-          {sessions && sessions.length > 5 && (
+          </Button>}
+          {!sidebarCollapsed && sessions && sessions.length > 5 && (
             <Input
               placeholder="搜索会话..."
               size="small"
@@ -758,7 +786,7 @@ export default function ChatPage() {
               style={{ marginTop: 4, fontSize: 12 }}
             />
           )}
-          <div style={{ flex: 1, overflow: "auto", marginTop: 8 }}>
+          {!sidebarCollapsed && <div style={{ flex: 1, overflow: "auto", marginTop: 8 }}>
             {groupedSessions.map((group) => (
               <div key={group.label}>
                 <div style={{ fontSize: 11, color: "var(--fj-ink-muted)", opacity: 0.6, padding: "6px 12px 2px", fontWeight: 500 }}>
@@ -790,7 +818,7 @@ export default function ChatPage() {
                 ))}
               </div>
             ))}
-          </div>
+          </div>}
         </div>}
 
         {/* Chat area */}

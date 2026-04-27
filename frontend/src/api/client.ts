@@ -218,6 +218,7 @@ export interface Filters {
 
 export interface Stats {
   total_texts: number;
+  source_count: number;
 }
 
 export interface TextIdentifierInfo {
@@ -926,12 +927,16 @@ export async function getPendingFeedbackCount(): Promise<number> {
 export interface AdminOverview {
   total_users: number;
   new_users_today: number;
+  new_users_yesterday: number;
   total_sessions: number;
   new_sessions_today: number;
+  new_sessions_yesterday: number;
   total_messages: number;
   new_messages_today: number;
+  new_messages_yesterday: number;
   pending_suggestions: number;
   pending_annotations: number;
+  last_updated: string;
 }
 
 export interface DailyCount {

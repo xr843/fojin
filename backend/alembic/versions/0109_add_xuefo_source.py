@@ -21,7 +21,7 @@ def upgrade() -> None:
                                   supports_search, sort_order, is_active)
         VALUES ('xuefo', '学点佛', 'Xue.fo', 'https://xue.fo/',
                 '佛学资源导航网站，聚合全球40余个佛教数字资源，涵盖大藏经、佛学辞典、电子书、影音、论文库、OCR工具等，覆盖汉传、藏传、南传、梵文多传统',
-                'open', '中国', 'zh,lzh', 'dh',
+                'open', '中国大陆', 'zh,lzh', 'dh',
                 false, 0, true)
         ON CONFLICT (code) DO NOTHING
         """)
