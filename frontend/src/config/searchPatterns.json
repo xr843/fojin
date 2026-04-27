@@ -97,5 +97,6 @@
   "dila-glossaries": "https://glossaries.dila.edu.tw/search?locale=zh-TW&term={q}",
   "vri": "https://search.tipitaka.org/solr/web?q={q}",
   "vri-tipitaka": "https://www.vridhamma.org/search/site/{q}",
-  "dhammatalks": "https://www.dhammatalks.org/search/?q={q}"
+  "dhammatalks": "https://www.dhammatalks.org/search/?q={q}",
+  "audiodharma": "https://www.audiodharma.org/playables/search?query={q}"
 }
