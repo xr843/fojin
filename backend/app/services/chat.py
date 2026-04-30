@@ -55,7 +55,7 @@ PROVIDER_URLS = {
 # Provider → default model
 PROVIDER_DEFAULT_MODELS = {
     # 国内
-    "deepseek": "deepseek-chat",
+    "deepseek": "deepseek-v4-flash",
     "dashscope": "qwen-plus",
     "zhipu": "glm-4-flash",
     "moonshot": "moonshot-v1-8k",
