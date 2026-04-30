@@ -502,6 +502,32 @@
   font-size: 16px;
 }
 
+/* ---------- 过滤切换 chip ---------- */
+.sources-toggle-chip {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 13px;
+  color: #595959;
+  cursor: pointer;
+  transition: all 0.18s;
+  white-space: nowrap;
+}
+
+.sources-toggle-chip:hover {
+  border-color: var(--fj-gold);
+  color: var(--fj-gold);
+}
+
+.sources-toggle-chip.is-active {
+  background: var(--fj-gold);
+  border-color: var(--fj-gold);
+  color: #fff;
+  font-weight: 500;
+}
+
 /* ---------- 响应式 ---------- */
 @media (max-width: 768px) {
   .sources-toolbar {

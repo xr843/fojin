@@ -28,6 +28,7 @@ export default function SourcesPage() {
   const regionFilter = searchParams.get("region") ?? "all";
   const langFilter = searchParams.get("lang") ?? "all";
   const fieldFilter = searchParams.get("field") ?? "all";
+  const fulltextOnly = searchParams.get("fulltext") === "1";
   const searchQuery = searchParams.get("try") ?? "";
   const rawGroupBy = searchParams.get("group") ?? "";
   const groupBy: GroupBy = (VALID_GROUP_BY as readonly string[]).includes(rawGroupBy)
@@ -63,6 +64,10 @@ export default function SourcesPage() {
   );
   const setFieldFilter = useCallback(
     (v: string) => updateParam("field", v, "all"),
+    [updateParam],
+  );
+  const setFulltextOnly = useCallback(
+    (v: boolean) => updateParam("fulltext", v ? "1" : "", ""),
     [updateParam],
   );
   const setSearchQuery = useCallback(
@@ -201,9 +206,12 @@ export default function SourcesPage() {
         const fields = (s.research_fields || "").split(",").map((f) => f.trim());
         if (!fields.includes(fieldFilter)) return false;
       }
+      if (fulltextOnly && !s.has_local_fulltext && !s.has_remote_fulltext) {
+        return false;
+      }
       return true;
     });
-  }, [sources, search, regionFilter, langFilter, fieldFilter]);
+  }, [sources, search, regionFilter, langFilter, fieldFilter, fulltextOnly]);
 
   const grouped = useMemo(() => {
     const map: Record<string, DataSource[]> = {};
@@ -428,6 +436,14 @@ export default function SourcesPage() {
             ...researchFields.map((f) => ({ value: f, label: FIELD_NAMES[f] || f })),
           ]}
         />
+        <button
+          type="button"
+          className={`sources-toggle-chip${fulltextOnly ? " is-active" : ""}`}
+          onClick={() => setFulltextOnly(!fulltextOnly)}
+          title="只显示已入库或外站可读全文的源（隐藏纯链接目录）"
+        >
+          {fulltextOnly ? "✓ " : ""}仅看全文 ({counters.local + counters.remote})
+        </button>
         <Select
           value={groupBy}
           onChange={setGroupBy}
