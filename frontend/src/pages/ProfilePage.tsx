@@ -9,6 +9,16 @@ import { getBookmarks, getHistory, getApiKeyStatus, saveApiKey, deleteApiKey, ch
 
 const { Title } = Typography;
 
+// Recommended model presets per provider — clicking a chip fills the model field.
+// Users can still type any custom model ID. Keep prices accurate; revisit when
+// providers change pricing or release new model tiers.
+const PROVIDER_MODELS: Record<string, Array<{ value: string; label: string; hint: string }>> = {
+  deepseek: [
+    { value: "deepseek-v4-flash", label: "V4 Flash", hint: "$0.28/1M output · 推荐日常" },
+    { value: "deepseek-v4-pro", label: "V4 Pro", hint: "$0.87/1M output · 75% 促销至 2026-05-31" },
+  ],
+};
+
 const PROVIDERS = [
   // 国内
   { value: "deepseek", label: "DeepSeek" },
@@ -329,6 +339,26 @@ export default function ProfilePage() {
                         placeholder="留空使用默认模型"
                         style={{ marginTop: 4 }}
                       />
+                      {PROVIDER_MODELS[provider] && (
+                        <Space wrap size={[6, 6]} style={{ marginTop: 8 }}>
+                          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                            推荐：
+                          </Typography.Text>
+                          {PROVIDER_MODELS[provider].map((m) => (
+                            <Tag.CheckableTag
+                              key={m.value}
+                              checked={apiModel === m.value}
+                              onChange={() => setApiModel(m.value)}
+                              style={{ cursor: "pointer", border: "1px solid #d9d9d9" }}
+                            >
+                              <span style={{ fontWeight: 500 }}>{m.label}</span>
+                              <span style={{ marginLeft: 6, color: "#8c8c8c", fontSize: 11 }}>
+                                {m.hint}
+                              </span>
+                            </Tag.CheckableTag>
+                          ))}
+                        </Space>
+                      )}
                     </div>
                     <Button type="primary" loading={saving} onClick={handleSaveKey}>
                       保存 API Key
