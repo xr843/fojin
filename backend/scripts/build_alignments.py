@@ -80,8 +80,10 @@ LLM_PRICE_PER_1K = {
     "claude-haiku-4-5-20251001": 0.0008,
     "gpt-4o-mini": 0.00015,
     "qwen-plus": 0.0004,
-    "deepseek-chat": 0.00027,    # FoJin's current main LLM (DeepSeek V3)
-    "deepseek-reasoner": 0.0014,
+    "deepseek-chat": 0.00028,         # legacy alias → deepseek-v4-flash (non-thinking)
+    "deepseek-reasoner": 0.0014,      # legacy alias → deepseek-v4-flash (thinking)
+    "deepseek-v4-flash": 0.00028,     # output $0.28/1M tokens
+    "deepseek-v4-pro": 0.00087,       # output $0.87/1M @ 75% promo until 2026-05-31 15:59 UTC; post-promo $3.48/1M (4×) — REVISIT BEFORE 2026-05-31
 }
 DEFAULT_PRICE_PER_1K = 0.0008    # unknown model → use Haiku estimate
 
