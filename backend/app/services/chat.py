@@ -345,6 +345,53 @@ async def get_history_paginated(
     return msgs, total
 
 
+def _byok_error_message(exc: Exception, status: int | None) -> str:
+    """Map upstream BYOK errors to user-friendly Chinese messages.
+
+    Many users see "API Key 无效或已过期" when the actual cause is a wrong
+    model ID or insufficient balance — DashScope/DeepSeek/etc. tend to
+    return 401/400/404 with descriptive bodies that we should surface.
+    """
+    body = ""
+    if isinstance(exc, httpx.HTTPStatusError) and exc.response is not None:
+        try:
+            body = exc.response.text[:600]
+        except Exception:
+            body = ""
+    body_low = body.lower()
+
+    # Model-not-found / model-not-authorized — most common foot-gun
+    model_signals = ("model not found", "model_not_found", "modelnotfound", "no such model",
+                     "does not exist", "not exist", "unsupported model", "invalid model",
+                     "model 不存在", "模型不存在", "未开通", "无权访问")
+    if any(sig in body_low for sig in (s.lower() for s in model_signals)):
+        return "AI 服务返回：所选模型 ID 不存在或您的账号未开通该模型，请在个人中心检查「模型」字段（建议点击下方推荐预设）。"
+
+    # Insufficient balance / quota
+    balance_signals = ("insufficient balance", "insufficient_balance", "no balance",
+                       "balance is insufficient", "quota exceeded", "out of credits",
+                       "余额不足", "额度不足", "欠费", "余额")
+    if any(sig in body_low for sig in (s.lower() for s in balance_signals)):
+        return "AI 服务返回：您的 API 账户余额不足或额度耗尽，请前往服务商控制台充值。"
+
+    # Auth failure — actual key invalid
+    auth_signals = ("invalid api key", "invalid_api_key", "incorrect api key",
+                    "authentication", "unauthorized", "api key 无效", "key 无效")
+    if status == 401 and any(sig in body_low for sig in (s.lower() for s in auth_signals)):
+        return "您的 API Key 无效或已过期，请在个人中心重新配置。"
+
+    # Status-only fallbacks (couldn't recognize body, but status hints at cause)
+    if status == 401:
+        return "AI 服务返回 401（认证失败）：请检查个人中心 API Key 是否正确，或确认所选模型是否已开通。"
+    if status == 404:
+        return "AI 服务返回 404：所选模型 ID 不存在，请在个人中心检查「模型」字段（建议点击下方推荐预设）。"
+    if status == 429:
+        return "AI 服务返回 429：触发限流，请稍后重试或升级您的服务商套餐。"
+    if status is not None:
+        return f"AI 服务返回错误（HTTP {status}），请稍后重试或检查个人中心配置。"
+    return "抱歉，AI 服务暂时不可用，请稍后重试。"
+
+
 def _detect_model_from_url(api_url: str) -> str:
     """Infer a default model name from the API URL when LLM_MODEL is empty."""
     for provider, url in PROVIDER_URLS.items():
@@ -736,8 +783,10 @@ async def send_message(
         logger.debug("TIMING: LLM call took %.2fs", _time.monotonic() - _t1)
     except (httpx.TimeoutException, httpx.HTTPStatusError, httpx.RequestError) as primary_exc:
         status = getattr(getattr(primary_exc, "response", None), "status_code", None)
-        if is_byok and status == 401:
-            answer = "您的 API Key 无效或已过期，请在个人中心重新配置。"
+        if is_byok and status in (400, 401, 403, 404, 422, 429):
+            resp_body = primary_exc.response.text[:500] if isinstance(primary_exc, httpx.HTTPStatusError) and primary_exc.response else "N/A"
+            logger.warning("BYOK LLM returned HTTP %s: %s | url=%s model=%s", status, resp_body, api_url, model)
+            answer = _byok_error_message(primary_exc, status)
         else:
             fb = None if is_byok else _resolve_fallback_llm_config()
             if fb is not None:
@@ -913,8 +962,10 @@ async def send_message_stream(
                     )
                     continue
                 # Final attempt failed — surface the error
-                if is_byok and status == 401:
-                    error_msg = "您的 API Key 无效或已过期，请在个人中心重新配置。"
+                if is_byok and status in (400, 401, 403, 404, 422, 429):
+                    resp_body = exc.response.text[:500] if isinstance(exc, httpx.HTTPStatusError) and exc.response else "N/A"
+                    logger.warning("BYOK LLM stream HTTP %s: %s | url=%s model=%s", status, resp_body, att_url, att_model)
+                    error_msg = _byok_error_message(exc, status)
                 elif isinstance(exc, httpx.TimeoutException):
                     logger.warning("LLM stream timed out")
                     error_msg = "抱歉，AI 服务响应超时，请稍后重试。"

@@ -10,12 +10,54 @@ import { getBookmarks, getHistory, getApiKeyStatus, saveApiKey, deleteApiKey, ch
 const { Title } = Typography;
 
 // Recommended model presets per provider — clicking a chip fills the model field.
-// Users can still type any custom model ID. Keep prices accurate; revisit when
-// providers change pricing or release new model tiers.
+// Users can still type any custom model ID. Hints describe role (cheap/flagship/vision)
+// instead of exact prices to avoid drift; check provider docs for current pricing.
 const PROVIDER_MODELS: Record<string, Array<{ value: string; label: string; hint: string }>> = {
   deepseek: [
-    { value: "deepseek-v4-flash", label: "V4 Flash", hint: "$0.28/1M output · 推荐日常" },
-    { value: "deepseek-v4-pro", label: "V4 Pro", hint: "$0.87/1M output · 75% 促销至 2026-05-31" },
+    { value: "deepseek-v4-flash", label: "V4 Flash", hint: "经济日常 · $0.28/1M output" },
+    { value: "deepseek-v4-pro", label: "V4 Pro", hint: "旗舰 · $0.87/1M @ 促销至 2026-05-31" },
+  ],
+  dashscope: [
+    { value: "qwen-plus", label: "Qwen Plus", hint: "稳定通用（旧 ID，强烈推荐）" },
+    { value: "qwen-turbo", label: "Qwen Turbo", hint: "经济快速" },
+    { value: "qwen-max", label: "Qwen Max", hint: "旗舰" },
+    { value: "qwen3.6-flash", label: "Qwen 3.6 Flash", hint: "新一代经济档" },
+    { value: "qwen3.6-plus", label: "Qwen 3.6 Plus", hint: "新一代主力" },
+  ],
+  moonshot: [
+    { value: "moonshot-v1-8k", label: "v1-8k", hint: "8K 上下文 · 经济" },
+    { value: "moonshot-v1-32k", label: "v1-32k", hint: "32K 上下文" },
+    { value: "moonshot-v1-128k", label: "v1-128k", hint: "128K 长文" },
+  ],
+  zhipu: [
+    { value: "glm-4-flash", label: "GLM-4 Flash", hint: "免费/极低价" },
+    { value: "glm-4-air", label: "GLM-4 Air", hint: "中档" },
+    { value: "glm-4-plus", label: "GLM-4 Plus", hint: "旗舰" },
+  ],
+  anthropic: [
+    { value: "claude-haiku-4-5", label: "Haiku 4.5", hint: "快速经济" },
+    { value: "claude-sonnet-4-6", label: "Sonnet 4.6", hint: "主力推荐" },
+    { value: "claude-opus-4-7", label: "Opus 4.7", hint: "旗舰" },
+  ],
+  openai: [
+    { value: "gpt-4o-mini", label: "GPT-4o mini", hint: "经济日常" },
+    { value: "gpt-4o", label: "GPT-4o", hint: "主力" },
+  ],
+  gemini: [
+    { value: "gemini-2.0-flash", label: "2.0 Flash", hint: "快速经济" },
+    { value: "gemini-2.5-pro", label: "2.5 Pro", hint: "旗舰" },
+  ],
+  doubao: [
+    { value: "doubao-1.5-lite-32k", label: "1.5 Lite", hint: "经济" },
+    { value: "doubao-1.5-pro-32k", label: "1.5 Pro", hint: "主力" },
+  ],
+  siliconflow: [
+    { value: "deepseek-ai/DeepSeek-V3", label: "DeepSeek V3", hint: "DeepSeek 镜像" },
+    { value: "Qwen/Qwen2.5-72B-Instruct", label: "Qwen 2.5 72B", hint: "Qwen 大模型" },
+    { value: "Pro/moonshotai/Kimi-K2-Instruct", label: "Kimi K2", hint: "Moonshot 镜像（Pro）" },
+  ],
+  xai: [
+    { value: "grok-2-latest", label: "Grok 2", hint: "稳定版" },
   ],
 };
 
