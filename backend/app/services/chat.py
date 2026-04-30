@@ -783,7 +783,7 @@ async def send_message(
         logger.debug("TIMING: LLM call took %.2fs", _time.monotonic() - _t1)
     except (httpx.TimeoutException, httpx.HTTPStatusError, httpx.RequestError) as primary_exc:
         status = getattr(getattr(primary_exc, "response", None), "status_code", None)
-        if is_byok and isinstance(primary_exc, (httpx.HTTPStatusError, httpx.TimeoutException, httpx.RequestError)) and status in (400, 401, 403, 404, 422, 429):
+        if is_byok and status in (400, 401, 403, 404, 422, 429):
             resp_body = primary_exc.response.text[:500] if isinstance(primary_exc, httpx.HTTPStatusError) and primary_exc.response else "N/A"
             logger.warning("BYOK LLM returned HTTP %s: %s | url=%s model=%s", status, resp_body, api_url, model)
             answer = _byok_error_message(primary_exc, status)
