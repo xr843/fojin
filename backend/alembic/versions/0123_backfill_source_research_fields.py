@@ -52,7 +52,7 @@ def upgrade() -> None:
     for fields, codes in BUCKETS.items():
         conn.execute(
             text(
-                "UPDATE buddhist_sources "
+                "UPDATE data_sources "
                 "SET research_fields = :fields "
                 "WHERE code = ANY(:codes) "
                 "AND (research_fields IS NULL OR research_fields = '')"
@@ -66,6 +66,6 @@ def downgrade() -> None:
     conn = op.get_bind()
     all_codes = [c for codes in BUCKETS.values() for c in codes]
     conn.execute(
-        text("UPDATE buddhist_sources SET research_fields = NULL WHERE code = ANY(:codes)"),
+        text("UPDATE data_sources SET research_fields = NULL WHERE code = ANY(:codes)"),
         {"codes": all_codes},
     )
