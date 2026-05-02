@@ -1127,7 +1127,7 @@ export default function ChatPage() {
                 placeholder={t("chat.general_assistant")}
                 value={masterId}
                 onChange={(v) => setMasterId(v || null)}
-                style={{ width: 240, fontSize: 13 }}
+                style={{ width: 260, fontSize: 13 }}
                 size="small"
                 options={[
                   { value: "", label: `🟢 ${t("chat.general_assistant")}` },
@@ -1147,12 +1147,16 @@ export default function ChatPage() {
                   {
                     label: "藏传",
                     options: [
+                      { value: "atisha", label: "🏔️ 阿底峡（噶当派·三士道）" },
+                      { value: "tsongkhapa", label: "🏔️ 宗喀巴（格鲁派·道次第）" },
                       { value: "milarepa", label: "🏔️ 米拉日巴（噶举派·大手印）" },
                     ],
                   },
                   {
                     label: "南传",
                     options: [
+                      { value: "buddhaghosa", label: "🌿 觉音尊者（上座部论师·清净道论）" },
+                      { value: "mahasi-sayadaw", label: "🌿 马哈希尊者（缅甸内观·标记法）" },
                       { value: "ajahn-chah", label: "🌿 阿姜查（泰国森林禅林派）" },
                     ],
                   },
