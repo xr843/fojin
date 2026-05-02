@@ -1133,7 +1133,6 @@ export default function ChatPage() {
                   { value: "", label: `🟢 ${t("chat.general_assistant")}` },
                   {
                     label: "汉传",
-                    title: "汉传",
                     options: [
                       { value: "zhiyi", label: "🪷 智顗（天台宗）" },
                       { value: "huineng", label: "🪷 慧能（禅宗）" },
@@ -1147,14 +1146,12 @@ export default function ChatPage() {
                   },
                   {
                     label: "藏传",
-                    title: "藏传",
                     options: [
                       { value: "milarepa", label: "🏔️ 米拉日巴（噶举派·大手印）" },
                     ],
                   },
                   {
                     label: "南传",
-                    title: "南传",
                     options: [
                       { value: "ajahn-chah", label: "🌿 阿姜查（泰国森林禅林派）" },
                     ],
