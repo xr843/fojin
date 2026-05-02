@@ -1127,18 +1127,35 @@ export default function ChatPage() {
                 placeholder={t("chat.general_assistant")}
                 value={masterId}
                 onChange={(v) => setMasterId(v || null)}
-                style={{ width: 200, fontSize: 13 }}
+                style={{ width: 240, fontSize: 13 }}
                 size="small"
                 options={[
                   { value: "", label: `🟢 ${t("chat.general_assistant")}` },
-                  { value: "zhiyi", label: "🪷 智顗（天台宗）" },
-                  { value: "huineng", label: "🪷 慧能（禅宗）" },
-                  { value: "xuanzang", label: "🪷 玄奘（唯识宗）" },
-                  { value: "fazang", label: "🪷 法藏（华严宗）" },
-                  { value: "kumarajiva", label: "🪷 鸠摩罗什（中观）" },
-                  { value: "yinguang", label: "🪷 印光（净土宗）" },
-                  { value: "ouyi", label: "🪷 蕅益（跨宗派）" },
-                  { value: "xuyun", label: "🪷 虚云（禅宗）" },
+                  {
+                    label: "汉传",
+                    options: [
+                      { value: "zhiyi", label: "🪷 智顗（天台宗）" },
+                      { value: "huineng", label: "🪷 慧能（禅宗）" },
+                      { value: "xuanzang", label: "🪷 玄奘（唯识宗）" },
+                      { value: "fazang", label: "🪷 法藏（华严宗）" },
+                      { value: "kumarajiva", label: "🪷 鸠摩罗什（中观）" },
+                      { value: "yinguang", label: "🪷 印光（净土宗）" },
+                      { value: "ouyi", label: "🪷 蕅益（跨宗派）" },
+                      { value: "xuyun", label: "🪷 虚云（禅宗）" },
+                    ],
+                  },
+                  {
+                    label: "藏传",
+                    options: [
+                      { value: "milarepa", label: "🏔️ 米拉日巴（噶举派·大手印）" },
+                    ],
+                  },
+                  {
+                    label: "南传",
+                    options: [
+                      { value: "ajahn-chah", label: "🌿 阿姜查（泰国森林禅林派）" },
+                    ],
+                  },
                 ]}
               />
               {masterId && <span style={{ fontSize: 11, color: "#a09070" }}>{t("chat.rag_scope_hint")}</span>}
