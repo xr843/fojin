@@ -25,7 +25,86 @@
 .sources-desc {
   font-size: 14px;
   color: var(--fj-ink-muted);
-  margin: 0;
+  margin: 0 0 10px;
+}
+
+/* ---------- 顶部能力 chip ---------- */
+.sources-cap-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.sources-cap-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid #e5dccb;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  color: #595959;
+  transition: all 0.18s;
+  line-height: 1.2;
+}
+
+.sources-cap-chip strong {
+  font-family: "Noto Serif SC", serif;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.sources-cap-chip:hover {
+  border-color: var(--fj-gold, #b08d57);
+  color: var(--fj-ink);
+}
+
+.sources-cap-chip:focus-visible,
+.sources-cap-chip-clear:focus-visible {
+  outline: 2px solid var(--fj-gold, #b08d57);
+  outline-offset: 2px;
+}
+
+.sources-cap-chip.is-active {
+  background: var(--fj-gold, #b08d57);
+  border-color: var(--fj-gold, #b08d57);
+  color: #fff;
+}
+
+.sources-cap-chip.is-active strong {
+  color: #fff;
+}
+
+/* color hints (inactive only — left border accent matches the badge color) */
+.sources-cap-chip-direct  { border-left: 3px solid #2f6fb1; }
+.sources-cap-chip-local   { border-left: 3px solid #389e0d; }
+.sources-cap-chip-remote  { border-left: 3px solid #08979c; }
+.sources-cap-chip-iiif    { border-left: 3px solid #722ed1; }
+.sources-cap-chip-api     { border-left: 3px solid #d4720c; }
+
+.sources-cap-chip.is-active.sources-cap-chip-direct,
+.sources-cap-chip.is-active.sources-cap-chip-local,
+.sources-cap-chip.is-active.sources-cap-chip-remote,
+.sources-cap-chip.is-active.sources-cap-chip-iiif,
+.sources-cap-chip.is-active.sources-cap-chip-api {
+  border-left-color: rgba(255, 255, 255, 0.5);
+}
+
+.sources-cap-chip-clear {
+  border: none;
+  background: transparent;
+  color: var(--fj-ink-muted);
+  cursor: pointer;
+  font-size: 12.5px;
+  padding: 4px 8px;
+  text-decoration: underline;
+}
+
+.sources-cap-chip-clear:hover {
+  color: var(--fj-gold, #b08d57);
 }
 
 /* ---------- 跨源搜索 Hero ---------- */

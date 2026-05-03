@@ -1,4 +1,4 @@
-import { Tag } from "antd";
+import { Tag, Tooltip } from "antd";
 import {
   ApiOutlined,
   FileImageOutlined,
@@ -50,29 +50,39 @@ export default function SourceCard({ source: s, searchQuery }: SourceCardProps) 
         </div>
         <div className="source-card-badges">
           {s.has_local_fulltext && (
-            <Tag color="green" className="source-card-badge">
-              <ReadOutlined /> 已入库
-            </Tag>
+            <Tooltip title="正文已入库 FoJin 数据库，可在站内直接阅读、引用与全文检索">
+              <Tag color="green" className="source-card-badge">
+                <ReadOutlined /> 已入库
+              </Tag>
+            </Tooltip>
           )}
           {s.has_remote_fulltext && !s.has_local_fulltext && (
-            <Tag color="cyan" className="source-card-badge">
-              <ReadOutlined /> 外站全文
-            </Tag>
+            <Tooltip title="全文托管在原站，跳转后可阅读，本站仅做导航与去重">
+              <Tag color="cyan" className="source-card-badge">
+                <ReadOutlined /> 外站全文
+              </Tag>
+            </Tooltip>
           )}
           {s.supports_search && (
-            <Tag color="blue" className="source-card-badge">
-              <SearchOutlined /> 可搜索
-            </Tag>
+            <Tooltip title="原站提供搜索功能；若已注册 URL 模板，下方会出现「搜索」直达按钮">
+              <Tag color="blue" className="source-card-badge">
+                <SearchOutlined /> 可搜索
+              </Tag>
+            </Tooltip>
           )}
           {s.supports_iiif && (
-            <Tag color="purple" className="source-card-badge">
-              <FileImageOutlined /> 影像
-            </Tag>
+            <Tooltip title="提供 IIIF 或高清扫描影像（写本、刻本、绘画等）">
+              <Tag color="purple" className="source-card-badge">
+                <FileImageOutlined /> 影像
+              </Tag>
+            </Tooltip>
           )}
           {s.supports_api && (
-            <Tag color="orange" className="source-card-badge">
-              <ApiOutlined /> API
-            </Tag>
+            <Tooltip title="提供机读 API（REST / RDF / IIIF 等），可程序化调用">
+              <Tag color="orange" className="source-card-badge">
+                <ApiOutlined /> API
+              </Tag>
+            </Tooltip>
           )}
         </div>
       </div>
