@@ -17,8 +17,18 @@ import {
 import "../styles/sources.css";
 
 type GroupBy = "region" | "field" | "lang";
+type Capability = "direct" | "local" | "remote" | "iiif" | "api";
 
 const VALID_GROUP_BY: readonly GroupBy[] = ["region", "field", "lang"] as const;
+const VALID_CAPABILITY: readonly Capability[] = ["direct", "local", "remote", "iiif", "api"] as const;
+
+const CAPABILITY_LABELS: Record<Capability, { label: string; tip: string }> = {
+  direct: { label: "可一键直达", tip: "已注册站内搜索模板，点击卡片「搜索」即可跳到对应站点的结果页" },
+  local: { label: "已入库全文", tip: "正文已入库 FoJin 数据库，可在站内直接阅读、引用与全文检索" },
+  remote: { label: "外站全文", tip: "全文托管在原站，跳转后可阅读，本站仅做导航与去重" },
+  iiif: { label: "影像", tip: "提供 IIIF 或高清扫描影像，适合写本、刻本、绘画等视觉资源" },
+  api: { label: "API", tip: "提供机读 API（REST / RDF / IIIF 等），可程序化调用" },
+};
 
 export default function SourcesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -34,6 +44,10 @@ export default function SourcesPage() {
   const groupBy: GroupBy = (VALID_GROUP_BY as readonly string[]).includes(rawGroupBy)
     ? (rawGroupBy as GroupBy)
     : "region";
+  const rawCap = searchParams.get("cap") ?? "";
+  const capability: Capability | null = (VALID_CAPABILITY as readonly string[]).includes(rawCap)
+    ? (rawCap as Capability)
+    : null;
 
   const updateParam = useCallback(
     (key: string, value: string, defaultValue: string) => {
@@ -73,6 +87,14 @@ export default function SourcesPage() {
   const setSearchQuery = useCallback(
     (v: string) => updateParam("try", v, ""),
     [updateParam],
+  );
+  const setCapability = useCallback(
+    (v: Capability | null) => updateParam("cap", v ?? "", ""),
+    [updateParam],
+  );
+  const toggleCapability = useCallback(
+    (v: Capability) => setCapability(capability === v ? null : v),
+    [capability, setCapability],
   );
   const setGroupBy = useCallback(
     (v: GroupBy) => {
@@ -209,9 +231,16 @@ export default function SourcesPage() {
       if (fulltextOnly && !s.has_local_fulltext && !s.has_remote_fulltext) {
         return false;
       }
+      if (capability) {
+        if (capability === "direct" && !hasDirectSearchUrl(s.code)) return false;
+        if (capability === "local" && !s.has_local_fulltext) return false;
+        if (capability === "remote" && !s.has_remote_fulltext) return false;
+        if (capability === "iiif" && !s.supports_iiif) return false;
+        if (capability === "api" && !s.supports_api) return false;
+      }
       return true;
     });
-  }, [sources, search, regionFilter, langFilter, fieldFilter, fulltextOnly]);
+  }, [sources, search, regionFilter, langFilter, fieldFilter, fulltextOnly, capability]);
 
   const grouped = useMemo(() => {
     const map: Record<string, DataSource[]> = {};
@@ -326,10 +355,43 @@ export default function SourcesPage() {
       </Helmet>
       <div className="sources-header">
         <h1 className="sources-title">数据源导航</h1>
-        <p className="sources-desc">
-          聚合全球 {total} 个佛教数字资源：
-          {counters.directSearch} 可一键直达 · {counters.local} 已入库全文 · {counters.remote} 外站全文 · {counters.iiif} 影像 · {counters.api} API
-        </p>
+        <p className="sources-desc">聚合全球 {total} 个佛教数字资源 · 点击下方能力筛选</p>
+        <div className="sources-cap-chips" role="group" aria-label="按能力过滤">
+          {(
+            [
+              { key: "direct", count: counters.directSearch },
+              { key: "local", count: counters.local },
+              { key: "remote", count: counters.remote },
+              { key: "iiif", count: counters.iiif },
+              { key: "api", count: counters.api },
+            ] as { key: Capability; count: number }[]
+          ).map(({ key, count }) => {
+            const active = capability === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                className={`sources-cap-chip sources-cap-chip-${key}${active ? " is-active" : ""}`}
+                onClick={() => toggleCapability(key)}
+                title={CAPABILITY_LABELS[key].tip}
+                aria-pressed={active}
+              >
+                <strong>{count}</strong>
+                <span>{CAPABILITY_LABELS[key].label}</span>
+              </button>
+            );
+          })}
+          {capability && (
+            <button
+              type="button"
+              className="sources-cap-chip-clear"
+              onClick={() => setCapability(null)}
+              aria-label="清除能力筛选"
+            >
+              清除
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="sources-hero-search">
