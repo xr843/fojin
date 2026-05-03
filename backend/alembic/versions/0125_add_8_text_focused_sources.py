@@ -141,9 +141,15 @@ SOURCES = [
 
 def upgrade() -> None:
     for s in SOURCES:
-        name_en = f"'{s['name_en']}'" if s["name_en"] else "NULL"
-        desc = s["description"].replace("'", "''")
-        name_zh = s["name_zh"].replace("'", "''")
+        # Escape single quotes in every text field — Tāranātha's apostrophe
+        # broke the previous attempt because only name_zh/description were
+        # escaped before. Cheaper than parameterized queries and matches the
+        # 0121/0124 idiom; just needs to cover every quoted column.
+        def q(v: str | None) -> str:
+            if v is None:
+                return "NULL"
+            return "'" + v.replace("'", "''") + "'"
+
         supports_search = "true" if s.get("supports_search") else "false"
         has_remote_fulltext = "true" if s.get("has_remote_fulltext") else "false"
         op.execute(
@@ -153,9 +159,9 @@ def upgrade() -> None:
                 f"access_type, region, languages, research_fields, "
                 f"supports_search, has_remote_fulltext, "
                 f"sort_order, is_active) "
-                f"VALUES ('{s['code']}', '{name_zh}', {name_en}, '{s['base_url']}', "
-                f"'{desc}', 'open', '{s['region']}', "
-                f"'{s['languages']}', '{s['research_fields']}', "
+                f"VALUES ({q(s['code'])}, {q(s['name_zh'])}, {q(s['name_en'])}, "
+                f"{q(s['base_url'])}, {q(s['description'])}, 'open', "
+                f"{q(s['region'])}, {q(s['languages'])}, {q(s['research_fields'])}, "
                 f"{supports_search}, {has_remote_fulltext}, "
                 f"0, true) "
                 f"ON CONFLICT (code) DO NOTHING"
