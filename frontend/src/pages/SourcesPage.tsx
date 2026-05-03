@@ -365,7 +365,10 @@ export default function SourcesPage() {
               { key: "iiif", count: counters.iiif },
               { key: "api", count: counters.api },
             ] as { key: Capability; count: number }[]
-          ).map(({ key, count }) => {
+          )
+            .slice()
+            .sort((a, b) => b.count - a.count)
+            .map(({ key, count }) => {
             const active = capability === key;
             return (
               <button
