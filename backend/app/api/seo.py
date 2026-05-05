@@ -49,6 +49,10 @@ _CANONICAL_RE = re.compile(
     r'<link\s+rel="canonical"\s+href="[^"]*"\s*/?>',
     re.IGNORECASE,
 )
+_ROBOTS_RE = re.compile(
+    r'<meta\s+name="robots"\s+content="[^"]*"\s*/?>',
+    re.IGNORECASE,
+)
 _HEAD_CLOSE_RE = re.compile(r"</head>", re.IGNORECASE)
 
 
@@ -84,8 +88,14 @@ async def _fetch_index_html() -> str:
     return html
 
 
-def _inject_meta(html: str, title: str, description: str, canonical_url: str) -> str:
-    """Replace <title>, <meta name="description">, and <link rel="canonical">.
+def _inject_meta(
+    html: str,
+    title: str,
+    description: str,
+    canonical_url: str,
+    robots: str = "index, follow",
+) -> str:
+    """Replace <title>, <meta name="description">, <link rel="canonical">, and <meta name="robots">.
 
     If a canonical link is missing entirely (the default for the React SPA
     template), we add it just before the closing </head> tag.
@@ -93,10 +103,16 @@ def _inject_meta(html: str, title: str, description: str, canonical_url: str) ->
     safe_title = _escape_meta_value(title)
     safe_desc = _escape_meta_value(description)
     safe_canonical = _escape_meta_value(canonical_url)
+    safe_robots = _escape_meta_value(robots)
 
     new_html = _TITLE_RE.sub(f"<title>{safe_title}</title>", html, count=1)
     new_html = _DESCRIPTION_RE.sub(
         f'<meta name="description" content="{safe_desc}" />',
+        new_html,
+        count=1,
+    )
+    new_html = _ROBOTS_RE.sub(
+        f'<meta name="robots" content="{safe_robots}" />',
         new_html,
         count=1,
     )
@@ -108,8 +124,15 @@ def _inject_meta(html: str, title: str, description: str, canonical_url: str) ->
     return new_html
 
 
-def _build_text_meta(text, request: Request) -> tuple[str, str, str]:
-    """Compose the per-text title, description, and canonical URL."""
+def _build_text_meta(text, request: Request, *, route: str) -> tuple[str, str, str]:
+    """Compose the per-text title, description, and canonical URL.
+
+    ``route`` is either ``"detail"`` (``/texts/{id}``) or ``"read"``
+    (``/texts/{id}/read``); the canonical is always self-referencing for the
+    requested URL to avoid the bot/browser canonical mismatch that previously
+    existed (the prerender Worker pointed ``/texts/{id}`` at itself, while
+    this module pointed it at ``/read``).
+    """
     title_zh = text.title_zh or "佛典"
     translator = (text.translator or "").strip()
     dynasty = (text.dynasty or "").strip()
@@ -118,7 +141,10 @@ def _build_text_meta(text, request: Request) -> tuple[str, str, str]:
     title_parts = [f"《{title_zh}》"]
     if translator:
         title_parts.append(f" {translator}译")
-    title_parts.append(" — 在线全文阅读 | 佛津 FoJin")
+    if route == "read":
+        title_parts.append(" — 在线全文阅读 | 佛津 FoJin")
+    else:
+        title_parts.append(" — 佛津 FoJin")
     title = "".join(title_parts)
 
     desc_parts = [f"《{title_zh}》"]
@@ -137,11 +163,21 @@ def _build_text_meta(text, request: Request) -> tuple[str, str, str]:
     base = str(request.base_url).rstrip("/")
     # base_url comes from the inbound request — under cloudflare/nginx the
     # forwarded scheme/host should already be set on the request.
-    canonical = f"{base}/texts/{text.id}/read"
+    if route == "read":
+        canonical = f"{base}/texts/{text.id}/read"
+    else:
+        canonical = f"{base}/texts/{text.id}"
     return title, description, canonical
 
 
-async def _serve_text_seo_html(text_id: int, request: Request, db: AsyncSession) -> HTMLResponse:
+async def _serve_text_seo_html(
+    text_id: int,
+    request: Request,
+    db: AsyncSession,
+    *,
+    route: str,
+    robots: str = "index, follow",
+) -> HTMLResponse:
     text = await get_text_by_id(db, text_id)
     if text is None:
         raise HTTPException(status_code=404, detail="text not found")
@@ -152,27 +188,39 @@ async def _serve_text_seo_html(text_id: int, request: Request, db: AsyncSession)
         # Fall back to a minimal HTML so the bot still gets correct meta;
         # the user's browser would fail anyway since the bundle refs are
         # missing — but bots don't care about JS.
-        title, description, canonical = _build_text_meta(text, request)
+        title, description, canonical = _build_text_meta(text, request, route=route)
         fallback = (
             "<!doctype html><html><head>"
             f"<title>{_escape_meta_value(title)}</title>"
             f'<meta name="description" content="{_escape_meta_value(description)}" />'
+            f'<meta name="robots" content="{_escape_meta_value(robots)}" />'
             f'<link rel="canonical" href="{_escape_meta_value(canonical)}" />'
             "</head><body></body></html>"
         )
         return HTMLResponse(content=fallback, status_code=200)
 
-    title, description, canonical = _build_text_meta(text, request)
-    return HTMLResponse(content=_inject_meta(html, title, description, canonical))
+    title, description, canonical = _build_text_meta(text, request, route=route)
+    return HTMLResponse(
+        content=_inject_meta(html, title, description, canonical, robots=robots)
+    )
 
 
 @router.get("/texts/{text_id}", response_class=HTMLResponse, include_in_schema=False)
 async def text_detail_seo_html(text_id: int, request: Request, db: AsyncSession = Depends(get_db)):
-    """SEO-friendly HTML for the text detail landing page."""
-    return await _serve_text_seo_html(text_id, request, db)
+    """SEO-friendly HTML for the text detail landing page (indexable)."""
+    return await _serve_text_seo_html(text_id, request, db, route="detail")
 
 
 @router.get("/texts/{text_id}/read", response_class=HTMLResponse, include_in_schema=False)
 async def text_reader_seo_html(text_id: int, request: Request, db: AsyncSession = Depends(get_db)):
-    """SEO-friendly HTML for the full-text reader page."""
-    return await _serve_text_seo_html(text_id, request, db)
+    """SEO-friendly HTML for the full-text reader page.
+
+    Marked ``noindex, follow``: the reader page Googlebot sees is just the
+    SPA shell (the actual text content only renders after the React bundle
+    runs), so it duplicates the content-richer ``/texts/{id}`` detail page
+    rendered by the Cloudflare prerender Worker. ``follow`` keeps internal
+    link equity flowing back to the detail page.
+    """
+    return await _serve_text_seo_html(
+        text_id, request, db, route="read", robots="noindex, follow"
+    )
