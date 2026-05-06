@@ -85,7 +85,7 @@
   "notfound.back": "返回首页",
   "search.no_results_for": "没有找到「{{query}}」的结果",
   "search.did_you_mean": "您是否想搜索",
-  "search.empty_state_external": "无站内匹配，可在以下外部数据源继续搜",
+  "search.empty_state_external": "无站内匹配，可在以下外部数据源继续搜索",
   "search.external_card_prefix": "在外站搜索：{{query}}",
   "language.zh": "中文简体",
   "language.zh-Hant": "中文繁體",
