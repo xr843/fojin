@@ -134,6 +134,14 @@ async def similarity_search(
     embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
     raw_conn = await session.connection()
 
+    # Widen pgvector HNSW search candidates beyond the postgres default of 40.
+    # 100 is the pgvector docs recommended starting point — costs <5ms at our
+    # ~50K-vector scale but materially improves recall, which matters for the
+    # trilingual RAG path where each language only gets top-4 / top-8 slots.
+    # SET LOCAL applies for the current transaction only; SQLAlchemy AsyncSession
+    # auto-begins, so this binds to the same transaction as the SELECT below.
+    await raw_conn.exec_driver_sql("SET LOCAL hnsw.ef_search = 100")
+
     base_select = (
         "SELECT te.text_id, te.juan_num, te.chunk_index, te.chunk_text, "
         "1 - (te.embedding <=> $1::vector) AS score, "
@@ -189,6 +197,7 @@ async def source_similarity_search(
     """Find most relevant data sources using pgvector cosine distance."""
     embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
     raw_conn = await session.connection()
+    await raw_conn.exec_driver_sql("SET LOCAL hnsw.ef_search = 100")
     result = await raw_conn.exec_driver_sql(
         "SELECT ds.id, ds.code, ds.name_zh, ds.description, ds.base_url, "
         "1 - (ds.embedding <=> $1::vector) AS score "
