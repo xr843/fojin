@@ -1,15 +1,20 @@
 import { Tag } from "antd";
 import { LinkOutlined, EyeOutlined } from "@ant-design/icons";
+import { useTranslation } from "react-i18next";
 import { buildSearchUrl } from "../../utils/sourceUrls";
 import type { DataSource } from "../../api/client";
 
 export default function ExternalCard({ source, query, rank }: { source: DataSource; query: string; rank: number }) {
+  const { t } = useTranslation();
   const url = buildSearchUrl(source.code, query) || "#";
   return (
     <div className="s-card s-card-ext">
       <div className="s-card-rank">排序<br />#{rank}</div>
       <div className="s-card-body">
-        <div className="s-card-title">{query}</div>
+        <div className="s-card-ext-prefix" style={{ fontSize: 12, color: "#9a8e7a", marginBottom: 2 }}>
+          {t("search.external_card_prefix", { query })}
+        </div>
+        <div className="s-card-title">{source.name_zh}</div>
         <div className="s-card-tags">
           <Tag color="blue" style={{ fontSize: 11 }}>{source.name_zh}</Tag>
           <Tag style={{ fontSize: 11 }}>外链跳转</Tag>
