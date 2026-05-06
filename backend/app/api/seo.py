@@ -24,9 +24,11 @@ import time
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.models.chat import SharedQA
 from app.services.text import get_text_by_id
 
 logger = logging.getLogger(__name__)
@@ -58,12 +60,7 @@ _HEAD_CLOSE_RE = re.compile(r"</head>", re.IGNORECASE)
 
 def _escape_meta_value(value: str) -> str:
     """Escape characters that would break out of an HTML attribute value."""
-    return (
-        value.replace("&", "&amp;")
-        .replace('"', "&quot;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-    )
+    return value.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 async def _fetch_index_html() -> str:
@@ -71,11 +68,7 @@ async def _fetch_index_html() -> str:
     now = time.monotonic()
     cached_at = _index_html_cache.get("ts")
     cached_html = _index_html_cache.get("html")
-    if (
-        isinstance(cached_at, float)
-        and isinstance(cached_html, str)
-        and now - cached_at < _INDEX_HTML_CACHE_TTL
-    ):
+    if isinstance(cached_at, float) and isinstance(cached_html, str) and now - cached_at < _INDEX_HTML_CACHE_TTL:
         return cached_html
 
     async with httpx.AsyncClient(timeout=5.0) as client:
@@ -157,7 +150,9 @@ def _build_text_meta(text, request: Request, *, route: str) -> tuple[str, str, s
         meta_bits.append(f"CBETA {cbeta_id}")
     if meta_bits:
         desc_parts.append("，" + "，".join(meta_bits))
-    desc_parts.append("。佛津 FoJin 数字佛典平台提供全文阅读、平行对照、AI 智能问答与原典引用。汉传、藏传、南传、梵文、巴利文多语种佛教文献聚合检索。")
+    desc_parts.append(
+        "。佛津 FoJin 数字佛典平台提供全文阅读、平行对照、AI 智能问答与原典引用。汉传、藏传、南传、梵文、巴利文多语种佛教文献聚合检索。"
+    )
     description = "".join(desc_parts)
 
     base = str(request.base_url).rstrip("/")
@@ -200,9 +195,7 @@ async def _serve_text_seo_html(
         return HTMLResponse(content=fallback, status_code=200)
 
     title, description, canonical = _build_text_meta(text, request, route=route)
-    return HTMLResponse(
-        content=_inject_meta(html, title, description, canonical, robots=robots)
-    )
+    return HTMLResponse(content=_inject_meta(html, title, description, canonical, robots=robots))
 
 
 @router.get("/texts/{text_id}", response_class=HTMLResponse, include_in_schema=False)
@@ -221,6 +214,147 @@ async def text_reader_seo_html(text_id: int, request: Request, db: AsyncSession 
     rendered by the Cloudflare prerender Worker. ``follow`` keeps internal
     link equity flowing back to the detail page.
     """
-    return await _serve_text_seo_html(
-        text_id, request, db, route="read", robots="noindex, follow"
+    return await _serve_text_seo_html(text_id, request, db, route="read", robots="noindex, follow")
+
+
+# ── Shared Q&A SSR meta ──────────────────────────────────────
+
+
+_MARKDOWN_FENCE_RE = re.compile(r"```[\s\S]*?```")
+_MARKDOWN_INLINE_CODE_RE = re.compile(r"`([^`]*)`")
+_MARKDOWN_LINK_RE = re.compile(r"\[([^\]]+)\]\([^)]+\)")
+_MARKDOWN_HEADING_RE = re.compile(r"^\s*#{1,6}\s*", re.MULTILINE)
+_MARKDOWN_EMPHASIS_RE = re.compile(r"[*_]{1,3}([^*_]+)[*_]{1,3}")
+_CITATION_BRACKETS_RE = re.compile(r"【[^】]*】")
+_WHITESPACE_RUN_RE = re.compile(r"\s+")
+
+
+def _strip_markdown(text: str) -> str:
+    """Best-effort markdown → plain text for the meta description.
+
+    The shared Q&A answer is markdown; meta descriptions are short plain
+    strings. We strip code fences, inline code, links, headings, and
+    emphasis markers, drop ``【…】`` citation pills, and collapse
+    whitespace.
+    """
+    cleaned = _MARKDOWN_FENCE_RE.sub("", text)
+    cleaned = _MARKDOWN_INLINE_CODE_RE.sub(r"\1", cleaned)
+    cleaned = _MARKDOWN_LINK_RE.sub(r"\1", cleaned)
+    cleaned = _MARKDOWN_HEADING_RE.sub("", cleaned)
+    cleaned = _MARKDOWN_EMPHASIS_RE.sub(r"\1", cleaned)
+    cleaned = _CITATION_BRACKETS_RE.sub("", cleaned)
+    return _WHITESPACE_RUN_RE.sub(" ", cleaned).strip()
+
+
+def _truncate_for_meta(value: str, *, limit: int) -> str:
+    if len(value) <= limit:
+        return value
+    return value[: limit - 1].rstrip() + "…"
+
+
+def _build_share_qa_meta(record: SharedQA, request: Request) -> dict[str, str]:
+    """Compose meta values for ``/share/qa/{share_id}``."""
+    question = (record.question or "").strip() or "佛学问答"
+    title_question = _truncate_for_meta(question, limit=60)
+    title = f"{title_question} - 佛津 AI 佛学问答"
+
+    answer_plain = _strip_markdown(record.answer or "")
+    description = _truncate_for_meta(answer_plain or question, limit=150)
+
+    base = str(request.base_url).rstrip("/")
+    canonical = f"{base}/share/qa/{record.id}"
+    og_image = f"{base}/api/og/share/qa/{record.id}"
+    return {
+        "title": title,
+        "description": description,
+        "canonical": canonical,
+        "og_title": title_question,
+        "og_description": description,
+        "og_image": og_image,
+    }
+
+
+_OG_TAG_PATTERNS = (
+    re.compile(r'<meta\s+property="og:title"\s+content="[^"]*"\s*/?>', re.IGNORECASE),
+    re.compile(r'<meta\s+property="og:description"\s+content="[^"]*"\s*/?>', re.IGNORECASE),
+    re.compile(r'<meta\s+property="og:image"\s+content="[^"]*"\s*/?>', re.IGNORECASE),
+    re.compile(r'<meta\s+property="og:image:width"\s+content="[^"]*"\s*/?>', re.IGNORECASE),
+    re.compile(r'<meta\s+property="og:image:height"\s+content="[^"]*"\s*/?>', re.IGNORECASE),
+    re.compile(r'<meta\s+property="og:type"\s+content="[^"]*"\s*/?>', re.IGNORECASE),
+    re.compile(r'<meta\s+property="og:url"\s+content="[^"]*"\s*/?>', re.IGNORECASE),
+    re.compile(r'<meta\s+name="twitter:card"\s+content="[^"]*"\s*/?>', re.IGNORECASE),
+)
+
+
+def _strip_existing_og_tags(html: str) -> str:
+    """Remove any pre-existing og:* / twitter:card tags from index.html."""
+    for pattern in _OG_TAG_PATTERNS:
+        html = pattern.sub("", html)
+    return html
+
+
+def _inject_share_qa_meta(html: str, meta: dict[str, str]) -> str:
+    """Inject share-Q&A specific meta tags into the SPA shell HTML.
+
+    Reuses ``_inject_meta`` for ``<title>``, description, canonical, and
+    robots; then appends og:* / twitter:card tags right before
+    ``</head>`` so crawlers without JS see the per-question values
+    instead of the homepage defaults.
+    """
+    new_html = _inject_meta(
+        html,
+        title=meta["title"],
+        description=meta["description"],
+        canonical_url=meta["canonical"],
+        robots="index, follow",
     )
+    new_html = _strip_existing_og_tags(new_html)
+    og_tags = (
+        f'<meta property="og:title" content="{_escape_meta_value(meta["og_title"])}" />\n'
+        f'  <meta property="og:description" content="{_escape_meta_value(meta["og_description"])}" />\n'
+        f'  <meta property="og:image" content="{_escape_meta_value(meta["og_image"])}" />\n'
+        f'  <meta property="og:image:width" content="1200" />\n'
+        f'  <meta property="og:image:height" content="630" />\n'
+        f'  <meta property="og:type" content="article" />\n'
+        f'  <meta property="og:url" content="{_escape_meta_value(meta["canonical"])}" />\n'
+        f'  <meta name="twitter:card" content="summary_large_image" />\n  '
+    )
+    return _HEAD_CLOSE_RE.sub(f"  {og_tags}</head>", new_html, count=1)
+
+
+@router.get("/share/qa/{share_id}", response_class=HTMLResponse, include_in_schema=False)
+async def shared_qa_seo_html(share_id: str, request: Request, db: AsyncSession = Depends(get_db)):
+    """SEO-friendly HTML for shared Q&A links.
+
+    Public Q&A links used to inherit the homepage meta tags (generic
+    title and a stock landscape og:image), so every link shared to
+    linux.do / X / WeChat / Telegram looked identical and carried no
+    information about the underlying question. This handler injects
+    per-question title / description / canonical and points
+    ``og:image`` at ``/api/og/share/qa/{id}`` for a dynamically
+    rendered card.
+    """
+    record = await db.scalar(select(SharedQA).where(SharedQA.id == share_id))
+    if record is None:
+        raise HTTPException(status_code=404, detail="Shared Q&A not found")
+
+    meta = _build_share_qa_meta(record, request)
+    try:
+        html = await _fetch_index_html()
+    except httpx.HTTPError as e:
+        logger.warning("Failed to fetch frontend index.html for share/qa: %s", e)
+        fallback = (
+            "<!doctype html><html><head>"
+            f"<title>{_escape_meta_value(meta['title'])}</title>"
+            f'<meta name="description" content="{_escape_meta_value(meta["description"])}" />'
+            f'<meta property="og:title" content="{_escape_meta_value(meta["og_title"])}" />'
+            f'<meta property="og:description" content="{_escape_meta_value(meta["og_description"])}" />'
+            f'<meta property="og:image" content="{_escape_meta_value(meta["og_image"])}" />'
+            f'<meta property="og:type" content="article" />'
+            f'<meta name="twitter:card" content="summary_large_image" />'
+            f'<link rel="canonical" href="{_escape_meta_value(meta["canonical"])}" />'
+            "</head><body></body></html>"
+        )
+        return HTMLResponse(content=fallback, status_code=200)
+
+    return HTMLResponse(content=_inject_share_qa_meta(html, meta))
