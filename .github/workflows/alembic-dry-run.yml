@@ -1,0 +1,99 @@
+name: Alembic dry-run
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+    paths:
+      - "backend/alembic/**"
+      - "backend/app/models/**"
+      - "backend/app/database.py"
+      - "backend/requirements*.txt"
+      - ".github/workflows/alembic-dry-run.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  alembic-dry-run:
+    name: Alembic upgrade head (dry-run)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg15
+        env:
+          POSTGRES_USER: fojin
+          POSTGRES_PASSWORD: fojin
+          POSTGRES_DB: fojin_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fojin -d fojin_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: fojin
+      POSTGRES_PASSWORD: fojin
+      POSTGRES_DB: fojin_test
+      # backend/app/config.py builds DATABASE_URL from POSTGRES_* above.
+      # Provide harmless defaults for any settings the import path may touch.
+      JWT_SECRET_KEY: ci-dummy-secret
+      REDIS_HOST: localhost
+      REDIS_PORT: "6379"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Wait for Postgres
+        run: |
+          for i in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432 -U fojin -d fojin_test; then
+              echo "postgres ready"; exit 0
+            fi
+            sleep 2
+          done
+          echo "postgres did not become ready"; exit 1
+
+      - name: Ensure pgvector extension
+        env:
+          PGPASSWORD: fojin
+        run: |
+          psql -h localhost -U fojin -d fojin_test -c "CREATE EXTENSION IF NOT EXISTS vector;"
+          psql -h localhost -U fojin -d fojin_test -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
+
+      - name: Alembic upgrade head
+        run: alembic upgrade head
+
+      - name: Alembic downgrade -1 (best-effort)
+        id: downgrade
+        continue-on-error: true
+        run: alembic downgrade -1
+
+      - name: Note irreversible migration (warning only)
+        if: steps.downgrade.outcome == 'failure'
+        run: |
+          echo "::warning::alembic downgrade -1 failed; latest migration may be irreversible. Treating as non-fatal."
+
+      - name: Alembic upgrade head (re-apply)
+        run: alembic upgrade head
+
+      - name: Show final alembic state
+        run: alembic current
