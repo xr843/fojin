@@ -19,17 +19,17 @@ from app.core.elasticsearch import INDEX_NAME
 
 
 async def main():
-    engine = create_async_engine(settings.DATABASE_URL, echo=False)
+    engine = create_async_engine(settings.database_url, echo=False)
     session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-    es = AsyncElasticsearch(settings.ELASTICSEARCH_URL)
+    es = AsyncElasticsearch(settings.es_host)
 
     async with session_factory() as session:
         result = await session.execute(text("""
             SELECT bt.id, bt.taisho_id, bt.cbeta_id, bt.title_zh, bt.title_en,
                    bt.title_sa, bt.title_bo, bt.title_pi, bt.translator,
                    bt.dynasty, bt.category, bt.subcategory, bt.fascicle_count,
-                   bt.cbeta_url, bt.has_content, bt.lang,
+                   bt.cbeta_url, bt.has_content, bt.content_char_count, bt.lang,
                    ds.code as source_code
             FROM buddhist_texts bt
             LEFT JOIN data_sources ds ON bt.source_id = ds.id
@@ -55,7 +55,8 @@ async def main():
                 "subcategory": row.subcategory,
                 "fascicle_count": row.fascicle_count,
                 "cbeta_url": row.cbeta_url,
-                "has_content": row.has_content or False,
+                "has_content": bool(row.has_content),
+                "content_char_count": row.content_char_count or 0,
                 "lang": row.lang or "lzh",
                 "source_code": row.source_code,
             }
