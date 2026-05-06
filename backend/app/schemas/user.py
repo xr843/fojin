@@ -48,6 +48,21 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class OAuthExchangeRequest(BaseModel):
+    code: str
+
+    @field_validator("code")
+    @classmethod
+    def code_format(cls, v: str) -> str:
+        # secrets.token_urlsafe(16) → 22 chars, urlsafe alphabet.
+        # Be lenient on length but reject anything obviously malformed.
+        if not v or len(v) < 16 or len(v) > 64:
+            raise ValueError("invalid code format")
+        if not re.fullmatch(r"[A-Za-z0-9_\-]+", v):
+            raise ValueError("invalid code format")
+        return v
+
+
 class UserProfile(BaseModel):
     id: int
     username: str

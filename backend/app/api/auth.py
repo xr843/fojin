@@ -1,6 +1,8 @@
+import json
+import logging
 import secrets
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +16,7 @@ from app.schemas.user import (
     ApiKeyRequest,
     ApiKeyStatus,
     ChangePasswordRequest,
+    OAuthExchangeRequest,
     TokenResponse,
     UserLogin,
     UserProfile,
@@ -29,6 +32,32 @@ from app.services.oauth import (
     sms_login,
     verify_sms_code,
 )
+
+logger = logging.getLogger(__name__)
+
+# One-time OAuth exchange code lifetime (seconds). Short by design — the
+# frontend should redeem the code immediately after redirect.
+OAUTH_EXCHANGE_TTL = 5
+OAUTH_EXCHANGE_PREFIX = "oauth:exchange:"
+
+
+async def _store_oauth_exchange(redis_client, token_resp: TokenResponse, provider: str) -> str:
+    """Stash a token in Redis under a one-time code; return the code.
+
+    The code is short-lived (OAUTH_EXCHANGE_TTL) and is consumed atomically
+    via GETDEL on the exchange endpoint.
+    """
+    code = secrets.token_urlsafe(16)
+    payload = json.dumps(
+        {
+            "access_token": token_resp.access_token,
+            "token_type": token_resp.token_type,
+            "provider": provider,
+        }
+    )
+    await redis_client.set(f"{OAUTH_EXCHANGE_PREFIX}{code}", payload, ex=OAUTH_EXCHANGE_TTL)
+    return code
+
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -182,9 +211,8 @@ async def github_oauth_callback(
 
     try:
         token_resp = await github_callback(code, db)
-        return RedirectResponse(
-            url=f"{settings.oauth_redirect_base}/login?token={token_resp.access_token}&provider=github"
-        )
+        exchange_code = await _store_oauth_exchange(redis_client, token_resp, "github")
+        return RedirectResponse(url=f"{settings.oauth_redirect_base}/login?provider=github&code={exchange_code}")
     except Exception:
         return RedirectResponse(url=f"{settings.oauth_redirect_base}/login?error=github_failed")
 
@@ -217,11 +245,86 @@ async def google_oauth_callback(
 
     try:
         token_resp = await google_callback(code, db)
-        return RedirectResponse(
-            url=f"{settings.oauth_redirect_base}/login?token={token_resp.access_token}&provider=google"
-        )
+        exchange_code = await _store_oauth_exchange(redis_client, token_resp, "google")
+        return RedirectResponse(url=f"{settings.oauth_redirect_base}/login?provider=google&code={exchange_code}")
     except Exception:
         return RedirectResponse(url=f"{settings.oauth_redirect_base}/login?error=google_failed")
+
+
+# ── OAuth: one-time code exchange ────────────────────────────
+
+
+@router.post("/oauth/exchange", response_model=TokenResponse)
+async def oauth_exchange(
+    data: OAuthExchangeRequest,
+    request: Request,
+):
+    """Exchange a short-lived OAuth code for a JWT.
+
+    The OAuth provider callback redirects the browser to the frontend with
+    only an opaque code in the URL. The frontend POSTs that code here to
+    obtain the actual JWT — keeping the JWT out of nginx access logs,
+    browser history, and Referer headers.
+
+    The code is consumed atomically (GETDEL) and is single-use.
+    """
+    redis_client = request.app.state.redis
+    key = f"{OAUTH_EXCHANGE_PREFIX}{data.code}"
+
+    # Atomic get-and-delete. Falls back to GET+DELETE on older Redis.
+    raw = None
+    try:
+        raw = await redis_client.getdel(key)
+    except AttributeError:
+        raw = await redis_client.get(key)
+        if raw is not None:
+            await redis_client.delete(key)
+
+    if not raw:
+        raise HTTPException(status_code=401, detail="code expired or invalid")
+
+    try:
+        payload = json.loads(raw)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=401, detail="code expired or invalid") from exc
+
+    access_token = payload.get("access_token")
+    provider = payload.get("provider")
+    if not access_token:
+        raise HTTPException(status_code=401, detail="code expired or invalid")
+
+    # Audit log: provider + user_id (decoded from JWT) + client IP. Never
+    # log the exchange code itself.
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        client_ip = forwarded.split(",")[0].strip()
+    elif request.client:
+        client_ip = request.client.host
+    else:
+        client_ip = None
+
+    user_id = None
+    try:
+        from app.core.auth import verify_token
+
+        verified = verify_token(access_token)
+        if verified is not None:
+            user_id = verified[0]
+    except Exception:
+        # Audit logging must not break the exchange.
+        pass
+
+    logger.info(
+        "oauth_exchange success provider=%s user_id=%s ip=%s",
+        provider,
+        user_id,
+        client_ip,
+    )
+
+    return TokenResponse(
+        access_token=access_token,
+        token_type=payload.get("token_type", "bearer"),
+    )
 
 
 # ── SMS Login ────────────────────────────────────────────────
@@ -261,5 +364,6 @@ async def sms_verification_login(
     valid = await verify_sms_code(data.phone, data.code, redis_client)
     if not valid:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=400, detail="验证码错误或已过期")
     return await sms_login(data.phone, db)
