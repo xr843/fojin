@@ -96,13 +96,13 @@ export default function SearchPage() {
     enabled: query.length > 0 && tab === "catalog",
   });
 
-  const { data: contentData, isLoading: contentLoading } = useQuery({
+  const { data: contentData, isLoading: contentLoading, isError: contentError } = useQuery({
     queryKey: ["searchContent", query, page, selectedSources, langFilter],
     queryFn: () => searchContent({ q: query, page, size: 20, sources: selectedSources || undefined, lang: langFilter || undefined }),
     enabled: query.length > 0 && tab === "content",
   });
 
-  const { data: dictData, isLoading: dictLoading } = useQuery({
+  const { data: dictData, isLoading: dictLoading, isError: dictError } = useQuery({
     queryKey: ["searchDict", query, dictPage, dictLang],
     queryFn: () => searchDictionary({ q: query, page: dictPage, size: 20, lang: dictLang || undefined }),
     enabled: query.length > 0 && tab === "dictionary",
@@ -218,7 +218,20 @@ export default function SearchPage() {
   };
 
   const loading = tab === "catalog" ? (isLoading || crossLangLoading) : tab === "content" ? (contentLoading || semanticLoading) : dictLoading;
+  // Primary query loading state (excluding secondary cross-language / semantic queries),
+  // used to bail out of skeleton rendering once the main result count is known to be 0.
+  const primaryLoading = tab === "catalog" ? isLoading : tab === "content" ? contentLoading : dictLoading;
   const localTotal = tab === "catalog" ? (data?.total || 0) : tab === "content" ? (contentData?.total || 0) : (dictData?.total || 0);
+  const hasSecondaryResults = tab === "catalog"
+    ? (crossLangData?.results.length || 0) > 0
+    : tab === "content"
+    ? (semanticData?.results.length || 0) > 0
+    : false;
+  // Don't fire the empty state when the primary query failed — the existing
+  // error UI handles that case. Without this guard, an API error renders
+  // both the error block AND the "no on-site matches" copy.
+  const primaryError = tab === "catalog" ? isError : tab === "content" ? contentError : dictError;
+  const showEmptyState = !primaryLoading && !primaryError && localTotal === 0 && !hasSecondaryResults;
   const extTotal = query.length > 0 ? filteredExtSources.length : 0;
 
   const sortedRegions = useMemo(() => {
@@ -468,7 +481,7 @@ export default function SearchPage() {
               </div>
             )}
 
-            {loading && Array.from({ length: 5 }).map((_, i) => (
+            {loading && !showEmptyState && Array.from({ length: 5 }).map((_, i) => (
               <div className="s-card" key={`skel-${i}`}>
                 <div className="s-card-rank">
                   <Skeleton.Button active size="small" style={{ width: 28, height: 14 }} />
@@ -559,8 +572,15 @@ export default function SearchPage() {
               </div>
             )}
 
+            {/* 站内 0 结果显式空状态：避免与外部源卡片混淆 */}
+            {showEmptyState && tab !== "dictionary" && (
+              <div className="s-empty-state" style={{ margin: "24px 0 12px", padding: "16px 20px", background: "var(--fj-sand-light, #faf7f2)", border: "1px solid #e8e0d4", borderRadius: 6, color: "#6b5d4a", fontSize: 14 }}>
+                {t("search.empty_state_external")}
+              </div>
+            )}
+
             {/* 外部数据源结果 */}
-            {!loading && tab !== "dictionary" && query.length > 0 && filteredExtSources.length > 0 && (
+            {(!loading || showEmptyState) && tab !== "dictionary" && query.length > 0 && filteredExtSources.length > 0 && (
               <>
                 <div className="s-ext-divider">
                   以下 {extTotal} 个外部数据源可继续搜索「{query}」
