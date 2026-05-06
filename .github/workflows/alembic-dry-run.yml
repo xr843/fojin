@@ -28,7 +28,7 @@ jobs:
         image: pgvector/pgvector:pg15
         env:
           POSTGRES_USER: fojin
-          POSTGRES_PASSWORD: fojin
+          POSTGRES_PASSWORD: ${{ github.run_id }}
           POSTGRES_DB: fojin_test
         ports:
           - 5432:5432
@@ -42,7 +42,7 @@ jobs:
       POSTGRES_HOST: localhost
       POSTGRES_PORT: "5432"
       POSTGRES_USER: fojin
-      POSTGRES_PASSWORD: fojin
+      POSTGRES_PASSWORD: ${{ github.run_id }}
       POSTGRES_DB: fojin_test
       # backend/app/config.py builds DATABASE_URL from POSTGRES_* above.
       # Provide harmless defaults for any settings the import path may touch.
@@ -74,7 +74,7 @@ jobs:
 
       - name: Ensure pgvector extension
         env:
-          PGPASSWORD: fojin
+          PGPASSWORD: ${{ github.run_id }}
         run: |
           psql -h localhost -U fojin -d fojin_test -c "CREATE EXTENSION IF NOT EXISTS vector;"
           psql -h localhost -U fojin -d fojin_test -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
