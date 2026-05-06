@@ -234,7 +234,12 @@ export default function Layout() {
               selectedKeys: [i18n.resolvedLanguage ?? i18n.language],
             }}
           >
-            <Button type="text" icon={<GlobalOutlined />} style={{ color: inkMuted, fontSize: 13 }}>
+            <Button
+              type="text"
+              icon={<GlobalOutlined />}
+              style={{ color: inkMuted, fontSize: 13 }}
+              aria-label={t("a11y.button.switch_language")}
+            >
               <span className="header-lang-text">{t(`language.${i18n.resolvedLanguage ?? i18n.language}`)}</span>
             </Button>
           </Dropdown>
@@ -268,6 +273,7 @@ export default function Layout() {
                 type="text"
                 icon={<UserOutlined />}
                 style={{ color: inkMuted, fontSize: 13 }}
+                aria-label={t("a11y.button.user_menu")}
               >
                 <span className="header-username">{user.display_name || user.username}</span>
               </Button>
@@ -287,6 +293,7 @@ export default function Layout() {
                 fontFamily: '"Noto Serif SC", serif',
               }}
               onClick={() => navigate("/login")}
+              aria-label={t("a11y.button.login")}
             >
               <span className="header-login-text">{t("auth.login")}</span>
             </Button>
