@@ -110,12 +110,14 @@ async def change_password(
         client_ip = request.client.host
     else:
         client_ip = None
+    user_agent = request.headers.get("user-agent")
     return await change_user_password(
         db,
         user,
         old_password=data.old_password,
         new_password=data.new_password,
         client_ip=client_ip,
+        user_agent=user_agent,
     )
 
 
