@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Badge, Popover, List, Button, Typography, Empty, Space } from "antd";
 import { BellOutlined } from "@ant-design/icons";
 import { useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../stores/authStore";
 import {
   getNotifications,
@@ -14,6 +15,7 @@ import {
 export default function NotificationBell() {
   const user = useAuthStore((s) => s.user);
   const location = useLocation();
+  const { t } = useTranslation();
   const [unreadCount, setUnreadCount] = useState(0);
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -123,8 +125,11 @@ export default function NotificationBell() {
       placement="bottomRight"
     >
       <Badge count={unreadCount} size="small" offset={[2, -2]}>
-        <BellOutlined
-          style={{ fontSize: 16, cursor: "pointer", color: "var(--fj-ink-muted)" }}
+        <Button
+          type="text"
+          icon={<BellOutlined style={{ fontSize: 16, color: "var(--fj-ink-muted)" }} />}
+          aria-label={t("a11y.button.notifications")}
+          style={{ padding: 4, height: "auto" }}
         />
       </Badge>
     </Popover>
