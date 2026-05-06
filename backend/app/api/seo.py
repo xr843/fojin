@@ -17,6 +17,7 @@ The frontend ``index.html`` is cached for 60 seconds so a frontend redeploy
 is picked up within a minute without restarting the backend.
 """
 
+import json
 import logging
 import re
 import time
@@ -195,7 +196,89 @@ async def _serve_text_seo_html(
         return HTMLResponse(content=fallback, status_code=200)
 
     title, description, canonical = _build_text_meta(text, request, route=route)
-    return HTMLResponse(content=_inject_meta(html, title, description, canonical, robots=robots))
+    patched = _inject_meta(html, title, description, canonical, robots=robots)
+    patched = _inject_text_jsonld(patched, _build_text_jsonld(text, canonical_url=canonical))
+    return HTMLResponse(content=patched)
+
+
+# Languages that buddhist_texts.lang uses, mapped to BCP-47 codes that
+# schema.org / search engines understand. ``lzh`` (literary Chinese) is the
+# only one that requires translation; the rest are already valid BCP-47.
+_LANG_TO_BCP47 = {
+    "lzh": "lzh",  # already a registered IANA subtag for Literary Chinese
+    "zh": "zh-Hant",
+    "pi": "pi",
+    "bo": "bo",
+    "sa": "sa",
+    "en": "en",
+    "ja": "ja",
+    "ko": "ko",
+}
+
+
+def _build_text_jsonld(text, *, canonical_url: str) -> dict:
+    """Build a schema.org Book entry for a Buddhist canonical text.
+
+    Crawlers and Google Scholar consume this to decide *what* the page is
+    about, beyond what \\<title\\> / meta description carry. We populate the
+    fields with the strongest signal we have — CBETA identifier, translator
+    if known, dynasty as a publication date approximation, language code.
+    """
+    title_zh = (text.title_zh or "").strip()
+    translator = (text.translator or "").strip()
+    dynasty = (text.dynasty or "").strip()
+    cbeta_id = (text.cbeta_id or "").strip()
+    lang = (text.lang or "lzh").strip().lower()
+
+    payload: dict = {
+        "@context": "https://schema.org",
+        "@type": "Book",
+        "name": title_zh or "佛典",
+        "url": canonical_url,
+        "inLanguage": _LANG_TO_BCP47.get(lang, lang),
+        "isAccessibleForFree": True,
+    }
+    if translator:
+        payload["translator"] = {"@type": "Person", "name": translator}
+    if dynasty:
+        # ``datePublished`` is meant to be ISO-8601, but a free-form era
+        # string ("唐"/"宋"/...) is what we have and is what Google's
+        # structured-data tester accepts gracefully.
+        payload["datePublished"] = dynasty
+    if cbeta_id:
+        payload["identifier"] = {
+            "@type": "PropertyValue",
+            "propertyID": "CBETA",
+            "value": cbeta_id,
+        }
+    # Title transliterations into other scripts when available.
+    alt_names = [
+        getattr(text, "title_en", None),
+        getattr(text, "title_sa", None),
+        getattr(text, "title_pi", None),
+        getattr(text, "title_bo", None),
+    ]
+    alt_names = [n for n in alt_names if n]
+    if alt_names:
+        payload["alternateName"] = alt_names
+    payload["publisher"] = {
+        "@type": "Organization",
+        "name": "佛津 FoJin",
+        "url": "https://fojin.app",
+    }
+    return payload
+
+
+def _inject_text_jsonld(html: str, payload: dict) -> str:
+    """Insert a single \\<script type=\"application/ld+json\"\\> just before \\</head\\>.
+
+    ``json.dumps`` does the escaping. We additionally guard against
+    ``</script>`` appearing inside the payload (technically impossible from
+    the fields we feed it, but cheap insurance).
+    """
+    blob = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+    tag = f'<script type="application/ld+json">{blob}</script>'
+    return _HEAD_CLOSE_RE.sub(f"  {tag}\n  </head>", html, count=1)
 
 
 @router.get("/texts/{text_id}", response_class=HTMLResponse, include_in_schema=False)
