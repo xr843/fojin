@@ -13,6 +13,32 @@ import pytest
 from app.api.auth import OAUTH_EXCHANGE_PREFIX
 
 
+@pytest.fixture(autouse=True)
+def _isolate_app_state_redis():
+    """Snapshot and restore ``app.state.redis`` around every test.
+
+    The OAuth exchange endpoint reads ``request.app.state.redis``, so
+    these tests have to install a mock there. Without this fixture, the
+    mock leaks into subsequent tests in the same pytest session — for
+    example ``tests/test_smoke.py::test_sources_include_distributions``
+    starts seeing AsyncMock-returned bytes where it expects real Redis
+    output, and fails with ``json.decoder.JSONDecodeError`` on the next
+    HTTP response.
+    """
+    from app.main import app
+
+    sentinel = object()
+    original = getattr(app.state, "redis", sentinel)
+    try:
+        yield
+    finally:
+        if original is sentinel:
+            if hasattr(app.state, "redis"):
+                delattr(app.state, "redis")
+        else:
+            app.state.redis = original
+
+
 def _install_redis(client, *, getdel_return=None, get_return=None):
     """Install a fresh AsyncMock as app.state.redis with deterministic behavior."""
     from app.main import app
