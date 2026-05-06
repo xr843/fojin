@@ -16,9 +16,11 @@ export default function LoginPage() {
   const [activeTab, setActiveTab] = useState("login");
   const [searchParams] = useSearchParams();
 
-  // Handle OAuth callback: ?token=xxx&provider=github
+  // Handle OAuth callback: ?provider=github&code=xxx
+  // The backend redirects with a one-time exchange code (NOT a JWT) to
+  // keep tokens out of nginx access logs, browser history, and Referer.
   useEffect(() => {
-    const token = searchParams.get("token");
+    const code = searchParams.get("code");
     const provider = searchParams.get("provider");
     const error = searchParams.get("error");
 
@@ -27,10 +29,11 @@ export default function LoginPage() {
       return;
     }
 
-    if (token && provider) {
-      // Got token from OAuth callback, fetch user info
+    if (code && provider) {
       (async () => {
         try {
+          const { data: tokenData } = await api.post("/auth/oauth/exchange", { code });
+          const token = tokenData.access_token;
           const { data: user } = await api.get("/auth/me", {
             headers: { Authorization: `Bearer ${token}` },
           });
@@ -38,7 +41,8 @@ export default function LoginPage() {
           message.success(`${provider === "github" ? "GitHub" : "Google"} 登录成功`);
           navigate("/", { replace: true });
         } catch {
-          message.error("登录失败，请重试");
+          message.error("第三方登录失败，请重试");
+          navigate("/login", { replace: true });
         }
       })();
     }
