@@ -68,75 +68,102 @@ async def _attach_parallel_chunks(db: AsyncSession, results: list[dict]) -> None
     both directions (text_a and text_b sides). For each match, fetches the
     aligned chunk's text from text_embeddings + title_zh from buddhist_texts.
 
-    Modifies `results` in place by setting result["parallel_chunks"] to a list
-    of ParallelChunk-compatible dicts.
+    Implementation note: collapses the previous N+1 (1 alignment query per
+    primary + 1 chunk-text query per parallel — up to 25 sequential awaits at
+    5×5) into a single bulk SQL round-trip. Builds two CTEs:
+      1. `primaries(idx, tid, juan, cidx)` — VALUES table of input tuples
+      2. ranked alignment matches per primary, joined back to text_embeddings
+         + buddhist_texts in one shot
+    Then groups results in Python by primary index. Modifies `results` in
+    place by setting result["parallel_chunks"] to a list of
+    ParallelChunk-compatible dicts.
     """
     if not results:
         return
-    # Build a bulk query: "for any of these (text_id, juan, chunk) tuples, find
-    # alignment_pairs where text_a_* OR text_b_* matches, and return the other side"
     for r in results:
         r.setdefault("parallel_chunks", [])
     try:
-        for r in results:
-            tid = r["text_id"]
-            juan = r["juan_num"]
-            cidx = r["chunk_index"]
-            sql = sql_text("""
+        # Build a VALUES list parametrized by primary index so we can match
+        # alignment rows back to the right result. Index is 0-based.
+        primary_keys: list[tuple[int, int, int, int]] = [
+            (i, int(r["text_id"]), int(r["juan_num"]), int(r["chunk_index"])) for i, r in enumerate(results)
+        ]
+        # Construct the VALUES clause inline (small N, all integers — safe to
+        # interpolate). Each row is `(idx, tid, juan, cidx)`.
+        values_sql = ", ".join(f"({idx}, {tid}, {juan}, {cidx})" for idx, tid, juan, cidx in primary_keys)
+        # Single bulk query:
+        #   - primaries: input tuples with their original index
+        #   - matches: alignment_pairs joined with primaries in either direction,
+        #              returning the OTHER side
+        #   - ranked: top-5 per primary by confidence
+        #   - final: join ranked with text_embeddings + buddhist_texts to fetch
+        #            chunk_text + title
+        bulk_sql = sql_text(f"""
+            WITH primaries(idx, tid, juan, cidx) AS (
+                VALUES {values_sql}
+            ),
+            matches AS (
                 SELECT
-                    CASE WHEN ap.text_a_id = :tid AND ap.text_a_juan_num = :juan AND ap.text_a_chunk_index = :cidx
+                    p.idx AS primary_idx,
+                    CASE WHEN ap.text_a_id = p.tid AND ap.text_a_juan_num = p.juan AND ap.text_a_chunk_index = p.cidx
                          THEN ap.text_b_id ELSE ap.text_a_id END AS other_text_id,
-                    CASE WHEN ap.text_a_id = :tid AND ap.text_a_juan_num = :juan AND ap.text_a_chunk_index = :cidx
+                    CASE WHEN ap.text_a_id = p.tid AND ap.text_a_juan_num = p.juan AND ap.text_a_chunk_index = p.cidx
                          THEN ap.text_b_juan_num ELSE ap.text_a_juan_num END AS other_juan,
-                    CASE WHEN ap.text_a_id = :tid AND ap.text_a_juan_num = :juan AND ap.text_a_chunk_index = :cidx
+                    CASE WHEN ap.text_a_id = p.tid AND ap.text_a_juan_num = p.juan AND ap.text_a_chunk_index = p.cidx
                          THEN ap.text_b_chunk_index ELSE ap.text_a_chunk_index END AS other_chunk_idx,
-                    CASE WHEN ap.text_a_id = :tid AND ap.text_a_juan_num = :juan AND ap.text_a_chunk_index = :cidx
+                    CASE WHEN ap.text_a_id = p.tid AND ap.text_a_juan_num = p.juan AND ap.text_a_chunk_index = p.cidx
                          THEN ap.text_b_lang ELSE ap.text_a_lang END AS other_lang,
                     ap.confidence
-                FROM alignment_pairs ap
-                WHERE (
-                    (ap.text_a_id = :tid AND ap.text_a_juan_num = :juan AND ap.text_a_chunk_index = :cidx)
+                FROM primaries p
+                JOIN alignment_pairs ap ON (
+                    (ap.text_a_id = p.tid AND ap.text_a_juan_num = p.juan AND ap.text_a_chunk_index = p.cidx)
                     OR
-                    (ap.text_b_id = :tid AND ap.text_b_juan_num = :juan AND ap.text_b_chunk_index = :cidx)
+                    (ap.text_b_id = p.tid AND ap.text_b_juan_num = p.juan AND ap.text_b_chunk_index = p.cidx)
                 )
-                AND ap.text_a_chunk_index IS NOT NULL
-                ORDER BY ap.confidence DESC
-                LIMIT 5
-            """)
-            rows = (await db.execute(sql, {"tid": tid, "juan": juan, "cidx": cidx})).fetchall()
-            if not rows:
+                WHERE ap.text_a_chunk_index IS NOT NULL
+            ),
+            ranked AS (
+                SELECT m.*,
+                       ROW_NUMBER() OVER (PARTITION BY m.primary_idx ORDER BY m.confidence DESC) AS rn
+                FROM matches m
+            )
+            SELECT
+                r.primary_idx,
+                r.other_text_id,
+                r.other_juan,
+                r.other_chunk_idx,
+                r.other_lang,
+                r.confidence,
+                te.chunk_text,
+                COALESCE(bt.title_zh, bt.title_sa, bt.title_pi, bt.title_en, '') AS title
+            FROM ranked r
+            LEFT JOIN text_embeddings te
+                ON te.text_id = r.other_text_id
+               AND te.juan_num = r.other_juan
+               AND te.chunk_index = r.other_chunk_idx
+            LEFT JOIN buddhist_texts bt ON bt.id = r.other_text_id
+            WHERE r.rn <= 5
+            ORDER BY r.primary_idx, r.rn
+        """)
+        rows = (await db.execute(bulk_sql)).fetchall()
+        for row in rows:
+            primary_idx = row[0]
+            chunk_text = row[6]
+            # Skip parallels that have no chunk_text (LEFT JOIN miss) — matches
+            # original behavior which only appended when the per-row fetch hit.
+            if chunk_text is None:
                 continue
-            # Fetch chunk_text + title for each parallel. Loop-per-row is fine
-            # for the expected small N (≤ 5 parallels × 5 primary results).
-            parallel_keys = [(row[0], row[1], row[2], row[3], float(row[4])) for row in rows]
-            text_map: dict[tuple[int, int, int], tuple[str, str]] = {}
-            for other_tid, other_juan, other_cidx, _lang, _conf in parallel_keys:
-                text_row = (await db.execute(
-                    sql_text(
-                        "SELECT te.chunk_text, "
-                        "COALESCE(bt.title_zh, bt.title_sa, bt.title_pi, bt.title_en, '') "
-                        "FROM text_embeddings te "
-                        "LEFT JOIN buddhist_texts bt ON bt.id = te.text_id "
-                        "WHERE te.text_id = :tid AND te.juan_num = :juan AND te.chunk_index = :cidx"
-                    ),
-                    {"tid": other_tid, "juan": other_juan, "cidx": other_cidx},
-                )).fetchone()
-                if text_row:
-                    text_map[(other_tid, other_juan, other_cidx)] = (text_row[0], text_row[1])
-            for other_tid, other_juan, other_cidx, other_lang, conf in parallel_keys:
-                key = (other_tid, other_juan, other_cidx)
-                if key not in text_map:
-                    continue
-                chunk_text, title = text_map[key]
-                r["parallel_chunks"].append({
-                    "text_id": other_tid,
-                    "juan_num": other_juan,
-                    "chunk_index": other_cidx,
+            results[primary_idx]["parallel_chunks"].append(
+                {
+                    "text_id": row[1],
+                    "juan_num": row[2],
+                    "chunk_index": row[3],
                     "chunk_text": chunk_text,
-                    "lang": other_lang or "lzh",
-                    "title": title,
-                    "confidence": conf,
-                })
+                    "lang": row[4] or "lzh",
+                    "title": row[7],
+                    "confidence": float(row[5]),
+                }
+            )
     except Exception:
         logger.exception("Failed to attach parallel chunks")
 
@@ -155,9 +182,7 @@ def _format_context_block(result: dict) -> str:
         for p in parallels[:3]:  # cap at 3 parallels per primary source
             lang_label = {"pi": "巴利", "bo": "藏", "sa": "梵", "en": "英", "lzh": "汉"}.get(p["lang"], p["lang"])
             title = p.get("title", "") or "其他藏经"
-            parallel_lines.append(
-                f"  · [{lang_label}] 《{title}》 第{p['juan_num']}卷: {p['chunk_text'][:300]}"
-            )
+            parallel_lines.append(f"  · [{lang_label}] 《{title}》 第{p['juan_num']}卷: {p['chunk_text'][:300]}")
         parallel_block = "\n[跨藏对读 parallel_chunks]\n" + "\n".join(parallel_lines)
         return f"{header}\n{body}{parallel_block}"
     return f"{header}\n{body}"
@@ -184,7 +209,7 @@ def _keyword_rerank(query: str, results: list[dict]) -> list[dict]:
             # Extract meaningful segments (2+ chars) from title for matching
             for i in range(len(title)):
                 for length in range(2, min(len(title) - i + 1, 8)):
-                    segment = title[i:i + length]
+                    segment = title[i : i + length]
                     if segment in query:
                         title_boost = 1.0
                         break
@@ -195,7 +220,12 @@ def _keyword_rerank(query: str, results: list[dict]) -> list[dict]:
         r["score"] = original_score * 0.7 + keyword_overlap * 0.2 + title_boost * 0.1
         logger.debug(
             "Rerank [keyword]: text_id=%s juan=%s | vec=%.3f kw=%.3f title=%.1f -> final=%.3f",
-            r["text_id"], r["juan_num"], original_score, keyword_overlap, title_boost, r["score"],
+            r["text_id"],
+            r["juan_num"],
+            original_score,
+            keyword_overlap,
+            title_boost,
+            r["score"],
         )
 
     results.sort(key=lambda r: r["score"], reverse=True)
@@ -239,7 +269,11 @@ async def _api_rerank(query: str, results: list[dict]) -> list[dict]:
             r["score"] = original_score * 0.4 + api_score * 0.6
             logger.debug(
                 "Rerank [API]: text_id=%s juan=%s | vec=%.3f api=%.3f -> final=%.3f",
-                r["text_id"], r["juan_num"], original_score, api_score, r["score"],
+                r["text_id"],
+                r["juan_num"],
+                original_score,
+                api_score,
+                r["score"],
             )
 
         results.sort(key=lambda r: r["score"], reverse=True)
@@ -409,7 +443,9 @@ async def retrieve_rag_context(
             bo_hits = await similarity_search(db, query_embedding, limit=PARALLEL_BO_K, lang_list=["bo"])
             text_results = _merge_with_alignment_sync(lzh_hits, pi_hits, bo_hits)
         else:
-            text_results = await similarity_search(db, query_embedding, limit=pgvector_limit, scope_text_ids=scope_text_ids)
+            text_results = await similarity_search(
+                db, query_embedding, limit=pgvector_limit, scope_text_ids=scope_text_ids
+            )
 
         source_results = await source_similarity_search(db, query_embedding, limit=3, min_score=0.5)
         logger.debug("TIMING: pgvector search took %.2fs", time.monotonic() - t1)
@@ -438,14 +474,20 @@ async def retrieve_rag_context(
         if ENABLE_PARALLEL_RAG and search_results:
             await _attach_parallel_chunks(db, search_results)
 
-        sources = [ChatSource(**{k: v for k, v in r.items() if k not in ("source_id",)} | {"source_id": r.get("source_id")}) for r in search_results]
+        sources = [
+            ChatSource(**{k: v for k, v in r.items() if k not in ("source_id",)} | {"source_id": r.get("source_id")})
+            for r in search_results
+        ]
         context_parts = [_format_context_block(r) for r in search_results]
         context_text = "\n\n".join(context_parts)
 
         # Append source recommendations if any matched
         if source_results:
-            logger.debug("Found %d relevant data sources (scores: %s)",
-                         len(source_results), [f"{s['name_zh']}={s['score']:.3f}" for s in source_results])
+            logger.debug(
+                "Found %d relevant data sources (scores: %s)",
+                len(source_results),
+                [f"{s['name_zh']}={s['score']:.3f}" for s in source_results],
+            )
             source_lines = []
             for s in source_results:
                 desc = (s["description"] or "")[:80]
