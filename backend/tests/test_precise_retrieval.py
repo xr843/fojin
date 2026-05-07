@@ -14,6 +14,7 @@ from app.services.precise_retrieval import (
     _cjk_to_int,
     _detect_title_juan,
     _parse_juan_number,
+    _resolve_title,
     try_precise_text_retrieval,
 )
 
@@ -186,16 +187,133 @@ async def test_truncates_long_content_with_marker():
 
 
 @pytest.mark.anyio
-async def test_ambiguous_title_falls_back_to_none():
-    """Two BuddhistText rows with the same title: don't guess; let
-    vector RAG handle it via score."""
+async def test_multiple_candidates_picks_first_deterministically():
+    """Famous sutras have multiple translator-rows under the same title
+    (心经×4, 金刚经×6). The query orders by (source_id, id) so
+    candidates[0] is the canonical translation; precise retrieval
+    must use that rather than punt to vector — punting is the bug
+    this PR is fixing."""
     db = MagicMock()
-    bt1, bt2 = MagicMock(), MagicMock()
+    canonical = MagicMock()
+    canonical.id = 9
+    canonical.title_zh = "般若波羅蜜多心經"
+    canonical.lang = "lzh"
+    canonical.source_id = 1
+    canonical.translator = "玄奘"
+
+    other = MagicMock()
+    other.id = 6504
+    other.title_zh = "般若波羅蜜多心經"
+    other.lang = "lzh"
+    other.source_id = 1
+    other.translator = "般若共利言等"
+
+    tc = MagicMock()
+    tc.text_id = 9
+    tc.juan_num = 1
+    tc.content = "般若波羅蜜多。"
+    tc.lang = "lzh"
+
     text_result = MagicMock()
-    text_result.scalars = MagicMock(return_value=iter([bt1, bt2]))
+    text_result.scalars = MagicMock(return_value=iter([canonical, other]))
+    content_result = MagicMock()
+    content_result.scalar_one_or_none = MagicMock(return_value=tc)
+    db.execute = AsyncMock(side_effect=[text_result, content_result])
+
+    result = await try_precise_text_retrieval(db, "《般若波羅蜜多心經》第1卷")
+    assert result is not None
+    assert result[0].text_id == 9  # canonical (玄奘) wins via SQL ORDER BY
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Title resolution: aliases + 简→繁 normalization
+# ──────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "raw, expected",
+    [
+        # Common short names — both simplified and traditional must
+        # resolve to the same canonical traditional title that lives in
+        # the production DB.
+        ("心经", "般若波羅蜜多心經"),
+        ("心經", "般若波羅蜜多心經"),
+        ("金刚经", "金剛般若波羅蜜經"),
+        ("金剛經", "金剛般若波羅蜜經"),
+        ("楞严经", "大佛頂如來密因修證了義諸菩薩萬行首楞嚴經"),
+        ("楞嚴經", "大佛頂如來密因修證了義諸菩薩萬行首楞嚴經"),
+        ("法华经", "妙法蓮華經"),
+        ("华严经", "大方廣佛華嚴經"),
+        ("圆觉经", "大方廣圓覺修多羅了義經"),
+        ("涅槃经", "大般涅槃經"),
+        ("起信论", "大乘起信論"),
+        # Whitespace must not affect resolution.
+        (" 心经 ", "般若波羅蜜多心經"),
+    ],
+)
+def test_resolve_title_aliases(raw, expected):
+    assert _resolve_title(raw) == expected
+
+
+def test_resolve_title_falls_back_to_simplified_to_traditional():
+    """Titles not in the alias table get OpenCC s2t conversion. This
+    handles the long tail of less-common scriptures the user might
+    type in simplified script (e.g. 楞伽阿跋多罗宝经 →
+    楞伽阿跋多羅寶經) without each one needing a hand-curated entry."""
+    # 楞伽阿跋多罗宝经 contains chars that differ across encodings
+    # (罗→羅, 宝→寶); s2t should convert them.
+    out = _resolve_title("楞伽阿跋多罗宝经")
+    assert "羅" in out
+    assert "寶" in out
+
+
+def test_resolve_title_passthrough_for_already_traditional():
+    """A title that's already in the canonical traditional form should
+    survive resolution unchanged — neither alias nor s2t should
+    mangle it."""
+    canonical = "大佛頂如來密因修證了義諸菩薩萬行首楞嚴經"
+    assert _resolve_title(canonical) == canonical
+
+
+@pytest.mark.anyio
+async def test_zero_candidates_returns_none():
+    """Title doesn't resolve to any DB row — must fall back to vector
+    RAG, never invent a result."""
+    db = MagicMock()
+    text_result = MagicMock()
+    text_result.scalars = MagicMock(return_value=iter([]))
     db.execute = AsyncMock(side_effect=[text_result])
-    result = await try_precise_text_retrieval(db, "《心经》第1卷")
+    result = await try_precise_text_retrieval(db, "《不存在经》第1卷")
     assert result is None
+
+
+@pytest.mark.anyio
+async def test_alias_resolution_drives_lookup_query():
+    """When the user types a short alias like 《心经》第1卷, the SQL
+    lookup must execute against the resolved canonical title, not the
+    raw input — otherwise the alias table is purely decorative."""
+    db = MagicMock()
+    bt = MagicMock()
+    bt.id = 9
+    bt.title_zh = "般若波羅蜜多心經"
+    bt.lang = "lzh"
+    bt.source_id = 1
+    bt.translator = "玄奘"
+    tc = MagicMock()
+    tc.text_id = 9
+    tc.juan_num = 1
+    tc.content = "般若波羅蜜多。"
+    tc.lang = "lzh"
+    text_result = MagicMock()
+    text_result.scalars = MagicMock(return_value=iter([bt]))
+    content_result = MagicMock()
+    content_result.scalar_one_or_none = MagicMock(return_value=tc)
+    db.execute = AsyncMock(side_effect=[text_result, content_result])
+
+    result = await try_precise_text_retrieval(db, "《心经》第1卷")
+    assert result is not None
+    assert result[0].title_zh == "般若波羅蜜多心經"
+    assert result[0].text_id == 9
 
 
 @pytest.mark.anyio
