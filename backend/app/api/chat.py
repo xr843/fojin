@@ -102,7 +102,7 @@ async def list_chat_models(
     """Return curated catalog of selectable models, with availability flag.
 
     返回前端可选的精选模型列表（含可用性标记）。"""
-    from app.services.chat import PROVIDER_URLS
+    from app.services.chat import _platform_provider_matches
     from app.services.llm_catalog import CATALOG
 
     items = []
@@ -113,13 +113,7 @@ async def list_chat_models(
             and user.encrypted_api_key
             and (user.api_provider or "openai") == opt.provider
         )
-        platform_url = settings.llm_api_url or ""
-        expected_url = PROVIDER_URLS.get(opt.provider, "")
-        platform_ok = bool(
-            expected_url
-            and (expected_url in platform_url or platform_url in expected_url)
-            and settings.llm_api_key
-        )
+        platform_ok = bool(_platform_provider_matches(opt.provider) and settings.llm_api_key)
         items.append({
             "id": opt.id,
             "provider": opt.provider,

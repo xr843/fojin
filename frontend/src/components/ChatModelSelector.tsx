@@ -80,7 +80,15 @@ export default function ChatModelSelector({ value, onChange }: ChatModelSelector
     fetchChatModels()
       .then((list) => {
         if (cancelled) return;
-        setModels(list.length > 0 ? list : FALLBACK_OPTIONS);
+        const next = list.length > 0 ? list : FALLBACK_OPTIONS;
+        setModels(next);
+        // Reconcile a stale localStorage choice (e.g. a model that's
+        // since been removed from the catalog) so the dropdown never
+        // displays a blank value while still POSTing the stale id.
+        if (!next.some((m) => m.id === value)) {
+          const firstAvailable = next.find((m) => m.available) ?? next[0];
+          if (firstAvailable) onChange(firstAvailable.id);
+        }
       })
       .catch((err) => {
         // Fallback so chat keeps working when /chat/models is unavailable.
@@ -93,6 +101,8 @@ export default function ChatModelSelector({ value, onChange }: ChatModelSelector
     return () => {
       cancelled = true;
     };
+    // value/onChange intentionally excluded — we only reconcile once per fetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const groupedOptions = useMemo<SelectGroup[]>(() => {

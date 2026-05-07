@@ -636,7 +636,13 @@ export default function ChatPage() {
         setSending(false);
         refetchQuota();
       },
-    }, abortController.signal, undefined, hotQuestionId, modelId);
+      // Only send model_id when the user has explicitly picked a non-default
+      // model. Treating the default as "no override" lets _resolve_llm_config
+      // pick the platform default for whatever LLM_API_URL is configured —
+      // important for non-deepseek deployments where forcing a deepseek
+      // catalog id would otherwise raise.
+    }, abortController.signal, undefined, hotQuestionId,
+       modelId === "deepseek:v4-flash" ? null : modelId);
   }, [sending, sessionId, masterId, modelId, user, refetchSessions, refetchQuota, queryClient]);
 
   const handleSend = useCallback(async () => {

@@ -495,19 +495,32 @@ def _resolve_with_model_override(
             logger.warning("Failed to decrypt user %s API key: %s", user.id, exc)
             raise ServiceError("您的 API Key 解密失败，请在个人中心重新配置。") from None
     # Platform path — only works when the platform-configured llm_api_url
-    # matches this provider
-    platform_url = settings.llm_api_url or ""
-    expected_url = PROVIDER_URLS.get(opt.provider, "")
-    if (
-        expected_url
-        and (expected_url in platform_url or platform_url in expected_url)
-        and settings.llm_api_key
-    ):
+    # matches this provider. Match by host prefix (rstrip trailing slashes)
+    # to avoid false positives where one URL is a substring of another
+    # (e.g. operator setting LLM_API_URL=https://api. would otherwise
+    # match every provider).
+    if _platform_provider_matches(opt.provider) and settings.llm_api_key:
+        expected_url = PROVIDER_URLS[opt.provider]
         return expected_url, settings.llm_api_key, opt.model, False, opt.provider
     # Provider not available on platform; user has no matching BYOK
     raise ServiceError(
         f"所选模型「{opt.label}」需要在个人中心配置 {opt.provider} 服务商的 API Key 后使用。"
     )
+
+
+def _platform_provider_matches(provider: str) -> bool:
+    """True iff the platform-configured llm_api_url points at this provider.
+
+    Uses host-anchored matching (after stripping trailing slashes) so that
+    e.g. ``https://api.deepseek.com/v1`` and ``https://api.deepseek.com``
+    both count as deepseek, but ``https://api.`` does not match every
+    provider.
+    """
+    expected = PROVIDER_URLS.get(provider, "").rstrip("/")
+    platform = (settings.llm_api_url or "").rstrip("/")
+    if not expected or not platform:
+        return False
+    return platform == expected or platform.startswith(expected + "/") or expected.startswith(platform + "/")
 
 
 def _resolve_fallback_llm_config() -> tuple[str, str, str, str] | None:
