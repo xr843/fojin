@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useMemo, useEffect, lazy, Suspense, type
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
-import { Input, Button, message, Alert, Tooltip, Modal, Select } from "antd";
+import { Input, Button, message, Alert, Tooltip, Modal, Select, Tag, Spin } from "antd";
 import Markdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
@@ -49,7 +49,15 @@ import {
   type HotQuestionCard,
   type HotQuestionCategory,
 } from "../api/client";
+import {
+  uploadChatAttachment,
+  type ChatAttachmentMeta,
+} from "../api/chatAttachments";
 import { useAuthStore } from "../stores/authStore";
+
+const MAX_ATTACHMENTS = 5;
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const ATTACHMENT_ACCEPT = ".pdf,.txt,.md,.docx,.csv,.html,.htm";
 
 /** Collapse loose markdown lists into tight lists by removing blank lines between list items. */
 function tightenLists(md: string): string {
@@ -261,6 +269,9 @@ export default function ChatPage() {
   const [sessionId, setSessionId] = useState<number | undefined>();
   const [messages, setMessages] = useState<ChatMessageItem[]>([]);
   const [sending, setSending] = useState(false);
+  const [attachments, setAttachments] = useState<ChatAttachmentMeta[]>([]);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -519,6 +530,40 @@ export default function ChatPage() {
     abortRef.current = null;
   }, []);
 
+  const handleFileChange = useCallback(async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    // Reset so picking the same file again fires onChange.
+    e.target.value = "";
+    if (!file) return;
+    if (attachments.length >= MAX_ATTACHMENTS) {
+      message.warning(`最多同时上传 ${MAX_ATTACHMENTS} 个附件`);
+      return;
+    }
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      message.error("文件超过 10MB 限制");
+      return;
+    }
+    setUploadingAttachment(true);
+    try {
+      const meta = await uploadChatAttachment(file);
+      setAttachments((prev) => [...prev, meta]);
+      message.success(`已上传 ${meta.filename}（${meta.char_count} 字）`);
+    } catch (err: unknown) {
+      const detail =
+        (err as { response?: { data?: { detail?: string } } })?.response
+          ?.data?.detail;
+      message.error(detail || "上传失败，请稍后重试");
+    } finally {
+      setUploadingAttachment(false);
+    }
+  }, [attachments.length]);
+
+  const handleRemoveAttachment = useCallback((id: number) => {
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
+  }, []);
+
   const handleSendMessage = useCallback(async (
     text: string,
     options?: { hotQuestionId?: number | null },
@@ -553,6 +598,11 @@ export default function ChatPage() {
     setMessages((prev) => [...prev, userMsg, assistantMsg]);
     setInput("");
     setSending(true);
+    // Snapshot attachment ids for this send and clear the chip row. Backend
+    // marks them consumed by id; clearing here prevents the next message from
+    // accidentally re-sending the same attachment_ids.
+    const attachmentIdsForSend = attachments.map((a) => a.id);
+    setAttachments([]);
     scrollToBottom();
 
     const abortController = new AbortController();
@@ -645,8 +695,9 @@ export default function ChatPage() {
       // important for non-deepseek deployments where forcing a deepseek
       // catalog id would otherwise raise.
       modelId: modelId === "deepseek:v4-flash" ? null : modelId,
+      attachmentIds: attachmentIdsForSend.length ? attachmentIdsForSend : null,
     });
-  }, [sending, sessionId, masterId, modelId, user, refetchSessions, refetchQuota, queryClient]);
+  }, [sending, sessionId, masterId, modelId, user, attachments, refetchSessions, refetchQuota, queryClient]);
 
   const handleSend = useCallback(async () => {
     await handleSendMessage(input);
@@ -1232,14 +1283,38 @@ export default function ChatPage() {
                 variant="borderless"
                 style={{ fontFamily: '"Noto Serif SC", serif', fontSize: 16, resize: "none" }}
               />
+              {attachments.length > 0 && (
+                <div className="chat-input-chips">
+                  {attachments.map((a) => (
+                    <Tag
+                      key={a.id}
+                      closable
+                      onClose={() => handleRemoveAttachment(a.id)}
+                      color="default"
+                      style={{ margin: 0 }}
+                    >
+                      {a.filename} · {(a.size_bytes / 1024).toFixed(1)} KB
+                    </Tag>
+                  ))}
+                </div>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ATTACHMENT_ACCEPT}
+                onChange={handleFileChange}
+                style={{ display: "none" }}
+              />
               <div className="chat-input-toolbar">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<PlusOutlined />}
-                  onClick={() => {}}
-                  title="附件上传 (PDF/TXT/MD/DOCX/CSV/HTML, ≤10MB)"
-                />
+                <Tooltip title="附件上传 (PDF/TXT/MD/DOCX/CSV/HTML, ≤10MB)">
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={uploadingAttachment ? <Spin size="small" /> : <PlusOutlined />}
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingAttachment || attachments.length >= MAX_ATTACHMENTS}
+                  />
+                </Tooltip>
                 <ChatModelSelector value={modelId} onChange={handleModelChange} />
                 <span className="chat-input-spacer" />
                 {sending ? (
