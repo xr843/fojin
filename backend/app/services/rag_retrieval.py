@@ -15,6 +15,7 @@ from app.config import settings
 from app.models.dictionary import DictionaryEntry
 from app.schemas.chat import ChatSource
 from app.services.embedding import generate_embedding, similarity_search, source_similarity_search
+from app.services.precise_retrieval import try_precise_text_retrieval
 
 logger = logging.getLogger(__name__)
 
@@ -426,6 +427,33 @@ async def retrieve_rag_context(
     sources: list[ChatSource] = []
     context_text = ""
     t0 = time.monotonic()
+
+    # Precise retrieval short-circuit: when the user explicitly names a
+    # 《经名》第N卷 we go to text_contents directly. Vector retrieval
+    # over 678K chunks can return thematically-similar passages from the
+    # wrong text — and the LLM has no signal that the user asked for a
+    # specific fascicle. Returns None unless the pattern is unambiguous
+    # AND the title resolves to exactly one buddhist_texts row AND that
+    # fascicle has non-empty content; on any miss we fall through to
+    # vector RAG below.
+    try:
+        precise = await try_precise_text_retrieval(
+            db, query, scope_text_ids=scope_text_ids,
+        )
+    except Exception:
+        logger.exception("precise_retrieval failed; falling back to vector RAG")
+        precise = None
+    if precise:
+        logger.debug("precise_retrieval hit: %d source(s)", len(precise))
+        context_text = "\n\n".join(_format_context_block({
+            "text_id": s.text_id,
+            "juan_num": s.juan_num,
+            "chunk_index": s.chunk_index,
+            "chunk_text": s.chunk_text,
+            "title_zh": s.title_zh,
+            "score": s.score,
+        }) for s in precise)
+        return precise, context_text
 
     try:
         search_query = f"{prev_query} {query}" if prev_query else query
