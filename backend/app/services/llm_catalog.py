@@ -24,9 +24,9 @@ class ModelOption:
 # Order matters — first entry is the default when no localStorage value exists.
 CATALOG: list[ModelOption] = [
     ModelOption("deepseek:v4-flash", "deepseek", "deepseek-v4-flash",
-                "DeepSeek V4 Flash", "经济快速，日常问答首选", False),
+                "DeepSeek V4 Flash", "经济快速，日常问答", False),
     ModelOption("deepseek:v4-pro", "deepseek", "deepseek-v4-pro",
-                "DeepSeek V4 Pro", "1.6T 参数旗舰，复杂推理（5-31 前 75% 折扣）", False),
+                "DeepSeek V4 Pro", "旗舰模型，复杂推理", False),
     ModelOption("dashscope:qwen3.6-plus", "dashscope", "qwen3.6-plus",
                 "通义千问 Qwen3.6 Plus", "阿里最新文本旗舰", False),
     ModelOption("dashscope:qwen3-vl-flash", "dashscope", "qwen3-vl-flash-2026-01-22",
