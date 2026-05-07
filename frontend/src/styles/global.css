@@ -163,6 +163,20 @@ em {
 .chat-input-toolbar > .chat-input-spacer {
   flex: 1;
 }
+/* On narrow viewports the model selector + Send + "+" can squeeze the
+   spacer to zero and overflow to the right. Allow the toolbar to wrap
+   so the Send button drops to a second row below the model selector
+   instead of horizontally clipping. */
+@media (max-width: 480px) {
+  .chat-input-toolbar {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+  .chat-input-toolbar > .chat-input-spacer {
+    flex-basis: 100%;
+    height: 0;
+  }
+}
 
 /* ========== Chat Markdown ========== */
 /* Override bubble's pre-wrap so markdown controls its own whitespace */
