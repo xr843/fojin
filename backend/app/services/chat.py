@@ -599,8 +599,14 @@ def _strip_followup_suggestions(text: str) -> str:
 
 async def _save_messages(
     db: AsyncSession, session_id: int, message: str, answer: str, sources: list[ChatSource]
-) -> None:
-    """Persist user + assistant messages to the database."""
+) -> int | None:
+    """Persist user + assistant messages and return the assistant message's id.
+
+    The id lets the streaming caller emit a `message_id` SSE event so the
+    frontend can attach the feedback / share buttons to the real
+    chat_messages row instead of the local `Date.now()` placeholder it
+    used while streaming. Returns None when the message cannot be
+    persisted (defensive — current callers always supply a session)."""
     user_msg = ChatMessage(session_id=session_id, role="user", content=message)
     assistant_msg = ChatMessage(
         session_id=session_id,
@@ -611,6 +617,8 @@ async def _save_messages(
     db.add(user_msg)
     db.add(assistant_msg)
     await db.commit()
+    await db.refresh(assistant_msg)
+    return assistant_msg.id
 
 
 async def _generate_session_title(
@@ -1023,8 +1031,21 @@ async def send_message_stream(
         yield f"data: {json.dumps({'type': 'sources', 'sources': [s.model_dump() for s in sources]}, ensure_ascii=False)}\n\n"
 
     if chat_session:
-        await _save_messages(db, chat_session.id, message, corrected_answer, sources)
+        assistant_msg_id = await _save_messages(
+            db, chat_session.id, message, corrected_answer, sources
+        )
         log_mutations(chat_session.id, _citation_mutations)
+        # Emit the real chat_messages.id so the frontend can swap the
+        # in-flight Date.now() placeholder. Without this, feedback /
+        # share buttons on a freshly-streamed message PUT to a
+        # nonexistent id — which is why the production feedback rate
+        # has been zero despite the UI being wired in ChatPage.
+        if assistant_msg_id is not None:
+            yield (
+                "data: "
+                + json.dumps({"type": "message_id", "id": assistant_msg_id})
+                + "\n\n"
+            )
     yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
 

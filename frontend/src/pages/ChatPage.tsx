@@ -594,6 +594,16 @@ export default function ChatPage() {
       onSearching: (_searchMsg: string) => {
         // 搜索状态由初始占位符 "正在检索经文并生成回答..." 显示，不覆盖 content
       },
+      onMessageId: (realId: number) => {
+        // Replace the in-flight Date.now() placeholder with the real
+        // chat_messages.id so feedback / share buttons target the
+        // correct row. Without this, every freshly-streamed message
+        // would PUT feedback to a nonexistent id, which is why
+        // production feedback rate is currently zero.
+        setMessages((prev) =>
+          prev.map((m) => (m.id === assistantId ? { ...m, id: realId } : m)),
+        );
+      },
       onSessionId: (newSessionId: number) => {
         if (!sessionId) {
           setSessionId(newSessionId);
@@ -1072,7 +1082,13 @@ export default function ChatPage() {
                           />
                         </Tooltip>
                       )}
-                      {m.role === "assistant" && user && (
+                      {m.role === "assistant" && user && m.id < 1e12 && (
+                        // Hide feedback affordances until the real
+                        // chat_messages.id has replaced the in-flight
+                        // Date.now() placeholder (Date.now() ≥ ~1.7e12,
+                        // real DB ids ≪ 1e12). A click during the
+                        // streaming-but-not-yet-saved window would PUT
+                        // to a nonexistent id and 404 silently.
                         <>
                           <Tooltip title="有帮助">
                             <Button

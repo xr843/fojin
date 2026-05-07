@@ -1357,6 +1357,14 @@ export interface StreamCallbacks {
    * stay consistent with what was persisted.
    */
   onCitationCorrection?: (correctedAnswer: string) => void;
+  /**
+   * Real chat_messages.id of the just-persisted assistant reply. Arrives
+   * after the stream is otherwise complete (after sources/correction,
+   * before done). Consumers must swap their in-flight Date.now()
+   * placeholder id with this real id, so the feedback / share buttons
+   * target the correct row.
+   */
+  onMessageId?: (assistantMessageId: number) => void;
   onError: (message: string) => void;
   onDone: () => void;
 }
@@ -1422,6 +1430,9 @@ export function sendChatMessageStream(
               break;
             case "citation_correction":
               callbacks?.onCitationCorrection?.(event.content);
+              break;
+            case "message_id":
+              callbacks?.onMessageId?.(event.id);
               break;
             case "error":
               callbacks.onError(event.message);
