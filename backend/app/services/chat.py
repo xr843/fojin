@@ -22,6 +22,7 @@ from app.models.user import User
 from app.schemas.chat import ChatResponse, ChatSource
 from app.services.citation_guard import enforce_citation_whitelist, log_mutations
 from app.services.master_profiles import get_master
+from app.services.quote_verifier import log_quote_mutations, verify_quoted_content
 from app.services.rag_retrieval import retrieve_rag_context
 
 logger = logging.getLogger(__name__)
@@ -830,10 +831,15 @@ async def send_message(
     # for the full rationale — this is the deterministic backstop after the
     # prompt's moral one.
     answer, _citation_mutations = enforce_citation_whitelist(answer, sources)
+    # Quote verifier runs after the citation guard so quotes attached
+    # to citations the guard already stripped don't get double-flagged.
+    # See app/services/quote_verifier for the substring-match contract.
+    answer, _quote_mutations = verify_quoted_content(answer, sources)
 
     if chat_session:
         await _save_messages(db, chat_session.id, message, answer, sources)
         log_mutations(chat_session.id, _citation_mutations)
+        log_quote_mutations(chat_session.id, _quote_mutations)
 
         # Auto-generate a better session title for new sessions (first message)
         if chat_session.title == message[:50]:
@@ -1016,7 +1022,13 @@ async def send_message_stream(
     # silently re-introduce the hallucination this guard exists to
     # prevent.
     corrected_answer, _citation_mutations = enforce_citation_whitelist(full_answer, sources)
-    if _citation_mutations:
+    # Quote verifier runs after citation_guard so flagged-and-stripped
+    # citations don't carry their quotes into a second annotation.
+    corrected_answer, _quote_mutations = verify_quoted_content(corrected_answer, sources)
+    # Emit one merged `citation_correction` event covering both
+    # rewrites (citation + quote annotations) so the frontend swap is a
+    # single state mutation rather than two.
+    if _citation_mutations or _quote_mutations:
         yield (
             "data: "
             + json.dumps(
@@ -1035,6 +1047,7 @@ async def send_message_stream(
             db, chat_session.id, message, corrected_answer, sources
         )
         log_mutations(chat_session.id, _citation_mutations)
+        log_quote_mutations(chat_session.id, _quote_mutations)
         # Emit the real chat_messages.id so the frontend can swap the
         # in-flight Date.now() placeholder. Without this, feedback /
         # share buttons on a freshly-streamed message PUT to a
