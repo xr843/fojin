@@ -152,6 +152,13 @@ async def similarity_search(
         "WHERE te.embedding IS NOT NULL"
     )
     filters: list[str] = []
+    # Asymmetric scope contract — see chat.py wiring docstring. Empty
+    # list intentionally falsy here: master with no indexed corpus
+    # (Ajahn Chah, Hsing Yun, …) wants vector RAG over the full
+    # corpus while precise retrieval is *disabled* by the same empty
+    # list. Don't switch to `is not None` without rereading that
+    # docstring — you'll force unindexed-master sessions to return
+    # empty SQL results.
     if scope_text_ids:
         placeholders = ",".join(str(tid) for tid in scope_text_ids)
         filters.append(f"te.text_id IN ({placeholders})")  # nosec B608 — hardcoded MasterProfile IDs

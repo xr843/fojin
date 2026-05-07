@@ -461,7 +461,12 @@ async def retrieve_rag_context(
         t1 = time.monotonic()
         logger.debug("TIMING: Embedding took %.2fs", t1 - t0)
 
-        # Text chunk retrieval: two modes depending on ENABLE_PARALLEL_RAG
+        # Text chunk retrieval: two modes depending on ENABLE_PARALLEL_RAG.
+        # Asymmetric scope contract — see chat.py wiring docstring.
+        # Empty list is intentionally treated as "no scope" here so
+        # masters with no indexed corpus (Ajahn Chah, Hsing Yun, …) get
+        # full-corpus parallel RAG; the same empty list disables
+        # precise retrieval (see precise_retrieval.try_precise_text_retrieval).
         if ENABLE_PARALLEL_RAG and not scope_text_ids:
             # Per-language top-k retrieval, then alignment-aware merging.
             # scope_text_ids (master persona mode) bypasses parallel mode

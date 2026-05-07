@@ -373,11 +373,28 @@ async def test_scope_text_ids_passes_in_scope_hit():
 @pytest.mark.anyio
 async def test_scope_text_ids_none_means_unrestricted():
     """None (the default) preserves the non-master-mode behaviour: all
-    texts are in scope. Empty list, by contrast, would correctly reject
-    every hit — but that's the caller's responsibility to construct."""
+    texts are in scope. Empty list, by contrast, rejects every hit —
+    that's the contract callers like chat.py rely on for masters
+    whose corpus index isn't loaded yet (Ajahn Chah, etc)."""
     db, _, _ = _mock_db_with_text_and_content(text_id=42)
     result = await try_precise_text_retrieval(db, "《心经》第1卷", scope_text_ids=None)
     assert result is not None
+
+
+@pytest.mark.anyio
+async def test_scope_text_ids_empty_list_blocks_every_hit():
+    """Empty list = "this master uses full-corpus vector RAG but
+    precise retrieval is disabled". This was the contract Ajahn
+    Chah's master profile relied on but chat.py's falsy-coalesce
+    silently broke it (an empty list collapsed to None, which means
+    'unrestricted'). Production sample 2026-05-07: Ajahn Chah master
+    answered `《楞严经》第一卷` with the chunk_text of 楞严经
+    silently sitting in the LLM's context — the persona prose hid
+    it, but the bypass was real. This test locks the empty-list
+    contract so a future regression can't undo the chat.py fix."""
+    db, _, _ = _mock_db_with_text_and_content(text_id=42)
+    result = await try_precise_text_retrieval(db, "《心经》第1卷", scope_text_ids=[])
+    assert result is None
 
 
 @pytest.mark.anyio

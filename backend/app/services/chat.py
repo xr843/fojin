@@ -191,6 +191,41 @@ _META_KEYWORDS = (
 )
 
 
+def _master_scope_text_ids(master) -> list[int] | None:  # type: ignore[no-untyped-def]
+    """Build the ``scope_text_ids`` value retrieve_rag_context expects.
+
+    Asymmetric three-state contract — see also
+    ``app/services/precise_retrieval.try_precise_text_retrieval`` and
+    ``app/services/embedding.similarity_search`` for the consumer side:
+
+    - ``master is None`` → return ``None``: no scope, full-corpus RAG.
+    - ``master.fojin_text_ids == []`` → return ``[]``: master has no
+      indexed corpus (Ajahn Chah, Hsing Yun, Yin Shun, Gampopa). The
+      empty list is *deliberately preserved* — downstream
+      ``similarity_search`` treats it as falsy and so leaves the
+      vector path unfiltered (full-corpus RAG, the design intent),
+      while ``try_precise_text_retrieval`` rejects every text_id
+      against ``not in []`` and so disables precise retrieval. This
+      asymmetry is the whole point: vector RAG runs across all texts
+      because the master has no indexed corpus to scope against, but
+      the precise short-circuit must NOT serve a 《大乘经》第N卷 query
+      under a Theravada master and leak that text's chunk_text into
+      the LLM's context.
+    - ``master.fojin_text_ids == [ids…]`` → return the list: scoped
+      vector + precise retrieval to those text_ids.
+
+    Production trace 2026-05-07 (msg 4437): the previous
+    falsy-coalesce ``master.fojin_text_ids if master and
+    master.fojin_text_ids else None`` collapsed empty list → None,
+    silently bypassing the precise scope check and serving 楞严经 to
+    Ajahn Chah master mode. Only the persona prompt's prose refusal
+    hid the breach from the user. Don't reintroduce ``or None``.
+    """
+    if master is None:
+        return None
+    return master.fojin_text_ids
+
+
 def _is_meta_question(message: str) -> bool:
     """Detect meta questions about the assistant itself (vs. Buddhist content)."""
     msg = message.strip().lower()
@@ -721,7 +756,7 @@ async def _prepare_chat(
     if _is_meta_question(message) and not master_id and not text_id:
         sources, context_text = [], ""
     else:
-        scope_text_ids = master.fojin_text_ids if master and master.fojin_text_ids else None
+        scope_text_ids = _master_scope_text_ids(master)
         sources, context_text = await retrieve_rag_context(
             db, message, prev_query=prev_user_msg, scope_text_ids=scope_text_ids,
         )
