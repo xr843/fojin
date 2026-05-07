@@ -66,20 +66,30 @@ MIN_QUOTE_CHARS = 12
 MAX_QUOTE_CITATION_GAP_CHARS = 80
 
 # Match a CJK quote-mark pair followed within the gap window by a
-# bracketed citation. Three quote-mark families are covered:
+# bracketed citation. Five quote-mark families are covered:
 #
-#   「…」  curly Chinese quotes (most common in classical citation)
-#   『…』  Chinese inner quotes (frequent in nested 引文)
-#   "…"   ASCII straight quotes — LLMs that emit full-width 「」 also
-#         emit ASCII " in the same answer; both must match
+#   「…」    Chinese L-brackets (most common in 古典 引文)
+#   『…』    Chinese double L-brackets (nested 引文)
+#   “…”     Typographic curly double quotes (U+201C / U+201D) —
+#             Markdown-rendered LLM output uses these by default
+#   ‘…’     Typographic curly single quotes (U+2018 / U+2019)
+#   "…"     ASCII straight quotes (LLMs occasionally emit these in
+#             code-fenced / programmatic content)
+#
+# Production sample 2026-05-07 showed DeepSeek answers using U+201C /
+# U+201D exclusively for inline quotes — an earlier scanner that only
+# matched 「」 + ASCII `"` was silent on every production
+# hallucination, defeating the entire module. Adding the curly forms
+# is the fix.
 #
 # Markdown blockquote (``> …``) is intentionally out of scope here —
-# its multi-line structure needs a different scanner; if it becomes
-# the dominant production form a follow-up can extend this module.
+# its multi-line structure needs a different scanner.
+_QUOTE_OPEN = "「『“‘\""
+_QUOTE_CLOSE = "」』”’\""
 _QUOTE_CITATION_RE = re.compile(
-    r"[「『\"]"
+    r"[" + re.escape(_QUOTE_OPEN) + r"]"
     r"(?P<quote>.{" + str(MIN_QUOTE_CHARS) + r",400}?)"
-    r"[」』\"]"
+    r"[" + re.escape(_QUOTE_CLOSE) + r"]"
     r".{0," + str(MAX_QUOTE_CITATION_GAP_CHARS) + r"}?"
     r"【《(?P<title>[^》]+)》(?:第(?P<juan>\d+)卷)?】",
     re.DOTALL,
@@ -90,8 +100,8 @@ _QUOTE_CITATION_RE = re.compile(
 # CJK and ASCII forms of every mark that might survive the LLM's
 # tokeniser without surviving CBETA's. Whitespace handled separately.
 _STRIP_PUNCT_RE = re.compile(
-    r"[\s,.!?;:\"'\(\)\[\]\-_~`<>"
-    r"，。！？、；：「」『』\"\"''《》〈〉…—（）\[\]【】·•～　]+"
+    r"[\s,.!?;:\"'\(\)\[\]\-_~`<>*"
+    r"，。！？、；：「」『』“”‘’《》〈〉…—（）\[\]【】·•～　]+"
 )
 
 

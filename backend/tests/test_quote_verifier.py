@@ -186,6 +186,40 @@ def test_distant_quote_and_citation_not_treated_as_pair():
     assert muts == []
 
 
+def test_curly_double_quotes_match_quote_pattern():
+    """Production sample 2026-05-07: DeepSeek emits typographic curly
+    double quotes (U+201C / U+201D) for inline citations, never the
+    ASCII " or 「」 forms. The regex must match them or the entire
+    module is silent on real production output."""
+    src = _src(7, "心經", 1, "无关原文，没有这段引文。")
+    answer = "经云：“色不异空，空不异色，色即是空，色即是色”【《心經》第1卷】"
+    out, muts = verify_quoted_content(answer, [src])
+    assert "⚠️" in out
+    assert len(muts) == 1
+    assert muts[0].reason == "quote_not_in_source"
+
+
+def test_markdown_bold_inside_curly_quotes_strips_to_compare_content():
+    """Common LLM output: “**色不異空**” — bold markers and
+    curly quotes must both be normalised away so the substring check
+    sees only the content, otherwise every formatted quote
+    false-positives."""
+    chunk = "色不異空空不異色色即是空空即是色"
+    src = _src(7, "心經", 1, chunk)
+    answer = "经云：“**色不異空，空不異色，色即是空，空即是色**”【《心經》第1卷】"
+    out, muts = verify_quoted_content(answer, [src])
+    assert "⚠️" not in out
+    assert muts == []
+
+
+def test_curly_single_quotes_also_supported():
+    src = _src(7, "心經", 1, "实际原文：色即是空空即是色。")
+    answer = "经云：‘伪造引文段落很长伪造引文段落很长’【《心經》第1卷】"
+    _out, muts = verify_quoted_content(answer, [src])
+    assert len(muts) == 1
+    assert muts[0].reason == "quote_not_in_source"
+
+
 def test_returns_dataclass_with_audit_fields():
     """Lock the audit shape so a future migration that persists these
     rows has a stable schema."""
