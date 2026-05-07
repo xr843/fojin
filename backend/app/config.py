@@ -71,6 +71,10 @@ class Settings(BaseSettings):
     # OAuth callback base URL (e.g. https://fojin.app)
     oauth_redirect_base: str = "http://localhost:3000"
 
+    # Chat attachment uploads — parsed-to-text files prepended to user
+    # messages. Directory is created on first write; override per-env.
+    upload_dir: str = "/data/uploads/chat"
+
     # Rate limiting (requests per minute)
     rate_limit_default: int = 200
     rate_limit_login: int = 10

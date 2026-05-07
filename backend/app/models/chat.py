@@ -45,6 +45,40 @@ class ChatMessage(Base):
     )
 
 
+class ChatAttachment(Base):
+    """Uploaded file attached to a chat turn.
+
+    Files are parsed to plain text on upload (see
+    ``app.services.attachment_parser``). The frontend gets back an id and
+    passes it in ``ChatRequest.attachment_ids``; the chat service then
+    prepends the parsed text to the user message before calling the LLM.
+
+    Ownership: ``user_id`` is NULL for anonymous uploads. The chat service
+    enforces "user can only consume their own + anonymous rows" so one
+    logged-in user can't reference another user's attachment by guessing
+    the id.
+    """
+
+    __tablename__ = "chat_attachments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    filename: Mapped[str] = mapped_column(String(255))
+    content_type: Mapped[str] = mapped_column(String(100))
+    size_bytes: Mapped[int] = mapped_column(Integer)
+    storage_path: Mapped[str] = mapped_column(String(500))
+    parsed_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    parse_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    consumed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
 class SharedQA(Base):
     __tablename__ = "shared_qa"
 
