@@ -23,6 +23,14 @@ class KGEntity(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    # Provenance — see migration 0128. Together these answer
+    # "where did this row come from, how trusted is it, and is it stale?"
+    # Written exclusively via app.services.provenance.apply_provenance —
+    # no server defaults, so a script that forgets to tag a row leaves
+    # NULLs that audit queries can spot.
+    source_tier: Mapped[str | None] = mapped_column(String(20))
+    source_version: Mapped[str | None] = mapped_column(String(80))
+    ingested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Relations where this entity is the subject
     outgoing_relations: Mapped[list["KGRelation"]] = relationship(
