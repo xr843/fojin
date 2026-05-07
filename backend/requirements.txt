@@ -12,7 +12,7 @@ PyJWT==2.12.1
 cryptography==46.0.7
 bcrypt==4.1.1
 defusedxml==0.7.1
-lxml==5.3.0
+lxml==6.1.0
 pgvector==0.3.6
 openai==1.58.0
 tiktoken==0.8.0
