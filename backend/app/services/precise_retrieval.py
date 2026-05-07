@@ -30,6 +30,7 @@ Design constraints:
 import logging
 import re
 
+from opencc import OpenCC
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,6 +38,106 @@ from app.models.text import BuddhistText, TextContent
 from app.schemas.chat import ChatSource
 
 logger = logging.getLogger(__name__)
+
+
+# Canonical short-name → full Taishō title aliases.
+#
+# Real users type the short conversational name (心经, 金刚经, 楞严经) but
+# buddhist_texts.title_zh stores the full canonical title in
+# traditional script. Without a translation table the precise short-
+# circuit misses every common scripture — initial production telemetry
+# (2026-05-07) showed `《心经》第1卷` falling through to vector RAG and
+# returning thematically-similar 注疏 instead of 心经 itself.
+#
+# Both simplified and traditional short forms map to the same canonical
+# title so the lookup is a single dictionary read regardless of the
+# user's input encoding. New entries should be vetted against the
+# production DB — not every nickname has an unambiguous canonical
+# target (e.g. "般若经" could mean 摩訶般若波羅蜜經 or 大般若波羅蜜多經
+# depending on context, so we deliberately don't include it).
+_TITLE_ALIASES: dict[str, str] = {
+    # 心经
+    "心经": "般若波羅蜜多心經",
+    "心經": "般若波羅蜜多心經",
+    # 金刚经
+    "金刚经": "金剛般若波羅蜜經",
+    "金剛經": "金剛般若波羅蜜經",
+    # 楞严经
+    "楞严经": "大佛頂如來密因修證了義諸菩薩萬行首楞嚴經",
+    "楞嚴經": "大佛頂如來密因修證了義諸菩薩萬行首楞嚴經",
+    # 法华经
+    "法华经": "妙法蓮華經",
+    "法華經": "妙法蓮華經",
+    # 华严经
+    "华严经": "大方廣佛華嚴經",
+    "華嚴經": "大方廣佛華嚴經",
+    # 维摩经
+    "维摩经": "維摩詰所說經",
+    "維摩經": "維摩詰所說經",
+    # 圆觉经
+    "圆觉经": "大方廣圓覺修多羅了義經",
+    "圓覺經": "大方廣圓覺修多羅了義經",
+    # 涅槃经
+    "涅槃经": "大般涅槃經",
+    "涅槃經": "大般涅槃經",
+    # 楞伽经
+    "楞伽经": "楞伽阿跋多羅寶經",
+    "楞伽經": "楞伽阿跋多羅寶經",
+    # 起信论
+    "起信论": "大乘起信論",
+    "起信論": "大乘起信論",
+}
+
+
+# OpenCC simplified → traditional converter. Matches what the rest of
+# the RAG stack already uses (see rag_retrieval.py). Lazy-instantiated
+# so import-time cost stays zero for callers that never trigger.
+
+
+class _IdentityConverter:
+    """Drop-in replacement for OpenCC when the real one fails to
+    initialise. ``convert`` is identity, so the alias path still works
+    even if 简→繁 normalisation is unavailable — a broken OpenCC must
+    never block the chat."""
+
+    def convert(self, x: str) -> str:
+        return x
+
+
+_s2t_converter: OpenCC | _IdentityConverter | None = None
+
+
+def _to_traditional(s: str) -> str:
+    """Best-effort 简→繁 normalization. Falls back to identity on any
+    OpenCC failure — this is a normalization helper, not a critical
+    path; misconverting is still better than crashing the chat."""
+    global _s2t_converter
+    if _s2t_converter is None:
+        try:
+            _s2t_converter = OpenCC("s2t")
+        except Exception:
+            logger.exception("OpenCC s2t init failed; precise lookup will not 简→繁 normalize")
+            _s2t_converter = _IdentityConverter()
+    try:
+        return _s2t_converter.convert(s)
+    except Exception:
+        return s
+
+
+def _resolve_title(title: str) -> str:
+    """Map a short / simplified user-facing title to the canonical
+    traditional title stored in ``buddhist_texts.title_zh``.
+
+    Order matters: alias lookup first (covers the high-frequency named
+    canon — 心经 → 般若波羅蜜多心經 — that pure 简→繁 conversion
+    cannot, since 心经/心經 isn't itself a row in the DB), then
+    OpenCC s2t for everything else (covers the long tail of titles
+    like 楞伽阿跋多羅寶經 that users may type in simplified script).
+    """
+    title = title.strip()
+    if title in _TITLE_ALIASES:
+        return _TITLE_ALIASES[title]
+    return _to_traditional(title)
 
 
 # Maximum characters of a fascicle's content to inline into the
@@ -171,31 +272,55 @@ async def try_precise_text_retrieval(
     detected = _detect_title_juan(query)
     if detected is None:
         return None
-    title, juan_num = detected
+    raw_title, juan_num = detected
+    resolved_title = _resolve_title(raw_title)
 
-    # 1. Resolve the title to a buddhist_texts row. Exact match only;
-    #    case is irrelevant for CJK but trim whitespace to be safe.
+    # 1. Exact match against the canonical title. Most popular sutras
+    #    have multiple translator-rows under the same title (心经×4,
+    #    金刚经×6, etc), so we accept >1 candidates and pick the
+    #    canonical one deterministically below — this is different from
+    #    the original conservative-on-ambiguity behaviour: now the
+    #    ambiguity is *expected* for famous texts and we resolve it
+    #    rather than punt.
+    # Invariant: CBETA primary corpus has source_id=1 (lowest in DB).
+    # If a new source ever ingests with source_id=0 this picker breaks
+    # silently and a non-canonical translator wins. Guarded by
+    # data_sources seed (CBETA pinned at id=1) — keep that pinning.
     text_q = await db.execute(
         select(BuddhistText)
-        .where(func.trim(BuddhistText.title_zh) == title)
-        .limit(2)
+        .where(func.trim(BuddhistText.title_zh) == resolved_title)
+        .order_by(BuddhistText.source_id, BuddhistText.id)
+        .limit(20)
     )
     candidates = list(text_q.scalars())
-    if len(candidates) != 1:
-        # Zero hits: title not in canon. Multiple hits: ambiguous (some
-        # titles legitimately exist in more than one source); let RAG
-        # disambiguate via score.
+    if not candidates:
         logger.debug(
-            "precise_retrieval miss: title=%r juan=%d candidates=%d",
-            title, juan_num, len(candidates),
+            "precise_retrieval miss: raw=%r resolved=%r juan=%d candidates=0",
+            raw_title, resolved_title, juan_num,
         )
         return None
+
+    # Deterministic disambiguation: ORDER BY (source_id, id) above means
+    # candidates[0] is the lowest-source-id (CBETA primary = source_id=1
+    # in this corpus) lowest-id row — which empirically corresponds to
+    # the canonical translator (玄奘 心经, 鳩摩羅什 金刚经, 等). Keeps
+    # behaviour stable across reruns.
     bt = candidates[0]
+    if len(candidates) > 1:
+        # INFO not DEBUG so the alias-hit-rate telemetry is visible in
+        # production logs without flipping global log level. The
+        # 2026-05-07 alias-miss bug went undetected for hours because
+        # the previous log line was DEBUG.
+        logger.info(
+            "precise_retrieval picked canonical: raw=%r resolved=%r "
+            "chosen_id=%d translator=%r out_of=%d candidates",
+            raw_title, resolved_title, bt.id, bt.translator, len(candidates),
+        )
 
     if scope_text_ids is not None and bt.id not in scope_text_ids:
         logger.debug(
             "precise_retrieval out-of-scope: text_id=%d title=%r not in master scope",
-            bt.id, title,
+            bt.id, resolved_title,
         )
         return None
 
