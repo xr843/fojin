@@ -1,5 +1,5 @@
 from app.models.annotation import Annotation, AnnotationReview
-from app.models.chat import ChatMessage, ChatSession, TextEmbedding
+from app.models.chat import ChatAttachment, ChatMessage, ChatSession, TextEmbedding
 from app.models.dictionary import DictionaryEntry
 from app.models.feed import AcademicFeed, SourceUpdate
 from app.models.hot_question import HotQuestion
@@ -16,6 +16,7 @@ __all__ = [
     "AnnotationReview",
     "Bookmark",
     "BuddhistText",
+    "ChatAttachment",
     "ChatMessage",
     "ChatSession",
     "DataSource",

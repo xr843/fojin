@@ -205,7 +205,7 @@ export default function ReaderAIPanel({
         streamingIdRef.current = 0;
         setSending(false);
       },
-    }, abortController.signal, readingContext);
+    }, { signal: abortController.signal, readingContext });
   }, [sending, sessionId, selectedText, onSelectedTextConsumed, scrollToBottom, readingContext]);
 
   const handleClearChat = useCallback(() => {

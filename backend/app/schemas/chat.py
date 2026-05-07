@@ -20,6 +20,12 @@ class ChatRequest(BaseModel):
     # Per-message model override — id from llm_catalog.CATALOG (e.g. "deepseek:v4-flash").
     # Unknown ids fall back gracefully so stale localStorage doesn't break chat.
     model_id: str | None = None
+    # File attachments uploaded via POST /chat/attachments. The service
+    # prepends each attachment's parsed text to the user message before
+    # the LLM call. Ownership is enforced server-side: a logged-in user
+    # may only reference their own rows or anonymous (user_id IS NULL)
+    # rows; an anonymous request may only reference anonymous rows.
+    attachment_ids: list[int] | None = None
 
 
 class HotQuestionCard(BaseModel):

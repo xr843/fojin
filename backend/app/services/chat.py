@@ -1,7 +1,7 @@
 import json
 import logging
 import time as _time
-from datetime import date
+from datetime import UTC, date, datetime
 
 import httpx
 from sqlalchemy import delete, func, select
@@ -16,7 +16,7 @@ from app.core.exceptions import (
     ServiceError,
     ValidationError,
 )
-from app.models.chat import ChatMessage, ChatSession
+from app.models.chat import ChatAttachment, ChatMessage, ChatSession
 from app.models.hot_question import HotQuestion
 from app.models.user import User
 from app.schemas.chat import ChatResponse, ChatSource
@@ -752,6 +752,89 @@ async def _generate_session_title(
         return None
 
 
+async def _load_and_render_attachments(
+    db: AsyncSession,
+    attachment_ids: list[int] | None,
+    user_id: int | None,
+) -> tuple[str, list[ChatAttachment]]:
+    """Fetch ChatAttachment rows for the request and render them as a
+    single text block prepended to the user's message.
+
+    Ownership rules (see schemas/chat.py docstring on ``attachment_ids``):
+    - logged-in user: rows where ``user_id`` matches OR is NULL (anon
+      uploads are public-by-design — chat attachment uploads don't have
+      an owner-binding step yet, so anyone with the id may consume).
+    - anonymous user: only rows where ``user_id IS NULL``.
+
+    Returns the rendered prefix (empty string if nothing to attach) and
+    the list of attachment rows that survived the ownership filter,
+    so the caller can mark them ``consumed_at`` after a successful
+    LLM call.
+    """
+    if not attachment_ids:
+        return "", []
+
+    # Deduplicate while preserving caller order so the prompt is
+    # deterministic. dict.fromkeys is the canonical idiom.
+    ordered_ids = list(dict.fromkeys(attachment_ids))
+
+    # consumed_at IS NULL makes attachments single-use: once an upload
+    # has been folded into a chat message, its content can't be replayed
+    # by a different caller guessing the (sequential, autoincrement) id.
+    # This is the actual mitigation against anonymous-upload enumeration —
+    # the user_id IS NULL allowance below is otherwise public-by-design.
+    stmt = select(ChatAttachment).where(
+        ChatAttachment.id.in_(ordered_ids),
+        ChatAttachment.consumed_at.is_(None),
+    )
+    if user_id is None:
+        stmt = stmt.where(ChatAttachment.user_id.is_(None))
+    else:
+        stmt = stmt.where(
+            (ChatAttachment.user_id == user_id) | (ChatAttachment.user_id.is_(None))
+        )
+    result = await db.execute(stmt)
+    rows = list(result.scalars().all())
+
+    # Re-sort to caller order (SQL IN doesn't guarantee order).
+    by_id = {row.id: row for row in rows}
+    ordered_rows = [by_id[i] for i in ordered_ids if i in by_id]
+    if not ordered_rows:
+        return "", []
+
+    parts: list[str] = []
+    for row in ordered_rows:
+        body = row.parsed_text
+        if not body:
+            body = f"(解析失败：{row.parse_error or '未知错误'})"
+        char_count = len(body)
+        parts.append(
+            f"===== 附件: {row.filename} ({char_count} 字) =====\n"
+            f"{body}\n"
+            f"===== 附件结束 =====\n"
+        )
+    return "\n".join(parts) + "\n", ordered_rows
+
+
+async def _mark_attachments_consumed(
+    db: AsyncSession, attachments: list[ChatAttachment]
+) -> None:
+    """Best-effort: stamp ``consumed_at`` so a future GC cron can prune
+    orphaned uploads. Failures here must not break the chat response —
+    the message is already saved by the time we get called."""
+    if not attachments:
+        return
+    now = datetime.now(UTC)
+    for row in attachments:
+        if row.consumed_at is None:
+            row.consumed_at = now
+    try:
+        await db.commit()
+    except Exception:  # pragma: no cover — db quirks shouldn't surface to user
+        logger.exception("Failed to mark attachments consumed")
+        await db.rollback()
+
+
 async def _prepare_chat(
     db: AsyncSession,
     user_id: int | None,
@@ -767,11 +850,15 @@ async def _prepare_chat(
     page_content: str | None = None,
     hot_question_id: int | None = None,
     model_id: str | None = None,
-) -> tuple[ChatSession | None, str, str, str, bool, str, list[ChatSource], list[dict[str, str]]]:
+    attachment_ids: list[int] | None = None,
+) -> tuple[ChatSession | None, str, str, str, bool, str, list[ChatSource], list[dict[str, str]], list[ChatAttachment]]:
     """Shared setup for send_message and send_message_stream.
 
-    Returns (chat_session, api_url, api_key, model, is_byok, provider, sources, llm_messages).
-    chat_session is None for anonymous users.
+    Returns (chat_session, api_url, api_key, model, is_byok, provider, sources, llm_messages, attachments).
+    chat_session is None for anonymous users. ``attachments`` is the list
+    of ChatAttachment rows that were ownership-validated and prepended to
+    the user message; the caller marks them ``consumed_at`` after a
+    successful LLM round-trip.
     """
     _validate_message(message)
 
@@ -839,13 +926,30 @@ async def _prepare_chat(
                 "page_content": page_content,
             }
 
+    # Attachments: load + ownership-check, then prepend their parsed text
+    # to whatever message the LLM is going to see. We deliberately do
+    # this after RAG retrieval so a 100k-char PDF doesn't pollute the
+    # query embedding — the attachment is *context for the LLM answer*,
+    # not a search query.
+    attachment_prefix, attachments = await _load_and_render_attachments(
+        db, attachment_ids, user_id,
+    )
+    if attachment_prefix:
+        if llm_message_override is not None:
+            llm_message_override = attachment_prefix + llm_message_override
+        else:
+            llm_message_override = attachment_prefix + message
+
     llm_messages = _build_llm_messages(
         history, context_text, message, master_id=master_id,
         reading_context=reading_context,
         llm_message_override=llm_message_override,
     )
 
-    return chat_session, api_url, api_key, model, is_byok, provider, sources, llm_messages
+    return (
+        chat_session, api_url, api_key, model, is_byok, provider,
+        sources, llm_messages, attachments,
+    )
 
 
 async def send_message(
@@ -863,12 +967,16 @@ async def send_message(
     page_content: str | None = None,
     hot_question_id: int | None = None,
     model_id: str | None = None,
+    attachment_ids: list[int] | None = None,
 ) -> ChatResponse:
     _t0 = _time.monotonic()
-    chat_session, api_url, api_key, model, is_byok, provider, sources, llm_messages = await _prepare_chat(
+    (
+        chat_session, api_url, api_key, model, is_byok, provider,
+        sources, llm_messages, attachments,
+    ) = await _prepare_chat(
         db, user_id, message, session_id, user, client_ip=client_ip, redis=redis, master_id=master_id,
         text_id=text_id, juan_num=juan_num, selected_text=selected_text, page_content=page_content,
-        hot_question_id=hot_question_id, model_id=model_id,
+        hot_question_id=hot_question_id, model_id=model_id, attachment_ids=attachment_ids,
     )
     _t1 = _time.monotonic()
     logger.debug("TIMING: _prepare_chat took %.2fs", _t1 - _t0)
@@ -942,6 +1050,7 @@ async def send_message(
         await _save_messages(db, chat_session.id, message, answer, sources)
         log_mutations(chat_session.id, _citation_mutations)
         log_quote_mutations(chat_session.id, _quote_mutations)
+        await _mark_attachments_consumed(db, attachments)
 
         # Auto-generate a better session title for new sessions (first message)
         if chat_session.title == message[:50]:
@@ -972,6 +1081,7 @@ async def send_message_stream(
     page_content: str | None = None,
     hot_question_id: int | None = None,
     model_id: str | None = None,
+    attachment_ids: list[int] | None = None,
 ):
     """Async generator yielding SSE events for streaming chat responses.
 
@@ -986,10 +1096,13 @@ async def send_message_stream(
     yield f"data: {json.dumps({'type': 'searching', 'message': '正在检索相关经文...'}, ensure_ascii=False)}\n\n"
 
     try:
-        chat_session, api_url, api_key, model, is_byok, provider, sources, llm_messages = await _prepare_chat(
+        (
+            chat_session, api_url, api_key, model, is_byok, provider,
+            sources, llm_messages, attachments,
+        ) = await _prepare_chat(
             db, user_id, message, session_id, user, client_ip=client_ip, redis=redis, master_id=master_id,
             text_id=text_id, juan_num=juan_num, selected_text=selected_text, page_content=page_content,
-            hot_question_id=hot_question_id, model_id=model_id,
+            hot_question_id=hot_question_id, model_id=model_id, attachment_ids=attachment_ids,
         )
     except (ValidationError, QuotaExceededError, AccessDeniedError, ServiceError) as exc:
         yield f"data: {json.dumps({'type': 'error', 'message': str(exc)}, ensure_ascii=False)}\n\n"
@@ -1151,6 +1264,7 @@ async def send_message_stream(
         )
         log_mutations(chat_session.id, _citation_mutations)
         log_quote_mutations(chat_session.id, _quote_mutations)
+        await _mark_attachments_consumed(db, attachments)
         # Emit the real chat_messages.id so the frontend can swap the
         # in-flight Date.now() placeholder. Without this, feedback /
         # share buttons on a freshly-streamed message PUT to a

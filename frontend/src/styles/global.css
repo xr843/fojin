@@ -119,6 +119,51 @@ em {
   40% { opacity: 1; transform: scale(1.1); }
 }
 
+/* ========== Chat Input Shell (Claude.ai-style) ========== */
+.chat-input-shell {
+  border: 1px solid #d9d9d9;
+  border-radius: 12px;
+  padding: 8px 12px;
+  background: #fff;
+  transition: border-color 0.2s;
+  display: flex;
+  flex-direction: column;
+}
+.chat-input-shell:focus-within {
+  border-color: var(--fj-accent, #8b7355);
+  box-shadow: 0 0 0 2px rgba(139, 115, 85, 0.08);
+}
+.chat-input-shell .ant-input,
+.chat-input-shell textarea.ant-input {
+  background: transparent;
+  border: 0;
+  box-shadow: none !important;
+  padding: 4px 0;
+  resize: none;
+}
+.chat-input-shell .ant-input:focus,
+.chat-input-shell textarea.ant-input:focus {
+  box-shadow: none !important;
+}
+.chat-input-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 0;
+  border-top: 1px solid #f0f0f0;
+}
+.chat-input-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid #f0f0f0;
+  margin-top: 4px;
+}
+.chat-input-toolbar > .chat-input-spacer {
+  flex: 1;
+}
+
 /* ========== Chat Markdown ========== */
 /* Override bubble's pre-wrap so markdown controls its own whitespace */
 .chat-markdown { white-space: normal; line-height: 1.65; }
