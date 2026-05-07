@@ -58,9 +58,9 @@ PROVIDER_URLS = {
 PROVIDER_DEFAULT_MODELS = {
     # 国内
     "deepseek": "deepseek-v4-flash",
-    "dashscope": "qwen-plus",
-    "zhipu": "glm-4-flash",
-    "moonshot": "moonshot-v1-8k",
+    "dashscope": "qwen3.6-plus",
+    "zhipu": "glm-5.1",
+    "moonshot": "kimi-k2.6",
     "doubao": "doubao-1.5-pro-32k",
     "minimax": "MiniMax-Text-01",
     "stepfun": "step-1-8k",
@@ -458,6 +458,71 @@ def _resolve_llm_config(user: User | None) -> tuple[str, str, str, bool, str]:
     return url, settings.llm_api_key, model, False, "openai"
 
 
+def _resolve_with_model_override(
+    user: User | None, model_id: str | None
+) -> tuple[str, str, str, bool, str]:
+    """Same as _resolve_llm_config but allows a per-message model override.
+
+    Selection precedence:
+    1. model_id from request → look up CATALOG → if user has BYOK matching the
+       same provider, use BYOK key with the catalog model. Else use platform
+       key (only works for providers with a configured platform key —
+       DeepSeek today).
+    2. No model_id → fall back to _resolve_llm_config (BYOK or platform default).
+
+    Raises ServiceError when model_id refers to a provider for which neither
+    BYOK nor a platform key is available.
+    """
+    from app.services.llm_catalog import CATALOG_BY_ID  # local import to avoid cycle if any
+
+    if not model_id:
+        return _resolve_llm_config(user)
+    opt = CATALOG_BY_ID.get(model_id)
+    if not opt:
+        # unknown id — silently fall back rather than 400, so a stale
+        # localStorage value doesn't break chat
+        logger.info("Unknown model_id %r from client; falling back to default", model_id)
+        return _resolve_llm_config(user)
+    # BYOK matching the catalog provider → use user's key, override model
+    if user and user.encrypted_api_key:
+        try:
+            user_provider = user.api_provider or "openai"
+            if user_provider == opt.provider:
+                key = decrypt_api_key(user.encrypted_api_key)
+                url = PROVIDER_URLS.get(opt.provider, settings.llm_api_url)
+                return url, key, opt.model, True, opt.provider
+        except Exception as exc:  # pragma: no cover — same handling as _resolve_llm_config
+            logger.warning("Failed to decrypt user %s API key: %s", user.id, exc)
+            raise ServiceError("您的 API Key 解密失败，请在个人中心重新配置。") from None
+    # Platform path — only works when the platform-configured llm_api_url
+    # matches this provider. Match by host prefix (rstrip trailing slashes)
+    # to avoid false positives where one URL is a substring of another
+    # (e.g. operator setting LLM_API_URL=https://api. would otherwise
+    # match every provider).
+    if _platform_provider_matches(opt.provider) and settings.llm_api_key:
+        expected_url = PROVIDER_URLS[opt.provider]
+        return expected_url, settings.llm_api_key, opt.model, False, opt.provider
+    # Provider not available on platform; user has no matching BYOK
+    raise ServiceError(
+        f"所选模型「{opt.label}」需要在个人中心配置 {opt.provider} 服务商的 API Key 后使用。"
+    )
+
+
+def _platform_provider_matches(provider: str) -> bool:
+    """True iff the platform-configured llm_api_url points at this provider.
+
+    Uses host-anchored matching (after stripping trailing slashes) so that
+    e.g. ``https://api.deepseek.com/v1`` and ``https://api.deepseek.com``
+    both count as deepseek, but ``https://api.`` does not match every
+    provider.
+    """
+    expected = PROVIDER_URLS.get(provider, "").rstrip("/")
+    platform = (settings.llm_api_url or "").rstrip("/")
+    if not expected or not platform:
+        return False
+    return platform == expected or platform.startswith(expected + "/") or expected.startswith(platform + "/")
+
+
 def _resolve_fallback_llm_config() -> tuple[str, str, str, str] | None:
     """Platform fallback LLM, used only when the primary platform model fails
     before any tokens have been streamed. Returns (url, key, model, provider)
@@ -701,6 +766,7 @@ async def _prepare_chat(
     selected_text: str | None = None,
     page_content: str | None = None,
     hot_question_id: int | None = None,
+    model_id: str | None = None,
 ) -> tuple[ChatSession | None, str, str, str, bool, str, list[ChatSource], list[dict[str, str]]]:
     """Shared setup for send_message and send_message_stream.
 
@@ -726,7 +792,7 @@ async def _prepare_chat(
     if user_id is not None:
         chat_session = await _resolve_session(db, user_id, message, session_id)
 
-    api_url, api_key, model, is_byok, provider = _resolve_llm_config(user)
+    api_url, api_key, model, is_byok, provider = _resolve_with_model_override(user, model_id)
 
     if not is_byok and not api_key:
         raise ServiceError("平台 AI 服务暂未配置。请在个人中心配置自己的 API Key 使用 AI 问答功能。")
@@ -796,12 +862,13 @@ async def send_message(
     selected_text: str | None = None,
     page_content: str | None = None,
     hot_question_id: int | None = None,
+    model_id: str | None = None,
 ) -> ChatResponse:
     _t0 = _time.monotonic()
     chat_session, api_url, api_key, model, is_byok, provider, sources, llm_messages = await _prepare_chat(
         db, user_id, message, session_id, user, client_ip=client_ip, redis=redis, master_id=master_id,
         text_id=text_id, juan_num=juan_num, selected_text=selected_text, page_content=page_content,
-        hot_question_id=hot_question_id,
+        hot_question_id=hot_question_id, model_id=model_id,
     )
     _t1 = _time.monotonic()
     logger.debug("TIMING: _prepare_chat took %.2fs", _t1 - _t0)
@@ -904,6 +971,7 @@ async def send_message_stream(
     selected_text: str | None = None,
     page_content: str | None = None,
     hot_question_id: int | None = None,
+    model_id: str | None = None,
 ):
     """Async generator yielding SSE events for streaming chat responses.
 
@@ -921,7 +989,7 @@ async def send_message_stream(
         chat_session, api_url, api_key, model, is_byok, provider, sources, llm_messages = await _prepare_chat(
             db, user_id, message, session_id, user, client_ip=client_ip, redis=redis, master_id=master_id,
             text_id=text_id, juan_num=juan_num, selected_text=selected_text, page_content=page_content,
-            hot_question_id=hot_question_id,
+            hot_question_id=hot_question_id, model_id=model_id,
         )
     except (ValidationError, QuotaExceededError, AccessDeniedError, ServiceError) as exc:
         yield f"data: {json.dumps({'type': 'error', 'message': str(exc)}, ensure_ascii=False)}\n\n"

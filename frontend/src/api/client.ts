@@ -1384,6 +1384,7 @@ export function sendChatMessageStream(
   signal?: AbortSignal,
   readingContext?: ReadingContext,
   hotQuestionId?: number | null,
+  modelId?: string | null,
 ): Promise<void> {
   return new Promise<void>((resolve) => {
     // Get auth token from localStorage (same pattern as axios interceptor)
@@ -1507,6 +1508,7 @@ export function sendChatMessageStream(
       message,
       session_id: sessionId ?? null,
       master_id: masterId,
+      ...(modelId ? { model_id: modelId } : {}),
       ...(hotQuestionId != null ? { hot_question_id: hotQuestionId } : {}),
       ...(readingContext ? {
         text_id: readingContext.text_id,

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.core.deps import get_current_user, get_optional_user
 from app.database import get_db
 from app.models.user import User
@@ -60,7 +61,7 @@ async def chat(
         db, user_id, data.message, data.session_id, user=user,
         client_ip=client_ip, redis=redis, master_id=data.master_id,
         text_id=data.text_id, juan_num=data.juan_num, selected_text=data.selected_text, page_content=data.page_content,
-        hot_question_id=data.hot_question_id,
+        hot_question_id=data.hot_question_id, model_id=data.model_id,
     )
 
 
@@ -82,7 +83,7 @@ async def chat_stream(
             db, user_id, data.message, data.session_id, user=user,
             client_ip=client_ip, redis=redis, master_id=data.master_id,
             text_id=data.text_id, juan_num=data.juan_num, selected_text=data.selected_text, page_content=data.page_content,
-            hot_question_id=data.hot_question_id,
+            hot_question_id=data.hot_question_id, model_id=data.model_id,
         ),
         media_type="text/event-stream",
         headers={
@@ -92,6 +93,37 @@ async def chat_stream(
             "Connection": "keep-alive",
         },
     )
+
+
+@router.get("/models", response_model=list[dict])
+async def list_chat_models(
+    user: User | None = Depends(get_optional_user),
+):
+    """Return curated catalog of selectable models, with availability flag.
+
+    返回前端可选的精选模型列表（含可用性标记）。"""
+    from app.services.chat import _platform_provider_matches
+    from app.services.llm_catalog import CATALOG
+
+    items = []
+    for opt in CATALOG:
+        # available if user BYOK matches OR platform key configured for this provider
+        byok_ok = bool(
+            user
+            and user.encrypted_api_key
+            and (user.api_provider or "openai") == opt.provider
+        )
+        platform_ok = bool(_platform_provider_matches(opt.provider) and settings.llm_api_key)
+        items.append({
+            "id": opt.id,
+            "provider": opt.provider,
+            "label": opt.label,
+            "description": opt.description,
+            "vision": opt.vision,
+            "available": byok_ok or platform_ok,
+            "requires_byok": not platform_ok,
+        })
+    return items
 
 
 @router.get("/masters")

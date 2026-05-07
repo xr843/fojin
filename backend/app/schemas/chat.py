@@ -17,6 +17,9 @@ class ChatRequest(BaseModel):
     # the LLM for the matching hot-question prompt template, keeping the
     # natural display_text in history/RAG.
     hot_question_id: int | None = None
+    # Per-message model override — id from llm_catalog.CATALOG (e.g. "deepseek:v4-flash").
+    # Unknown ids fall back gracefully so stale localStorage doesn't break chat.
+    model_id: str | None = None
 
 
 class HotQuestionCard(BaseModel):
