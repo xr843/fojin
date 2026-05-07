@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useMemo, useEffect, lazy, Suspense, type
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
-import { Input, Button, Space, message, Alert, Tooltip, Modal, Select } from "antd";
+import { Input, Button, message, Alert, Tooltip, Modal, Select } from "antd";
 import Markdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
@@ -1216,7 +1216,7 @@ export default function ChatPage() {
                 style={{ marginBottom: 8, fontSize: 12 }}
               />
             )}
-            <Space.Compact style={{ width: "100%", alignItems: "stretch" }}>
+            <div className="chat-input-shell">
               <Input.TextArea
                 ref={(instance) => { inputRef.current = instance?.resizableTextArea?.textArea ?? null; }}
                 value={input}
@@ -1228,44 +1228,39 @@ export default function ChatPage() {
                 }}
                 placeholder={tabSuggestions.length > 0 ? `${tabSuggestions[(tabIndexRef.current + 1) % tabSuggestions.length]}    ⇥ Tab    ⇧⏎ 换行` : t("chat.input_placeholder")}
                 disabled={sending}
-                autoSize={{ minRows: 1, maxRows: 6 }}
+                autoSize={{ minRows: 2, maxRows: 8 }}
+                variant="borderless"
                 style={{ fontFamily: '"Noto Serif SC", serif', fontSize: 16, resize: "none" }}
               />
-              {sending ? (
+              <div className="chat-input-toolbar">
                 <Button
-                  danger
-                  icon={<StopOutlined />}
-                  onClick={handleCancel}
-                  size="large"
-                >
-                  {t("chat.stop")}
-                </Button>
-              ) : (
-                <Button
-                  type="primary"
-                  icon={<SendOutlined />}
-                  onClick={handleSend}
-                  size="large"
-                  style={{ background: "var(--fj-accent)", borderColor: "var(--fj-accent)" }}
+                  type="text"
+                  size="small"
+                  icon={<PlusOutlined />}
+                  onClick={() => {}}
+                  title="附件上传 (PDF/TXT/MD/DOCX/CSV/HTML, ≤10MB)"
                 />
-              )}
-            </Space.Compact>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginTop: 8,
-                gap: 8,
-              }}
-            >
-              <Button
-                size="small"
-                icon={<PlusOutlined />}
-                disabled
-                title="附件上传（即将上线）"
-              />
-              <ChatModelSelector value={modelId} onChange={handleModelChange} />
+                <ChatModelSelector value={modelId} onChange={handleModelChange} />
+                <span className="chat-input-spacer" />
+                {sending ? (
+                  <Button
+                    danger
+                    icon={<StopOutlined />}
+                    onClick={handleCancel}
+                  >
+                    {t("chat.stop")}
+                  </Button>
+                ) : (
+                  <Button
+                    type="primary"
+                    icon={<SendOutlined />}
+                    onClick={handleSend}
+                    style={{ background: "var(--fj-accent)", borderColor: "var(--fj-accent)" }}
+                  >
+                    {t("chat.send", "发送")}
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </div>
