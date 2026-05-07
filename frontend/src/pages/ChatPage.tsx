@@ -29,6 +29,7 @@ import {
 } from "@ant-design/icons";
 const ShareCard = lazy(() => import("../components/ShareCard"));
 const CitationDrawer = lazy(() => import("../components/CitationDrawer"));
+import ChatModelSelector from "../components/ChatModelSelector";
 import type { CitationTarget } from "../components/CitationDrawer";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -249,6 +250,14 @@ export default function ChatPage() {
   const { user } = useAuthStore();
   const [input, setInput] = useState("");
   const [masterId, setMasterId] = useState<string | null>(null);
+  const [modelId, setModelId] = useState<string>(() => {
+    if (typeof window === "undefined") return "deepseek:v4-flash";
+    return window.localStorage.getItem("fojin.chat.modelId") || "deepseek:v4-flash";
+  });
+  const handleModelChange = useCallback((id: string) => {
+    setModelId(id);
+    try { window.localStorage.setItem("fojin.chat.modelId", id); } catch { /* ignore */ }
+  }, []);
   const [sessionId, setSessionId] = useState<number | undefined>();
   const [messages, setMessages] = useState<ChatMessageItem[]>([]);
   const [sending, setSending] = useState(false);
@@ -627,8 +636,8 @@ export default function ChatPage() {
         setSending(false);
         refetchQuota();
       },
-    }, abortController.signal, undefined, hotQuestionId);
-  }, [sending, sessionId, masterId, user, refetchSessions, refetchQuota, queryClient]);
+    }, abortController.signal, undefined, hotQuestionId, modelId);
+  }, [sending, sessionId, masterId, modelId, user, refetchSessions, refetchQuota, queryClient]);
 
   const handleSend = useCallback(async () => {
     await handleSendMessage(input);
@@ -1232,6 +1241,23 @@ export default function ChatPage() {
                 />
               )}
             </Space.Compact>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginTop: 8,
+                gap: 8,
+              }}
+            >
+              <Button
+                size="small"
+                icon={<PlusOutlined />}
+                disabled
+                title="附件上传（即将上线）"
+              />
+              <ChatModelSelector value={modelId} onChange={handleModelChange} />
+            </div>
           </div>
         </div>
 
