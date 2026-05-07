@@ -1376,16 +1376,28 @@ export interface ReadingContext {
   page_content?: string;
 }
 
+export interface ChatStreamOptions {
+  signal?: AbortSignal;
+  readingContext?: ReadingContext;
+  hotQuestionId?: number | null;
+  modelId?: string | null;
+  attachmentIds?: number[] | null;
+}
+
 export function sendChatMessageStream(
   message: string,
   sessionId: number | undefined,
   masterId: string | null,
   callbacks: StreamCallbacks,
-  signal?: AbortSignal,
-  readingContext?: ReadingContext,
-  hotQuestionId?: number | null,
-  modelId?: string | null,
+  options: ChatStreamOptions = {},
 ): Promise<void> {
+  const {
+    signal,
+    readingContext,
+    hotQuestionId,
+    modelId,
+    attachmentIds,
+  } = options;
   return new Promise<void>((resolve) => {
     // Get auth token from localStorage (same pattern as axios interceptor)
     let token = "";
@@ -1510,6 +1522,9 @@ export function sendChatMessageStream(
       master_id: masterId,
       ...(modelId ? { model_id: modelId } : {}),
       ...(hotQuestionId != null ? { hot_question_id: hotQuestionId } : {}),
+      ...(attachmentIds && attachmentIds.length > 0
+        ? { attachment_ids: attachmentIds }
+        : {}),
       ...(readingContext ? {
         text_id: readingContext.text_id,
         juan_num: readingContext.juan_num,
