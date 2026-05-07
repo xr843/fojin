@@ -58,9 +58,9 @@ PROVIDER_URLS = {
 PROVIDER_DEFAULT_MODELS = {
     # 国内
     "deepseek": "deepseek-v4-flash",
-    "dashscope": "qwen-plus",
-    "zhipu": "glm-4-flash",
-    "moonshot": "moonshot-v1-8k",
+    "dashscope": "qwen3.6-plus",
+    "zhipu": "glm-5.1",
+    "moonshot": "kimi-k2.6",
     "doubao": "doubao-1.5-pro-32k",
     "minimax": "MiniMax-Text-01",
     "stepfun": "step-1-8k",
