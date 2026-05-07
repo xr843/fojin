@@ -20,6 +20,7 @@ from app.models.chat import ChatMessage, ChatSession
 from app.models.hot_question import HotQuestion
 from app.models.user import User
 from app.schemas.chat import ChatResponse, ChatSource
+from app.services.citation_guard import enforce_citation_whitelist, log_mutations
 from app.services.master_profiles import get_master
 from app.services.rag_retrieval import retrieve_rag_context
 
@@ -816,8 +817,15 @@ async def send_message(
         logger.exception("LLM call failed")
         answer = "抱歉，AI 服务暂时不可用，请稍后重试。"
 
+    # Citation guard: rewrite any 【《X》第N卷】 the model produced that is
+    # not anchored in the retrieved sources. See app/services/citation_guard
+    # for the full rationale — this is the deterministic backstop after the
+    # prompt's moral one.
+    answer, _citation_mutations = enforce_citation_whitelist(answer, sources)
+
     if chat_session:
         await _save_messages(db, chat_session.id, message, answer, sources)
+        log_mutations(chat_session.id, _citation_mutations)
 
         # Auto-generate a better session title for new sessions (first message)
         if chat_session.title == message[:50]:
@@ -984,12 +992,39 @@ async def send_message_stream(
         yield f"data: {json.dumps({'type': 'error', 'message': error_msg}, ensure_ascii=False)}\n\n"
         full_answer = full_answer or error_msg
 
+    # Citation guard: rewrite any 【《X》第N卷】 not anchored in the
+    # retrieved sources. The user has already seen the raw stream; we
+    # emit a final 'citation_correction' event so the frontend can swap
+    # the visible message to the corrected version, then persist only
+    # the corrected version to chat_messages so reload + history are
+    # canonical.
+    #
+    # SSE event ordering contract (must be preserved if events are
+    # re-ordered later): no `token` events are emitted after
+    # `citation_correction`. Frontend stream consumers in
+    # frontend/src/pages/ChatPage.tsx and src/components/ReaderAIPanel.tsx
+    # rely on this — once they swap the visible message to the corrected
+    # text, a late `token` would re-append the LLM's raw output and
+    # silently re-introduce the hallucination this guard exists to
+    # prevent.
+    corrected_answer, _citation_mutations = enforce_citation_whitelist(full_answer, sources)
+    if _citation_mutations:
+        yield (
+            "data: "
+            + json.dumps(
+                {"type": "citation_correction", "content": corrected_answer},
+                ensure_ascii=False,
+            )
+            + "\n\n"
+        )
+
     # 回答完成后显示引用来源——先论点后论据，自然阅读顺序
     if sources:
         yield f"data: {json.dumps({'type': 'sources', 'sources': [s.model_dump() for s in sources]}, ensure_ascii=False)}\n\n"
 
     if chat_session:
-        await _save_messages(db, chat_session.id, message, full_answer, sources)
+        await _save_messages(db, chat_session.id, message, corrected_answer, sources)
+        log_mutations(chat_session.id, _citation_mutations)
     yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
 

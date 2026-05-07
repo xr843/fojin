@@ -158,6 +158,15 @@ export default function ReaderAIPanel({
         );
         scrollToBottom();
       },
+      onCitationCorrection: (correctedAnswer: string) => {
+        // Backend contract (see send_message_stream): no `token` events
+        // arrive after `citation_correction`. If that contract is ever
+        // broken, a late chunk would append to the corrected answer and
+        // re-introduce the hallucination we just stripped.
+        setMessages((prev) =>
+          prev.map((m) => m.id === assistantId ? { ...m, content: correctedAnswer } : m),
+        );
+      },
       onSources: (sources: ChatSource[]) => {
         setMessages((prev) =>
           prev.map((m) => m.id === assistantId ? { ...m, sources } : m),
