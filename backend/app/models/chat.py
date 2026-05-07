@@ -62,8 +62,12 @@ class ChatAttachment(Base):
     __tablename__ = "chat_attachments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    # The ix_chat_attachments_user_id and ix_chat_attachments_created_at
+    # indexes are owned by the alembic migration (0129) — do not set
+    # index=True here, otherwise SQLAlchemy create_all would try to make
+    # a duplicate.
     user_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     filename: Mapped[str] = mapped_column(String(255))
     content_type: Mapped[str] = mapped_column(String(100))
@@ -72,7 +76,7 @@ class ChatAttachment(Base):
     parsed_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     parse_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), index=True
+        DateTime(timezone=True), server_default=func.now()
     )
     consumed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

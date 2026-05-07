@@ -48,7 +48,9 @@ def _truncate(text: str) -> str:
 
 
 def _parse_text(file_bytes: bytes) -> str:
-    return file_bytes.decode("utf-8", errors="replace")
+    # utf-8-sig strips a leading BOM if present so it doesn't leak into
+    # the LLM prompt as a stray ﻿ character.
+    return file_bytes.decode("utf-8-sig", errors="replace")
 
 
 def _parse_csv(file_bytes: bytes) -> str:

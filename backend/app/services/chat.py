@@ -1,7 +1,7 @@
 import json
 import logging
 import time as _time
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 import httpx
 from sqlalchemy import delete, func, select
@@ -778,7 +778,15 @@ async def _load_and_render_attachments(
     # deterministic. dict.fromkeys is the canonical idiom.
     ordered_ids = list(dict.fromkeys(attachment_ids))
 
-    stmt = select(ChatAttachment).where(ChatAttachment.id.in_(ordered_ids))
+    # consumed_at IS NULL makes attachments single-use: once an upload
+    # has been folded into a chat message, its content can't be replayed
+    # by a different caller guessing the (sequential, autoincrement) id.
+    # This is the actual mitigation against anonymous-upload enumeration —
+    # the user_id IS NULL allowance below is otherwise public-by-design.
+    stmt = select(ChatAttachment).where(
+        ChatAttachment.id.in_(ordered_ids),
+        ChatAttachment.consumed_at.is_(None),
+    )
     if user_id is None:
         stmt = stmt.where(ChatAttachment.user_id.is_(None))
     else:
@@ -816,7 +824,7 @@ async def _mark_attachments_consumed(
     the message is already saved by the time we get called."""
     if not attachments:
         return
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     for row in attachments:
         if row.consumed_at is None:
             row.consumed_at = now
