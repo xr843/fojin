@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Input, Button, message, Spin } from "antd";
+import { Input, Button, message, Spin, Tooltip } from "antd";
 import {
   SendOutlined,
   RobotOutlined,
@@ -9,11 +9,15 @@ import {
   ReadOutlined,
   ClearOutlined,
   CopyOutlined,
+  LikeOutlined,
+  LikeFilled,
+  DislikeOutlined,
+  DislikeFilled,
 } from "@ant-design/icons";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize from "rehype-sanitize";
-import { sendChatMessageStream } from "../api/client";
+import { sendChatMessageStream, updateChatMessageFeedback } from "../api/client";
 import type { ChatSource, ChatMessageItem, ReadingContext } from "../api/client";
 import type { ReactNode } from "react";
 
@@ -167,6 +171,15 @@ export default function ReaderAIPanel({
           prev.map((m) => m.id === assistantId ? { ...m, content: correctedAnswer } : m),
         );
       },
+      onMessageId: (realId: number) => {
+        // Swap Date.now() placeholder for real chat_messages.id so the
+        // feedback button below targets the correct row. Without this
+        // every freshly-streamed message's feedback PUT 404'd silently
+        // — see ChatPage for the full context.
+        setMessages((prev) =>
+          prev.map((m) => (m.id === assistantId ? { ...m, id: realId } : m)),
+        );
+      },
       onSources: (sources: ChatSource[]) => {
         setMessages((prev) =>
           prev.map((m) => m.id === assistantId ? { ...m, sources } : m),
@@ -291,6 +304,62 @@ export default function ReaderAIPanel({
                               {q}
                             </span>
                           ))}
+                        </div>
+                      )}
+                      {/* Feedback row — only after streaming completes
+                          and only on a real persisted message id (the
+                          backend swaps the local Date.now() placeholder
+                          via the message_id SSE event). Mirrors
+                          ChatPage's pattern so the two chat surfaces
+                          collect feedback uniformly. */}
+                      {!isStreaming && m.id < 1e12 && (
+                        <div style={{ marginTop: 8, display: "flex", gap: 4 }}>
+                          <Tooltip title="有帮助">
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={m.feedback === "up" ? <LikeFilled /> : <LikeOutlined />}
+                              style={{
+                                color: m.feedback === "up" ? "var(--fj-accent)" : "var(--fj-ink-muted)",
+                                fontSize: 12,
+                              }}
+                              onClick={() => {
+                                const newFeedback = m.feedback === "up" ? null : "up";
+                                const prevFeedback = m.feedback;
+                                setMessages((prev) =>
+                                  prev.map((x) => (x.id === m.id ? { ...x, feedback: newFeedback } : x)),
+                                );
+                                updateChatMessageFeedback(m.id, newFeedback as "up" | "down" | null).catch(() => {
+                                  setMessages((prev) =>
+                                    prev.map((x) => (x.id === m.id ? { ...x, feedback: prevFeedback } : x)),
+                                  );
+                                });
+                              }}
+                            />
+                          </Tooltip>
+                          <Tooltip title="没帮助">
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={m.feedback === "down" ? <DislikeFilled /> : <DislikeOutlined />}
+                              style={{
+                                color: m.feedback === "down" ? "#e74c3c" : "var(--fj-ink-muted)",
+                                fontSize: 12,
+                              }}
+                              onClick={() => {
+                                const newFeedback = m.feedback === "down" ? null : "down";
+                                const prevFeedback = m.feedback;
+                                setMessages((prev) =>
+                                  prev.map((x) => (x.id === m.id ? { ...x, feedback: newFeedback } : x)),
+                                );
+                                updateChatMessageFeedback(m.id, newFeedback as "up" | "down" | null).catch(() => {
+                                  setMessages((prev) =>
+                                    prev.map((x) => (x.id === m.id ? { ...x, feedback: prevFeedback } : x)),
+                                  );
+                                });
+                              }}
+                            />
+                          </Tooltip>
                         </div>
                       )}
                     </>

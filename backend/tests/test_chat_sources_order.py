@@ -106,7 +106,7 @@ async def test_sources_after_tokens():
     mock_client_cls = _make_mock_httpx_client(["般若", "是智慧"])
 
     with patch("app.services.chat._prepare_chat", new_callable=AsyncMock, return_value=prepare_return), \
-         patch("app.services.chat._save_messages", new_callable=AsyncMock), \
+         patch("app.services.chat._save_messages", new_callable=AsyncMock, return_value=99), \
          patch("app.services.chat.httpx.AsyncClient", mock_client_cls):
 
         from app.services.chat import send_message_stream
@@ -153,7 +153,7 @@ async def test_empty_sources_not_emitted():
     mock_client_cls = _make_mock_httpx_client(["佛", "法"])
 
     with patch("app.services.chat._prepare_chat", new_callable=AsyncMock, return_value=prepare_return), \
-         patch("app.services.chat._save_messages", new_callable=AsyncMock), \
+         patch("app.services.chat._save_messages", new_callable=AsyncMock, return_value=99), \
          patch("app.services.chat.httpx.AsyncClient", mock_client_cls):
 
         from app.services.chat import send_message_stream
@@ -184,7 +184,7 @@ async def test_session_id_value_correct():
     mock_client_cls = _make_mock_httpx_client(["OK"])
 
     with patch("app.services.chat._prepare_chat", new_callable=AsyncMock, return_value=prepare_return), \
-         patch("app.services.chat._save_messages", new_callable=AsyncMock), \
+         patch("app.services.chat._save_messages", new_callable=AsyncMock, return_value=99), \
          patch("app.services.chat.httpx.AsyncClient", mock_client_cls):
 
         from app.services.chat import send_message_stream
