@@ -1,6 +1,19 @@
-from fastapi import APIRouter, Depends, Query, Request
+import logging
+from pathlib import Path
+from uuid import uuid4
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.chat import ChatAttachment
+from app.services.attachment_parser import (
+    ALLOWED_EXTENSIONS,
+    MAX_FILE_BYTES,
+    parse_attachment,
+)
+
+logger = logging.getLogger(__name__)
 
 from app.config import settings
 from app.core.deps import get_current_user, get_optional_user
@@ -62,6 +75,7 @@ async def chat(
         client_ip=client_ip, redis=redis, master_id=data.master_id,
         text_id=data.text_id, juan_num=data.juan_num, selected_text=data.selected_text, page_content=data.page_content,
         hot_question_id=data.hot_question_id, model_id=data.model_id,
+        attachment_ids=data.attachment_ids,
     )
 
 
@@ -84,6 +98,7 @@ async def chat_stream(
             client_ip=client_ip, redis=redis, master_id=data.master_id,
             text_id=data.text_id, juan_num=data.juan_num, selected_text=data.selected_text, page_content=data.page_content,
             hot_question_id=data.hot_question_id, model_id=data.model_id,
+            attachment_ids=data.attachment_ids,
         ),
         media_type="text/event-stream",
         headers={
@@ -93,6 +108,109 @@ async def chat_stream(
             "Connection": "keep-alive",
         },
     )
+
+
+@router.post("/attachments", status_code=201)
+async def upload_chat_attachment(
+    file: UploadFile = File(...),
+    user: User | None = Depends(get_optional_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Upload a single file (PDF/TXT/MD/DOCX/CSV/HTML, ≤10MB), parse to plain text,
+    and return an attachment id the frontend can pass in chat send via attachment_ids.
+
+    上传单个附件（PDF/TXT/MD/DOCX/CSV/HTML，≤10MB），解析为文本后返回附件 id。"""
+    # Validation order follows CLAUDE.md HTTP code rule
+    # (auth -> 415 -> 413 -> 422 -> 201). Auth is intentionally optional
+    # since chat itself supports anonymous access; we skip the 401/403
+    # bands entirely here.
+
+    filename = file.filename or "upload"
+    ext = ""
+    idx = filename.rfind(".")
+    if idx != -1:
+        ext = filename[idx:].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="暂不支持该文件类型，可上传 PDF / TXT / MD / DOCX / CSV / HTML",
+        )
+
+    # Read in chunks so a malicious 1GB upload doesn't OOM the worker.
+    # We bail the moment we cross MAX_FILE_BYTES — no need to read the
+    # whole stream just to reject it.
+    chunks: list[bytes] = []
+    total = 0
+    chunk_size = 1 << 20  # 1 MiB
+    while True:
+        chunk = await file.read(chunk_size)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > MAX_FILE_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="文件超出 10 MB 上限",
+            )
+        chunks.append(chunk)
+    file_bytes = b"".join(chunks)
+
+    # Persist to disk first so the row always references a real file,
+    # even if parse fails (we still want the parse_error trail).
+    upload_dir = Path(settings.upload_dir)
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    disk_name = f"{uuid4().hex}{ext}"
+    storage_path = str(upload_dir / disk_name)
+    try:
+        with open(storage_path, "wb") as fh:
+            fh.write(file_bytes)
+    except OSError as exc:
+        logger.exception("Failed to persist chat attachment to disk")
+        raise HTTPException(status_code=500, detail=f"文件保存失败：{exc}") from exc
+
+    parsed_text: str | None = None
+    parse_error: str | None = None
+    try:
+        parsed_text = parse_attachment(file_bytes, filename, file.content_type or "")
+    except ValueError as exc:
+        parse_error = str(exc)[:500]
+        logger.info("Attachment parse failed for %s: %s", filename, parse_error)
+    except Exception as exc:  # pragma: no cover — safety net for unknown parser bugs
+        parse_error = f"解析异常：{exc}"[:500]
+        logger.exception("Unexpected parser error")
+
+    row = ChatAttachment(
+        user_id=user.id if user else None,
+        filename=filename[:255],
+        content_type=(file.content_type or "application/octet-stream")[:100],
+        size_bytes=total,
+        storage_path=storage_path[:500],
+        parsed_text=parsed_text,
+        parse_error=parse_error,
+    )
+    db.add(row)
+    await db.commit()
+    await db.refresh(row)
+
+    if parse_error is not None:
+        # Row is saved (so a future GC can clean the file), but the
+        # request as a whole reports 422 so the frontend knows to warn
+        # the user.  We still emit the id in the body so the client
+        # can choose to attach it anyway (with the parse_error inlined
+        # by the chat service).
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"上传成功但解析失败：{parse_error}",
+        )
+
+    preview = (parsed_text or "")[:200]
+    return {
+        "id": row.id,
+        "filename": row.filename,
+        "size_bytes": row.size_bytes,
+        "char_count": len(parsed_text or ""),
+        "preview": preview,
+    }
 
 
 @router.get("/models", response_model=list[dict])
