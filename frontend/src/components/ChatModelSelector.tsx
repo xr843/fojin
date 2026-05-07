@@ -2,6 +2,20 @@ import { useEffect, useMemo, useState } from "react";
 import { Select, Tooltip } from "antd";
 import { PictureOutlined } from "@ant-design/icons";
 import { fetchChatModels, type ChatModelOption } from "../api/chatModels";
+import deepseekLogo from "../assets/llm-logos/deepseek.svg";
+import qwenLogo from "../assets/llm-logos/qwen.svg";
+import kimiLogo from "../assets/llm-logos/kimi.svg";
+import zhipuLogo from "../assets/llm-logos/zhipu.svg";
+
+// Provider → brand logo (lobehub/lobe-icons, MIT). dashscope is Alibaba's
+// hosting platform for Qwen, so it shares the Qwen mark; moonshot ships
+// Kimi.
+const PROVIDER_LOGO: Record<string, string> = {
+  deepseek: deepseekLogo,
+  dashscope: qwenLogo,
+  moonshot: kimiLogo,
+  zhipu: zhipuLogo,
+};
 
 interface ChatModelSelectorProps {
   value: string;
@@ -36,12 +50,21 @@ interface SelectGroup {
 function buildLabel(model: ChatModelOption): React.ReactNode {
   const suffix = model.available ? "" : "（需配置 Key）";
   const text = `${model.label}${suffix}`;
+  const logoSrc = PROVIDER_LOGO[model.provider];
   return (
     <Tooltip title={model.description} placement="left" mouseEnterDelay={0.2}>
-      <span>
-        {text}
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+        {logoSrc && (
+          <img
+            src={logoSrc}
+            alt=""
+            aria-hidden
+            style={{ width: 16, height: 16, flexShrink: 0 }}
+          />
+        )}
+        <span>{text}</span>
         {model.vision && (
-          <PictureOutlined style={{ marginLeft: 4, color: "#8b7355" }} />
+          <PictureOutlined style={{ marginLeft: 2, color: "#8b7355" }} />
         )}
       </span>
     </Tooltip>
