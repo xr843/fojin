@@ -1349,6 +1349,14 @@ export interface StreamCallbacks {
   onSources: (sources: ChatSource[]) => void;
   onSessionId: (sessionId: number) => void;
   onSearching?: (message: string) => void;
+  /**
+   * Backend has rewritten one or more 【《X》第N卷】 references in the
+   * answer to anchor them to retrieved sources. The full corrected
+   * answer is provided; the consumer should replace the visible
+   * message body with this value so reload + the just-streamed view
+   * stay consistent with what was persisted.
+   */
+  onCitationCorrection?: (correctedAnswer: string) => void;
   onError: (message: string) => void;
   onDone: () => void;
 }
@@ -1411,6 +1419,9 @@ export function sendChatMessageStream(
               break;
             case "searching":
               callbacks?.onSearching?.(event.message);
+              break;
+            case "citation_correction":
+              callbacks?.onCitationCorrection?.(event.content);
               break;
             case "error":
               callbacks.onError(event.message);
