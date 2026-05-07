@@ -598,11 +598,12 @@ export default function ChatPage() {
     setMessages((prev) => [...prev, userMsg, assistantMsg]);
     setInput("");
     setSending(true);
-    // Snapshot attachment ids for this send and clear the chip row. Backend
-    // marks them consumed by id; clearing here prevents the next message from
-    // accidentally re-sending the same attachment_ids.
+    // Snapshot attachment ids for this send. Don't clear chips yet —
+    // if the stream errors before the backend marks them consumed,
+    // keeping the chips lets the user retry by hitting Send again
+    // (consumed_at IS NULL on the backend means re-use is safe).
+    // Cleared in onDone (success path) below.
     const attachmentIdsForSend = attachments.map((a) => a.id);
-    setAttachments([]);
     scrollToBottom();
 
     const abortController = new AbortController();
@@ -684,6 +685,11 @@ export default function ChatPage() {
         abortRef.current = null;
         streamingIdRef.current = 0;
         setSending(false);
+        // Clear attachment chips only after successful stream completion.
+        // On error the chips stay so the user can retry without re-uploading.
+        if (attachmentIdsForSend.length > 0) {
+          setAttachments((prev) => prev.filter((a) => !attachmentIdsForSend.includes(a.id)));
+        }
         refetchQuota();
       },
     }, {

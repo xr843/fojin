@@ -198,9 +198,15 @@ async def upload_chat_attachment(
         # the user.  We still emit the id in the body so the client
         # can choose to attach it anyway (with the parse_error inlined
         # by the chat service).
+        # The parse_error string in DB keeps the raw exc text for
+        # debugging, but the user-facing detail is stripped to its
+        # Chinese prefix to avoid leaking pypdf / docx internal
+        # exception traces. Parser errors all use the form
+        # "<friendly Chinese reason>：<library detail>".
+        user_facing = parse_error.split("：", 1)[0] if "：" in parse_error else "文件解析失败"
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"上传成功但解析失败：{parse_error}",
+            detail=f"上传成功但解析失败：{user_facing}",
         )
 
     preview = (parsed_text or "")[:200]
