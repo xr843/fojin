@@ -16,6 +16,7 @@ from app.services.attachment_parser import (
 logger = logging.getLogger(__name__)
 
 from app.config import settings
+from app.core.client_ip import get_real_client_ip
 from app.core.deps import get_current_user, get_optional_user
 from app.database import get_db
 from app.models.user import User
@@ -51,10 +52,9 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 
 
 def _get_client_ip(request: Request) -> str:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
+    # Trust the LAST entry of X-Forwarded-For (appended by nginx); the
+    # first entry is attacker-controlled. See app.core.client_ip docstring.
+    return get_real_client_ip(request, default="unknown") or "unknown"
 
 
 @router.post("", response_model=ChatResponse)

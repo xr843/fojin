@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.core.client_ip import get_real_client_ip
 from app.core.crypto import decrypt_api_key, encrypt_api_key
 from app.core.deps import get_current_user
 from app.database import get_db
@@ -103,13 +104,7 @@ async def change_password(
     前端应立刻用返回的新 token 替换本地存储的旧 token。
     同一用户在其他设备上的所有旧 JWT 都会在下一次请求时变成 401。
     """
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        client_ip = forwarded.split(",")[0].strip()
-    elif request.client:
-        client_ip = request.client.host
-    else:
-        client_ip = None
+    client_ip = get_real_client_ip(request, default=None)
     user_agent = request.headers.get("user-agent")
     return await change_user_password(
         db,
@@ -297,13 +292,7 @@ async def oauth_exchange(
 
     # Audit log: provider + user_id (decoded from JWT) + client IP. Never
     # log the exchange code itself.
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        client_ip = forwarded.split(",")[0].strip()
-    elif request.client:
-        client_ip = request.client.host
-    else:
-        client_ip = None
+    client_ip = get_real_client_ip(request, default=None)
 
     user_id = None
     try:
