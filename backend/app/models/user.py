@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, SmallInteger, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -26,6 +26,10 @@ class User(Base):
 
     # BYOK (Bring Your Own Key)
     encrypted_api_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Version of the KDF that produced encrypted_api_key. 1 = legacy
+    # (SHA-256 of JWT_SECRET_KEY), 2 = standalone API_KEY_ENCRYPTION_KEY.
+    # See app/core/crypto.py and migration 0130.
+    api_key_kdf_version: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default="1")
     api_provider: Mapped[str | None] = mapped_column(String(50), nullable=True)
     api_model: Mapped[str | None] = mapped_column(String(100), nullable=True)
     api_custom_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
