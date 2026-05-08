@@ -11,7 +11,7 @@
 Data discovered 2026-03-02 via Apify Google Search Scraper.
 
 Revision ID: 0033
-Revises: 0032
+Revises: 0031
 Create Date: 2026-03-02
 """
 
@@ -21,7 +21,7 @@ from alembic import op
 from sqlalchemy import text as sa_text
 
 revision: str = "0033"
-down_revision: Union[str, None] = "0032"
+down_revision: Union[str, None] = "0031"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
