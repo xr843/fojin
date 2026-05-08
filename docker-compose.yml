@@ -85,6 +85,10 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env (32+ chars)}
+      # P0-1: BYOK encryption key, independent of JWT_SECRET_KEY.
+      API_KEY_ENCRYPTION_KEY: ${API_KEY_ENCRYPTION_KEY:?Set API_KEY_ENCRYPTION_KEY in .env (Fernet.generate_key() output)}
+      # Drives the production fail-fast block in app/config.py.
+      FOJIN_ENV: ${FOJIN_ENV:-production}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173,http://localhost:5174}
       LLM_API_URL: ${LLM_API_URL:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
