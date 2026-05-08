@@ -98,11 +98,23 @@ async def _migrate_one(session: AsyncSession, user_id: int, v1_blob: str) -> tup
 
 
 async def _record_failure(session: AsyncSession, user_id: int, error: str) -> None:
+    """Append a failure row, but at most once per user_id per failing
+    migration window.  Codex review flagged that re-running the script
+    after a partial failure would otherwise spam the audit table; ops
+    cares about the *current* set of unmigrated users, not a per-run
+    counter.  We dedupe at insert time rather than via a unique index
+    so the column can carry distinct error messages over the lifetime
+    of the system (e.g. v1 decrypt failure today, then a different
+    error after JWT_SECRET rotation tomorrow)."""
     truncated = error[:500]
     await session.execute(
         text(
             "INSERT INTO api_key_migration_failures (user_id, error) "
-            "VALUES (:uid, :err)"
+            "SELECT :uid, :err "
+            "WHERE NOT EXISTS ("
+            "  SELECT 1 FROM api_key_migration_failures "
+            "  WHERE user_id = :uid AND error = :err"
+            ")"
         ),
         {"uid": user_id, "err": truncated},
     )
@@ -113,6 +125,21 @@ async def run(dry_run: bool, notify_admin_on_fail: bool) -> int:
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
     )
+
+    # Hard refusal: without API_KEY_ENCRYPTION_KEY explicitly set in the
+    # process env, app/config.py's dev fallback would synthesize an
+    # ephemeral key.  Re-encrypting prod ciphertexts under a process-
+    # local random key and committing them is exactly the data-loss
+    # scenario this migration exists to prevent.  Fail loudly before we
+    # touch any rows.
+    if not os.environ.get("API_KEY_ENCRYPTION_KEY"):
+        logger.error(
+            "API_KEY_ENCRYPTION_KEY is not set in the process environment. "
+            "Refusing to run — re-encrypting under an ephemeral dev key "
+            "would corrupt every migrated row on the next restart."
+        )
+        return 2
+
     engine = create_async_engine(settings.database_url, future=True)
     Session = async_sessionmaker(engine, expire_on_commit=False)
 

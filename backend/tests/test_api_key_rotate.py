@@ -70,6 +70,13 @@ async def test_rotate_v2_to_v2_idempotent(client, monkeypatch):
 
 
 @pytest.mark.anyio
+async def test_rotate_unauthenticated_rejected(client):
+    """Codex reviewer gap: rotate must reject unauth callers."""
+    resp = await client.post("/api/auth/api-key/rotate-encryption")
+    assert resp.status_code in (401, 403)
+
+
+@pytest.mark.anyio
 async def test_rotate_409_on_undecryptable(client, monkeypatch):
     """If neither v1 nor v2 unlocks the blob, return 409 not 500."""
     monkeypatch.setattr(
