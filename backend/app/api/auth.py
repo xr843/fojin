@@ -132,7 +132,9 @@ async def save_api_key(
     db: AsyncSession = Depends(get_db),
 ):
     """保存用户自己的 API Key（加密存储）。"""
-    user.encrypted_api_key = encrypt_api_key(data.api_key)
+    cipher, kdf_ver = encrypt_api_key(data.api_key)
+    user.encrypted_api_key = cipher
+    user.api_key_kdf_version = kdf_ver
     user.api_provider = data.provider
     user.api_model = data.model
     user.api_custom_url = data.custom_url if data.provider == "custom" else None
@@ -153,7 +155,7 @@ async def get_api_key_status(user: User = Depends(get_current_user)):
     if not user.encrypted_api_key:
         return ApiKeyStatus(has_api_key=False)
     try:
-        key = decrypt_api_key(user.encrypted_api_key)
+        key = decrypt_api_key(user.encrypted_api_key, user.api_key_kdf_version)
         preview = f"{key[:6]}...{key[-4:]}" if len(key) > 10 else "***"
     except Exception:
         preview = None
@@ -176,8 +178,47 @@ async def delete_api_key(
     user.api_provider = None
     user.api_model = None
     user.api_custom_url = None
+    # Free of ciphertext → claim the current KDF so the next save doesn't
+    # round-trip through v1.
+    from app.core.crypto import KDF_VERSION_V2
+
+    user.api_key_kdf_version = KDF_VERSION_V2
     await db.commit()
     return {"ok": True}
+
+
+@router.post("/api-key/rotate-encryption")
+async def rotate_api_key_encryption(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Re-encrypt the user's stored BYOK key under the current KDF.
+
+    Escape hatch for the v1→v2 migration: if the bulk migrate script
+    can't decrypt a row (because JWT_SECRET_KEY was rotated before this
+    fix landed), the row stays at v1 and chat returns "decrypt failed".
+    The user can re-save their key from the UI — but if they don't have
+    the plaintext anymore, this endpoint at least lets them confirm
+    they're already on v2.  Idempotent: a v2 row stays v2.
+    """
+    if not user.encrypted_api_key:
+        raise HTTPException(status_code=404, detail="No API key configured")
+    try:
+        plaintext = decrypt_api_key(user.encrypted_api_key, user.api_key_kdf_version)
+    except Exception as exc:
+        logger.warning("Rotate-encryption decrypt failed for user %s: %s", user.id, exc)
+        # 409 rather than 500 — this is a "your stored ciphertext is no
+        # longer recoverable" state, not a server bug.  Frontend should
+        # tell the user to re-enter their key.
+        raise HTTPException(
+            status_code=409,
+            detail="Stored API key cannot be decrypted; please re-enter it.",
+        ) from None
+    cipher, kdf_ver = encrypt_api_key(plaintext)
+    user.encrypted_api_key = cipher
+    user.api_key_kdf_version = kdf_ver
+    await db.commit()
+    return {"ok": True, "kdf_version": kdf_ver}
 
 
 # ── OAuth: GitHub ────────────────────────────────────────────

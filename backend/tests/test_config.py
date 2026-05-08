@@ -1,6 +1,5 @@
 """Tests for JWT secret validation in production mode."""
 
-import os
 import importlib
 
 import pytest
@@ -28,13 +27,18 @@ def test_production_rejects_short_secret(monkeypatch):
 
 
 def test_production_accepts_valid_secret(monkeypatch):
-    """FOJIN_ENV=production with a 32+ char secret should not raise."""
+    """FOJIN_ENV=production with both secrets set should not raise."""
     monkeypatch.setenv("FOJIN_ENV", "production")
     monkeypatch.setenv("JWT_SECRET_KEY", "a" * 32)
+    # P0-1: API_KEY_ENCRYPTION_KEY is now also fail-fast in prod, so the
+    # "happy path" boot needs both secrets present.
+    from cryptography.fernet import Fernet
+    monkeypatch.setenv("API_KEY_ENCRYPTION_KEY", Fernet.generate_key().decode())
 
     import app.config
     importlib.reload(app.config)
     assert len(app.config.settings.jwt_secret_key) >= 32
+    assert app.config.settings.api_key_encryption_key
 
 
 def test_development_warns_on_default(monkeypatch):

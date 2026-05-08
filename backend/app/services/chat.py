@@ -441,7 +441,7 @@ def _resolve_llm_config(user: User | None) -> tuple[str, str, str, bool, str]:
     """Return (api_url, api_key, model, is_byok, provider) based on user's BYOK or platform default."""
     if user and user.encrypted_api_key:
         try:
-            key = decrypt_api_key(user.encrypted_api_key)
+            key = decrypt_api_key(user.encrypted_api_key, user.api_key_kdf_version)
             provider = user.api_provider or "openai"
             if provider == "custom":
                 url = user.api_custom_url or settings.llm_api_url
@@ -488,7 +488,7 @@ def _resolve_with_model_override(
         try:
             user_provider = user.api_provider or "openai"
             if user_provider == opt.provider:
-                key = decrypt_api_key(user.encrypted_api_key)
+                key = decrypt_api_key(user.encrypted_api_key, user.api_key_kdf_version)
                 url = PROVIDER_URLS.get(opt.provider, settings.llm_api_url)
                 return url, key, opt.model, True, opt.provider
         except Exception as exc:  # pragma: no cover — same handling as _resolve_llm_config

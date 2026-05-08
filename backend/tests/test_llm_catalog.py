@@ -84,7 +84,7 @@ def test_resolve_byok_matching_provider_overrides_model(monkeypatch):
     monkeypatch.setattr(chat_module.settings, "llm_api_url", "https://api.deepseek.com/v1")
     monkeypatch.setattr(chat_module.settings, "llm_api_key", "platform-key")
     monkeypatch.setattr(
-        chat_module, "decrypt_api_key", lambda blob: "user-moonshot-key"
+        chat_module, "decrypt_api_key", lambda blob, version=1: "user-moonshot-key"
     )
 
     user = MagicMock()
