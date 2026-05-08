@@ -61,7 +61,7 @@ jobs:
         run: pip install bandit
 
       - name: Run bandit on backend
-        run: bandit -r backend/app/ --severity-level medium --confidence-level medium --confidence-level medium -f json -o bandit-report.json || true
+        run: bandit -r backend/app/ --severity-level medium --confidence-level medium -f json -o bandit-report.json || true
 
       - name: Display bandit results
         if: always()
