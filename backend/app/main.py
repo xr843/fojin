@@ -252,16 +252,10 @@ app.add_middleware(RateLimitMiddleware)
 # GZip handled by nginx — removed from backend to avoid compressing SSE streams
 
 
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        response: Response = await call_next(request)
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
-        response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
-        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()"
-        return response
+# SecurityHeadersMiddleware removed in P2-3 cleanup.
+# Security headers are set exclusively in frontend/nginx.conf to avoid
+# duplicate headers on responses proxied through nginx (which the
+# pre-fix audit found arriving as e.g. two X-Frame-Options values).
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
@@ -327,7 +321,6 @@ class LastActiveMiddleware(BaseHTTPMiddleware):
         return response
 
 
-app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(LastActiveMiddleware)
 
