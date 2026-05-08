@@ -84,7 +84,7 @@ services:
       ES_HOST: http://elasticsearch:9200
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-changeme-in-production}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env (32+ chars)}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173,http://localhost:5174}
       LLM_API_URL: ${LLM_API_URL:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
@@ -132,7 +132,7 @@ services:
     cpus: 0.5
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-fojin}:${POSTGRES_PASSWORD}@postgres:5432/umami
-      APP_SECRET: ${UMAMI_APP_SECRET:-change-me-in-production}
+      APP_SECRET: ${UMAMI_APP_SECRET:?Set UMAMI_APP_SECRET in .env}
       BASE_PATH: /umami
     ports:
       - "127.0.0.1:3001:3000"
