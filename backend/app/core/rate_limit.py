@@ -8,6 +8,7 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import settings
+from app.core.client_ip import get_real_client_ip
 
 logger = logging.getLogger(__name__)
 
@@ -30,14 +31,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         # Behind Nginx reverse proxy, request.client.host is always the
-        # internal Docker IP. Read the real client IP from X-Forwarded-For
-        # (set by Nginx: proxy_set_header X-Forwarded-For).
-        forwarded = request.headers.get("x-forwarded-for")
-        if forwarded:
-            # X-Forwarded-For: client, proxy1, proxy2 — take the first
-            client_ip = forwarded.split(",")[0].strip()
-        else:
-            client_ip = request.client.host if request.client else "unknown"
+        # internal Docker IP. Use the shared helper to extract the real
+        # client IP from X-Forwarded-For — taking the LAST entry, since
+        # nginx's $proxy_add_x_forwarded_for appends the trusted on-the-wire
+        # IP to any client-supplied value. Taking the first entry would
+        # let clients forge their source IP and bypass rate limiting.
+        client_ip = get_real_client_ip(request, default="unknown")
         path = request.url.path
         minute_window = int(time.time()) // 60
 
