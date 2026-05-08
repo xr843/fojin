@@ -1,7 +1,7 @@
 """split supports_fulltext into has_local_fulltext and has_remote_fulltext
 
 Revision ID: 0028
-Revises: 0027
+Revises: 0026
 Create Date: 2026-03-02
 """
 
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = "0028"
-down_revision: Union[str, None] = "0027"
+down_revision: Union[str, None] = "0026"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

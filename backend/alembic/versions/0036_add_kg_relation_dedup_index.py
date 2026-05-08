@@ -5,7 +5,7 @@ WHERE source IS NOT NULL. Enforces idempotent auto-extraction
 while leaving manually-created (source=NULL) relations unconstrained.
 
 Revision ID: 0036
-Revises: 0035
+Revises: 0034
 Create Date: 2026-03-03
 """
 
@@ -14,7 +14,7 @@ from typing import Sequence, Union
 from alembic import op
 
 revision: str = "0036"
-down_revision: Union[str, None] = "0035"
+down_revision: Union[str, None] = "0034"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
