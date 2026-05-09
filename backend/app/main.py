@@ -45,6 +45,7 @@ from app.api import (
     rss,
     search,
     seo,
+    seo_dict,
     seo_persons,
     share,
     sitemap,
@@ -400,6 +401,10 @@ app.include_router(seo.router)
 # SEO: per-person SSR landing pages (43k+ KG person entities, previously
 # invisible to search engines).
 app.include_router(seo_persons.router)
+
+# SEO: per-dictionary-headword SSR landing pages (~300k unique headwords
+# across 700k+ entries).
+app.include_router(seo_dict.router)
 
 
 @app.get("/api/health")

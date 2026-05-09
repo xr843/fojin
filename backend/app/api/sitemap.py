@@ -2,11 +2,13 @@
 
 import math
 from datetime import date
+from urllib.parse import quote
 
 from fastapi import APIRouter, Response
 from fastapi.responses import Response as FastAPIResponse
 from sqlalchemy import select
 
+from app.api.seo_dict import count_distinct_headwords, get_distinct_headwords
 from app.database import async_session
 from app.models.knowledge_graph import KGEntity
 from app.services.text import get_all_text_ids_with_dates
@@ -16,6 +18,7 @@ router = APIRouter(tags=["sitemap"])
 BASE_URL = "https://fojin.app"
 TEXTS_PER_BATCH = 40_000
 PERSONS_PER_BATCH = 20_000
+DICT_PER_BATCH = 40_000
 
 STATIC_PAGES = [
     ("/", "daily", "1.0"),
@@ -62,9 +65,11 @@ async def sitemap_index() -> Response:
     async with async_session() as session:
         texts = await get_all_text_ids_with_dates(session)
         person_count = await _get_person_count(session)
+        dict_count = await count_distinct_headwords(session)
 
     text_batches = max(1, math.ceil(len(texts) / TEXTS_PER_BATCH))
     person_batches = max(1, math.ceil(person_count / PERSONS_PER_BATCH)) if person_count else 0
+    dict_batches = max(1, math.ceil(dict_count / DICT_PER_BATCH)) if dict_count else 0
 
     sitemaps = ['<?xml version="1.0" encoding="UTF-8"?>']
     sitemaps.append('<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
@@ -73,6 +78,8 @@ async def sitemap_index() -> Response:
         sitemaps.append(f"  <sitemap><loc>{BASE_URL}/sitemap-texts-{i}.xml</loc></sitemap>")
     for i in range(person_batches):
         sitemaps.append(f"  <sitemap><loc>{BASE_URL}/sitemap-persons-{i}.xml</loc></sitemap>")
+    for i in range(dict_batches):
+        sitemaps.append(f"  <sitemap><loc>{BASE_URL}/sitemap-dict-{i}.xml</loc></sitemap>")
     sitemaps.append("</sitemapindex>")
 
     return _xml_response("\n".join(sitemaps))
@@ -89,6 +96,46 @@ async def sitemap_static() -> Response:
         lines.append(f"    <loc>{BASE_URL}{path}</loc>")
         lines.append(f"    <lastmod>{today}</lastmod>")
         lines.append(f"    <changefreq>{changefreq}</changefreq>")
+        lines.append(f"    <priority>{priority}</priority>")
+        lines.append("  </url>")
+    lines.append("</urlset>")
+
+    return _xml_response("\n".join(lines))
+
+
+@router.api_route("/sitemap-dict-{batch}.xml", methods=["GET", "HEAD"])
+async def sitemap_dict(batch: int) -> FastAPIResponse:
+    """Dictionary headword sitemap, paginated by batch number.
+
+    Backed by ``app.api.seo_dict.dict_seo_html`` — ~300k unique headwords
+    across 700k+ entries. Largest content surface FoJin offers; previously
+    invisible to search engines.
+    """
+    if batch < 0:
+        return Response(content="Not Found", status_code=404)
+
+    offset = batch * DICT_PER_BATCH
+    async with async_session() as session:
+        rows = await get_distinct_headwords(session, offset=offset, limit=DICT_PER_BATCH)
+
+    if not rows:
+        return Response(content="Not Found", status_code=404)
+
+    today = date.today().isoformat()
+    lines = ['<?xml version="1.0" encoding="UTF-8"?>']
+    lines.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
+    for headword, entry_count in rows:
+        # Skip pathological headwords that would generate junk URLs.
+        if not headword or len(headword) > 200 or "\n" in headword or "\t" in headword:
+            continue
+        # quote() with safe='' encodes everything; Google handles UTF-8 URLs
+        # but we still encode for correctness against intermediate proxies.
+        encoded = quote(headword, safe="")
+        priority = "0.7" if entry_count >= 3 else "0.4"
+        lines.append("  <url>")
+        lines.append(f"    <loc>{BASE_URL}/dict/{encoded}</loc>")
+        lines.append(f"    <lastmod>{today}</lastmod>")
+        lines.append("    <changefreq>monthly</changefreq>")
         lines.append(f"    <priority>{priority}</priority>")
         lines.append("  </url>")
     lines.append("</urlset>")
