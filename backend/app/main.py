@@ -44,6 +44,7 @@ from app.api import (
     relations,
     rss,
     search,
+    search_unified,
     seo,
     seo_dict,
     seo_persons,
@@ -339,6 +340,7 @@ async def fojin_error_handler(request: Request, exc: FoJinError):
 # Phase 1 routers
 app.include_router(auth.router, prefix="/api")
 app.include_router(search.router, prefix="/api")
+app.include_router(search_unified.router, prefix="/api")
 app.include_router(texts.router, prefix="/api")
 app.include_router(bookmarks.router, prefix="/api")
 app.include_router(history.router, prefix="/api")
