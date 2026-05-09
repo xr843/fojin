@@ -184,9 +184,8 @@ async def test_jsonld_does_not_break_when_payload_contains_html_like_text(seo_cl
     ld_open = body.find("application/ld+json")
     legit_close = body.find("</script>", ld_open)
     assert legit_close > ld_open
-    # And there should be exactly one </script> for our ld+json (the next
-    # </script> after `application/ld+json` is the closing tag, not an
-    # injected one).
-    assert body.count('<script type="application/ld+json">') == 1
+    # detail route emits two ld+json tags (Book + BreadcrumbList); both
+    # must be present and intact — no injected extras.
+    assert body.count('<script type="application/ld+json">') == 2
     # The escaped form must appear instead of the raw one in the payload.
     assert "<\\/script>" in body
