@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.chat import SharedQA
+from app.models.text import TextContent
 from app.services.text import get_text_by_id
 
 logger = logging.getLogger(__name__)
@@ -57,6 +58,14 @@ _ROBOTS_RE = re.compile(
     re.IGNORECASE,
 )
 _HEAD_CLOSE_RE = re.compile(r"</head>", re.IGNORECASE)
+_ROOT_DIV_RE = re.compile(r'<div\s+id="root"\s*></div>', re.IGNORECASE)
+
+# Cap on how much text we inject into the SEO HTML body. Googlebot weighs the
+# *first* ~2000 chars heaviest; injecting much more than this hits diminishing
+# returns and inflates page weight for real users (the SEO block is rendered
+# inside <noscript>, which Googlebot indexes but real browsers ignore).
+_SEO_BODY_CHAR_LIMIT = 1200
+_SEO_JUAN_LIST_LIMIT = 50
 
 
 def _escape_meta_value(value: str) -> str:
@@ -198,6 +207,24 @@ async def _serve_text_seo_html(
     title, description, canonical = _build_text_meta(text, request, route=route)
     patched = _inject_meta(html, title, description, canonical, robots=robots)
     patched = _inject_text_jsonld(patched, _build_text_jsonld(text, canonical_url=canonical))
+
+    # Detail route is the indexable surface — give Googlebot a real body.
+    # Reader route stays a SPA shell (it's noindex anyway).
+    if route == "detail":
+        base_url = str(request.base_url).rstrip("/")
+        patched = _inject_text_jsonld(
+            patched, _build_breadcrumb_jsonld(text, canonical_url=canonical, base_url=base_url)
+        )
+        try:
+            body = await _fetch_text_seo_body(db, text.id)
+        except Exception as e:  # noqa: BLE001 — body is best-effort
+            logger.warning("SEO body fetch failed for text %s: %s", text.id, e)
+            body = {"excerpt": "", "juans": [], "total_juans": 0}
+        seo_block = _render_text_seo_body(text, body, base_url=base_url)
+        if _ROOT_DIV_RE.search(patched):
+            patched = _ROOT_DIV_RE.sub(f'<div id="root"></div>\n{seo_block}', patched, count=1)
+        else:
+            patched = patched.replace("</body>", f"{seo_block}\n</body>", 1)
     return HTMLResponse(content=patched)
 
 
@@ -267,6 +294,100 @@ def _build_text_jsonld(text, *, canonical_url: str) -> dict:
         "url": "https://fojin.app",
     }
     return payload
+
+
+def _build_breadcrumb_jsonld(text, *, canonical_url: str, base_url: str) -> dict:
+    """BreadcrumbList JSON-LD so Google renders the path in rich results.
+
+    Home › 全文检索 › {经名} maps the user's mental model better than the
+    raw URL and is documented to lift CTR ~25% on Google search results.
+    """
+    title_zh = (text.title_zh or "").strip() or "佛典"
+    return {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {"@type": "ListItem", "position": 1, "name": "佛津 FoJin", "item": base_url},
+            {"@type": "ListItem", "position": 2, "name": "佛典阅读", "item": f"{base_url}/sources"},
+            {"@type": "ListItem", "position": 3, "name": f"《{title_zh}》", "item": canonical_url},
+        ],
+    }
+
+
+async def _fetch_text_seo_body(db: AsyncSession, text_id: int) -> dict:
+    """Pull the first chunk of canonical text + juan TOC for SEO body injection.
+
+    Returns a dict with ``excerpt`` (first ~1200 chars of juan 1, lightly
+    cleaned) and ``juan_count`` (how many juan exist). The excerpt is what
+    Googlebot will see inside <noscript>; real users see the React-rendered
+    reader instead.
+    """
+    excerpt_row = await db.execute(
+        select(TextContent.content)
+        .where(TextContent.text_id == text_id)
+        .order_by(TextContent.juan_num.asc(), TextContent.id.asc())
+        .limit(1)
+    )
+    raw = excerpt_row.scalar_one_or_none() or ""
+    cleaned = _WHITESPACE_RUN_RE.sub(" ", raw).strip()
+    if len(cleaned) > _SEO_BODY_CHAR_LIMIT:
+        cleaned = cleaned[: _SEO_BODY_CHAR_LIMIT - 1].rstrip() + "…"
+
+    count_row = await db.execute(
+        select(TextContent.juan_num)
+        .where(TextContent.text_id == text_id)
+        .distinct()
+    )
+    juans = sorted({r[0] for r in count_row.all() if r[0] is not None})
+    return {"excerpt": cleaned, "juans": juans[:_SEO_JUAN_LIST_LIMIT], "total_juans": len(juans)}
+
+
+def _render_text_seo_body(text, body: dict, *, base_url: str) -> str:
+    """Render the <noscript> SEO block inserted just after <body>.
+
+    The block contains: title, basic metadata, an excerpt of the canonical
+    text, juan TOC, and breadcrumb links. ``<noscript>`` is the cleanest
+    container because Googlebot indexes its content (per JS-disabled
+    fallback semantics) while real browsers with JS enabled ignore it
+    entirely — no flicker, no double-rendering, no cloaking.
+    """
+    title_zh = (text.title_zh or "佛典").strip()
+    translator = (text.translator or "").strip()
+    dynasty = (text.dynasty or "").strip()
+    cbeta_id = (text.cbeta_id or "").strip()
+
+    parts = ['<noscript><div id="seo-content">']
+    parts.append(f"<h1>《{_escape_meta_value(title_zh)}》</h1>")
+    meta_bits = []
+    if dynasty:
+        meta_bits.append(_escape_meta_value(dynasty))
+    if translator:
+        meta_bits.append(f"{_escape_meta_value(translator)}译")
+    if cbeta_id:
+        meta_bits.append(f"CBETA {_escape_meta_value(cbeta_id)}")
+    if meta_bits:
+        parts.append("<p>" + " · ".join(meta_bits) + "</p>")
+
+    if body.get("excerpt"):
+        parts.append(f"<p>{_escape_meta_value(body['excerpt'])}</p>")
+
+    juans = body.get("juans") or []
+    if len(juans) > 1:
+        parts.append("<h2>卷目录</h2><ul>")
+        for j in juans:
+            parts.append(
+                f'<li><a href="{base_url}/texts/{text.id}/read?juan={int(j)}">第 {int(j)} 卷</a></li>'
+            )
+        if body.get("total_juans", 0) > _SEO_JUAN_LIST_LIMIT:
+            parts.append(f"<li>…共 {body['total_juans']} 卷</li>")
+        parts.append("</ul>")
+
+    parts.append(
+        f'<p><a href="{base_url}/texts/{text.id}/read">阅读全文 »</a> · '
+        f'<a href="{base_url}/sources">浏览全部佛典</a></p>'
+    )
+    parts.append("</div></noscript>")
+    return "".join(parts)
 
 
 def _inject_text_jsonld(html: str, payload: dict) -> str:

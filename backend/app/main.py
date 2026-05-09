@@ -45,6 +45,7 @@ from app.api import (
     rss,
     search,
     seo,
+    seo_persons,
     share,
     sitemap,
     source_suggestions,
@@ -395,6 +396,10 @@ app.include_router(rss.router)
 # and /texts/{id}/read so Google's no-JS crawler sees real titles
 # instead of the homepage default).
 app.include_router(seo.router)
+
+# SEO: per-person SSR landing pages (43k+ KG person entities, previously
+# invisible to search engines).
+app.include_router(seo_persons.router)
 
 
 @app.get("/api/health")
