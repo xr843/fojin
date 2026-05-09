@@ -109,13 +109,9 @@ async def _fetch_person_related(
     )
     relations = rel_rows.scalars().all()
 
-    text_ids: set[int] = set()
     related_person_ids: set[int] = set()
     for r in relations:
-        if r.subject_id == entity_id:
-            other = r.object_id
-        else:
-            other = r.subject_id
+        other = r.object_id if r.subject_id == entity_id else r.subject_id
         related_person_ids.add(other)
 
     # KGRelation doesn't link directly to BuddhistText, so fall back to the
@@ -304,7 +300,7 @@ async def person_seo_html(
 
     try:
         related_texts, related_persons = await _fetch_person_related(db, entity.id)
-    except Exception as e:  # noqa: BLE001 — related blocks are best-effort
+    except Exception as e:  # related blocks are best-effort
         logger.warning("person related fetch failed for %s: %s", entity.id, e)
         related_texts, related_persons = [], []
 

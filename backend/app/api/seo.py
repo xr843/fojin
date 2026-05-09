@@ -217,7 +217,7 @@ async def _serve_text_seo_html(
         )
         try:
             body = await _fetch_text_seo_body(db, text.id)
-        except Exception as e:  # noqa: BLE001 — body is best-effort
+        except Exception as e:  # body is best-effort — never block detail render
             logger.warning("SEO body fetch failed for text %s: %s", text.id, e)
             body = {"excerpt": "", "juans": [], "total_juans": 0}
         seo_block = _render_text_seo_body(text, body, base_url=base_url)
