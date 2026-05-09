@@ -37,7 +37,25 @@
 
 无需改 nginx 配置，因为 `frontend/public/` 内容会被 vite build 直接 copy 到 dist/，由 nginx 默认 `try_files $uri $uri/ /index.html` 服务。
 
-## 5. 验证当前 SEO 改动是否生效
+## 5. ⚠️ Cloudflare Bot Fight Mode 必查
+
+测试发现：直查 nginx，Googlebot UA 拿到 12k 字节富内容 ✅；但走 Cloudflare（fojin.app）只拿到 2.4k 精简版 ❌。**这是 Cloudflare Bot Fight Mode 在拦截/降级 Googlebot 流量**——属于 CF 的 over-protection。
+
+修复（必做）：
+
+1. Cloudflare Dashboard → 选择 fojin.app → **Security → Bots**
+2. **Bot Fight Mode** 设为 **Off**（或保留 Off，不要开 Super Bot Fight Mode）
+3. 或者添加 WAF Custom Rule：`User-Agent contains "Googlebot" or "Bingbot" or "Baiduspider"` → Action: **Skip**（跳过所有 security feature）
+
+**未做这步前，所有上面的 SEO 工作对 Google 都是无效的**——因为 Google 看到的是 CF 精简版，不是 nginx 实际返回。
+
+验证：
+```bash
+curl -s -A "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)" https://fojin.app/texts/1 | wc -c
+# 应该 ≥ 12000；若 ≈ 2400 表示 CF 仍在拦截
+```
+
+## 6. 验证当前 SEO 改动是否生效
 
 ```bash
 # 经文 detail 页应该有 noscript 内的正文片段 + breadcrumb
@@ -53,7 +71,7 @@ curl -s https://fojin.app/sitemap.xml | grep persons
 curl -s -A "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)" https://fojin.app/texts/1 | wc -c
 ```
 
-## 6. 监控指标（6 周回访）
+## 7. 监控指标（6 周回访）
 
 | 指标 | 当前 baseline | 目标（6 周） |
 |---|---|---|

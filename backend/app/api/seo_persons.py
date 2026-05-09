@@ -286,7 +286,12 @@ def _render_person_html(
     return "".join(parts)
 
 
-@router.get("/persons/{person_id}", response_class=HTMLResponse, include_in_schema=False)
+@router.api_route(
+    "/persons/{person_id}",
+    methods=["GET", "HEAD"],
+    response_class=HTMLResponse,
+    include_in_schema=False,
+)
 async def person_seo_html(
     person_id: int, request: Request, db: AsyncSession = Depends(get_db)
 ):
