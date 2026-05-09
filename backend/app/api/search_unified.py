@@ -32,7 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app.core.elasticsearch import get_es
-from app.database import get_db
+from app.database import async_session, get_db
 from app.models.dictionary import DictionaryEntry
 from app.models.hot_question import HotQuestion
 from app.services.search import (
@@ -48,27 +48,33 @@ _DICT_SECTION_LIMIT = 5
 _HOT_Q_SECTION_LIMIT = 4
 
 
-async def _dict_top_hits(db: AsyncSession, q: str) -> list[dict]:
+async def _dict_top_hits(q: str) -> list[dict]:
     """Top-N exact + prefix dictionary hits for the unified result.
 
     Mirrors the /api/dictionary/search prioritization but caps tighter
-    since this is a teaser, not a full results page.
+    since this is a teaser, not a full results page. Uses its own session
+    so it can run concurrently with other DB-using sections in
+    asyncio.gather (a single AsyncSession does not allow concurrent
+    operations).
     """
     relevance = case(
         (DictionaryEntry.headword == q, 3),
         (DictionaryEntry.headword.ilike(f"{q}%"), 2),
         else_=1,
     )
-    stmt = (
-        select(DictionaryEntry)
-        .options(joinedload(DictionaryEntry.source))
-        .where(or_(DictionaryEntry.headword == q, DictionaryEntry.headword.ilike(f"{q}%")))
-        .order_by(relevance.desc(), func.length(DictionaryEntry.headword), DictionaryEntry.headword)
-        .limit(_DICT_SECTION_LIMIT)
-    )
-    rows = await db.execute(stmt)
+    async with async_session() as db:
+        stmt = (
+            select(DictionaryEntry)
+            .options(joinedload(DictionaryEntry.source))
+            .where(or_(DictionaryEntry.headword == q, DictionaryEntry.headword.ilike(f"{q}%")))
+            .order_by(relevance.desc(), func.length(DictionaryEntry.headword), DictionaryEntry.headword)
+            .limit(_DICT_SECTION_LIMIT)
+        )
+        rows = await db.execute(stmt)
+        entries = list(rows.unique().scalars().all())
+
     out = []
-    for e in rows.unique().scalars().all():
+    for e in entries:
         out.append(
             {
                 "id": e.id,
@@ -82,23 +88,27 @@ async def _dict_top_hits(db: AsyncSession, q: str) -> list[dict]:
     return out
 
 
-async def _hot_question_hits(db: AsyncSession, q: str) -> list[dict]:
+async def _hot_question_hits(q: str) -> list[dict]:
     """Pre-curated hot_questions matching the query as substring.
 
     These are 200 hand-edited prompts that already exist in the system —
     surfacing them in unified results steers the 77 empty chat sessions /
-    493 single-turn sessions toward a starting point.
+    493 single-turn sessions toward a starting point. Independent session
+    for asyncio.gather concurrency safety.
     """
-    stmt = (
-        select(HotQuestion)
-        .where(HotQuestion.is_active.is_(True))
-        .where(HotQuestion.display_text.ilike(f"%{q}%"))
-        .order_by(HotQuestion.sort_order.asc())
-        .limit(_HOT_Q_SECTION_LIMIT)
-    )
-    rows = await db.execute(stmt)
+    async with async_session() as db:
+        stmt = (
+            select(HotQuestion)
+            .where(HotQuestion.is_active.is_(True))
+            .where(HotQuestion.display_text.ilike(f"%{q}%"))
+            .order_by(HotQuestion.sort_order.asc())
+            .limit(_HOT_Q_SECTION_LIMIT)
+        )
+        rows = await db.execute(stmt)
+        questions = list(rows.scalars().all())
+
     out = []
-    for h in rows.scalars().all():
+    for h in questions:
         out.append(
             {
                 "slug": h.slug,
@@ -134,11 +144,14 @@ async def search_unified(
     """
     es = get_es()
 
+    # search_semantic uses the request-scoped session; catalog/content use ES.
+    # dict + hot_q each open their own session for concurrency safety
+    # (a single AsyncSession can't service two concurrent execute() calls).
     catalog_coro = search_texts(es, q, page=1, size=10, sources=sources, lang=lang, db=db)
     content_coro = search_content(es, q, page=1, size=5, sources=sources, lang=lang)
     semantic_coro = search_semantic(db, q, size=5, lang=lang, sources=sources)
-    dict_coro = _dict_top_hits(db, q)
-    hot_coro = _hot_question_hits(db, q)
+    dict_coro = _dict_top_hits(q)
+    hot_coro = _hot_question_hits(q)
 
     catalog_r, content_r, semantic_r, dict_r, hot_r = await asyncio.gather(
         catalog_coro,

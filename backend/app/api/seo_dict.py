@@ -27,8 +27,9 @@ import logging
 from urllib.parse import unquote
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse
-from sqlalchemy import func, select
+from fastapi.responses import HTMLResponse, RedirectResponse
+from opencc import OpenCC
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -36,6 +37,12 @@ from app.api.seo import _escape_meta_value
 from app.database import get_db
 from app.models.dictionary import DictionaryEntry
 from app.models.text import BuddhistText, TextContent
+
+# Dictionary entries are stored in traditional Chinese (CBETA / DDB / FGS
+# convention). Users typing simplified Chinese in the URL must be matched
+# against the traditional form; dictionary.py uses the same pattern.
+_s2t = OpenCC("s2t")
+_t2s = OpenCC("t2s")
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["seo"])
@@ -254,10 +261,29 @@ async def dict_seo_html(headword: str, request: Request, db: AsyncSession = Depe
     if not headword or len(headword) > _MAX_HEADWORD_LEN:
         raise HTTPException(status_code=404, detail="invalid headword")
 
+    # Try simplified, traditional, and original variant — dictionary entries
+    # are stored in traditional Chinese, but Google / users may arrive with
+    # the simplified form. Dedupe to a single SQL roundtrip.
+    variants = list({headword, _s2t.convert(headword), _t2s.convert(headword)})
+    canonical_headword = headword
+    if len(variants) > 1:
+        # Probe which variant actually exists; prefer traditional (CBETA convention).
+        probe = await db.execute(
+            select(DictionaryEntry.headword)
+            .where(DictionaryEntry.headword.in_(variants))
+            .limit(1)
+        )
+        found = probe.scalar_one_or_none()
+        if found and found != headword:
+            # Redirect simplified → canonical traditional URL so we don't
+            # split SEO juice across simplified + traditional duplicates.
+            return RedirectResponse(url=f"/dict/{found}", status_code=301)
+        canonical_headword = found or headword
+
     stmt = (
         select(DictionaryEntry)
         .options(joinedload(DictionaryEntry.source))
-        .where(DictionaryEntry.headword == headword)
+        .where(or_(*[DictionaryEntry.headword == v for v in variants]))
         .limit(50)
     )
     rows = await db.execute(stmt)
@@ -266,7 +292,8 @@ async def dict_seo_html(headword: str, request: Request, db: AsyncSession = Depe
         raise HTTPException(status_code=404, detail="headword not found")
 
     base_url = str(request.base_url).rstrip("/")
-    canonical = f"{base_url}/dict/{headword}"
+    canonical = f"{base_url}/dict/{canonical_headword}"
+    headword = canonical_headword
 
     try:
         related = await _fetch_reverse_index(db, headword)
