@@ -435,6 +435,41 @@ export async function getSearchSuggestions(q: string): Promise<string[]> {
   return data.suggestions;
 }
 
+export interface UnifiedSearchSection {
+  dictionary?: Array<{
+    id: number;
+    headword: string;
+    reading?: string | null;
+    definition: string;
+    source?: string | null;
+    url: string;
+  }> | null;
+  hot_questions?: Array<{
+    slug: string;
+    category: string;
+    text: string;
+    url: string;
+  }> | null;
+  catalog?: { total: number; results: SearchHit[] } | null;
+  content?: unknown;
+  semantic?: { total: number; results: SemanticSearchHit[] } | null;
+}
+
+export interface UnifiedSearchResponse {
+  query: string;
+  sections: UnifiedSearchSection;
+  errors: Record<string, string>;
+}
+
+export async function searchUnified(params: {
+  q: string;
+  sources?: string;
+  lang?: string;
+}): Promise<UnifiedSearchResponse> {
+  const { data } = await api.get<UnifiedSearchResponse>("/search/unified", { params, timeout: 30000 });
+  return data;
+}
+
 export async function getTextDetail(id: number): Promise<TextDetail> {
   const { data } = await api.get<TextDetail>(`/texts/${id}`);
   return data;

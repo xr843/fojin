@@ -2,10 +2,13 @@ import asyncio
 import time
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.elasticsearch import get_es
 from app.database import get_db
+from app.models.dictionary import DictionaryEntry
+from app.models.hot_question import HotQuestion
 from app.schemas.text import CrossLanguageSearchResponse, SearchResponse, SemanticSearchResponse
 from app.services.search import (
     get_aggregations,
@@ -48,13 +51,74 @@ async def search(
 @router.get("/search/suggest")
 async def search_suggest(
     q: str = Query(..., min_length=1, max_length=200, description="搜索建议关键词"),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Return search suggestions (autocomplete) based on input.
+    """Return autocomplete suggestions across multiple sources.
 
-    根据输入返回搜索建议（自动补全）。"""
+    Sources merged in priority order:
+    1. ES title prefix matches (existing behavior — sutra titles & translators)
+    2. Dictionary headword exact + prefix matches (300k+ unique headwords —
+       captures terminology queries like "苦谛" / "般若")
+    3. hot_questions display_text substring matches (200 curated prompts —
+       steers users toward known-answerable questions)
+
+    Each source has its own quota; the response returns up to ~10
+    deduplicated suggestions total. All three lookups run in parallel.
+
+    根据输入返回搜索建议（自动补全），整合经文标题、辞典词头与精选问题。"""
     es = get_es()
-    suggestions = await get_suggestions(es, q)
-    return {"suggestions": suggestions}
+
+    async def _dict_prefix() -> list[str]:
+        try:
+            stmt = (
+                select(DictionaryEntry.headword)
+                .where(DictionaryEntry.headword.ilike(f"{q}%"))
+                .group_by(DictionaryEntry.headword)
+                .order_by(func.length(DictionaryEntry.headword), DictionaryEntry.headword)
+                .limit(5)
+            )
+            rows = await db.execute(stmt)
+            return [r[0] for r in rows.all() if r[0]]
+        except Exception:
+            return []
+
+    async def _hot_q_match() -> list[str]:
+        try:
+            stmt = (
+                select(HotQuestion.display_text)
+                .where(HotQuestion.is_active.is_(True))
+                .where(HotQuestion.display_text.ilike(f"%{q}%"))
+                .order_by(HotQuestion.sort_order.asc())
+                .limit(3)
+            )
+            rows = await db.execute(stmt)
+            return [r[0] for r in rows.all() if r[0]]
+        except Exception:
+            return []
+
+    es_suggestions, dict_suggestions, hot_suggestions = await asyncio.gather(
+        get_suggestions(es, q),
+        _dict_prefix(),
+        _hot_q_match(),
+        return_exceptions=False,
+    )
+
+    seen: set[str] = set()
+    merged: list[str] = []
+    # Order: dict (most specific) > es titles > hot questions.
+    # Users searching "苦" want the dictionary entry first, not a sutra
+    # whose title begins with 苦.
+    for source_list in (dict_suggestions, es_suggestions, hot_suggestions):
+        for s in source_list:
+            if s and s not in seen:
+                seen.add(s)
+                merged.append(s)
+            if len(merged) >= 10:
+                break
+        if len(merged) >= 10:
+            break
+
+    return {"suggestions": merged}
 
 
 @router.get("/search/cross-language", response_model=CrossLanguageSearchResponse)
