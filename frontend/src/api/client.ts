@@ -451,7 +451,7 @@ export interface UnifiedSearchSection {
     url: string;
   }> | null;
   catalog?: { total: number; results: SearchHit[] } | null;
-  content?: unknown;
+  content?: { total: number; total_juans?: number; results: ContentSearchHit[] } | null;
   semantic?: { total: number; results: SemanticSearchHit[] } | null;
 }
 

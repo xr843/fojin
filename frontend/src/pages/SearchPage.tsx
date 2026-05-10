@@ -9,11 +9,11 @@ import {
 import {
   SearchOutlined, VerticalAlignTopOutlined, CloseOutlined,
 } from "@ant-design/icons";
-import { searchTexts, searchContent, searchDictionary, searchCrossLanguage, searchSemantic, getSources, getSearchSuggestions, searchDictionaryGrouped } from "../api/client";
+import { searchTexts, searchContent, searchDictionary, searchCrossLanguage, searchSemantic, searchUnified, getSources, getSearchSuggestions, searchDictionaryGrouped } from "../api/client";
 import type { DictGroupedSearchResponse } from "../api/client";
 import { hasDirectSearchUrl } from "../utils/sourceUrls";
 import { addSearchHistory, getSearchHistory, type SearchHistoryItem } from "../utils/history";
-import { ResultCard, ExternalCard, DictCard, ContentCard, CrossLangCard, SemanticCard } from "../components/search";
+import { ResultCard, ExternalCard, DictCard, ContentCard, CrossLangCard, SemanticCard, UnifiedResults } from "../components/search";
 import "../styles/search.css";
 import "../styles/sources.css";
 
@@ -21,9 +21,11 @@ export default function SearchPage() {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Derive state from URL — these are the source of truth
+  // Derive state from URL — these are the source of truth.
+  // Default tab is "all" (unified overview); legacy aliases still resolve to
+  // their canonical tab so old links keep working.
   const query = searchParams.get("q") ?? "";
-  const rawTab = searchParams.get("tab") ?? "catalog";
+  const rawTab = searchParams.get("tab") ?? "all";
   const tab = rawTab === "crosslang" ? "catalog" : rawTab === "semantic" ? "content" : rawTab === "dictionary" ? "catalog" : rawTab;
   const selectedSources = searchParams.get("sources") ?? "";
 
@@ -118,6 +120,15 @@ export default function SearchPage() {
     queryKey: ["searchSemantic", query, selectedSources, langFilter, dynasty, category],
     queryFn: () => searchSemantic({ q: query, size: 20, dynasty, category, lang: langFilter || undefined, sources: selectedSources || undefined }),
     enabled: query.length > 0 && tab === "content",
+  });
+
+  // Unified search powers the default "全部 / All" tab — single round trip
+  // to /search/unified returns sectioned results (dictionary, hot_questions,
+  // catalog, content, semantic) so the user no longer has to pick a tab.
+  const { data: unifiedData, isLoading: unifiedLoading, isError: unifiedError, refetch: refetchUnified } = useQuery({
+    queryKey: ["searchUnified", query, selectedSources, langFilter],
+    queryFn: () => searchUnified({ q: query, sources: selectedSources || undefined, lang: langFilter || undefined }),
+    enabled: query.length > 0 && tab === "all",
   });
 
   // Dictionary knowledge card (parallel, non-blocking)
@@ -302,13 +313,16 @@ export default function SearchPage() {
           activeKey={tab}
           onChange={(k) => { setPage(1); updateUrl({ tab: k }); }}
           items={[
+            { key: "all", label: "全部" },
             { key: "catalog", label: "搜经典" },
             { key: "content", label: "搜经文" },
           ]}
           size="small"
         />
         <div className="s-mode-hint">
-          {tab === "catalog"
+          {tab === "all"
+            ? "一站式综合检索：词典释义、经文标题、相关问答、内文片段一次呈现"
+            : tab === "catalog"
             ? "按经名、译者、编号检索，自动匹配所有语种标题与翻译版本"
             : tab === "content"
             ? "AI 语义理解 + 关键词精确匹配，在 34.7 万段经文中检索"
@@ -369,6 +383,45 @@ export default function SearchPage() {
 
           {/* 主内容 */}
           <main className="s-main">
+            {tab === "all" ? (
+              <>
+                {unifiedLoading && (
+                  <div style={{ marginTop: 16 }}>
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <div className="s-card" key={`skel-all-${i}`}>
+                        <div className="s-card-body">
+                          <Skeleton.Input active size="small" style={{ width: 200, height: 18, marginBottom: 8 }} />
+                          <Skeleton active paragraph={{ rows: 2 }} title={false} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {!unifiedLoading && unifiedError && (
+                  <Result
+                    status="error"
+                    title="搜索失败"
+                    subTitle="搜索服务暂时不可用，请稍后重试。"
+                    extra={<Button type="primary" onClick={() => refetchUnified()}>重试</Button>}
+                  />
+                )}
+                {!unifiedLoading && !unifiedError && unifiedData && (
+                  <UnifiedResults data={unifiedData} />
+                )}
+                {/* 外部数据源结果 */}
+                {!unifiedLoading && !unifiedError && query.length > 0 && filteredExtSources.length > 0 && (
+                  <>
+                    <div className="s-ext-divider">
+                      以下 {extTotal} 个外部数据源可继续搜索「{query}」
+                    </div>
+                    {filteredExtSources.map((s, i) => (
+                      <ExternalCard key={s.code} source={s} query={query} rank={i + 1} />
+                    ))}
+                  </>
+                )}
+              </>
+            ) : (
+            <>
             <div className="s-result-header">
               <span className="s-result-count">
                 {tab === "dictionary"
@@ -590,6 +643,8 @@ export default function SearchPage() {
                     rank={i + 1} />
                 ))}
               </>
+            )}
+            </>
             )}
           </main>
         </div>
