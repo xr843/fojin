@@ -435,6 +435,30 @@ export async function getSearchSuggestions(q: string): Promise<string[]> {
   return data.suggestions;
 }
 
+export interface CbetaRedirect {
+  text_id: number;
+  cbeta_id: string;
+  redirect_to: string;
+}
+
+/**
+ * Resolve a CBETA ID (e.g. "T0278") to a canonical /texts/{id} URL.
+ * Returns null on 404 / non-CBETA input — callers should silently fall back
+ * to the regular search results path.
+ *
+ * 用户在搜索栏输入 CBETA 编号时直跳经文页。
+ */
+export async function getCbetaRedirect(cbetaId: string): Promise<CbetaRedirect | null> {
+  try {
+    const { data } = await api.get<CbetaRedirect>(
+      `/cbeta/${encodeURIComponent(cbetaId)}`,
+    );
+    return data;
+  } catch {
+    return null;
+  }
+}
+
 export interface UnifiedSearchSection {
   dictionary?: Array<{
     id: number;
@@ -451,7 +475,7 @@ export interface UnifiedSearchSection {
     url: string;
   }> | null;
   catalog?: { total: number; results: SearchHit[] } | null;
-  content?: unknown;
+  content?: { total: number; total_juans?: number; results: ContentSearchHit[] } | null;
   semantic?: { total: number; results: SemanticSearchHit[] } | null;
 }
 
