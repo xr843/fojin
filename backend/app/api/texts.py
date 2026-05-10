@@ -1,6 +1,7 @@
+import re
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,9 +14,13 @@ from app.models.text import BuddhistText
 from app.models.user import ReadingHistory, User
 from app.schemas.text import JuanContentResponse, JuanLanguagesResponse, JuanListResponse, TextResponseBase
 from app.services.content import get_juan_content, get_juan_languages, get_juan_list
-from app.services.text import get_text_by_id, get_text_count
+from app.services.text import get_text_by_id, get_text_count, get_text_id_by_cbeta
 
 router = APIRouter(tags=["texts"])
+
+# CBETA-style identifier: prefix letter (T/X/J/B/P/C) + 1-4 digits + optional lowercase suffix.
+# 例：T0278、X0235a、J1510b。Web search 直跳走这个正则即可。
+_CBETA_ID_RE = re.compile(r"^[TXJBPC]\d{1,4}[a-z]?$")
 
 
 @router.get("/texts/lookup-cbeta")
@@ -33,6 +38,33 @@ async def lookup_cbeta_ids(
         select(BuddhistText.cbeta_id, BuddhistText.id).where(BuddhistText.cbeta_id.in_(cbeta_ids))
     )
     return dict(result.all())
+
+
+class CbetaRedirectResponse(BaseModel):
+    text_id: int
+    cbeta_id: str
+    redirect_to: str
+
+
+@router.get("/cbeta/{cbeta_id}", response_model=CbetaRedirectResponse)
+async def resolve_cbeta_id(
+    cbeta_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Resolve a CBETA ID (e.g. ``T0278``) to the canonical ``/texts/{id}`` URL.
+
+    用户在搜索栏输入 CBETA 编号时直跳经文页，跳过结果列表。"""
+    cbeta_id = cbeta_id.strip().upper()
+    if not _CBETA_ID_RE.match(cbeta_id):
+        raise HTTPException(status_code=404, detail="Invalid CBETA ID format")
+    text_id = await get_text_id_by_cbeta(db, cbeta_id)
+    if text_id is None:
+        raise HTTPException(status_code=404, detail=f"CBETA ID {cbeta_id} not found")
+    return CbetaRedirectResponse(
+        text_id=text_id,
+        cbeta_id=cbeta_id,
+        redirect_to=f"/texts/{text_id}",
+    )
 
 
 class SimilarPassageItem(BaseModel):

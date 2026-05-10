@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { useSearchParams, Link } from "react-router-dom";
+import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
@@ -9,7 +9,7 @@ import {
 import {
   SearchOutlined, VerticalAlignTopOutlined, CloseOutlined,
 } from "@ant-design/icons";
-import { searchTexts, searchContent, searchDictionary, searchCrossLanguage, searchSemantic, getSources, getSearchSuggestions, searchDictionaryGrouped } from "../api/client";
+import { searchTexts, searchContent, searchDictionary, searchCrossLanguage, searchSemantic, getSources, getSearchSuggestions, searchDictionaryGrouped, getCbetaRedirect } from "../api/client";
 import type { DictGroupedSearchResponse } from "../api/client";
 import { hasDirectSearchUrl } from "../utils/sourceUrls";
 import { addSearchHistory, getSearchHistory, type SearchHistoryItem } from "../utils/history";
@@ -17,9 +17,14 @@ import { ResultCard, ExternalCard, DictCard, ContentCard, CrossLangCard, Semanti
 import "../styles/search.css";
 import "../styles/sources.css";
 
+// CBETA-style identifier: prefix letter (T/X/J/B/P/C) + 1-4 digits + optional lowercase suffix.
+// 例：T0278、X0235a、J1510b。命中即直跳 /texts/{id}，跳过结果列表。
+const CBETA_ID_RE = /^[TXJBPC]\d{1,4}[a-z]?$/i;
+
 export default function SearchPage() {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   // Derive state from URL — these are the source of truth
   const query = searchParams.get("q") ?? "";
@@ -62,6 +67,24 @@ export default function SearchPage() {
   useEffect(() => {
     setAcInput(query);
   }, [query]);
+
+  // CBETA ID 直跳：用户输入 T0278 / X0235a 等时，命中即跳 /texts/{id}，
+  // 跳过结果列表。404/非 CBETA 静默 fallback 到常规搜索。
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (!trimmed || !CBETA_ID_RE.test(trimmed)) return;
+    let cancelled = false;
+    (async () => {
+      const result = await getCbetaRedirect(trimmed.toUpperCase());
+      if (cancelled || !result) return;
+      // Umami: track CBETA shortcut hits — power-user signal.
+      if (typeof umami !== "undefined") {
+        umami.track("cbeta-shortcut", { cbeta_id: result.cbeta_id });
+      }
+      navigate(result.redirect_to, { replace: true });
+    })();
+    return () => { cancelled = true; };
+  }, [query, navigate]);
 
   const langFilter = searchParams.get("lang") || "";
   const dictLang = searchParams.get("dict_lang") || "";
