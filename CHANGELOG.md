@@ -10,6 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Default DeepSeek model alias `deepseek-chat` → `deepseek-v4-flash` (legacy ID still works as alias). Production `LLM_MODEL` upgraded to `deepseek-v4-pro` to leverage 75% promotional pricing through 2026-05-31; revisit before promo ends to avoid 4× cost increase.
 - Updated `build_alignments.py` price table with `deepseek-v4-flash` ($0.28/1M output) and `deepseek-v4-pro` ($0.87/1M output, promo).
 
+### Fixed
+- Dictionary browse mode (`/api/dictionary/search/grouped` with `q=*`) now resolves `source.code → source_id` before the entry query so the planner can use the new `(source_id, headword)` composite index instead of walking the full headword btree. Foguang dictionary (32k entries / 360k total): EXPLAIN drops from 9.7s to ~2ms; end-to-end API latency 904–2891ms → 113–125ms.
+
 ## [3.4.0] — 2026-03-23
 
 ### Added
