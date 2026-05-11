@@ -130,11 +130,23 @@ async def search_dictionary_grouped(
         base_filters.append(DataSource.code == source)
 
     if browse_mode:
-        # Browse mode: return entries from a specific source, sorted by headword with pagination
+        # Resolve source.code -> id first so the planner sees a literal source_id
+        # and uses the (source_id, headword) composite index instead of walking the
+        # full headword btree. Without this, ORDER BY headword + LIMIT defeats
+        # the source_id index (EXPLAIN: 9.7s on 360k rows; with literal id: 2ms).
+        source_id = (
+            await db.execute(select(DataSource.id).where(DataSource.code == source))
+        ).scalar()
+        if source_id is None:
+            return {"query": q, "total": 0, "page": page, "page_size": page_size, "groups": []}
+
+        browse_filters = [DictionaryEntry.source_id == source_id]
+        if lang:
+            browse_filters.append(DictionaryEntry.lang == lang)
+
         stmt = (
             select(DictionaryEntry)
-            .join(DictionaryEntry.source)
-            .where(*base_filters)
+            .where(*browse_filters)
             .options(joinedload(DictionaryEntry.source))
             .order_by(DictionaryEntry.headword)
             .offset((page - 1) * page_size)
@@ -143,8 +155,8 @@ async def search_dictionary_grouped(
         result = await db.execute(stmt)
         entries = list(result.unique().scalars().all())
 
-        # Get total count for this source
-        count_stmt = select(func.count()).select_from(DictionaryEntry).join(DictionaryEntry.source).where(*base_filters)
+        # Total count: scoped by source_id only (uses ix_dictionary_entries_source_id, ~8ms)
+        count_stmt = select(func.count()).select_from(DictionaryEntry).where(*browse_filters)
         total = (await db.execute(count_stmt)).scalar() or 0
     else:
         variants = _zh_variants(q)
