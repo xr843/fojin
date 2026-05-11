@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, Query
+import json
+import logging
+
+from fastapi import APIRouter, Depends, Query, Request, Response
 from opencc import OpenCC
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,7 +12,12 @@ from app.database import get_db
 from app.models.dictionary import DictionaryEntry
 from app.models.source import DataSource
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/dictionary", tags=["dictionary"])
+
+SOURCES_CACHE_KEY = "dict:sources:v1"
+SOURCES_CACHE_TTL = 600  # 10 min — sources change on migration only
+PUBLIC_CACHE_HEADER = "public, max-age=300, stale-while-revalidate=600"
 
 _s2t = OpenCC("s2t")
 _t2s = OpenCC("t2s")
@@ -64,19 +72,17 @@ def _entry_to_dict(e: DictionaryEntry) -> dict:
 
 
 @router.get("/hot")
-async def hot_terms():
+async def hot_terms(response: Response):
     """Return popular Buddhist dictionary search terms for the landing page.
 
     返回辞典热门搜索词列表，用于首页展示。"""
+    response.headers["Cache-Control"] = PUBLIC_CACHE_HEADER
     return {"terms": HOT_TERMS}
 
 
-@router.get("/sources")
-async def list_sources(db: AsyncSession = Depends(get_db)):
-    """List all dictionary sources with entry counts.
-
-    返回所有辞典来源及其词条数量。"""
-    # Subquery: count entries per source
+async def _compute_sources(db: AsyncSession) -> list[dict]:
+    # GROUP BY count(*) on dictionary_entries (~360k rows) costs ~450ms cold;
+    # cached upstream so this only runs every SOURCES_CACHE_TTL seconds.
     entry_counts = (
         select(DictionaryEntry.source_id, func.count().label("entry_count"))
         .group_by(DictionaryEntry.source_id)
@@ -104,6 +110,41 @@ async def list_sources(db: AsyncSession = Depends(get_db)):
         }
         for src, count in rows
     ]
+
+
+@router.get("/sources")
+async def list_sources(
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
+    """List all dictionary sources with entry counts.
+
+    返回所有辞典来源及其词条数量。"""
+    response.headers["Cache-Control"] = PUBLIC_CACHE_HEADER
+
+    redis = getattr(request.app.state, "redis", None)
+    if redis is not None:
+        try:
+            raw = await redis.get(SOURCES_CACHE_KEY)
+            if raw:
+                return json.loads(raw)
+        except Exception as e:
+            logger.debug("dict sources cache get failed: %s", e)
+
+    payload = await _compute_sources(db)
+
+    if redis is not None:
+        try:
+            await redis.setex(
+                SOURCES_CACHE_KEY,
+                SOURCES_CACHE_TTL,
+                json.dumps(payload, ensure_ascii=False),
+            )
+        except Exception as e:
+            logger.debug("dict sources cache set failed: %s", e)
+
+    return payload
 
 
 @router.get("/search/grouped")
@@ -161,6 +202,7 @@ async def search_dictionary_grouped(
     else:
         variants = _zh_variants(q)
         relevance = _build_relevance(variants)
+        result_cap = 200
 
         # Phase 1: exact + prefix match (fast, uses btree index)
         fast_cond = _build_exact_prefix_conditions(variants)
@@ -168,24 +210,34 @@ async def search_dictionary_grouped(
         stmt = select(DictionaryEntry).where(fast_cond, *base_filters).options(joinedload(DictionaryEntry.source))
         if source:
             stmt = stmt.join(DictionaryEntry.source)
-        stmt = stmt.order_by(relevance.desc(), func.length(DictionaryEntry.headword), DictionaryEntry.headword).limit(200)
+        stmt = stmt.order_by(relevance.desc(), func.length(DictionaryEntry.headword), DictionaryEntry.headword).limit(result_cap)
         result = await db.execute(stmt)
         entries = list(result.unique().scalars().all())
-        total = len(entries)
 
         # Phase 2: substring match only if phase 1 found very few results
-        if total < 5:
+        if len(entries) < 5:
             sub_cond = _build_substring_conditions(variants)
             stmt2 = select(DictionaryEntry).where(sub_cond, *base_filters).options(joinedload(DictionaryEntry.source))
             if source:
                 stmt2 = stmt2.join(DictionaryEntry.source)
-            stmt2 = stmt2.order_by(relevance.desc(), func.length(DictionaryEntry.headword)).limit(200)
+            stmt2 = stmt2.order_by(relevance.desc(), func.length(DictionaryEntry.headword)).limit(result_cap)
             result2 = await db.execute(stmt2)
             seen_ids = {e.id for e in entries}
             for e in result2.unique().scalars().all():
                 if e.id not in seen_ids:
                     entries.append(e)
                     seen_ids.add(e.id)
+
+        # Honest total: previously returned len(entries), which silently capped at
+        # result_cap. If we hit the cap, run a scoped count(*) to report the real
+        # number. ~10ms via existing indexes; only paid when results are abundant.
+        if len(entries) >= result_cap:
+            real_total_cond = fast_cond
+            count_stmt = select(func.count()).select_from(DictionaryEntry).where(real_total_cond, *base_filters)
+            if source:
+                count_stmt = count_stmt.join(DictionaryEntry.source)
+            total = (await db.execute(count_stmt)).scalar() or len(entries)
+        else:
             total = len(entries)
 
     # Group by source
