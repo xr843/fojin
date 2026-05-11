@@ -12,6 +12,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 - Dictionary browse mode (`/api/dictionary/search/grouped` with `q=*`) now resolves `source.code → source_id` before the entry query so the planner can use the new `(source_id, headword)` composite index instead of walking the full headword btree. Foguang dictionary (32k entries / 360k total): EXPLAIN drops from 9.7s to ~2ms; end-to-end API latency 904–2891ms → 113–125ms.
+- `/api/dictionary/search/grouped` `total` no longer silently caps at 200. When phase-1 hits the cap, a scoped `count(*)` reports the real number (e.g. `q=佛` now reports 2186 instead of 200). Adds one ~10ms count query only when the cap is hit; common-case rare queries pay nothing.
+
+### Performance
+- `/api/dictionary/sources` cached in Redis (10 min TTL). The full-table `GROUP BY source_id COUNT(*)` (~450ms cold on 360k rows) now runs at most once per 10 min; warm hits return in ~10ms server-side. Public `Cache-Control: max-age=300, stale-while-revalidate=600` lets CDNs and browsers further amortize.
+- `/api/dictionary/hot` gets the same `Cache-Control` header (response is a constant list).
 
 ## [3.4.0] — 2026-03-23
 
