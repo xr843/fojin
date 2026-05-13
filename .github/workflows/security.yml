@@ -104,7 +104,11 @@ jobs:
         # CVE-2026-4539: existing waiver.
         # CVE-2026-3219 (pip 26.0.1 archive confusion): affects `pip install` on
         #   crafted archives only; CI uses pinned wheels from PyPI.
-        run: pip-audit --desc --ignore-vuln CVE-2026-4539 --ignore-vuln CVE-2026-3219
+        # CVE-2026-6357 (pip 26.0.1 self-update import race, fix in 26.1):
+        #   runner-level pip, not a FoJin dependency. CI uses pinned wheels and
+        #   doesn't invoke `pip install --upgrade pip` post-deploy. Waive until
+        #   the GitHub Actions Python toolcache ships 26.1.
+        run: pip-audit --desc --ignore-vuln CVE-2026-4539 --ignore-vuln CVE-2026-3219 --ignore-vuln CVE-2026-6357
 
       - name: Upload pip-audit report
         if: always()

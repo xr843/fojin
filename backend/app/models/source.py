@@ -28,6 +28,10 @@ class DataSource(Base):
     supports_api: Mapped[bool] = mapped_column(Boolean, server_default="false")
     sort_order: Mapped[int] = mapped_column(Integer, server_default="0")
     is_active: Mapped[bool] = mapped_column(Boolean, server_default="true")
+    # Valid: ok|degraded|cert_invalid|unreachable|moved. is_active is editorial
+    # removal; health_status is the cron-updated reachability signal.
+    health_status: Mapped[str] = mapped_column(String(20), server_default="ok")
+    health_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # embedding column is vector(1024), managed via raw SQL; not mapped here
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
