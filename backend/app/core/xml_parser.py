@@ -27,6 +27,7 @@ CONTENT_TAGS = {
     f"{{{TEI_NS}}}p",
     f"{{{TEI_NS}}}l",       # verse line
     f"{{{TEI_NS}}}head",
+    f"{{{TEI_NS}}}item",    # list entries — catalog/科文 texts (T2178-2182, X "科" series) are entirely <list><item>
 }
 
 # Elements to skip entirely (including their children)
