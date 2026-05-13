@@ -45,6 +45,8 @@ class DataSourceResponse(BaseModel):
     supports_api: bool = False
     sort_order: int = 0
     is_active: bool = True
+    health_status: str = "ok"
+    health_checked_at: datetime | None = None
     created_at: datetime
     distributions: list[SourceDistributionResponse] = Field(default_factory=list)
 
