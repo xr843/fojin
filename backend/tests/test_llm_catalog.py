@@ -40,7 +40,7 @@ def test_resolve_with_no_model_id_falls_back_to_default(monkeypatch):
     """No model_id → behave exactly like _resolve_llm_config(user)."""
     monkeypatch.setattr(chat_module.settings, "llm_api_url", "https://api.deepseek.com/v1")
     monkeypatch.setattr(chat_module.settings, "llm_api_key", "platform-key")
-    monkeypatch.setattr(chat_module.settings, "llm_model", "deepseek-v4-flash")
+    monkeypatch.setattr(chat_module.settings, "llm_model", "deepseek-v4-pro")
 
     assert _resolve_with_model_override(None, None) == _resolve_llm_config(None)
 
@@ -49,7 +49,7 @@ def test_resolve_with_unknown_model_id_falls_back_gracefully(monkeypatch):
     """Stale localStorage id must not 400 — fall back to default."""
     monkeypatch.setattr(chat_module.settings, "llm_api_url", "https://api.deepseek.com/v1")
     monkeypatch.setattr(chat_module.settings, "llm_api_key", "platform-key")
-    monkeypatch.setattr(chat_module.settings, "llm_model", "deepseek-v4-flash")
+    monkeypatch.setattr(chat_module.settings, "llm_model", "deepseek-v4-pro")
 
     result = _resolve_with_model_override(None, "vendor:nonsense-model")
     assert result == _resolve_llm_config(None)
@@ -114,10 +114,10 @@ def test_resolve_byok_provider_mismatch_falls_to_platform(monkeypatch):
     user.api_provider = "moonshot"
 
     url, key, model, is_byok, provider = _resolve_with_model_override(
-        user, "deepseek:v4-flash"
+        user, "deepseek:v4-pro"
     )
     assert url == PROVIDER_URLS["deepseek"]
     assert key == "platform-key"
-    assert model == "deepseek-v4-flash"
+    assert model == "deepseek-v4-pro"
     assert is_byok is False
     assert provider == "deepseek"

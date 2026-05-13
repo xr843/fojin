@@ -259,8 +259,8 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [masterId, setMasterId] = useState<string | null>(null);
   const [modelId, setModelId] = useState<string>(() => {
-    if (typeof window === "undefined") return "deepseek:v4-flash";
-    return window.localStorage.getItem("fojin.chat.modelId") || "deepseek:v4-flash";
+    if (typeof window === "undefined") return "deepseek:v4-pro";
+    return window.localStorage.getItem("fojin.chat.modelId") || "deepseek:v4-pro";
   });
   const handleModelChange = useCallback((id: string) => {
     setModelId(id);
@@ -700,7 +700,7 @@ export default function ChatPage() {
       // pick the platform default for whatever LLM_API_URL is configured —
       // important for non-deepseek deployments where forcing a deepseek
       // catalog id would otherwise raise.
-      modelId: modelId === "deepseek:v4-flash" ? null : modelId,
+      modelId: modelId === "deepseek:v4-pro" ? null : modelId,
       attachmentIds: attachmentIdsForSend.length ? attachmentIdsForSend : null,
     });
   }, [sending, sessionId, masterId, modelId, user, attachments, refetchSessions, refetchQuota, queryClient]);

@@ -24,9 +24,9 @@ interface ChatModelSelectorProps {
 
 const FALLBACK_OPTIONS: ChatModelOption[] = [
   {
-    id: "deepseek:v4-flash",
+    id: "deepseek:v4-pro",
     provider: "deepseek",
-    label: "DeepSeek V4 Flash",
+    label: "DeepSeek V4 Pro",
     description: "默认模型",
     vision: false,
     available: true,
