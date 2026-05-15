@@ -81,7 +81,6 @@ function MiniTrend({ title, data, color }: { title: string; data: DailyCount[]; 
         smooth
         height={200}
         style={{ stroke: color }}
-        axis={{ x: { labelAutoHide: true, labelAutoRotate: false } }}
       />
     </div>
   );
