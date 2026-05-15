@@ -17,7 +17,7 @@ from app.models import (  # noqa: F401
     KGEntity, KGRelation, IIIFManifest,
     TextEmbedding, ChatSession, ChatMessage,
     Annotation, AnnotationReview,
-    DictionaryEntry,
+    DictionaryEntry, AdminAuditLog,
 )
 
 config = context.config

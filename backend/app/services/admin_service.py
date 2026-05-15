@@ -7,10 +7,16 @@ from sqlalchemy import Date, and_, case, cast, distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.annotation import Annotation
+from app.models.audit import AdminAuditLog
 from app.models.chat import ChatMessage, ChatSession
 from app.models.source import SourceSuggestion
 from app.models.user import ReadingHistory, User
-from app.schemas.admin import AdminAnnotationItem, AdminOverview, DailyCount
+from app.schemas.admin import (
+    AdminAnnotationItem,
+    AdminAuditLogItem,
+    AdminOverview,
+    DailyCount,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -173,13 +179,27 @@ async def _daily_counts(
 async def _daily_active_users(
     db: AsyncSession, since: datetime, date_grid: list[date]
 ) -> list[DailyCount]:
-    """Active users = distinct users who sent chat messages OR read texts each day."""
-    chat_day = _local_day(ChatSession.created_at)
+    """Active users = distinct users who sent a chat message OR read a text each day.
+
+    Chat activity keys off ``ChatMessage.created_at`` (joined to ChatSession for
+    the owner), NOT ``ChatSession.created_at``. A user replying inside a session
+    opened on an earlier day is active on the day they send the message — keying
+    off session creation would miss every follow-up turn in an existing session.
+    Only ``role='user'`` messages count, since an assistant reply is not the
+    user doing something.
+    """
+    chat_day = _local_day(ChatMessage.created_at)
     read_day = _local_day(ReadingHistory.last_read_at)
 
     chat_q = (
         select(chat_day.label("day"), ChatSession.user_id.label("uid"))
-        .where(ChatSession.created_at >= since, ChatSession.user_id.is_not(None))
+        .select_from(ChatMessage)
+        .join(ChatSession, ChatMessage.session_id == ChatSession.id)
+        .where(
+            ChatMessage.created_at >= since,
+            ChatMessage.role == "user",
+            ChatSession.user_id.is_not(None),
+        )
     )
     read_q = (
         select(read_day.label("day"), ReadingHistory.user_id.label("uid"))
@@ -257,4 +277,69 @@ async def list_annotations_for_review(
             status=ann.status,
             created_at=ann.created_at,
         ))
+    return total, items
+
+
+def record_audit(
+    db: AsyncSession,
+    actor_id: int | None,
+    action: str,
+    target_type: str,
+    target_id: int | None = None,
+    detail: dict | None = None,
+) -> None:
+    """Stage an audit-log row in the caller's transaction.
+
+    Deliberately does NOT commit: the caller commits the audited mutation and
+    this row together, so a change can never land without its trail (and a
+    failed audit insert rolls the mutation back).
+    """
+    db.add(
+        AdminAuditLog(
+            actor_id=actor_id,
+            action=action,
+            target_type=target_type,
+            target_id=target_id,
+            detail=detail,
+        )
+    )
+
+
+async def list_audit_log(
+    db: AsyncSession,
+    page: int = 1,
+    size: int = 20,
+    action: str | None = None,
+) -> tuple[int, list[AdminAuditLogItem]]:
+    base = select(AdminAuditLog, User.username).outerjoin(
+        User, AdminAuditLog.actor_id == User.id
+    )
+    count_base = select(func.count()).select_from(AdminAuditLog)
+
+    if action:
+        base = base.where(AdminAuditLog.action == action)
+        count_base = count_base.where(AdminAuditLog.action == action)
+
+    total = (await db.execute(count_base)).scalar_one()
+
+    query = (
+        base.order_by(AdminAuditLog.created_at.desc())
+        .offset((page - 1) * size)
+        .limit(size)
+    )
+    result = await db.execute(query)
+
+    items = [
+        AdminAuditLogItem(
+            id=row.id,
+            actor_id=row.actor_id,
+            actor_username=username,
+            action=row.action,
+            target_type=row.target_type,
+            target_id=row.target_id,
+            detail=row.detail,
+            created_at=row.created_at,
+        )
+        for row, username in result.all()
+    ]
     return total, items

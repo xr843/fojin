@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.role_guard import require_role
@@ -6,13 +7,21 @@ from app.database import get_db
 from app.models.user import User
 from app.schemas.admin import (
     AdminAnnotationListResponse,
+    AdminAuditLogListResponse,
     AdminOverview,
     AdminTrends,
     AdminUserItem,
     AdminUserListResponse,
     AdminUserUpdate,
 )
-from app.services.admin_service import get_overview, get_trends, list_annotations_for_review, list_users
+from app.services.admin_service import (
+    get_overview,
+    get_trends,
+    list_annotations_for_review,
+    list_audit_log,
+    list_users,
+    record_audit,
+)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -64,16 +73,28 @@ async def update_user(
             detail="不能修改自己的角色或状态",
         )
 
-    from sqlalchemy import select
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
 
-    if payload.role is not None:
+    changes: dict = {}
+    if payload.role is not None and payload.role != user.role:
+        changes["role"] = {"from": user.role, "to": payload.role}
         user.role = payload.role
-    if payload.is_active is not None:
+    if payload.is_active is not None and payload.is_active != user.is_active:
+        changes["is_active"] = {"from": user.is_active, "to": payload.is_active}
         user.is_active = payload.is_active
+
+    if changes:
+        record_audit(
+            db,
+            actor_id=current_user.id,
+            action="update_user",
+            target_type="user",
+            target_id=user.id,
+            detail=changes,
+        )
     await db.commit()
     await db.refresh(user)
     return user
@@ -88,4 +109,16 @@ async def annotation_list(
     db: AsyncSession = Depends(get_db),
 ):
     total, items = await list_annotations_for_review(db, page, size, status)
+    return {"total": total, "page": page, "size": size, "items": items}
+
+
+@router.get("/audit-log", response_model=AdminAuditLogListResponse)
+async def audit_log_list(
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    action: str | None = Query(None),
+    _user=Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    total, items = await list_audit_log(db, page, size, action)
     return {"total": total, "page": page, "size": size, "items": items}

@@ -1,4 +1,5 @@
 from app.models.annotation import Annotation, AnnotationReview
+from app.models.audit import AdminAuditLog
 from app.models.chat import ChatAttachment, ChatMessage, ChatSession, TextEmbedding
 from app.models.dictionary import DictionaryEntry
 from app.models.feed import AcademicFeed, SourceUpdate
@@ -12,6 +13,7 @@ from app.models.user import Bookmark, ReadingHistory, User
 
 __all__ = [
     "AcademicFeed",
+    "AdminAuditLog",
     "Annotation",
     "AnnotationReview",
     "Bookmark",

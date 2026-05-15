@@ -73,3 +73,21 @@ class AdminAnnotationListResponse(BaseModel):
     page: int
     size: int
     items: list[AdminAnnotationItem]
+
+
+class AdminAuditLogItem(BaseModel):
+    id: int
+    actor_id: int | None
+    actor_username: str | None
+    action: str
+    target_type: str
+    target_id: int | None
+    detail: dict | None
+    created_at: datetime
+
+
+class AdminAuditLogListResponse(BaseModel):
+    total: int
+    page: int
+    size: int
+    items: list[AdminAuditLogItem]

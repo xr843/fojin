@@ -72,3 +72,24 @@ async def test_annotations_list_requires_admin(client):
     """GET /admin/annotations without auth returns 401."""
     resp = await client.get("/api/admin/annotations")
     assert resp.status_code in (401, 403)
+
+
+@pytest.mark.anyio
+async def test_audit_log_requires_admin(client):
+    """GET /admin/audit-log without auth returns 401."""
+    resp = await client.get("/api/admin/audit-log")
+    assert resp.status_code in (401, 403)
+
+
+@pytest.mark.anyio
+async def test_audit_log_non_admin(client):
+    """GET /admin/audit-log as regular user returns 403."""
+    fake_user = _fake_user(role="user")
+    from app.main import app
+    from app.core.deps import get_current_user
+    app.dependency_overrides[get_current_user] = lambda: fake_user
+    try:
+        resp = await client.get("/api/admin/audit-log")
+        assert resp.status_code == 403
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
