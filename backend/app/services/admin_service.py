@@ -21,6 +21,7 @@ from app.schemas.admin import (
 logger = logging.getLogger(__name__)
 
 OVERVIEW_CACHE_KEY = "admin:stats:overview"
+TRENDS_CACHE_KEY_PREFIX = "admin:stats:trends:"  # full key appends the days window
 OVERVIEW_CACHE_TTL = 300  # 5 minutes
 
 # Server, ops team, and end users all live in CST. created_at columns are stored
@@ -129,7 +130,12 @@ async def _cache_set(redis, key: str, value: dict, ttl: int = OVERVIEW_CACHE_TTL
         logger.debug("Cache set error for key=%s", key)
 
 
-async def get_trends(db: AsyncSession, days: int = 30) -> dict:
+async def get_trends(db: AsyncSession, days: int = 30, redis=None) -> dict:
+    cache_key = f"{TRENDS_CACHE_KEY_PREFIX}{days}"
+    cached = await _cache_get(redis, cache_key)
+    if cached is not None:
+        return cached
+
     today = _local_today()
     since = today - timedelta(days=days - 1)
     since_dt = _local_midnight_utc(since)
@@ -139,11 +145,15 @@ async def get_trends(db: AsyncSession, days: int = 30) -> dict:
     messages = await _daily_counts(db, ChatMessage, ChatMessage.created_at, since_dt, date_grid)
     active_users = await _daily_active_users(db, since_dt, date_grid)
 
-    return {
-        "registrations": registrations,
-        "messages": messages,
-        "active_users": active_users,
+    # Stored as plain dicts so the Redis JSON round-trip is lossless;
+    # AdminTrends(**result) coerces them back into DailyCount either way.
+    result = {
+        "registrations": [d.model_dump() for d in registrations],
+        "messages": [d.model_dump() for d in messages],
+        "active_users": [d.model_dump() for d in active_users],
     }
+    await _cache_set(redis, cache_key, result)
+    return result
 
 
 def _fill_missing_days(rows: dict[date, int], date_grid: list[date]) -> list[DailyCount]:

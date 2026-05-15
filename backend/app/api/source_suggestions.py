@@ -13,6 +13,7 @@ from app.database import get_db
 from app.models.notification import Notification
 from app.models.source import DataSource, SourceSuggestion
 from app.models.user import User
+from app.services.admin_service import record_audit
 
 router = APIRouter(prefix="/source-suggestions", tags=["source-suggestions"])
 
@@ -103,7 +104,7 @@ async def list_source_suggestions(
 @router.delete("/{suggestion_id}", status_code=204)
 async def delete_source_suggestion(
     suggestion_id: int,
-    _user=Depends(require_role("admin")),
+    current_user: User = Depends(require_role("admin")),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -112,6 +113,14 @@ async def delete_source_suggestion(
     suggestion = result.scalar_one_or_none()
     if not suggestion:
         raise SuggestionNotFoundError()
+    record_audit(
+        db,
+        actor_id=current_user.id,
+        action="delete_suggestion",
+        target_type="source_suggestion",
+        target_id=suggestion.id,
+        detail={"name": suggestion.name, "url": suggestion.url},
+    )
     await db.delete(suggestion)
     await db.commit()
 
@@ -120,7 +129,7 @@ async def delete_source_suggestion(
 async def update_suggestion_status(
     suggestion_id: int,
     payload: StatusUpdate,
-    _user=Depends(require_role("admin")),
+    current_user: User = Depends(require_role("admin")),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -136,6 +145,16 @@ async def update_suggestion_status(
     # Auto-create DataSource when accepted
     if payload.status == "accepted" and old_status != "accepted":
         await _create_data_source(db, suggestion)
+
+    if payload.status != old_status:
+        record_audit(
+            db,
+            actor_id=current_user.id,
+            action="update_suggestion",
+            target_type="source_suggestion",
+            target_id=suggestion.id,
+            detail={"status": {"from": old_status, "to": payload.status}},
+        )
 
     # Notify the submitting user if they exist
     if suggestion.user_id and payload.status in ("accepted", "rejected"):

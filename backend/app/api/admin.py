@@ -43,7 +43,10 @@ async def stats_trends(
     _user=Depends(require_role("admin")),
     db: AsyncSession = Depends(get_db),
 ):
-    return AdminTrends(**(await get_trends(db, days)))
+    from app.main import app
+
+    redis = getattr(app.state, "redis", None)
+    return AdminTrends(**(await get_trends(db, days, redis)))
 
 
 @router.get("/users", response_model=AdminUserListResponse)
