@@ -1070,6 +1070,26 @@ export async function getAdminAnnotations(params: {
   return data;
 }
 
+export interface AdminAuditLogItem {
+  id: number;
+  actor_id: number | null;
+  actor_username: string | null;
+  action: string;
+  target_type: string;
+  target_id: number | null;
+  detail: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export async function getAdminAuditLog(params: {
+  page?: number;
+  size?: number;
+  action?: string;
+}): Promise<PaginatedResponse<AdminAuditLogItem>> {
+  const { data } = await api.get<PaginatedResponse<AdminAuditLogItem>>("/admin/audit-log", { params });
+  return data;
+}
+
 // --- Similar Passages ---
 
 export interface SimilarPassageItem {

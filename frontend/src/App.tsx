@@ -35,6 +35,7 @@ const AdminDashboardPage = lazy(() => import("./pages/AdminDashboardPage"));
 const AdminUsersPage = lazy(() => import("./pages/AdminUsersPage"));
 const AdminAnnotationsPage = lazy(() => import("./pages/AdminAnnotationsPage"));
 const AdminFeedbacksPage = lazy(() => import("./pages/AdminFeedbacksPage"));
+const AdminAuditLogPage = lazy(() => import("./pages/AdminAuditLogPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 const TimelinePage = lazy(() => import("./pages/TimelinePage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
@@ -82,6 +83,7 @@ function App() {
               <Route path="/admin/suggestions" element={<AdminSuggestionsPage />} />
               <Route path="/admin/annotations" element={<AdminAnnotationsPage />} />
               <Route path="/admin/feedbacks" element={<AdminFeedbacksPage />} />
+              <Route path="/admin/audit-log" element={<AdminAuditLogPage />} />
             </Route>
             <Route path="/parallel/:textId" element={<ParallelReaderPage />} />
             <Route path="/kg" element={<RouteErrorBoundary><KnowledgeGraphPage /></RouteErrorBoundary>} />
