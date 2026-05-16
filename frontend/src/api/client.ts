@@ -271,6 +271,8 @@ export interface DataSource {
   /** Cron-updated reachability signal; independent of is_active. */
   health_status: "ok" | "degraded" | "cert_invalid" | "unreachable" | "moved";
   health_checked_at: string | null;
+  /** Latest-probe context: redirect target for `moved`, failure reason otherwise, null when ok. */
+  health_detail: string | null;
   distributions: SourceDistribution[];
 }
 

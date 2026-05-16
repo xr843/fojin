@@ -24,7 +24,7 @@ from app.services.source import (
 
 router = APIRouter(prefix="/sources", tags=["sources"])
 
-SOURCES_LIST_CACHE_KEY = "sources:list:v2"  # v2: + health_status/health_checked_at (0132)
+SOURCES_LIST_CACHE_KEY = "sources:list:v3"  # v3: + health_detail (0136)
 SOURCES_LIST_CACHE_TTL = 1800  # 30 min; data only changes on manual admin edits
 
 _sources_list_adapter = TypeAdapter(list[DataSourceResponse])

@@ -47,6 +47,7 @@ class DataSourceResponse(BaseModel):
     is_active: bool = True
     health_status: str = "ok"
     health_checked_at: datetime | None = None
+    health_detail: str | None = None
     created_at: datetime
     distributions: list[SourceDistributionResponse] = Field(default_factory=list)
 
