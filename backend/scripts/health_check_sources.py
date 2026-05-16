@@ -3,8 +3,12 @@
 巡检所有活跃数据源的可达性，将结果写入 data_sources.health_status /
 health_checked_at，并失效 sources 列表缓存。
 
-Designed to run from cron (see docs/deployment / VPS crontab). Independent of
-``is_active``: a source can be reachable-but-deprecated, or down-but-kept.
+Designed to run from cron on the deployment host. Independent of ``is_active``:
+a source can be reachable-but-deprecated, or down-but-kept.
+
+Redirects are followed manually with a per-hop public-IP check (see
+``host_is_public``) so a hijacked source URL cannot turn the probe into an
+SSRF against internal services.
 
 Usage:
     cd backend
@@ -17,6 +21,7 @@ import asyncio
 import os
 import sys
 import warnings
+from urllib.parse import urlsplit
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -28,10 +33,16 @@ from sqlalchemy.orm import sessionmaker
 
 from app.api.sources import SOURCES_LIST_CACHE_KEY
 from app.config import settings
-from app.services.source_health import SSL_ERROR, classify_health
+from app.services.source_health import (
+    SSL_ERROR,
+    VALID_STATUSES,
+    classify_health,
+    host_is_public,
+)
 
 TIMEOUT = 15  # seconds per request
 CONCURRENCY = 10  # max concurrent probes — be gentle on small academic sites
+MAX_REDIRECTS = 5  # redirect hops to follow before giving up
 USER_AGENT = "Mozilla/5.0 (compatible; FoJin-HealthCheck/1.0; +https://fojin.app)"
 
 
@@ -52,22 +63,51 @@ def _error_kind(exc: Exception) -> str:
 
 
 async def probe(client: httpx.AsyncClient, code: str, url: str | None) -> dict:
-    """Probe one source and return {code, status} where status is a health_status."""
+    """Probe one source and return {code, status} where status is a health_status.
+
+    Redirects are followed by hand (``follow_redirects=False``) so every hop's
+    host can be vetted with :func:`host_is_public` before a request is sent —
+    this is what stops a redirect chain from reaching internal services."""
     if not url or url == "None":
         # No URL to probe — leave it as-is rather than inventing a verdict.
         return {"code": code, "status": None, "detail": "no base_url"}
+    parts = urlsplit(url)
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        # A malformed base_url is a config error, not a reachability verdict.
+        return {"code": code, "status": None, "detail": f"bad base_url: {url[:80]}"}
+
+    current = url
     try:
-        resp = await client.get(url, follow_redirects=True, timeout=TIMEOUT)
+        for _ in range(MAX_REDIRECTS + 1):
+            host = urlsplit(current).hostname
+            if not host_is_public(host):
+                # Internal / unresolvable target — refuse to probe it. From an
+                # editor's view the source is effectively unreachable.
+                return {
+                    "code": code,
+                    "status": "unreachable",
+                    "detail": f"blocked or unresolvable host: {host}",
+                }
+            resp = await client.get(current, follow_redirects=False, timeout=TIMEOUT)
+            if resp.is_redirect and "location" in resp.headers:
+                current = str(httpx.URL(current).join(resp.headers["location"]))
+                continue
+            status = classify_health(
+                error=None,
+                status_code=resp.status_code,
+                requested_url=url,
+                final_url=current,
+            )
+            detail = f"HTTP {resp.status_code}"
+            if current != url:
+                detail += f" -> {current}"
+            return {"code": code, "status": status, "detail": detail}
+
+        # Redirect budget exhausted.
         status = classify_health(
-            error=None,
-            status_code=resp.status_code,
-            requested_url=url,
-            final_url=str(resp.url),
+            error="redirect_loop", status_code=None, requested_url=url, final_url=None
         )
-        detail = f"HTTP {resp.status_code}"
-        if str(resp.url) != url:
-            detail += f" -> {resp.url}"
-        return {"code": code, "status": status, "detail": detail}
+        return {"code": code, "status": status, "detail": f"redirect_loop: >{MAX_REDIRECTS} hops"}
     except Exception as exc:  # every probe failure maps to a health verdict
         kind = _error_kind(exc)
         status = classify_health(error=kind, status_code=None, requested_url=url, final_url=None)
@@ -106,6 +146,13 @@ async def main(dry_run: bool) -> None:
     verdicts = [r for r in results if r["status"] is not None]
     skipped = [r for r in results if r["status"] is None]
 
+    # Guard against a logic regression writing an unknown token: classify_health
+    # only ever returns VALID_STATUSES, but a bad value would land silently in
+    # the DB (the frontend badge lookup fails open to "no badge").
+    bad = [r for r in verdicts if r["status"] not in VALID_STATUSES]
+    if bad:
+        raise SystemExit(f"ABORT: classifier produced invalid status(es): {bad}")
+
     # ---- write back ----
     changed = 0
     if not dry_run:
@@ -121,13 +168,18 @@ async def main(dry_run: bool) -> None:
                 )
                 changed += res.rowcount or 0
             await session.commit()
+        if changed != len(verdicts):
+            # A source deactivated between the SELECT and the UPDATE drops out.
+            print(f"NOTE: {len(verdicts) - changed} verdict(s) not written (source deactivated?).")
 
     await engine.dispose()
 
     # ---- bust the sources list cache so the UI badge reflects new verdicts ----
+    # delete() runs after commit() so a concurrent reader can only ever
+    # re-cache fresh data; only .delete() is used, so no decode_responses.
     if not dry_run and verdicts:
         try:
-            redis_client = aioredis.from_url(settings.redis_url, decode_responses=True)
+            redis_client = aioredis.from_url(settings.redis_url)
             await redis_client.delete(SOURCES_LIST_CACHE_KEY)
             await redis_client.aclose()
             print(f"Invalidated cache key '{SOURCES_LIST_CACHE_KEY}'.")

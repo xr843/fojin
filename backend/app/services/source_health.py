@@ -10,6 +10,8 @@ or DB; the probing/IO lives in ``scripts/health_check_sources.py``.
 Valid statuses: ok | degraded | cert_invalid | unreachable | moved
 """
 
+import ipaddress
+import socket
 from urllib.parse import urlsplit
 
 # Probe error kinds the caller may report. Anything that is not a clean HTTP
@@ -17,6 +19,42 @@ from urllib.parse import urlsplit
 SSL_ERROR = "ssl"
 
 VALID_STATUSES = frozenset({"ok", "degraded", "cert_invalid", "unreachable", "moved"})
+
+
+def _ip_is_blocked(ip: str) -> bool:
+    """True for any non-public address: private, loopback, link-local, etc.
+
+    Unparseable input is treated as blocked (fail closed)."""
+    try:
+        addr = ipaddress.ip_address(ip)
+    except ValueError:
+        return True
+    return (
+        addr.is_private
+        or addr.is_loopback
+        or addr.is_link_local
+        or addr.is_multicast
+        or addr.is_reserved
+        or addr.is_unspecified
+    )
+
+
+def host_is_public(host: str | None) -> bool:
+    """True only when *every* address ``host`` resolves to is publicly routable.
+
+    The health-check cron follows redirects from admin-editable source URLs on a
+    VPS with internal network reach; without this guard a hijacked source could
+    redirect the probe at ``169.254.169.254`` (cloud metadata) or an RFC1918
+    host — an SSRF. A residual DNS-rebinding window remains between this check
+    and httpx's own connect-time resolution; acceptable for a cron over curated
+    academic sites, but noted deliberately."""
+    if not host:
+        return False
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except (socket.gaierror, UnicodeError, OSError):
+        return False
+    return bool(infos) and all(not _ip_is_blocked(info[4][0]) for info in infos)
 
 
 def _registrable_host(url: str | None) -> str:
