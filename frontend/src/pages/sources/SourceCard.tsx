@@ -72,6 +72,19 @@ export default function SourceCard({ source: s, searchQuery }: SourceCardProps) 
   const healthCheckedAt = s.health_checked_at
     ? new Date(s.health_checked_at).toLocaleDateString("zh-CN")
     : null;
+  // For a moved source, health_detail is the redirect target — the one piece
+  // of actionable context worth surfacing in the badge tooltip.
+  const healthTooltip = health
+    ? [
+        health.tip,
+        s.health_status === "moved" && s.health_detail
+          ? `现重定向至：${s.health_detail}`
+          : null,
+        healthCheckedAt ? `最近巡检：${healthCheckedAt}` : null,
+      ]
+        .filter(Boolean)
+        .join("\n")
+    : null;
 
   return (
     <div className="source-card">
@@ -85,11 +98,7 @@ export default function SourceCard({ source: s, searchQuery }: SourceCardProps) 
         </div>
         <div className="source-card-badges">
           {health && (
-            <Tooltip
-              title={
-                healthCheckedAt ? `${health.tip}（最近巡检：${healthCheckedAt}）` : health.tip
-              }
-            >
+            <Tooltip title={<span style={{ whiteSpace: "pre-line" }}>{healthTooltip}</span>}>
               <Tag color={health.color} className="source-card-badge">
                 <WarningOutlined /> {health.label}
               </Tag>

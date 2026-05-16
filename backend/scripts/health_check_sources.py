@@ -62,32 +62,36 @@ def _error_kind(exc: Exception) -> str:
     return "other"
 
 
+def _verdict(code: str, status: str | None, detail: str | None) -> dict:
+    """A probe result. ``detail`` is the storage-ready health_detail value:
+    the redirect target for ``moved``, the failure reason otherwise, ``None``
+    for ``ok`` (and for skipped probes, where ``status`` is also ``None``)."""
+    return {"code": code, "status": status, "detail": detail}
+
+
 async def probe(client: httpx.AsyncClient, code: str, url: str | None) -> dict:
-    """Probe one source and return {code, status} where status is a health_status.
+    """Probe one source into a {code, status, detail} verdict.
 
     Redirects are followed by hand (``follow_redirects=False``) so every hop's
     host can be vetted with :func:`host_is_public` before a request is sent —
     this is what stops a redirect chain from reaching internal services."""
     if not url or url == "None":
         # No URL to probe — leave it as-is rather than inventing a verdict.
-        return {"code": code, "status": None, "detail": "no base_url"}
+        return _verdict(code, None, "no base_url")
     parts = urlsplit(url)
     if parts.scheme not in ("http", "https") or not parts.hostname:
         # A malformed base_url is a config error, not a reachability verdict.
-        return {"code": code, "status": None, "detail": f"bad base_url: {url[:80]}"}
+        return _verdict(code, None, f"bad base_url: {url[:80]}")
 
     current = url
     try:
         for _ in range(MAX_REDIRECTS + 1):
             host = urlsplit(current).hostname
             if not host_is_public(host):
-                # Internal / unresolvable target — refuse to probe it. From an
-                # editor's view the source is effectively unreachable.
-                return {
-                    "code": code,
-                    "status": "unreachable",
-                    "detail": f"blocked or unresolvable host: {host}",
-                }
+                # Host does not resolve, or resolves to a non-public address —
+                # refuse to probe it. From an editor's view the source is
+                # effectively unreachable.
+                return _verdict(code, "unreachable", f"unresolvable or non-public host: {host}")
             resp = await client.get(current, follow_redirects=False, timeout=TIMEOUT)
             if resp.is_redirect and "location" in resp.headers:
                 current = str(httpx.URL(current).join(resp.headers["location"]))
@@ -98,20 +102,24 @@ async def probe(client: httpx.AsyncClient, code: str, url: str | None) -> dict:
                 requested_url=url,
                 final_url=current,
             )
-            detail = f"HTTP {resp.status_code}"
-            if current != url:
-                detail += f" -> {current}"
-            return {"code": code, "status": status, "detail": detail}
+            if status == "ok":
+                detail = None
+            elif status == "moved":
+                # The redirect target — the one piece of actionable context.
+                detail = current
+            else:
+                detail = f"HTTP {resp.status_code}"
+            return _verdict(code, status, detail)
 
         # Redirect budget exhausted.
         status = classify_health(
             error="redirect_loop", status_code=None, requested_url=url, final_url=None
         )
-        return {"code": code, "status": status, "detail": f"redirect_loop: >{MAX_REDIRECTS} hops"}
+        return _verdict(code, status, f"exceeded {MAX_REDIRECTS} redirect hops")
     except Exception as exc:  # every probe failure maps to a health verdict
         kind = _error_kind(exc)
         status = classify_health(error=kind, status_code=None, requested_url=url, final_url=None)
-        return {"code": code, "status": status, "detail": f"{kind}: {str(exc)[:120]}"}
+        return _verdict(code, status, f"{kind}: {str(exc)[:160]}")
 
 
 async def main(dry_run: bool) -> None:
@@ -161,10 +169,11 @@ async def main(dry_run: bool) -> None:
                 res = await session.execute(
                     text(
                         "UPDATE data_sources "
-                        "SET health_status = :s, health_checked_at = now() "
+                        "SET health_status = :s, health_checked_at = now(), "
+                        "    health_detail = :d "
                         "WHERE code = :c AND is_active = true"
                     ),
-                    {"s": r["status"], "c": r["code"]},
+                    {"s": r["status"], "d": r["detail"], "c": r["code"]},
                 )
                 changed += res.rowcount or 0
             await session.commit()
@@ -197,7 +206,7 @@ async def main(dry_run: bool) -> None:
             continue
         print(f"{'=' * 70}\n{status.upper()} ({len(bucket)})\n{'=' * 70}")
         for r in sorted(bucket, key=lambda x: x["code"]):
-            print(f"  {r['code']:36s} {r['detail']}")
+            print(f"  {r['code']:36s} {r['detail'] or ''}")
         print()
 
     if skipped:
