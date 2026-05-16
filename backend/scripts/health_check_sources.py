@@ -62,10 +62,20 @@ def _error_kind(exc: Exception) -> str:
     return "other"
 
 
+# data_sources.health_detail is VARCHAR(500); Postgres errors (not truncates)
+# on an over-long value, which would abort the whole write transaction. Cap
+# every detail at the boundary so one pathological redirect URL can't do that.
+HEALTH_DETAIL_MAXLEN = 500
+
+
 def _verdict(code: str, status: str | None, detail: str | None) -> dict:
     """A probe result. ``detail`` is the storage-ready health_detail value:
     the redirect target for ``moved``, the failure reason otherwise, ``None``
-    for ``ok`` (and for skipped probes, where ``status`` is also ``None``)."""
+    for ``ok`` (and for skipped probes, where ``status`` is also ``None``).
+
+    ``detail`` is hard-capped to the column width — see HEALTH_DETAIL_MAXLEN."""
+    if detail is not None and len(detail) > HEALTH_DETAIL_MAXLEN:
+        detail = detail[: HEALTH_DETAIL_MAXLEN - 1] + "…"
     return {"code": code, "status": status, "detail": detail}
 
 
@@ -106,6 +116,9 @@ async def probe(client: httpx.AsyncClient, code: str, url: str | None) -> dict:
                 detail = None
             elif status == "moved":
                 # The redirect target — the one piece of actionable context.
+                # Stored and shown as plain text only; if it is ever turned
+                # into an href, the scheme must be sanitised first (a source
+                # could redirect to a javascript: / data: Location).
                 detail = current
             else:
                 detail = f"HTTP {resp.status_code}"
