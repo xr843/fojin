@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Data-source health monitoring. `scripts/health_check_sources.py` probes every active source's `base_url` and records a `health_status` verdict (`ok` / `degraded` / `cert_invalid` / `unreachable` / `moved`) plus `health_checked_at`. The Sources page now shows a warning badge on cards whose source has moved, is unreachable, has an invalid TLS certificate, or returns HTTP errors — healthy sources stay unbadged. Designed to run from cron; busts the sources-list cache on completion so the UI reflects new verdicts within one TTL. Builds on the `health_status` column added in migration 0132.
+
 ### Changed
 - Default DeepSeek model alias `deepseek-chat` → `deepseek-v4-flash` (legacy ID still works as alias). Production `LLM_MODEL` upgraded to `deepseek-v4-pro` to leverage 75% promotional pricing through 2026-05-31; revisit before promo ends to avoid 4× cost increase.
 - Updated `build_alignments.py` price table with `deepseek-v4-flash` ($0.28/1M output) and `deepseek-v4-pro` ($0.87/1M output, promo).

@@ -268,6 +268,9 @@ export interface DataSource {
   supports_api: boolean;
   sort_order: number;
   is_active: boolean;
+  /** Cron-updated reachability signal; independent of is_active. */
+  health_status: "ok" | "degraded" | "cert_invalid" | "unreachable" | "moved";
+  health_checked_at: string | null;
   distributions: SourceDistribution[];
 }
 
