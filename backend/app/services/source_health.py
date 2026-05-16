@@ -137,11 +137,11 @@ def classify_health(
     if status_code >= 500:
         return "unreachable"
     # Only 404/410 mean the page is genuinely gone — that is a degraded source.
-    # Other 4xx (401 auth-required, 403 bot/geo-blocked, 429 rate-limited) mean
-    # the server answered and the site is up; it just won't serve an automated
-    # probe. Treating those as degraded wrongly badges healthy major sources
-    # (archive.org, hathitrust, loc.gov, Cloudflare-fronted sites, …), so they
-    # classify as ok — the link still works for a human in a browser.
+    # Every other 4xx (400 bad-request, 401 auth-required, 403 bot/geo-blocked,
+    # 429 rate-limited) means the server answered and the site is up; it just
+    # won't serve an automated probe. Treating those as degraded wrongly badges
+    # healthy major sources (hathitrust, loc.gov, Cloudflare-fronted sites, …),
+    # so they classify as ok — the link still works for a human in a browser.
     if status_code in (404, 410):
         return "degraded"
     return "ok"

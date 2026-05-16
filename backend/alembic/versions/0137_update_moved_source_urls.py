@@ -1,4 +1,4 @@
-"""Update base_url for relocated sources; deactivate suttaworld.
+"""Update base_url for relocated sources; deactivate dead ones.
 
 Acting on the 2026-05-16 health-check audit. The cron flagged 13 sources as
 ``moved``; this migration applies the editorial follow-up.
@@ -6,22 +6,26 @@ Acting on the 2026-05-16 health-check audit. The cron flagged 13 sources as
 base_url updates — sources that genuinely relocated to a different site, each
 redirect target verified by hand to be the same project at its new home:
 
-  deerpark-ai         deerpark.ai            -> deerpark.app
   ymfz                ymfz.org               -> buddha.now (圓滿法藏 佛語今譯)
   sutra-mobi          sutra.mobi             -> sutra.yjsword.com (巴利经藏)
   vienna-rkts-kanjur  istb.univie.ac.at/...  -> rkts.org/rktsneu/
   dllm-laos           laomanuscripts.net     -> digital.crossasia.org/...
   munich-indology     indologie.uni-muenchen -> kw.lmu.de/indotib/de/
-  hamburg-khmer       manuscript-cultures... -> csmc.uni-hamburg.de
+  hamburg-khmer       manuscript-cultures... -> csmc.uni-hamburg.de/
   cetom               univie.ac.at/tocharian -> cetom.univie.ac.at/
   va-museum           collections.vam.ac.uk  -> www.vam.ac.uk/collections
 
 NOT touched: 84000 / 84000-glossary redirect read.84000.co -> 84000.co, a
 same-site sub-domain restructure — the reading-room URL stays more specific.
 
-Deactivation — suttaworld: suttaworld.org has lapsed and now redirects to an
-unrelated commercial gambling site (vob.uk.com). is_active=false so it leaves
-the public catalog; base_url is left intact for the record.
+Deactivations (is_active=false; base_url left intact for the record):
+
+  suttaworld   suttaworld.org has lapsed and now redirects to an unrelated
+               commercial gambling site (vob.uk.com).
+  deerpark-ai  the "DeerPark AI 佛学问答" product is gone — deerpark.ai now
+               redirects to deerpark.app (汉文大藏经), already catalogued as
+               the separate `deerpark-app` source. Re-pointing would create a
+               duplicate row, so this dead entry is retired instead.
 
 Revision ID: 0137
 Revises: 0136
@@ -38,7 +42,6 @@ depends_on = None
 
 # code -> (old_base_url, new_base_url)
 URL_UPDATES = {
-    "deerpark-ai": ("https://deerpark.ai/", "https://deerpark.app"),
     "ymfz": ("https://www.ymfz.org/", "https://buddha.now/"),
     "sutra-mobi": ("https://sutra.mobi/", "https://sutra.yjsword.com/"),
     "vienna-rkts-kanjur": (
@@ -55,11 +58,14 @@ URL_UPDATES = {
     ),
     "hamburg-khmer": (
         "https://www.manuscript-cultures.uni-hamburg.de/",
-        "https://www.csmc.uni-hamburg.de",
+        "https://www.csmc.uni-hamburg.de/",
     ),
     "cetom": ("https://www.univie.ac.at/tocharian/", "https://cetom.univie.ac.at/"),
     "va-museum": ("https://collections.vam.ac.uk/", "https://www.vam.ac.uk/collections"),
 }
+
+# Dead sources retired from the public catalog (was active before this migration).
+DEACTIVATE = ("suttaworld", "deerpark-ai")
 
 
 def _set_base_url(code: str, url: str) -> None:
@@ -79,10 +85,12 @@ def _set_active(code: str, active: bool) -> None:
 def upgrade() -> None:
     for code, (_old, new) in URL_UPDATES.items():
         _set_base_url(code, new)
-    _set_active("suttaworld", False)
+    for code in DEACTIVATE:
+        _set_active(code, False)
 
 
 def downgrade() -> None:
     for code, (old, _new) in URL_UPDATES.items():
         _set_base_url(code, old)
-    _set_active("suttaworld", True)
+    for code in DEACTIVATE:
+        _set_active(code, True)
