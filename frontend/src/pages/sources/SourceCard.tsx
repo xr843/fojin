@@ -6,6 +6,7 @@ import {
   LinkOutlined,
   ReadOutlined,
   SearchOutlined,
+  WarningOutlined,
 } from "@ant-design/icons";
 import type { DataSource } from "../../api/client";
 import { buildSearchUrl, getLangName } from "../../utils/sourceUrls";
@@ -15,6 +16,34 @@ interface SourceCardProps {
   source: DataSource;
   searchQuery: string;
 }
+
+// Cron-updated reachability verdicts worth surfacing to readers. "ok" shows
+// nothing — only problems get a badge, to keep healthy cards uncluttered.
+const HEALTH_BADGE: Record<
+  Exclude<DataSource["health_status"], "ok">,
+  { label: string; color: string; tip: string }
+> = {
+  degraded: {
+    label: "访问受限",
+    color: "gold",
+    tip: "原站可达，但目标页面返回错误（如 403/404）。链接可能已失效，建议核对后再访问。",
+  },
+  cert_invalid: {
+    label: "证书异常",
+    color: "orange",
+    tip: "原站 HTTPS 证书校验失败，浏览器访问时可能弹出安全警告。",
+  },
+  unreachable: {
+    label: "暂无法访问",
+    color: "red",
+    tip: "最近一次巡检时原站连接超时或被拒绝，可能为临时故障。",
+  },
+  moved: {
+    label: "站点已迁移",
+    color: "volcano",
+    tip: "原站已重定向到其他域名，原链接可能已迁移。",
+  },
+};
 
 export default function SourceCard({ source: s, searchQuery }: SourceCardProps) {
   const langs = [
@@ -38,6 +67,12 @@ export default function SourceCard({ source: s, searchQuery }: SourceCardProps) 
   // misleading users. If a source lacks a template, the button is hidden.
   const searchUrl = searchQuery ? buildSearchUrl(s.code, searchQuery) : null;
 
+  const health =
+    s.health_status && s.health_status !== "ok" ? HEALTH_BADGE[s.health_status] : null;
+  const healthCheckedAt = s.health_checked_at
+    ? new Date(s.health_checked_at).toLocaleDateString("zh-CN")
+    : null;
+
   return (
     <div className="source-card">
       <div className="source-card-top">
@@ -49,6 +84,17 @@ export default function SourceCard({ source: s, searchQuery }: SourceCardProps) 
           {s.name_en && <span className="source-card-name-en">{s.name_en}</span>}
         </div>
         <div className="source-card-badges">
+          {health && (
+            <Tooltip
+              title={
+                healthCheckedAt ? `${health.tip}（最近巡检：${healthCheckedAt}）` : health.tip
+              }
+            >
+              <Tag color={health.color} className="source-card-badge">
+                <WarningOutlined /> {health.label}
+              </Tag>
+            </Tooltip>
+          )}
           {s.has_local_fulltext && (
             <Tooltip title="正文已入库 FoJin 数据库，可在站内直接阅读、引用与全文检索">
               <Tag color="green" className="source-card-badge">
