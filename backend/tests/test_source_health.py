@@ -50,11 +50,38 @@ def test_redirect_to_different_domain_is_moved():
     )
 
 
-def test_4xx_is_degraded():
-    for code in (403, 404, 410):
+def test_subdomain_restructure_within_same_site_is_not_moved():
+    # read.84000.co -> 84000.co, collections.vam.ac.uk -> vam.ac.uk: a
+    # sub-domain restructure by the same operator is not an actionable move.
+    for requested, final in [
+        ("https://read.84000.co/x", "https://84000.co/"),
+        ("https://collections.vam.ac.uk/", "https://www.vam.ac.uk/collections"),
+        ("https://www.univie.ac.at/tocharian/", "https://cetom.univie.ac.at/"),
+    ]:
+        assert (
+            classify_health(
+                error=None, status_code=200, requested_url=requested, final_url=final
+            )
+            == "ok"
+        )
+
+
+def test_404_and_410_are_degraded():
+    # Only "page is genuinely gone" codes count as degraded.
+    for code in (404, 410):
         assert (
             classify_health(error=None, status_code=code, requested_url=HOME, final_url=HOME)
             == "degraded"
+        )
+
+
+def test_other_4xx_is_ok():
+    # 401 auth / 403 bot-or-geo-block / 429 rate-limit: the server answered,
+    # the site is up — it just won't serve an automated probe.
+    for code in (400, 401, 403, 429):
+        assert (
+            classify_health(error=None, status_code=code, requested_url=HOME, final_url=HOME)
+            == "ok"
         )
 
 

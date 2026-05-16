@@ -68,16 +68,37 @@ def _registrable_host(url: str | None) -> str:
     return host[4:] if host.startswith("www.") else host
 
 
-def _is_moved(requested_url: str, final_url: str | None) -> bool:
-    """True when a redirect landed on a different registrable host.
+def _same_site(host_a: str, host_b: str) -> bool:
+    """True when two hosts belong to the same site.
 
-    Path-only redirects, http→https upgrades and www-prefix changes are *not*
-    moves — sites reorganise constantly and those are not actionable."""
+    Equal hosts, or one a dotted sub-domain of the other — ``read.84000.co``
+    and ``84000.co``, ``collections.vam.ac.uk`` and ``vam.ac.uk``. A redirect
+    between these is a sub-domain restructure by the same operator, not a move.
+    (Sibling sub-domains under a shared parent are *not* caught — telling those
+    apart needs a public-suffix list; treating them as moved is the safe miss.)
+    """
+    if not host_a or not host_b:
+        return False
+    return (
+        host_a == host_b
+        or host_a.endswith("." + host_b)
+        or host_b.endswith("." + host_a)
+    )
+
+
+def _is_moved(requested_url: str, final_url: str | None) -> bool:
+    """True when a redirect landed on a different site.
+
+    Path-only redirects, http→https upgrades, www-prefix changes and
+    sub-domain restructures within the same site are *not* moves — sites
+    reorganise constantly and those are not actionable."""
     if not final_url:
         return False
     src = _registrable_host(requested_url)
     dst = _registrable_host(final_url)
-    return bool(src) and bool(dst) and src != dst
+    if not src or not dst:
+        return False
+    return not _same_site(src, dst)
 
 
 def classify_health(
@@ -115,6 +136,12 @@ def classify_health(
         return "unreachable"
     if status_code >= 500:
         return "unreachable"
-    if status_code >= 400:
+    # Only 404/410 mean the page is genuinely gone — that is a degraded source.
+    # Other 4xx (401 auth-required, 403 bot/geo-blocked, 429 rate-limited) mean
+    # the server answered and the site is up; it just won't serve an automated
+    # probe. Treating those as degraded wrongly badges healthy major sources
+    # (archive.org, hathitrust, loc.gov, Cloudflare-fronted sites, …), so they
+    # classify as ok — the link still works for a human in a browser.
+    if status_code in (404, 410):
         return "degraded"
     return "ok"
