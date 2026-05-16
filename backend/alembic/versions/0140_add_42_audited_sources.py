@@ -1,16 +1,20 @@
-"""Add 42 content-verified data sources (2026-05-16 全网检索 batch 3).
+"""Add 40 new + reactivate 2 audited data sources (2026-05-16 全网检索 batch 3).
 
 Found by a four-agent web sweep partitioned by tradition (CJK / Tibetan /
 Theravada / Sanskrit-academic-AI). The agents produced ~80 raw candidates;
-a dedup pass against the 580-source catalog dropped ~15 already present
-under a different code (Dharmamitra=mitra-ai, BuddhaNexus=buddhanexus,
-ACIP=acip, IDP=idp, SEADL-NIU=seadl-niu, …). Every surviving candidate then
-had its URL re-verified live: 4 were cut (actib — repo not yet populated;
-cjbs — journal discontinued; a BDRC blog post with no portal) and 2 held
-(higashi-honganji 聖典 unreachable; UCR Thai Digital Monastery returning 502).
+a dedup pass against the catalog dropped ~15 already present under a
+different code (Dharmamitra=mitra-ai, BuddhaNexus=buddhanexus, ACIP=acip,
+IDP=idp, SEADL-NIU=seadl-niu, …). Every surviving candidate then had its URL
+re-verified live: 4 were cut (actib — repo not yet populated; cjbs — journal
+discontinued; a BDRC blog post with no portal) and 2 held (higashi-honganji
+聖典 unreachable; UCR Thai Digital Monastery returning 502).
 
-The 42 below are all verified reachable — sites behind Cloudflare/rate limits
-answered 403/429, which means the server is up (a human browser reaches them).
+Of the 42 that passed, two — iriz-hanazono and read-workbench — turned out to
+already exist in the catalog as *inactive* rows (deactivated by earlier audits
+when their hosts went down). The 2026-05-16 sweep re-verified both are live
+again, so they are REACTIVATED here rather than inserted (read-workbench also
+gets its base_url corrected: read.gardens.express → readworkbench.org). The
+remaining 40 are genuinely new INSERTs.
 
 access_type='external'; sort_order 0; is_active true;
 INSERT ... ON CONFLICT (code) DO NOTHING for idempotency.
@@ -41,18 +45,6 @@ NEW_SOURCES = [
         "languages": "ja,zh",
         "research_fields": "han,art",
         "supports_iiif": True,
-        "has_remote_fulltext": True,
-    },
-    {
-        "code": "iriz-hanazono",
-        "name_zh": "国际禅学研究所禅籍数据库",
-        "name_en": "International Research Institute for Zen Buddhism (Hanazono Univ.)",
-        "base_url": "http://iriz.hanazono.ac.jp/",
-        "description": "花园大学国际禅学研究所的禅籍文本数据库、公案索引与「电子达摩」禅宗术语检索系统，是有别于驹泽、禅文化研究所的独立禅学研究枢纽。",
-        "region": "日本",
-        "languages": "ja,zh",
-        "research_fields": "han",
-        "supports_search": True,
         "has_remote_fulltext": True,
     },
     {
@@ -412,17 +404,6 @@ NEW_SOURCES = [
     },
     # ---- 梵语 / 西方学术 / AI ----
     {
-        "code": "read-workbench",
-        "name_zh": "READ Workbench 古代佛教写本协作编辑平台",
-        "name_en": "READ Workbench",
-        "base_url": "https://readworkbench.org/",
-        "description": "悉尼大学等机构的古代佛教写本与铭文协作式学术校勘平台，托管早期佛教写本项目与 Senior 犍陀罗卷轴。",
-        "region": "澳大利亚",
-        "languages": "sa,pi,en",
-        "research_fields": "sanskrit,dh",
-        "supports_search": True,
-    },
-    {
         "code": "sttar-sanskrit",
         "name_zh": "西藏所藏梵文佛典精校丛刊（STTAR）",
         "name_en": "Sanskrit Texts from the Tibetan Autonomous Region (STTAR)",
@@ -499,11 +480,27 @@ NEW_SOURCES = [
 ]
 
 
+# Sources that already exist in the catalog as inactive rows (deactivated by
+# earlier audits when their hosts went down) and are re-verified live now.
+# code -> (old_base_url, new_base_url) — old is restored on downgrade.
+REACTIVATE = {
+    "iriz-hanazono": ("https://iriz.hanazono.ac.jp/", "https://iriz.hanazono.ac.jp/"),
+    "read-workbench": ("https://read.gardens.express/", "https://readworkbench.org/"),
+}
+
+
 def upgrade() -> None:
     def q(v):
         if v is None:
             return "NULL"
         return "'" + str(v).replace("'", "''") + "'"
+
+    for code, (_old, new) in REACTIVATE.items():
+        op.execute(
+            text(
+                "UPDATE data_sources SET is_active = true, base_url = :u WHERE code = :c"
+            ).bindparams(u=new, c=code)
+        )
 
     for s in NEW_SOURCES:
         supports_search = "true" if s.get("supports_search") else "false"
@@ -530,4 +527,13 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     for s in NEW_SOURCES:
-        op.execute(text(f"DELETE FROM data_sources WHERE code = '{s['code']}'"))
+        op.execute(
+            text("DELETE FROM data_sources WHERE code = :c").bindparams(c=s["code"])
+        )
+    # Restore the reactivated rows to inactive + their previous base_url.
+    for code, (old, _new) in REACTIVATE.items():
+        op.execute(
+            text(
+                "UPDATE data_sources SET is_active = false, base_url = :u WHERE code = :c"
+            ).bindparams(u=old, c=code)
+        )
