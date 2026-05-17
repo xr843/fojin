@@ -157,24 +157,25 @@ function injectCitationLinks(content: string, sources: ChatSource[] | null): str
   }
   if (titleMap.size === 0) return content;
 
-  // Build the citation URL. When a quote is known and a retrieved chunk
-  // actually contains it, anchor the citation to THAT chunk — otherwise the
-  // drawer opens whichever chunk merely scored highest, which usually does
-  // not hold the quoted sentence. The quote rides along in the URL so the
-  // drawer can highlight the exact passage.
-  const buildUrl = (
+  // Resolve a citation to its URL and the fascicle (juan) it points at.
+  // When a quote is known and a retrieved chunk actually contains it, anchor
+  // the citation to THAT chunk — otherwise the drawer opens whichever chunk
+  // merely scored highest, which usually does not hold the quoted sentence.
+  // The quote rides along in the URL so the drawer can highlight it.
+  const buildCitation = (
     fallback: ChatSource,
     simplifiedTitle: string,
     juanHint: number | null,
     quote: string | null,
-  ): string => {
+  ): { url: string; juan: number } => {
     const candidates = titleSources.get(simplifiedTitle) ?? [];
     const picked = pickSourceForQuote(candidates, quote);
     const source = picked ?? fallback;
     const chunkIdx = source.chunk_index ?? -1;
     const juan = picked ? picked.juan_num : (juanHint ?? source.juan_num);
     const tail = quote ? `/${encodeURIComponent(quote)}` : "";
-    return `${CITATION_URL_SCHEME}://${source.text_id}/${juan}/${chunkIdx}/${encodeURIComponent(simplifiedTitle)}${tail}`;
+    const url = `${CITATION_URL_SCHEME}://${source.text_id}/${juan}/${chunkIdx}/${encodeURIComponent(simplifiedTitle)}${tail}`;
+    return { url, juan };
   };
 
   // Pass 1 — explicit 【《title》…】 markers. The replace callback receives the
@@ -190,8 +191,13 @@ function injectCitationLinks(content: string, sources: ChatSource[] | null): str
       const juanMatch = tail.match(/第(\d+)卷/);
       const juanHint = juanMatch ? parseInt(juanMatch[1], 10) : null;
       const quote = extractPrecedingQuote(full.slice(0, offset));
-      const url = buildUrl(source, simplifiedTitle, juanHint, quote);
-      return `[【《${title}》${tail}】](${url})`;
+      const { url, juan } = buildCitation(source, simplifiedTitle, juanHint, quote);
+      // Rewrite the fascicle slot in the visible label to the resolved juan
+      // so the label matches the link target — this also turns a literal
+      // 第N卷 placeholder the LLM left unsubstituted into a real number.
+      // Non-卷 qualifiers (卷上, 第十八愿) carry no 第…卷 slot and are kept.
+      const label = tail.replace(/第[^】卷]*卷/, `第${juan}卷`);
+      return `[【《${title}》${label}】](${url})`;
     },
   );
 
@@ -208,7 +214,7 @@ function injectCitationLinks(content: string, sources: ChatSource[] | null): str
         const simplifiedTitle = toSimplified(title);
         const source = titleMap.get(simplifiedTitle);
         if (!source) return bareMatch;
-        const url = buildUrl(source, simplifiedTitle, null, null);
+        const { url } = buildCitation(source, simplifiedTitle, null, null);
         return `[《${title}》](${url})`;
       });
     })

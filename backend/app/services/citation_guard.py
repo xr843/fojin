@@ -41,11 +41,26 @@ from app.schemas.chat import ChatSource
 logger = logging.getLogger(__name__)
 
 
-# Matches 【《<title>》第<digits>卷】 or 【《<title>》】.
-# Mirrors the frontend regex in ReaderAIPanel.tsx#injectCitationLinks so a
-# citation that survives this guard is exactly the citation the frontend
-# will rewrite into a clickable link.
-_CITATION_RE = re.compile(r"【《([^》]+)》(?:第(\d+)卷)?】")
+# Matches 【《<title>》第<fascicle>卷】 or 【《<title>》】. The fascicle group
+# is captured loosely (not just \d+) on purpose: the LLM sometimes copies
+# the prompt's 【《经名》第N卷】 template verbatim and leaves a literal "N"
+# in place. Capturing it lets _rewrite replace that placeholder with a real
+# retrieved fascicle instead of letting "第N卷" reach the user untouched.
+_CITATION_RE = re.compile(r"【《([^》]+)》(?:第([^】]+?)卷)?】")
+
+
+def _parse_juan(juan_str: str | None) -> tuple[int | None, bool]:
+    """Return (numeric_juan, is_placeholder).
+
+    A digits-only token is a real fascicle number. Any other non-empty
+    token — a literal "N" / "X" / "?" left unsubstituted from the prompt
+    template — is a placeholder that must be replaced with a real fascicle.
+    """
+    if juan_str is None:
+        return None, False
+    if juan_str.isdigit():
+        return int(juan_str), False
+    return None, True
 
 
 @dataclass(frozen=True)
@@ -102,8 +117,7 @@ def enforce_citation_whitelist(
 
         def _strip(match: re.Match[str]) -> str:
             title = match.group(1)
-            juan_str = match.group(2)
-            juan = int(juan_str) if juan_str else None
+            juan, _ = _parse_juan(match.group(2))
             replacement = f"《{title}》（未在检索结果中验证，请谨慎）"
             mutations.append(
                 CitationMutation(
@@ -124,8 +138,7 @@ def enforce_citation_whitelist(
     def _rewrite(match: re.Match[str]) -> str:
         original = match.group(0)
         title = match.group(1)
-        juan_str = match.group(2)
-        original_juan = int(juan_str) if juan_str else None
+        original_juan, juan_is_placeholder = _parse_juan(match.group(2))
 
         if title not in whitelist:
             replacement = f"《{title}》（未在检索结果中验证，请谨慎）"
@@ -142,19 +155,18 @@ def enforce_citation_whitelist(
             return replacement
 
         valid_juans = whitelist[title]
-        # Title-only citation (【《X》】 with no fascicle) is always allowed
-        # when the title is real — it points at the text as a whole.
-        if original_juan is None:
+        # Title-only citation (【《X》】 with no fascicle at all) is always
+        # allowed when the title is real — it points at the text as a whole.
+        if original_juan is None and not juan_is_placeholder:
             return original
-        if original_juan in valid_juans:
+        if original_juan is not None and original_juan in valid_juans:
             return original
 
-        # Title is real, fascicle is wrong. Pick the smallest retrieved
-        # fascicle as the deterministic replacement — picking any one is
-        # better than picking none, and "smallest" is stable across runs.
+        # Either a numeric fascicle that doesn't match any source, or an
+        # unsubstituted "第N卷" placeholder. Both must be rewritten to a
+        # real retrieved fascicle. Pick the smallest — deterministic and
+        # stable across runs — or drop the fascicle if none was retrieved.
         if not valid_juans:
-            # Title was retrieved but with no fascicle context. Drop the
-            # fascicle from the citation rather than invent one.
             replacement = f"【《{title}》】"
             corrected_juan = None
         else:
@@ -163,7 +175,7 @@ def enforce_citation_whitelist(
 
         mutations.append(
             CitationMutation(
-                kind="fascicle_corrected",
+                kind="fascicle_placeholder" if juan_is_placeholder else "fascicle_corrected",
                 original=original,
                 replacement=replacement,
                 title=title,
