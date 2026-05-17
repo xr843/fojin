@@ -19,7 +19,6 @@ import {
   getAdminOverview,
   getAdminTrends,
   type AdminOverview,
-  type DailyCount,
 } from "../api/client";
 import { getPlatformActivity } from "../api/feed";
 
@@ -66,26 +65,6 @@ function PendingCard({ overview }: { overview: AdminOverview }) {
   );
 }
 
-function MiniTrend({ title, data, color }: { title: string; data: DailyCount[]; color: string }) {
-  const peak = data.reduce((m, d) => Math.max(m, d.count), 0);
-  return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-        <Text type="secondary" style={{ fontSize: 13 }}>{title}</Text>
-        <Text type="secondary" style={{ fontSize: 12 }}>峰值 {peak}</Text>
-      </div>
-      <Line
-        data={data}
-        xField="date"
-        yField="count"
-        smooth
-        height={200}
-        style={{ stroke: color }}
-      />
-    </div>
-  );
-}
-
 export default function AdminDashboardPage() {
   const overviewQuery = useQuery({
     queryKey: ["adminOverview"],
@@ -117,6 +96,24 @@ export default function AdminDashboardPage() {
 
   const overview = overviewQuery.data!;
   const trends = trendsQuery.data!;
+
+  const chartData = [
+    ...trends.registrations.map((d) => ({ ...d, type: "新注册" })),
+    ...trends.messages.map((d) => ({ ...d, type: "消息数" })),
+    ...trends.active_users.map((d) => ({ ...d, type: "活跃用户" })),
+  ];
+
+  const lineConfig = {
+    data: chartData,
+    xField: "date",
+    yField: "count",
+    colorField: "type",
+    smooth: true,
+    height: 360,
+    axis: {
+      x: { labelAutoRotate: false },
+    },
+  };
 
   const lastUpdated = overview.last_updated
     ? new Date(overview.last_updated).toLocaleString("zh-CN", { hour12: false })
@@ -184,19 +181,7 @@ export default function AdminDashboardPage() {
           style={{ marginTop: 16 }}
           extra={<Text type="secondary" style={{ fontSize: 12 }}>更新于 {lastUpdated}</Text>}
         >
-          {/* Three separately-scaled charts: a shared Y axis would squash
-              新注册/消息数 (single digits) against 活跃用户 (hundreds). */}
-          <Row gutter={[16, 16]}>
-            <Col xs={24} md={8}>
-              <MiniTrend title="新注册" data={trends.registrations} color="#1677ff" />
-            </Col>
-            <Col xs={24} md={8}>
-              <MiniTrend title="消息数" data={trends.messages} color="#fa8c16" />
-            </Col>
-            <Col xs={24} md={8}>
-              <MiniTrend title="活跃用户" data={trends.active_users} color="#13c2c2" />
-            </Col>
-          </Row>
+          <Line {...lineConfig} />
         </Card>
 
         <PlatformActivityCard />
