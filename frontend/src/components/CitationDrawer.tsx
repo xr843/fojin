@@ -148,6 +148,8 @@ function CitationBlocks({ chunks, quote }: { chunks: ChunkContextItem[]; quote?:
         color: "var(--fj-ink)",
       }}
     >
+      {/* groupByCenter collapses the contiguous center chunks into exactly
+          one center block, so markRef binds to a single element. */}
       {groupByCenter(chunks).map((b) => {
         const cls = `chat-citation-chunk${b.isCenter ? " chat-citation-chunk-center" : ""}`;
         const span = b.isCenter && quote ? findQuoteSpan(b.text, quote) : null;
