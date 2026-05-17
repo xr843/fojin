@@ -175,6 +175,19 @@ def test_quote_in_non_first_retrieved_chunk_passes():
     assert "⚠️" not in out
 
 
+def test_simplified_answer_quote_verifies_against_traditional_source():
+    """The user asks in 简体; the LLM answers and cites in 简体; CBETA stores
+    繁体. A faithful simplified rendering of the traditional original must
+    verify — script localisation is not a fidelity loss, and before the
+    繁→简 fold every such quote drowned the answer in false ⚠️ notices."""
+    answer = "经云「一切诸行皆是无常，是名第一」【《瑜伽师地论》第46卷】。"
+    # CBETA-style source: traditional title AND traditional chunk text.
+    src = _src(7, "瑜伽師地論", 46, "如彼頌言「一切諸行皆是無常，是名第一」唱拕南。")
+    out, muts = verify_quoted_content(answer, [src])
+    assert muts == []
+    assert "⚠️" not in out
+
+
 def test_multiple_failing_quotes_all_annotated():
     """Two fabricated quotes in one answer must both be marked, and
     the markers must not interfere with each other (right-to-left
