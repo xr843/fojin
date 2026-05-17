@@ -47,9 +47,17 @@ import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+from opencc import OpenCC
+
 from app.schemas.chat import ChatSource
 
 logger = logging.getLogger(__name__)
+
+# 繁→简 fold for the substring test. The user asks in 简体 and the LLM
+# answers — and quotes — in 简体, while CBETA stores 繁体. Rendering a quote
+# in the reader's script is localisation, not a fidelity loss, so a script
+# mismatch must not by itself fail verification.
+_t2s = OpenCC("t2s")
 
 
 # Minimum length of a quoted segment we'll subject to verification.
@@ -120,16 +128,15 @@ def _normalise(s: str) -> str:
 
     Goals:
       1. NFKC fold so half/full-width forms compare equal
-      2. Strip every punctuation and whitespace character so that an
+      2. 繁→简 fold so a simplified-Chinese quote matches a traditional
+         CBETA source — without this every quote in a 简体 answer of a
+         繁体 source false-fails, drowning the answer in ⚠️ notices
+      3. Strip every punctuation and whitespace character so that an
          LLM that drops a comma doesn't false-positive
-      3. Lowercase (no effect on CJK but covers stray Latin)
-
-    What this does *not* do: 简→繁 conversion. The cited source is
-    already traditional (CBETA stores 繁 only); if the LLM emits 简
-    inside its own quote it deserves to fail verification — quoting
-    a canonical text in 简 isn't preserving the citation either.
+      4. Lowercase (no effect on CJK but covers stray Latin)
     """
     s = unicodedata.normalize("NFKC", s)
+    s = _t2s.convert(s)
     s = _STRIP_PUNCT_RE.sub("", s)
     return s.lower()
 
@@ -148,11 +155,16 @@ def _find_sources(
     Exact (title + juan) matches are returned when juan is given; if none
     match the juan, falls back to every title match (any juan) — the
     citation guard occasionally corrects a slightly-off fascicle number.
+
+    Title comparison is 繁→简 folded: the LLM may write the title in 简体
+    while CBETA stores it in 繁体, and an exact ``==`` would then miss the
+    source and false-flag the quote as having no matching source.
     """
+    target_title = _t2s.convert(title)
     exact: list[ChatSource] = []
     title_only: list[ChatSource] = []
     for s in sources:
-        if s.title_zh == title:
+        if s.title_zh and _t2s.convert(s.title_zh) == target_title:
             if juan is not None and s.juan_num == juan:
                 exact.append(s)
             else:
@@ -161,7 +173,7 @@ def _find_sources(
         # via alignment_pairs as a child of an unrelated lzh source,
         # so the parent's title_zh is never the parallel's title.
         for p in s.parallel_chunks:
-            if p.title != title:
+            if not p.title or _t2s.convert(p.title) != target_title:
                 continue
             # Adapt the parallel chunk into a ChatSource-shaped carrier
             # so the substring test reads its chunk_text.
