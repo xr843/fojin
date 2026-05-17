@@ -1,15 +1,19 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { Button, Spin, Alert, Tabs } from "antd";
 import { BookOutlined, ArrowRightOutlined, CloseOutlined, GlobalOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { getChunkContext, getChunkAlignment, type ChunkContextItem, type ParallelPair } from "../api/client";
+import { findQuoteSpan } from "../utils/citationMatch";
 
 export interface CitationTarget {
   textId: number;
   juanNum: number;
   chunkIndex: number;
   titleZh: string;
+  /** The quoted passage, when the citation came from a 「…」 quote — lets the
+   *  drawer highlight the exact sentence inside the cited chunk. */
+  quote?: string;
 }
 
 // Map ISO language codes from alignment_pairs to display labels + font classes.
@@ -121,6 +125,47 @@ function groupByCenter(chunks: ChunkContextItem[]): CitationBlock[] {
     }
   }
   return out;
+}
+
+/**
+ * Render the 汉文 passage blocks. The center (cited) block gets the quoted
+ * sentence wrapped in <mark> and scrolled into view, so a citation lands on
+ * the exact passage rather than a ~500-char chunk the reader must scan.
+ */
+function CitationBlocks({ chunks, quote }: { chunks: ChunkContextItem[]; quote?: string }) {
+  const markRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    markRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [chunks, quote]);
+
+  return (
+    <div
+      style={{
+        fontFamily: '"Noto Serif SC", "Source Han Serif", serif',
+        fontSize: 15,
+        lineHeight: 1.9,
+        color: "var(--fj-ink)",
+      }}
+    >
+      {groupByCenter(chunks).map((b) => {
+        const cls = `chat-citation-chunk${b.isCenter ? " chat-citation-chunk-center" : ""}`;
+        const span = b.isCenter && quote ? findQuoteSpan(b.text, quote) : null;
+        if (!span) {
+          return <div key={b.key} className={cls}>{b.text}</div>;
+        }
+        return (
+          <div key={b.key} className={cls}>
+            {b.text.slice(0, span[0])}
+            <mark className="chat-citation-quote-mark" ref={markRef}>
+              {b.text.slice(span[0], span[1])}
+            </mark>
+            {b.text.slice(span[1])}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 /**
@@ -252,23 +297,7 @@ export default function CitationDrawer({ target, onClose }: Props) {
                           … 前文（本卷第 {data.chunks[0]?.chunk_index ?? 0} 段之前）
                         </div>
                       )}
-                      <div
-                        style={{
-                          fontFamily: '"Noto Serif SC", "Source Han Serif", serif',
-                          fontSize: 15,
-                          lineHeight: 1.9,
-                          color: "var(--fj-ink)",
-                        }}
-                      >
-                        {groupByCenter(dedupedChunks).map((b) => (
-                          <div
-                            key={b.key}
-                            className={`chat-citation-chunk${b.isCenter ? " chat-citation-chunk-center" : ""}`}
-                          >
-                            {b.text}
-                          </div>
-                        ))}
-                      </div>
+                      <CitationBlocks chunks={dedupedChunks} quote={target?.quote} />
                       {data.has_more_after && (
                         <div className="chat-citation-boundary-hint">
                           … 后文（本卷第 {data.chunks[data.chunks.length - 1]?.chunk_index ?? 0} 段之后）
@@ -313,23 +342,7 @@ export default function CitationDrawer({ target, onClose }: Props) {
                     … 前文（本卷第 {data.chunks[0]?.chunk_index ?? 0} 段之前）
                   </div>
                 )}
-                <div
-                  style={{
-                    fontFamily: '"Noto Serif SC", "Source Han Serif", serif',
-                    fontSize: 15,
-                    lineHeight: 1.9,
-                    color: "var(--fj-ink)",
-                  }}
-                >
-                  {groupByCenter(dedupedChunks).map((b) => (
-                    <div
-                      key={b.key}
-                      className={`chat-citation-chunk${b.isCenter ? " chat-citation-chunk-center" : ""}`}
-                    >
-                      {b.text}
-                    </div>
-                  ))}
-                </div>
+                <CitationBlocks chunks={dedupedChunks} quote={target?.quote} />
                 {data.has_more_after && (
                   <div className="chat-citation-boundary-hint">
                     … 后文（本卷第 {data.chunks[data.chunks.length - 1]?.chunk_index ?? 0} 段之后）

@@ -6,7 +6,11 @@ import { Input, Button, message, Alert, Tooltip, Modal, Select, Tag, Spin } from
 import Markdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
-import * as OpenCC from "opencc-js";
+import {
+  toSimplified,
+  extractPrecedingQuote,
+  pickSourceForQuote,
+} from "../utils/citationMatch";
 import {
   SendOutlined,
   RobotOutlined,
@@ -94,15 +98,6 @@ function parseFollowUps(content: string): { cleanContent: string; suggestions: s
 
 const CITATION_URL_SCHEME = "fojin-citation";
 
-// CBETA stores sutra titles in traditional Chinese; LLM answers come back in
-// simplified Chinese whenever the user's question was simplified. Normalizing
-// both sides to simplified via opencc-js lets injectCitationLinks actually
-// find matches in the RAG source map.
-const _t2s = OpenCC.Converter({ from: "tw", to: "cn" });
-const toSimplified = (s: string): string => {
-  try { return _t2s(s); } catch { return s; }
-};
-
 // rehype-sanitize's defaultSchema strips any <a href> whose protocol is not
 // in its allowlist (http, https, mailto, tel, …). We add our custom citation
 // scheme so the citation-drawer machinery below can intercept it instead of
@@ -145,50 +140,65 @@ const chatUrlTransform = (url: string): string => {
 function injectCitationLinks(content: string, sources: ChatSource[] | null): string {
   if (!sources || sources.length === 0) return content;
 
-  // Key on the simplified form so titles coming back from CBETA in
-  // traditional characters can be matched against simplified-Chinese
-  // answer text. Multiple traditional sources that collapse to the same
-  // simplified key keep the highest-scoring one.
+  // Two indexes over the RAG sources, both keyed on the simplified title so
+  // traditional CBETA titles match simplified answer text:
+  //   titleMap     — the single highest-scored chunk per title (fallback)
+  //   titleSources — every retrieved chunk per title, for quote-aware pick
   const titleMap = new Map<string, ChatSource>();
+  const titleSources = new Map<string, ChatSource[]>();
   for (const s of sources) {
     if (!s.title_zh || s.text_id <= 0) continue;
     const key = toSimplified(s.title_zh);
     const existing = titleMap.get(key);
-    if (!existing || s.score > existing.score) {
-      titleMap.set(key, s);
-    }
+    if (!existing || s.score > existing.score) titleMap.set(key, s);
+    const list = titleSources.get(key);
+    if (list) list.push(s);
+    else titleSources.set(key, [s]);
   }
   if (titleMap.size === 0) return content;
 
-  const buildUrl = (source: ChatSource, title: string, juan: number): string => {
+  // Build the citation URL. When a quote is known and a retrieved chunk
+  // actually contains it, anchor the citation to THAT chunk — otherwise the
+  // drawer opens whichever chunk merely scored highest, which usually does
+  // not hold the quoted sentence. The quote rides along in the URL so the
+  // drawer can highlight the exact passage.
+  const buildUrl = (
+    fallback: ChatSource,
+    simplifiedTitle: string,
+    juanHint: number | null,
+    quote: string | null,
+  ): string => {
+    const candidates = titleSources.get(simplifiedTitle) ?? [];
+    const picked = pickSourceForQuote(candidates, quote);
+    const source = picked ?? fallback;
     const chunkIdx = source.chunk_index ?? -1;
-    return `${CITATION_URL_SCHEME}://${source.text_id}/${juan}/${chunkIdx}/${encodeURIComponent(title)}`;
+    const juan = picked ? picked.juan_num : (juanHint ?? source.juan_num);
+    const tail = quote ? `/${encodeURIComponent(quote)}` : "";
+    return `${CITATION_URL_SCHEME}://${source.text_id}/${juan}/${chunkIdx}/${encodeURIComponent(simplifiedTitle)}${tail}`;
   };
 
-  // Pass 1 — explicit 【《title》…】 markers. Previously the tail was locked to
-  // "第(\d+)卷", which dropped perfectly-valid variants like "卷上" or
-  // "第十八愿" on the floor. Now we accept any qualifier up to the close
-  // bracket and only parse a juan number out of it when we can.
+  // Pass 1 — explicit 【《title》…】 markers. The replace callback receives the
+  // marker's offset in the original string; the text just before it carries
+  // the passage the LLM is attributing.
   let withExplicit = content.replace(
     /【《([^》]+)》([^】]*)】/g,
-    (_match, rawTitle: string, tail: string) => {
+    (_match, rawTitle: string, tail: string, offset: number, full: string) => {
       const title = rawTitle.trim();
       const simplifiedTitle = toSimplified(title);
       const source = titleMap.get(simplifiedTitle);
       if (!source) return _match;
       const juanMatch = tail.match(/第(\d+)卷/);
-      const juan = juanMatch ? parseInt(juanMatch[1], 10) : source.juan_num;
-      const url = buildUrl(source, simplifiedTitle, juan);
-      const labelTail = tail ? tail : "";
-      return `[【《${title}》${labelTail}】](${url})`;
+      const juanHint = juanMatch ? parseInt(juanMatch[1], 10) : null;
+      const quote = extractPrecedingQuote(full.slice(0, offset));
+      const url = buildUrl(source, simplifiedTitle, juanHint, quote);
+      return `[【《${title}》${tail}】](${url})`;
     },
   );
 
   // Pass 2 — bare 《title》 in prose. Split on any markdown links already in
   // the content (the ones pass 1 just produced, plus any pre-existing links)
-  // so we only process plaintext segments. Split with a capture group: JS
-  // interleaves the matches into the output array, so odd indices are the
-  // preserved link strings and even indices are plaintext we can rewrite.
+  // so we only process plaintext segments. No quote is bound to a bare
+  // mention, so the chunk stays the top-scored one.
   const parts = withExplicit.split(/(\[[^\]]*\]\([^)]*\))/g);
   withExplicit = parts
     .map((part, i) => {
@@ -198,7 +208,7 @@ function injectCitationLinks(content: string, sources: ChatSource[] | null): str
         const simplifiedTitle = toSimplified(title);
         const source = titleMap.get(simplifiedTitle);
         if (!source) return bareMatch;
-        const url = buildUrl(source, simplifiedTitle, source.juan_num);
+        const url = buildUrl(source, simplifiedTitle, null, null);
         return `[《${title}》](${url})`;
       });
     })
@@ -212,6 +222,7 @@ interface ParsedCitation {
   juanNum: number;
   chunkIndex: number;
   titleZh: string;
+  quote?: string;
 }
 
 function parseCitationHref(href: string): ParsedCitation | null {
@@ -223,10 +234,13 @@ function parseCitationHref(href: string): ParsedCitation | null {
   const juanNum = parseInt(parts[1], 10);
   const chunkIndex = parseInt(parts[2], 10);
   const titleZh = parts[3] ? decodeURIComponent(parts[3]) : "";
+  // Segment 5 (optional) carries the quoted passage so the drawer can
+  // highlight it. Absent on legacy links built before quote-aware citations.
+  const quote = parts[4] ? decodeURIComponent(parts[4]) : undefined;
   if (!Number.isFinite(textId) || !Number.isFinite(juanNum) || !Number.isFinite(chunkIndex)) {
     return null;
   }
-  return { textId, juanNum, chunkIndex, titleZh };
+  return { textId, juanNum, chunkIndex, titleZh, quote };
 }
 
 function groupSessionsByDate(sessions: ChatSessionItem[]): { label: string; items: ChatSessionItem[] }[] {

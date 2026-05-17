@@ -160,6 +160,21 @@ def test_parallel_chunk_quotes_are_checkable():
     assert muts == []
 
 
+def test_quote_in_non_first_retrieved_chunk_passes():
+    """RAG returns several chunks per juan. A quote living in a later
+    chunk must still verify — the verifier checks every candidate chunk,
+    not just the first-iterated one. Before the multi-chunk fix this
+    false-flagged a perfectly legitimate quote."""
+    answer = "经中说「以五事交擾，渾濁真性，故名惡世」【《阿彌陀經疏鈔》第4卷】。"
+    sources = [
+        _src(12379, "阿彌陀經疏鈔", 4, "卷四前段……与引文无关的高分内容……"),
+        _src(12379, "阿彌陀經疏鈔", 4, "……以五事交擾，渾濁真性，故名惡世……"),
+    ]
+    out, muts = verify_quoted_content(answer, sources)
+    assert muts == []
+    assert "⚠️" not in out
+
+
 def test_multiple_failing_quotes_all_annotated():
     """Two fabricated quotes in one answer must both be marked, and
     the markers must not interfere with each other (right-to-left
