@@ -344,7 +344,7 @@ export default function SearchPage() {
         />
         <div className="s-mode-hint">
           {tab === "all"
-            ? "一站式综合检索：词典释义、经文标题、相关问答、内文片段一次呈现"
+            ? "一站式综合检索：辞典释义、经文标题、相关问答、内文片段一次呈现"
             : tab === "catalog"
             ? "按经名、译者、编号检索，自动匹配所有语种标题与翻译版本"
             : tab === "content"

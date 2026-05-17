@@ -67,12 +67,12 @@ export default function UnifiedResults({ data }: Props) {
 
   return (
     <div className="s-unified">
-      {/* 词典释义 — overview shows only the first 2 entries; the full set
+      {/* 辞典释义 — overview shows only the first 2 entries; the full set
           (often a dozen dictionaries for a common term) lives on the
           dedicated dictionary page so it doesn't push the text results down. */}
       {dictionary.length > 0 && (
         <section className="s-unified-section">
-          <h3 style={sectionTitleStyle}>{"🔤"} 词典释义</h3>
+          <h3 style={sectionTitleStyle}>{"🔤"} 辞典释义</h3>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {dictionary.slice(0, 2).map((entry) => (
               <Link
@@ -114,7 +114,7 @@ export default function UnifiedResults({ data }: Props) {
               to={`/dictionary?q=${encodeURIComponent(data.query)}`}
               style={{ display: "inline-block", marginTop: 8, fontSize: 13, color: "var(--fj-accent)" }}
             >
-              查看全部 {dictionary.length} 条词典释义 →
+              查看全部 {dictionary.length} 条辞典释义 →
             </Link>
           )}
         </section>
