@@ -134,50 +134,51 @@ def _normalise(s: str) -> str:
     return s.lower()
 
 
-def _find_source(
+def _find_sources(
     sources: Iterable[ChatSource], title: str, juan: int | None
-) -> ChatSource | None:
-    """Locate the source whose ``title_zh`` and ``juan_num`` match.
+) -> list[ChatSource]:
+    """All retrieved chunks (and parallels) whose title/juan match the cite.
 
-    Falls back to title-only match (any juan) when the user-supplied
-    juan can't be found — the verifier's job is to check the quote
-    against *some* legitimate retrieval of that text, and the LLM
-    occasionally cites the right text with a slightly off fascicle
-    number that the citation guard already corrected.
+    RAG returns several chunks per text, and the quoted sentence is often
+    not in the first-iterated one — so the verifier must check the quote
+    against the *whole* candidate set, not a single hit. Returning the first
+    match (as the earlier ``_find_source`` did) false-flagged a legitimate
+    quote whenever it landed in a non-first retrieved chunk of the cited juan.
+
+    Exact (title + juan) matches are returned when juan is given; if none
+    match the juan, falls back to every title match (any juan) — the
+    citation guard occasionally corrects a slightly-off fascicle number.
     """
-    title_match: ChatSource | None = None
-    parallel_title_match: ChatSource | None = None
+    exact: list[ChatSource] = []
+    title_only: list[ChatSource] = []
     for s in sources:
         if s.title_zh == title:
             if juan is not None and s.juan_num == juan:
-                return s
-            if title_match is None:
-                title_match = s
+                exact.append(s)
+            else:
+                title_only.append(s)
         # Always check parallels — a Pali / Tibetan parallel arrives
         # via alignment_pairs as a child of an unrelated lzh source,
         # so the parent's title_zh is never the parallel's title.
         for p in s.parallel_chunks:
             if p.title != title:
                 continue
+            # Adapt the parallel chunk into a ChatSource-shaped carrier
+            # so the substring test reads its chunk_text.
+            carrier = ChatSource(
+                text_id=p.text_id,
+                juan_num=p.juan_num,
+                chunk_index=p.chunk_index,
+                chunk_text=p.chunk_text,
+                score=1.0,
+                title_zh=p.title,
+                lang=p.lang,
+            )
             if juan is None or p.juan_num == juan:
-                # Adapt the parallel chunk into a ChatSource-shaped
-                # carrier so the substring test reads its chunk_text.
-                return ChatSource(
-                    text_id=p.text_id,
-                    juan_num=p.juan_num,
-                    chunk_index=p.chunk_index,
-                    chunk_text=p.chunk_text,
-                    score=1.0,
-                    title_zh=p.title,
-                    lang=p.lang,
-                )
-            if parallel_title_match is None:
-                parallel_title_match = ChatSource(
-                    text_id=p.text_id, juan_num=p.juan_num,
-                    chunk_index=p.chunk_index, chunk_text=p.chunk_text,
-                    score=1.0, title_zh=p.title, lang=p.lang,
-                )
-    return title_match or parallel_title_match
+                exact.append(carrier)
+            else:
+                title_only.append(carrier)
+    return exact or title_only
 
 
 def verify_quoted_content(
@@ -207,8 +208,8 @@ def verify_quoted_content(
         if len(quote) < MIN_QUOTE_CHARS:
             continue
 
-        source = _find_source(sources, title, juan)
-        if source is None:
+        candidates = _find_sources(sources, title, juan)
+        if not candidates:
             mutations.append(
                 QuoteMutation(
                     quote=quote, title=title, juan=juan,
@@ -220,9 +221,13 @@ def verify_quoted_content(
             )
             continue
 
+        # Pass if the quote is a substring of ANY retrieved chunk for the
+        # cited text — a multi-chunk retrieval scatters the passage across
+        # several chunks of the same juan.
         normalised_quote = _normalise(quote)
-        normalised_source = _normalise(source.chunk_text)
-        if normalised_quote not in normalised_source:
+        if not any(
+            normalised_quote in _normalise(c.chunk_text) for c in candidates
+        ):
             mutations.append(
                 QuoteMutation(
                     quote=quote, title=title, juan=juan,

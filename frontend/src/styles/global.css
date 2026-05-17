@@ -388,6 +388,18 @@ em {
   background: rgba(255, 220, 90, 0.15);
 }
 
+/* The exact quoted sentence inside the cited chunk — distinct from the
+   chunk-level tint so the reader's eye lands on the sentence itself. */
+.chat-citation-quote-mark {
+  background: rgba(255, 196, 0, 0.5);
+  border-radius: 2px;
+  padding: 1px 1px;
+  color: inherit;
+  font-weight: 600;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
 /* Mobile: stack the panel below the chat column instead of side-by-side.
    The divider hides; the parent flex container should switch direction to
    column via an additional class applied when the panel is open (handled
