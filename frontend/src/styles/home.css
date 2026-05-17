@@ -546,9 +546,9 @@
 /* ---------- 功能导航卡片 ---------- */
 .home-features {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 16px;
-  max-width: 900px;
+  max-width: 1080px;
   margin: 32px auto 0;
 }
 
