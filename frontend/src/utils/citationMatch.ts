@@ -30,10 +30,12 @@ export function toSimplified(s: string): string {
 // Punctuation + whitespace stripped before substring tests so a dropped or
 // swapped comma does not break matching. Mirrors the backend quote verifier's
 // _STRIP_PUNCT_RE. `g` flag — only use with .replace(), not .test().
+// \u3000 is the ideographic (full-width) space — written as an escape so
+// ESLint's no-irregular-whitespace does not trip on a literal in source.
 const PUNCT_GLOBAL =
-  /[\s,.!?;:"'()[\]\-_~`<>*，。！？、；：「」『』“”‘’《》〈〉…—（）【】·•～　]/g;
+  /[\s,.!?;:"'()[\]\-_~`<>*，。！？、；：「」『』“”‘’《》〈〉…—（）【】·•～\u3000]/g;
 const PUNCT_ONE =
-  /[\s,.!?;:"'()[\]\-_~`<>*，。！？、；：「」『』“”‘’《》〈〉…—（）【】·•～　]/;
+  /[\s,.!?;:"'()[\]\-_~`<>*，。！？、；：「」『』“”‘’《》〈〉…—（）【】·•～\u3000]/;
 
 /** Fold 繁→简, strip punctuation/whitespace, lowercase — for tolerant matching. */
 export function normalizeForMatch(s: string): string {
