@@ -4,7 +4,7 @@ import { BookOutlined, ArrowRightOutlined, CloseOutlined, GlobalOutlined } from 
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { getChunkContext, getChunkAlignment, type ChunkContextItem, type ParallelPair } from "../api/client";
-import { findQuoteSpan } from "../utils/citationMatch";
+import { mapQuoteToBlocks } from "../utils/citationMatch";
 
 export interface CitationTarget {
   textId: number;
@@ -128,9 +128,12 @@ function groupByCenter(chunks: ChunkContextItem[]): CitationBlock[] {
 }
 
 /**
- * Render the 汉文 passage blocks. The center (cited) block gets the quoted
- * sentence wrapped in <mark> and scrolled into view, so a citation lands on
- * the exact passage rather than a ~500-char chunk the reader must scan.
+ * Render the 汉文 passage blocks with the quoted sentence wrapped in <mark>
+ * and scrolled into view, so a citation lands on the exact passage rather
+ * than a ~500-char chunk the reader must scan. The quote is matched across
+ * the whole passage — chunks overlap by 50 chars, so a boundary-spanning
+ * sentence is split across the leading-context and center blocks and must
+ * be highlighted in both halves.
  */
 function CitationBlocks({ chunks, quote }: { chunks: ChunkContextItem[]; quote?: string }) {
   const markRef = useRef<HTMLElement | null>(null);
@@ -138,6 +141,11 @@ function CitationBlocks({ chunks, quote }: { chunks: ChunkContextItem[]; quote?:
   useEffect(() => {
     markRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [chunks, quote]);
+
+  const blocks = groupByCenter(chunks);
+  const blockSpans = mapQuoteToBlocks(blocks.map((b) => b.text), quote);
+  // The first highlighted block carries markRef — that is where we scroll to.
+  const firstHighlighted = blockSpans.findIndex((s) => s !== null);
 
   return (
     <div
@@ -148,18 +156,19 @@ function CitationBlocks({ chunks, quote }: { chunks: ChunkContextItem[]; quote?:
         color: "var(--fj-ink)",
       }}
     >
-      {/* groupByCenter collapses the contiguous center chunks into exactly
-          one center block, so markRef binds to a single element. */}
-      {groupByCenter(chunks).map((b) => {
+      {blocks.map((b, i) => {
         const cls = `chat-citation-chunk${b.isCenter ? " chat-citation-chunk-center" : ""}`;
-        const span = b.isCenter && quote ? findQuoteSpan(b.text, quote) : null;
+        const span = blockSpans[i];
         if (!span) {
           return <div key={b.key} className={cls}>{b.text}</div>;
         }
         return (
           <div key={b.key} className={cls}>
             {b.text.slice(0, span[0])}
-            <mark className="chat-citation-quote-mark" ref={markRef}>
+            <mark
+              className="chat-citation-quote-mark"
+              ref={i === firstHighlighted ? markRef : undefined}
+            >
               {b.text.slice(span[0], span[1])}
             </mark>
             {b.text.slice(span[1])}
