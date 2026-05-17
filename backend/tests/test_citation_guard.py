@@ -63,6 +63,30 @@ def test_corrects_fascicle_when_title_real_but_juan_wrong():
     assert muts[0].corrected_juan == 1
 
 
+def test_literal_N_placeholder_is_replaced_with_real_fascicle():
+    """The LLM copied the prompt's 【《经名》第N卷】 template verbatim,
+    leaving a literal "N". The guard must substitute a real retrieved
+    fascicle, not let "第N卷" reach the user."""
+    answer = "偈语出自【《大般涅槃经》第N卷】。"
+    out, muts = enforce_citation_whitelist(answer, [_src(7, "大般涅槃经", 36)])
+    assert "【《大般涅槃经》第36卷】" in out
+    assert "第N卷" not in out
+    assert len(muts) == 1
+    assert muts[0].kind == "fascicle_placeholder"
+    assert muts[0].corrected_juan == 36
+
+
+def test_literal_X_placeholder_for_unknown_title_is_flagged():
+    """A 第X卷 placeholder on a title that isn't in the whitelist still
+    gets the unverified-title treatment — the loosened regex must not let
+    placeholder citations of fabricated titles slip through unchecked."""
+    answer = "据【《伪造经》第X卷】所言。"
+    out, muts = enforce_citation_whitelist(answer, [_src(7, "心经", 1)])
+    assert "第X卷" not in out
+    assert "（未在检索结果中验证，请谨慎）" in out
+    assert muts[0].kind == "unverified_title"
+
+
 def test_picks_smallest_fascicle_for_deterministic_replacement():
     """Title appears in multiple sources at different juans — the rewriter
     must be deterministic, not score-dependent, so two reruns of the same
