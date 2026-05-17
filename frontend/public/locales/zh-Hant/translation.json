@@ -82,6 +82,8 @@
   "home.feature_collections_desc": "按主題瀏覽精選佛教典籍",
   "home.feature_dict_title": "佛學辭典",
   "home.feature_dict_desc": "多語種佛學術語查詢與釋義",
+  "home.feature_geo_title": "佛教地理",
+  "home.feature_geo_desc": "佛教人物、寺院與地點的地理分佈探索",
   "home.trust": "資料來源均為全球學術機構公開資源，定期同步，自動去重",
   "home.trust_link": "瞭解資料來源 →",
   "footer.copyright": "佛津 FoJin © 2026 — 全球佛教古籍數字資源聚合平臺",

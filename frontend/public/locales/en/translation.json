@@ -82,6 +82,8 @@
   "home.feature_collections_desc": "Browse curated Buddhist text collections by theme",
   "home.feature_dict_title": "Buddhist Dictionary",
   "home.feature_dict_desc": "Multilingual Buddhist terminology lookup and definitions",
+  "home.feature_geo_title": "Buddhist Geography",
+  "home.feature_geo_desc": "Map exploration of Buddhist figures, monasteries and places",
   "home.trust": "All data sourced from publicly available academic resources worldwide, synced regularly with automatic deduplication",
   "home.trust_link": "About our sources →",
   "footer.copyright": "FoJin © 2026 — Global Buddhist Classics Digital Resource Platform",

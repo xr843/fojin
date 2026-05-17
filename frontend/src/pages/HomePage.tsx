@@ -11,6 +11,7 @@ import {
   RobotOutlined,
   BookOutlined,
   FileTextOutlined,
+  GlobalOutlined,
 } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { InfoCircleOutlined, CloseOutlined } from "@ant-design/icons";
@@ -177,6 +178,11 @@ export default function HomePage() {
             <ApartmentOutlined className="home-feature-icon" />
             <div className="home-feature-title">{t("home.feature_kg_title")}</div>
             <div className="home-feature-desc">{t("home.feature_kg_desc")}</div>
+          </div>
+          <div className="home-feature-card" onClick={() => navigate("/map")}>
+            <GlobalOutlined className="home-feature-icon" />
+            <div className="home-feature-title">{t("home.feature_geo_title")}</div>
+            <div className="home-feature-desc">{t("home.feature_geo_desc")}</div>
           </div>
           <div className="home-feature-card" onClick={() => navigate("/collections")}>
             <BookOutlined className="home-feature-icon" />
