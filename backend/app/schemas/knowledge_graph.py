@@ -123,3 +123,13 @@ class KGTimelineEntity(BaseModel):
 class KGTimelineResponse(BaseModel):
     entities: list[KGTimelineEntity]
     total: int
+
+
+class KGPathResponse(BaseModel):
+    """Shortest undirected path between two KG entities.
+
+    两实体间最短无向路径查询结果。"""
+    found: bool
+    hops: int
+    nodes: list[KGGraphNode]
+    links: list[KGGraphLink]
