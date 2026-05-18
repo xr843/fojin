@@ -12,6 +12,7 @@ import {
   UnorderedListOutlined,
   ProfileOutlined,
   FieldTimeOutlined,
+  NodeIndexOutlined,
 } from "@ant-design/icons";
 import ForceGraph, {
   TYPE_COLORS,
@@ -206,6 +207,7 @@ export default function KnowledgeGraphPage() {
   });
   const [showStats, setShowStats] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
+  const [showPath, setShowPath] = useState(false);
   const [curatedOpen, setCuratedOpen] = useState(!isMobile);
 
   // ── Progressive expand state ──────────────────────────────────────────────
@@ -446,6 +448,15 @@ export default function KnowledgeGraphPage() {
             <span>时间轴</span>
           </span>
         </Tooltip>
+        <Tooltip title="查询两个实体之间的最短关系路径">
+          <span
+            className={`kg-path-toggle${showPath ? " active" : ""}`}
+            onClick={() => setShowPath((v) => !v)}
+          >
+            <NodeIndexOutlined />
+            <span>路径查询</span>
+          </span>
+        </Tooltip>
       </div>
       {showTimeline && (
         <div className="kg-timeline-panel">
@@ -619,11 +630,13 @@ export default function KnowledgeGraphPage() {
         </div>
       )}
 
-      {/* 路径查询面板 — 当前选中实体作为起点 */}
-      <KGPathQuery
-        fromEntity={entityDetail ?? null}
-        onNodeClick={handleGraphNodeClick}
-      />
+      {/* 路径查询面板 — 收进开关，默认不展开（小众功能，不常驻占位） */}
+      {showPath && (
+        <KGPathQuery
+          fromEntity={entityDetail ?? null}
+          onNodeClick={handleGraphNodeClick}
+        />
+      )}
 
       {/* 搜索结果面板 */}
       {/* 桌面端：渲染在三栏内；移动端：仅 search Tab 激活时渲染 */}

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as d3 from "d3";
+import { CompressOutlined } from "@ant-design/icons";
 import { escapeHtml } from "../utils/sanitize";
 
 interface GraphNode {
@@ -93,6 +94,9 @@ export default function ForceGraph({
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  // Holds the current graph's fit-to-view function. The 适应窗口 button
+  // (rendered in JSX, outside the d3 effect) calls it on demand.
+  const fitToViewRef = useRef<(() => void) | null>(null);
   const [containerWidth, setContainerWidth] = useState(propWidth || 800);
 
   // Responsive width via ResizeObserver
@@ -433,18 +437,17 @@ export default function ForceGraph({
       node.attr("transform", (d: any) => `translate(${d.x},${d.y})`);
     });
 
-    // ── Zoom-to-fit once the layout settles ──
-    // Without this the graph can render off-centre or too zoomed and
-    // the user has to pan/zoom manually before they can read anything.
-    // Only fires on the first settle — a later drag must not snap the
-    // user's view back.
-    let fitted = false;
-    simulation.on("end", () => {
-      if (fitted || !simNodes.length) return;
-      fitted = true;
+    // ── Fit-to-view (manual, on-demand) ──
+    // This is deliberately NOT automatic. An earlier version fitted on
+    // simulation "end" — but that fired several seconds after load and
+    // jarringly shrank large graphs to an unreadable size, which users
+    // mistook for a glitch. Now the 适应窗口 button triggers it when the
+    // user actually wants the whole graph in view.
+    const fitToView = () => {
+      if (!simNodes.length) return;
       // Expand the bounds by each node's own radius plus its name-label
-      // extent (~40px below + sideways), so a big hub sitting at the
-      // edge of the layout isn't clipped after the fit.
+      // extent (~40px below + sideways), so a big hub at the edge of the
+      // layout isn't clipped after the fit.
       const pad = 24;
       let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
       for (const n of simNodes as any[]) {
@@ -465,7 +468,8 @@ export default function ForceGraph({
         .transition()
         .duration(450)
         .call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
-    });
+    };
+    fitToViewRef.current = fitToView;
 
     return () => {
       simulation.stop();
@@ -481,6 +485,35 @@ export default function ForceGraph({
         height={height}
         style={{ background: "#fdfcfa" }}
       />
+      {/* 适应窗口 — on-demand fit-to-view (replaces the old jarring auto-fit) */}
+      {nodes.length > 0 && (
+        <button
+          type="button"
+          onClick={() => fitToViewRef.current?.()}
+          title="将整张图谱缩放到适应窗口"
+          style={{
+            position: "absolute",
+            top: 10,
+            right: 10,
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            padding: "4px 10px",
+            fontSize: 12,
+            fontFamily: '"Noto Serif SC", serif',
+            color: "#5b4a32",
+            background: "rgba(255,255,255,0.92)",
+            border: "1px solid #e8e0d4",
+            borderRadius: 6,
+            cursor: "pointer",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+            zIndex: 10,
+          }}
+        >
+          <CompressOutlined />
+          适应窗口
+        </button>
+      )}
       {/* Custom tooltip */}
       <div
         ref={tooltipRef}
