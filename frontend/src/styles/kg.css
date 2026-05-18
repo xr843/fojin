@@ -550,6 +550,62 @@
   }
 }
 
+/* ---------- 移动端 Tab 切换器 ---------- */
+.kg-mobile-tabs {
+  margin-bottom: 10px;
+}
+
+/* 古典水墨风：覆盖 antd Segmented 默认蓝色高亮 */
+.kg-mobile-tabs .ant-segmented {
+  background: #f5f0e8;
+  border: 1px solid var(--fj-border);
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.kg-mobile-tabs .ant-segmented .ant-segmented-item-selected {
+  background: var(--fj-accent, #8b6914);
+  color: #fff;
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+.kg-mobile-tabs .ant-segmented .ant-segmented-item:not(.ant-segmented-item-selected) {
+  color: var(--fj-ink-muted, #7a6e5c);
+}
+
+.kg-mobile-tabs .ant-segmented .ant-segmented-item:hover:not(.ant-segmented-item-selected) {
+  color: var(--fj-ink, #3a2e1c);
+}
+
+.kg-tab-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: "Noto Serif SC", serif;
+  font-size: 13px;
+}
+
+/* 移动端 Tab 模式下布局铺满 */
+.kg-layout--mobile {
+  display: block;
+}
+
+.kg-layout--mobile .kg-sidebar,
+.kg-layout--mobile .kg-graph-area,
+.kg-layout--mobile .kg-detail-panel {
+  width: 100%;
+  position: static;
+}
+
+.kg-layout--mobile .kg-sidebar-body {
+  max-height: calc(100vh - 280px);
+}
+
+.kg-layout--mobile .kg-detail-panel {
+  min-height: 300px;
+}
+
 /* ---------- 移动端适配 ---------- */
 @media (max-width: 768px) {
   .kg-page {
@@ -596,24 +652,10 @@
     font-size: 11px;
   }
 
+  /* 移动端布局：Tab 模式下各面板全宽，不再 flex-column 堆叠 */
   .kg-layout {
     flex-direction: column;
     gap: 10px;
-  }
-
-  .kg-sidebar {
-    width: 100%;
-    position: static;
-    order: 2;
-  }
-
-  .kg-sidebar-body {
-    max-height: 150px;
-  }
-
-  .kg-graph-area {
-    width: 100%;
-    order: 1;
   }
 
   .kg-graph-container svg {
@@ -622,12 +664,6 @@
 
   .kg-graph-empty {
     min-height: 40vh;
-  }
-
-  .kg-detail-panel {
-    width: 100%;
-    position: static;
-    order: 3;
   }
 
   .kg-legend {
