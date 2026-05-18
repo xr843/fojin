@@ -11,6 +11,7 @@ import {
   RightOutlined,
   UnorderedListOutlined,
   ProfileOutlined,
+  FieldTimeOutlined,
 } from "@ant-design/icons";
 import ForceGraph, {
   TYPE_COLORS,
@@ -19,7 +20,8 @@ import ForceGraph, {
   PREDICATE_COLORS,
 } from "../components/ForceGraph";
 import EntityCard from "../components/EntityCard";
-import { searchKGEntities, getKGEntity, getKGEntityGraph, getKGStats } from "../api/client";
+import KGTimeline from "../components/kg/KGTimeline";
+import { searchKGEntities, getKGEntity, getKGEntityGraph, getKGStats, getKGTimeline } from "../api/client";
 import type { KGEntity } from "../api/client";
 import "../styles/kg.css";
 
@@ -163,12 +165,20 @@ export default function KnowledgeGraphPage() {
     return ALL_PREDICATE_VALUES;
   });
   const [showStats, setShowStats] = useState(false);
+  const [showTimeline, setShowTimeline] = useState(false);
   const [curatedOpen, setCuratedOpen] = useState(!isMobile);
 
   const { data: kgStats } = useQuery({
     queryKey: ["kg-stats"],
     queryFn: getKGStats,
     staleTime: 60_000,
+  });
+
+  const { data: timelineData, isLoading: timelineLoading } = useQuery({
+    queryKey: ["kg-timeline"],
+    queryFn: () => getKGTimeline({ limit: 1000 }),
+    staleTime: 300_000,
+    enabled: showTimeline,
   });
 
   // 标记是否需要自动选中下一次搜索结果。初始为 true，除非 URL 已指定 id。
@@ -279,7 +289,37 @@ export default function KnowledgeGraphPage() {
             </span>
           </Tooltip>
         )}
+        <Tooltip title="时间轴视图">
+          <span
+            className={`kg-timeline-toggle${showTimeline ? " active" : ""}`}
+            onClick={() => setShowTimeline((v) => !v)}
+          >
+            <FieldTimeOutlined />
+            <span>时间轴</span>
+          </span>
+        </Tooltip>
       </div>
+      {showTimeline && (
+        <div className="kg-timeline-panel">
+          <div className="kg-timeline-header">
+            <span className="kg-timeline-title">
+              <FieldTimeOutlined style={{ marginRight: 6 }} />
+              历史时间轴
+            </span>
+            <span style={{ fontSize: 11, color: "#9a8e7a" }}>
+              点击实体可查看详情
+            </span>
+          </div>
+          <div className="kg-timeline-body">
+            <KGTimeline
+              entities={timelineData?.entities ?? []}
+              loading={timelineLoading}
+              selectedEntityId={selectedEntityId}
+              onEntityClick={(id) => setSelectedEntityId(id)}
+            />
+          </div>
+        </div>
+      )}
       {showStats && kgStats && (
         <div className="kg-stats-panel">
           <div className="kg-stats-group">

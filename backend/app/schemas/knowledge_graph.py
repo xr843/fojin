@@ -110,3 +110,16 @@ class KGLineageArc(BaseModel):
 class KGLineageArcsResponse(BaseModel):
     arcs: list[KGLineageArc]
     total: int
+
+
+class KGTimelineEntity(BaseModel):
+    id: int
+    name_zh: str
+    entity_type: str
+    year_start: int
+    year_end: int | None = None
+
+
+class KGTimelineResponse(BaseModel):
+    entities: list[KGTimelineEntity]
+    total: int
