@@ -730,6 +730,27 @@ export async function getKGLineageArcs(params?: {
   return data;
 }
 
+export interface KGTimelineEntity {
+  id: number;
+  name_zh: string;
+  entity_type: string;
+  year_start: number;
+  year_end: number | null;
+}
+
+export interface KGTimelineResponse {
+  entities: KGTimelineEntity[];
+  total: number;
+}
+
+export async function getKGTimeline(params?: {
+  entity_type?: string;
+  limit?: number;
+}): Promise<KGTimelineResponse> {
+  const { data } = await api.get<KGTimelineResponse>("/kg/timeline", { params });
+  return data;
+}
+
 // Dictionary
 export interface DictEntry {
   id: DictEntryId;

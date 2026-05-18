@@ -202,6 +202,87 @@ async def test_entity_detail_includes_relations(kg_client):
 
 
 # ---------------------------------------------------------------------------
+# Test 8: 时间轴端点返回实体列表及 total
+# ---------------------------------------------------------------------------
+@pytest.mark.anyio
+async def test_timeline_returns_entities(kg_client):
+    timeline_entities = [
+        {"id": 4, "name_zh": "玄奘", "entity_type": "person",
+         "year_start": 602, "year_end": 664},
+        {"id": 6, "name_zh": "法显", "entity_type": "person",
+         "year_start": 337, "year_end": 422},
+    ]
+    with patch(f"{_KG_API}.get_timeline_entities") as m:
+        m.return_value = (timeline_entities, 2)
+        resp = await kg_client.get("/api/kg/timeline")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 2
+        assert len(data["entities"]) == 2
+        assert data["entities"][0]["name_zh"] == "玄奘"
+        assert data["entities"][0]["year_start"] == 602
+        assert data["entities"][0]["year_end"] == 664
+
+
+# ---------------------------------------------------------------------------
+# Test 9: 时间轴端点支持 entity_type 过滤
+# ---------------------------------------------------------------------------
+@pytest.mark.anyio
+async def test_timeline_entity_type_filter(kg_client):
+    dynasty_entity = [
+        {"id": 10, "name_zh": "唐朝", "entity_type": "dynasty",
+         "year_start": 618, "year_end": 907},
+    ]
+    with patch(f"{_KG_API}.get_timeline_entities") as m:
+        m.return_value = (dynasty_entity, 1)
+        resp = await kg_client.get("/api/kg/timeline", params={"entity_type": "dynasty"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["entities"][0]["entity_type"] == "dynasty"
+        # Verify service was called with the filter
+        m.assert_called_once()
+        call_kwargs = m.call_args
+        assert call_kwargs[0][1] == "dynasty" or call_kwargs[1].get("entity_type") == "dynasty"
+
+
+# ---------------------------------------------------------------------------
+# Test 10: 时间轴端点正确处理 BCE（负数）年份
+# ---------------------------------------------------------------------------
+@pytest.mark.anyio
+async def test_timeline_bce_years(kg_client):
+    bce_entity = [
+        {"id": 20, "name_zh": "龙树", "entity_type": "person",
+         "year_start": -150, "year_end": -70},
+    ]
+    with patch(f"{_KG_API}.get_timeline_entities") as m:
+        m.return_value = (bce_entity, 1)
+        resp = await kg_client.get("/api/kg/timeline")
+        assert resp.status_code == 200
+        entities = resp.json()["entities"]
+        assert entities[0]["year_start"] == -150
+        assert entities[0]["year_end"] == -70
+
+
+# ---------------------------------------------------------------------------
+# Test 11: 时间轴端点处理 year_end 为空的实体
+# ---------------------------------------------------------------------------
+@pytest.mark.anyio
+async def test_timeline_missing_year_end(kg_client):
+    partial_entity = [
+        {"id": 30, "name_zh": "某法师", "entity_type": "person",
+         "year_start": 800, "year_end": None},
+    ]
+    with patch(f"{_KG_API}.get_timeline_entities") as m:
+        m.return_value = (partial_entity, 1)
+        resp = await kg_client.get("/api/kg/timeline")
+        assert resp.status_code == 200
+        entities = resp.json()["entities"]
+        assert entities[0]["year_start"] == 800
+        assert entities[0]["year_end"] is None
+
+
+# ---------------------------------------------------------------------------
 # Test 7: 搜索结果透出 relation_count（图度数），供前端排序徽章使用
 # ---------------------------------------------------------------------------
 @pytest.mark.anyio

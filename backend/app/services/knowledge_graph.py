@@ -429,6 +429,66 @@ async def get_geo_entities(
     return entities, total
 
 
+async def get_timeline_entities(
+    session: AsyncSession,
+    entity_type: str | None = None,
+    limit: int = 500,
+) -> tuple[list[dict], int]:
+    """Get entities with usable temporal data (numeric year_start required).
+
+    返回具有有效起始年份的实体列表，支持朝代和人物类型；BCE年份以负整数表示。"""
+    # Allow filtering by a single entity_type; if absent, return both person
+    # and dynasty rows (the two types most likely to carry year data).
+    if entity_type:
+        type_condition = "e.entity_type = :entity_type"
+        params: dict = {"entity_type": entity_type, "limit": limit}
+    else:
+        type_condition = "e.entity_type IN ('person', 'dynasty')"
+        params = {"limit": limit}
+
+    sql = text(
+        f"""
+        SELECT
+            e.id,
+            e.name_zh,
+            e.entity_type,
+            (e.properties->>'year_start')::int AS year_start,
+            (e.properties->>'year_end')::int   AS year_end
+        FROM kg_entities e
+        WHERE {type_condition}
+          AND (e.properties->>'year_start') ~ '^-?[0-9]+$'
+          AND COALESCE(e.properties->>'is_hidden', 'false') != 'true'
+        ORDER BY (e.properties->>'year_start')::int ASC
+        LIMIT :limit
+        """  # nosec B608 - type_condition is a hardcoded clause, not user input
+    )
+    result = await session.execute(sql, params)
+    rows = result.fetchall()
+
+    count_sql = text(
+        f"""
+        SELECT COUNT(*) FROM kg_entities e
+        WHERE {type_condition}
+          AND (e.properties->>'year_start') ~ '^-?[0-9]+$'
+          AND COALESCE(e.properties->>'is_hidden', 'false') != 'true'
+        """  # nosec B608
+    )
+    count_result = await session.execute(count_sql, params)
+    total = count_result.scalar() or 0
+
+    entities = [
+        {
+            "id": row[0],
+            "name_zh": row[1],
+            "entity_type": row[2],
+            "year_start": row[3],
+            "year_end": row[4],
+        }
+        for row in rows
+    ]
+    return entities, total
+
+
 async def get_lineage_arcs(
     session: AsyncSession,
     school: str | None = None,

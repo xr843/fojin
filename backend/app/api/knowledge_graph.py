@@ -18,6 +18,8 @@ from app.schemas.knowledge_graph import (
     KGGraphResponse,
     KGLineageArcsResponse,
     KGSearchResponse,
+    KGTimelineEntity,
+    KGTimelineResponse,
 )
 from app.services.knowledge_graph import (
     get_entity,
@@ -27,6 +29,7 @@ from app.services.knowledge_graph import (
     get_kg_stats,
     get_lineage_arcs,
     get_text_entities,
+    get_timeline_entities,
     search_entities,
 )
 
@@ -96,6 +99,25 @@ async def kg_stats(db: AsyncSession = Depends(get_db)):
 
     获取知识图谱统计信息（各类型实体与关系数量）。"""
     return await get_kg_stats(db)
+
+
+@router.get("/timeline", response_model=KGTimelineResponse)
+async def get_kg_timeline(
+    entity_type: str | None = Query(
+        None,
+        description="Filter by entity type (e.g. 'person', 'dynasty'). Omit for all temporal entities.",
+    ),
+    limit: int = Query(500, le=2000),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get knowledge graph entities with temporal data for timeline display.
+
+    返回携带有效起始年份的知识图谱实体，用于时间轴可视化。BCE年份以负整数表示。"""
+    entities, total = await get_timeline_entities(db, entity_type, limit)
+    return KGTimelineResponse(
+        entities=[KGTimelineEntity(**e) for e in entities],
+        total=total,
+    )
 
 
 @router.get("/geo", response_model=KGGeoResponse)
