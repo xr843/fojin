@@ -598,8 +598,9 @@
   margin-left: 1px;
 }
 
-/* 时间轴切换按钮（紧靠统计按钮右侧） */
-.kg-timeline-toggle {
+/* 头部切换按钮（时间轴 / 路径查询，紧靠统计按钮右侧） */
+.kg-timeline-toggle,
+.kg-path-toggle {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -609,8 +610,10 @@
   font-size: 13px;
   transition: color 0.2s;
 }
-.kg-timeline-toggle:hover { color: var(--fj-ink); }
-.kg-timeline-toggle.active { color: var(--fj-accent); }
+.kg-timeline-toggle:hover,
+.kg-path-toggle:hover { color: var(--fj-ink); }
+.kg-timeline-toggle.active,
+.kg-path-toggle.active { color: var(--fj-accent); }
 
 /* ---------- 响应式 ---------- */
 @media (max-width: 1200px) {
