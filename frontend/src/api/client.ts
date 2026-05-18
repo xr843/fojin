@@ -1136,6 +1136,32 @@ export async function getAdminAuditLog(params: {
   return data;
 }
 
+// --- Admin Module Usage (Umami analytics) ---
+
+export interface ModuleEventItem {
+  event_name: string;
+  label: string;
+  count: number;
+}
+
+export interface KeywordItem {
+  keyword: string;
+  count: number;
+}
+
+export interface AdminModuleUsage {
+  days: number;
+  events: ModuleEventItem[];
+  top_search_keywords: KeywordItem[];
+}
+
+export async function getAdminModuleUsage(days: number = 7): Promise<AdminModuleUsage> {
+  const { data } = await api.get<AdminModuleUsage>("/admin/stats/module-usage", {
+    params: { days },
+  });
+  return data;
+}
+
 // --- Similar Passages ---
 
 export interface SimilarPassageItem {

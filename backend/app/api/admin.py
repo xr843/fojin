@@ -8,6 +8,7 @@ from app.models.user import User
 from app.schemas.admin import (
     AdminAnnotationListResponse,
     AdminAuditLogListResponse,
+    AdminModuleUsage,
     AdminOverview,
     AdminTrends,
     AdminUserItem,
@@ -22,6 +23,7 @@ from app.services.admin_service import (
     list_users,
     record_audit,
 )
+from app.services.usage_service import get_module_usage
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -47,6 +49,25 @@ async def stats_trends(
 
     redis = getattr(app.state, "redis", None)
     return AdminTrends(**(await get_trends(db, days, redis)))
+
+
+@router.get("/stats/module-usage", response_model=AdminModuleUsage)
+async def stats_module_usage(
+    days: int = Query(7, ge=1, le=90),
+    _user=Depends(require_role("admin")),
+):
+    """Return Umami-sourced module usage stats (search / read / chat / source_click).
+
+    This endpoint reads the self-hosted Umami analytics database.  It is fully
+    resilient: if Umami is down or unreachable, it returns an empty result
+    (events=[], top_search_keywords=[]) rather than propagating a 500 error.
+    """
+    result = await get_module_usage(days)
+    return AdminModuleUsage(
+        days=days,
+        events=result["events"],
+        top_search_keywords=result["top_search_keywords"],
+    )
 
 
 @router.get("/users", response_model=AdminUserListResponse)

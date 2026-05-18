@@ -10,6 +10,11 @@ import {
   DatabaseOutlined,
   ArrowUpOutlined,
   ArrowDownOutlined,
+  SearchOutlined,
+  RobotOutlined,
+  ReadOutlined,
+  LinkOutlined,
+  ThunderboltOutlined,
 } from "@ant-design/icons";
 import { Helmet } from "react-helmet-async";
 import { useQuery } from "@tanstack/react-query";
@@ -18,7 +23,9 @@ import { Line } from "@ant-design/charts";
 import {
   getAdminOverview,
   getAdminTrends,
+  getAdminModuleUsage,
   type AdminOverview,
+  type ModuleEventItem,
 } from "../api/client";
 import { getPlatformActivity } from "../api/feed";
 
@@ -185,8 +192,100 @@ export default function AdminDashboardPage() {
         </Card>
 
         <PlatformActivityCard />
+        <ModuleUsageCard />
       </div>
     </>
+  );
+}
+
+/** Map event_name → antd icon for the module usage card. */
+function _eventIcon(name: string) {
+  switch (name) {
+    case "search":       return <SearchOutlined />;
+    case "chat":         return <RobotOutlined />;
+    case "read":         return <ReadOutlined />;
+    case "source_click": return <LinkOutlined />;
+    case "cbeta-shortcut": return <ThunderboltOutlined />;
+    default:             return <DatabaseOutlined />;
+  }
+}
+
+function ModuleUsageCard() {
+  const [days, setDays] = useState<number>(7);
+  const { data, isLoading } = useQuery({
+    queryKey: ["adminModuleUsage", days],
+    queryFn: () => getAdminModuleUsage(days),
+    staleTime: 300_000,
+  });
+
+  return (
+    <Card
+      title="板块使用情况"
+      style={{ marginTop: 16 }}
+      extra={
+        <Segmented
+          value={days}
+          onChange={(v) => setDays(v as number)}
+          options={[
+            { label: "7天", value: 7 },
+            { label: "14天", value: 14 },
+            { label: "30天", value: 30 },
+          ]}
+        />
+      }
+    >
+      {isLoading ? (
+        <Spin />
+      ) : !data || data.events.length === 0 ? (
+        <Empty description="暂无 Umami 数据" />
+      ) : (
+        <>
+          <Text type="secondary" style={{ fontSize: 12 }}>各板块事件量</Text>
+          <Row gutter={[16, 16]} style={{ marginTop: 4, marginBottom: 16 }}>
+            {data.events.map((ev: ModuleEventItem) => (
+              <Col xs={12} sm={6} key={ev.event_name}>
+                <Statistic
+                  title={ev.label}
+                  value={ev.count}
+                  prefix={_eventIcon(ev.event_name)}
+                />
+              </Col>
+            ))}
+          </Row>
+
+          {data.top_search_keywords.length > 0 && (
+            <div style={{ marginTop: 8 }}>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                热门检索词（Top 10）
+              </Text>
+              <div style={{ marginTop: 8 }}>
+                {data.top_search_keywords.map((kw, i) => (
+                  <div
+                    key={`${kw.keyword}-${i}`}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      padding: "4px 0",
+                      borderBottom: i < data.top_search_keywords.length - 1
+                        ? "1px solid #f0f0f0"
+                        : undefined,
+                    }}
+                  >
+                    <span>
+                      <Text type="secondary" style={{ marginRight: 8 }}>
+                        {i + 1}.
+                      </Text>
+                      {kw.keyword}
+                    </span>
+                    <span style={{ color: "#999" }}>{kw.count} 次</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </Card>
   );
 }
 
