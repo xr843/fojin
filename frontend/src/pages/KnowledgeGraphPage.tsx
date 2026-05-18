@@ -213,6 +213,10 @@ export default function KnowledgeGraphPage() {
   // the expand-ring affordance on unexpanded nodes.
   const [expandedNodeIds, setExpandedNodeIds] = useState<Set<number>>(new Set());
 
+  // Ref mirror of expandedNodeIds — kept in sync after every setState so
+  // handleNodeExpand can read the latest value without being recreated.
+  const expandedNodeIdsRef = useRef<Set<number>>(new Set());
+
   const queryClient = useQueryClient();
 
   const { data: kgStats } = useQuery({
@@ -272,49 +276,68 @@ export default function KnowledgeGraphPage() {
     enabled: !!selectedEntityId,
   });
 
-  // Reset accumulated graph whenever the root query changes — entity, depth, or
-  // predicate filter. Seed immediately from the initial fetch result so the
-  // graph renders as soon as data arrives.
+  // Single coherent effect: manages both clearing on root-key change and
+  // seeding from graphData.  Tracks the "current root key" so we only seed
+  // accumulatedGraph when graphData actually belongs to the active query —
+  // this eliminates the two-effect race where the clear ran, then the old
+  // graphData seeded stale data for one render before the refetch finished.
+  const prevRootRef = useRef<string>("");
+  // The root key that graphData currently corresponds to (react-query's
+  // queryKey is [entity, depth, predicates], so we build the same key here).
   useEffect(() => {
-    if (graphData) {
+    const key = `${selectedEntityId}_${graphDepth}_${selectedPredicates.join(",")}`;
+    const rootChanged = key !== prevRootRef.current;
+
+    if (rootChanged) {
+      // Root changed: immediately wipe accumulated state.
+      prevRootRef.current = key;
+      setAccumulatedGraph(null);
+      const empty = new Set<number>();
+      setExpandedNodeIds(empty);
+      expandedNodeIdsRef.current = empty;
+    }
+
+    // Seed from graphData only when it matches the *current* root key.
+    // If the root just changed above, graphData is still from the old query
+    // (react-query hasn't refetched yet) — we must not seed from it.
+    if (!rootChanged && graphData) {
       setAccumulatedGraph({
         nodes: graphData.nodes,
         links: graphData.links,
         truncated: graphData.truncated,
       });
-      // Mark the root entity as expanded (initial fetch already covers its neighbourhood)
-      setExpandedNodeIds(selectedEntityId != null ? new Set([selectedEntityId]) : new Set());
-    } else {
-      setAccumulatedGraph(null);
-      setExpandedNodeIds(new Set());
+      // Mark the root entity as expanded (initial fetch covers its neighbourhood)
+      const seeded = selectedEntityId != null ? new Set([selectedEntityId]) : new Set<number>();
+      setExpandedNodeIds(seeded);
+      expandedNodeIdsRef.current = seeded;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graphData]);
-
-  // When the root entity / depth / predicates change, clear stale accumulated data
-  // immediately (don't wait for the new fetch) so the graph never shows old data.
-  const prevRootRef = useRef<string>("");
-  useEffect(() => {
-    const key = `${selectedEntityId}_${graphDepth}_${selectedPredicates.join(",")}`;
-    if (key !== prevRootRef.current) {
-      prevRootRef.current = key;
-      setAccumulatedGraph(null);
-      setExpandedNodeIds(new Set());
-    }
-  }, [selectedEntityId, graphDepth, selectedPredicates]);
+  }, [selectedEntityId, graphDepth, selectedPredicates, graphData]);
 
   // ── Expand handler ─────────────────────────────────────────────────────────
   // Fetches the depth-1 neighbourhood of a node and merges it into the
   // accumulated display graph.  Uses queryClient.fetchQuery so the result is
   // cached and avoids re-fetching if the same node is double-clicked again.
+  //
+  // P2: reads expandedNodeIds from a ref (not the state) so this callback
+  // is never recreated on each expand — stable identity prevents the d3
+  // simulation from re-initialising on every expand.
+  //
+  // selectedPredicates is captured via a ref for the same reason: the
+  // callback identity must not change when predicates change between expands.
+  const selectedPredicatesRef = useRef<string[]>(selectedPredicates);
+  useEffect(() => {
+    selectedPredicatesRef.current = selectedPredicates;
+  }, [selectedPredicates]);
+
   const handleNodeExpand = useCallback(
     async (node: { id: number }) => {
-      if (expandedNodeIds.has(node.id)) return; // already expanded
+      if (expandedNodeIdsRef.current.has(node.id)) return; // already expanded
 
+      const predicates = selectedPredicatesRef.current;
       try {
         const incoming = await queryClient.fetchQuery({
-          queryKey: ["kg-graph-expand", node.id, selectedPredicates],
-          queryFn: () => getKGEntityGraph(node.id, 1, 80, selectedPredicates),
+          queryKey: ["kg-graph-expand", node.id, predicates],
+          queryFn: () => getKGEntityGraph(node.id, 1, 80, predicates),
           staleTime: 5 * 60_000,
         });
 
@@ -324,12 +347,17 @@ export default function KnowledgeGraphPage() {
           return { ...merged, truncated: prev.truncated || incoming.truncated };
         });
 
-        setExpandedNodeIds((prev) => new Set([...prev, node.id]));
+        setExpandedNodeIds((prev) => {
+          const next = new Set([...prev, node.id]);
+          expandedNodeIdsRef.current = next;
+          return next;
+        });
       } catch {
         // Silent fail — if the network request errors the graph stays as-is
       }
     },
-    [expandedNodeIds, selectedPredicates, queryClient],
+    // queryClient is stable; refs are stable — no deps that would cause churn
+    [queryClient],
   );
 
   const handleSearch = (value: string) => {

@@ -382,9 +382,21 @@ export default function ForceGraph({
         hideTooltip();
       })
       .on("click", (_event: any, d: any) => {
-        if (onNodeClick) onNodeClick(d);
+        // Debounce: wait 250 ms so a double-click can cancel before we
+        // treat this as a single-click re-root.  The timer is stored on
+        // the node datum itself so each node has its own pending timer.
+        if (d._clickTimer != null) return; // already waiting — this is the 2nd click of a dblclick, ignore
+        d._clickTimer = window.setTimeout(() => {
+          d._clickTimer = null;
+          if (onNodeClick) onNodeClick(d);
+        }, 250);
       })
       .on("dblclick", (event: any, d: any) => {
+        // Cancel the pending single-click timer so onNodeClick is NOT called.
+        if (d._clickTimer != null) {
+          clearTimeout(d._clickTimer);
+          d._clickTimer = null;
+        }
         // Prevent the zoom double-click handler from triggering on the node.
         event.stopPropagation();
         if (onNodeExpand) onNodeExpand(d);
