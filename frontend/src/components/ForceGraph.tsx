@@ -28,6 +28,10 @@ interface ForceGraphProps {
   width?: number;
   height?: number;
   onNodeClick?: (node: GraphNode) => void;
+  /** Called when the user double-clicks a node to progressively expand it. */
+  onNodeExpand?: (node: GraphNode) => void;
+  /** Set of node ids that have already been expanded (depth-1 fetched). */
+  expandedNodeIds?: Set<number>;
 }
 
 /* ── 古典配色 ── */
@@ -83,6 +87,8 @@ export default function ForceGraph({
   width: propWidth,
   height = 600,
   onNodeClick,
+  onNodeExpand,
+  expandedNodeIds,
 }: ForceGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -276,6 +282,22 @@ export default function ForceGraph({
           }) as any
       );
 
+    // ── Expand ring: a faint outer circle on nodes that haven't yet been
+    // depth-1 expanded.  Gives the user a cue that double-clicking will
+    // reveal more connections without cluttering the layout.
+    node
+      .append("circle")
+      .attr("class", "expand-ring")
+      .attr("r", (d: any) => nodeRadius(d) + 5)
+      .attr("fill", "none")
+      .attr("stroke", (d: any) =>
+        expandedNodeIds?.has(d.id) ? "none" : (TYPE_COLORS[d.entity_type] || "#888")
+      )
+      .attr("stroke-width", 1.5)
+      .attr("stroke-opacity", (d: any) => (expandedNodeIds?.has(d.id) ? 0 : 0.35))
+      .attr("stroke-dasharray", "3 3")
+      .attr("pointer-events", "none");
+
     // Node circle with subtle shadow — radius scaled by degree
     node
       .append("circle")
@@ -341,10 +363,13 @@ export default function ForceGraph({
             return sid === d.id || tid === d.id ? 2.5 : 0.5;
           });
 
-        // Tooltip
+        // Tooltip — include expand hint if node hasn't been expanded yet
         const typeLabel = TYPE_LABELS[d.entity_type] || d.entity_type;
         let html = `<strong>${escapeHtml(d.name)}</strong> <span style="color:#9a8e7a">${escapeHtml(typeLabel)}</span>`;
         if (d.description) html += `<br><span style="color:#7a6e5c;font-size:11px">${escapeHtml(d.description)}</span>`;
+        if (onNodeExpand && !expandedNodeIds?.has(d.id)) {
+          html += `<br><span style="color:#b08d57;font-size:10px">双击展开邻域</span>`;
+        }
         showTooltip(html, event.offsetX, event.offsetY);
       })
       .on("mouseout", function () {
@@ -357,7 +382,24 @@ export default function ForceGraph({
         hideTooltip();
       })
       .on("click", (_event: any, d: any) => {
-        if (onNodeClick) onNodeClick(d);
+        // Debounce: wait 250 ms so a double-click can cancel before we
+        // treat this as a single-click re-root.  The timer is stored on
+        // the node datum itself so each node has its own pending timer.
+        if (d._clickTimer != null) return; // already waiting — this is the 2nd click of a dblclick, ignore
+        d._clickTimer = window.setTimeout(() => {
+          d._clickTimer = null;
+          if (onNodeClick) onNodeClick(d);
+        }, 250);
+      })
+      .on("dblclick", (event: any, d: any) => {
+        // Cancel the pending single-click timer so onNodeClick is NOT called.
+        if (d._clickTimer != null) {
+          clearTimeout(d._clickTimer);
+          d._clickTimer = null;
+        }
+        // Prevent the zoom double-click handler from triggering on the node.
+        event.stopPropagation();
+        if (onNodeExpand) onNodeExpand(d);
       });
 
     // Trim a link to the node boundaries so it starts/ends at the
@@ -428,7 +470,7 @@ export default function ForceGraph({
     return () => {
       simulation.stop();
     };
-  }, [nodes, links, width, height, onNodeClick, showTooltip, hideTooltip]);
+  }, [nodes, links, width, height, onNodeClick, onNodeExpand, expandedNodeIds, showTooltip, hideTooltip]);
 
   return (
     <div ref={containerRef} style={{ width: "100%", position: "relative" }} role="img" aria-label="知识图谱可视化">
