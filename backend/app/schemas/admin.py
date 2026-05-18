@@ -91,3 +91,22 @@ class AdminAuditLogListResponse(BaseModel):
     page: int
     size: int
     items: list[AdminAuditLogItem]
+
+
+# --- Module Usage (Umami analytics) ---
+
+class ModuleEventItem(BaseModel):
+    event_name: str
+    label: str
+    count: int
+
+
+class KeywordItem(BaseModel):
+    keyword: str
+    count: int
+
+
+class AdminModuleUsage(BaseModel):
+    days: int
+    events: list[ModuleEventItem]
+    top_search_keywords: list[KeywordItem]
