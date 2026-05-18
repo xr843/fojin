@@ -112,6 +112,12 @@ export default function KGPathQuery({ fromEntity, onNodeClick }: KGPathQueryProp
           <span className="kg-path-label">终点</span>
           <Select
             showSearch
+            // virtual={false}: with async-loaded options the rc-virtual-list
+            // can fail to render items (it measures a 0-height viewport when
+            // options arrive after the dropdown opened, then never re-measures
+            // → an empty dropdown despite results being present). The result
+            // set is capped at 10, so plain rendering costs nothing.
+            virtual={false}
             value={toEntity ? toEntity.name_zh : undefined}
             placeholder="搜索目标实体…"
             filterOption={false}
