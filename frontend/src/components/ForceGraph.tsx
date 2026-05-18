@@ -143,7 +143,9 @@ export default function ForceGraph({
         .append("marker")
         .attr("id", `arrow-${pred}`)
         .attr("viewBox", "0 0 10 6")
-        .attr("refX", 26)
+        // Lines are shortened to the target node's edge in the tick
+        // handler, so the arrow tip should sit at the line endpoint.
+        .attr("refX", 10)
         .attr("refY", 3)
         .attr("markerWidth", 8)
         .attr("markerHeight", 5)
@@ -167,6 +169,27 @@ export default function ForceGraph({
     const simNodes = nodes.map((n) => ({ ...n }));
     const simLinks = links.map((l) => ({ ...l }));
 
+    // ── Node degree → radius ──
+    // A node's degree (how many relations touch it) is its visual
+    // importance. Sizing the circle by degree makes hubs — the
+    // translators, the schools — pop out of a busy graph instead of
+    // every node looking equally (un)important. Square-root scale so a
+    // 16× busier node isn't 16× wider.
+    const degree = new Map<number, number>();
+    simLinks.forEach((l: any) => {
+      const sid = typeof l.source === "object" ? l.source.id : l.source;
+      const tid = typeof l.target === "object" ? l.target.id : l.target;
+      degree.set(sid, (degree.get(sid) || 0) + 1);
+      degree.set(tid, (degree.get(tid) || 0) + 1);
+    });
+    const maxDegree = Math.max(1, ...simNodes.map((n) => degree.get(n.id) || 0));
+    const radiusScale = d3
+      .scaleSqrt()
+      .domain([0, maxDegree])
+      .range([12, 30])
+      .clamp(true);
+    const nodeRadius = (d: any) => radiusScale(degree.get(d.id) || 0);
+
     // Adaptive forces based on node count
     const nodeCount = simNodes.length;
     const chargeStrength = nodeCount > 100 ? -200 : nodeCount > 50 ? -280 : -350;
@@ -183,7 +206,7 @@ export default function ForceGraph({
       )
       .force("charge", d3.forceManyBody().strength(chargeStrength))
       .force("center", d3.forceCenter(width / 2, height / 2))
-      .force("collision", d3.forceCollide().radius(28))
+      .force("collision", d3.forceCollide().radius((d: any) => nodeRadius(d) + 8))
       .force("x", d3.forceX(width / 2).strength(0.03))
       .force("y", d3.forceY(height / 2).strength(0.03));
 
@@ -253,16 +276,16 @@ export default function ForceGraph({
           }) as any
       );
 
-    // Node circle with subtle shadow
+    // Node circle with subtle shadow — radius scaled by degree
     node
       .append("circle")
-      .attr("r", 16)
+      .attr("r", nodeRadius)
       .attr("fill", (d: any) => TYPE_COLORS[d.entity_type] || "#888")
       .attr("stroke", "#fff")
       .attr("stroke-width", 2)
       .attr("filter", "drop-shadow(0 1px 2px rgba(0,0,0,0.12))");
 
-    // Short label inside node (1-2 chars)
+    // Short label inside node (1-2 chars), font scaled with radius
     node
       .append("text")
       .text((d: any) => {
@@ -271,19 +294,19 @@ export default function ForceGraph({
       })
       .attr("text-anchor", "middle")
       .attr("dy", "0.35em")
-      .attr("font-size", 10)
+      .attr("font-size", (d: any) => Math.max(10, nodeRadius(d) * 0.62))
       .attr("font-weight", 600)
       .attr("fill", "#fff")
       .attr("pointer-events", "none");
 
-    // Full name label below node
+    // Full name label below node — offset by the node's own radius
     node
       .append("text")
       .text((d: any) =>
         d.name.length > 6 ? d.name.slice(0, 6) + "…" : d.name
       )
       .attr("text-anchor", "middle")
-      .attr("dy", 30)
+      .attr("dy", (d: any) => nodeRadius(d) + 14)
       .attr("font-size", 11)
       .attr("font-family", '"Noto Serif SC", serif')
       .attr("fill", "#2b2318")
@@ -337,14 +360,69 @@ export default function ForceGraph({
         if (onNodeClick) onNodeClick(d);
       });
 
+    // Trim a link to the node boundaries so it starts/ends at the
+    // circle edge rather than the centre — with degree-scaled radii a
+    // fixed offset would leave arrows floating or buried.
+    const trimLink = (d: any) => {
+      const sx = d.source.x, sy = d.source.y;
+      const tx = d.target.x, ty = d.target.y;
+      const dx = tx - sx, dy = ty - sy;
+      const dist = Math.hypot(dx, dy) || 1;
+      const sr = nodeRadius(d.source) + 2;
+      const tr = nodeRadius(d.target) + 5; // extra gap for the arrowhead
+      return {
+        x1: sx + (dx / dist) * sr,
+        y1: sy + (dy / dist) * sr,
+        x2: tx - (dx / dist) * tr,
+        y2: ty - (dy / dist) * tr,
+      };
+    };
+
     // ── Tick ──
     simulation.on("tick", () => {
-      link
-        .attr("x1", (d: any) => d.source.x)
-        .attr("y1", (d: any) => d.source.y)
-        .attr("x2", (d: any) => d.target.x)
-        .attr("y2", (d: any) => d.target.y);
+      link.each(function (d: any) {
+        const e = trimLink(d);
+        d3.select(this)
+          .attr("x1", e.x1)
+          .attr("y1", e.y1)
+          .attr("x2", e.x2)
+          .attr("y2", e.y2);
+      });
       node.attr("transform", (d: any) => `translate(${d.x},${d.y})`);
+    });
+
+    // ── Zoom-to-fit once the layout settles ──
+    // Without this the graph can render off-centre or too zoomed and
+    // the user has to pan/zoom manually before they can read anything.
+    // Only fires on the first settle — a later drag must not snap the
+    // user's view back.
+    let fitted = false;
+    simulation.on("end", () => {
+      if (fitted || !simNodes.length) return;
+      fitted = true;
+      // Expand the bounds by each node's own radius plus its name-label
+      // extent (~40px below + sideways), so a big hub sitting at the
+      // edge of the layout isn't clipped after the fit.
+      const pad = 24;
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const n of simNodes as any[]) {
+        const ext = nodeRadius(n) + 40;
+        const x = n.x ?? width / 2, y = n.y ?? height / 2;
+        minX = Math.min(minX, x - ext);
+        maxX = Math.max(maxX, x + ext);
+        minY = Math.min(minY, y - ext);
+        maxY = Math.max(maxY, y + ext);
+      }
+      minX -= pad; maxX += pad; minY -= pad; maxY += pad;
+      const bw = maxX - minX, bh = maxY - minY;
+      if (bw < 1 || bh < 1) return;
+      const scale = Math.min(2, Math.max(0.2, 0.92 * Math.min(width / bw, height / bh)));
+      const tx = width / 2 - (scale * (minX + maxX)) / 2;
+      const ty = height / 2 - (scale * (minY + maxY)) / 2;
+      svg
+        .transition()
+        .duration(450)
+        .call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
     });
 
     return () => {
