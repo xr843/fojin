@@ -4,6 +4,7 @@ import {
   ReadOutlined,
   ArrowRightOutlined,
   ArrowLeftOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import type { EntityRelationItem } from "../api/client";
@@ -165,6 +166,17 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
           }
         >
           查辞典释义
+        </Button>
+      )}
+      {entity.entity_type === "person" && (
+        <Button
+          type="link"
+          size="small"
+          icon={<UserOutlined />}
+          style={{ padding: 0, marginBottom: 10, color: "#8b2500", fontSize: 12 }}
+          onClick={() => navigate(`/person/${entity.id}`)}
+        >
+          人物主页
         </Button>
       )}
 
