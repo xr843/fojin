@@ -358,11 +358,14 @@ async def get_platform_activity(db: AsyncSession, redis=None, days: int = 7) -> 
         )
     ).scalar() or 0
 
+    # Feedback is stored as "up" / "down" (see schemas/chat.py:
+    # feedback: Literal["up", "down"]). The old "thumbs_up" literal
+    # matched nothing, so 好评率 was permanently stuck at 0.0%.
     positive_feedback = (
         await db.execute(
             select(func.count(ChatMessage.id)).where(
                 ChatMessage.created_at >= cutoff,
-                ChatMessage.feedback == "thumbs_up",
+                ChatMessage.feedback == "up",
             )
         )
     ).scalar() or 0
