@@ -400,11 +400,20 @@ export default function ForceGraph({
     simulation.on("end", () => {
       if (fitted || !simNodes.length) return;
       fitted = true;
-      const pad = 52;
-      const xs = simNodes.map((n: any) => n.x ?? width / 2);
-      const ys = simNodes.map((n: any) => n.y ?? height / 2);
-      const minX = Math.min(...xs) - pad, maxX = Math.max(...xs) + pad;
-      const minY = Math.min(...ys) - pad, maxY = Math.max(...ys) + pad;
+      // Expand the bounds by each node's own radius plus its name-label
+      // extent (~40px below + sideways), so a big hub sitting at the
+      // edge of the layout isn't clipped after the fit.
+      const pad = 24;
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const n of simNodes as any[]) {
+        const ext = nodeRadius(n) + 40;
+        const x = n.x ?? width / 2, y = n.y ?? height / 2;
+        minX = Math.min(minX, x - ext);
+        maxX = Math.max(maxX, x + ext);
+        minY = Math.min(minY, y - ext);
+        maxY = Math.max(maxY, y + ext);
+      }
+      minX -= pad; maxX += pad; minY -= pad; maxY += pad;
       const bw = maxX - minX, bh = maxY - minY;
       if (bw < 1 || bh < 1) return;
       const scale = Math.min(2, Math.max(0.2, 0.92 * Math.min(width / bw, height / bh)));
