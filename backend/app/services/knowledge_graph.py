@@ -446,6 +446,11 @@ async def get_timeline_entities(
         type_condition = "e.entity_type IN ('person', 'dynasty')"
         params = {"limit": limit}
 
+    # Year regex is length-bounded ('{1,6}'): a plain '[0-9]+' would let a
+    # 20-digit string pass the filter and then overflow int4 in the cast,
+    # crashing the endpoint. year_end is cast through a CASE because it has
+    # no WHERE filter of its own — a row with a valid year_start but a
+    # garbage year_end must yield NULL, not an error.
     sql = text(
         f"""
         SELECT
@@ -453,10 +458,14 @@ async def get_timeline_entities(
             e.name_zh,
             e.entity_type,
             (e.properties->>'year_start')::int AS year_start,
-            (e.properties->>'year_end')::int   AS year_end
+            CASE
+                WHEN (e.properties->>'year_end') ~ '^-?[0-9]{{1,6}}$'
+                THEN (e.properties->>'year_end')::int
+                ELSE NULL
+            END AS year_end
         FROM kg_entities e
         WHERE {type_condition}
-          AND (e.properties->>'year_start') ~ '^-?[0-9]+$'
+          AND (e.properties->>'year_start') ~ '^-?[0-9]{{1,6}}$'
           AND COALESCE(e.properties->>'is_hidden', 'false') != 'true'
         ORDER BY (e.properties->>'year_start')::int ASC
         LIMIT :limit
@@ -469,7 +478,7 @@ async def get_timeline_entities(
         f"""
         SELECT COUNT(*) FROM kg_entities e
         WHERE {type_condition}
-          AND (e.properties->>'year_start') ~ '^-?[0-9]+$'
+          AND (e.properties->>'year_start') ~ '^-?[0-9]{{1,6}}$'
           AND COALESCE(e.properties->>'is_hidden', 'false') != 'true'
         """  # nosec B608
     )
