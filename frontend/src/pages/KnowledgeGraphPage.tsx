@@ -1,7 +1,15 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Input, Select, Spin, Empty, Slider, Checkbox, Alert, Tooltip } from "antd";
-import { ApartmentOutlined, SearchOutlined, BarChartOutlined } from "@ant-design/icons";
+import {
+  ApartmentOutlined,
+  SearchOutlined,
+  BarChartOutlined,
+  CompassOutlined,
+  DownOutlined,
+  RightOutlined,
+} from "@ant-design/icons";
 import ForceGraph, {
   TYPE_COLORS,
   TYPE_LABELS,
@@ -40,6 +48,21 @@ const ALL_PREDICATES = [
 
 const ALL_PREDICATE_VALUES = ALL_PREDICATES.map((p) => p.value);
 
+// One-line plain-language gloss for each relation type — surfaced as a
+// tooltip on the filter checkboxes so terms like 「异译」「平行文本」
+// don't gate casual users out of the graph.
+const PREDICATE_DESC: Record<string, string> = {
+  translated: "某人翻译了某部典籍",
+  teacher_of: "师徒之间的传法承继关系",
+  member_of_school: "人物所归属的宗派",
+  cites: "一部典籍引用了另一部典籍",
+  commentary_on: "对某部典籍的注释或疏解",
+  active_in: "人物活跃的朝代或地域",
+  alt_translation: "同一原典的不同译本（异译）",
+  parallel_text: "跨语言或跨藏经对应的平行文本",
+  associated_with: "其它相关联系",
+};
+
 const TYPE_LABEL_MAP: Record<string, string> = {
   person: "人物",
   text: "典籍",
@@ -50,15 +73,78 @@ const TYPE_LABEL_MAP: Record<string, string> = {
   dynasty: "朝代",
 };
 
+// Curated entry points for the "推荐探索" strip. Every name below was
+// verified against the production /kg/entities API to resolve to at
+// least one related entity, so a chip never lands on an empty graph.
+const CURATED_GROUPS: { title: string; items: { label: string; type: string }[] }[] = [
+  {
+    title: "高僧大德",
+    items: [
+      { label: "玄奘", type: "person" },
+      { label: "鸠摩罗什", type: "person" },
+      { label: "不空", type: "person" },
+      { label: "义净", type: "person" },
+      { label: "法显", type: "person" },
+      { label: "龙树", type: "person" },
+      { label: "世亲", type: "person" },
+      { label: "无著", type: "person" },
+      { label: "法藏", type: "person" },
+      { label: "惠能", type: "person" },
+      { label: "智顗", type: "person" },
+      { label: "道宣", type: "person" },
+    ],
+  },
+  {
+    title: "八大宗派",
+    items: [
+      { label: "天台宗", type: "school" },
+      { label: "华严宗", type: "school" },
+      { label: "法相宗", type: "school" },
+      { label: "三论宗", type: "school" },
+      { label: "律宗", type: "school" },
+      { label: "净土宗", type: "school" },
+      { label: "禅宗", type: "school" },
+      { label: "密宗", type: "school" },
+    ],
+  },
+  {
+    title: "核心概念",
+    items: [
+      { label: "缘起", type: "concept" },
+      { label: "佛性", type: "concept" },
+      { label: "般若", type: "concept" },
+      { label: "涅槃", type: "concept" },
+      { label: "中观", type: "concept" },
+    ],
+  },
+];
+
 export default function KnowledgeGraphPage() {
-  const [query, setQuery] = useState("玄奘");
-  const [entityType, setEntityType] = useState("");
-  const [selectedEntityId, setSelectedEntityId] = useState<number | null>(null);
   const isMobile = typeof window !== "undefined" && window.innerWidth <= 768;
-  const [graphDepth, setGraphDepth] = useState(isMobile ? 1 : 2);
-  const [selectedPredicates, setSelectedPredicates] =
-    useState<string[]>(ALL_PREDICATE_VALUES);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Initialise all view state from the URL once, so a shared/bookmarked
+  // /kg?q=…&id=…&depth=…&rels=… link restores the exact same view.
+  const [query, setQuery] = useState(() => searchParams.get("q") || "玄奘");
+  const [entityType, setEntityType] = useState(() => searchParams.get("type") || "");
+  const [selectedEntityId, setSelectedEntityId] = useState<number | null>(() => {
+    const id = searchParams.get("id");
+    return id && /^\d+$/.test(id) ? Number(id) : null;
+  });
+  const [graphDepth, setGraphDepth] = useState(() => {
+    const d = Number(searchParams.get("depth"));
+    return d >= 1 && d <= 4 ? d : isMobile ? 1 : 2;
+  });
+  const [selectedPredicates, setSelectedPredicates] = useState<string[]>(() => {
+    const rels = searchParams.get("rels");
+    if (rels) {
+      const parsed = rels.split(",").filter((r) => ALL_PREDICATE_VALUES.includes(r));
+      if (parsed.length) return parsed;
+    }
+    return ALL_PREDICATE_VALUES;
+  });
   const [showStats, setShowStats] = useState(false);
+  const [curatedOpen, setCuratedOpen] = useState(!isMobile);
 
   const { data: kgStats } = useQuery({
     queryKey: ["kg-stats"],
@@ -66,8 +152,22 @@ export default function KnowledgeGraphPage() {
     staleTime: 60_000,
   });
 
-  // 标记是否需要自动选中下一次搜索结果
-  const autoSelectRef = useRef(true);
+  // 标记是否需要自动选中下一次搜索结果。初始为 true，除非 URL 已指定 id。
+  const autoSelectRef = useRef(!searchParams.get("id"));
+
+  // Mirror view state back into the URL (replace, so it doesn't spam
+  // history). Only non-default values are written to keep links clean.
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (query) next.set("q", query);
+    if (entityType) next.set("type", entityType);
+    if (selectedEntityId != null) next.set("id", String(selectedEntityId));
+    if (graphDepth !== (isMobile ? 1 : 2)) next.set("depth", String(graphDepth));
+    if (selectedPredicates.length !== ALL_PREDICATE_VALUES.length) {
+      next.set("rels", selectedPredicates.join(","));
+    }
+    setSearchParams(next, { replace: true });
+  }, [query, entityType, selectedEntityId, graphDepth, selectedPredicates, isMobile, setSearchParams]);
 
   const { data: searchResults, isLoading: searching } = useQuery({
     queryKey: ["kg-search", query, entityType],
@@ -108,6 +208,14 @@ export default function KnowledgeGraphPage() {
 
   const handleGraphNodeClick = (node: { id: number }) => {
     setSelectedEntityId(node.id);
+  };
+
+  // 点击「推荐探索」入口：相当于一次带类型过滤的搜索
+  const handleCurated = (label: string, type: string) => {
+    setQuery(label);
+    setEntityType(type);
+    setSelectedEntityId(null);
+    autoSelectRef.current = true;
   };
 
   const entityHasRelations = graphData && graphData.links.length > 0;
@@ -207,10 +315,55 @@ export default function KnowledgeGraphPage() {
             onChange={(vals) => setSelectedPredicates(vals as string[])}
             options={ALL_PREDICATES.map((p) => ({
               value: p.value,
-              label: p.label,
+              label: (
+                <Tooltip title={PREDICATE_DESC[p.value]}>
+                  <span>{p.label}</span>
+                </Tooltip>
+              ),
             }))}
           />
         </div>
+      </div>
+
+      {/* 推荐探索 — curated entry points so a new user doesn't face a blank search box */}
+      <div className="kg-curated">
+        <div
+          className="kg-curated-head"
+          role="button"
+          tabIndex={0}
+          aria-expanded={curatedOpen}
+          onClick={() => setCuratedOpen((o) => !o)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setCuratedOpen((o) => !o);
+            }
+          }}
+        >
+          <CompassOutlined />
+          <span className="kg-curated-title">推荐探索</span>
+          {curatedOpen ? <DownOutlined /> : <RightOutlined />}
+        </div>
+        {curatedOpen && (
+          <div className="kg-curated-body">
+            {CURATED_GROUPS.map((g) => (
+              <div key={g.title} className="kg-curated-group">
+                <span className="kg-curated-group-title">{g.title}</span>
+                <div className="kg-curated-chips">
+                  {g.items.map((item) => (
+                    <button
+                      key={item.label}
+                      className={`kg-chip${query === item.label ? " active" : ""}`}
+                      onClick={() => handleCurated(item.label, item.type)}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Three-column layout */}
@@ -260,6 +413,11 @@ export default function KnowledgeGraphPage() {
                       >
                         {TYPE_LABEL_MAP[entity.entity_type] || entity.entity_type}
                       </span>
+                      {entity.relation_count != null && entity.relation_count > 0 && (
+                        <span className="kg-result-degree">
+                          {entity.relation_count} 关系
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))
