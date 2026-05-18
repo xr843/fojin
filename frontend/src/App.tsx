@@ -24,6 +24,7 @@ const LoginPage = lazy(() => import("./pages/LoginPage"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 const ParallelReaderPage = lazy(() => import("./pages/ParallelReaderPage"));
 const KnowledgeGraphPage = lazy(() => import("./pages/KnowledgeGraphPage"));
+const PersonPage = lazy(() => import("./pages/PersonPage"));
 const ChatPage = lazy(() => import("./pages/ChatPage"));
 const DictionaryPage = lazy(() => import("./pages/DictionaryPage"));
 const SutraLandingPage = lazy(() => import("./pages/SutraLandingPage"));
@@ -87,6 +88,7 @@ function App() {
             </Route>
             <Route path="/parallel/:textId" element={<ParallelReaderPage />} />
             <Route path="/kg" element={<RouteErrorBoundary><KnowledgeGraphPage /></RouteErrorBoundary>} />
+            <Route path="/person/:id" element={<RouteErrorBoundary><PersonPage /></RouteErrorBoundary>} />
             <Route path="/exports" element={<ExportsPage />} />
             <Route path="/timeline" element={<TimelinePage />} />
             <Route path="/dashboard" element={<DashboardPage />} />
