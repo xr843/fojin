@@ -80,8 +80,10 @@ async def search_entities(
     total_result = await session.execute(count_stmt)
     total = total_result.scalar() or 0
 
-    # Relevance sorting: exact > prefix > contains; person/school before text
-    # Use first variant (original query) for matching
+    # Relevance sorting: exact > prefix > contains; within the same
+    # relevance tier, the most-connected entity (highest graph degree)
+    # wins so an ambiguous name resolves to its richest node; type and
+    # id are final tiebreaks.
     relevance = case(
         (KGEntity.name_zh == q, 0),
         (KGEntity.name_zh.startswith(q), 1),
@@ -93,9 +95,33 @@ async def search_entities(
         (KGEntity.entity_type == "dynasty", 2),
         else_=3,
     )
-    stmt = stmt.order_by(relevance, type_priority, KGEntity.id).offset(offset).limit(limit)
+    # Degree = number of KG relations touching the entity (as subject or
+    # object). Used both as a sort key and surfaced to the UI as
+    # `relation_count` so a result can show "N 条关系".
+    degree_col = (
+        select(func.count(KGRelation.id))
+        .where(
+            or_(
+                KGRelation.subject_id == KGEntity.id,
+                KGRelation.object_id == KGEntity.id,
+            )
+        )
+        .correlate(KGEntity)
+        .scalar_subquery()
+        .label("degree")
+    )
+    stmt = (
+        stmt.add_columns(degree_col)
+        .order_by(relevance, degree_col.desc(), type_priority, KGEntity.id)
+        .offset(offset)
+        .limit(limit)
+    )
     result = await session.execute(stmt)
-    return list(result.scalars().all()), total
+    entities: list[KGEntity] = []
+    for ent, degree in result.all():
+        ent.relation_count = int(degree or 0)
+        entities.append(ent)
+    return entities, total
 
 
 async def get_entity(session: AsyncSession, entity_id: int) -> KGEntity | None:

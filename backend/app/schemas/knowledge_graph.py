@@ -13,6 +13,10 @@ class KGEntityResponse(BaseModel):
     properties: dict | None = None
     text_id: int | None = None
     external_ids: dict | None = None
+    # Number of KG relations touching this entity. Populated by
+    # search_entities (used for degree-ranked results + UI badge);
+    # defaults to 0 for endpoints that don't compute it.
+    relation_count: int = 0
 
     model_config = {"from_attributes": True}
 

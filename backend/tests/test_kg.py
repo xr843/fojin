@@ -32,6 +32,7 @@ def _make_entity(id, entity_type, name_zh, **kwargs):
     obj.properties = kwargs.get("properties")
     obj.text_id = kwargs.get("text_id")
     obj.external_ids = kwargs.get("external_ids")
+    obj.relation_count = kwargs.get("relation_count", 0)
     return obj
 
 
@@ -198,3 +199,23 @@ async def test_entity_detail_includes_relations(kg_client):
         assert len(data["relations"]) == 1
         assert data["relations"][0]["predicate"] == "member_of_school"
         assert data["relations"][0]["target_name"] == "華嚴宗"
+
+
+# ---------------------------------------------------------------------------
+# Test 7: 搜索结果透出 relation_count（图度数），供前端排序徽章使用
+# ---------------------------------------------------------------------------
+@pytest.mark.anyio
+async def test_search_results_expose_relation_count(kg_client):
+    with patch(f"{_KG_API}.search_entities") as m:
+        m.return_value = (
+            [
+                _make_entity(1, "person", "玄奘", relation_count=42),
+                _make_entity(2, "person", "玄奘三藏", relation_count=0),
+            ],
+            2,
+        )
+        resp = await kg_client.get("/api/kg/entities", params={"q": "玄奘"})
+        assert resp.status_code == 200
+        results = resp.json()["results"]
+        assert results[0]["relation_count"] == 42
+        assert results[1]["relation_count"] == 0
