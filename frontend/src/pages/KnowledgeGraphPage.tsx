@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Input, Select, Spin, Empty, Slider, Checkbox, Alert, Tooltip } from "antd";
+import { Input, Select, Spin, Empty, Slider, Checkbox, Alert, Tooltip, Segmented } from "antd";
 import {
   ApartmentOutlined,
   SearchOutlined,
@@ -9,6 +9,8 @@ import {
   CompassOutlined,
   DownOutlined,
   RightOutlined,
+  UnorderedListOutlined,
+  ProfileOutlined,
 } from "@ant-design/icons";
 import ForceGraph, {
   TYPE_COLORS,
@@ -119,8 +121,25 @@ const CURATED_GROUPS: { title: string; items: { label: string; type: string }[] 
   },
 ];
 
+// 移动端 Tab 三选项
+type MobileTab = "search" | "graph" | "detail";
+
 export default function KnowledgeGraphPage() {
-  const isMobile = typeof window !== "undefined" && window.innerWidth <= 768;
+  // 响应式 isMobile：监听 resize，避免旋转/窗口变化后失效
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== "undefined" && window.innerWidth <= 768
+  );
+  const handleResize = useCallback(() => {
+    setIsMobile(window.innerWidth <= 768);
+  }, []);
+  useEffect(() => {
+    window.addEventListener("resize", handleResize, { passive: true });
+    return () => window.removeEventListener("resize", handleResize);
+  }, [handleResize]);
+
+  // 移动端当前激活的 Tab
+  const [mobileTab, setMobileTab] = useState<MobileTab>("search");
+
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Initialise all view state from the URL once, so a shared/bookmarked
@@ -204,10 +223,14 @@ export default function KnowledgeGraphPage() {
 
   const handleEntitySelect = (entity: KGEntity) => {
     setSelectedEntityId(entity.id);
+    // 移动端：选中搜索结果后自动切到图谱 Tab
+    if (isMobile) setMobileTab("graph");
   };
 
   const handleGraphNodeClick = (node: { id: number }) => {
     setSelectedEntityId(node.id);
+    // 移动端：点击图谱节点后自动切到详情 Tab
+    if (isMobile) setMobileTab("detail");
   };
 
   // 点击「推荐探索」入口：相当于一次带类型过滤的搜索
@@ -216,6 +239,8 @@ export default function KnowledgeGraphPage() {
     setEntityType(type);
     setSelectedEntityId(null);
     autoSelectRef.current = true;
+    // 移动端：推荐探索触发搜索后切到搜索结果 Tab（让用户看到结果）
+    if (isMobile) setMobileTab("search");
   };
 
   const entityHasRelations = graphData && graphData.links.length > 0;
@@ -366,170 +391,218 @@ export default function KnowledgeGraphPage() {
         )}
       </div>
 
-      {/* Three-column layout */}
-      <div className="kg-layout">
-        {/* Left: Search Results */}
-        <div className="kg-sidebar">
-          <div className="kg-sidebar-card">
-            <div className="kg-sidebar-title">
-              搜索结果
-              {searchResults && (
-                <span style={{ fontWeight: 400, color: "#9a8e7a", marginLeft: 6, fontSize: 11 }}>
-                  {searchResults.total} 条
-                </span>
-              )}
-            </div>
-            <div className="kg-sidebar-body">
-              {searching ? (
-                <div style={{ padding: 32, textAlign: "center" }}>
-                  <Spin />
-                </div>
-              ) : !searchResults?.results.length ? (
-                <div style={{ padding: 32 }}>
-                  <Empty
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                    description={query ? "未找到相关实体" : "输入关键词搜索"}
-                  />
-                </div>
-              ) : (
-                searchResults.results.map((entity) => (
-                  <div
-                    key={entity.id}
-                    className={`kg-result-item${selectedEntityId === entity.id ? " active" : ""}`}
-                    onClick={() => handleEntitySelect(entity)}
-                  >
-                    <div className="kg-result-name">
-                      {entity.name_zh}
-                      {entity.name_sa && (
-                        <span className="kg-result-sub">{entity.name_sa}</span>
-                      )}
-                    </div>
-                    {entity.description && (
-                      <div className="kg-result-desc">{entity.description}</div>
-                    )}
-                    <div className="kg-result-tags">
-                      <span
-                        className={`kg-type-tag kg-type-tag--${entity.entity_type}`}
-                      >
-                        {TYPE_LABEL_MAP[entity.entity_type] || entity.entity_type}
-                      </span>
-                      {entity.relation_count != null && entity.relation_count > 0 && (
-                        <span className="kg-result-degree">
-                          {entity.relation_count} 关系
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+      {/* 移动端 Tab 切换器 — 仅在 ≤768px 显示 */}
+      {isMobile && (
+        <div className="kg-mobile-tabs">
+          <Segmented
+            block
+            value={mobileTab}
+            onChange={(v) => setMobileTab(v as MobileTab)}
+            options={[
+              {
+                value: "search",
+                label: (
+                  <span className="kg-tab-label">
+                    <UnorderedListOutlined />
+                    <span>搜索结果</span>
+                  </span>
+                ),
+              },
+              {
+                value: "graph",
+                label: (
+                  <span className="kg-tab-label">
+                    <ApartmentOutlined />
+                    <span>图谱</span>
+                  </span>
+                ),
+              },
+              {
+                value: "detail",
+                label: (
+                  <span className="kg-tab-label">
+                    <ProfileOutlined />
+                    <span>详情</span>
+                  </span>
+                ),
+              },
+            ]}
+          />
         </div>
+      )}
 
-        {/* Center: Graph */}
-        <div className="kg-graph-area">
-          {loadingGraph ? (
-            <div className="kg-graph-empty">
-              <Spin size="large" />
-            </div>
-          ) : selectedEntityId && !entityHasRelations ? (
-            <div className="kg-graph-empty">
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="该实体尚未与其他实体建立关系"
-              >
-                {entityDetail && (
-                  <p style={{ color: "#9a8e7a", fontSize: 12, margin: 0 }}>
-                    「{entityDetail.name_zh}」暂无图谱关系数据
-                  </p>
+      {/* 搜索结果面板 */}
+      {/* 桌面端：渲染在三栏内；移动端：仅 search Tab 激活时渲染 */}
+      {/* 三栏布局（桌面端：三列并排；移动端：各 Tab 单独展示） */}
+      <div className={`kg-layout${isMobile ? " kg-layout--mobile" : ""}`}>
+        {/* Left: Search Results */}
+        {(!isMobile || mobileTab === "search") && (
+          <div className="kg-sidebar">
+            <div className="kg-sidebar-card">
+              <div className="kg-sidebar-title">
+                搜索结果
+                {searchResults && (
+                  <span style={{ fontWeight: 400, color: "#9a8e7a", marginLeft: 6, fontSize: 11 }}>
+                    {searchResults.total} 条
+                  </span>
                 )}
-              </Empty>
-            </div>
-          ) : graphData?.nodes.length ? (
-            <div className="kg-graph-container">
-              {graphData.truncated && (
-                <div className="kg-truncated-bar">
-                  <Alert
-                    type="warning"
-                    showIcon
-                    message={
-                      isMobile
-                        ? `节点过多（${graphData.nodes.length}），请减小深度`
-                        : `图谱节点超出（${graphData.nodes.length} 节点 / ${graphData.links.length} 边），可减小深度或过滤关系类型`
-                    }
-                    closable
-                  />
-                </div>
-              )}
-              <ForceGraph
-                nodes={graphData.nodes}
-                links={graphData.links}
-                height={graphHeight}
-                onNodeClick={handleGraphNodeClick}
-              />
-              {/* HTML Legend */}
-              <div className="kg-legend">
-                <div className="kg-legend-section">
-                  <span className="kg-legend-title">节点</span>
-                  {usedNodeTypes.map((type) => (
-                    <span key={type} className="kg-legend-item">
-                      <span
-                        className="kg-legend-dot"
-                        style={{ background: TYPE_COLORS[type] || "#888" }}
-                      />
-                      {TYPE_LABELS[type] || type}
-                    </span>
-                  ))}
-                </div>
-                <div style={{ width: 1, height: 16, background: "#e8e0d4" }} />
-                <div className="kg-legend-section">
-                  <span className="kg-legend-title">关系</span>
-                  {usedPredicates.map((pred) => (
-                    <span key={pred} className="kg-legend-item">
-                      <span
-                        className="kg-legend-line"
-                        style={{
-                          background: PREDICATE_COLORS[pred] || "#bbb5a6",
-                        }}
-                      />
-                      {PREDICATE_LABELS[pred] || pred}
-                    </span>
-                  ))}
-                </div>
+              </div>
+              <div className="kg-sidebar-body">
+                {searching ? (
+                  <div style={{ padding: 32, textAlign: "center" }}>
+                    <Spin />
+                  </div>
+                ) : !searchResults?.results.length ? (
+                  <div style={{ padding: 32 }}>
+                    <Empty
+                      image={Empty.PRESENTED_IMAGE_SIMPLE}
+                      description={query ? "未找到相关实体" : "输入关键词搜索"}
+                    />
+                  </div>
+                ) : (
+                  searchResults.results.map((entity) => (
+                    <div
+                      key={entity.id}
+                      className={`kg-result-item${selectedEntityId === entity.id ? " active" : ""}`}
+                      onClick={() => handleEntitySelect(entity)}
+                    >
+                      <div className="kg-result-name">
+                        {entity.name_zh}
+                        {entity.name_sa && (
+                          <span className="kg-result-sub">{entity.name_sa}</span>
+                        )}
+                      </div>
+                      {entity.description && (
+                        <div className="kg-result-desc">{entity.description}</div>
+                      )}
+                      <div className="kg-result-tags">
+                        <span
+                          className={`kg-type-tag kg-type-tag--${entity.entity_type}`}
+                        >
+                          {TYPE_LABEL_MAP[entity.entity_type] || entity.entity_type}
+                        </span>
+                        {entity.relation_count != null && entity.relation_count > 0 && (
+                          <span className="kg-result-degree">
+                            {entity.relation_count} 关系
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
-          ) : (
-            <div className="kg-graph-empty">
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="选择实体查看知识图谱"
-              />
-            </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* Center: Graph */}
+        {(!isMobile || mobileTab === "graph") && (
+          <div className="kg-graph-area">
+            {loadingGraph ? (
+              <div className="kg-graph-empty">
+                <Spin size="large" />
+              </div>
+            ) : selectedEntityId && !entityHasRelations ? (
+              <div className="kg-graph-empty">
+                <Empty
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description="该实体尚未与其他实体建立关系"
+                >
+                  {entityDetail && (
+                    <p style={{ color: "#9a8e7a", fontSize: 12, margin: 0 }}>
+                      「{entityDetail.name_zh}」暂无图谱关系数据
+                    </p>
+                  )}
+                </Empty>
+              </div>
+            ) : graphData?.nodes.length ? (
+              <div className="kg-graph-container">
+                {graphData.truncated && (
+                  <div className="kg-truncated-bar">
+                    <Alert
+                      type="warning"
+                      showIcon
+                      message={
+                        isMobile
+                          ? `节点过多（${graphData.nodes.length}），请减小深度`
+                          : `图谱节点超出（${graphData.nodes.length} 节点 / ${graphData.links.length} 边），可减小深度或过滤关系类型`
+                      }
+                      closable
+                    />
+                  </div>
+                )}
+                <ForceGraph
+                  nodes={graphData.nodes}
+                  links={graphData.links}
+                  height={graphHeight}
+                  onNodeClick={handleGraphNodeClick}
+                />
+                {/* HTML Legend */}
+                <div className="kg-legend">
+                  <div className="kg-legend-section">
+                    <span className="kg-legend-title">节点</span>
+                    {usedNodeTypes.map((type) => (
+                      <span key={type} className="kg-legend-item">
+                        <span
+                          className="kg-legend-dot"
+                          style={{ background: TYPE_COLORS[type] || "#888" }}
+                        />
+                        {TYPE_LABELS[type] || type}
+                      </span>
+                    ))}
+                  </div>
+                  <div style={{ width: 1, height: 16, background: "#e8e0d4" }} />
+                  <div className="kg-legend-section">
+                    <span className="kg-legend-title">关系</span>
+                    {usedPredicates.map((pred) => (
+                      <span key={pred} className="kg-legend-item">
+                        <span
+                          className="kg-legend-line"
+                          style={{
+                            background: PREDICATE_COLORS[pred] || "#bbb5a6",
+                          }}
+                        />
+                        {PREDICATE_LABELS[pred] || pred}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="kg-graph-empty">
+                <Empty
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description="选择实体查看知识图谱"
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Right: Entity Detail */}
-        <div className="kg-detail-panel">
-          {entityDetail ? (
-            <div className="kg-detail-card">
-              <EntityCard
-                entity={entityDetail}
-                onEntityClick={(id) => setSelectedEntityId(id)}
-              />
-            </div>
-          ) : selectedEntityId ? (
-            <div className="kg-detail-empty">
-              <Spin />
-            </div>
-          ) : (
-            <div className="kg-detail-empty">
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="点击节点查看详情"
-              />
-            </div>
-          )}
-        </div>
+        {(!isMobile || mobileTab === "detail") && (
+          <div className="kg-detail-panel">
+            {entityDetail ? (
+              <div className="kg-detail-card">
+                <EntityCard
+                  entity={entityDetail}
+                  onEntityClick={(id) => setSelectedEntityId(id)}
+                />
+              </div>
+            ) : selectedEntityId ? (
+              <div className="kg-detail-empty">
+                <Spin />
+              </div>
+            ) : (
+              <div className="kg-detail-empty">
+                <Empty
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description="点击节点查看详情"
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
