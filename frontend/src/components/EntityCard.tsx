@@ -1,6 +1,7 @@
-import { Typography, Button, Divider } from "antd";
+import { Typography, Button, Divider, Tooltip } from "antd";
 import {
   BookOutlined,
+  ReadOutlined,
   ArrowRightOutlined,
   ArrowLeftOutlined,
 } from "@ant-design/icons";
@@ -52,6 +53,27 @@ const PROPERTY_LABELS: Record<string, string> = {
   year_start: "生年",
   year_end: "卒年",
 };
+
+/* Relation-source provenance labels. A relation's `source` records where
+   the assertion came from — an authoritative catalogue, auto-extracted
+   metadata, or hand-seeded data. Surfacing it lets a scholar judge how
+   much to trust an edge instead of taking every relation at face value. */
+const SOURCE_LABELS: Record<string, string> = {
+  dila_catalog: "DILA 规范目录",
+  dila: "DILA 规范库",
+  "auto:cbeta_metadata": "CBETA 元数据",
+  "seed:lineage": "师承谱系（人工校订）",
+  "seed:person_place": "人物地理（人工校订）",
+  "seed:school_affiliation": "宗派归属（人工校订）",
+};
+
+function prettifySource(source: string): string {
+  if (SOURCE_LABELS[source]) return SOURCE_LABELS[source];
+  if (source.startsWith("seed:")) return "人工校订";
+  if (source.startsWith("auto:")) return "自动提取";
+  if (source.startsWith("dila")) return "DILA 规范库";
+  return source;
+}
 
 interface Entity {
   id: number;
@@ -119,7 +141,8 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
         </Typography.Paragraph>
       )}
 
-      {/* Link to text */}
+      {/* Cross-module jumps: read the linked text, or look the term up
+          in the Buddhist dictionary — so the graph isn't a dead end. */}
       {entity.text_id && (
         <Button
           type="link"
@@ -129,6 +152,19 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
           onClick={() => navigate(`/texts/${entity.text_id}`)}
         >
           查看关联经文
+        </Button>
+      )}
+      {entity.entity_type === "concept" && (
+        <Button
+          type="link"
+          size="small"
+          icon={<ReadOutlined />}
+          style={{ padding: 0, marginBottom: 10, color: "#8b2500", fontSize: 12 }}
+          onClick={() =>
+            navigate(`/dict/${encodeURIComponent(entity.name_zh)}`)
+          }
+        >
+          查辞典释义
         </Button>
       )}
 
@@ -298,6 +334,20 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
                         {targetMeta.label}
                       </span>
                       <span>{rel.target_name}</span>
+                      {rel.source && (
+                        <Tooltip title={`关系出处：${rel.source}`}>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              color: "#b3a98f",
+                              marginLeft: "auto",
+                              flexShrink: 0,
+                            }}
+                          >
+                            据 {prettifySource(rel.source)}
+                          </span>
+                        </Tooltip>
+                      )}
                     </div>
                   );
                 })}
