@@ -21,6 +21,7 @@ import ForceGraph, {
 } from "../components/ForceGraph";
 import EntityCard from "../components/EntityCard";
 import KGTimeline from "../components/kg/KGTimeline";
+import KGPathQuery from "../components/kg/KGPathQuery";
 import { searchKGEntities, getKGEntity, getKGEntityGraph, getKGStats, getKGTimeline } from "../api/client";
 import type { KGEntity } from "../api/client";
 import "../styles/kg.css";
@@ -470,6 +471,12 @@ export default function KnowledgeGraphPage() {
           />
         </div>
       )}
+
+      {/* 路径查询面板 — 当前选中实体作为起点 */}
+      <KGPathQuery
+        fromEntity={entityDetail ?? null}
+        onNodeClick={handleGraphNodeClick}
+      />
 
       {/* 搜索结果面板 */}
       {/* 桌面端：渲染在三栏内；移动端：仅 search Tab 激活时渲染 */}

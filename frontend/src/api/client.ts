@@ -663,6 +663,24 @@ export async function getKGStats(): Promise<KGStats> {
   return data;
 }
 
+export interface KGPathResponse {
+  found: boolean;
+  hops: number;
+  nodes: KGGraphNode[];
+  links: KGGraphLink[];
+}
+
+export async function getKGPath(
+  fromId: number,
+  toId: number,
+  maxHops: number = 6,
+): Promise<KGPathResponse> {
+  const { data } = await api.get<KGPathResponse>("/kg/path", {
+    params: { from_id: fromId, to_id: toId, max_hops: maxHops },
+  });
+  return data;
+}
+
 export interface KGGeoEntity {
   id: number;
   entity_type: string;
