@@ -10,7 +10,10 @@ services:
     container_name: fojin-postgres
     restart: always
     logging: *default-logging
-    mem_limit: 1g
+    # 1g chronically OOM-killed backends (155 cgroup OOMs in the dmesg
+    # buffer, all task=postgres) → full crash-recovery cycles dropping
+    # every connection. Raised to 3g; host has the headroom.
+    mem_limit: 3g
     cpus: 1.0
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-fojin}
