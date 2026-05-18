@@ -174,6 +174,97 @@
   border-color: var(--fj-accent);
 }
 
+/* ---------- 推荐探索 ---------- */
+.kg-curated {
+  background: #faf8f4;
+  border: 1px solid var(--fj-border);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.kg-curated-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  user-select: none;
+  color: var(--fj-ink-muted);
+}
+.kg-curated-head:hover { color: var(--fj-ink); }
+.kg-curated-head .anticon { font-size: 12px; }
+
+.kg-curated-title {
+  font-family: "Noto Serif SC", serif;
+  font-size: 13px;
+  font-weight: 600;
+  margin-right: auto;
+}
+
+.kg-curated-body {
+  padding: 4px 14px 12px;
+}
+
+.kg-curated-group {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 0;
+}
+
+.kg-curated-group-title {
+  font-family: "Noto Serif SC", serif;
+  font-size: 12px;
+  color: var(--fj-ink-muted);
+  flex-shrink: 0;
+  width: 56px;
+}
+
+.kg-curated-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.kg-chip {
+  font-family: "Noto Serif SC", serif;
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 3px 11px;
+  border-radius: 12px;
+  border: 1px solid var(--fj-border);
+  background: #fff;
+  color: var(--fj-ink-light);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.kg-chip:hover {
+  border-color: var(--fj-gold);
+  color: var(--fj-ink);
+}
+.kg-chip.active {
+  background: var(--fj-gold);
+  border-color: var(--fj-gold);
+  color: #fff;
+}
+
+@media (max-width: 768px) {
+  .kg-curated-group {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .kg-curated-group-title { width: auto; }
+}
+
+/* 关系度数徽章 */
+.kg-result-degree {
+  font-size: 10px;
+  line-height: 18px;
+  color: #9a8e7a;
+  white-space: nowrap;
+}
+
 /* ---------- 三栏布局 ---------- */
 .kg-layout {
   display: flex;

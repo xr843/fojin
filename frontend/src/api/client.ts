@@ -321,6 +321,8 @@ export interface KGEntity {
   properties: Record<string, any> | null;
   text_id: TextId | null;
   external_ids: Record<string, string> | null;
+  /** KG relation count — populated by search results, used for the degree badge. */
+  relation_count?: number;
 }
 
 export interface EntityRelationItem {
