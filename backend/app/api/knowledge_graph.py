@@ -63,10 +63,12 @@ async def get_kg_entity(entity_id: int, db: AsyncSession = Depends(get_db)):
     if not entity:
         raise KGEntityNotFoundError(entity_id=entity_id)
     relations = await get_entity_relations(db, entity_id)
-    return KGEntityDetailResponse(
-        **KGEntityResponse.model_validate(entity).model_dump(),
-        relations=relations,
-    )
+    # relation_count isn't set on the detail path (search_entities computes
+    # it via a degree subquery); derive it from the relations we just
+    # fetched so the field isn't a misleading 0.
+    base = KGEntityResponse.model_validate(entity).model_dump()
+    base["relation_count"] = len(relations)
+    return KGEntityDetailResponse(**base, relations=relations)
 
 
 @router.get("/entities/{entity_id}/graph", response_model=KGGraphResponse)

@@ -329,7 +329,16 @@ export default function KnowledgeGraphPage() {
       <div className="kg-curated">
         <div
           className="kg-curated-head"
+          role="button"
+          tabIndex={0}
+          aria-expanded={curatedOpen}
           onClick={() => setCuratedOpen((o) => !o)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setCuratedOpen((o) => !o);
+            }
+          }}
         >
           <CompassOutlined />
           <span className="kg-curated-title">推荐探索</span>
