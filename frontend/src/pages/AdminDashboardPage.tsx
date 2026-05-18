@@ -240,7 +240,9 @@ function ModuleUsageCard() {
         <Empty description="暂无 Umami 数据" />
       ) : (
         <>
-          <Text type="secondary" style={{ fontSize: 12 }}>各板块事件量</Text>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            各板块事件量（全站访客，含未登录）
+          </Text>
           <Row gutter={[16, 16]} style={{ marginTop: 4, marginBottom: 16 }}>
             {data.events.map((ev: ModuleEventItem) => (
               <Col xs={12} sm={6} key={ev.event_name}>
@@ -363,7 +365,9 @@ function PlatformActivityCard() {
         </Col>
       </Row>
 
-      <Text type="secondary" style={{ fontSize: 12 }}>阅读</Text>
+      {/* 口径：reading_history 仅记录登录用户；全站(含匿名)阅读量见
+          「板块使用情况」面板的「在线阅读」。 */}
+      <Text type="secondary" style={{ fontSize: 12 }}>阅读（仅登录用户）</Text>
       <Row gutter={[16, 16]} style={{ marginTop: 4, marginBottom: 16 }}>
         <Col xs={12} sm={6}>
           <Statistic title="阅读次数" value={data.reading.total_reads} prefix={<BookOutlined />} />
@@ -373,16 +377,12 @@ function PlatformActivityCard() {
         </Col>
       </Row>
 
+      {/* 静态总量(经文总数/数据源)已移出 — 本面板只放随时间范围变化的
+          周期指标；总量见首页。 */}
       <Text type="secondary" style={{ fontSize: 12 }}>内容</Text>
       <Row gutter={[16, 16]} style={{ marginTop: 4, marginBottom: 16 }}>
         <Col xs={12} sm={6}>
-          <Statistic title="新增经文" value={data.content.new_texts} prefix={<DatabaseOutlined />} />
-        </Col>
-        <Col xs={12} sm={6}>
-          <Statistic title="经文总数" value={data.content.total_texts} />
-        </Col>
-        <Col xs={12} sm={6}>
-          <Statistic title="活跃数据源" value={data.content.total_sources} />
+          <Statistic title="本期新增经文" value={data.content.new_texts} prefix={<DatabaseOutlined />} />
         </Col>
       </Row>
 
