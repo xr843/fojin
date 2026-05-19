@@ -54,13 +54,13 @@ docker exec fojin-backend python scripts/import_catalog.py
 docker exec fojin-backend python scripts/import_content.py --all --xml-dir /data/xml-p5
 
 # 生成 embedding（支持增量）
-docker exec fojin-backend python -m scripts.generate_embeddings --source cbeta
+docker exec fojin-backend python -m scripts.archive.misc.generate_embeddings --source cbeta
 
 # SuttaCentral 早期佛典
-docker exec fojin-backend python scripts/import_suttacentral.py
+docker exec fojin-backend python scripts/archive/imports/import_suttacentral.py
 
-# 全部导入脚本
-ls backend/scripts/import_*.py
+# 全部导入脚本（一次性导入脚本在 archive/ 下）
+ls backend/scripts/archive/imports/
 ```
 
 每个 importer 直接从原始源（CBETA、SuttaCentral 等）下载 —— 本仓库不附带任何数据。
@@ -100,7 +100,7 @@ ls backend/scripts/import_*.py
 1. **AI 问答** — 当小津引用 MVP 经典时，引文抽屉显示 `[ 汉文 ] [ 巴利 (5) ] [ 藏文 (3) ]` 标签页，点切换即可对照不同语种段落（藏文显示 Noto Tibetan 字体）
 2. **阅读器** — 点工具栏 🌐 **「多语对读」** 内联侧栏，默认「按经对读」tab 展示 SuttaCentral 学术对应（Akanuma 级权威，四阿含↔尼柯耶 3293 条），每条附 Pāli 原文 + Sujato 英译预览 + 阅读全文链接。切换「按段对读」tab 查看 embedding+LLM 段级对齐（实验，有噪音）。可与 AI 解读面板**同时打开**，各自拖拽调宽
 
-**对齐管道**（`backend/scripts/build_alignments.py`）：
+**对齐管道**（`backend/scripts/archive/misc/build_alignments.py`）：
 - pgvector top-20 候选粗召回
 - LLM 精验证（DeepSeek V3）返回 `{is_parallel, confidence, reason}`
 - 置信度 ≥ 0.75 入 `alignment_pairs` 表，唯一索引保证幂等

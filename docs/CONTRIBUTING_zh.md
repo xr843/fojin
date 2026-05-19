@@ -28,9 +28,10 @@
 
 ## 添加数据源
 
-1. 创建 `backend/scripts/import_<source_name>.py`
-2. 参考现有导入脚本（如 `import_suttacentral.py`）
-3. 在 `backend/scripts/import_all.py` 中注册
+1. 在 `backend/scripts/archive/imports/` 创建 `import_<source_name>.py`
+2. 继承 `backend/scripts/base_importer.py` 的 `BaseImporter`，参考现有导入脚本
+   （如 `archive/imports/import_suttacentral.py`）
+3. 从 `backend/` 目录运行：`python scripts/archive/imports/import_<source_name>.py`
 4. 更新 README.md 中的数据源表
 
 ## 提交 Issue

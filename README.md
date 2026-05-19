@@ -67,13 +67,13 @@ docker exec fojin-backend python scripts/import_catalog.py
 docker exec fojin-backend python scripts/import_content.py --all --xml-dir /data/xml-p5
 
 # Generate embeddings for AI Q&A (supports incremental processing)
-docker exec fojin-backend python -m scripts.generate_embeddings --source cbeta
+docker exec fojin-backend python -m scripts.archive.misc.generate_embeddings --source cbeta
 
 # Import SuttaCentral Early Buddhist Texts
-docker exec fojin-backend python scripts/import_suttacentral.py
+docker exec fojin-backend python scripts/archive/imports/import_suttacentral.py
 
-# See all available importers
-ls backend/scripts/import_*.py
+# See all available importers (one-off importers live under archive/)
+ls backend/scripts/archive/imports/
 ```
 
 Each importer downloads data directly from the original source (CBETA, SuttaCentral, etc.) — no data is bundled in this repository.
@@ -168,7 +168,7 @@ Hand-verified precision on random 10-pair sample: **100%** (all pairs correctly 
 
 2. **In the reader** — Click the 🌐 **「多语对读」** (Multilingual Parallel) button in the toolbar. Default tab **「按经对读」** shows sutta-level parallels from SuttaCentral's authoritative Akanuma-style table (3,293 pairs covering all 4 Āgamas ↔ Nikāyas), with Pāli original + Sujato English previews and "read full text" links. Alternate tab **「按段对读」** retains the experimental embedding+LLM chunk-level alignment (pipeline-generated, known to have noise). The panel sits to the left of the AI reading panel; both can be open simultaneously and independently resized.
 
-**Pipeline (`backend/scripts/build_alignments.py`):**
+**Pipeline (`backend/scripts/archive/misc/build_alignments.py`):**
 
 - pgvector top-20 candidate recall within target text's embeddings
 - LLM verification (DeepSeek V3) returns `{is_parallel, confidence, reason}` JSON per candidate
