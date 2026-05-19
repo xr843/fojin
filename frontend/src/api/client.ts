@@ -475,12 +475,6 @@ export interface UnifiedSearchSection {
     source?: string | null;
     url: string;
   }> | null;
-  hot_questions?: Array<{
-    slug: string;
-    category: string;
-    text: string;
-    url: string;
-  }> | null;
   catalog?: { total: number; results: SearchHit[] } | null;
   content?: { total: number; total_juans?: number; results: ContentSearchHit[] } | null;
   semantic?: { total: number; results: SemanticSearchHit[] } | null;

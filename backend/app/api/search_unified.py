@@ -34,7 +34,6 @@ from sqlalchemy.orm import joinedload
 from app.core.elasticsearch import get_es
 from app.database import async_session, get_db
 from app.models.dictionary import DictionaryEntry
-from app.models.hot_question import HotQuestion
 from app.services.search import (
     search_content,
     search_semantic,
@@ -45,7 +44,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["search"])
 
 _DICT_SECTION_LIMIT = 5
-_HOT_Q_SECTION_LIMIT = 4
 
 
 async def _dict_top_hits(q: str) -> list[dict]:
@@ -88,38 +86,6 @@ async def _dict_top_hits(q: str) -> list[dict]:
     return out
 
 
-async def _hot_question_hits(q: str) -> list[dict]:
-    """Pre-curated hot_questions matching the query as substring.
-
-    These are 200 hand-edited prompts that already exist in the system —
-    surfacing them in unified results steers the 77 empty chat sessions /
-    493 single-turn sessions toward a starting point. Independent session
-    for asyncio.gather concurrency safety.
-    """
-    async with async_session() as db:
-        stmt = (
-            select(HotQuestion)
-            .where(HotQuestion.is_active.is_(True))
-            .where(HotQuestion.display_text.ilike(f"%{q}%"))
-            .order_by(HotQuestion.sort_order.asc())
-            .limit(_HOT_Q_SECTION_LIMIT)
-        )
-        rows = await db.execute(stmt)
-        questions = list(rows.scalars().all())
-
-    out = []
-    for h in questions:
-        out.append(
-            {
-                "slug": h.slug,
-                "category": h.category,
-                "text": h.display_text,
-                "url": f"/chat?q={h.display_text}",
-            }
-        )
-    return out
-
-
 @router.get("/search/unified")
 async def search_unified(
     q: str = Query(..., min_length=1, max_length=200, description="Unified search query"),
@@ -134,7 +100,6 @@ async def search_unified(
             "query": str,
             "sections": {
                 "dictionary": [...]    # top-5 dict hits with /dict/ links
-                "hot_questions": [...] # top-4 curated prompts
                 "catalog": {...}       # SearchResponse — top-10 metadata hits
                 "content": {...}       # ContentSearchResponse — top-5 body hits
                 "semantic": {...}      # SemanticSearchResponse — top-5 vector hits
@@ -145,20 +110,18 @@ async def search_unified(
     es = get_es()
 
     # search_semantic uses the request-scoped session; catalog/content use ES.
-    # dict + hot_q each open their own session for concurrency safety
+    # dict opens its own session for concurrency safety
     # (a single AsyncSession can't service two concurrent execute() calls).
     catalog_coro = search_texts(es, q, page=1, size=10, sources=sources, lang=lang, db=db)
     content_coro = search_content(es, q, page=1, size=5, sources=sources, lang=lang)
     semantic_coro = search_semantic(db, q, size=5, lang=lang, sources=sources)
     dict_coro = _dict_top_hits(q)
-    hot_coro = _hot_question_hits(q)
 
-    catalog_r, content_r, semantic_r, dict_r, hot_r = await asyncio.gather(
+    catalog_r, content_r, semantic_r, dict_r = await asyncio.gather(
         catalog_coro,
         content_coro,
         semantic_coro,
         dict_coro,
-        hot_coro,
         return_exceptions=True,
     )
 
@@ -191,6 +154,5 @@ async def search_unified(
         },
     )
     _attach("dictionary", dict_r)
-    _attach("hot_questions", hot_r)
 
     return {"query": q, "sections": sections, "errors": errors}

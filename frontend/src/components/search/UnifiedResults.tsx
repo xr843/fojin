@@ -11,7 +11,7 @@ interface Props {
 
 /**
  * Unified search results — sectioned overview combining dictionary entries,
- * catalog hits, hot Q&A, and content/semantic snippets in a single view.
+ * catalog hits, and content/semantic snippets in a single view.
  *
  * Sections render in importance order; empty sections are hidden.
  * Used by SearchPage's "全部 / All" tab (default landing tab).
@@ -20,7 +20,6 @@ export default function UnifiedResults({ data }: Props) {
   const sections = data.sections;
 
   const dictionary = sections.dictionary ?? [];
-  const hotQuestions = sections.hot_questions ?? [];
   const catalogResults = sections.catalog?.results ?? [];
   const contentResults = sections.content?.results ?? [];
   const semanticResults = sections.semantic?.results ?? [];
@@ -45,7 +44,6 @@ export default function UnifiedResults({ data }: Props) {
   const hasAny =
     dictionary.length > 0 ||
     catalogResults.length > 0 ||
-    hotQuestions.length > 0 ||
     mergedSnippets.length > 0;
 
   if (!hasAny) {
@@ -127,46 +125,6 @@ export default function UnifiedResults({ data }: Props) {
           {catalogResults.slice(0, 5).map((hit, i) => (
             <ResultCard key={hit.id} hit={hit} rank={i + 1} />
           ))}
-        </section>
-      )}
-
-      {/* 相关问答 */}
-      {hotQuestions.length > 0 && (
-        <section className="s-unified-section">
-          <h3 style={sectionTitleStyle}>{"💡"} 相关问答</h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {hotQuestions.map((q) => (
-              <Link
-                key={q.slug}
-                to={q.url.startsWith("/") ? q.url : `/${q.url}`}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: "10px 14px",
-                  background: "#fff",
-                  border: "1px solid #e8e0d4",
-                  borderRadius: 6,
-                  color: "inherit",
-                  textDecoration: "none",
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: 11,
-                    color: "#9a8e7a",
-                    background: "var(--fj-sand-light, #faf7f2)",
-                    padding: "2px 8px",
-                    borderRadius: 4,
-                    flexShrink: 0,
-                  }}
-                >
-                  {q.category}
-                </span>
-                <span style={{ fontSize: 14, color: "#3d2f1a" }}>{q.text}</span>
-              </Link>
-            ))}
-          </div>
         </section>
       )}
 
