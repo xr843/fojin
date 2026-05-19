@@ -39,9 +39,12 @@ Thank you for your interest in contributing to FoJin! This project aims to make 
 
 To add a new Buddhist text data source:
 
-1. Create `backend/scripts/import_<source_name>.py`
-2. Follow the pattern of existing import scripts (see `import_suttacentral.py` as a good example)
-3. Add the source to `backend/scripts/import_all.py`
+1. Create `import_<source_name>.py` — subclass `BaseImporter` from
+   `backend/scripts/base_importer.py`; follow an existing importer
+   (e.g. `archive/imports/import_suttacentral.py`)
+2. Develop and run it from `backend/scripts/` (the `sys.path` bootstrap in
+   `BaseImporter`-based scripts assumes that location)
+3. Once it has run, move it to `backend/scripts/archive/imports/`
 4. Update the data sources table in README.md
 
 ## Reporting Issues

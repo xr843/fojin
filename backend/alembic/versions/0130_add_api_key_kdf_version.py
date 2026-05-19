@@ -4,7 +4,7 @@ Part of P0-1: split the BYOK encryption key from JWT_SECRET_KEY so that
 rotating the JWT secret no longer silently destroys every stored API
 key.  The version column lets the read path dispatch between the legacy
 KDF (v1, derived from JWT secret) and the new KDF (v2, standalone
-``API_KEY_ENCRYPTION_KEY``) until ``scripts/migrate_api_keys.py``
+``API_KEY_ENCRYPTION_KEY``) until ``scripts/archive/misc/migrate_api_keys.py``
 re-encrypts the existing rows in place.
 
 Backfill rules:

@@ -7,11 +7,12 @@
 - **根目录** — 仍在使用的脚本：cron 周期任务、容器启动钩子、导入编排
   wrapper、共享库、可重复运行的诊断工具。
 - **`archive/`** — 一次性脚本：已完成使命的数据导入 / 回填 / 清理脚本。
-  保留作可复现文档（灾备重建、新实例 setup），不再日常运行。按用途分子目录：
-  `imports/ fetch/ backfill/ enrich/ cleanup/ seed/ misc/`。
+  保留作**历史参考 / 可复现文档**（记录数据是怎么建起来的），不再日常运行。
+  按用途分子目录：`imports/ fetch/ backfill/ enrich/ cleanup/ seed/ misc/`。
 
-归档脚本使用绝对导入 `from scripts.base_importer import ...`，共享库留在根目录，
-因此从 `backend/` 目录运行归档脚本仍然可用。
+> ⚠️ 归档脚本多数在文件头用 `dirname(__file__)` 按「自己位于 `scripts/` 下」
+> 自举 `sys.path`，移入子目录后该路径不再成立 —— **不能原地直接运行**。
+> 若灾备需重跑某个归档脚本，先 `git mv` 移回 `scripts/` 根目录再执行。
 
 ## 活跃脚本
 

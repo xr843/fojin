@@ -297,7 +297,7 @@ async def get_chunk_context(
     ]
 
     # Boundary detection. Chunks within a juan are contiguous (0..max) per
-    # the ingestion pipeline in scripts/generate_embeddings.py, so
+    # the ingestion pipeline in scripts/archive/misc/generate_embeddings.py, so
     # has_more_before reduces to low > 0. has_more_after needs one existence
     # probe because we don't know the juan's max chunk_index up front.
     has_more_before = low > 0

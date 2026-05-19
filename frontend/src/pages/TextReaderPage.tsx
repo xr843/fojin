@@ -554,7 +554,7 @@ export default function TextReaderPage() {
   }, [textId, textDetail]);
 
   // Deep-link from the chat citation drawer: ?highlight_chunk=N
-  // Chunks are 500 chars wide with 50-char overlap (see scripts/generate_embeddings.py),
+  // Chunks are 500 chars wide with 50-char overlap (see scripts/archive/misc/generate_embeddings.py),
   // so chunk N starts at approximately char N * 450 in the juan body. After the
   // juan content paints, scroll the reader container to the matching fraction of
   // its scrollable height. Precision is ±1 paragraph, which is close enough for
