@@ -72,14 +72,19 @@ export default function SourceCard({ source: s, searchQuery }: SourceCardProps) 
   const healthCheckedAt = s.health_checked_at
     ? new Date(s.health_checked_at).toLocaleDateString("zh-CN")
     : null;
-  // For a moved source, health_detail is the redirect target — the one piece
-  // of actionable context worth surfacing in the badge tooltip.
+  // health_detail carries per-source context the generic tip lacks: for a moved
+  // source it's the redirect target, for degraded/unreachable/cert_invalid it's
+  // the probe's specific failure reason. Surface it for every problem state.
+  const healthDetailLine =
+    health && s.health_detail
+      ? s.health_status === "moved"
+        ? `现重定向至：${s.health_detail}`
+        : `详情：${s.health_detail}`
+      : null;
   const healthTooltip = health
     ? [
         health.tip,
-        s.health_status === "moved" && s.health_detail
-          ? `现重定向至：${s.health_detail}`
-          : null,
+        healthDetailLine,
         healthCheckedAt ? `最近巡检：${healthCheckedAt}` : null,
       ]
         .filter(Boolean)
