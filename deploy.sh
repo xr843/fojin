@@ -44,7 +44,7 @@ backend_changed=false
 backend_image_changed=false
 if echo "$CHANGED" | grep -q '^frontend/'; then frontend_changed=true; fi
 if echo "$CHANGED" | grep -q '^backend/';  then backend_changed=true;  fi
-if echo "$CHANGED" | grep -qE '^backend/(Dockerfile|requirements.*\.txt|pyproject\.toml)'; then
+if echo "$CHANGED" | grep -qE '^backend/(Dockerfile|requirements[^/]*\.txt|pyproject\.toml)$'; then
   backend_image_changed=true
 fi
 
@@ -84,7 +84,8 @@ done
 
 if $frontend_changed; then
   log "Verifying frontend ..."
-  FE_PORT="$(docker compose port frontend 80 2>/dev/null | cut -d: -f2)"
+  # `|| true` 收尾: docker compose port 失败时不让 set -e 在守卫之前先杀脚本。
+  FE_PORT="$(docker compose port frontend 80 2>/dev/null | cut -d: -f2 || true)"
   if [ -z "$FE_PORT" ]; then fail "拿不到 frontend 端口映射"; fi
   for i in $(seq 1 15); do
     if curl -sf "http://localhost:${FE_PORT}/" >/dev/null 2>&1; then
