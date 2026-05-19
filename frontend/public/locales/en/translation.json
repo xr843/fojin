@@ -93,7 +93,6 @@
   "search.no_results_for": "No results found for \"{{query}}\"",
   "search.did_you_mean": "Did you mean",
   "search.empty_state_external": "No on-site matches. You can continue searching the external sources below.",
-  "search.external_card_prefix": "Search on external site: {{query}}",
   "language.zh": "中文",
   "language.zh-Hant": "中文（繁體）",
   "language.en": "English",
