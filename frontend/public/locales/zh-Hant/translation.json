@@ -93,7 +93,6 @@
   "search.no_results_for": "沒有找到「{{query}}」的結果",
   "search.did_you_mean": "您是否想搜尋",
   "search.empty_state_external": "無站內匹配，可在以下外部資料源繼續搜尋",
-  "search.external_card_prefix": "在外站搜尋：{{query}}",
   "language.zh": "中文簡體",
   "language.zh-Hant": "中文繁體",
   "language.en": "English",

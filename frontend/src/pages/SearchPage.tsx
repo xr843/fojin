@@ -13,7 +13,7 @@ import { searchTexts, searchContent, searchDictionary, searchCrossLanguage, sear
 import type { DictGroupedSearchResponse } from "../api/client";
 import { hasDirectSearchUrl } from "../utils/sourceUrls";
 import { addSearchHistory, getSearchHistory, type SearchHistoryItem } from "../utils/history";
-import { ResultCard, ExternalCard, DictCard, ContentCard, CrossLangCard, SemanticCard, UnifiedResults } from "../components/search";
+import { ResultCard, ExternalSourcesSection, DictCard, ContentCard, CrossLangCard, SemanticCard, UnifiedResults } from "../components/search";
 import "../styles/search.css";
 import "../styles/sources.css";
 
@@ -266,7 +266,6 @@ export default function SearchPage() {
   // both the error block AND the "no on-site matches" copy.
   const primaryError = tab === "catalog" ? isError : tab === "content" ? contentError : dictError;
   const showEmptyState = !primaryLoading && !primaryError && localTotal === 0 && !hasSecondaryResults;
-  const extTotal = query.length > 0 ? filteredExtSources.length : 0;
 
   const sortedRegions = useMemo(() => {
     return Object.keys(regionCounts).sort((a, b) => {
@@ -433,14 +432,7 @@ export default function SearchPage() {
                 )}
                 {/* 外部数据源结果 */}
                 {!unifiedLoading && !unifiedError && query.length > 0 && filteredExtSources.length > 0 && (
-                  <>
-                    <div className="s-ext-divider">
-                      以下 {extTotal} 个外部数据源可继续搜索「{query}」
-                    </div>
-                    {filteredExtSources.map((s, i) => (
-                      <ExternalCard key={s.code} source={s} query={query} rank={i + 1} />
-                    ))}
-                  </>
+                  <ExternalSourcesSection sources={filteredExtSources} query={query} />
                 )}
               </>
             ) : (
@@ -657,15 +649,7 @@ export default function SearchPage() {
 
             {/* 外部数据源结果 */}
             {(!loading || showEmptyState) && tab !== "dictionary" && query.length > 0 && filteredExtSources.length > 0 && (
-              <>
-                <div className="s-ext-divider">
-                  以下 {extTotal} 个外部数据源可继续搜索「{query}」
-                </div>
-                {filteredExtSources.map((s, i) => (
-                  <ExternalCard key={s.code} source={s} query={query}
-                    rank={i + 1} />
-                ))}
-              </>
+              <ExternalSourcesSection sources={filteredExtSources} query={query} />
             )}
             </>
             )}

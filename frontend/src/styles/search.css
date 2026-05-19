@@ -157,16 +157,6 @@
   border-color: var(--fj-gold);
 }
 
-.s-card-ext {
-  border-left: 3px solid var(--fj-border);
-  background: var(--fj-bg-alt);
-  opacity: 0.85;
-}
-
-.s-card-ext:hover {
-  opacity: 1;
-}
-
 .s-card-rank {
   width: 50px;
   flex-shrink: 0;
@@ -297,6 +287,55 @@
   margin: 8px 0;
   border-top: 1px dashed var(--fj-border);
   border-bottom: 1px dashed var(--fj-border);
+}
+
+/* ---------- 外部源紧凑行 ---------- */
+.s-ext-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  margin-bottom: 6px;
+  background: var(--fj-bg-alt);
+  border: 1px solid var(--fj-border);
+  border-radius: 6px;
+  transition: border-color 0.15s;
+}
+
+.s-ext-row:hover {
+  border-color: var(--fj-gold);
+}
+
+.s-ext-row-name {
+  font-family: "Noto Serif SC", serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fj-ink);
+}
+
+.s-ext-row-spacer {
+  flex: 1 1 8px;
+  min-width: 8px;
+}
+
+.s-ext-toggle {
+  display: block;
+  width: 100%;
+  margin: 4px 0 12px;
+  padding: 8px;
+  background: var(--fj-bg-alt);
+  border: 1px dashed var(--fj-border);
+  border-radius: 6px;
+  color: var(--fj-ink-light);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.s-ext-toggle:hover {
+  border-color: var(--fj-gold);
+  color: var(--fj-ink);
 }
 
 /* ---------- 辞典释义 ---------- */
