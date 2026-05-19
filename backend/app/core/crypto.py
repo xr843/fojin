@@ -5,7 +5,7 @@ Two key derivation versions live side-by-side during the v1→v2 migration:
 * ``KDF_VERSION_V1`` (legacy) — Fernet key = SHA-256(JWT_SECRET_KEY).  This
   shares a secret with the JWT signing key, which means rotating the JWT
   secret silently invalidates every stored API key (P0-1 audit).  Kept
-  here only as a read-side fallback while ``scripts/migrate_api_keys.py``
+  here only as a read-side fallback while ``scripts/archive/misc/migrate_api_keys.py``
   re-encrypts existing rows.
 
 * ``KDF_VERSION_V2`` (current) — Fernet key = ``API_KEY_ENCRYPTION_KEY``,
