@@ -2,9 +2,16 @@
 
 数据源健康状态分类的单元测试。Pure logic, no DB / network."""
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 
-from app.services.source_health import _ip_is_blocked, classify_health, host_is_public
+from app.services.source_health import (
+    _ip_is_blocked,
+    classify_health,
+    host_is_public,
+    resolve_unreachable_since,
+)
 
 HOME = "https://example.org/"
 
@@ -172,3 +179,35 @@ def test_host_is_public_allows_public_ip_literal():
 def test_host_is_public_rejects_empty():
     assert host_is_public(None) is False
     assert host_is_public("") is False
+
+
+# --- resolve_unreachable_since: streak tracking ---------------------------
+
+NOW = datetime(2026, 5, 19, 4, 30, tzinfo=UTC)
+EARLIER = NOW - timedelta(days=12)
+
+
+def test_unreachable_streak_starts_when_newly_unreachable():
+    # No prior streak -> the streak starts now.
+    assert resolve_unreachable_since("unreachable", None, NOW) == NOW
+
+
+def test_unreachable_streak_start_is_preserved_while_still_unreachable():
+    # An ongoing streak keeps its original start, so age keeps accruing.
+    assert resolve_unreachable_since("unreachable", EARLIER, NOW) == EARLIER
+
+
+@pytest.mark.parametrize("status", ["ok", "degraded", "cert_invalid", "moved"])
+def test_any_non_unreachable_status_clears_the_streak(status):
+    # "30 consecutive days unreachable" is about connectivity specifically —
+    # every other verdict, healthy or not, ends the streak.
+    assert resolve_unreachable_since(status, EARLIER, NOW) is None
+
+
+def test_non_unreachable_with_no_prior_streak_stays_none():
+    assert resolve_unreachable_since("ok", None, NOW) is None
+
+
+def test_streak_start_is_timezone_aware():
+    # The value lands in a TIMESTAMPTZ column — a naive datetime would shift.
+    assert resolve_unreachable_since("unreachable", None, NOW).tzinfo is not None

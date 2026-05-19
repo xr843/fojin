@@ -35,6 +35,9 @@ class DataSource(Base):
     # Actionable context for the latest probe: redirect target for moved,
     # failure reason otherwise, NULL when ok.
     health_detail: Mapped[str | None] = mapped_column(String(500))
+    # When the source first entered its current continuous unreachable streak;
+    # NULL when not unreachable. now() - unreachable_since is the streak length.
+    unreachable_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # embedding column is vector(1024), managed via raw SQL; not mapped here
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

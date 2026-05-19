@@ -1,7 +1,7 @@
 """Probe every active data source and persist its health_status.
 
 巡检所有活跃数据源的可达性，将结果写入 data_sources.health_status /
-health_checked_at，并失效 sources 列表缓存。
+health_checked_at / health_detail / unreachable_since，并失效 sources 列表缓存。
 
 Designed to run from cron on the deployment host. Independent of ``is_active``:
 a source can be reachable-but-deprecated, or down-but-kept.
@@ -21,6 +21,7 @@ import asyncio
 import os
 import sys
 import warnings
+from datetime import UTC, datetime
 from urllib.parse import urlsplit
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -38,6 +39,7 @@ from app.services.source_health import (
     VALID_STATUSES,
     classify_health,
     host_is_public,
+    resolve_unreachable_since,
 )
 
 TIMEOUT = 15  # seconds per request
@@ -143,11 +145,15 @@ async def main(dry_run: bool) -> None:
         rows = (
             await session.execute(
                 text(
-                    "SELECT code, base_url FROM data_sources "
+                    "SELECT code, base_url, unreachable_since FROM data_sources "
                     "WHERE is_active = true ORDER BY code"
                 )
             )
         ).fetchall()
+
+    # Streak start per source, read once up front: resolve_unreachable_since
+    # needs the prior value to decide whether to start, keep or clear the streak.
+    prev_unreachable: dict[str, datetime | None] = {r[0]: r[2] for r in rows}
 
     print(
         f"Health-checking {len(rows)} active sources "
@@ -177,16 +183,28 @@ async def main(dry_run: bool) -> None:
     # ---- write back ----
     changed = 0
     if not dry_run:
+        # One timestamp for the whole pass: every row's health_checked_at and
+        # any freshly-started unreachable streak share the same probe time.
+        checked_at = datetime.now(UTC)
         async with async_session() as session:
             for r in verdicts:
+                unreachable_since = resolve_unreachable_since(
+                    r["status"], prev_unreachable.get(r["code"]), checked_at
+                )
                 res = await session.execute(
                     text(
                         "UPDATE data_sources "
-                        "SET health_status = :s, health_checked_at = now(), "
-                        "    health_detail = :d "
+                        "SET health_status = :s, health_checked_at = :t, "
+                        "    health_detail = :d, unreachable_since = :u "
                         "WHERE code = :c AND is_active = true"
                     ),
-                    {"s": r["status"], "d": r["detail"], "c": r["code"]},
+                    {
+                        "s": r["status"],
+                        "t": checked_at,
+                        "d": r["detail"],
+                        "u": unreachable_since,
+                        "c": r["code"],
+                    },
                 )
                 changed += res.rowcount or 0
             await session.commit()

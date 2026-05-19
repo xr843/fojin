@@ -12,6 +12,7 @@ Valid statuses: ok | degraded | cert_invalid | unreachable | moved
 
 import ipaddress
 import socket
+from datetime import datetime
 from urllib.parse import urlsplit
 
 # Probe error kinds the caller may report. Anything that is not a clean HTTP
@@ -145,3 +146,32 @@ def classify_health(
     if status_code in (404, 410):
         return "degraded"
     return "ok"
+
+
+def resolve_unreachable_since(
+    status: str,
+    previous: datetime | None,
+    now: datetime,
+) -> datetime | None:
+    """The ``unreachable_since`` value to persist after a probe.
+
+    ``unreachable_since`` marks when a source *first* entered its current
+    continuous unreachable streak. It lets the daily digest flag sources down
+    long enough to consider deactivating, without storing per-probe history.
+    Any non-``unreachable`` verdict ends the streak — including ``degraded``,
+    ``cert_invalid`` and ``moved``, since "30 consecutive days *unreachable*"
+    is specifically about connectivity, not any unhealthy state.
+
+      - newly unreachable (``previous`` is None)  -> ``now`` (streak starts)
+      - still unreachable (``previous`` is set)   -> ``previous`` (streak kept)
+      - any other status                          -> ``None`` (streak cleared)
+
+    The probing/IO caller (``scripts/health_check_sources.py``) is a cron
+    singleton and the sole writer of this column, so the read-then-write it
+    does around this function carries no concurrency hazard. A source that is
+    *skipped* (no probe verdict) is never written, so its streak — like its
+    other health columns — freezes at the last probed value.
+    """
+    if status != "unreachable":
+        return None
+    return now if previous is None else previous
