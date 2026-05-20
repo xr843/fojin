@@ -265,7 +265,7 @@ export default function KGTimeline({
                           key={`bucket-${bucket.startYear}`}
                           title={`${formatYear(bucket.startYear)} — ${formatYear(
                             bucket.endYear - 1
-                          )}　${bucket.entities.length} 人物：${sample}${more}（点击查看全部）`}
+                          )}\u3000${bucket.entities.length} 人物：${sample}${more}（点击查看全部）`}
                           placement="top"
                           overlayStyle={{ maxWidth: 320 }}
                         >
@@ -437,7 +437,7 @@ export default function KGTimeline({
           openBucket
             ? `${formatYear(openBucket.startYear)} — ${formatYear(
                 openBucket.endYear - 1
-              )}　${openBucket.entities.length} 位人物`
+              )}\u3000${openBucket.entities.length} 位人物`
             : ""
         }
         placement="right"
@@ -465,7 +465,7 @@ export default function KGTimeline({
                   style={{ cursor: "pointer", padding: "8px 4px" }}
                   tabIndex={0}
                   role="button"
-                  aria-label={`${e.name_zh}　${yearLabel}`}
+                  aria-label={`${e.name_zh}\u3000${yearLabel}`}
                   onClick={open}
                   onKeyDown={(ev) => {
                     if (ev.key === "Enter" || ev.key === " ") {
