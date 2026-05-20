@@ -642,8 +642,8 @@ async def get_timeline_entities(
                 e.id,
                 e.name_zh,
                 e.entity_type,
-                COALESCE(NULLIF(e.properties->>'year_start', ''), e.properties->>'birth_year') AS ys,
-                COALESCE(NULLIF(e.properties->>'year_end', ''),   e.properties->>'death_year')  AS ye
+                COALESCE(NULLIF(e.properties->>'year_start', ''), NULLIF(e.properties->>'birth_year', '')) AS ys,
+                COALESCE(NULLIF(e.properties->>'year_end', ''),   NULLIF(e.properties->>'death_year', ''))  AS ye
             FROM kg_entities e
             WHERE {type_condition}
               AND COALESCE(e.properties->>'is_hidden', 'false') != 'true'
@@ -659,13 +659,13 @@ async def get_timeline_entities(
     count_sql = text(
         f"""
         SELECT COUNT(*) FROM (
-            SELECT COALESCE(NULLIF(e.properties->>'year_start', ''), e.properties->>'birth_year') AS ys
+            SELECT COALESCE(NULLIF(e.properties->>'year_start', ''), NULLIF(e.properties->>'birth_year', '')) AS ys
             FROM kg_entities e
             WHERE {type_condition}
               AND COALESCE(e.properties->>'is_hidden', 'false') != 'true'
         ) src
         WHERE ys ~ '^-?[0-9]{{1,6}}$'
-        """  # nosec B608
+        """  # nosec B608 - type_condition is a hardcoded clause, not user input
     )
     count_result = await session.execute(count_sql, params)
     total = count_result.scalar() or 0
