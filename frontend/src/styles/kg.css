@@ -598,6 +598,14 @@
   margin-left: 1px;
 }
 
+.kg-timeline-legend-hint {
+  margin-left: auto;
+  font-size: 11px;
+  color: #9a8e7a;
+  font-family: "Noto Serif SC", serif;
+  font-style: italic;
+}
+
 /* 头部切换按钮（时间轴 / 路径查询，紧靠统计按钮右侧） */
 .kg-timeline-toggle,
 .kg-path-toggle {
