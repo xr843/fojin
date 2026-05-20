@@ -1,15 +1,17 @@
 /**
- * KGTimeline — 知识图谱实体时间轴视图
+ * KGTimeline — 知识图谱实体时间轴视图（直方图分桶 + 稀疏点混合）
  *
- * 将携带 year_start（及可选 year_end）的实体渲染在水平时间轴上。
- * - person / dynasty 各自以 TYPE_COLORS 配色区分。
- * - BCE 年份以负整数表示，坐标轴正确处理跨零点跨度。
- * - 单点实体（无 year_end）显示为圆点；有时段的显示为短横条。
- * - 点击实体调用 onEntityClick(id)。
+ * 渲染逻辑：
+ * - dynasty 实体：保持原样（年代横条，本来就稀疏）
+ * - person 实体：按 BUCKET_YEARS 年分桶；
+ *   - 高密度桶（>= DENSE_THRESHOLD 人）渲染成柱条（高度=对数缩放人数）
+ *   - 低密度桶散落渲染为圆点（每个仍可单独点击）
+ *   - 点击柱条 → 抽屉列出该桶全部人物，点击列表项激活实体面板
+ * - 单点和单条都保留键盘可达 + tooltip。
  */
 
 import { useMemo, useRef, useState, useEffect } from "react";
-import { Spin, Empty, Tooltip } from "antd";
+import { Spin, Empty, Tooltip, Drawer, List } from "antd";
 import { TYPE_COLORS } from "../ForceGraph";
 import type { KGTimelineEntity } from "../../api/client";
 
@@ -26,18 +28,47 @@ function formatYear(year: number): string {
   return `公元 ${year}`;
 }
 
-// 每个 entity_type 在时间轴上的垂直分组序号（影响 y 偏移，用于错排防重叠）
+// 每个 entity_type 在时间轴上的垂直分组序号
 const TYPE_ROW: Record<string, number> = {
   dynasty: 0,
   person: 1,
 };
 
-const ROW_HEIGHT = 28;   // px per entity-type row
-const POINT_R = 5;       // 单点圆半径
-const BAR_H = 10;        // 时段横条高度
-const MIN_BAR_W = 4;     // 最小横条宽度（避免过细不可点）
-const AXIS_H = 28;       // 坐标轴高度（底部）
+const ROW_HEIGHT = 56;       // px per entity-type row (taller for histogram)
+const POINT_R = 5;
+const BAR_H = 10;            // dynasty 时段横条高度
+const MIN_BAR_W = 4;
+const AXIS_H = 28;
 const PADDING = { top: 8, right: 24, bottom: AXIS_H, left: 24 };
+
+// 直方图分桶配置
+const BUCKET_YEARS = 50;      // 50 年/桶
+const DENSE_THRESHOLD = 6;    // 桶内 >=6 人则渲染为柱条
+const MAX_BAR_HEIGHT = 40;    // px
+const MIN_DENSE_BAR_HEIGHT = 6;
+
+interface PersonBucket {
+  startYear: number;
+  endYear: number;
+  entities: KGTimelineEntity[];
+}
+
+function bucketPersons(entities: KGTimelineEntity[]): PersonBucket[] {
+  if (!entities.length) return [];
+  const sorted = [...entities].sort((a, b) => a.year_start - b.year_start);
+  const minY = sorted[0].year_start;
+  const maxY = sorted[sorted.length - 1].year_start;
+  const startBucket = Math.floor(minY / BUCKET_YEARS) * BUCKET_YEARS;
+  const buckets: PersonBucket[] = [];
+  for (let s = startBucket; s <= maxY; s += BUCKET_YEARS) {
+    buckets.push({ startYear: s, endYear: s + BUCKET_YEARS, entities: [] });
+  }
+  for (const e of sorted) {
+    const idx = Math.floor((e.year_start - startBucket) / BUCKET_YEARS);
+    if (buckets[idx]) buckets[idx].entities.push(e);
+  }
+  return buckets.filter((b) => b.entities.length > 0);
+}
 
 export default function KGTimeline({
   entities,
@@ -47,6 +78,7 @@ export default function KGTimeline({
 }: KGTimelineProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(800);
+  const [openBucket, setOpenBucket] = useState<PersonBucket | null>(null);
 
   // 响应容器宽度
   useEffect(() => {
@@ -59,9 +91,15 @@ export default function KGTimeline({
     return () => ro.disconnect();
   }, []);
 
-  const { domain, rowGroups, svgHeight } = useMemo(() => {
+  const { domain, rowGroups, personBuckets, maxPersonBucket, svgHeight } = useMemo(() => {
     if (!entities.length) {
-      return { domain: [-100, 2000] as [number, number], rowGroups: {}, svgHeight: 80 };
+      return {
+        domain: [-100, 2000] as [number, number],
+        rowGroups: {} as Record<string, KGTimelineEntity[]>,
+        personBuckets: [] as PersonBucket[],
+        maxPersonBucket: 0,
+        svgHeight: 80,
+      };
     }
 
     const allYears = entities.flatMap((e) =>
@@ -69,20 +107,24 @@ export default function KGTimeline({
     );
     const minY = Math.min(...allYears);
     const maxY = Math.max(...allYears);
-    // 留出边距
     const pad = Math.max((maxY - minY) * 0.02, 30);
     const domain: [number, number] = [minY - pad, maxY + pad];
 
-    // 按 entity_type 分组
     const rowGroups: Record<string, KGTimelineEntity[]> = {};
     for (const e of entities) {
       (rowGroups[e.entity_type] ??= []).push(e);
     }
 
+    const personBuckets = bucketPersons(rowGroups.person ?? []);
+    const maxPersonBucket = personBuckets.reduce(
+      (m, b) => Math.max(m, b.entities.length),
+      0
+    );
+
     const numRows = Object.keys(rowGroups).length;
     const svgHeight = PADDING.top + numRows * ROW_HEIGHT + PADDING.bottom + 8;
 
-    return { domain, rowGroups, svgHeight };
+    return { domain, rowGroups, personBuckets, maxPersonBucket, svgHeight };
   }, [entities]);
 
   // 线性映射 year → x
@@ -90,6 +132,13 @@ export default function KGTimeline({
   const scaleX = (year: number) => {
     const ratio = (year - domain[0]) / (domain[1] - domain[0]);
     return PADDING.left + ratio * chartW;
+  };
+
+  // 对数高度缩放：log(1 + count) / log(1 + max) * MAX
+  const scaleBarHeight = (count: number) => {
+    if (maxPersonBucket <= 0) return 0;
+    const ratio = Math.log(1 + count) / Math.log(1 + maxPersonBucket);
+    return Math.max(MIN_DENSE_BAR_HEIGHT, ratio * MAX_BAR_HEIGHT);
   };
 
   // 坐标轴刻度（最多 10 个）
@@ -105,7 +154,7 @@ export default function KGTimeline({
     return result;
   }, [domain]);
 
-  // 按类型排序的 row 列表（dynasty 排在上方）
+  // 按类型排序的 row 列表
   const sortedTypes = Object.keys(rowGroups).sort(
     (a, b) => (TYPE_ROW[a] ?? 99) - (TYPE_ROW[b] ?? 99)
   );
@@ -121,10 +170,7 @@ export default function KGTimeline({
   if (!entities.length) {
     return (
       <div className="kg-timeline-empty">
-        <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="暂无时间数据"
-        />
+        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无时间数据" />
       </div>
     );
   }
@@ -176,46 +222,170 @@ export default function KGTimeline({
         {sortedTypes.map((etype, rowIdx) => {
           const color = TYPE_COLORS[etype] ?? "#888";
           const rowY = PADDING.top + rowIdx * ROW_HEIGHT + ROW_HEIGHT / 2;
+          const baselineY = PADDING.top + rowIdx * ROW_HEIGHT + ROW_HEIGHT - 4;
           const rowEntities = rowGroups[etype];
 
           return (
             <g key={etype}>
-              {/* 行背景网格线 */}
+              {/* 行背景网格线（柱条 baseline） */}
               <line
                 x1={PADDING.left}
-                y1={rowY}
+                y1={baselineY}
                 x2={width - PADDING.right}
-                y2={rowY}
+                y2={baselineY}
                 stroke="#f0ebe3"
                 strokeWidth={1}
               />
 
-              {/* 实体 */}
-              {rowEntities.map((e) => {
-                const x1 = scaleX(e.year_start);
-                const isSelected = e.id === selectedEntityId;
+              {/* person 行：分桶混合渲染 */}
+              {etype === "person" ? (
+                <>
+                  {personBuckets.map((bucket) => {
+                    const dense = bucket.entities.length >= DENSE_THRESHOLD;
+                    if (dense) {
+                      // 直方图柱条
+                      const x1 = scaleX(bucket.startYear);
+                      const x2 = scaleX(bucket.endYear);
+                      const barW = Math.max(x2 - x1 - 1, MIN_BAR_W);
+                      const barH = scaleBarHeight(bucket.entities.length);
+                      const sample = bucket.entities
+                        .slice(0, 5)
+                        .map((e) => e.name_zh)
+                        .join("、");
+                      const more =
+                        bucket.entities.length > 5
+                          ? `…等 ${bucket.entities.length} 人`
+                          : "";
+                      return (
+                        <Tooltip
+                          key={`bucket-${bucket.startYear}`}
+                          title={`${formatYear(bucket.startYear)} — ${formatYear(
+                            bucket.endYear - 1
+                          )}　${bucket.entities.length} 人物：${sample}${more}（点击查看全部）`}
+                          placement="top"
+                        >
+                          <rect
+                            x={x1}
+                            y={baselineY - barH}
+                            width={barW}
+                            height={barH}
+                            fill={color}
+                            fillOpacity={0.65}
+                            stroke="rgba(0,0,0,0.18)"
+                            strokeWidth={0.5}
+                            rx={1}
+                            ry={1}
+                            style={{ cursor: "pointer" }}
+                            onClick={() => setOpenBucket(bucket)}
+                            tabIndex={0}
+                            role="button"
+                            aria-label={`${formatYear(bucket.startYear)} — ${formatYear(bucket.endYear - 1)} ${bucket.entities.length} 人物`}
+                            onKeyDown={(ev) => {
+                              if (ev.key === "Enter" || ev.key === " ") {
+                                ev.preventDefault();
+                                setOpenBucket(bucket);
+                              }
+                            }}
+                          />
+                        </Tooltip>
+                      );
+                    }
 
-                if (e.year_end != null && e.year_end !== e.year_start) {
-                  // 时段横条
-                  const x2 = scaleX(e.year_end);
-                  const barW = Math.max(x2 - x1, MIN_BAR_W);
+                    // 稀疏桶：每个实体单独画点
+                    return bucket.entities.map((e) => {
+                      const x = scaleX(e.year_start);
+                      const isSelected = e.id === selectedEntityId;
+                      return (
+                        <Tooltip
+                          key={e.id}
+                          title={`${e.name_zh}（${formatYear(e.year_start)}${
+                            e.year_end != null && e.year_end !== e.year_start
+                              ? ` — ${formatYear(e.year_end)}`
+                              : ""
+                          }）`}
+                          placement="top"
+                        >
+                          <circle
+                            cx={x}
+                            cy={baselineY - 4}
+                            r={isSelected ? POINT_R + 2 : POINT_R}
+                            fill={color}
+                            fillOpacity={isSelected ? 1 : 0.78}
+                            stroke={isSelected ? "#fff" : "rgba(0,0,0,0.12)"}
+                            strokeWidth={isSelected ? 2 : 1}
+                            style={{ cursor: "pointer" }}
+                            onClick={() => onEntityClick(e.id)}
+                            tabIndex={0}
+                            role="button"
+                            aria-label={e.name_zh}
+                            onKeyDown={(ev) => {
+                              if (ev.key === "Enter" || ev.key === " ") {
+                                ev.preventDefault();
+                                onEntityClick(e.id);
+                              }
+                            }}
+                          />
+                        </Tooltip>
+                      );
+                    });
+                  })}
+                </>
+              ) : (
+                /* 非 person 行（dynasty 等）：保持原样 */
+                rowEntities.map((e) => {
+                  const x1 = scaleX(e.year_start);
+                  const isSelected = e.id === selectedEntityId;
+
+                  if (e.year_end != null && e.year_end !== e.year_start) {
+                    const x2 = scaleX(e.year_end);
+                    const barW = Math.max(x2 - x1, MIN_BAR_W);
+                    return (
+                      <Tooltip
+                        key={e.id}
+                        title={`${e.name_zh}（${formatYear(e.year_start)} — ${formatYear(e.year_end)}）`}
+                        placement="top"
+                      >
+                        <rect
+                          x={x1}
+                          y={rowY - BAR_H / 2}
+                          width={barW}
+                          height={BAR_H}
+                          rx={3}
+                          ry={3}
+                          fill={color}
+                          fillOpacity={isSelected ? 1 : 0.72}
+                          stroke={isSelected ? "#fff" : "none"}
+                          strokeWidth={isSelected ? 1.5 : 0}
+                          style={{ cursor: "pointer" }}
+                          onClick={() => onEntityClick(e.id)}
+                          tabIndex={0}
+                          role="button"
+                          aria-label={e.name_zh}
+                          onKeyDown={(ev) => {
+                            if (ev.key === "Enter" || ev.key === " ") {
+                              ev.preventDefault();
+                              onEntityClick(e.id);
+                            }
+                          }}
+                        />
+                      </Tooltip>
+                    );
+                  }
+
                   return (
                     <Tooltip
                       key={e.id}
-                      title={`${e.name_zh}（${formatYear(e.year_start)} — ${formatYear(e.year_end)}）`}
+                      title={`${e.name_zh}（${formatYear(e.year_start)}）`}
                       placement="top"
                     >
-                      <rect
-                        x={x1}
-                        y={rowY - BAR_H / 2}
-                        width={barW}
-                        height={BAR_H}
-                        rx={3}
-                        ry={3}
+                      <circle
+                        cx={x1}
+                        cy={rowY}
+                        r={isSelected ? POINT_R + 2 : POINT_R}
                         fill={color}
-                        fillOpacity={isSelected ? 1 : 0.72}
-                        stroke={isSelected ? "#fff" : "none"}
-                        strokeWidth={isSelected ? 1.5 : 0}
+                        fillOpacity={isSelected ? 1 : 0.78}
+                        stroke={isSelected ? "#fff" : "rgba(0,0,0,0.12)"}
+                        strokeWidth={isSelected ? 2 : 1}
                         style={{ cursor: "pointer" }}
                         onClick={() => onEntityClick(e.id)}
                         tabIndex={0}
@@ -230,38 +400,8 @@ export default function KGTimeline({
                       />
                     </Tooltip>
                   );
-                }
-
-                // 单点
-                return (
-                  <Tooltip
-                    key={e.id}
-                    title={`${e.name_zh}（${formatYear(e.year_start)}）`}
-                    placement="top"
-                  >
-                    <circle
-                      cx={x1}
-                      cy={rowY}
-                      r={isSelected ? POINT_R + 2 : POINT_R}
-                      fill={color}
-                      fillOpacity={isSelected ? 1 : 0.78}
-                      stroke={isSelected ? "#fff" : "rgba(0,0,0,0.12)"}
-                      strokeWidth={isSelected ? 2 : 1}
-                      style={{ cursor: "pointer" }}
-                      onClick={() => onEntityClick(e.id)}
-                      tabIndex={0}
-                      role="button"
-                      aria-label={e.name_zh}
-                      onKeyDown={(ev) => {
-                        if (ev.key === "Enter" || ev.key === " ") {
-                          ev.preventDefault();
-                          onEntityClick(e.id);
-                        }
-                      }}
-                    />
-                  </Tooltip>
-                );
-              })}
+                })
+              )}
             </g>
           );
         })}
@@ -281,7 +421,50 @@ export default function KGTimeline({
             </span>
           </span>
         ))}
+        <span className="kg-timeline-legend-hint">
+          密集时段折叠为柱条，点击展开
+        </span>
       </div>
+
+      {/* ── 时段抽屉 ── */}
+      <Drawer
+        title={
+          openBucket
+            ? `${formatYear(openBucket.startYear)} — ${formatYear(
+                openBucket.endYear - 1
+              )}　${openBucket.entities.length} 位人物`
+            : ""
+        }
+        placement="right"
+        width={360}
+        open={openBucket !== null}
+        onClose={() => setOpenBucket(null)}
+        destroyOnClose
+      >
+        {openBucket && (
+          <List
+            size="small"
+            dataSource={openBucket.entities}
+            renderItem={(e) => (
+              <List.Item
+                style={{ cursor: "pointer", padding: "8px 4px" }}
+                onClick={() => {
+                  onEntityClick(e.id);
+                  setOpenBucket(null);
+                }}
+              >
+                <span style={{ fontWeight: 500 }}>{e.name_zh}</span>
+                <span style={{ color: "#9a8e7a", fontSize: 12 }}>
+                  {formatYear(e.year_start)}
+                  {e.year_end != null && e.year_end !== e.year_start
+                    ? ` — ${formatYear(e.year_end)}`
+                    : ""}
+                </span>
+              </List.Item>
+            )}
+          />
+        )}
+      </Drawer>
     </div>
   );
 }
