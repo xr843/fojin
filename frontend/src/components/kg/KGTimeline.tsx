@@ -54,6 +54,10 @@ interface PersonBucket {
 }
 
 function bucketPersons(entities: KGTimelineEntity[]): PersonBucket[] {
+  // Bucketing uses astronomical years (-50 means 50 BCE, 0 included);
+  // formatYear collapses 0 → "公元前 1" so labels read naturally.
+  // We bucket by birth year (year_start) only — long-lived monks land in
+  // their birth bucket, the standard scholarly cohorting choice.
   if (!entities.length) return [];
   const sorted = [...entities].sort((a, b) => a.year_start - b.year_start);
   const minY = sorted[0].year_start;
@@ -263,6 +267,7 @@ export default function KGTimeline({
                             bucket.endYear - 1
                           )}　${bucket.entities.length} 人物：${sample}${more}（点击查看全部）`}
                           placement="top"
+                          overlayStyle={{ maxWidth: 320 }}
                         >
                           <rect
                             x={x1}
@@ -445,23 +450,37 @@ export default function KGTimeline({
           <List
             size="small"
             dataSource={openBucket.entities}
-            renderItem={(e) => (
-              <List.Item
-                style={{ cursor: "pointer", padding: "8px 4px" }}
-                onClick={() => {
-                  onEntityClick(e.id);
-                  setOpenBucket(null);
-                }}
-              >
-                <span style={{ fontWeight: 500 }}>{e.name_zh}</span>
-                <span style={{ color: "#9a8e7a", fontSize: 12 }}>
-                  {formatYear(e.year_start)}
-                  {e.year_end != null && e.year_end !== e.year_start
-                    ? ` — ${formatYear(e.year_end)}`
-                    : ""}
-                </span>
-              </List.Item>
-            )}
+            renderItem={(e) => {
+              const yearLabel = `${formatYear(e.year_start)}${
+                e.year_end != null && e.year_end !== e.year_start
+                  ? ` — ${formatYear(e.year_end)}`
+                  : ""
+              }`;
+              const open = () => {
+                onEntityClick(e.id);
+                setOpenBucket(null);
+              };
+              return (
+                <List.Item
+                  style={{ cursor: "pointer", padding: "8px 4px" }}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`${e.name_zh}　${yearLabel}`}
+                  onClick={open}
+                  onKeyDown={(ev) => {
+                    if (ev.key === "Enter" || ev.key === " ") {
+                      ev.preventDefault();
+                      open();
+                    }
+                  }}
+                >
+                  <span style={{ fontWeight: 500 }}>{e.name_zh}</span>
+                  <span style={{ color: "#9a8e7a", fontSize: 12 }}>
+                    {yearLabel}
+                  </span>
+                </List.Item>
+              );
+            }}
           />
         )}
       </Drawer>
