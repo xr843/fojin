@@ -123,7 +123,7 @@ async def get_kg_timeline(
         None,
         description="Filter by entity type (e.g. 'person', 'dynasty'). Omit for all temporal entities.",
     ),
-    limit: int = Query(500, le=2000),
+    limit: int = Query(500, le=10000),
     db: AsyncSession = Depends(get_db),
 ):
     """Get knowledge graph entities with temporal data for timeline display.
