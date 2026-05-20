@@ -643,6 +643,17 @@ async def get_timeline_entities(
     # the COALESCE the timeline only saw the BDRC-derived ~95 persons and
     # appeared Tibetan-only; coalescing surfaces the Chinese/Japanese cohort
     # too (~2.5k persons total).
+    # Buddhist-only filter (person rows): users expect a Buddhist-history
+    # timeline, not a general kg dump. Without this, untagged DILA entries
+    # like 周文王/孔門弟子/范蠡 leak in. Tagging is done by
+    # scripts/classify_buddhist_persons.py (regex over description) which
+    # writes is_buddhist={'true','false'} for 17k rows; the remaining 26k
+    # ambiguous stay NULL and drop out here too. Dynasty rows are exempt
+    # (they're 唐/宋/明 dynasty names, no per-entity Buddhist flag).
+    buddhist_filter = (
+        "(e.entity_type != 'person' OR e.properties->>'is_buddhist' = 'true')"
+    )
+
     sql = text(
         f"""
         SELECT id, name_zh, entity_type, ys::int AS year_start,
@@ -657,6 +668,7 @@ async def get_timeline_entities(
             FROM kg_entities e
             WHERE {type_condition}
               AND COALESCE(e.properties->>'is_hidden', 'false') != 'true'
+              AND {buddhist_filter}
         ) src
         WHERE ys ~ '^-?[0-9]{{1,6}}$'
         ORDER BY ys::int ASC
@@ -673,6 +685,7 @@ async def get_timeline_entities(
             FROM kg_entities e
             WHERE {type_condition}
               AND COALESCE(e.properties->>'is_hidden', 'false') != 'true'
+              AND {buddhist_filter}
         ) src
         WHERE ys ~ '^-?[0-9]{{1,6}}$'
         """  # nosec B608 - type_condition is a hardcoded clause, not user input
