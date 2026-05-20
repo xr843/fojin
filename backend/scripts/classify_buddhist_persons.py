@@ -15,13 +15,23 @@ conservative regex:
 
   STRONG_BUDDHIST regex → is_buddhist=true
   STRONG_SECULAR regex (and no buddhist marker) → is_buddhist=false
-  ambiguous → leave NULL  (the timeline filter will reject NULL by default,
-                          so unknowns drop out)
+  Both fire → is_buddhist=None (ambiguous; conservative — "宁可漏不要错")
+  Neither fires → is_buddhist=None
+
+The timeline filter rejects NULL by default, so unknowns drop out.
 
 Run on production:
   python scripts/classify_buddhist_persons.py --dry-run
   python scripts/classify_buddhist_persons.py --dry-run --sample 50
   python scripts/classify_buddhist_persons.py --write
+
+Re-classification:
+  Already-tagged rows (is_buddhist=true or =false) are NOT touched on re-run.
+  To force re-classification after the regex evolves, first NULL the field:
+    UPDATE kg_entities
+       SET properties = ((properties::jsonb) - 'is_buddhist')::json
+       WHERE entity_type='person' AND properties->>'is_buddhist' IS NOT NULL;
+  …then re-run --write.
 """
 from __future__ import annotations
 
@@ -51,6 +61,7 @@ STRONG_BUDDHIST = re.compile(
     r"出家"
     r"|受具"
     r"|薙染|剃度|剃染"
+    r"|披剃"
     r"|譯經|译经"
     r"|沙門|沙门"
     r"|比丘尼?"
@@ -58,7 +69,7 @@ STRONG_BUDDHIST = re.compile(
     r"|禪師|禅师"
     r"|法師|法师"
     r"|律師|律师"
-    r"|住持|方丈|寺主"
+    r"|寺主"                   # 「住持/方丈」太宽，能匹配奉佛皇帝；故移除
     r"|入滅|入灭|示寂|圓寂|圆寂"
     r"|阿羅漢|阿罗汉|尊者"
     r"|釋[迦氏]|释[迦氏]"      # 釋迦/釋氏/釋…(法号「释」开头)
@@ -67,7 +78,12 @@ STRONG_BUDDHIST = re.compile(
     r"|轉法輪|转法轮"
     r"|三藏"
     r"|戒律.*師|戒律.*师"
-    r"|僧"                     # broad — last because also in 僧侶/僧人
+    # 「僧」单字太宽（高僧/与僧往来/反對僧道 都会命中）。要求是
+    # 僧人/僧侶 等明确身份词，或「X朝/X州僧」「為僧/出家為僧」上下文。
+    r"|僧[人侶徒衣俗]"
+    r"|為[僧道].{0,3}$|出家為僧|遊僧|遊方僧"
+    r"|[唐宋元明清晉魏齊梁陳隋][初末]?僧"
+    r"|[蜀魏吳][國]?僧"
 )
 
 # Patterns that, if present AND no Buddhist marker, mark the person secular.
@@ -93,17 +109,6 @@ STRONG_SECULAR = re.compile(
     r"|韓非|商鞅|李斯|蘇秦|張儀|管仲|樂毅|白起|韓信|蕭何|張良|諸葛"
 )
 
-# A whitelist of strings that, even if matched by STRONG_SECULAR, suggests the
-# person is still a Buddhist (e.g. 帝師 of a Tibetan tradition). When matched,
-# we *re-prefer* the buddhist classification.  Used sparingly.
-SECULAR_OVERRIDE_TO_BUDDHIST = re.compile(
-    r"國師.*佛|国师.*佛"
-    r"|帝師.*喇嘛|帝师.*喇嘛"
-    r"|帝師.*薩迦|帝师.*萨迦"
-    r"|出家|受具|譯經|譯經"
-)
-
-
 # Strip parenthesised DILA / CBETA citation tails before applying regex —
 # without this, "陳朝將軍。（唐僧索引：329）" matches STRONG_BUDDHIST on the
 # stray 「僧」 in the citation marker and gets mis-tagged as Buddhist.
@@ -111,7 +116,13 @@ _CITATION_PAREN = re.compile(r"[（(][^）)]*(?:索引|疑年錄|疑年录|百�
 
 
 def classify(description: str | None) -> str | None:
-    """Return 'true', 'false', or None (ambiguous)."""
+    """Return 'true', 'false', or None (ambiguous).
+
+    Bias: when buddhist + secular markers both fire we return None
+    (ambiguous) rather than guessing. Per user requirement: "宁可漏一些真
+    佛教徒，也不展示周文王。" Whatever survives strict 'true' goes to the
+    timeline; everything else drops out.
+    """
     if not description:
         return None
     cleaned = _CITATION_PAREN.sub("", description)
@@ -120,15 +131,9 @@ def classify(description: str | None) -> str | None:
 
     if buddhist_hit and not secular_hit:
         return "true"
-    if buddhist_hit and secular_hit:
-        # Both fired — try the override regex; otherwise prefer buddhist
-        # (secular markers like 大將 can appear in monk biographies as
-        # 出家前 background).
-        if SECULAR_OVERRIDE_TO_BUDDHIST.search(description):
-            return "true"
-        return "true"
     if secular_hit and not buddhist_hit:
         return "false"
+    # Both fired or neither did → ambiguous.
     return None
 
 
