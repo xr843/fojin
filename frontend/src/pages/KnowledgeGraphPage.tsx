@@ -238,7 +238,7 @@ export default function KnowledgeGraphPage() {
 
   const { data: timelineData, isLoading: timelineLoading } = useQuery({
     queryKey: ["kg-timeline"],
-    queryFn: () => getKGTimeline({ limit: 1000 }),
+    queryFn: () => getKGTimeline({ limit: 5000 }),
     staleTime: 300_000,
     enabled: showTimeline,
   });

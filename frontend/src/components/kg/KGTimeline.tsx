@@ -34,7 +34,7 @@ const TYPE_ROW: Record<string, number> = {
   person: 1,
 };
 
-const ROW_HEIGHT = 56;       // px per entity-type row (taller for histogram)
+const ROW_HEIGHT = 80;       // px per entity-type row (taller for histogram)
 const POINT_R = 5;
 const BAR_H = 10;            // dynasty 时段横条高度
 const MIN_BAR_W = 4;
@@ -44,7 +44,7 @@ const PADDING = { top: 8, right: 24, bottom: AXIS_H, left: 24 };
 // 直方图分桶配置
 const BUCKET_YEARS = 50;      // 50 年/桶
 const DENSE_THRESHOLD = 6;    // 桶内 >=6 人则渲染为柱条
-const MAX_BAR_HEIGHT = 40;    // px
+const MAX_BAR_HEIGHT = 60;    // px
 const MIN_DENSE_BAR_HEIGHT = 6;
 
 interface PersonBucket {
@@ -138,10 +138,12 @@ export default function KGTimeline({
     return PADDING.left + ratio * chartW;
   };
 
-  // 对数高度缩放：log(1 + count) / log(1 + max) * MAX
+  // 平方根高度缩放：sqrt(count) / sqrt(max) * MAX
+  // 比对数更陡，能拉开 641 vs 41 这种 16× 真实差距的视觉对比
+  // (对数把 16× 压成 2.5×；sqrt 拉到 ~4×)
   const scaleBarHeight = (count: number) => {
     if (maxPersonBucket <= 0) return 0;
-    const ratio = Math.log(1 + count) / Math.log(1 + maxPersonBucket);
+    const ratio = Math.sqrt(count) / Math.sqrt(maxPersonBucket);
     return Math.max(MIN_DENSE_BAR_HEIGHT, ratio * MAX_BAR_HEIGHT);
   };
 
