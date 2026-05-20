@@ -132,31 +132,36 @@ SKIP_COUNTRIES: set[str] = {"印度"}
 DEFAULT_COUNTRIES: tuple[str, ...] = ("CN",)
 
 
-def parse_dynasty(raw: str | None) -> tuple[set[str], tuple[int, int] | None]:
-    """Resolve a (possibly composite) dynasty value to allowed countries + era.
+def parse_dynasty(raw: str | None) -> tuple[tuple[str, ...], None]:
+    """Resolve a (possibly composite) dynasty value to allowed countries.
 
     DILA sometimes stores composite values like "南宋;元" or "金;蒙古"; whitespace
     and newlines also leak in. Split on common separators, look each token up,
-    union the countries, widen the era span.
+    preserve the priority order from DYNASTY_MAP so the first allowed country
+    is the most likely placement (e.g. 民國 → CN before 台湾).
+
+    The era half of DYNASTY_MAP is reserved for future scoring against
+    temple.founded_year, which is not yet populated. Returns None for now to
+    keep the API stable.
     """
     if not raw:
-        return set(DEFAULT_COUNTRIES), None
+        return tuple(DEFAULT_COUNTRIES), None
     tokens = re.split(r"[;；,，/／\s]+", raw.strip())
-    countries: set[str] = set()
-    starts: list[int] = []
-    ends: list[int] = []
+    ordered: list[str] = []
+    seen: set[str] = set()
     for tok in tokens:
         if not tok:
             continue
         info = DYNASTY_MAP.get(tok)
         if not info:
             continue
-        countries.update(info[0])
-        starts.append(info[1][0])
-        ends.append(info[1][1])
-    if not countries:
-        return set(DEFAULT_COUNTRIES), None
-    return countries, (min(starts), max(ends))
+        for country in info[0]:
+            if country not in seen:
+                seen.add(country)
+                ordered.append(country)
+    if not ordered:
+        return tuple(DEFAULT_COUNTRIES), None
+    return tuple(ordered), None
 
 
 # ---------------------------------------------------------------------------
@@ -208,12 +213,13 @@ def score_match(
       b. No dynasty + multiple surviving candidates spanning >1 country.
       c. Allowed countries are entirely in SKIP_COUNTRIES (e.g. 印度).
     """
-    allowed_countries, _era = parse_dynasty(person_dynasty_raw)
-    if allowed_countries.issubset(SKIP_COUNTRIES):
+    allowed_countries, _ = parse_dynasty(person_dynasty_raw)
+    allowed_set = set(allowed_countries)
+    if allowed_set.issubset(SKIP_COUNTRIES):
         return None
 
     # Filter candidates by country; treat missing country as 'CN'
-    filtered = [c for c in candidates if (c.country or "CN") in allowed_countries]
+    filtered = [c for c in candidates if (c.country or "CN") in allowed_set]
     if not filtered:
         return None
 
@@ -222,14 +228,14 @@ def score_match(
     if len(surviving_countries) > 1 and not person_dynasty_raw:
         return None
 
-    # Pick: prefer candidate matching the first allowed country (priority order)
+    # Pick the first candidate matching the dynasty's priority order
+    # (allowed_countries is an ordered tuple from parse_dynasty).
     chosen = filtered[0]
-    if person_dynasty_raw:
-        for ac in allowed_countries:
-            match = next((c for c in filtered if (c.country or "CN") == ac), None)
-            if match:
-                chosen = match
-                break
+    for ac in allowed_countries:
+        match = next((c for c in filtered if (c.country or "CN") == ac), None)
+        if match:
+            chosen = match
+            break
 
     score = 1.0
     name_len = len(chosen.name)
@@ -494,7 +500,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--write", action="store_true", help="actually write to DB")
     ap.add_argument("--dry-run", action="store_true", help="default; alias for not passing --write")
-    ap.add_argument("--min-score", type=float, default=0.5, help="reject matches below this score")
+    ap.add_argument("--min-score", type=float, default=0.8, help="reject matches below this score (default 0.8 — leaves 1.0-base matches with mild penalties; lower at your own risk)")
     ap.add_argument("--sample", type=int, default=100, help="how many sample rows to emit")
     ap.add_argument("--sample-csv", type=str, default=None, help="write sample to CSV file instead of stdout")
     args = ap.parse_args()

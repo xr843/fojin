@@ -514,8 +514,11 @@ async def get_geo_entities(
         "COALESCE(e.properties->>'is_hidden', 'false') != 'true'",
         # person whitelist: high-confidence sources only.
         # - wikidata / city_match / province_match: original v2-era CN whitelist (kept as-is).
-        # - desc_match_v3: dynasty-scored country-aware match (PR feat/person-coords-v3);
+        # - desc_match_v3: dynasty-scored country-aware match (backfill_person_coords_v3.py);
         #   no bbox constraint — 日本/韩国/台湾 dynasties render in their actual country.
+        #   The whitelist trusts the script's --min-score gate (default 0.8); do NOT
+        #   lower it without re-auditing this filter, or unvetted low-score rows
+        #   will leak onto the public map.
         # Still filtered out: legacy desc_match:* (海外误投) and teacher_hop:* (transitive推断).
         # monastery / place 等不受影响.
         """(
