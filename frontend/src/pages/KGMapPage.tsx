@@ -141,7 +141,7 @@ export default function KGMapPage() {
         <h3>佛教地理</h3>
         {geoData && (
           <Tooltip
-            title="人物：仅展示中国境内、来源为 Wikidata/城市匹配/省份匹配的高置信度坐标；师承推断与描述贪心匹配结果已剔除。寺院：来自高德 V3 全量抓取。"
+            title="人物：展示 Wikidata、城市/省份匹配，以及 desc_match_v3（按朝代国别打分的寺院描述匹配，覆盖中日韩台）。师承推断与旧版描述贪心匹配已剔除。寺院：来自高德 V3 全量抓取。"
           >
             <span className="kg-map-stats" style={{ cursor: "help" }}>
               <BarChartOutlined />

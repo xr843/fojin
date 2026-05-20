@@ -512,10 +512,17 @@ async def get_geo_entities(
         "e.entity_type != 'sub_entity'",
         "COALESCE(e.properties->>'is_buddhist', 'true') != 'false'",
         "COALESCE(e.properties->>'is_hidden', 'false') != 'true'",
-        # person 只放高置信度 + 中国境内；teacher_hop / desc_match 有误匹配（中国僧人投海外同名寺）
-        # monastery / place 等不受影响
+        # person whitelist: high-confidence sources only.
+        # - wikidata / city_match / province_match: original v2-era CN whitelist (kept as-is).
+        # - desc_match_v3: dynasty-scored country-aware match (PR feat/person-coords-v3);
+        #   no bbox constraint — 日本/韩国/台湾 dynasties render in their actual country.
+        # Still filtered out: legacy desc_match:* (海外误投) and teacher_hop:* (transitive推断).
+        # monastery / place 等不受影响.
         """(
             e.entity_type != 'person'
+            OR (
+                e.properties->>'geo_source' LIKE 'desc_match_v3:%'
+            )
             OR (
                 (e.properties->>'latitude')::float BETWEEN 18 AND 54
                 AND (e.properties->>'longitude')::float BETWEEN 73 AND 135
