@@ -65,8 +65,9 @@ const DYNASTIES: { name: string; startYear: number; endYear: number; fill: strin
   { name: "元", startYear: 1279, endYear: 1368, fill: "#e8dccc" },
   { name: "明", startYear: 1368, endYear: 1644, fill: "#d6c9b3" },
   { name: "清", startYear: 1644, endYear: 1912, fill: "#e8dccc" },
-  // 民國 endYear 用当前年份动态求值，避免硬编码后随时间 drift。
-  { name: "民國", startYear: 1912, endYear: new Date().getFullYear(), fill: "#d6c9b3" },
+  { name: "民國", startYear: 1912, endYear: 1949, fill: "#d6c9b3" },
+  // 現代 endYear 用当前年份动态求值，tooltip 显示「至今」。
+  { name: "現代", startYear: 1949, endYear: new Date().getFullYear(), fill: "#e8dccc" },
 ];
 const DYNASTY_LABEL_MIN_W = 8;    // 段宽 < 8px 才完全省略；其余靠 textLength 压缩
 
@@ -287,7 +288,7 @@ export default function KGTimeline({
           return (
             <Tooltip
               key={d.name}
-              title={`${d.name}（公元 ${d.startYear} — ${d.endYear}）`}
+              title={`${d.name}（公元 ${d.startYear} — ${d.name === "現代" ? "至今" : d.endYear}）`}
               placement="top"
             >
               <g style={{ cursor: "help" }}>
