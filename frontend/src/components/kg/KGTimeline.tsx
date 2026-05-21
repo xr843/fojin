@@ -42,9 +42,11 @@ const AXIS_H = 28;
 const DYNASTY_BAND_H = 22;   // 朝代背景条带高度（位于刻度下方）
 const PADDING = { top: 8, right: 24, bottom: AXIS_H + DYNASTY_BAND_H, left: 24 };
 
-// 直方图分桶配置
+// 直方图分桶配置 — 所有非空桶一律柱条（含 count=1）
+// 历史：曾有 DENSE_THRESHOLD=6 的混合渲染（<6 画圆点），但视觉切换
+// 打断阅读流。sqrt 缩放下 count=1 → ~6px（MIN_DENSE_BAR_HEIGHT 兜底），
+// 相对密集峰一眼看出是单条；tooltip 仍给精确人数。统一柱条更一致。
 const BUCKET_YEARS = 50;      // 50 年/桶
-const DENSE_THRESHOLD = 6;    // 桶内 >=6 人则渲染为柱条
 const MAX_BAR_HEIGHT = 60;    // px
 const MIN_DENSE_BAR_HEIGHT = 6;
 
@@ -341,101 +343,59 @@ export default function KGTimeline({
                 strokeWidth={1}
               />
 
-              {/* person 行：分桶混合渲染 */}
+              {/* person 行：所有非空桶一律柱条（含 count=1） */}
               {etype === "person" ? (
                 <>
                   {personBuckets.map((bucket) => {
-                    const dense = bucket.entities.length >= DENSE_THRESHOLD;
-                    if (dense) {
-                      // 直方图柱条
-                      const x1 = scaleX(bucket.startYear);
-                      const x2 = scaleX(bucket.endYear);
-                      const barW = Math.max(x2 - x1 - 1, MIN_BAR_W);
-                      const barH = scaleBarHeight(bucket.entities.length);
-                      const sample = bucket.entities
-                        .slice(0, 5)
-                        .map((e) => e.name_zh)
-                        .join("、");
-                      const more =
-                        bucket.entities.length > 5
-                          ? `…等 ${bucket.entities.length} 人`
-                          : "";
-                      return (
-                        <Tooltip
-                          key={`bucket-${bucket.startYear}`}
-                          title={`${formatYear(bucket.startYear)} — ${formatYear(
-                            bucket.endYear - 1
-                          )}\u3000${bucket.entities.length} 人物：${sample}${more}（点击查看全部）`}
-                          placement="top"
-                          overlayStyle={{ maxWidth: 320 }}
-                        >
-                          <rect
-                            x={x1}
-                            y={baselineY - barH}
-                            width={barW}
-                            height={barH}
-                            fill={color}
-                            fillOpacity={0.65}
-                            stroke="rgba(0,0,0,0.18)"
-                            strokeWidth={0.5}
-                            rx={1}
-                            ry={1}
-                            style={{ cursor: "pointer" }}
-                            onClick={() => setOpenBucket(bucket)}
-                            tabIndex={0}
-                            role="button"
-                            aria-label={`${formatYear(bucket.startYear)} — ${formatYear(bucket.endYear - 1)} ${bucket.entities.length} 人物`}
-                            onKeyDown={(ev) => {
-                              if (ev.key === "Enter" || ev.key === " ") {
-                                ev.preventDefault();
-                                setOpenBucket(bucket);
-                              }
-                            }}
-                          />
-                        </Tooltip>
-                      );
-                    }
-
-                    // 稀疏桶：每个实体单独画点
-                    return bucket.entities.map((e) => {
-                      const x = scaleX(e.year_start);
-                      const isSelected = e.id === selectedEntityId;
-                      return (
-                        <Tooltip
-                          key={e.id}
-                          title={`${e.name_zh}（${formatYear(e.year_start)}${
-                            e.year_end != null && e.year_end !== e.year_start
-                              ? ` — ${formatYear(e.year_end)}`
-                              : ""
-                          }）`}
-                          placement="top"
-                        >
-                          <circle
-                            cx={x}
-                            cy={baselineY - 4}
-                            r={isSelected ? POINT_R + 2 : POINT_R}
-                            fill={color}
-                            fillOpacity={isSelected ? 1 : 0.78}
-                            stroke={isSelected ? "#fff" : "rgba(0,0,0,0.12)"}
-                            strokeWidth={isSelected ? 2 : 1}
-                            style={{ cursor: "pointer" }}
-                            onClick={() => onEntityClick(e.id)}
-                            tabIndex={0}
-                            role="button"
-                            aria-label={e.name_zh}
-                            onKeyDown={(ev) => {
-                              if (ev.key === "Enter" || ev.key === " ") {
-                                ev.preventDefault();
-                                onEntityClick(e.id);
-                              }
-                            }}
-                          />
-                        </Tooltip>
-                      );
-                    });
+                    const x1 = scaleX(bucket.startYear);
+                    const x2 = scaleX(bucket.endYear);
+                    const barW = Math.max(x2 - x1 - 1, MIN_BAR_W);
+                    const barH = scaleBarHeight(bucket.entities.length);
+                    const sample = bucket.entities
+                      .slice(0, 5)
+                      .map((e) => e.name_zh)
+                      .join("、");
+                    const more =
+                      bucket.entities.length > 5
+                        ? `…等 ${bucket.entities.length} 人`
+                        : "";
+                    return (
+                      <Tooltip
+                        key={`bucket-${bucket.startYear}`}
+                        title={`${formatYear(bucket.startYear)} — ${formatYear(
+                          bucket.endYear - 1
+                        )}\u3000${bucket.entities.length} 人物：${sample}${more}（点击查看全部）`}
+                        placement="top"
+                        overlayStyle={{ maxWidth: 320 }}
+                      >
+                        <rect
+                          x={x1}
+                          y={baselineY - barH}
+                          width={barW}
+                          height={barH}
+                          fill={color}
+                          fillOpacity={0.65}
+                          stroke="rgba(0,0,0,0.18)"
+                          strokeWidth={0.5}
+                          rx={1}
+                          ry={1}
+                          style={{ cursor: "pointer" }}
+                          onClick={() => setOpenBucket(bucket)}
+                          tabIndex={0}
+                          role="button"
+                          aria-label={`${formatYear(bucket.startYear)} — ${formatYear(bucket.endYear - 1)} ${bucket.entities.length} 人物`}
+                          onKeyDown={(ev) => {
+                            if (ev.key === "Enter" || ev.key === " ") {
+                              ev.preventDefault();
+                              setOpenBucket(bucket);
+                            }
+                          }}
+                        />
+                      </Tooltip>
+                    );
                   })}
                 </>
-              ) : (
+                            ) : (
                 /* 非 person 行（dynasty 等）：保持原样 */
                 rowEntities.map((e) => {
                   const x1 = scaleX(e.year_start);
