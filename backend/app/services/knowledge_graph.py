@@ -1,3 +1,5 @@
+import asyncio
+
 from opencc import OpenCC
 from sqlalchemy import case, exists, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -511,8 +513,7 @@ _MENTION_NAMES_BY_LEN: list[tuple[str, int, str]] | None = None
 
 # Guard the lazy load so concurrent cold-start requests don't double-load
 # the 70k-row index (each load is ~5MB + one SQL scan).
-import asyncio as _asyncio
-_MENTIONS_BUILD_LOCK = _asyncio.Lock()
+_MENTIONS_BUILD_LOCK = asyncio.Lock()
 
 _MENTIONS_SCANNABLE_TYPES = frozenset(
     {"person", "monastery", "place", "school", "concept", "text", "dynasty"}
