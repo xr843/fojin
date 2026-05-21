@@ -10,7 +10,7 @@
  * - 单点和单条都保留键盘可达 + tooltip。
  */
 
-import { useMemo, useRef, useState, useEffect } from "react";
+import { useMemo, useRef, useState, useEffect, useLayoutEffect } from "react";
 import { Spin, Empty, Tooltip, Drawer, List } from "antd";
 import { TYPE_COLORS } from "../ForceGraph";
 import type { KGTimelineEntity } from "../../api/client";
@@ -106,7 +106,15 @@ export default function KGTimeline({
   const [width, setWidth] = useState(800);
   const [openBucket, setOpenBucket] = useState<PersonBucket | null>(null);
 
-  // 响应容器宽度
+  // 响应容器宽度。第一次挂载时同步读 BoundingClientRect 拿到真实宽度
+  // (面板 lazy mount 时 ResizeObserver 首发可能 contentRect.width=0 → 被
+  // 'w > 0' 守卫挡住，width 永远卡在 useState 初值 800px，画布只用一半屏)。
+  useLayoutEffect(() => {
+    if (!containerRef.current) return;
+    const initialW = containerRef.current.getBoundingClientRect().width;
+    if (initialW > 0) setWidth(initialW);
+  }, []);
+
   useEffect(() => {
     if (!containerRef.current) return;
     const ro = new ResizeObserver((entries) => {
