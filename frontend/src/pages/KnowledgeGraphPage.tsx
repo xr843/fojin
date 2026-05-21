@@ -710,7 +710,10 @@ export default function KnowledgeGraphPage() {
               <div className="kg-graph-empty">
                 <Spin size="large" />
               </div>
-            ) : selectedEntityId && !entityHasRelations && entityDetail ? (
+            ) : selectedEntityId && !loadingGraph && !entityHasRelations && entityDetail ? (
+              // Only fall through to the mentions panel after the graph
+              // fetch has resolved with zero links — otherwise during a
+              // loading transition we'd flash the mentions panel.
               <div className="kg-graph-empty-with-mentions">
                 <KGMentionsPanel
                   entityId={selectedEntityId}

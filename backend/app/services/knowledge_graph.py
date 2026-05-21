@@ -509,6 +509,11 @@ _MENTION_NAMES_BY_LEN: list[tuple[str, int, str]] | None = None
 # (name_zh, entity_id, entity_type) — sorted by len(name_zh) DESC so that
 # substring match prefers longer (more specific) candidates first.
 
+# Guard the lazy load so concurrent cold-start requests don't double-load
+# the 70k-row index (each load is ~5MB + one SQL scan).
+import asyncio as _asyncio
+_MENTIONS_BUILD_LOCK = _asyncio.Lock()
+
 _MENTIONS_SCANNABLE_TYPES = frozenset(
     {"person", "monastery", "place", "school", "concept", "text", "dynasty"}
 )
@@ -554,7 +559,11 @@ async def get_mentioned_entities(
     """
     global _MENTION_NAMES_BY_LEN
     if _MENTION_NAMES_BY_LEN is None:
-        _MENTION_NAMES_BY_LEN = await _load_mentions_index(session)
+        async with _MENTIONS_BUILD_LOCK:
+            # Double-check after grabbing the lock — another waiter may have
+            # already populated it.
+            if _MENTION_NAMES_BY_LEN is None:
+                _MENTION_NAMES_BY_LEN = await _load_mentions_index(session)
 
     if not description:
         return []
@@ -587,10 +596,11 @@ async def get_mentioned_entities(
                 # Mask span; record match.
                 for k in range(n):
                     masked[idx + k] = "\0"
-                # Build a snippet around the match for context.
+                # Build a snippet around the match for context. Collapse
+                # newlines so the chip-list snippet renders on one line.
                 lo = max(0, idx - 8)
                 hi = min(len(description), idx + n + 8)
-                snippet = description[lo:hi]
+                snippet = description[lo:hi].replace("\n", " ").strip()
                 results.append(
                     {
                         "id": mid,
@@ -607,8 +617,14 @@ async def get_mentioned_entities(
 
 
 def reset_mentions_cache() -> None:
-    """Force the mentions index to reload on next call.  Used by admin
-    tooling after bulk entity changes; safe to call at any time."""
+    """Force the mentions index to reload on next call.
+
+    Currently unwired — the index is loaded lazily on first request and
+    accepts staleness from bulk imports until the next process restart.
+    DILA entities don't change often enough to need finer invalidation.
+    Keeping this stub so a future admin endpoint or bulk-import hook can
+    flip it without touching the cache internals.
+    """
     global _MENTION_NAMES_BY_LEN
     _MENTION_NAMES_BY_LEN = None
 
