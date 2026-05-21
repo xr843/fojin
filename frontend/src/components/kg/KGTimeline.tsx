@@ -63,7 +63,8 @@ const DYNASTIES: { name: string; startYear: number; endYear: number; fill: strin
   { name: "元", startYear: 1279, endYear: 1368, fill: "#e8dccc" },
   { name: "明", startYear: 1368, endYear: 1644, fill: "#d6c9b3" },
   { name: "清", startYear: 1644, endYear: 1912, fill: "#e8dccc" },
-  { name: "民國", startYear: 1912, endYear: 2025, fill: "#d6c9b3" },
+  // 民國 endYear 用当前年份动态求值，避免硬编码后随时间 drift。
+  { name: "民國", startYear: 1912, endYear: new Date().getFullYear(), fill: "#d6c9b3" },
 ];
 const DYNASTY_LABEL_MIN_W = 24;   // 段宽不足时省略标签
 
