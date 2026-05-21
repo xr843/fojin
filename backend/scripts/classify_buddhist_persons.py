@@ -55,43 +55,48 @@ from app.config import settings
 # Heuristics
 # ---------------------------------------------------------------------------
 
-# Patterns that, if present, mark the person as Buddhist.
-# Tuned against DILA narratives. False-positive risk audited by sampling.
-STRONG_BUDDHIST = re.compile(
-    r"出家"
-    r"|受具"
-    r"|薙染|剃度|剃染"
-    r"|披剃"
-    r"|譯經|译经"
-    r"|沙門|沙门"
-    r"|比丘尼?"
-    r"|和尚"
-    r"|禪師|禅师"
-    r"|法師|法师"
-    r"|律師|律师"
-    r"|寺主"                   # 「住持/方丈」太宽，能匹配奉佛皇帝；故移除
-    r"|入滅|入灭|示寂|圓寂|圆寂"
+# HARD_BUDDHIST: 本人就是僧/居士的硬证据。一旦命中，无视 SOFT 与 SECULAR
+# (除了"還俗"/"全真教出家" 等专门 override，见 classify())。
+HARD_BUDDHIST = re.compile(
+    r"出家"                    # 本人动作
+    r"|受具"                    # 本人受具足戒
+    r"|薙染|剃度|剃染|披剃"     # 本人剃度
+    r"|譯經|译经"               # 译经师身份
+    r"|沙門|沙门"               # 自我身份
+    r"|比丘尼?"                 # 比丘/比丘尼身份
+    r"|寺主"                    # 担任寺主
+    r"|入滅|入灭|示寂|圓寂|圆寂" # 本人死亡词
+    r"|釋[迦氏]|释[迦氏]"        # 法号「釋」开头
+    r"|僧[人侶徒衣俗]"           # 僧人/僧侶 等身份词
+    r"|為[僧].{0,3}$|出家為僧|遊僧|遊方僧"
+    r"|[唐宋元明清晉魏齊梁陳隋][初末]?僧"
+    r"|[蜀魏吳][國]?僧"
+)
+
+# SOFT_BUDDHIST: 法号/尊号/概念，本人可能是僧也可能是与僧往来的世俗
+# (e.g. "受弘一法師指導" — 弘一是僧，对话者未必)。SOFT only + SECULAR → false。
+SOFT_BUDDHIST = re.compile(
+    r"和尚|禪師|禅师|法師|法师|律師|律师"
     r"|阿羅漢|阿罗汉|尊者"
-    r"|釋[迦氏]|释[迦氏]"      # 釋迦/釋氏/釋…(法号「释」开头)
     r"|菩薩|菩萨"
     r"|涅槃|涅盘"
     r"|轉法輪|转法轮"
     r"|三藏"
     r"|戒律.*師|戒律.*师"
-    # 「僧」单字太宽（高僧/与僧往来/反對僧道 都会命中）。要求是
-    # 僧人/僧侶 等明确身份词，或「X朝/X州僧」「為僧/出家為僧」上下文。
-    r"|僧[人侶徒衣俗]"
-    r"|為[僧道].{0,3}$|出家為僧|遊僧|遊方僧"
-    r"|[唐宋元明清晉魏齊梁陳隋][初末]?僧"
-    r"|[蜀魏吳][國]?僧"
 )
 
-# Patterns that, if present AND no Buddhist marker, mark the person secular.
-# Intentionally broad: catches 孔門十哲, 周/漢/明 dynasty officials, scholars,
-# warriors, royalty.
+# Override patterns: present in description → must classify as secular even
+# if HARD_BUDDHIST also fires.
+# - 還俗/歸俗: 短暂出家又返俗，本质世俗 (e.g. 徐孝克 周易学者)
+# - 全真/道教 + 出家: 道教徒出家，不算佛教 (e.g. 黃公望 元代道教画家)
+SECULAR_OVERRIDE = re.compile(r"還俗|还俗|歸俗|归俗|(?:全真|道教)[^。]{0,8}出家")
+
+# STRONG_SECULAR: 命中即偏向世俗。HARD 仍优先 (不会被这覆盖)，但 SOFT 配
+# SECULAR 即归 false。新增世俗职业（诗人/画家/书法家/学者/博士/建筑师/工程师等）
+# 是 v3 audit 发现的 false-positive 来源 (傅維早/陶潛/学者类)。
 STRONG_SECULAR = re.compile(
     r"孔[子門门]|儒[家學学]|孟[子軻轲]"
-    r"|道家|道教.*真人"        # 真人 alone could be Buddhist (修真), require 道教
+    r"|道家|道教|道士|全真教|龍門派|龙门派"
     r"|諸侯|诸侯"
     r"|皇帝|帝[號号]|登基|即位"
     r"|丞相|宰相|相國|相国"
@@ -107,6 +112,14 @@ STRONG_SECULAR = re.compile(
     r"|帝師.*[儒道]|国师.*儒"
     r"|魯國|齊國|楚國"
     r"|韓非|商鞅|李斯|蘇秦|張儀|管仲|樂毅|白起|韓信|蕭何|張良|諸葛"
+    # ── 新增：世俗职业（v3 audit 抓到的 false positive 模式）
+    r"|詩人|诗人|散文家|小說家|小说家|文人|作家|翻譯家|翻译家"
+    r"|畫家|画家|書法家|书法家|藝術家|艺术家|金石家"
+    r"|建築師|建筑师|工程師|工程师|攝影師|摄影师"
+    r"|科學家|科学家|医生|醫生|商人|實業家|实业家|外交官"
+    r"|文學博士|哲學博士|歷史學家|历史学家"
+    r"|官員|官员|議員|议员|大臣"
+    r"|教授|校長|校长"       # 注意：佛学院教授会被 HARD/SOFT 抵消，不影响真僧
 )
 
 # Strip parenthesised DILA / CBETA citation tails before applying regex —
@@ -118,22 +131,46 @@ _CITATION_PAREN = re.compile(r"[（(][^）)]*(?:索引|疑年錄|疑年录|百�
 def classify(description: str | None) -> str | None:
     """Return 'true', 'false', or None (ambiguous).
 
-    Bias: when buddhist + secular markers both fire we return None
-    (ambiguous) rather than guessing. Per user requirement: "宁可漏一些真
-    佛教徒，也不展示周文王。" Whatever survives strict 'true' goes to the
-    timeline; everything else drops out.
+    Three-layer logic:
+      1. SECULAR_OVERRIDE (還俗 / 全真道教出家) → "false" — even if HARD
+         buddhist fires. Catches 徐孝克 (周易学者临时出家又还俗),
+         黃公望 (元代全真教画家).
+      2. HARD_BUDDHIST (本人是僧的硬证据：出家/受具/剃染/沙門/比丘/X朝僧/
+         譯經/釋X 法号) → "true". Even if secular profession 兼任 (e.g.
+         少年教授后出家).
+      3. SOFT_BUDDHIST (法号/称谓，可能是他人) combined with SECULAR →
+         "false" (e.g. 傅維早 建築師受法师托修寺 / 陶潛 詩人访慧远).
+         SOFT only without SECULAR → "true" (法号体的真僧).
+      4. SECULAR only → "false".
+      5. Neither → None (ambiguous, dropped by timeline filter).
     """
     if not description:
         return None
     cleaned = _CITATION_PAREN.sub("", description)
-    buddhist_hit = bool(STRONG_BUDDHIST.search(cleaned))
-    secular_hit = bool(STRONG_SECULAR.search(cleaned))
 
-    if buddhist_hit and not secular_hit:
-        return "true"
-    if secular_hit and not buddhist_hit:
+    # Layer 1: secular override beats everything.
+    if SECULAR_OVERRIDE.search(cleaned):
         return "false"
-    # Both fired or neither did → ambiguous.
+
+    hard = bool(HARD_BUDDHIST.search(cleaned))
+    soft = bool(SOFT_BUDDHIST.search(cleaned))
+    secular = bool(STRONG_SECULAR.search(cleaned))
+
+    # Layer 2: hard buddhist wins over secular profession.
+    if hard:
+        return "true"
+
+    # Layer 3: soft alone vs soft+secular.
+    if soft and secular:
+        return "false"
+    if soft:
+        return "true"
+
+    # Layer 4: secular alone.
+    if secular:
+        return "false"
+
+    # Layer 5: neither.
     return None
 
 
