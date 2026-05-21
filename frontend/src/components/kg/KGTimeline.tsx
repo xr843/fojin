@@ -39,13 +39,33 @@ const POINT_R = 5;
 const BAR_H = 10;            // dynasty 时段横条高度
 const MIN_BAR_W = 4;
 const AXIS_H = 28;
-const PADDING = { top: 8, right: 24, bottom: AXIS_H, left: 24 };
+const DYNASTY_BAND_H = 22;   // 朝代背景条带高度（位于刻度下方）
+const PADDING = { top: 8, right: 24, bottom: AXIS_H + DYNASTY_BAND_H, left: 24 };
 
 // 直方图分桶配置
 const BUCKET_YEARS = 50;      // 50 年/桶
 const DENSE_THRESHOLD = 6;    // 桶内 >=6 人则渲染为柱条
 const MAX_BAR_HEIGHT = 60;    // px
 const MIN_DENSE_BAR_HEIGHT = 6;
+
+// 朝代分段（非重叠版本，用于底部学术信息条带）
+// 边界做了简化：北宋/遼/金、南宋/金/元、隋/南北朝 等并存期取主流。
+// 颜色用交错的两种暖色调，与正文柱条主色（#b85450 person）拉开。
+const DYNASTIES: { name: string; startYear: number; endYear: number; fill: string }[] = [
+  { name: "西晉", startYear: 265, endYear: 317, fill: "#e8dccc" },
+  { name: "東晉", startYear: 317, endYear: 420, fill: "#d6c9b3" },
+  { name: "南北朝", startYear: 420, endYear: 589, fill: "#e8dccc" },
+  { name: "隋", startYear: 589, endYear: 618, fill: "#d6c9b3" },
+  { name: "唐", startYear: 618, endYear: 907, fill: "#e8dccc" },
+  { name: "五代", startYear: 907, endYear: 960, fill: "#d6c9b3" },
+  { name: "北宋", startYear: 960, endYear: 1127, fill: "#e8dccc" },
+  { name: "南宋", startYear: 1127, endYear: 1279, fill: "#d6c9b3" },
+  { name: "元", startYear: 1279, endYear: 1368, fill: "#e8dccc" },
+  { name: "明", startYear: 1368, endYear: 1644, fill: "#d6c9b3" },
+  { name: "清", startYear: 1644, endYear: 1912, fill: "#e8dccc" },
+  { name: "民國", startYear: 1912, endYear: 2025, fill: "#d6c9b3" },
+];
+const DYNASTY_LABEL_MIN_W = 24;   // 段宽不足时省略标签
 
 interface PersonBucket {
   startYear: number;
@@ -221,6 +241,54 @@ export default function KGTimeline({
                 {y < 0 ? `前${Math.abs(y)}` : y}
               </text>
             </g>
+          );
+        })}
+
+        {/* ── 朝代背景条带（位于刻度下方）── */}
+        {DYNASTIES.map((d) => {
+          // 裁剪到当前 domain
+          const ds = Math.max(d.startYear, domain[0]);
+          const de = Math.min(d.endYear, domain[1]);
+          if (de <= ds) return null;
+          const x1 = scaleX(ds);
+          const x2 = scaleX(de);
+          const w = x2 - x1;
+          if (w < 1) return null;
+          const bandTop = svgHeight - DYNASTY_BAND_H;
+          const showLabel = w >= DYNASTY_LABEL_MIN_W;
+          return (
+            <Tooltip
+              key={d.name}
+              title={`${d.name}（公元 ${d.startYear} — ${d.endYear}）`}
+              placement="top"
+            >
+              <g style={{ cursor: "help" }}>
+                <rect
+                  x={x1}
+                  y={bandTop}
+                  width={w}
+                  height={DYNASTY_BAND_H - 2}
+                  fill={d.fill}
+                  fillOpacity={0.55}
+                  stroke="rgba(154, 142, 122, 0.25)"
+                  strokeWidth={0.5}
+                />
+                {showLabel && (
+                  <text
+                    x={x1 + w / 2}
+                    y={bandTop + DYNASTY_BAND_H / 2 + 1}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fontSize={11}
+                    fill="#6b5d47"
+                    fontFamily="'Noto Serif SC', serif"
+                    style={{ pointerEvents: "none" }}
+                  >
+                    {d.name}
+                  </text>
+                )}
+              </g>
+            </Tooltip>
           );
         })}
 
