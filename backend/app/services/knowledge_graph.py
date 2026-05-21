@@ -1,3 +1,5 @@
+import asyncio
+
 from opencc import OpenCC
 from sqlalchemy import case, exists, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -493,6 +495,139 @@ async def get_text_entities(session: AsyncSession, text_id: int) -> list[KGEntit
         select(KGEntity).where(KGEntity.text_id == text_id)
     )
     return list(result.scalars().all())
+
+
+# ── Mentions cache ─────────────────────────────────────────────────────────
+# Maps name_zh → (id, entity_type) for all "linkable" entities (excludes
+# sub_entity).  Built lazily on first call; rebuilt manually via reset().
+# ~70k entries, ≤8 MB in memory.  Used by get_mentioned_entities() to scan
+# a single description for substring matches without a full-table SQL scan.
+#
+# Names with length 1 are excluded — too noisy (single characters match
+# everything). Length-2 short names are kept because Buddhist names like
+# 玄奘 / 義淨 / 道宣 are 2 chars.
+
+_MENTION_NAMES_BY_LEN: list[tuple[str, int, str]] | None = None
+# (name_zh, entity_id, entity_type) — sorted by len(name_zh) DESC so that
+# substring match prefers longer (more specific) candidates first.
+
+# Guard the lazy load so concurrent cold-start requests don't double-load
+# the 70k-row index (each load is ~5MB + one SQL scan).
+_MENTIONS_BUILD_LOCK = asyncio.Lock()
+
+_MENTIONS_SCANNABLE_TYPES = frozenset(
+    {"person", "monastery", "place", "school", "concept", "text", "dynasty"}
+)
+
+
+async def _load_mentions_index(session: AsyncSession) -> list[tuple[str, int, str]]:
+    rows = (
+        await session.execute(
+            text(
+                """
+                SELECT name_zh, id, entity_type
+                FROM kg_entities
+                WHERE entity_type = ANY(:types)
+                  AND length(name_zh) >= 2
+                  AND COALESCE(properties->>'is_hidden', 'false') != 'true'
+                """
+            ),
+            {"types": list(_MENTIONS_SCANNABLE_TYPES)},
+        )
+    ).all()
+    # Sort by name length DESC for greedy longest-match consumption.
+    return sorted(
+        ((r.name_zh, r.id, r.entity_type) for r in rows),
+        key=lambda t: -len(t[0]),
+    )
+
+
+async def get_mentioned_entities(
+    session: AsyncSession,
+    entity_id: int,
+    description: str | None,
+    limit: int = 30,
+) -> list[dict]:
+    """Find in-DB entities whose name_zh appears as a substring of description.
+
+    Returns up to *limit* matches, ranked longest-name-first.  Greedy
+    consumption: once a name matches, its text range is masked out so a
+    shorter sub-name doesn't double-count (e.g. matching "崇福寺" prevents
+    "崇福" from also firing on the same span).
+
+    The caller is responsible for excluding entries that are already
+    represented in the structured kg_relations graph (UI concern).
+    """
+    global _MENTION_NAMES_BY_LEN
+    if _MENTION_NAMES_BY_LEN is None:
+        async with _MENTIONS_BUILD_LOCK:
+            # Double-check after grabbing the lock — another waiter may have
+            # already populated it.
+            if _MENTION_NAMES_BY_LEN is None:
+                _MENTION_NAMES_BY_LEN = await _load_mentions_index(session)
+
+    if not description:
+        return []
+
+    # Mask string: same length as description, '\0' marks consumed chars.
+    masked = list(description)
+    results: list[dict] = []
+    seen_ids: set[int] = {entity_id}
+    # Dedup by name as well — DB has 14 different "崇福寺" entities and
+    # surfacing them all is noise. Pick the first; future iteration can add
+    # a "同名 N 个" disambiguation badge.
+    seen_names: set[str] = set()
+
+    for name, mid, etype in _MENTION_NAMES_BY_LEN:
+        if len(results) >= limit:
+            break
+        if mid in seen_ids:
+            continue
+        if name in seen_names:
+            continue
+        # Find first unmasked occurrence.
+        start = 0
+        n = len(name)
+        while True:
+            idx = description.find(name, start)
+            if idx < 0:
+                break
+            # Verify span is unmasked.
+            if all(masked[idx + k] != "\0" for k in range(n)):
+                # Mask span; record match.
+                for k in range(n):
+                    masked[idx + k] = "\0"
+                # Build a snippet around the match for context. Collapse
+                # newlines so the chip-list snippet renders on one line.
+                lo = max(0, idx - 8)
+                hi = min(len(description), idx + n + 8)
+                snippet = description[lo:hi].replace("\n", " ").strip()
+                results.append(
+                    {
+                        "id": mid,
+                        "name_zh": name,
+                        "entity_type": etype,
+                        "snippet": snippet,
+                    }
+                )
+                seen_ids.add(mid)
+                seen_names.add(name)
+                break
+            start = idx + 1
+    return results
+
+
+def reset_mentions_cache() -> None:
+    """Force the mentions index to reload on next call.
+
+    Currently unwired — the index is loaded lazily on first request and
+    accepts staleness from bulk imports until the next process restart.
+    DILA entities don't change often enough to need finer invalidation.
+    Keeping this stub so a future admin endpoint or bulk-import hook can
+    flip it without touching the cache internals.
+    """
+    global _MENTION_NAMES_BY_LEN
+    _MENTION_NAMES_BY_LEN = None
 
 
 async def get_geo_entities(

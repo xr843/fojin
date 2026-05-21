@@ -125,6 +125,24 @@ class KGTimelineResponse(BaseModel):
     total: int
 
 
+class KGMentionItem(BaseModel):
+    """An entity whose name_zh appears as a substring of another entity's description.
+
+    Used for the "描述中提及" panel: surfaces soft/inferred connections so
+    isolated nodes (DILA persons with no structured kg_relations) still
+    have navigable context.  The relation is NOT written to kg_relations —
+    it's computed on demand.
+    """
+    id: int
+    name_zh: str
+    entity_type: str
+    snippet: str | None = None
+
+
+class KGMentionsResponse(BaseModel):
+    mentions: list[KGMentionItem]
+
+
 class KGPathResponse(BaseModel):
     """Shortest undirected path between two KG entities.
 

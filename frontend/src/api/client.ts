@@ -645,6 +645,28 @@ export async function getKGEntityGraph(
   return data;
 }
 
+export interface KGMentionItem {
+  id: number;
+  name_zh: string;
+  entity_type: string;
+  snippet?: string | null;
+}
+
+export interface KGMentionsResponse {
+  mentions: KGMentionItem[];
+}
+
+export async function getKGEntityMentions(
+  entityId: number,
+  limit: number = 30,
+): Promise<KGMentionsResponse> {
+  const { data } = await api.get<KGMentionsResponse>(
+    `/kg/entities/${entityId}/mentions`,
+    { params: { limit } },
+  );
+  return data;
+}
+
 export interface KGStats {
   entities: Record<string, number>;
   relations: Record<string, number>;
