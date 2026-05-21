@@ -66,7 +66,8 @@ const DYNASTIES: { name: string; startYear: number; endYear: number; fill: strin
   // 民國 endYear 用当前年份动态求值，避免硬编码后随时间 drift。
   { name: "民國", startYear: 1912, endYear: new Date().getFullYear(), fill: "#d6c9b3" },
 ];
-const DYNASTY_LABEL_MIN_W = 24;   // 段宽不足时省略标签
+const DYNASTY_LABEL_MIN_W = 8;    // 段宽 < 8px 才完全省略；其余靠 textLength 压缩
+const DYNASTY_LABEL_NATURAL_W = 24; // 自然字宽 (~11px × 2 char + padding)；超过此宽度按自然字距
 
 interface PersonBucket {
   startYear: number;
@@ -257,6 +258,11 @@ export default function KGTimeline({
           if (w < 1) return null;
           const bandTop = svgHeight - DYNASTY_BAND_H;
           const showLabel = w >= DYNASTY_LABEL_MIN_W;
+          // 短段（西晉 52y、隋 29y、五代 53y 等）用 textLength 压缩字距
+          // 而非整体省略；这样所有朝代都有名称，只是窄段字距收紧。
+          const useTextLength = w < DYNASTY_LABEL_NATURAL_W;
+          // 留 2px 内边距，避免字与相邻段边界紧贴。
+          const textLengthValue = Math.max(w - 4, 6);
           return (
             <Tooltip
               key={d.name}
@@ -284,6 +290,13 @@ export default function KGTimeline({
                     fill="#6b5d47"
                     fontFamily="'Noto Serif SC', serif"
                     style={{ pointerEvents: "none" }}
+                    {...(useTextLength
+                      ? {
+                          textLength: textLengthValue,
+                          lengthAdjust:
+                            "spacingAndGlyphs" as React.SVGAttributes<SVGTextElement>["lengthAdjust"],
+                        }
+                      : {})}
                   >
                     {d.name}
                   </text>
