@@ -69,7 +69,6 @@ const DYNASTIES: { name: string; startYear: number; endYear: number; fill: strin
   { name: "民國", startYear: 1912, endYear: new Date().getFullYear(), fill: "#d6c9b3" },
 ];
 const DYNASTY_LABEL_MIN_W = 8;    // 段宽 < 8px 才完全省略；其余靠 textLength 压缩
-const DYNASTY_LABEL_NATURAL_W = 24; // 自然字宽 (~11px × 2 char + padding)；超过此宽度按自然字距
 
 interface PersonBucket {
   startYear: number;
@@ -276,11 +275,15 @@ export default function KGTimeline({
           if (w < 1) return null;
           const bandTop = svgHeight - DYNASTY_BAND_H;
           const showLabel = w >= DYNASTY_LABEL_MIN_W;
-          // 短段（西晉 52y、隋 29y、五代 53y 等）用 textLength 压缩字距
-          // 而非整体省略；这样所有朝代都有名称，只是窄段字距收紧。
-          const useTextLength = w < DYNASTY_LABEL_NATURAL_W;
-          // 留 2px 内边距，避免字与相邻段边界紧贴。
-          const textLengthValue = Math.max(w - 4, 6);
+          // textLength + lengthAdjust='spacingAndGlyphs' **既能压缩也能拉伸**
+          // 字符。原先无条件加 textLength=w-4 让单字短段（如「隋」）的字
+          // 被拉伸到段宽，看起来字号变大。
+          // 正确做法：只压缩、不拉伸 — 仅当自然字宽 > 可用宽时才设
+          // textLength。汉字 fontSize=11 时近似 1 字 ≈ 11 px。
+          const estimatedNaturalW = d.name.length * 11;
+          const availableW = w - 4;
+          const useTextLength = estimatedNaturalW > availableW;
+          const textLengthValue = Math.max(availableW, 6);
           return (
             <Tooltip
               key={d.name}
