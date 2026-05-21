@@ -28,6 +28,14 @@ function formatYear(year: number): string {
   return `公元 ${year}`;
 }
 
+// Bucket 时间范围标签：endInclusive 越过当前年份时显示「至今」
+// （avoid 「公元 2049」 这种落到未来的别扭文案，与 dynasty band 「現代 — 至今」一致）
+function formatBucketRange(startYear: number, endInclusive: number): string {
+  const now = new Date().getFullYear();
+  const tail = endInclusive > now ? "至今" : formatYear(endInclusive);
+  return `${formatYear(startYear)} — ${tail}`;
+}
+
 // 每个 entity_type 在时间轴上的垂直分组序号
 const TYPE_ROW: Record<string, number> = {
   dynasty: 0,
@@ -366,9 +374,7 @@ export default function KGTimeline({
                     return (
                       <Tooltip
                         key={`bucket-${bucket.startYear}`}
-                        title={`${formatYear(bucket.startYear)} — ${formatYear(
-                          bucket.endYear - 1
-                        )}\u3000${bucket.entities.length} 人物：${sample}${more}（点击查看全部）`}
+                        title={`${formatBucketRange(bucket.startYear, bucket.endYear - 1)}\u3000${bucket.entities.length} 人物：${sample}${more}（点击查看全部）`}
                         placement="top"
                         overlayStyle={{ maxWidth: 320 }}
                       >
@@ -387,7 +393,7 @@ export default function KGTimeline({
                           onClick={() => setOpenBucket(bucket)}
                           tabIndex={0}
                           role="button"
-                          aria-label={`${formatYear(bucket.startYear)} — ${formatYear(bucket.endYear - 1)} ${bucket.entities.length} 人物`}
+                          aria-label={`${formatBucketRange(bucket.startYear, bucket.endYear - 1)} ${bucket.entities.length} 人物`}
                           onKeyDown={(ev) => {
                             if (ev.key === "Enter" || ev.key === " ") {
                               ev.preventDefault();
@@ -499,9 +505,7 @@ export default function KGTimeline({
       <Drawer
         title={
           openBucket
-            ? `${formatYear(openBucket.startYear)} — ${formatYear(
-                openBucket.endYear - 1
-              )}\u3000${openBucket.entities.length} 位人物`
+            ? `${formatBucketRange(openBucket.startYear, openBucket.endYear - 1)}\u3000${openBucket.entities.length} 位人物`
             : ""
         }
         placement="right"
