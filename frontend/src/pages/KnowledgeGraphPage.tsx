@@ -440,13 +440,13 @@ export default function KnowledgeGraphPage() {
             </span>
           </Tooltip>
         )}
-        <Tooltip title="时间轴视图">
+        <Tooltip title="佛教人物时间轴">
           <span
             className={`kg-timeline-toggle${showTimeline ? " active" : ""}`}
             onClick={() => setShowTimeline((v) => !v)}
           >
             <FieldTimeOutlined />
-            <span>时间轴</span>
+            <span>佛教人物时间轴</span>
           </span>
         </Tooltip>
         <Tooltip title="查询两个实体之间的最短关系路径">
@@ -464,7 +464,7 @@ export default function KnowledgeGraphPage() {
           <div className="kg-timeline-header">
             <span className="kg-timeline-title">
               <FieldTimeOutlined style={{ marginRight: 6 }} />
-              历史时间轴
+              佛教人物时间轴
             </span>
             <span style={{ fontSize: 11, color: "#9a8e7a" }}>
               点击实体可查看详情
