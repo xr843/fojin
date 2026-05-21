@@ -195,18 +195,26 @@ export default function KGTimeline({
     (a, b) => (TYPE_ROW[a] ?? 99) - (TYPE_ROW[b] ?? 99)
   );
 
+  // wrap div 始终渲染（即使 loading/empty）— 否则 useLayoutEffect/
+  // ResizeObserver 在 deps=[] 首次执行时 containerRef.current 还是 null
+  // (因为 wrap 未挂载)，宽度永远卡在 useState 初值 800px。loading 状态时
+  // wrap 仍存在，effect 跑、ResizeObserver 接管后续宽度变化。
   if (loading) {
     return (
-      <div className="kg-timeline-loading">
-        <Spin />
+      <div className="kg-timeline-wrap" ref={containerRef}>
+        <div className="kg-timeline-loading">
+          <Spin />
+        </div>
       </div>
     );
   }
 
   if (!entities.length) {
     return (
-      <div className="kg-timeline-empty">
-        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无时间数据" />
+      <div className="kg-timeline-wrap" ref={containerRef}>
+        <div className="kg-timeline-empty">
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无时间数据" />
+        </div>
       </div>
     );
   }
