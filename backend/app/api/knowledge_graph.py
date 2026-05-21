@@ -19,13 +19,11 @@ from app.schemas.knowledge_graph import (
     KGLineageArcsResponse,
     KGMentionItem,
     KGMentionsResponse,
-    KGPathResponse,
     KGSearchResponse,
     KGTimelineEntity,
     KGTimelineResponse,
 )
 from app.services.knowledge_graph import (
-    find_shortest_path,
     get_entity,
     get_entity_graph,
     get_entity_relations,
@@ -121,20 +119,6 @@ async def get_kg_entity_graph(
     pred_list = [p.strip() for p in predicates.split(",") if p.strip()] if predicates else None
     graph = await get_entity_graph(db, entity_id, depth, max_nodes=max_nodes, predicates=pred_list)
     return graph
-
-
-@router.get("/path", response_model=KGPathResponse)
-async def get_kg_path(
-    from_id: int = Query(..., description="起始实体 ID"),
-    to_id: int = Query(..., description="目标实体 ID"),
-    max_hops: int = Query(6, ge=1, le=8, description="最大跳数（1-8）"),
-    db: AsyncSession = Depends(get_db),
-):
-    """Find the shortest undirected path between two KG entities.
-
-    查找两个知识图谱实体之间的最短无向关系路径（双向 BFS，最多 max_hops 跳）。"""
-    result = await find_shortest_path(db, from_id, to_id, max_hops)
-    return KGPathResponse(**result)
 
 
 @router.get("/stats")

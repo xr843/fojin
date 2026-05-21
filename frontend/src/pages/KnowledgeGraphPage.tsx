@@ -12,7 +12,6 @@ import {
   UnorderedListOutlined,
   ProfileOutlined,
   FieldTimeOutlined,
-  NodeIndexOutlined,
 } from "@ant-design/icons";
 import ForceGraph, {
   TYPE_COLORS,
@@ -22,7 +21,6 @@ import ForceGraph, {
 } from "../components/ForceGraph";
 import EntityCard from "../components/EntityCard";
 import KGTimeline from "../components/kg/KGTimeline";
-import KGPathQuery from "../components/kg/KGPathQuery";
 import KGMentionsPanel from "../components/kg/KGMentionsPanel";
 import { searchKGEntities, getKGEntity, getKGEntityGraph, getKGStats, getKGTimeline } from "../api/client";
 import type { KGEntity, KGGraphNode, KGGraphLink } from "../api/client";
@@ -208,7 +206,6 @@ export default function KnowledgeGraphPage() {
   });
   const [showStats, setShowStats] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
-  const [showPath, setShowPath] = useState(false);
   const [curatedOpen, setCuratedOpen] = useState(!isMobile);
 
   // ── Progressive expand state ──────────────────────────────────────────────
@@ -449,15 +446,6 @@ export default function KnowledgeGraphPage() {
             <span>佛教人物时间轴</span>
           </span>
         </Tooltip>
-        <Tooltip title="查询两个实体之间的最短关系路径">
-          <span
-            className={`kg-path-toggle${showPath ? " active" : ""}`}
-            onClick={() => setShowPath((v) => !v)}
-          >
-            <NodeIndexOutlined />
-            <span>路径查询</span>
-          </span>
-        </Tooltip>
       </div>
       {showTimeline && (
         <div className="kg-timeline-panel">
@@ -629,14 +617,6 @@ export default function KnowledgeGraphPage() {
             ]}
           />
         </div>
-      )}
-
-      {/* 路径查询面板 — 收进开关，默认不展开（小众功能，不常驻占位） */}
-      {showPath && (
-        <KGPathQuery
-          fromEntity={entityDetail ?? null}
-          onNodeClick={handleGraphNodeClick}
-        />
       )}
 
       {/* 搜索结果面板 */}
