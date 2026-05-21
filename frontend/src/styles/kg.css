@@ -859,3 +859,94 @@
   justify-content: center;
   margin-top: 10px;
 }
+
+/* ── 描述中提及面板 ───────────────────────────────────────────────────── */
+.kg-mentions-panel {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px 20px;
+}
+
+.kg-mentions-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--fj-border);
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+}
+
+.kg-mentions-title {
+  font-family: "Noto Serif SC", serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fj-ink);
+}
+
+.kg-mentions-hint {
+  font-size: 11px;
+  color: #9a8e7a;
+  font-style: italic;
+}
+
+.kg-mentions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.kg-mentions-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-family: "Noto Serif SC", serif;
+  font-size: 13px;
+  color: var(--fj-ink);
+  transition: background-color 0.12s ease;
+}
+
+.kg-mentions-item:hover,
+.kg-mentions-item:focus-visible {
+  background: rgba(184, 84, 80, 0.06);
+  border-color: var(--fj-border);
+  outline: none;
+}
+
+.kg-mentions-name {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.kg-mentions-snippet {
+  flex: 1;
+  color: #9a8e7a;
+  font-size: 12px;
+  margin-left: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kg-mentions-loading,
+.kg-mentions-error {
+  padding: 20px;
+  text-align: center;
+  color: #9a8e7a;
+  font-size: 12px;
+}
+
+.kg-graph-empty-with-mentions {
+  flex: 1;
+  min-height: 360px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}

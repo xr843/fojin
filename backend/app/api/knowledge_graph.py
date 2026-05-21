@@ -17,6 +17,8 @@ from app.schemas.knowledge_graph import (
     KGGeoResponse,
     KGGraphResponse,
     KGLineageArcsResponse,
+    KGMentionItem,
+    KGMentionsResponse,
     KGPathResponse,
     KGSearchResponse,
     KGTimelineEntity,
@@ -30,6 +32,7 @@ from app.services.knowledge_graph import (
     get_geo_entities,
     get_kg_stats,
     get_lineage_arcs,
+    get_mentioned_entities,
     get_text_entities,
     get_timeline_entities,
     search_entities,
@@ -74,6 +77,31 @@ async def get_kg_entity(entity_id: int, db: AsyncSession = Depends(get_db)):
     base = KGEntityResponse.model_validate(entity).model_dump()
     base["relation_count"] = len(relations)
     return KGEntityDetailResponse(**base, relations=relations)
+
+
+@router.get("/entities/{entity_id}/mentions", response_model=KGMentionsResponse)
+async def get_kg_entity_mentions(
+    entity_id: int,
+    limit: int = Query(30, ge=1, le=60),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return in-DB entities whose name appears in this entity's description.
+
+    Used by the UI to provide a "描述中提及" panel when the structured
+    kg_relations graph is sparse — common for DILA-imported persons whose
+    only context is free-text description.  Inferred, not stored.
+
+    返回该实体描述文本中提及的其它知识图谱实体，用于"描述中提及"面板，
+    在 kg_relations 没有结构化关系时仍能给出可点击的语义关联。"""
+    entity = await get_entity(db, entity_id)
+    if not entity:
+        raise KGEntityNotFoundError(entity_id=entity_id)
+    mentions = await get_mentioned_entities(
+        db, entity_id=entity_id, description=entity.description, limit=limit
+    )
+    return KGMentionsResponse(
+        mentions=[KGMentionItem(**m) for m in mentions]
+    )
 
 
 @router.get("/entities/{entity_id}/graph", response_model=KGGraphResponse)

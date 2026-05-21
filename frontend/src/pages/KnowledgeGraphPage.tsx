@@ -23,6 +23,7 @@ import ForceGraph, {
 import EntityCard from "../components/EntityCard";
 import KGTimeline from "../components/kg/KGTimeline";
 import KGPathQuery from "../components/kg/KGPathQuery";
+import KGMentionsPanel from "../components/kg/KGMentionsPanel";
 import { searchKGEntities, getKGEntity, getKGEntityGraph, getKGStats, getKGTimeline } from "../api/client";
 import type { KGEntity, KGGraphNode, KGGraphLink } from "../api/client";
 import "../styles/kg.css";
@@ -709,18 +710,16 @@ export default function KnowledgeGraphPage() {
               <div className="kg-graph-empty">
                 <Spin size="large" />
               </div>
-            ) : selectedEntityId && !entityHasRelations ? (
-              <div className="kg-graph-empty">
-                <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description="该实体尚未与其他实体建立关系"
-                >
-                  {entityDetail && (
-                    <p style={{ color: "#9a8e7a", fontSize: 12, margin: 0 }}>
-                      「{entityDetail.name_zh}」暂无图谱关系数据
-                    </p>
-                  )}
-                </Empty>
+            ) : selectedEntityId && !entityHasRelations && entityDetail ? (
+              <div className="kg-graph-empty-with-mentions">
+                <KGMentionsPanel
+                  entityId={selectedEntityId}
+                  entityName={entityDetail.name_zh}
+                  onEntityClick={(id) => {
+                    setSelectedEntityId(id);
+                    autoSelectRef.current = false;
+                  }}
+                />
               </div>
             ) : displayGraph?.nodes.length ? (
               <div className="kg-graph-container">
