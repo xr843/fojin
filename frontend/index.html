@@ -28,8 +28,8 @@
     <link rel="preload" href="/fonts/MaShanZheng-title.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
-    <!-- Umami Analytics (self-hosted, privacy-first, no cookies) -->
-    <script defer src="https://analytics.fojin.app/script.js" data-website-id="c757a04c-82e0-4f53-a720-830b0e1a7287"></script>
+    <!-- Umami Analytics is opt-in at build time via VITE_UMAMI_URL + VITE_UMAMI_WEBSITE_ID;
+         see src/umami.ts. Self-hosters who don't set both envs get no tracking script. -->
     <title>佛津 FoJin — 全球佛教古籍数字资源聚合平台</title>
 
     <!-- JSON-LD Structured Data -->

@@ -6,6 +6,7 @@ import { HelmetProvider } from "react-helmet-async";
 import App from "./App";
 import "./i18n";
 import "./styles/global.css";
+import "./umami";
 
 const queryClient = new QueryClient({
   defaultOptions: {

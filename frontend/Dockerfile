@@ -1,5 +1,12 @@
 FROM node:22-alpine AS build
 
+# Opt-in Umami analytics. Both must be set for the tracking script to be
+# injected at runtime; see frontend/src/umami.ts.
+ARG VITE_UMAMI_URL=""
+ARG VITE_UMAMI_WEBSITE_ID=""
+ENV VITE_UMAMI_URL=$VITE_UMAMI_URL
+ENV VITE_UMAMI_WEBSITE_ID=$VITE_UMAMI_WEBSITE_ID
+
 WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm install
