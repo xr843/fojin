@@ -2,7 +2,7 @@
 #
 # fojin 生产部署脚本 —— 幂等、路径感知、带健康检查。
 #
-#   用法:  ./deploy.sh [branch] [--force-frontend] [--force-backend]
+#   用法:  ./deploy.sh [branch] [--force-frontend] [--force-backend] [--rebuild-backend]
 #          branch 默认 master。flags 用于绕过自动判定。
 #
 # 设计要点 (踩过的坑都在这里固化下来):
@@ -10,9 +10,15 @@
 #     "Cannot fast-forward to multiple branches"。改用 fetch + 显式 ff-merge。
 #   - 后端代码走 bind-mount, uvicorn 无 --reload: `docker compose up -d`
 #     不会重建未变镜像的容器, 新代码不会被加载。必须显式 `restart backend`。
+#   - 后端依赖变更必须 rebuild image: bind-mount 只覆盖代码,
+#     `requirements.txt` / `Dockerfile` 改动要重新构建 image 才生效。
 #   - 路径感知: 只重建/重启真正改动的服务, 避免每次全量 build 攒构建缓存。
 #   - .env 感知: frontend Dockerfile 把 VITE_* env 作为 ARG 烘焙进 bundle,
 #     所以 .env 改动也要触发 frontend rebuild — git rev 没动 ≠ 无需部署。
+#   - CD 抢跑感知: marker 不是空的 touch 文件, 而是上次成功 build/restart 时
+#     的 commit hash。比较 "marker 里的 commit" vs "当前 HEAD" 来检测变更,
+#     这样即便别的进程 (webhook CD / 手动 git pull) 已经把代码拉下来,
+#     我们也能正确判断未部署的差量。
 #   - 部署后做真实健康检查, 不是 `sleep 10` 了事。
 #
 set -euo pipefail
@@ -23,10 +29,12 @@ cd "$REPO_DIR"
 BRANCH=""
 FORCE_FRONTEND=false
 FORCE_BACKEND=false
+REBUILD_BACKEND=false
 for arg in "$@"; do
   case "$arg" in
-    --force-frontend) FORCE_FRONTEND=true ;;
-    --force-backend)  FORCE_BACKEND=true ;;
+    --force-frontend)  FORCE_FRONTEND=true ;;
+    --force-backend)   FORCE_BACKEND=true ;;
+    --rebuild-backend) REBUILD_BACKEND=true ;;
     -*) printf '!!! 未知参数: %s\n' "$arg" >&2; exit 2 ;;
     *)
       if [ -n "$BRANCH" ]; then
@@ -45,6 +53,7 @@ BACKEND_RESTART_MARKER="$STATE_DIR/last-backend-restart"
 mkdir -p "$STATE_DIR"
 
 log()  { printf '\n\033[1;36m>>> %s\033[0m\n' "$*"; }
+warn() { printf '\n\033[1;33m!!! %s\033[0m\n' "$*" >&2; }
 fail() { printf '\n\033[1;31m!!! %s\033[0m\n' "$*" >&2; exit 1; }
 
 # True if reference file is missing or older than .env.
@@ -53,6 +62,18 @@ env_newer_than() {
   [ -f .env ] || return 1
   [ ! -e "$marker" ] && return 0
   [ .env -nt "$marker" ]
+}
+
+# Read first line of marker file (the commit hash from last successful build).
+# Returns "" if marker missing or empty.
+marker_commit() {
+  local f="$1"
+  [ -s "$f" ] && head -n1 "$f" || true
+}
+
+# True iff $1 is a known git commit in this repo.
+is_known_commit() {
+  git rev-parse --verify --quiet "$1^{commit}" >/dev/null 2>&1
 }
 
 # --- 1. 取最新代码 -----------------------------------------------------------
@@ -64,26 +85,59 @@ git merge --ff-only "origin/$BRANCH" \
 NEW_REV="$(git rev-parse HEAD)"
 
 if [ "$OLD_REV" = "$NEW_REV" ]; then
-  log "HEAD 未变 ($(git rev-parse --short HEAD)) — 仅按 .env / flag 判定是否仍要部署。"
+  log "HEAD 未动 ($(git rev-parse --short HEAD)) — 按 marker / .env / flag 判定剩余 diff。"
 else
   log "HEAD: $(git rev-parse --short "$OLD_REV") -> $(git rev-parse --short "$NEW_REV")"
 fi
 
-# --- 2. 综合判断改了哪些服务 -------------------------------------------------
-CHANGED=""
-if [ "$OLD_REV" != "$NEW_REV" ]; then
-  CHANGED="$(git diff --name-only "$OLD_REV" "$NEW_REV")"
-  echo "$CHANGED" | sed 's/^/    /'
-fi
+# --- 2. 基于 marker 计算每个 service 的真实 diff ----------------------------
+# 不再用 OLD_REV → NEW_REV: 那样会被 CD 抢跑绕过 (HEAD 已经在新 commit, ff-merge
+# 报 "Already up to date", OLD_REV == NEW_REV, 但 marker 还停在更早的 commit)。
+# 改成 "上次成功 build/restart 时记录的 commit" → NEW_REV, 才反映真实未部署量。
+
+FE_BASE="$(marker_commit "$FRONTEND_BUILD_MARKER")"
+BE_BASE="$(marker_commit "$BACKEND_RESTART_MARKER")"
 
 frontend_changed=false
 backend_changed=false
 backend_image_changed=false
 
-if echo "$CHANGED" | grep -q '^frontend/'; then frontend_changed=true; fi
-if echo "$CHANGED" | grep -q '^backend/';  then backend_changed=true;  fi
-if echo "$CHANGED" | grep -qE '^backend/(Dockerfile|requirements[^/]*\.txt|pyproject\.toml)$'; then
+# Frontend
+if [ -z "$FE_BASE" ]; then
+  log "frontend 无 build 记录 — 触发首次构建。"
+  frontend_changed=true
+elif ! is_known_commit "$FE_BASE"; then
+  warn "frontend marker 指向未知 commit ($FE_BASE) — 保险起见重建。"
+  frontend_changed=true
+elif [ "$FE_BASE" != "$NEW_REV" ]; then
+  FE_DIFF="$(git diff --name-only "$FE_BASE" "$NEW_REV")"
+  if echo "$FE_DIFF" | grep -q '^frontend/'; then
+    log "frontend/ 自 ${FE_BASE:0:7} 起有变更 — 触发 rebuild。"
+    echo "$FE_DIFF" | grep '^frontend/' | sed 's/^/    /'
+    frontend_changed=true
+  fi
+fi
+
+# Backend (code vs image-level changes are distinct)
+if [ -z "$BE_BASE" ]; then
+  log "backend 无 restart 记录 — 触发首次构建。"
+  backend_changed=true
   backend_image_changed=true
+elif ! is_known_commit "$BE_BASE"; then
+  warn "backend marker 指向未知 commit ($BE_BASE) — 保险起见重建 image。"
+  backend_changed=true
+  backend_image_changed=true
+elif [ "$BE_BASE" != "$NEW_REV" ]; then
+  BE_DIFF="$(git diff --name-only "$BE_BASE" "$NEW_REV")"
+  if echo "$BE_DIFF" | grep -q '^backend/'; then
+    log "backend/ 自 ${BE_BASE:0:7} 起有变更 — 触发 restart。"
+    echo "$BE_DIFF" | grep '^backend/' | sed 's/^/    /'
+    backend_changed=true
+    if echo "$BE_DIFF" | grep -qE '^backend/(Dockerfile|requirements[^/]*\.txt|pyproject\.toml)$'; then
+      log "backend 依赖/Dockerfile 改动 — 升级为 rebuild image。"
+      backend_image_changed=true
+    fi
+  fi
 fi
 
 # .env 时间戳触发: frontend 镜像把 .env 烘焙进 bundle, backend 进程启动时读 env.
@@ -96,11 +150,13 @@ if env_newer_than "$BACKEND_RESTART_MARKER"; then
   backend_changed=true
 fi
 
-$FORCE_FRONTEND && { log "--force-frontend 已指定。"; frontend_changed=true; }
-$FORCE_BACKEND  && { log "--force-backend 已指定。"; backend_changed=true; }
+# Manual overrides
+$FORCE_FRONTEND  && { log "--force-frontend 已指定。";  frontend_changed=true; }
+$FORCE_BACKEND   && { log "--force-backend 已指定。";   backend_changed=true; }
+$REBUILD_BACKEND && { log "--rebuild-backend 已指定。"; backend_changed=true; backend_image_changed=true; }
 
 if ! $frontend_changed && ! $backend_changed; then
-  log "无任何变更信号 (git/.env/flag) — 无需部署。"
+  log "无任何变更信号 (marker/.env/flag) — 无需部署。"
   exit 0
 fi
 
@@ -109,7 +165,7 @@ if $frontend_changed; then
   log "Frontend changed — building image + recreating container ..."
   docker compose build frontend
   docker compose up -d frontend
-  touch "$FRONTEND_BUILD_MARKER"
+  echo "$NEW_REV" > "$FRONTEND_BUILD_MARKER"
 else
   log "Frontend unchanged — skip."
 fi
@@ -124,7 +180,7 @@ if $backend_changed; then
     log "Backend code/env changed — restarting container (bind-mount reload) ..."
     docker compose restart backend
   fi
-  touch "$BACKEND_RESTART_MARKER"
+  echo "$NEW_REV" > "$BACKEND_RESTART_MARKER"
 else
   log "Backend unchanged — skip."
 fi
