@@ -1,6 +1,9 @@
 # Environment
 .env
 
+# Deploy state (per-host markers used by deploy.sh)
+.deploy-state/
+
 # Python
 __pycache__/
 *.py[cod]
