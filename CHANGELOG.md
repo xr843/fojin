@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Security
 - Umami analytics tag is no longer hardcoded in `frontend/index.html`. The script is now injected at runtime by `frontend/src/umami.ts` only when both `VITE_UMAMI_URL` and `VITE_UMAMI_WEBSITE_ID` are set at build time (#623). Self-hosted deployments default to **no analytics phone-home** — previously every `docker compose up` silently reported search keywords, chat prompts (first 30 chars), reading IDs, and source clicks to `analytics.fojin.app`.
+- Bumped `fastapi` 0.121.0 → 0.136.3, which transitively pulls `starlette` from 0.49.3 → 1.1.0 and closes PYSEC-2026-161 (Host-header URL-reconstruction inconsistency that could enable auth bypass when authentication compares against the reconstructed URL path). FoJin itself was not exploitable — `request.base_url` is only used in SEO sitemap/canonical generation, never in auth decisions — but the audit pipeline had been red for weeks. 334 backend tests pass under the new deps.
 
 ### Changed
 - `deploy.sh` no longer exits early on "HEAD unchanged". It now also rebuilds frontend when `.env` is newer than the last build (since `VITE_*` envs are baked into the bundle as Dockerfile `ARG`s) and restarts backend when `.env` is newer than the last restart. Adds `--force-frontend` / `--force-backend` flags for manual overrides. Marker files live under `.deploy-state/` (gitignored, per-host). Fixes the silent "I changed .env but deploy says nothing to do" trap.
