@@ -334,11 +334,19 @@ cd backend && pytest tests/ -q
 
 - Non-root containers (backend: `app`, frontend: `nginx`)
 - Multi-stage Docker builds (no build tools in production)
-- Internal services bound to `127.0.0.1` only
+- Internal services (Postgres, Redis, Elasticsearch, backend, Umami) bound to `127.0.0.1` only
 - Memory/CPU limits per container
 - CSP, X-Frame-Options, X-Content-Type-Options headers
 - Query length limits on all search parameters
 - JWT with 8h expiry, production requires strong secret
+
+### Self-hosting privacy defaults
+
+- **No analytics phone-home.** The Umami tracking script is opt-in via build-time `VITE_UMAMI_URL` + `VITE_UMAMI_WEBSITE_ID`; if either is unset, the frontend ships without telemetry.
+- **LLM / embedding traffic is upstream by default.** Stock config calls DeepSeek + SiliconFlow with your platform key — user questions go there. Point `LLM_API_URL` / `EMBEDDING_API_URL` at a local OpenAI-compatible server (vLLM, Ollama, LM Studio) for a fully offline setup, or have each user provide their own key via the in-app BYOK flow.
+- **The frontend container is reachable from the docker host network, not only `127.0.0.1`.** On a multi-user LAN this means anyone on the network can hit your instance. Front it with an authenticated reverse proxy, or change the `frontend.ports` mapping in `docker-compose.yml` to bind on `127.0.0.1`.
+
+See [SECURITY.md](SECURITY.md) for the full picture.
 
 ## Contributing
 

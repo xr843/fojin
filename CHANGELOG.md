@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Security
+- Umami analytics tag is no longer hardcoded in `frontend/index.html`. The script is now injected at runtime by `frontend/src/umami.ts` only when both `VITE_UMAMI_URL` and `VITE_UMAMI_WEBSITE_ID` are set at build time (#623). Self-hosted deployments default to **no analytics phone-home** — previously every `docker compose up` silently reported search keywords, chat prompts (first 30 chars), reading IDs, and source clicks to `analytics.fojin.app`.
+
+### Changed
+- `deploy.sh` no longer exits early on "HEAD unchanged". It now also rebuilds frontend when `.env` is newer than the last build (since `VITE_*` envs are baked into the bundle as Dockerfile `ARG`s) and restarts backend when `.env` is newer than the last restart. Adds `--force-frontend` / `--force-backend` flags for manual overrides. Marker files live under `.deploy-state/` (gitignored, per-host). Fixes the silent "I changed .env but deploy says nothing to do" trap.
+
 ### Added
 - Data-source health monitoring. `scripts/health_check_sources.py` probes every active source's `base_url` and records a `health_status` verdict (`ok` / `degraded` / `cert_invalid` / `unreachable` / `moved`) plus `health_checked_at`. The Sources page now shows a warning badge on cards whose source has moved, is unreachable, has an invalid TLS certificate, or returns HTTP errors — healthy sources stay unbadged. Redirects are followed by hand with a per-hop public-IP check so a hijacked source URL cannot turn the cron into an SSRF against internal services. Designed to run from cron; busts the sources-list cache after writing so a stale verdict survives at most one cache TTL. Builds on the `health_status` column added in migration 0132.
 - `data_sources.health_detail` (migration 0136) — the health check now records actionable context for the latest probe: the redirect target for a `moved` source, the failure reason otherwise. A `moved` source's badge tooltip surfaces where it relocated to, so the verdict can be acted on instead of just observed.
