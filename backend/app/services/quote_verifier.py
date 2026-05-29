@@ -32,9 +32,13 @@ The check is deliberately conservative:
   quote inside a 繁-script source citation has already lost the
   attribution chain it claimed to preserve, so failing the check is
   the correct behaviour.
-- On miss we **annotate inline** rather than rewrite — preserving the
-  LLM's prose lets the user see what was claimed while making the
-  unverified status obvious.
+- On miss we append **one consolidated caveat** at the end of the answer
+  (before any ``[追问]`` block) rather than annotating each quote inline.
+  The earlier per-quote inline ⚠️ markers fired so often on *correct*
+  canonical quotes — retrieval favours dense commentaries over the base
+  sutra that actually contains the line — that they disfigured sound answers
+  mid-sentence and inside tables. The single trailing caveat keeps the
+  unverified-status signal; per-quote detail still reaches the logs.
 
 The verifier is wired *after* ``enforce_citation_whitelist`` so quotes
 attached to citations the guard already stripped (unverified titles)
@@ -193,24 +197,48 @@ def _find_sources(
     return exact or title_only
 
 
+# A single, unobtrusive caveat appended once when ≥1 quote fails verification,
+# replacing the previous per-quote inline ⚠️ markers. Because retrieval favours
+# dense commentaries over base sutras, those inline markers fired on the LLM's
+# *correct* canonical quotes (e.g. 「照见五蕴皆空」 under a 心经 commentary that
+# doesn't contain the line) and disfigured otherwise-sound answers mid-sentence
+# and inside tables. One caveat paragraph (placed before any [追问] block) keeps
+# the scholarly signal without breaking the prose; per-quote detail still goes to
+# the logs via QuoteMutation.
+_QUOTE_CAVEAT = "> ⚠️ 本回答中部分直接引文未能在检索到的经文片段中逐字核实，建议点按引用链接核对原文。"
+
+
+def _append_caveat(answer: str) -> str:
+    """Insert the quote caveat as its own paragraph, before any trailing
+    ``[追问]`` suggestion lines so it reads as part of the answer body rather
+    than after the follow-up buttons (which the frontend renders separately and
+    the backend strips before persistence)."""
+    lines = answer.split("\n")
+    for i, line in enumerate(lines):
+        if line.strip().startswith("[追问]"):
+            head = "\n".join(lines[:i]).rstrip()
+            tail = "\n".join(lines[i:])
+            return f"{head}\n\n{_QUOTE_CAVEAT}\n\n{tail}"
+    return answer.rstrip() + f"\n\n{_QUOTE_CAVEAT}"
+
+
 def verify_quoted_content(
     answer: str, sources: list[ChatSource]
 ) -> tuple[str, list[QuoteMutation]]:
-    """Annotate quoted segments that aren't substrings of the cited
-    source's chunk_text. Unchanged answers (no quote-citation pairs,
-    or all quotes verified) are returned identical, with empty
-    mutations list.
+    """Flag quoted segments that aren't substrings of the cited source's
+    chunk_text. Unchanged answers (no quote-citation pairs, or all quotes
+    verified) are returned identical, with an empty mutations list.
 
-    Implementation: regex scans for ``「…」【《X》第N卷】`` proximity
-    pairs, normalises both sides, and inserts an inline ⚠️ marker
-    after any failing pair. Multiple failing pairs in one answer get
-    individual annotations.
+    Implementation: regex scans for ``「…」【《X》第N卷】`` proximity pairs and
+    normalises both sides. Any failing pair is recorded as a QuoteMutation
+    (for logging); if there is at least one, a single consolidated caveat is
+    appended once to the answer (before any ``[追问]`` block). Multiple
+    failures share the one caveat rather than each getting an inline marker.
     """
     if not answer or "【《" not in answer:
         return answer, []
 
     mutations: list[QuoteMutation] = []
-    annotations: list[tuple[int, str]] = []  # (insert_at_index, marker)
 
     for m in _QUOTE_CITATION_RE.finditer(answer):
         quote = m.group("quote").strip()
@@ -228,9 +256,6 @@ def verify_quoted_content(
                     reason="no_matching_source",
                 )
             )
-            annotations.append(
-                (m.end(), "[⚠️ 引文出处未在检索结果中找到]")
-            )
             continue
 
         # Pass if the quote is a substring of ANY retrieved chunk for the
@@ -246,18 +271,11 @@ def verify_quoted_content(
                     reason="quote_not_in_source",
                 )
             )
-            annotations.append(
-                (m.end(), "[⚠️ 引文未在该卷原文中验证到，请谨慎引用]")
-            )
 
-    if not annotations:
+    if not mutations:
         return answer, mutations
 
-    # Insert markers from right-to-left so earlier indices stay valid.
-    annotated = answer
-    for index, marker in sorted(annotations, key=lambda x: x[0], reverse=True):
-        annotated = annotated[:index] + marker + annotated[index:]
-    return annotated, mutations
+    return _append_caveat(answer), mutations
 
 
 def log_quote_mutations(
