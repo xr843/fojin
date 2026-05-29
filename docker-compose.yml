@@ -99,6 +99,14 @@ services:
       EMBEDDING_API_URL: ${EMBEDDING_API_URL:-}
       EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-m3}
+      # Cross-encoder reranker. When RERANKER_API_URL is set, rag_retrieval
+      # re-scores vector candidates with a cross-encoder (the single biggest
+      # RAG-precision lever); empty → falls back to keyword reranking.
+      # RERANKER_API_KEY is optional: rag_retrieval falls back to
+      # EMBEDDING_API_KEY (same SiliconFlow account hosts bge-reranker-v2-m3).
+      RERANKER_API_URL: ${RERANKER_API_URL:-}
+      RERANKER_API_KEY: ${RERANKER_API_KEY:-}
+      RERANKER_MODEL: ${RERANKER_MODEL:-BAAI/bge-reranker-v2-m3}
       DIANJIN_API_KEY: ${DIANJIN_API_KEY:-}
       AMAP_KEY: ${AMAP_KEY:-}
       # OAuth & SMS

@@ -19,12 +19,21 @@ from app.services.precise_retrieval import try_precise_text_retrieval
 
 logger = logging.getLogger(__name__)
 
-# Minimum cosine similarity score to include a chunk in RAG context.
-# Chunks below this threshold are considered irrelevant and filtered out.
-MIN_RELEVANCE_SCORE = 0.35
+# Minimum first-stage (vector cosine) score for a chunk to survive into the
+# rerank candidate pool. Kept deliberately low because the cross-encoder reranker
+# — not this coarse cosine floor — is the real relevance filter: a base sutra can
+# lose the cosine race to its own dense commentaries yet score highest under the
+# reranker, so an aggressive pre-filter here would discard it before the reranker
+# ever sees it. The final top-MAX_CONTEXT_CHUNKS is chosen on the blended
+# (vector + cross-encoder) score, which keeps genuine noise out of the answer.
+MIN_RELEVANCE_SCORE = 0.25
 
 # Maximum chunks to send to LLM after reranking (fewer but more relevant = better answers)
 MAX_CONTEXT_CHUNKS = 5
+
+# Upper bound on candidates cross-encoded per query (latency/cost + request-size
+# guardrail). The post-dedup pool is well under this today; it just caps growth.
+RERANK_CANDIDATE_LIMIT = 32
 
 # Trilingual RAG: enable per-language retrieval + alignment-aware merging.
 # When True, retrieve_rag_context fetches separately from lzh/pi/bo and then
@@ -34,7 +43,13 @@ ENABLE_PARALLEL_RAG = settings.enable_parallel_rag if hasattr(settings, "enable_
 
 # Per-lang top-k budgets for parallel mode. Total retrieved = LZH_K + PI_K + BO_K.
 # Keep larger for lzh since 95%+ users read Chinese and primary narrative stays in lzh.
-PARALLEL_LZH_K = 8
+# LZH_K is deliberately generous (well above MAX_CONTEXT_CHUNKS): the cross-encoder
+# reranker only re-scores what vector search already retrieved, so a base sutra
+# that loses the first-stage cosine race to its own dense commentaries (the 心经
+# 本经 vs 心經注疏 failure mode) must still be inside this candidate pool for the
+# reranker to be able to promote it. Final context is still capped at
+# MAX_CONTEXT_CHUNKS after reranking.
+PARALLEL_LZH_K = 15
 PARALLEL_PI_K = 4
 PARALLEL_BO_K = 4
 
@@ -243,10 +258,16 @@ async def _api_rerank(query: str, results: list[dict]) -> list[dict]:
     api_key = settings.reranker_api_key or settings.embedding_api_key or settings.llm_api_key
     model = settings.reranker_model
 
-    documents = [r["chunk_text"][:500] for r in results]
+    # Cap how many docs we cross-encode: bounds latency/cost and the request
+    # body even if a future caller widens the candidate pool. Today the pool is
+    # ~15-20 after dedup, well under this; results beyond it keep vector-only
+    # score (api defaults to 0.0 below) and rank last.
+    documents = [r["chunk_text"][:500] for r in results[:RERANK_CANDIDATE_LIMIT]]
 
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
+        # Short timeout: the keyword fallback is cheap and local, so don't make a
+        # reranker hiccup cost the user 15s of dead air on an interactive query.
+        async with httpx.AsyncClient(timeout=6) as client:
             resp = await client.post(
                 f"{api_url}/rerank",
                 headers={"Authorization": f"Bearer {api_key}"},
@@ -409,7 +430,7 @@ async def retrieve_rag_context(
     query: str,
     *,
     prev_query: str | None = None,
-    pgvector_limit: int = 10,
+    pgvector_limit: int = 15,
     scope_text_ids: list[int] | None = None,
 ) -> tuple[list[ChatSource], str]:
     """Run pgvector similarity search and return (sources, context_text).
