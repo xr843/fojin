@@ -44,7 +44,8 @@ def test_rewrites_unknown_title_when_whitelist_has_other_titles():
     sources = [_src(7, "心经", 1)]
     out, muts = enforce_citation_whitelist(answer, sources)
     assert "【《某伪经》第3卷】" not in out
-    assert "《某伪经》（未在检索结果中验证，请谨慎）" in out
+    assert "《某伪经》" in out  # stripped to plain prose
+    assert "未在检索结果中验证" not in out  # no inline warning disfiguring the answer
     assert len(muts) == 1
     assert muts[0].kind == "unverified_title"
     assert muts[0].title == "某伪经"
@@ -83,7 +84,8 @@ def test_literal_X_placeholder_for_unknown_title_is_flagged():
     answer = "据【《伪造经》第X卷】所言。"
     out, muts = enforce_citation_whitelist(answer, [_src(7, "心经", 1)])
     assert "第X卷" not in out
-    assert "（未在检索结果中验证，请谨慎）" in out
+    assert "《伪造经》" in out
+    assert "未在检索结果中验证" not in out
     assert muts[0].kind == "unverified_title"
 
 
@@ -114,7 +116,7 @@ def test_title_only_citation_for_unknown_title_is_flagged():
     answer = "参见【《不存在经》】。"
     out, muts = enforce_citation_whitelist(answer, [_src(7, "心经", 1)])
     assert "【《不存在经》】" not in out
-    assert "《不存在经》（未在检索结果中验证，请谨慎）" in out
+    assert "《不存在经》" in out
     assert muts[0].original_juan is None
 
 
@@ -145,8 +147,9 @@ def test_empty_sources_strips_all_citations_with_caveats():
     answer = "如【《心经》第1卷】与【《金刚经》】所言。"
     out, muts = enforce_citation_whitelist(answer, [])
     assert "【《" not in out
-    assert "《心经》（未在检索结果中验证，请谨慎）" in out
-    assert "《金刚经》（未在检索结果中验证，请谨慎）" in out
+    assert "《心经》" in out
+    assert "《金刚经》" in out
+    assert "未在检索结果中验证" not in out
     assert len(muts) == 2
     assert {m.kind for m in muts} == {"unverified_title"}
 
@@ -157,7 +160,7 @@ def test_text_id_zero_sources_excluded_from_whitelist():
     answer = "依据【《心经》第1卷】所述。"
     out, muts = enforce_citation_whitelist(answer, [_src(0, "心经", 1)])
     assert "【《心经》第1卷】" not in out
-    assert "《心经》（未在检索结果中验证，请谨慎）" in out
+    assert "《心经》" in out
     assert muts[0].kind == "unverified_title"
 
 
@@ -201,4 +204,4 @@ def test_mutation_is_dataclass_with_full_audit_fields():
     assert m.title == "伪经"
     assert m.original_juan == 1
     assert m.corrected_juan is None
-    assert "未在检索结果中验证" in m.replacement
+    assert m.replacement == "《伪经》"

@@ -11,9 +11,15 @@ backstop after the prompt's moral one.
 Two failure modes are caught:
 
 1. **Hallucinated title** — ``【《X》第N卷】`` where ``X`` does not appear
-   in the retrieved sources or their aligned parallels. Rewritten to
-   ``《X》（未在检索结果中验证，请谨慎）`` so the user keeps the model's
-   intent but loses the false air of authority a 【】 reference carries.
+   in the retrieved sources or their aligned parallels. Rewritten to plain
+   prose ``《X》`` — the clickable 【】 wrapper is stripped (so the user can
+   never click through to an empty sidebar), but no inline warning is
+   injected. An un-retrieved title becoming a bare ``《X》`` mention is exactly
+   the prose fallback the system prompt already asks for; an inline
+   "（未验证）" scold mid-sentence/mid-table only disfigured otherwise-correct
+   answers (the LLM routinely names real canonical texts that retrieval — which
+   favours dense commentaries over base sutras — simply didn't surface). The
+   mutation is still logged for drift monitoring.
 
 2. **Wrong fascicle** — title ``X`` is in the whitelist but ``N`` does
    not match any source's ``juan_num`` for that title. Rewritten to use
@@ -118,7 +124,7 @@ def enforce_citation_whitelist(
         def _strip(match: re.Match[str]) -> str:
             title = match.group(1)
             juan, _ = _parse_juan(match.group(2))
-            replacement = f"《{title}》（未在检索结果中验证，请谨慎）"
+            replacement = f"《{title}》"
             mutations.append(
                 CitationMutation(
                     kind="unverified_title",
@@ -141,7 +147,7 @@ def enforce_citation_whitelist(
         original_juan, juan_is_placeholder = _parse_juan(match.group(2))
 
         if title not in whitelist:
-            replacement = f"《{title}》（未在检索结果中验证，请谨慎）"
+            replacement = f"《{title}》"
             mutations.append(
                 CitationMutation(
                     kind="unverified_title",

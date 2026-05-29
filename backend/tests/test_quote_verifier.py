@@ -105,7 +105,7 @@ def test_quote_not_in_source_gets_annotated():
     answer = "经文明示：「众生皆有佛性，如来藏不空妙有」【《心經》第1卷】"
     out, muts = verify_quoted_content(answer, [src])
     assert "⚠️" in out
-    assert "未在该卷原文中验证到" in out
+    assert "未能在检索到的经文片段中逐字核实" in out  # single consolidated caveat
     assert len(muts) == 1
     assert muts[0].reason == "quote_not_in_source"
     assert muts[0].title == "心經"
@@ -120,8 +120,9 @@ def test_no_matching_source_gets_annotated_differently():
     src = _src(7, "心經", 1, "...")
     answer = "云：「众生皆有佛性，如来藏不空妙有」【《不存在经》第1卷】"
     out, muts = verify_quoted_content(answer, [src])
-    assert "⚠️" in out
-    assert "出处未在检索结果中找到" in out
+    assert "⚠️" in out  # consolidated caveat present
+    # Both failure reasons now share one user-facing caveat; the distinction
+    # ('wrong text' vs 'wrong content') survives only in the audit mutation.
     assert len(muts) == 1
     assert muts[0].reason == "no_matching_source"
 
@@ -188,18 +189,31 @@ def test_simplified_answer_quote_verifies_against_traditional_source():
     assert "⚠️" not in out
 
 
-def test_multiple_failing_quotes_all_annotated():
-    """Two fabricated quotes in one answer must both be marked, and
-    the markers must not interfere with each other (right-to-left
-    insertion preserves earlier indices)."""
+def test_multiple_failing_quotes_share_one_caveat():
+    """Two fabricated quotes in one answer are both logged, but the user
+    sees a single consolidated caveat rather than two inline markers."""
     src = _src(7, "心經", 1, "无关原文")
     answer = (
         "云：「假引文片段一假引文片段一假引文片段一」【《心經》第1卷】然后："
         "「假引文片段二假引文片段二假引文片段二」【《心經》第1卷】"
     )
     out, muts = verify_quoted_content(answer, [src])
-    assert out.count("⚠️") == 2
-    assert len(muts) == 2
+    assert out.count("⚠️") == 1  # one consolidated caveat regardless of count
+    assert len(muts) == 2  # but every failing quote is still logged
+
+
+def test_caveat_inserted_before_followup_block():
+    """The consolidated caveat must sit in the answer body, above any trailing
+    [追问] lines — not after the follow-up buttons (which render separately)."""
+    src = _src(7, "心經", 1, "无关原文")
+    answer = (
+        "云：「假引文片段一假引文片段一假引文片段一」【《心經》第1卷】\n"
+        "[追问] 问题一\n"
+        "[追问] 问题二\n"
+    )
+    out, muts = verify_quoted_content(answer, [src])
+    assert len(muts) == 1
+    assert out.index("⚠️") < out.index("[追问]")  # caveat above the follow-up block
 
 
 def test_distant_quote_and_citation_not_treated_as_pair():
