@@ -19,6 +19,8 @@ Usage:
 import argparse
 import asyncio
 import os
+import socket
+import ssl
 import sys
 import warnings
 from datetime import UTC, datetime
@@ -28,6 +30,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import httpx
 import redis.asyncio as aioredis
+from cryptography import x509
+from cryptography.x509.oid import AuthorityInformationAccessOID
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
@@ -35,16 +39,22 @@ from sqlalchemy.orm import sessionmaker
 from app.api.sources import SOURCES_LIST_CACHE_KEY
 from app.config import settings
 from app.services.source_health import (
+    SSL_CHAIN_INCOMPLETE,
     SSL_ERROR,
     VALID_STATUSES,
     classify_health,
     host_is_public,
+    is_incomplete_chain_error,
     resolve_unreachable_since,
 )
 
-TIMEOUT = 15  # seconds per request
+TIMEOUT = 30  # seconds per request — small academic/library sites are often slow
 CONCURRENCY = 10  # max concurrent probes — be gentle on small academic sites
 MAX_REDIRECTS = 5  # redirect hops to follow before giving up
+# A single probe from one VPS vantage is noisy: a transient timeout, a dropped
+# connection or a 5xx blip would otherwise badge a healthy source. Retry those
+# (and only those) once before recording a verdict.
+RETRY_BACKOFF = 2  # seconds to wait before the single retry of a transient fail
 USER_AGENT = "Mozilla/5.0 (compatible; FoJin-HealthCheck/1.0; +https://fojin.app)"
 
 
@@ -81,20 +91,90 @@ def _verdict(code: str, status: str | None, detail: str | None) -> dict:
     return {"code": code, "status": status, "detail": detail}
 
 
-async def probe(client: httpx.AsyncClient, code: str, url: str | None) -> dict:
-    """Probe one source into a {code, status, detail} verdict.
+async def _serves_content(client: httpx.AsyncClient, url: str) -> bool:
+    """True when ``url``'s host returns any non-5xx response with cert
+    verification disabled.
+
+    Used only to confirm that a source which failed the verified probe with a
+    *missing-intermediate* cert error is nonetheless live — so a chain gap
+    (which AIA browsers paper over) downgrades to ``ok`` instead of a dead host
+    being badged healthy. ``follow_redirects=False`` preserves the SSRF
+    guarantee: the caller already vetted this exact host with
+    :func:`host_is_public`, and an unvetted redirect target is never chased."""
+    try:
+        resp = await client.get(url, follow_redirects=False, timeout=TIMEOUT)
+        return resp.status_code < 500
+    except Exception:
+        return False
+
+
+def _leaf_declares_aia_issuer(host: str, port: int) -> bool:
+    """True when the server's leaf certificate carries an AIA caIssuers URL.
+
+    This is the signal that separates a *recoverable* missing-intermediate chain
+    — AIA-capable browsers (Chrome/Edge/Safari) fetch the named issuer and
+    complete the chain — from a genuinely untrusted leaf (e.g. a private root
+    with no AIA), which yields the same OpenSSL "unable to get local issuer"
+    code yet every browser rejects. The handshake runs with verification
+    disabled so the presented leaf can be read even when the chain doesn't
+    validate; the cert is only inspected, never trusted.
+
+    Any failure (connect error, no peer cert, no AIA extension, parse error)
+    returns False — the conservative answer that keeps the source cert_invalid.
+    Blocking socket/TLS work; call via ``asyncio.to_thread``."""
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    try:
+        with (
+            socket.create_connection((host, port), timeout=TIMEOUT) as sock,
+            ctx.wrap_socket(sock, server_hostname=host) as ssock,
+        ):
+            der = ssock.getpeercert(binary_form=True)
+        if not der:
+            return False
+        cert = x509.load_der_x509_certificate(der)
+        aia = cert.extensions.get_extension_for_class(x509.AuthorityInformationAccess).value
+        return any(
+            desc.access_method == AuthorityInformationAccessOID.CA_ISSUERS for desc in aia
+        )
+    except Exception:
+        return False
+
+
+async def _chain_gap_is_browser_recoverable(
+    insecure_client: httpx.AsyncClient, url: str
+) -> bool:
+    """True when a missing-intermediate TLS failure is one browsers recover from.
+
+    Both conditions are required, so neither a dead host nor a genuinely
+    untrusted leaf is laundered into ``ok``:
+      - the host actually serves content (insecure re-fetch, non-5xx) — it's a
+        live source, not a host that merely failed at the TLS layer;
+      - the leaf certificate declares an AIA caIssuers URL — AIA-capable
+        browsers can fetch the absent intermediate and complete the chain."""
+    if not await _serves_content(insecure_client, url):
+        return False
+    parts = urlsplit(url)
+    if not parts.hostname:
+        return False
+    return await asyncio.to_thread(_leaf_declares_aia_issuer, parts.hostname, parts.port or 443)
+
+
+async def _probe_once(
+    client: httpx.AsyncClient, insecure_client: httpx.AsyncClient, code: str, url: str
+) -> tuple[dict, bool]:
+    """Probe ``url`` once into a ``(verdict, transient)`` pair.
+
+    ``transient`` is True for failures a retry might clear — a timeout, a
+    dropped connection, or a 5xx — so the caller can re-probe before recording
+    a verdict. A missing-intermediate cert that the insecure re-fetch confirms
+    is live downgrades to ``ok`` (see :func:`_serves_content`); every other cert
+    failure stays ``cert_invalid``.
 
     Redirects are followed by hand (``follow_redirects=False``) so every hop's
     host can be vetted with :func:`host_is_public` before a request is sent —
     this is what stops a redirect chain from reaching internal services."""
-    if not url or url == "None":
-        # No URL to probe — leave it as-is rather than inventing a verdict.
-        return _verdict(code, None, "no base_url")
-    parts = urlsplit(url)
-    if parts.scheme not in ("http", "https") or not parts.hostname:
-        # A malformed base_url is a config error, not a reachability verdict.
-        return _verdict(code, None, f"bad base_url: {url[:80]}")
-
     current = url
     try:
         for _ in range(MAX_REDIRECTS + 1):
@@ -103,7 +183,10 @@ async def probe(client: httpx.AsyncClient, code: str, url: str | None) -> dict:
                 # Host does not resolve, or resolves to a non-public address —
                 # refuse to probe it. From an editor's view the source is
                 # effectively unreachable.
-                return _verdict(code, "unreachable", f"unresolvable or non-public host: {host}")
+                return (
+                    _verdict(code, "unreachable", f"unresolvable or non-public host: {host}"),
+                    False,
+                )
             resp = await client.get(current, follow_redirects=False, timeout=TIMEOUT)
             if resp.is_redirect and "location" in resp.headers:
                 current = str(httpx.URL(current).join(resp.headers["location"]))
@@ -124,17 +207,50 @@ async def probe(client: httpx.AsyncClient, code: str, url: str | None) -> dict:
                 detail = current
             else:
                 detail = f"HTTP {resp.status_code}"
-            return _verdict(code, status, detail)
+            # A 5xx is the one HTTP outcome worth retrying; ok / moved / degraded
+            # and the 4xx the classifier already reads as reachable are stable.
+            return _verdict(code, status, detail), resp.status_code >= 500
 
         # Redirect budget exhausted.
         status = classify_health(
             error="redirect_loop", status_code=None, requested_url=url, final_url=None
         )
-        return _verdict(code, status, f"exceeded {MAX_REDIRECTS} redirect hops")
+        return _verdict(code, status, f"exceeded {MAX_REDIRECTS} redirect hops"), False
     except Exception as exc:  # every probe failure maps to a health verdict
         kind = _error_kind(exc)
+        if (
+            kind == SSL_ERROR
+            and is_incomplete_chain_error(str(exc))
+            and await _chain_gap_is_browser_recoverable(insecure_client, current)
+        ):
+            # Missing-intermediate chain on a live host whose leaf advertises an
+            # AIA issuer — AIA-capable browsers complete the chain and load it.
+            status = classify_health(
+                error=SSL_CHAIN_INCOMPLETE, status_code=None, requested_url=url, final_url=current
+            )
+            return _verdict(code, status, None), False
         status = classify_health(error=kind, status_code=None, requested_url=url, final_url=None)
-        return _verdict(code, status, f"{kind}: {str(exc)[:160]}")
+        return _verdict(code, status, f"{kind}: {str(exc)[:160]}"), kind in ("timeout", "connect")
+
+
+async def probe(
+    client: httpx.AsyncClient, insecure_client: httpx.AsyncClient, code: str, url: str | None
+) -> dict:
+    """Probe one source into a {code, status, detail} verdict, retrying once on
+    a transient failure (timeout / dropped connection / 5xx)."""
+    if not url or url == "None":
+        # No URL to probe — leave it as-is rather than inventing a verdict.
+        return _verdict(code, None, "no base_url")
+    parts = urlsplit(url)
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        # A malformed base_url is a config error, not a reachability verdict.
+        return _verdict(code, None, f"bad base_url: {url[:80]}")
+
+    verdict, transient = await _probe_once(client, insecure_client, code, url)
+    if transient:
+        await asyncio.sleep(RETRY_BACKOFF)
+        verdict, _ = await _probe_once(client, insecure_client, code, url)
+    return verdict
 
 
 async def main(dry_run: bool) -> None:
@@ -162,11 +278,17 @@ async def main(dry_run: bool) -> None:
 
     semaphore = asyncio.Semaphore(CONCURRENCY)
     # verify=True is intentional — detecting cert_invalid is a goal of this job.
-    async with httpx.AsyncClient(headers={"User-Agent": USER_AGENT}, verify=True) as client:
+    # The insecure client is used *only* to re-confirm a missing-intermediate
+    # source is live (see _serves_content); it never produces a verdict on its
+    # own, so a real cert failure can't be laundered into "ok".
+    async with (
+        httpx.AsyncClient(headers={"User-Agent": USER_AGENT}, verify=True) as client,
+        httpx.AsyncClient(headers={"User-Agent": USER_AGENT}, verify=False) as insecure_client,
+    ):
 
         async def bounded(code: str, url: str | None) -> dict:
             async with semaphore:
-                return await probe(client, code, url)
+                return await probe(client, insecure_client, code, url)
 
         results = await asyncio.gather(*(bounded(r[0], r[1]) for r in rows))
 

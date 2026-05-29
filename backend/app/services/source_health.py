@@ -18,8 +18,37 @@ from urllib.parse import urlsplit
 # Probe error kinds the caller may report. Anything that is not a clean HTTP
 # response with a status code falls into one of these.
 SSL_ERROR = "ssl"
+# A cert chain that is merely *incomplete* — the server omitted an intermediate
+# certificate ("unable to get local issuer certificate"). AIA-fetching browsers
+# (Chrome/Edge/Safari, the large majority of readers) complete the chain and
+# load the page normally, so this is not worth a "证书异常" badge. The probe
+# assigns this token only after confirming both that the host serves content and
+# that the leaf advertises an AIA caIssuers URL — so a genuinely untrusted root,
+# which raises the same OpenSSL error, is not downgraded. See
+# scripts/health_check_sources.py.
+SSL_CHAIN_INCOMPLETE = "ssl_chain_incomplete"
 
 VALID_STATUSES = frozenset({"ok", "degraded", "cert_invalid", "unreachable", "moved"})
+
+
+def is_incomplete_chain_error(message: str | None) -> bool:
+    """True for the *missing-intermediate* TLS family — OpenSSL's "unable to get
+    local issuer certificate" (verify code 20).
+
+    This is a coarse pre-filter, not a final verdict. Code 20 covers two cases:
+    a server that merely omitted an intermediate (AIA-capable browsers refetch
+    it and load the page) and, less commonly, a leaf signed by a CA absent from
+    every trust store with no AIA pointer (browsers reject it). The caller only
+    downgrades to ``ok`` after a second check confirms the leaf actually
+    advertises an AIA caIssuers URL — see ``_chain_gap_is_browser_recoverable``
+    in scripts/health_check_sources.py — so this function deliberately stays
+    broad. Hard failures with a different signature (expired, hostname mismatch,
+    self-signed leaf, weak key, old-TLS alert) never match here and stay
+    ``cert_invalid``.
+    """
+    if not message:
+        return False
+    return "unable to get local issuer certificate" in message.lower()
 
 
 def _ip_is_blocked(ip: str) -> bool:
@@ -125,6 +154,10 @@ def classify_health(
     """
     if error == SSL_ERROR:
         return "cert_invalid"
+    if error == SSL_CHAIN_INCOMPLETE:
+        # Only a missing-intermediate chain gap, and the probe already confirmed
+        # the host serves content — browsers load it, so no badge.
+        return "ok"
     if error is not None:
         return "unreachable"
 

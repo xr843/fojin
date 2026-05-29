@@ -10,6 +10,7 @@ from app.services.source_health import (
     _ip_is_blocked,
     classify_health,
     host_is_public,
+    is_incomplete_chain_error,
     resolve_unreachable_since,
 )
 
@@ -105,6 +106,48 @@ def test_ssl_error_is_cert_invalid():
         classify_health(error="ssl", status_code=None, requested_url=HOME, final_url=None)
         == "cert_invalid"
     )
+
+
+def test_ssl_chain_incomplete_is_ok():
+    # A missing-intermediate chain gap, already confirmed content-reachable by
+    # the probe's insecure re-fetch: AIA-fetching browsers load it, so no badge.
+    assert (
+        classify_health(
+            error="ssl_chain_incomplete", status_code=None, requested_url=HOME, final_url=None
+        )
+        == "ok"
+    )
+
+
+@pytest.mark.parametrize(
+    "msg",
+    [
+        "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to "
+        "get local issuer certificate (_ssl.c:1010)",
+        "unable to get local issuer certificate",
+        "UNABLE TO GET LOCAL ISSUER CERTIFICATE",  # case-insensitive
+    ],
+)
+def test_incomplete_chain_messages_detected(msg):
+    assert is_incomplete_chain_error(msg) is True
+
+
+@pytest.mark.parametrize(
+    "msg",
+    [
+        "certificate has expired",
+        "Hostname mismatch, certificate is not valid for 'example.org'",
+        "self-signed certificate",
+        "self-signed certificate in certificate chain",  # private root -> hard fail
+        "EE certificate key too weak",
+        "no alternative certificate subject name matches target host name",
+        "tlsv1 alert internal error",
+        "",
+        None,
+    ],
+)
+def test_hard_cert_errors_are_not_incomplete_chain(msg):
+    assert is_incomplete_chain_error(msg) is False
 
 
 def test_timeout_and_connect_errors_are_unreachable():
