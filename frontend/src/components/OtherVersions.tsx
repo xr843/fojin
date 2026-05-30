@@ -69,6 +69,7 @@ export default function OtherVersions({ textId }: { textId: number }) {
         </span>
       }
       size="small"
+      style={{ marginBottom: 12 }}
     >
       <List
         size="small"

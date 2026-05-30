@@ -4,6 +4,7 @@ import { LinkOutlined, BookOutlined, ExpandAltOutlined } from "@ant-design/icons
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { getJuanAlignment, getCanonicalParallels, getFullParallelContent } from "../api/client";
+import OtherVersions from "./OtherVersions";
 
 interface Props {
   textId: number;
@@ -333,15 +334,20 @@ function ChunkView({ textId, juanNum }: Props) {
 }
 
 /**
- * Reader 右侧"多语对读"内联面板（非 modal）。
- *
- * 两个视图：
- *  - 按经对读（默认）：SuttaCentral 权威经级对应，来源 text_relations
+ * Reader 右侧"跨藏对照"统一面板（非 modal）。一处汇聚三种跨藏视角：
+ *  - 其他版本：同一 FRBR Work 的不同译本（Work 脊椎，来源 work_witnesses）
+ *  - 按经对读（默认 tab）：SuttaCentral 权威经级对应，来源 text_relations
  *  - 按段对读（实验）：embedding+LLM 段级对齐，来源 alignment_pairs
+ *
+ * 「其他版本」= 同一部经的不同语言译本（最直接的跨藏入口），无则不渲染；
+ * 「对读」= 相关但不同的经文之间的平行关系。
  */
 export default function ReaderParallelPanel({ textId, juanNum }: Props) {
   return (
     <div className="reader-parallel-panel">
+      <div style={{ padding: "0 12px" }}>
+        <OtherVersions textId={textId} />
+      </div>
       <Tabs
         defaultActiveKey="canonical"
         size="small"
