@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Typography, Spin, Button, Select, Breadcrumb, Row, Col, message, Tooltip } from "antd";
@@ -16,11 +16,11 @@ import {
   GlobalOutlined,
 } from "@ant-design/icons";
 import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBookmark, addBookmark, removeBookmark, searchDictionaryGrouped } from "../api/client";
-import type { DictGroupedSearchResponse } from "../api/client";
 import { useAuthStore } from "../stores/authStore";
 import CitationGenerator from "../components/CitationGenerator";
 import AnnotationPanel from "../components/AnnotationPanel";
-import AskXiaojinButton from "../components/AskXiaojinButton";
+import { ReaderDictPopover } from "../components/ReaderDictPopover";
+import { DICT_POPOVER_INIT, MAX_WORD_LEN, type DictPopoverState } from "../components/ReaderDictPopover.types";
 import ReaderAIPanel from "../components/ReaderAIPanel";
 import ReaderParallelPanel from "../components/ReaderParallelPanel";
 
@@ -246,98 +246,6 @@ function getInitialFontSize(): number {
 }
 
 /** 划词查辞典浮层状态 */
-interface DictPopoverState {
-  visible: boolean;
-  text: string;
-  x: number;
-  y: number;
-  loading: boolean;
-  result: DictGroupedSearchResponse | null;
-}
-
-const DICT_POPOVER_INIT: DictPopoverState = {
-  visible: false,
-  text: "",
-  x: 0,
-  y: 0,
-  loading: false,
-  result: null,
-};
-
-/** 划词查辞典浮层组件 */
-function DictPopover({
-  state,
-  onClose,
-}: {
-  state: DictPopoverState;
-  onClose: () => void;
-}) {
-  if (!state.visible) return null;
-
-  // 选最佳释义：优先中文释义类辞典（definition 最长的），排除多语对照类短释义
-  const HIGH_QUALITY_SOURCES = [
-    "dila-dfb", "foguang", "nti-reader", "bs-faxiang", "bs-changjianci",
-    "zhonghua-baike", "bs-yiqiejing-yinyi", "bs-agama", "weishi",
-    "abhidharma", "tiantai", "sanzang-fashu",
-  ];
-  let bestEntry = state.result?.groups?.[0]?.entries?.[0];
-  if (state.result?.groups) {
-    for (const g of state.result.groups) {
-      if (HIGH_QUALITY_SOURCES.includes(g.source_code) && g.entries[0]) {
-        bestEntry = g.entries[0];
-        break;
-      }
-    }
-  }
-
-  // 计算浮层位置
-  const popW = 220;
-  let left = state.x - popW / 2;
-  let top = state.y + 8;
-
-  if (left < 8) left = 8;
-  if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
-  if (top + 120 > window.innerHeight - 8) {
-    top = state.y - 120;
-    if (top < 8) top = 8;
-  }
-
-  return (
-    <div
-      className="reader-dict-popover"
-      style={{ left, top }}
-      onMouseDown={(e) => e.stopPropagation()}
-    >
-      <div className="reader-dict-popover-header">
-        <span className="reader-dict-popover-keyword">{state.text}</span>
-        <button className="reader-dict-popover-close" onClick={onClose}>✕</button>
-      </div>
-      <div className="reader-dict-popover-body">
-        {state.loading ? (
-          <div style={{ textAlign: "center", padding: 12 }}>
-            <Spin size="small" />
-          </div>
-        ) : bestEntry ? (
-          <div className="reader-dict-popover-entry">
-            <div className="reader-dict-popover-def">
-              {bestEntry.definition.length > 30
-                ? bestEntry.definition.slice(0, 30) + "…"
-                : bestEntry.definition}
-            </div>
-          </div>
-        ) : (
-          <div className="reader-dict-popover-empty">未找到释义</div>
-        )}
-      </div>
-      <div className="reader-dict-popover-footer">
-        <Link to={`/dictionary?q=${encodeURIComponent(state.text)}`} onClick={onClose}>
-          查看全部释义 →
-        </Link>
-      </div>
-    </div>
-  );
-}
-
 export default function TextReaderPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -433,7 +341,8 @@ export default function TextReaderPage() {
   const handleTextSelect = useCallback(async () => {
     const sel = window.getSelection();
     const text = sel?.toString().trim() || "";
-    if (text.length < 1 || text.length > 20) return;
+    // 1–500 字才弹浮层；>500 视为误选，忽略
+    if (text.length < 1 || text.length > 500) return;
 
     // 获取选中文字的位置
     const range = sel?.getRangeAt(0);
@@ -442,7 +351,10 @@ export default function TextReaderPage() {
     const x = rect.left + rect.width / 2;
     const y = rect.bottom;
 
-    setDictPopover({ visible: true, text, x, y, loading: true, result: null });
+    // 短词查辞典；整句选择只显示「问小津」，不查辞典
+    const isWord = text.length <= MAX_WORD_LEN;
+    setDictPopover({ visible: true, text, x, y, loading: isWord, result: null });
+    if (!isWord) return;
 
     try {
       const result = await searchDictionaryGrouped({ q: text });
@@ -793,11 +705,11 @@ export default function TextReaderPage() {
       ) : (
         <Typography.Text type="secondary">暂无内容</Typography.Text>
       )}
-      <AskXiaojinButton
-        containerRef={readerContentRef}
+      <ReaderDictPopover
+        state={dictPopover}
+        onClose={closeDictPopover}
         onAsk={handleAskXiaojin}
       />
-      <DictPopover state={dictPopover} onClose={closeDictPopover} />
       </div>
 
       {/* Bottom navigation */}
