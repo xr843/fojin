@@ -49,3 +49,13 @@ class WorkListResponse(BaseModel):
     page: int
     page_size: int
     items: list[WorkListItem]
+
+
+class WorkByTextResponse(BaseModel):
+    """给定一条经文，返回它所属作品 + 全部见证本（含自身，前端按需排除自身）。"""
+
+    slug: str
+    title_primary: str
+    title_sa: str | None = None
+    witness_count: int = 0
+    witnesses: list[WorkWitnessResponse] = []

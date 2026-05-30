@@ -1767,3 +1767,44 @@ export async function getTextVersions(textId: number): Promise<TextVersionsRespo
   const { data } = await api.get<TextVersionsResponse>(`/texts/${textId}/versions`);
   return data;
 }
+
+// --- Work spine (FRBR Work witnesses) ---
+
+/** 单个见证本（同一 FRBR Work 下的某一具体文本，可能跨语言/跨藏经）。 */
+export interface WorkWitnessInfo {
+  // 后端在 Work 接口返回纯数字 text_id，故不品牌化。
+  text_id: number;
+  cbeta_id: string;
+  title: string | null;
+  lang: string;
+  canon: string | null;
+  role: string;
+  confidence: string;
+  has_content: boolean;
+}
+
+/** GET /api/works/by-text/{text_id} 的响应：当前文本所属的 Work 及其全部见证本。 */
+export interface WorkByText {
+  slug: string;
+  title_primary: string;
+  title_sa: string | null;
+  witness_count: number;
+  witnesses: WorkWitnessInfo[];
+}
+
+/**
+ * 取某文本所属 FRBR Work 及其全部见证本（跨语言/跨藏经的同一经的不同版本）。
+ * 文本未挂任何 Work 时后端返回 404 —— 此处吞掉 404 返回 null，调用方据此不渲染。
+ * 其他错误照常抛出。
+ */
+export async function getWorkByText(textId: number): Promise<WorkByText | null> {
+  try {
+    const { data } = await api.get<WorkByText>(`/works/by-text/${textId}`);
+    return data;
+  } catch (err) {
+    if (axios.isAxiosError(err) && err.response?.status === 404) {
+      return null;
+    }
+    throw err;
+  }
+}

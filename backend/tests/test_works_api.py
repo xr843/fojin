@@ -130,6 +130,50 @@ async def test_get_work_404_for_missing_slug(client):
 
 
 # --------------------------------------------------------------------------- #
+# GET /works/by-text/{text_id}
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.anyio
+async def test_get_work_by_text_returns_siblings(client):
+    work = _make_work(slug="lotus-sutra", title_primary="妙法蓮華經", title_sa="Saddharmapuṇḍarīka")
+    w_sa = _make_witness(text_id=10, role="root", lang="sa", canon="gretil")
+    t_sa = _make_text(id=10, cbeta_id="GRETIL-sdp", title_sa="Saddharmapuṇḍarīka", has_content=True)
+    w_zh = _make_witness(text_id=20, role="translation", lang="lzh", canon="taisho")
+    t_zh = _make_text(id=20, cbeta_id="T0262", title_zh="妙法蓮華經", has_content=True)
+
+    # call 1: WorkWitness.work_id for the text ; 2: Work by id ; 3: enriched rows
+    work_res = MagicMock()
+    work_res.scalar_one.return_value = work
+    teardown = _override_db(
+        [_scalar_result(1), work_res, _all_result([(w_sa, t_sa), (w_zh, t_zh)])]
+    )
+    try:
+        resp = await client.get("/api/works/by-text/20")
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["slug"] == "lotus-sutra"
+        assert data["witness_count"] == 2
+        assert {w["text_id"] for w in data["witnesses"]} == {10, 20}
+        # title-per-lang: the lzh witness surfaces title_zh
+        lzh = next(w for w in data["witnesses"] if w["lang"] == "lzh")
+        assert lzh["title"] == "妙法蓮華經"
+    finally:
+        teardown()
+
+
+@pytest.mark.anyio
+async def test_get_work_by_text_404_when_unassigned(client):
+    # No WorkWitness row → text not yet in any work → 404.
+    teardown = _override_db([_scalar_result(None)])
+    try:
+        resp = await client.get("/api/works/by-text/99999")
+        assert resp.status_code == 404, resp.text
+    finally:
+        teardown()
+
+
+# --------------------------------------------------------------------------- #
 # GET /works/{slug}/witnesses
 # --------------------------------------------------------------------------- #
 
