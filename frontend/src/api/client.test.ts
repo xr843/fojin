@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import axios from "axios";
 import type { AxiosError, InternalAxiosRequestConfig, AxiosResponse } from "axios";
 import { useAuthStore } from "../stores/authStore";
@@ -178,5 +178,24 @@ describe("axios 实例配置", () => {
   it("超时设置为 15 秒", async () => {
     const clientModule = await import("./client");
     expect(clientModule.default.defaults.timeout).toBe(15000);
+  });
+});
+
+describe("getWorkByText", () => {
+  it("文本未挂作品时后端 404 → 吞掉返回 null", async () => {
+    const { api, getWorkByText } = await import("./client");
+    const spy = vi
+      .spyOn(api, "get")
+      .mockRejectedValueOnce({ isAxiosError: true, response: { status: 404 } });
+    await expect(getWorkByText(123)).resolves.toBeNull();
+    spy.mockRestore();
+  });
+
+  it("非 404 错误照常抛出", async () => {
+    const { api, getWorkByText } = await import("./client");
+    const err = { isAxiosError: true, response: { status: 500 } };
+    const spy = vi.spyOn(api, "get").mockRejectedValueOnce(err);
+    await expect(getWorkByText(123)).rejects.toBe(err);
+    spy.mockRestore();
   });
 });

@@ -16,6 +16,7 @@ from app.database import get_db
 from app.models.text import BuddhistText
 from app.models.work import Work, WorkWitness
 from app.schemas.work import (
+    WorkByTextResponse,
     WorkDetailResponse,
     WorkListItem,
     WorkListResponse,
@@ -60,6 +61,36 @@ def _witness_title(text: BuddhistText, lang: str) -> str | None:
         if val:
             return val
     return text.title_en or text.title_zh
+
+
+async def _enriched_witnesses(
+    db: AsyncSession, work_id: int
+) -> list[WorkWitnessResponse]:
+    """All witnesses of a work, joined to BuddhistText, root-first then lang/id."""
+    stmt = (
+        select(WorkWitness, BuddhistText)
+        .join(BuddhistText, BuddhistText.id == WorkWitness.text_id)
+        .where(WorkWitness.work_id == work_id)
+        .order_by(
+            (WorkWitness.role != "root"),  # False (root) sorts before True
+            WorkWitness.lang.asc(),
+            WorkWitness.text_id.asc(),
+        )
+    )
+    rows = (await db.execute(stmt)).all()
+    return [
+        WorkWitnessResponse(
+            text_id=witness.text_id,
+            cbeta_id=text.cbeta_id,
+            title=_witness_title(text, witness.lang),
+            lang=witness.lang,
+            canon=witness.canon,
+            role=witness.role,
+            confidence=witness.confidence,
+            has_content=bool(text.has_content),
+        )
+        for witness, text in rows
+    ]
 
 
 @router.get("", response_model=WorkListResponse)
@@ -192,28 +223,31 @@ async def list_work_witnesses(
     if work is None:
         raise _work_not_found(slug)
 
-    stmt = (
-        select(WorkWitness, BuddhistText)
-        .join(BuddhistText, BuddhistText.id == WorkWitness.text_id)
-        .where(WorkWitness.work_id == work)
-        .order_by(
-            (WorkWitness.role != "root"),  # False (root) sorts before True
-            WorkWitness.lang.asc(),
-            WorkWitness.text_id.asc(),
-        )
-    )
-    rows = (await db.execute(stmt)).all()
+    return await _enriched_witnesses(db, work)
 
-    return [
-        WorkWitnessResponse(
-            text_id=witness.text_id,
-            cbeta_id=text.cbeta_id,
-            title=_witness_title(text, witness.lang),
-            lang=witness.lang,
-            canon=witness.canon,
-            role=witness.role,
-            confidence=witness.confidence,
-            has_content=bool(text.has_content),
+
+@router.get("/by-text/{text_id}", response_model=WorkByTextResponse)
+async def get_work_by_text(
+    text_id: int, db: AsyncSession = Depends(get_db)
+) -> WorkByTextResponse:
+    """Given a text id, return the Work it belongs to + all its witnesses.
+
+    Powers the reader's "其他版本 / 对照本" panel. 404 if the text is not yet
+    assigned to any work (e.g. imported after the last build_works run).
+    """
+    work_id = (
+        await db.execute(
+            select(WorkWitness.work_id).where(WorkWitness.text_id == text_id)
         )
-        for witness, text in rows
-    ]
+    ).scalar_one_or_none()
+    if work_id is None:
+        raise NotFoundError(f"该经文尚未归入任何作品: {text_id}")
+    work = (await db.execute(select(Work).where(Work.id == work_id))).scalar_one()
+    witnesses = await _enriched_witnesses(db, work_id)
+    return WorkByTextResponse(
+        slug=work.slug,
+        title_primary=work.title_primary,
+        title_sa=work.title_sa,
+        witness_count=len(witnesses),
+        witnesses=witnesses,
+    )
