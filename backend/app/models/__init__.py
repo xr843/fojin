@@ -10,6 +10,7 @@ from app.models.relation import TextRelation
 from app.models.source import DataSource, SourceDistribution, TextIdentifier
 from app.models.text import BuddhistText, TextContent
 from app.models.user import Bookmark, ReadingHistory, User
+from app.models.work import Work, WorkAlias, WorkWitness
 
 __all__ = [
     "AcademicFeed",
@@ -35,4 +36,7 @@ __all__ = [
     "TextIdentifier",
     "TextRelation",
     "User",
+    "Work",
+    "WorkAlias",
+    "WorkWitness",
 ]

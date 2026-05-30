@@ -54,6 +54,7 @@ from app.api import (
     sources,
     stats,
     texts,
+    works,
 )
 
 try:
@@ -360,6 +361,9 @@ app.include_router(annotations.router, prefix="/api")
 
 # Dictionary
 app.include_router(dictionary.router, prefix="/api")
+
+# Works (FRBR work spine) — read-only
+app.include_router(works.router, prefix="/api")
 
 # Citations
 app.include_router(citations.router, prefix="/api")
