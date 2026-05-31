@@ -2,45 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, List, Tag, Typography } from "antd";
 import { SwapOutlined } from "@ant-design/icons";
 import { Link } from "react-router-dom";
-import { getWorkByText, type WorkWitnessInfo } from "../api/client";
+import { getWorkByText } from "../api/client";
+import { workLangLabel, workCanonLabel, witnessHref } from "../utils/works";
 
 const { Text } = Typography;
-
-/** lang code → 中文标签 */
-const LANG_LABELS: Record<string, string> = {
-  lzh: "中文",
-  zh: "中文",
-  pi: "巴利",
-  pli: "巴利",
-  sa: "梵文",
-  san: "梵文",
-  bo: "藏文",
-  tib: "藏文",
-  en: "英文",
-};
-
-/** canon code → 中文藏经名（仅常见者，未知则原样不展示） */
-const CANON_LABELS: Record<string, string> = {
-  taisho: "大正藏",
-  xuzangjing: "卍續藏",
-  xuzang: "卍續藏",
-  pali: "巴利",
-  kangyur: "甘珠爾",
-  gretil: "GRETIL",
-};
-
-function langLabel(lang: string): string {
-  return LANG_LABELS[lang] || lang;
-}
-
-function canonLabel(canon: string | null | undefined): string | null {
-  if (!canon) return null;
-  return CANON_LABELS[canon] || null;
-}
-
-function witnessHref(w: WorkWitnessInfo): string {
-  return w.has_content ? `/texts/${w.text_id}/read` : `/texts/${w.text_id}`;
-}
 
 /**
  * 「其他版本 / 对照本」面板：展示当前文本所属 FRBR Work 下、除自身以外的
@@ -76,8 +41,8 @@ export default function OtherVersions({ textId }: { textId: number }) {
         dataSource={siblings}
         rowKey={(w) => String(w.text_id)}
         renderItem={(w) => {
-          const lang = langLabel(w.lang);
-          const canon = canonLabel(w.canon);
+          const lang = workLangLabel(w.lang);
+          const canon = workCanonLabel(w.canon);
           return (
             <List.Item>
               <List.Item.Meta
@@ -103,6 +68,11 @@ export default function OtherVersions({ textId }: { textId: number }) {
           );
         }}
       />
+      <div style={{ textAlign: "right", marginTop: 4 }}>
+        <Link to={`/works/${data.slug}`} style={{ fontSize: 12 }}>
+          查看作品全部 {data.witness_count} 个版本 →
+        </Link>
+      </div>
     </Card>
   );
 }

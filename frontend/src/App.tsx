@@ -28,6 +28,7 @@ const PersonPage = lazy(() => import("./pages/PersonPage"));
 const ChatPage = lazy(() => import("./pages/ChatPage"));
 const DictionaryPage = lazy(() => import("./pages/DictionaryPage"));
 const SutraLandingPage = lazy(() => import("./pages/SutraLandingPage"));
+const WorkDetailPage = lazy(() => import("./pages/WorkDetailPage"));
 const ExportsPage = lazy(() => import("./pages/ExportsPage"));
 const CollectionsPage = lazy(() => import("./pages/CollectionsPage"));
 const TopicsPage = lazy(() => import("./pages/TopicsPage"));
@@ -71,6 +72,7 @@ function App() {
             <Route path="/collections" element={<CollectionsPage />} />
             <Route path="/topics" element={<TopicsPage />} />
             <Route path="/sutras/:slug" element={<SutraLandingPage />} />
+            <Route path="/works/:slug" element={<RouteErrorBoundary><WorkDetailPage /></RouteErrorBoundary>} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/dictionary" element={<DictionaryPage />} />
             <Route path="/chat" element={<RouteErrorBoundary><ChatPage /></RouteErrorBoundary>} />
