@@ -146,6 +146,10 @@ describe("OtherVersions 其他版本面板", () => {
     expect(screen.getByText("GRETIL-sdp")).toBeInTheDocument();
     // root 角色标记「底本」
     expect(screen.getByText("底本")).toBeInTheDocument();
+
+    // 「查看作品全部版本」链接指向作品详情页 /works/{slug}
+    const worksLink = screen.getByText(/查看作品全部 2 个版本/).closest("a");
+    expect(worksLink).toHaveAttribute("href", "/works/lotus-sutra");
   });
 
   it("无内容的见证本链接到详情页而非阅读页", async () => {

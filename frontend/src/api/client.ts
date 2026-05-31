@@ -1808,3 +1808,32 @@ export async function getWorkByText(textId: number): Promise<WorkByText | null> 
     throw err;
   }
 }
+
+/** GET /api/works/{slug} 的响应：FRBR Work 详情（聚合元数据 + 见证本计数）。 */
+export interface WorkDetail {
+  id: number;
+  slug: string;
+  title_primary: string;
+  title_sa: string | null;
+  title_pi: string | null;
+  sc_root_uid: string | null;
+  toh_number: string | null;
+  category: string | null;
+  note: string | null;
+  created_at: string;
+  witness_count: number;
+}
+
+/** 取作品详情。404 时抛出（由调用方/路由处理）。 */
+export async function getWork(slug: string): Promise<WorkDetail> {
+  const { data } = await api.get<WorkDetail>(`/works/${encodeURIComponent(slug)}`);
+  return data;
+}
+
+/** 取作品的全部见证本（root 优先，已富化标题/内容标志）。 */
+export async function getWorkWitnesses(slug: string): Promise<WorkWitnessInfo[]> {
+  const { data } = await api.get<WorkWitnessInfo[]>(
+    `/works/${encodeURIComponent(slug)}/witnesses`,
+  );
+  return data;
+}
