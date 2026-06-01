@@ -46,7 +46,7 @@ function renderCard(source: DataSource) {
 describe("SourceCard 健康徽章 tooltip", () => {
   it("ok 源不显示健康徽章", () => {
     renderCard(makeSource());
-    expect(screen.queryByText("暂无法访问")).not.toBeInTheDocument();
+    expect(screen.queryByText("巡检未达")).not.toBeInTheDocument();
     expect(screen.queryByText("访问受限")).not.toBeInTheDocument();
   });
 
@@ -83,11 +83,11 @@ describe("SourceCard 健康徽章 tooltip", () => {
     renderCard(
       makeSource({ health_status: "unreachable", health_detail: null }),
     );
-    await user.hover(screen.getByText("暂无法访问"));
+    await user.hover(screen.getByText("巡检未达"));
     // 通用 tip 仍在，但不应出现「详情：」前缀。
     // 注：此断言依赖 HEALTH_BADGE 各 tip 文案均不含「详情：」子串——
     // 若日后某 tip 引入该词，需改为对 tooltip 容器作用域断言。
-    expect(await screen.findByText(/连接超时或被拒绝/)).toBeInTheDocument();
+    expect(await screen.findByText(/浏览器通常仍可正常访问/)).toBeInTheDocument();
     expect(screen.queryByText(/详情：/)).not.toBeInTheDocument();
   });
 });

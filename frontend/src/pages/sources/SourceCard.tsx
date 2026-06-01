@@ -34,9 +34,9 @@ const HEALTH_BADGE: Record<
     tip: "原站 HTTPS 证书校验失败，浏览器访问时可能弹出安全警告。",
   },
   unreachable: {
-    label: "暂无法访问",
-    color: "red",
-    tip: "最近一次巡检时原站连接超时或被拒绝，可能为临时故障。",
+    label: "巡检未达",
+    color: "default",
+    tip: "本站自动巡检从单一服务器未能连接该源——多为数据中心 IP 被目标站限制或临时网络问题，你的浏览器通常仍可正常访问。长期持续不可达的源会被定期复核、必要时下架。",
   },
   moved: {
     label: "站点已迁移",
