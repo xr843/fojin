@@ -112,3 +112,92 @@ def select_audit_targets(
     rng = random.Random(seed)
     sample = rng.sample(remaining, min(random_n, len(remaining)))
     return top, sample
+
+
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
+
+from app.database import async_session
+from app.models.work import Work
+
+
+async def fetch_rows() -> list[WorkRow]:
+    """SELECT-only. Loads every Work with its witnesses and aliases eagerly,
+    then projects to the pure WorkRow shape."""
+    async with async_session() as session:
+        result = await session.execute(
+            select(Work).options(
+                selectinload(Work.witnesses),
+                selectinload(Work.aliases),
+            )
+        )
+        works = result.scalars().unique().all()
+    rows: list[WorkRow] = []
+    for w in works:
+        schemes = {a.scheme for a in w.aliases}
+        rows.append(
+            WorkRow(
+                work_id=w.id,
+                slug=w.slug,
+                title=w.title_primary,
+                origin_pass=classify_origin(schemes),
+                witness_count=len(w.witnesses),
+                canons=tuple(wit.canon or "?" for wit in w.witnesses),
+                confidences=tuple(wit.confidence for wit in w.witnesses),
+            )
+        )
+    return rows
+
+
+def render_summary(m: dict) -> str:
+    lines = [
+        "FRBR Works audit",
+        f"  works={m['total_works']}  witnesses={m['total_witnesses']}",
+        f"  multi-witness={m['multi_witness_works']} ({m['multi_witness_ratio']:.1%})  "
+        f"singleton={m['singleton_works']}",
+        f"  cross-canon works={m['cross_canon_works']} ({m['cross_canon_ratio']:.1%})",
+        "  by origin pass:",
+    ]
+    for origin, b in sorted(m["by_origin"].items()):
+        lines.append(f"    {origin:16} works={b['works']:>6}  witnesses={b['witnesses']:>6}  multi={b['multi']:>5}")
+    lines.append(f"  confidence: {m['confidence_distribution']}")
+    lines.append(f"  pass1 cluster sizes: {m['pass1_cluster_histogram']}")
+    return "\n".join(lines)
+
+
+def render_sample(top: list[WorkRow], sample: list[WorkRow]) -> str:
+    out = ["# Pass-1 audit sample (manual error-rate spot-check)\n"]
+    for label, group in (("Largest clusters", top), ("Random sample", sample)):
+        out.append(f"## {label}\n")
+        for r in group:
+            out.append(f"- **{r.title}** (`{r.slug}`, id={r.work_id}) — {r.witness_count} witnesses, canons={sorted(set(r.canons))}")
+            out.append(f"  - [ ] correct grouping?  notes: ")
+        out.append("")
+    return "\n".join(out)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Read-only FRBR Works audit.")
+    parser.add_argument("--json", action="store_true", help="emit metrics JSON only")
+    parser.add_argument("--sample-out", metavar="PATH", help="write the Pass-1 audit sample to PATH")
+    parser.add_argument("--top-n", type=int, default=20)
+    parser.add_argument("--random-n", type=int, default=20)
+    args = parser.parse_args()
+
+    rows = asyncio.run(fetch_rows())
+    metrics = compute_metrics(rows)
+
+    if args.json:
+        print(json.dumps(metrics, ensure_ascii=False, indent=2))
+    else:
+        print(render_summary(metrics))
+        print("\n" + json.dumps(metrics, ensure_ascii=False))
+
+    if args.sample_out:
+        top, sample = select_audit_targets(rows, top_n=args.top_n, random_n=args.random_n)
+        Path(args.sample_out).write_text(render_sample(top, sample), encoding="utf-8")
+        print(f"\nwrote audit sample → {args.sample_out}", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main()
