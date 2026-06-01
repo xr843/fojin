@@ -1,5 +1,4 @@
-from scripts.audit_works import classify_origin, cluster_bucket
-from scripts.audit_works import WorkRow, compute_metrics, select_audit_targets
+from scripts.audit_works import WorkRow, classify_origin, cluster_bucket, compute_metrics, select_audit_targets
 
 
 def test_classify_origin_priority():
@@ -54,6 +53,15 @@ def test_compute_metrics_core_ratios():
     assert m["pass1_cluster_histogram"]["1"] == 1
 
 
+def test_cross_canon_excludes_unknown_canon():
+    rows = [
+        _row(1, "pass1_skt", ["taisho", "?"], ["auto", "auto"]),       # NOT cross-canon
+        _row(2, "pass1_skt", ["taisho", "kangyur"], ["auto", "auto"]), # cross-canon
+    ]
+    m = compute_metrics(rows)
+    assert m["cross_canon_works"] == 1
+
+
 def test_select_audit_targets_is_deterministic_and_pass1_multi_only():
     rows = [_row(i, "pass1_skt", ["taisho", "kangyur"], ["auto"] * (i % 4 + 2)) for i in range(50)]
     rows += [_row(99, "pass2_sc", ["pali"], ["verified", "verified"])]  # must be excluded
@@ -61,7 +69,7 @@ def test_select_audit_targets_is_deterministic_and_pass1_multi_only():
     assert all(r.origin_pass == "pass1_skt" for r in top + sample)
     assert [r.witness_count for r in top] == sorted([r.witness_count for r in top], reverse=True)
     # deterministic: same seed → same ids
-    top2, sample2 = select_audit_targets(rows, top_n=5, random_n=5, seed=20260601)
+    _top2, sample2 = select_audit_targets(rows, top_n=5, random_n=5, seed=20260601)
     assert [r.work_id for r in sample] == [r.work_id for r in sample2]
     # top and sample do not overlap
     assert not ({r.work_id for r in top} & {r.work_id for r in sample})

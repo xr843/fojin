@@ -66,7 +66,9 @@ def compute_metrics(rows: list[WorkRow]) -> dict:
     total_witnesses = sum(r.witness_count for r in rows)
     multi = sum(1 for r in rows if r.witness_count >= 2)
     singleton = total_works - multi
-    cross_canon = sum(1 for r in rows if len(set(r.canons)) >= 2)
+    # Exclude the unknown-canon sentinel ("?") and empties so a real-canon +
+    # null-canon witness pair is NOT miscounted as cross-canon (feeds the gate).
+    cross_canon = sum(1 for r in rows if len({c for c in r.canons if c and c != "?"}) >= 2)
 
     by_origin: dict[str, dict[str, int]] = {}
     conf_dist: dict[str, int] = {}
@@ -83,7 +85,8 @@ def compute_metrics(rows: list[WorkRow]) -> dict:
             bkt = cluster_bucket(r.witness_count)
             pass1_hist[bkt] = pass1_hist.get(bkt, 0) + 1
 
-    ratio = lambda n: round(n / total_works, 4) if total_works else 0.0
+    def ratio(n: int) -> float:
+        return round(n / total_works, 4) if total_works else 0.0
     return {
         "total_works": total_works,
         "total_witnesses": total_witnesses,
@@ -131,6 +134,7 @@ async def fetch_rows() -> list[WorkRow]:
                 selectinload(Work.aliases),
             )
         )
+        # defensive; selectinload (unlike joinedload) does not duplicate parent rows
         works = result.scalars().unique().all()
     rows: list[WorkRow] = []
     for w in works:
@@ -171,7 +175,7 @@ def render_sample(top: list[WorkRow], sample: list[WorkRow]) -> str:
         out.append(f"## {label}\n")
         for r in group:
             out.append(f"- **{r.title}** (`{r.slug}`, id={r.work_id}) — {r.witness_count} witnesses, canons={sorted(set(r.canons))}")
-            out.append(f"  - [ ] correct grouping?  notes: ")
+            out.append("  - [ ] correct grouping?  notes: ")
         out.append("")
     return "\n".join(out)
 
