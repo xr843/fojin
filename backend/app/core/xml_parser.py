@@ -176,6 +176,7 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
     juans: list[dict] = []
     current_juan = 1
     current_lines: list[str] = []
+    preface_lines: list[str] = []  # sidelined <cb:div type="xu"> paratext
 
     def flush_juan():
         nonlocal current_lines
@@ -191,7 +192,7 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
         current_lines = []
 
     def process_element(elem):
-        nonlocal current_juan, current_lines
+        nonlocal current_juan, current_lines, preface_lines
 
         tag = elem.tag
 
@@ -256,6 +257,20 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
                 process_element(child)
             return
 
+        # Sideline front-matter preface divs (序 / type="xu"). These are paratext
+        # — e.g. the imperial 御製序 prepended to short sutras like 心經 (T0251) —
+        # which would otherwise fold into juan 1, bury the scripture body, and
+        # cripple RAG recall of the root text. Captured separately (not into
+        # current_lines) so it is excluded from the scripture body, yet still
+        # available as a fallback below if a work has NO other content (some
+        # CBETA fragments are preface-only) — never silently emptied.
+        # Deliberately narrow: only type="xu", not a general front-matter filter.
+        if tag == f"{{{CB_NS}}}div" and elem.get("type") == "xu":
+            preface_text = _extract_text(elem).strip()
+            if preface_text:
+                preface_lines.append(preface_text)
+            return
+
         # For div/cb:div and other container elements, recurse
         if tag in (f"{{{TEI_NS}}}div", f"{{{CB_NS}}}div",
                    f"{{{TEI_NS}}}body", f"{{{TEI_NS}}}text",
@@ -274,6 +289,18 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
     # If no juans were found but there is content, treat everything as juan 1
     if not juans and current_lines:
         text = "\n".join(line for line in current_lines if line.strip()).strip()
+        if text:
+            juans.append({
+                "juan_num": 1,
+                "content": text,
+                "char_count": len(text.replace("\n", "").replace(" ", "")),
+            })
+
+    # Last resort: a preface-only work (no scripture body at all). Emit the
+    # sidelined paratext rather than returning [] — which import_work would
+    # silently skip, leaving the work with has_content=False and unindexed.
+    if not juans and preface_lines:
+        text = "\n".join(preface_lines).strip()
         if text:
             juans.append({
                 "juan_num": 1,
