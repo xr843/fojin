@@ -53,6 +53,108 @@ PARALLEL_LZH_K = 15
 PARALLEL_PI_K = 4
 PARALLEL_BO_K = 4
 
+# --- 本经召回保底 (root-sutra reserved slot) ---------------------------------
+# When a user names a root sutra, dense commentaries out-rank the terse root in
+# BOTH vector recall and the cross-encoder rerank, so the named sutra never
+# reaches the LLM (the 本经召回缺口: e.g. "心经核心思想" → top-5 is 100% 心經注疏,
+# root 般若波羅蜜多心經 absent even when force-fed into the candidate pool).
+# Fix: detect the named root via a curated alias map and reserve it one context
+# slot, bypassing both the cosine race and the rerank burial. Keyed by canonical
+# root cbeta_id (stable); resolved to text_id at runtime. Maps the highest-traffic
+# sutras only — high precision, no reliance on the dirty `category` field.
+_ROOT_SUTRA_ALIASES: dict[str, str] = {
+    "般若波羅蜜多心經": "T0251", "般若波罗蜜多心经": "T0251", "心經": "T0251", "心经": "T0251",
+    "金剛般若": "T0235", "金刚般若": "T0235", "金剛經": "T0235", "金刚经": "T0235",
+    "妙法蓮華經": "T0262", "妙法莲华经": "T0262", "法華經": "T0262", "法华经": "T0262",
+    "普門品": "T0262", "普门品": "T0262",
+    "觀無量壽經": "T0365", "观无量寿经": "T0365", "觀無量壽佛經": "T0365", "观无量寿佛经": "T0365",
+    "無量壽經": "T0360", "无量寿经": "T0360",
+    "阿彌陀經": "T0366", "阿弥陀经": "T0366",
+    "地藏菩薩本願": "T0412", "地藏菩萨本愿": "T0412", "地藏經": "T0412", "地藏经": "T0412",
+    "藥師經": "T0450", "药师经": "T0450", "藥師琉璃光": "T0450", "药师琉璃光": "T0450",
+    "維摩詰": "T0475", "维摩诘": "T0475", "維摩經": "T0475", "维摩经": "T0475",
+    "楞伽": "T0670",
+    "圓覺經": "T0842", "圆觉经": "T0842",
+    "首楞嚴": "T0945", "首楞严": "T0945", "楞嚴經": "T0945", "楞严经": "T0945",
+    "大悲咒": "T1060", "千手千眼": "T1060",
+    "六祖壇經": "T2008", "六祖坛经": "T2008", "壇經": "T2008", "坛经": "T2008",
+    "四十二章經": "T0784", "四十二章经": "T0784",
+    # 普门品 (Avalokiteśvara chapter) is fascicle of the Lotus T0262, not a
+    # standalone cbeta_id — the per-chunk similarity picks the right fascicle.
+}
+# Longest alias first so e.g. "观无量寿经" (T0365) wins over "无量寿经" (T0360).
+_ROOT_ALIAS_KEYS_BY_LEN = sorted(_ROOT_SUTRA_ALIASES, key=len, reverse=True)
+_root_text_id_cache: dict[str, int | None] = {}
+
+# The 2-char aliases 心经/坛经 are substrings of common non-sutra phrases that
+# split 经 into a following compound: 担心|经济, 关心|经验, 论坛|经历, 开心|经常…
+# Reject such a match when the char right after the alias starts a 经-word.
+_AMBIGUOUS_SHORT_ALIASES = {"心经", "心經", "坛经", "壇經"}
+_JING_COMPOUND_TAIL = set("济濟验驗常过過营營历歷理典商销銷书書文手度络絡费費办辦纬緯由")
+
+
+def _detect_named_root(query: str) -> str | None:
+    """Return the canonical root cbeta_id of the longest curated sutra alias that
+    appears in the query, or None. Longest-match disambiguates nested names; the
+    2-char ambiguous aliases are rejected when followed by a 经-compound char so
+    e.g. "担心经济压力" does not mis-fire as 心經."""
+    for alias in _ROOT_ALIAS_KEYS_BY_LEN:
+        if alias not in query:
+            continue
+        if alias in _AMBIGUOUS_SHORT_ALIASES:
+            # Accept only if SOME occurrence isn't followed by a 经-compound char.
+            start, real = 0, False
+            while (pos := query.find(alias, start)) != -1:
+                tail = query[pos + len(alias): pos + len(alias) + 1]
+                if not tail or tail not in _JING_COMPOUND_TAIL:
+                    real = True
+                    break
+                start = pos + 1
+            if not real:
+                continue
+        return _ROOT_SUTRA_ALIASES[alias]
+    return None
+
+
+async def _resolve_root_text_id(db: AsyncSession, cbeta_id: str) -> int | None:
+    """Resolve a root cbeta_id → buddhist_texts.id (lzh), cached per process."""
+    if cbeta_id in _root_text_id_cache:
+        return _root_text_id_cache[cbeta_id]
+    row = (
+        await db.execute(
+            sql_text("SELECT id FROM buddhist_texts WHERE cbeta_id = :c AND lang = 'lzh' LIMIT 1"),
+            {"c": cbeta_id},
+        )
+    ).first()
+    tid = row[0] if row else None
+    _root_text_id_cache[cbeta_id] = tid
+    return tid
+
+
+async def _inject_root_sutra_slot(
+    db: AsyncSession, query: str, query_embedding: list[float], search_results: list[dict]
+) -> list[dict]:
+    """If the query names a root sutra and that root isn't already in the final
+    context, prepend its best-matching chunk into a reserved slot (keeping the
+    total at MAX_CONTEXT_CHUNKS). No-op when no sutra is named or the root is
+    already present. See 本经召回缺口 note above."""
+    cbeta_id = _detect_named_root(query)
+    if not cbeta_id:
+        return search_results
+    root_tid = await _resolve_root_text_id(db, cbeta_id)
+    if root_tid is None:
+        return search_results
+    if any(r["text_id"] == root_tid for r in search_results):
+        return search_results
+    root_hits = await similarity_search(db, query_embedding, limit=1, scope_text_ids=[root_tid])
+    if not root_hits:
+        return search_results
+    logger.debug("本经召回保底: reserved slot for root %s (text_id=%d)", cbeta_id, root_tid)
+    others = [r for r in search_results if r["text_id"] != root_tid]
+    # Root keeps its raw cosine (lower than the others' blended rerank scores);
+    # it sits at slot 1 by construction — do NOT re-sort search_results after this.
+    return [root_hits[0]] + others[: MAX_CONTEXT_CHUNKS - 1]
+
 
 def _format_source_label(result: dict) -> str:
     if result.get("title_zh"):
@@ -521,6 +623,20 @@ async def retrieve_rag_context(
 
         # Cap at MAX_CONTEXT_CHUNKS (fewer but more relevant after reranking)
         search_results = reranked[:MAX_CONTEXT_CHUNKS]
+
+        # 本经召回保底: if the user named a root sutra, guarantee it a context
+        # slot — vector recall + rerank otherwise bury the terse root under its
+        # own dense commentaries. Full-corpus mode only; master personas keep
+        # their scoped corpus untouched. Isolated so a hiccup in the extra
+        # similarity_search degrades to the un-injected top-5 rather than
+        # bubbling to the outer rollback and wiping a good answer.
+        if not scope_text_ids:
+            try:
+                search_results = await _inject_root_sutra_slot(
+                    db, query, query_embedding, search_results
+                )
+            except Exception:
+                logger.warning("本经召回保底 injection failed; using un-injected results", exc_info=True)
 
         # Attach alignment parallels to sources (only if parallel mode on).
         # Query alignment_pairs for each primary hit; if found, inject the
