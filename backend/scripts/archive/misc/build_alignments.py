@@ -83,7 +83,7 @@ LLM_PRICE_PER_1K = {
     "deepseek-chat": 0.00028,         # legacy alias → deepseek-v4-flash (non-thinking)
     "deepseek-reasoner": 0.0014,      # legacy alias → deepseek-v4-flash (thinking)
     "deepseek-v4-flash": 0.00028,     # output $0.28/1M tokens
-    "deepseek-v4-pro": 0.00087,       # output $0.87/1M @ 75% promo until 2026-05-31 15:59 UTC; post-promo $3.48/1M (4×) — REVISIT BEFORE 2026-05-31
+    "deepseek-v4-pro": 0.00087,       # output $0.87/1M (75% off made permanent 2026-05-23 — now the standard rate, no rollback)
 }
 DEFAULT_PRICE_PER_1K = 0.0008    # unknown model → use Haiku estimate
 
