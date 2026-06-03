@@ -83,8 +83,17 @@ async def get_or_create_diff(
 
 
 def _resolve_model() -> str:
-    """Server-side default model — same source as chat fallback path."""
-    return getattr(settings, "llm_default_model", None) or "deepseek-v4-pro"
+    """AI diff 的 model 决策 — 独立于 /chat 路径。
+
+    deepseek-v4-pro / v4-flash 都是 reasoning models（像 o1），输出分为
+    reasoning_tokens + content。结构化对照任务不需要推理，但 reasoning
+    阶段会无差别消耗 max_tokens；2026-06-03 实测 max_tokens=1500 + v4-pro
+    导致 reasoning_tokens 吃掉全部 budget、content="" 的空返回 bug。
+
+    deepseek-chat 是 chat-only model（V3.x 系列），无 reasoning 阶段，
+    适合结构化 JSON 输出。可用 settings.ai_diff_model 覆盖（保留切换通道）。
+    """
+    return getattr(settings, "ai_diff_model", None) or "deepseek-chat"
 
 
 async def _call_llm(chunks: list[AiDiffChunk], model: str) -> dict[str, Any]:
