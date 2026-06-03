@@ -101,11 +101,15 @@ export function useSyncScroll(refs: ColumnRefArray, map: AlignmentMap): void {
       return { el: c.el, h };
     });
 
+    // Capture ref maps for cleanup so eslint react-hooks/exhaustive-deps stays happy
+    const debounceMap = debounceTimer.current;
+    const suppressMap = suppressUntil.current;
+
     return () => {
       for (const { el, h } of handlers) el.removeEventListener("scroll", h);
-      for (const t of debounceTimer.current.values()) clearTimeout(t);
-      debounceTimer.current.clear();
-      suppressUntil.current.clear();
+      for (const t of debounceMap.values()) clearTimeout(t);
+      debounceMap.clear();
+      suppressMap.clear();
     };
     // refs and map are stable per render — rebind only when the column set / alignment changes
     // eslint-disable-next-line react-hooks/exhaustive-deps

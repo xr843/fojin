@@ -67,7 +67,7 @@ describe("AlignmentColumn", () => {
   });
 
   it("forwards scroll container ref", () => {
-    let captured: HTMLElement | null = null;
+    const captured: { el: HTMLElement | null } = { el: null };
     const Wrapper = forwardRef<HTMLDivElement>((_, ref) => (
       <AlignmentColumn text={textFixture()} alignment={null} scrollRef={ref} />
     ));
@@ -76,12 +76,12 @@ describe("AlignmentColumn", () => {
     render(
       <Wrapper
         ref={(el) => {
-          captured = el;
+          captured.el = el;
         }}
       />
     );
-    expect(captured).toBeTruthy();
-    expect(captured?.classList.contains("parallel-column-scroll")).toBe(true);
+    expect(captured.el).toBeTruthy();
+    expect(captured.el?.classList.contains("parallel-column-scroll")).toBe(true);
   });
 
   it("renders lang chip", () => {
