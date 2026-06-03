@@ -1,3 +1,4 @@
+from app.models.ai_diff_cache import AiDiffCache
 from app.models.annotation import Annotation, AnnotationReview
 from app.models.audit import AdminAuditLog
 from app.models.chat import ChatAttachment, ChatMessage, ChatSession, TextEmbedding
@@ -15,6 +16,7 @@ from app.models.work import Work, WorkAlias, WorkWitness
 __all__ = [
     "AcademicFeed",
     "AdminAuditLog",
+    "AiDiffCache",
     "Annotation",
     "AnnotationReview",
     "Bookmark",
