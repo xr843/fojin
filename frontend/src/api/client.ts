@@ -1837,3 +1837,31 @@ export async function getWorkWitnesses(slug: string): Promise<WorkWitnessInfo[]>
   );
   return data;
 }
+
+// === V2 cross-canon AI difference analysis ===
+
+export interface AiDiffChunkInput {
+  text_id: number;
+  juan_num: number;
+  chunk_index: number;
+  lang: string;
+  text: string;
+}
+
+export interface AiDiffAnalysis {
+  summary?: string;
+  differences?: string[];
+  doctrinal_notes?: string;
+}
+
+export interface AiDiffResponse {
+  cached: boolean;
+  prompt_version: string;
+  model: string;
+  analysis: AiDiffAnalysis;
+}
+
+export async function postAiDiff(chunks: AiDiffChunkInput[]): Promise<AiDiffResponse> {
+  const { data } = await api.post<AiDiffResponse>("/alignment/ai-diff", { chunks });
+  return data;
+}
