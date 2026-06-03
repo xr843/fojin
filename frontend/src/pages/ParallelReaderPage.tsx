@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import {
@@ -12,16 +12,19 @@ import {
   Spin,
   Typography,
 } from "antd";
-import { ArrowLeftOutlined, SwapOutlined } from "@ant-design/icons";
+import { ArrowLeftOutlined, RobotOutlined, SwapOutlined } from "@ant-design/icons";
 import {
   getJuanAlignment,
   getParallelRead,
   getTextRelations,
+  type AiDiffChunkInput,
   type JuanAlignmentResponse,
 } from "../api/client";
 import AlignmentColumn from "../components/parallel/AlignmentColumn";
+import AIDiffPopover from "../components/parallel/AIDiffPopover";
 import { buildAlignmentMap } from "../components/parallel/buildAlignmentMap";
 import { useSyncScroll, type ColumnRef } from "../components/parallel/useSyncScroll";
+import { useSelectedChunks } from "../components/parallel/useSelectedChunks";
 import type { ColumnData } from "../components/parallel/types";
 import "../styles/parallel.css";
 
@@ -109,6 +112,24 @@ export default function ParallelReaderPage() {
   }));
 
   useSyncScroll(scrollRefs, alignmentMap);
+
+  const { selected, toggle, clear } = useSelectedChunks();
+  const [showDiff, setShowDiff] = useState(false);
+  const selectedKeys = useMemo(
+    () => new Set(selected.map((s) => `${s.text_id}:${s.chunk_index}`)),
+    [selected],
+  );
+
+  const makeChunkClickHandler = (col: ColumnData) => (idx: number, paragraph: string) => {
+    const c: AiDiffChunkInput = {
+      text_id: col.text.text_id,
+      juan_num: col.text.juan_num,
+      chunk_index: idx,
+      lang: col.text.lang,
+      text: paragraph,
+    };
+    toggle(c);
+  };
 
   const handleCompareChange = (value: number) => {
     const next = new URLSearchParams(searchParams);
@@ -208,9 +229,32 @@ export default function ParallelReaderPage() {
                 scrollRef={(el) => {
                   scrollRefs.current[i] = { textId: col.text.text_id, el };
                 }}
+                selectedKeys={selectedKeys}
+                onChunkClick={makeChunkClickHandler(col)}
               />
             ))}
           </div>
+          {selected.length >= 2 && !showDiff && (
+            <Button
+              type="primary"
+              size="large"
+              shape="round"
+              icon={<RobotOutlined />}
+              className="ai-diff-trigger"
+              onClick={() => setShowDiff(true)}
+            >
+              AI 差异分析（{selected.length} 段）
+            </Button>
+          )}
+          {showDiff && selected.length >= 2 && (
+            <AIDiffPopover
+              chunks={selected}
+              onClose={() => {
+                setShowDiff(false);
+                clear();
+              }}
+            />
+          )}
         </>
       )}
     </div>

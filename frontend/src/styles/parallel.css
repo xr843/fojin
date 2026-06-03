@@ -227,3 +227,75 @@
   color: #999;
   font-size: 12px;
 }
+
+/* === V2 paragraph selection + AI diff popover === */
+.parallel-paragraph.is-selected {
+  background-color: rgba(91, 140, 107, 0.18);
+  outline: 1px solid rgba(91, 140, 107, 0.45);
+  outline-offset: 1px;
+  border-radius: 2px;
+}
+
+.ai-diff-trigger {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1100;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.ai-diff-popover {
+  position: fixed;
+  bottom: 88px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 560px;
+  max-width: calc(100vw - 32px);
+  max-height: 60vh;
+  overflow-y: auto;
+  z-index: 1101;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+}
+
+.ai-diff-popover-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-diff-summary {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #222;
+}
+
+.ai-diff-section-label {
+  font-size: 12px;
+  color: #5b8c6b;
+  font-weight: 500;
+  margin: 8px 0 4px 0;
+}
+
+.ai-diff-differences {
+  margin: 0 0 12px 0;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #333;
+}
+
+.ai-diff-doctrinal {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #333;
+}
+
+.ai-diff-meta {
+  border-top: 1px solid #f0f0f0;
+  padding-top: 8px;
+  font-size: 11px;
+  color: #999;
+}

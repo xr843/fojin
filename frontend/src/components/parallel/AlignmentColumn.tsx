@@ -22,6 +22,8 @@ interface Props {
   text: ParallelTextContent;
   alignment: JuanAlignmentResponse | null;
   scrollRef?: Ref<HTMLDivElement>;
+  selectedKeys?: Set<string>;
+  onChunkClick?: (chunkIndex: number, paragraph: string) => void;
 }
 
 /** Split raw content into paragraph lines, normalising whitespace. */
@@ -60,7 +62,13 @@ function chunkIndexFor(paragraph: string, chunkIndex: Map<string, number>): numb
   return null;
 }
 
-export default function AlignmentColumn({ text, alignment, scrollRef }: Props) {
+export default function AlignmentColumn({
+  text,
+  alignment,
+  scrollRef,
+  selectedKeys,
+  onChunkClick,
+}: Props) {
   const paragraphs = splitParagraphs(text.content);
   const chunkIndex = buildChunkIndex(alignment);
 
@@ -81,12 +89,17 @@ export default function AlignmentColumn({ text, alignment, scrollRef }: Props) {
       <div ref={scrollRef} className="parallel-column-scroll" data-text-id={text.text_id}>
         {paragraphs.map((p, i) => {
           const idx = chunkIndexFor(p, chunkIndex);
+          const selectionKey = idx !== null ? `${text.text_id}:${idx}` : "";
+          const isSelected = idx !== null && selectedKeys?.has(selectionKey);
+          const isClickable = onChunkClick && idx !== null;
           return (
             <p
               key={i}
-              className="parallel-paragraph"
+              className={`parallel-paragraph${isSelected ? " is-selected" : ""}`}
               data-chunk-index={idx ?? undefined}
               lang={text.lang}
+              onClick={isClickable ? () => onChunkClick(idx, p) : undefined}
+              style={isClickable ? { cursor: "pointer" } : undefined}
             >
               {p}
             </p>
