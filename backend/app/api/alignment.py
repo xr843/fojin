@@ -383,3 +383,24 @@ async def get_full_parallel_content(
         pali_chars=len(pali_full) if pali_full else 0,
         english_chars=len(english_full) if english_full else 0,
     )
+
+
+# === V2: AI difference analysis ===
+
+from app.schemas.ai_diff import AiDiffRequest, AiDiffResponse
+from app.services.ai_diff import get_or_create_diff
+
+
+@router.post("/ai-diff", response_model=AiDiffResponse)
+async def ai_diff(
+    payload: AiDiffRequest,
+    db: AsyncSession = Depends(get_db),
+) -> AiDiffResponse:
+    """Generate (or fetch cached) cross-canon difference analysis for 2-4 selected chunks."""
+    cached, prompt_version, model, analysis = await get_or_create_diff(db, payload.chunks)
+    return AiDiffResponse(
+        cached=cached,
+        prompt_version=prompt_version,
+        model=model,
+        analysis=analysis,
+    )
