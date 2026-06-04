@@ -8,11 +8,21 @@ class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=2000)
     session_id: int | None = None
     master_id: str | None = None
-    # Reading context (sent when AI is invoked from the reader page)
+    # Reading context (sent when AI is invoked from the reader page).
+    # selected_text / page_content caps must accommodate real CBETA juan
+    # lengths — many fascicles (e.g. 大般若經) exceed 50K chars and the
+    # whole juan rides along as page_content when a user asks from the
+    # reader. The previous 1000 / 15000 caps rejected those requests with
+    # a generic 422 before the service-side truncation in
+    # ``_build_reader_context_prompt`` (500 / 10000 chars into the LLM
+    # context) ever got a chance to run, surfacing as "请求失败，请重试"
+    # for every long-juan reader question. Caps are now sized to admit
+    # any practical CBETA payload; the LLM-context safety cut still
+    # happens server-side regardless of what the client sent.
     text_id: int | None = None
     juan_num: int | None = None
-    selected_text: str | None = Field(None, max_length=1000)
-    page_content: str | None = Field(None, max_length=15000)
+    selected_text: str | None = Field(None, max_length=5000)
+    page_content: str | None = Field(None, max_length=200000)
     # Welcome-card shortcut: when set, backend swaps the user turn sent to
     # the LLM for the matching hot-question prompt template, keeping the
     # natural display_text in history/RAG.
