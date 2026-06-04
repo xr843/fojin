@@ -338,6 +338,46 @@ async def fojin_error_handler(request: Request, exc: FoJinError):
     )
 
 
+# Detailed 422 logger so silent client/server schema drift surfaces in
+# backend logs instead of being swallowed into a generic "请求失败，请重试"
+# in the frontend. The default RequestValidationError response body
+# already carries the failing fields; this handler just teaches the
+# server to also log them so we can grep without a browser dev-tools
+# session. Kept intentionally lightweight — body content is summarised
+# (len/type only) so we never leak user-typed text into the log.
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_logger(request: Request, exc: RequestValidationError):
+    safe_errors = []
+    for err in exc.errors():
+        safe = {"loc": err.get("loc"), "type": err.get("type"), "msg": err.get("msg")}
+        ctx = err.get("ctx")
+        if isinstance(ctx, dict):
+            # Pydantic stuffs raw exception instances (e.g. password
+            # validator's ValueError) into ctx — they aren't JSON-safe
+            # and the keys are noise for diagnosis. Only keep the numeric
+            # constraint values we actually want to log.
+            safe["ctx"] = {k: v for k, v in ctx.items() if k in {"max_length", "min_length", "limit"}}
+        inp = err.get("input")
+        if isinstance(inp, str):
+            safe["input_len"] = len(inp)
+        elif inp is not None:
+            safe["input_type"] = type(inp).__name__
+        safe_errors.append(safe)
+    logger.warning(
+        "422 validation_error path=%s method=%s errors=%s",
+        request.url.path, request.method, safe_errors,
+    )
+    # Mirror FastAPI's default response body shape so the frontend's
+    # existing 422 parsing keeps working. `jsonable_encoder` handles the
+    # un-JSON-able ctx.error (ValueError instances from custom field
+    # validators) the same way the default handler does.
+    return JSONResponse(status_code=422, content={"detail": jsonable_encoder(exc.errors())})
+
+
 # Phase 1 routers
 app.include_router(auth.router, prefix="/api")
 app.include_router(search.router, prefix="/api")
