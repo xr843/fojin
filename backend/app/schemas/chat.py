@@ -5,7 +5,16 @@ from pydantic import BaseModel, Field
 
 
 class ChatRequest(BaseModel):
-    message: str = Field(..., min_length=1, max_length=2000)
+    # message cap raised from 2000 → 20000 to admit the natural reader
+    # workflow where a user pastes a multi-paragraph passage into the
+    # input as their "question" (e.g. "解读以下这段经文：…"). 2000 chars
+    # ≈ 660 Chinese characters and was routinely overshot, surfacing as
+    # a generic 422 → "请求失败，请重试" on the frontend. 20000 chars
+    # comfortably fits any single-message LLM payload (≈ 6-7K tokens for
+    # CJK) and still keeps a hard upper guard against DoS / runaway
+    # paste accidents. Frontend has no client-side maxLength on this
+    # input so the backend cap is the only wall; pick it generously.
+    message: str = Field(..., min_length=1, max_length=20000)
     session_id: int | None = None
     master_id: str | None = None
     # Reading context (sent when AI is invoked from the reader page).
