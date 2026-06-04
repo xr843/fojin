@@ -273,3 +273,176 @@ def test_returns_dataclass_with_audit_fields():
     assert muts[0].title == "心經"
     assert muts[0].juan == 1
     assert muts[0].reason == "quote_not_in_source"
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Verifier — Markdown blockquote mode
+# ──────────────────────────────────────────────────────────────────────
+#
+# LLMs frequently format long quotations as Markdown blockquotes:
+#
+#     > 色不異空，空不異色，
+#     > 色即是空，空即是色。
+#     >
+#     > —— 【《心經》第1卷】
+#
+# The inline-quote scanner above cannot see these because the body is
+# never wrapped in 「」/“”/'' and may span multiple lines. The block
+# below exercises a dedicated multi-line scanner that pairs a contiguous
+# `> …` block with a nearby `【《X》第N卷】` citation, with the same
+# substring-test semantics as the inline path.
+
+
+def test_blockquote_quote_in_source_does_not_annotate():
+    """The happy path: a multi-line `> …` block whose stripped content
+    appears verbatim in the cited chunk_text must not annotate."""
+    chunk = "色不異空，空不異色，色即是空，空即是色，受想行識亦復如是。"
+    src = _src(7, "心經", 1, chunk)
+    answer = (
+        "经云：\n\n"
+        "> 色不異空，空不異色，\n"
+        "> 色即是空，空即是色\n\n"
+        "【《心經》第1卷】"
+    )
+    out, muts = verify_quoted_content(answer, [src])
+    assert out == answer
+    assert muts == []
+
+
+def test_blockquote_not_in_source_gets_annotated():
+    """LLM fabricates a blockquote passage and pairs it with a real
+    title. This is the flagship production failure mode for long
+    citations and must produce the consolidated caveat."""
+    src = _src(7, "心經", 1, "实际原文：般若波罗蜜多，照见五蕴皆空。")
+    answer = (
+        "经文明示：\n\n"
+        "> 众生皆有佛性，如来藏不空妙有，\n"
+        "> 此乃如来真实义\n\n"
+        "【《心經》第1卷】"
+    )
+    out, muts = verify_quoted_content(answer, [src])
+    assert "⚠️" in out
+    assert "未能在检索到的经文片段中逐字核实" in out
+    assert len(muts) == 1
+    assert muts[0].reason == "blockquote_not_in_source"
+    assert muts[0].title == "心經"
+    assert muts[0].juan == 1
+
+
+def test_blockquote_simplified_quote_verifies_against_traditional_source():
+    """Same 繁→简 fold semantics as the inline path — a simplified
+    blockquote rendering of a traditional CBETA source must pass."""
+    src = _src(7, "瑜伽師地論", 46, "如彼頌言「一切諸行皆是無常，是名第一」唱拕南。")
+    answer = (
+        "经云：\n\n"
+        "> 一切诸行皆是无常，是名第一\n\n"
+        "【《瑜伽师地论》第46卷】"
+    )
+    out, muts = verify_quoted_content(answer, [src])
+    assert out == answer
+    assert muts == []
+
+
+def test_blockquote_with_citation_on_trailing_blockquote_line():
+    """Common LLM style: citation lives on a final `> ——【《X》第N卷】`
+    line inside the same blockquote block. Must still pair."""
+    src = _src(7, "心經", 1, "色不異空空不異色色即是空空即是色。")
+    answer = (
+        "> 色不異空，空不異色，色即是空，空即是色\n"
+        "> ——【《心經》第1卷】"
+    )
+    out, muts = verify_quoted_content(answer, [src])
+    assert out == answer
+    assert muts == []
+
+
+def test_blockquote_too_short_is_skipped():
+    """Blockquote whose stripped content is < MIN_QUOTE_CHARS gets the
+    same paraphrase-noise treatment as inline short quotes — skipped."""
+    src = _src(7, "心經", 1, "completely different content here")
+    answer = "经云：\n\n> 色即是空\n\n【《心經》第1卷】"
+    out, muts = verify_quoted_content(answer, [src])
+    assert out == answer
+    assert muts == []
+
+
+def test_blockquote_far_from_citation_not_treated_as_pair():
+    """Same gap-window discipline as the inline path: a blockquote
+    separated from the citation by several paragraphs of commentary is
+    not bound to it and the verifier under-verifies rather than
+    misattributes."""
+    src = _src(7, "心經", 1, "无关原文")
+    answer = (
+        "> 假引文一假引文二假引文三假引文四\n\n"
+        "中间穿插一段无关紧要的注释解说文字。" * 8
+        + "\n\n【《心經》第1卷】"
+    )
+    out, muts = verify_quoted_content(answer, [src])
+    assert "⚠️" not in out
+    assert muts == []
+
+
+def test_self_appended_caveat_blockquote_is_not_rescanned():
+    """The consolidated caveat itself is a `> ⚠️ …` blockquote. If the
+    verifier ran a second pass over its own output it would either
+    inflate the mutation count or recurse — the scanner must skip
+    blockquotes that start with the caveat marker."""
+    src = _src(7, "心經", 1, "实际原文：般若波罗蜜多。")
+    answer = (
+        "经云：\n\n"
+        "> 众生皆有佛性，如来藏不空妙有，此真实义\n\n"
+        "【《心經》第1卷】"
+    )
+    out, muts = verify_quoted_content(answer, [src])
+    assert len(muts) == 1
+    # The caveat blockquote sits in `out`; re-running verify on it must
+    # not produce additional mutations or a second caveat.
+    out2, muts2 = verify_quoted_content(out, [src])
+    assert muts2 == muts  # same set of original mutations
+    assert out2.count("⚠️") == 1  # still exactly one caveat
+
+
+def test_new_fab_after_existing_caveat_still_gets_user_visible_signal():
+    """Regression for a re-entrancy loophole: if an answer already carries
+    a caveat (from a prior pass) AND new fabricated content appears below
+    it, the new fab must remain user-visible — i.e. the caveat must be
+    relocated to the bottom of the answer, not silently kept at its old
+    mid-answer position where the reader would never associate it with the
+    new fab. The earlier behavior (skip append when marker present) hid
+    the new mutation from users while still logging it; correct contract
+    is single caveat AND positioned below the newest fab content.
+    """
+    src = _src(7, "心經", 1, "实际原文：般若波罗蜜多。")
+    answer_with_old_caveat = (
+        "经云：\n\n"
+        "> 众生皆有佛性，如来藏不空妙有，此真实义\n\n"
+        "【《心經》第1卷】\n\n"
+        "> ⚠️ 本回答中部分直接引文未能在检索到的经文片段中逐字核实，建议点按引用链接核对原文。\n\n"
+        "补充又云：「假引文片段二假引文片段二假引文片段二」【《心經》第1卷】"
+    )
+    out, muts = verify_quoted_content(answer_with_old_caveat, [src])
+    assert out.count("⚠️") == 1  # single caveat invariant
+    assert len(muts) == 2  # both fabs surfaced in audit
+    # The relocated caveat must sit AFTER the newly-detected inline fab,
+    # otherwise the user can't tell the warning covers it.
+    new_fab_pos = out.index("假引文片段二")
+    caveat_pos = out.index("⚠️")
+    assert caveat_pos > new_fab_pos
+
+
+def test_blockquote_and_inline_failures_share_one_caveat():
+    """Mixed failure modes (one inline 「…」 fab + one `> …` fab) get
+    one consolidated user-facing caveat, with both failures recorded in
+    the audit list."""
+    src = _src(7, "心經", 1, "无关原文")
+    answer = (
+        "云：「假引文片段一假引文片段一假引文片段一」【《心經》第1卷】\n\n"
+        "又云：\n\n"
+        "> 假引文片段二假引文片段二假引文片段二\n\n"
+        "【《心經》第1卷】"
+    )
+    out, muts = verify_quoted_content(answer, [src])
+    assert out.count("⚠️") == 1
+    assert len(muts) == 2
+    reasons = {m.reason for m in muts}
+    assert reasons == {"quote_not_in_source", "blockquote_not_in_source"}
