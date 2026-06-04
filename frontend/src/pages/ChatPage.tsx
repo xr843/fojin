@@ -629,8 +629,10 @@ export default function ChatPage() {
     const abortController = new AbortController();
     abortRef.current = abortController;
 
-    // Auto-timeout after 90 seconds
-    const timeoutId = setTimeout(() => abortController.abort(), 90_000);
+    // 5 min — must exceed backend LLM call budget (120s for reader page_content)
+    // plus the fallback chain, otherwise reasoning models on long passages
+    // abort mid-stream and surface as "请求失败，请重试".
+    const timeoutId = setTimeout(() => abortController.abort(), 300_000);
 
     await sendChatMessageStream(msg, sessionId, masterId, {
       onToken: (content: string) => {
