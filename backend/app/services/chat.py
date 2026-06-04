@@ -590,11 +590,19 @@ async def _check_anonymous_quota(redis, client_ip: str) -> None:
 
 
 def _validate_message(message: str) -> None:
-    """Validate chat message content."""
+    """Validate chat message content.
+
+    The length cap must stay aligned with ``ChatRequest.message.max_length``
+    in app/schemas/chat.py — if the schema admits a longer message but
+    this service-layer check rejects it, the result is a stream-internal
+    ValidationError that surfaces in the UI as a generic
+    "请求失败，请重试" with no breadcrumb until you look at backend logs
+    (PR #651). Keep the two numbers in sync.
+    """
     if not message or not message.strip():
         raise ValidationError("消息不能为空")
-    if len(message) > 2000:
-        raise ValidationError("消息长度不能超过2000字")
+    if len(message) > 20000:
+        raise ValidationError("消息长度不能超过20000字")
 
 
 async def _resolve_session(
