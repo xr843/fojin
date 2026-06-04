@@ -1404,7 +1404,7 @@ export async function sendChatMessage(
   const { data } = await api.post<ChatResponse>("/chat", {
     message,
     session_id: sessionId,
-  }, { timeout: 90000 });
+  }, { timeout: 300000 });
   return data;
 }
 
@@ -1651,7 +1651,12 @@ export function sendChatMessageStream(
       }
     };
 
-    xhr.timeout = 90000;
+    // 5 min — must exceed the backend's per-LLM-call timeout (120s for
+    // reader-mode page_content + retry/fallback chain) so a slow reasoning
+    // model on a long passage doesn't get killed by the client mid-stream
+    // and surface as the generic "请求失败，请重试". 90s was the original
+    // cap and routinely tripped on DeepSeek V4 Pro + reader-mode juan.
+    xhr.timeout = 300000;
 
     // AbortSignal support
     if (signal) {

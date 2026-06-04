@@ -149,7 +149,9 @@ export default function ReaderAIPanel({
 
     const abortController = new AbortController();
     abortRef.current = abortController;
-    const timeoutId = setTimeout(() => abortController.abort(), 90_000);
+    // 5 min — see client.ts xhr.timeout comment. Reader mode regularly
+    // hits 90-180s end-to-end on long juan + reasoning models.
+    const timeoutId = setTimeout(() => abortController.abort(), 300_000);
 
     await sendChatMessageStream(msg, sessionId, null, {
       onToken: (content: string) => {

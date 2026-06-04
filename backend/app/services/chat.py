@@ -1108,6 +1108,15 @@ async def send_message_stream(
             hot_question_id=hot_question_id, model_id=model_id, attachment_ids=attachment_ids,
         )
     except (ValidationError, QuotaExceededError, AccessDeniedError, ServiceError) as exc:
+        # Surface app-level rejections (quota, auth, attachment ownership, RAG
+        # underflow, etc.) into backend logs. The frontend already gets the
+        # message via the SSE 'error' event, but server-side these used to be
+        # invisible — every chat that failed at the prepare phase looked like
+        # an HTTP 200 in the access log and the maintainer had no breadcrumb.
+        logger.warning(
+            "chat/stream prepare rejected: %s: %s (user_id=%s session_id=%s)",
+            type(exc).__name__, exc, user_id, session_id,
+        )
         yield f"data: {json.dumps({'type': 'error', 'message': str(exc)}, ensure_ascii=False)}\n\n"
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
         return
