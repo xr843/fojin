@@ -84,17 +84,25 @@ async def chat_stream(
     request: Request,
     data: ChatRequest,
     user: User | None = Depends(get_optional_user),
-    db: AsyncSession = Depends(get_db),
 ):
     """Stream AI answer via Server-Sent Events (SSE). Same as POST /chat but with real-time token streaming.
 
-    SSE 流式发送消息并获取 AI 回答。"""
+    SSE 流式发送消息并获取 AI 回答.
+
+    Intentionally does **not** depend on ``get_db``: this endpoint returns a
+    StreamingResponse whose generator's lifetime is the LLM-stream window
+    (60-120s), and a single DI-supplied session held across that window
+    pinned a PG connection per active stream — the production pool
+    exhaustion in project_fojin_db_pool_streaming. The generator owns its
+    own sessions internally, one for prep and one for save, neither
+    held across the LLM I/O.
+    """
     user_id = user.id if user else None
     client_ip = _get_client_ip(request) if not user else None
     redis = getattr(request.app.state, "redis", None)
     return StreamingResponse(
         send_message_stream(
-            db, user_id, data.message, data.session_id, user=user,
+            user_id, data.message, data.session_id, user=user,
             client_ip=client_ip, redis=redis, master_id=data.master_id,
             text_id=data.text_id, juan_num=data.juan_num, selected_text=data.selected_text, page_content=data.page_content,
             hot_question_id=data.hot_question_id, model_id=data.model_id,
