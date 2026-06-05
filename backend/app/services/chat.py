@@ -4,7 +4,7 @@ import time as _time
 from datetime import UTC, date, datetime
 
 import httpx
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -16,6 +16,7 @@ from app.core.exceptions import (
     ServiceError,
     ValidationError,
 )
+from app.database import async_session
 from app.models.chat import ChatAttachment, ChatMessage, ChatSession
 from app.models.hot_question import HotQuestion
 from app.models.user import User
@@ -544,15 +545,35 @@ def _resolve_fallback_llm_config() -> tuple[str, str, str, str] | None:
 
 
 async def _check_daily_quota(db: AsyncSession, user: User) -> None:
-    """Check and increment daily free chat quota. Raises QuotaExceededError if exceeded."""
+    """Check and increment daily free chat quota. Raises QuotaExceededError if exceeded.
+
+    The increment runs as an **explicit UPDATE** rather than mutating
+    ``user`` attributes because ``user`` is loaded by ``get_optional_user``
+    on a *different* session from the one threaded into the streaming
+    chat path (see send_message_stream's prep-phase session). A
+    ``user.attr = value`` mutation against a session that doesn't own
+    the row gets silently dropped by ``flush()`` — no SQL is emitted,
+    quota stops incrementing, and free-tier limits stop applying.
+    The UPDATE-by-id form works regardless of which session loaded
+    ``user`` originally. The in-memory ``user`` is also patched so the
+    caller's view stays consistent within the same request.
+    """
     today = date.today()
-    if user.last_chat_date != today:
-        user.daily_chat_count = 0
-        user.last_chat_date = today
-    if user.daily_chat_count >= FREE_DAILY_LIMIT_USER:
+    same_day = user.last_chat_date == today
+    current_count = user.daily_chat_count if same_day else 0
+    if current_count >= FREE_DAILY_LIMIT_USER:
         raise QuotaExceededError(limit=FREE_DAILY_LIMIT_USER)
-    user.daily_chat_count += 1
+    new_count = current_count + 1
+    await db.execute(
+        update(User)
+        .where(User.id == user.id)
+        .values(daily_chat_count=new_count, last_chat_date=today)
+    )
     await db.flush()
+    # Keep the caller's in-memory User in sync with what we just wrote
+    # so any later attribute reads in the same request are coherent.
+    user.daily_chat_count = new_count
+    user.last_chat_date = today
 
 
 def _anon_quota_key(client_ip: str) -> str:
@@ -832,15 +853,39 @@ async def _mark_attachments_consumed(
 ) -> None:
     """Best-effort: stamp ``consumed_at`` so a future GC cron can prune
     orphaned uploads. Failures here must not break the chat response —
-    the message is already saved by the time we get called."""
+    the message is already saved by the time we get called.
+
+    Uses an explicit UPDATE rather than ``row.consumed_at = now`` because
+    ``attachments`` are loaded by ``_load_and_render_attachments`` in the
+    prep-phase session which closes before this runs (see
+    send_message_stream's two-phase session split). Mutating attributes
+    on detached rows silently no-ops on commit, which would defeat the
+    ``consumed_at IS NULL`` single-use mitigation that defends against
+    anonymous-upload id-enumeration (see schemas/chat.py
+    ``attachment_ids`` docstring). The UPDATE-by-id form persists
+    regardless of which session originally loaded the rows.
+    """
     if not attachments:
         return
+    pending_ids = [row.id for row in attachments if row.consumed_at is None]
+    if not pending_ids:
+        return
     now = datetime.now(UTC)
-    for row in attachments:
-        if row.consumed_at is None:
-            row.consumed_at = now
     try:
+        await db.execute(
+            update(ChatAttachment)
+            .where(ChatAttachment.id.in_(pending_ids))
+            # Defensive: if another concurrent path already consumed it,
+            # don't overwrite the original consumption timestamp.
+            .where(ChatAttachment.consumed_at.is_(None))
+            .values(consumed_at=now)
+        )
         await db.commit()
+        # Patch in-memory rows so the caller's view (e.g. follow-up
+        # references via the same request) is coherent.
+        for row in attachments:
+            if row.consumed_at is None:
+                row.consumed_at = now
     except Exception:  # pragma: no cover — db quirks shouldn't surface to user
         logger.exception("Failed to mark attachments consumed")
         await db.rollback()
@@ -1078,7 +1123,6 @@ async def send_message(
 
 
 async def send_message_stream(
-    db: AsyncSession,
     user_id: int | None,
     message: str,
     session_id: int | None = None,
@@ -1093,11 +1137,31 @@ async def send_message_stream(
     hot_question_id: int | None = None,
     model_id: str | None = None,
     attachment_ids: list[int] | None = None,
+    sessionmaker=async_session,
 ):
     """Async generator yielding SSE events for streaming chat responses.
 
     Yields session_id immediately after validation so the frontend gets
     a response within milliseconds, then does RAG retrieval + LLM streaming.
+
+    **Session lifecycle**: this generator opens TWO short-lived DB sessions
+    instead of holding one across the whole stream. Phase-1 (prep / RAG /
+    quota) and phase-3 (save / mark consumed) each get their own session,
+    and the LLM-streaming phase between them runs with no session checked
+    out at all.
+
+    The previous shape (single ``db: AsyncSession = Depends(get_db)``
+    threaded through the whole generator) pinned a PG connection for the
+    full 60-120s LLM-streaming window — a single user with two tabs plus
+    an SEO crawler could exhaust the 10+20 pool in minutes (PR #649 +
+    project_fojin_db_pool_streaming). Splitting the session here lets the
+    pool churn at the rate of actual DB work (typically <1s of each
+    request), not at the rate of LLM latency.
+
+    ``sessionmaker`` defaults to the module-level ``async_session`` factory
+    but is overridable for tests that want to assert no-DB-during-LLM
+    behaviour with a counting wrapper. The endpoint is the only caller
+    that uses the default.
     """
     # Flush Cloudflare's response buffer with a padded SSE comment (~2KB).
     yield ": " + " " * 2048 + "\n\n"
@@ -1106,16 +1170,29 @@ async def send_message_stream(
     # 立即告知前端正在检索，消除空白等待感
     yield f"data: {json.dumps({'type': 'searching', 'message': '正在检索相关经文...'}, ensure_ascii=False)}\n\n"
 
-    try:
-        (
-            chat_session, api_url, api_key, model, is_byok, provider,
-            sources, llm_messages, attachments,
-        ) = await _prepare_chat(
-            db, user_id, message, session_id, user, client_ip=client_ip, redis=redis, master_id=master_id,
-            text_id=text_id, juan_num=juan_num, selected_text=selected_text, page_content=page_content,
-            hot_question_id=hot_question_id, model_id=model_id, attachment_ids=attachment_ids,
-        )
-    except (ValidationError, QuotaExceededError, AccessDeniedError, ServiceError) as exc:
+    # Capture the prep error (if any) so we can yield it OUTSIDE the
+    # ``async with`` block — yielding inside would keep the session
+    # checked out for the duration of the network write to the client,
+    # defeating the point of the split.
+    prep_result = None
+    prep_error: Exception | None = None
+    async with sessionmaker() as db_prep:
+        try:
+            prep_result = await _prepare_chat(
+                db_prep, user_id, message, session_id, user,
+                client_ip=client_ip, redis=redis, master_id=master_id,
+                text_id=text_id, juan_num=juan_num,
+                selected_text=selected_text, page_content=page_content,
+                hot_question_id=hot_question_id, model_id=model_id,
+                attachment_ids=attachment_ids,
+            )
+        except (ValidationError, QuotaExceededError, AccessDeniedError, ServiceError) as exc:
+            prep_error = exc
+    # db_prep is closed here — connection returned to the pool before any
+    # LLM I/O begins, regardless of whether prep succeeded or surfaced an
+    # app-level rejection.
+
+    if prep_error is not None:
         # Surface app-level rejections (quota, auth, attachment ownership, RAG
         # underflow, etc.) into backend logs. The frontend already gets the
         # message via the SSE 'error' event, but server-side these used to be
@@ -1123,11 +1200,16 @@ async def send_message_stream(
         # an HTTP 200 in the access log and the maintainer had no breadcrumb.
         logger.warning(
             "chat/stream prepare rejected: %s: %s (user_id=%s session_id=%s)",
-            type(exc).__name__, exc, user_id, session_id,
+            type(prep_error).__name__, prep_error, user_id, session_id,
         )
-        yield f"data: {json.dumps({'type': 'error', 'message': str(exc)}, ensure_ascii=False)}\n\n"
+        yield f"data: {json.dumps({'type': 'error', 'message': str(prep_error)}, ensure_ascii=False)}\n\n"
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
         return
+
+    (
+        chat_session, api_url, api_key, model, is_byok, provider,
+        sources, llm_messages, attachments,
+    ) = prep_result
 
     # Yield session_id immediately so frontend gets a fast response
     yield f"data: {json.dumps({'type': 'session_id', 'session_id': chat_session.id if chat_session else 0}, ensure_ascii=False)}\n\n"
@@ -1278,13 +1360,37 @@ async def send_message_stream(
     if sources:
         yield f"data: {json.dumps({'type': 'sources', 'sources': [s.model_dump() for s in sources]}, ensure_ascii=False)}\n\n"
 
+    # --- Phase 3: persist messages + attachments ---
+    # Fresh session so LLM-stream latency above didn't pin a pool slot.
+    # Captured outside the block so the resulting yield happens after the
+    # session is back in the pool (same reasoning as the prep block).
+    #
+    # Wrapped in try/except so a save-side failure (PG transient, unique
+    # violation, etc.) still lets us emit ``done`` to the client. Without
+    # this, an unhandled exception would escape the generator and the
+    # frontend stream consumer would never see the completion event —
+    # the user got their reply but the UI sits in "thinking…" until
+    # they navigate away. The reply is unfortunately not persisted in
+    # this failure mode; the alternative (silently retry / different
+    # storage path) is out of scope for this refactor.
+    assistant_msg_id: int | None = None
     if chat_session:
-        assistant_msg_id = await _save_messages(
-            db, chat_session.id, message, corrected_answer, sources
-        )
-        log_mutations(chat_session.id, _citation_mutations)
-        log_quote_mutations(chat_session.id, _quote_mutations)
-        await _mark_attachments_consumed(db, attachments)
+        try:
+            async with sessionmaker() as db_save:
+                assistant_msg_id = await _save_messages(
+                    db_save, chat_session.id, message, corrected_answer, sources
+                )
+                log_mutations(chat_session.id, _citation_mutations)
+                log_quote_mutations(chat_session.id, _quote_mutations)
+                await _mark_attachments_consumed(db_save, attachments)
+        except Exception:
+            logger.exception(
+                "chat/stream phase-3 save failed; user got the reply but it is "
+                "not persisted (session_id=%s, user_id=%s)",
+                chat_session.id, user_id,
+            )
+        # db_save closed before the message_id yield below.
+
         # Emit the real chat_messages.id so the frontend can swap the
         # in-flight Date.now() placeholder. Without this, feedback /
         # share buttons on a freshly-streamed message PUT to a

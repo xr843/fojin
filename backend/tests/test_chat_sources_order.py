@@ -5,9 +5,9 @@
 """
 
 import json
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.schemas.chat import ChatSource
 
@@ -114,9 +114,8 @@ async def test_sources_after_tokens():
 
         from app.services.chat import send_message_stream
 
-        db = AsyncMock()
         chunks = []
-        async for chunk in send_message_stream(db, user_id=1, message="什么是般若"):
+        async for chunk in send_message_stream(user_id=1, message="什么是般若"):
             chunks.append(chunk)
 
     events = _parse_sse_events(chunks)
@@ -161,9 +160,8 @@ async def test_empty_sources_not_emitted():
 
         from app.services.chat import send_message_stream
 
-        db = AsyncMock()
         chunks = []
-        async for chunk in send_message_stream(db, user_id=1, message="什么是佛法"):
+        async for chunk in send_message_stream(user_id=1, message="什么是佛法"):
             chunks.append(chunk)
 
     events = _parse_sse_events(chunks)
@@ -192,9 +190,8 @@ async def test_session_id_value_correct():
 
         from app.services.chat import send_message_stream
 
-        db = AsyncMock()
         chunks = []
-        async for chunk in send_message_stream(db, user_id=1, message="测试"):
+        async for chunk in send_message_stream(user_id=1, message="测试"):
             chunks.append(chunk)
 
     events = _parse_sse_events(chunks)
@@ -221,9 +218,8 @@ async def test_error_during_prepare_yields_error_and_done():
     ):
         from app.services.chat import send_message_stream
 
-        db = AsyncMock()
         chunks = []
-        async for chunk in send_message_stream(db, user_id=1, message="测试配额"):
+        async for chunk in send_message_stream(user_id=1, message="测试配额"):
             chunks.append(chunk)
 
     events = _parse_sse_events(chunks)
