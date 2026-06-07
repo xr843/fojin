@@ -108,7 +108,10 @@ jobs:
         #   runner-level pip, not a FoJin dependency. CI uses pinned wheels and
         #   doesn't invoke `pip install --upgrade pip` post-deploy. Waive until
         #   the GitHub Actions Python toolcache ships 26.1.
-        run: pip-audit --desc --ignore-vuln CVE-2026-4539 --ignore-vuln CVE-2026-3219 --ignore-vuln CVE-2026-6357
+        # PYSEC-2026-196 (pip 26.1.1 console_scripts path traversal, fix in 26.1.2):
+        #   same runner-level scope as above; FoJin doesn't run `pip install` on
+        #   untrusted entry-point packages. Waive until toolcache ships 26.1.2.
+        run: pip-audit --desc --ignore-vuln CVE-2026-4539 --ignore-vuln CVE-2026-3219 --ignore-vuln CVE-2026-6357 --ignore-vuln PYSEC-2026-196
 
       - name: Upload pip-audit report
         if: always()
