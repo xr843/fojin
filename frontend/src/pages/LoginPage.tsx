@@ -185,7 +185,6 @@ function SocialLoginButtons() {
           block
           size="large"
           onClick={async () => { try { const { data } = await api.get("/auth/github/login"); window.location.href = data.url; } catch { message.error("GitHub 登录失败"); } }}
-          style={{ background: "#24292e", color: "#fff", borderColor: "#24292e" }}
         >
           GitHub 登录
         </Button>
