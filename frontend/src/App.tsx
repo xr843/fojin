@@ -59,6 +59,12 @@ function App() {
   return (
     <ConfigProvider
       locale={antLocale}
+      theme={{
+        token: {
+          colorPrimary: "#8b2500",
+          borderRadius: 2,
+        },
+      }}
     >
       <ErrorBoundary>
         <Suspense fallback={<Loading />}>
