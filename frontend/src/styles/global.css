@@ -55,7 +55,7 @@ body {
 /* Search highlight */
 em {
   font-style: normal;
-  color: #1677ff;
+  color: var(--fj-accent);
   font-weight: 600;
 }
 
