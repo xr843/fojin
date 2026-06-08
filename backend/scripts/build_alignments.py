@@ -67,6 +67,7 @@ EMBED_TOP_K = 20                     # pgvector candidates per source chunk
 MAX_PARALLEL_PER_CHUNK = 3           # stop after accepting this many targets for one src chunk
 COST_CEILING_USD = 5.0               # abort if estimated LLM spend exceeds (override via --max-spend-usd)
 AVG_TOKENS_PER_CALL = 2000           # realistic for deepseek verify: ~1.5K input (bilingual chunks + prompt) + ~200 output
+COMMIT_EVERY_N_CHUNKS = 10           # checkpoint to DB every N processed text_a chunks (was: end of outer loop only)
 
 # Verification LLM configuration.
 # Defaults: reuse FoJin's main LLM (settings.llm_api_url + llm_model), detect
@@ -598,6 +599,7 @@ async def process_pair(
     limit_chunks: int | None,
     threshold: float,
     cost_guard: CostGuard,
+    commit_every: int = COMMIT_EVERY_N_CHUNKS,
 ) -> dict[str, int]:
     """Process one MVP pair. Returns counters dict."""
     stats = {"accepted": 0, "rejected_llm": 0, "rejected_embed": 0, "errors": 0}
@@ -649,6 +651,15 @@ async def process_pair(
 
                     if not candidates:
                         stats["rejected_embed"] += 1
+                        # still maybe time for periodic commit
+                        if (not dry_run) and i % commit_every == 0:
+                            await session.commit()
+                            logger.info(
+                                "  [a:%d/%d] checkpoint at chunk %d/%d: ✓%d ✗llm=%d ✗embed=%d spent=$%.3f",
+                                a_idx, len(a_resolved), i, len(a_chunks),
+                                stats["accepted"], stats["rejected_llm"], stats["rejected_embed"],
+                                cost_guard.spend_usd(),
+                            )
                         continue
 
                     if dry_run:
@@ -700,7 +711,19 @@ async def process_pair(
                         else:
                             stats["rejected_llm"] += 1
 
-                # Commit + progress log after each source text completes
+                    # Periodic checkpoint so a long single-text_a pair (e.g.
+                    # lotus_zh_bo: 182 chunks × ~20 candidates × ~4s/LLM-call
+                    # would otherwise hold one transaction open for ~3h).
+                    if i % commit_every == 0:
+                        await session.commit()
+                        logger.info(
+                            "  [a:%d/%d] checkpoint at chunk %d/%d: ✓%d ✗llm=%d ✗embed=%d spent=$%.3f",
+                            a_idx, len(a_resolved), i, len(a_chunks),
+                            stats["accepted"], stats["rejected_llm"], stats["rejected_embed"],
+                            cost_guard.spend_usd(),
+                        )
+
+                # Final commit + progress log after each source text completes
                 await session.commit()
                 logger.info(
                     "  [a:%d/%d] done: ✓total=%d ✗llm=%d ✗embed=%d spent=$%.3f",
@@ -712,7 +735,7 @@ async def process_pair(
     return stats
 
 
-async def main_async(pair_key: str, dry_run: bool, limit_chunks: int | None, threshold: float, max_spend_usd: float, force_reasoning_model: bool) -> None:
+async def main_async(pair_key: str, dry_run: bool, limit_chunks: int | None, threshold: float, max_spend_usd: float, force_reasoning_model: bool, commit_every: int) -> None:
     pairs_to_run = (
         MVP_PAIRS if pair_key == "all"
         else [p for p in MVP_PAIRS if p.key == pair_key]
@@ -745,7 +768,7 @@ async def main_async(pair_key: str, dry_run: bool, limit_chunks: int | None, thr
         logger.info("=" * 70)
         logger.info("Pair: %s — %s", pair.name, pair.description)
         logger.info("=" * 70)
-        stats = await process_pair(pair, dry_run, limit_chunks, threshold, cost_guard)
+        stats = await process_pair(pair, dry_run, limit_chunks, threshold, cost_guard, commit_every)
         for k, v in stats.items():
             overall[k] += v
 
@@ -777,9 +800,18 @@ if __name__ == "__main__":
         help="Allow a real run with a reasoning model (deepseek-v4-pro / o1 / …). "
              "Disabled by default because reasoning_tokens make cost estimates unreliable.",
     )
+    parser.add_argument(
+        "--commit-every",
+        type=int,
+        default=COMMIT_EVERY_N_CHUNKS,
+        help=f"Commit DB transaction every N processed text_a chunks "
+             f"(default {COMMIT_EVERY_N_CHUNKS}). Prevents long open transactions "
+             "on single-text_a pairs (e.g. lotus_zh_bo: 182 chunks otherwise "
+             "held one transaction open ~3h). Set higher for faster pairs.",
+    )
     args = parser.parse_args()
 
     asyncio.run(main_async(
         args.pair, args.dry_run, args.limit_chunks, args.threshold,
-        args.max_spend_usd, args.force_reasoning_model,
+        args.max_spend_usd, args.force_reasoning_model, args.commit_every,
     ))
