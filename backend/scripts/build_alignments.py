@@ -71,9 +71,25 @@ AVG_TOKENS_PER_CALL = 2000           # realistic for deepseek verify: ~1.5K inpu
 # Verification LLM configuration.
 # Defaults: reuse FoJin's main LLM (settings.llm_api_url + llm_model), detect
 # Anthropic-vs-OpenAI format purely from URL. Override via env VERIFY_LLM_*.
+#
+# WARNING: when settings.llm_model is a reasoning model (e.g. deepseek-v4-pro,
+# deepseek-reasoner, o1, claude-*-thinking), reasoning_tokens inflate cost
+# unpredictably even though we ask for ~200 output tokens of strict JSON. For
+# batch verification, ALWAYS set VERIFY_LLM_MODEL to a chat (non-thinking) model
+# such as deepseek-v4-flash. The runtime log below echoes which model is in use.
 VERIFY_LLM_API_URL = os.environ.get("VERIFY_LLM_API_URL", "")  # falls back to settings.llm_api_url
 VERIFY_LLM_API_KEY = os.environ.get("VERIFY_LLM_API_KEY", "")  # falls back to settings.llm_api_key
 VERIFY_LLM_MODEL = os.environ.get("VERIFY_LLM_MODEL", "")      # falls back to settings.llm_model
+
+# Reasoning models whose token use can't be predicted from completion length;
+# we refuse to start a real run on these unless --force-reasoning-model is set.
+REASONING_MODELS_DENYLIST = frozenset({
+    "deepseek-v4-pro",
+    "deepseek-reasoner",
+    "o1",
+    "o1-mini",
+    "o3-mini",
+})
 
 # Price per 1K tokens for cost ceiling (approximate; doesn't affect routing)
 LLM_PRICE_PER_1K = {
@@ -235,6 +251,17 @@ MVP_PAIRS: list[AlignmentPair] = [
         ),
         text_b=TextResolver(source_code="cbeta", text_id=4),  # T0125 增壹阿含
         description="AN 4 四法集 (~270 suttas, chunks≥5 后 ~150) ↔ T0125 增壹阿含",
+    ),
+    # ========================================================================
+    # v1.2 Mahayana 汉藏 batch (2026-06-08)
+    # text_a = 汉译 (smaller outer loop), text_b = 84000 藏译 (larger pgvector pool)
+    # ========================================================================
+    AlignmentPair(
+        key="lotus_zh_bo",
+        name="法华经 汉藏",
+        text_a=TextResolver(source_code="cbeta", text_id=6513),  # T0262 妙法莲华经 罗什, 182 chunks
+        text_b=TextResolver(source_code="84000", text_id=5267),  # Toh 113, 1307 chunks
+        description="T0262《妙法莲华经》罗什译 ↔ 84000 Toh 113 Saddharmapuṇḍarīka 藏译",
     ),
 ]
 
@@ -685,7 +712,7 @@ async def process_pair(
     return stats
 
 
-async def main_async(pair_key: str, dry_run: bool, limit_chunks: int | None, threshold: float, max_spend_usd: float) -> None:
+async def main_async(pair_key: str, dry_run: bool, limit_chunks: int | None, threshold: float, max_spend_usd: float, force_reasoning_model: bool) -> None:
     pairs_to_run = (
         MVP_PAIRS if pair_key == "all"
         else [p for p in MVP_PAIRS if p.key == pair_key]
@@ -696,6 +723,15 @@ async def main_async(pair_key: str, dry_run: bool, limit_chunks: int | None, thr
         sys.exit(1)
 
     effective_model = VERIFY_LLM_MODEL or settings.llm_model
+    if effective_model in REASONING_MODELS_DENYLIST and not dry_run and not force_reasoning_model:
+        logger.error(
+            "❌ Refusing real run with reasoning model '%s' — reasoning_tokens "
+            "will balloon cost beyond the LLM_PRICE_PER_1K estimate. Either:\n"
+            "  (a) set VERIFY_LLM_MODEL=deepseek-v4-flash (recommended); or\n"
+            "  (b) re-run with --force-reasoning-model if you really mean it.",
+            effective_model,
+        )
+        sys.exit(2)
     price = LLM_PRICE_PER_1K.get(effective_model, DEFAULT_PRICE_PER_1K)
     cost_guard = CostGuard(max_spend_usd, price)
     logger.info("Using verify LLM: %s @ %s (cost est $%.5f/1K tok)",
@@ -723,7 +759,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--pair",
         required=True,
-        help="Pair key: heart|satipatthana|dhammacakka|dhamma_pali|vimalakirti|agama_mn|agama_dn|agama_sn56|agama_an4|all",
+        help="Pair key: heart|satipatthana|dhammacakka|dhamma_pali|vimalakirti|agama_mn|agama_dn|agama_sn56|agama_an4|lotus_zh_bo|all",
     )
     parser.add_argument("--dry-run", action="store_true", help="Skip LLM calls, print embedding candidates only")
     parser.add_argument("--limit-chunks", type=int, default=None, help="Cap chunks per text (for smoke testing)")
@@ -735,6 +771,15 @@ if __name__ == "__main__":
         help=f"Abort if estimated LLM spend exceeds this (default ${COST_CEILING_USD}). "
              "Raise explicitly for large batch runs (e.g. --max-spend-usd 20).",
     )
+    parser.add_argument(
+        "--force-reasoning-model",
+        action="store_true",
+        help="Allow a real run with a reasoning model (deepseek-v4-pro / o1 / …). "
+             "Disabled by default because reasoning_tokens make cost estimates unreliable.",
+    )
     args = parser.parse_args()
 
-    asyncio.run(main_async(args.pair, args.dry_run, args.limit_chunks, args.threshold, args.max_spend_usd))
+    asyncio.run(main_async(
+        args.pair, args.dry_run, args.limit_chunks, args.threshold,
+        args.max_spend_usd, args.force_reasoning_model,
+    ))
