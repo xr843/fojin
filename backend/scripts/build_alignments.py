@@ -264,6 +264,21 @@ MVP_PAIRS: list[AlignmentPair] = [
         text_b=TextResolver(source_code="84000", text_id=5267),  # Toh 113, 1307 chunks
         description="T0262《妙法莲华经》罗什译 ↔ 84000 Toh 113 Saddharmapuṇḍarīka 藏译",
     ),
+    # ------------------------------------------------------------------
+    # Batch 1.5: 般若部 / 楞伽 / 涅槃 / 楞严 一档（2026-06-09 加入）
+    # 优先 8k 颂般若 — 双侧都 embedded、规模与 lotus 同级、最早可上线。
+    # 楞严 (T0945)↔Toh 506 和 涅槃 (T0374)↔Toh 119 暂不加 pair —
+    # 84000 这两本藏译目前 chunks=0 未 ingest（参考 prod 2026-06-09 实测）。
+    # 25k 颂般若 (T0223↔Toh 9, 815×12022 chunks) 留 Batch 2，需先决定
+    # 切片策略 / cron 多日跑。
+    # ------------------------------------------------------------------
+    AlignmentPair(
+        key="prajna_8k_zh_bo",
+        name="八千颂般若 汉藏",
+        text_a=TextResolver(source_code="cbeta", text_id=6482),  # T0227 小品般若波罗蜜经 (鸠摩罗什), 193 chunks
+        text_b=TextResolver(source_code="84000", text_id=5165),  # Toh 11 Aṣṭasāhasrikā Prajñāpāramitā, 4706 chunks
+        description="T0227《小品般若波罗蜜经》罗什译 ↔ 84000 Toh 11 Aṣṭasāhasrikā Prajñāpāramitā 藏译",
+    ),
 ]
 
 
@@ -782,7 +797,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--pair",
         required=True,
-        help="Pair key: heart|satipatthana|dhammacakka|dhamma_pali|vimalakirti|agama_mn|agama_dn|agama_sn56|agama_an4|lotus_zh_bo|all",
+        help="Pair key: heart|satipatthana|dhammacakka|dhamma_pali|vimalakirti|agama_mn|agama_dn|agama_sn56|agama_an4|lotus_zh_bo|prajna_8k_zh_bo|all",
     )
     parser.add_argument("--dry-run", action="store_true", help="Skip LLM calls, print embedding candidates only")
     parser.add_argument("--limit-chunks", type=int, default=None, help="Cap chunks per text (for smoke testing)")
