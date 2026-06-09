@@ -32,7 +32,7 @@ Buddhist texts are scattered across hundreds of databases worldwide — CBETA, S
 | Find a sutra across databases | **Multi-dimensional search** across 10,500+ texts from 503 sources |
 | Read the full text online | **8,900+ texts** with 23,500+ volumes of full content, CBETA-style layout |
 | Compare translations | **Parallel reading** in 30 languages side by side |
-| Compare sutras across Buddhist canons | **Trilingual cross-canon parallel reading** — 5 MVP sutras with 142 LLM-verified chunk alignments across Chinese / Pali / Tibetan (Heart Sutra, Satipaṭṭhāna, Dhammacakka, Dhammapada, Vimalakīrti) |
+| Compare sutras across Buddhist canons | **Trilingual cross-canon parallel reading** — 3,400+ LLM-verified chunk alignments across Chinese / Pali / Tibetan covering Heart Sutra, Vimalakīrti, **Lotus Sutra (法华 ↔ Toh 113, 259 pairs)**, Satipaṭṭhāna + the full Āgama ↔ Nikāya corpus (MN/DN/SN/AN), Dhammapada |
 | Look up Buddhist terms | **32 dictionaries**, 748K entries (Chinese/Sanskrit/Pali/Tibetan/English) |
 | Explore relationships | **Knowledge graph** with 31K+ entities and 28K+ relations (23K lineage chains) |
 | Discover similar texts | **Semantic similarity** powered by 678K+ embedding vectors (pgvector + HNSW) |
@@ -150,21 +150,26 @@ Compare translations side by side — Classical Chinese, Sanskrit, Pali, Tibetan
 
 **The first LLM-driven cross-canon parallel reading system for Buddhist texts.** No other platform provides this: CBETA (汉文), SuttaCentral (Pali), and 84000 (Tibetan) each operate in their own language silo. FoJin bridges them via LLM-verified chunk-level alignment.
 
-**MVP (first 5 classics, 142 alignments):**
+**Current coverage (3,400+ chunk-level alignments across 10 pair definitions):**
 
-| Sutra | Source | Target | Pairs | Type |
+| Sutra / Corpus | Source | Target | Pairs | Type |
 |---|---|---|---:|---|
+| **《妙法蓮華經》Lotus Sutra** (2026-06-08) | T0262 罗什 (Chinese) | Toh 113 Kangyur (Tibetan) | **259** | 汉 ↔ 藏 |
+| 《維摩詰所說經》Vimalakīrti | T0475 罗什 (Chinese) | Toh 176 (Tibetan) | 20 | 汉 ↔ 藏 |
 | 《般若波羅蜜多心經》Heart Sutra | T0252 (Chinese) | Toh 21 Kangyur (Tibetan) | 6 | 汉 ↔ 藏 |
-| 《維摩詰所說經》Vimalakīrti | T0475 (Chinese, 罗什译) | Toh 176 (Tibetan) | 20 | 汉 ↔ 藏 |
 | Mahāsatipaṭṭhāna Sutta 念处经 | MN 10 (Pali) | T0026 中阿含 (Chinese) | 50 | 巴 ↔ 汉 |
 | Dhammacakkappavattana 转法轮经 | SN 56.11 (Pali) | T0099 杂阿含 (Chinese) | 17 | 巴 ↔ 汉 |
 | Dhammapada 法句经 | T0210 (Chinese) | SC 26 vaggas (Pali) | 49 | 汉 ↔ 巴 |
+| **Majjhima Nikāya ↔ 中阿含** | All MN suttas (Pali) | T0026 (Chinese) | ~1,800 | 巴 ↔ 汉 |
+| **Dīgha Nikāya ↔ 长阿含** | All DN suttas (Pali) | T0001 (Chinese) | ~700 | 巴 ↔ 汉 |
+| **Saṃyutta Nikāya 56 ↔ 杂阿含** | SN 56 suttas (Pali) | T0099 (Chinese) | ~150 | 巴 ↔ 汉 |
+| **Aṅguttara Nikāya 4 ↔ 增一阿含** | AN 4 suttas (Pali) | T0125 (Chinese) | ~400 | 巴 ↔ 汉 |
 
-Hand-verified precision on random 10-pair sample: **100%** (all pairs correctly identified across Chinese, Pali, and Tibetan).
+Confidence distribution: all pairs ≥ 0.80; 88% ≥ 0.95. Hand-verified precision on the original MVP sample: **100%**. The Lotus Sutra batch (2026-06-08) cost $1.70 in DeepSeek API calls for 259 accepted pairs out of 3,029 LLM-verified candidates.
 
 **How to use:**
 
-1. **In AI Q&A** — When XiaoJin cites one of the 5 MVP sutras, the citation drawer shows tabs `[ 汉文 ] [ 巴利 (5) ] [ 藏文 (3) ]`. Click a tab to see the corresponding passage in another canon, rendered with proper Devanagari / Tibetan fonts.
+1. **In AI Q&A** — When XiaoJin cites an aligned sutra, the citation drawer shows tabs `[ 汉文 ] [ 巴利 (5) ] [ 藏文 (3) ]`. Click a tab to see the corresponding passage in another canon, rendered with proper Devanagari / Tibetan fonts.
 
 2. **In the reader** — Click the 🌐 **「多语对读」** (Multilingual Parallel) button in the toolbar. Default tab **「按经对读」** shows sutta-level parallels from SuttaCentral's authoritative Akanuma-style table (3,293 pairs covering all 4 Āgamas ↔ Nikāyas), with Pāli original + Sujato English previews and "read full text" links. Alternate tab **「按段对读」** retains the experimental embedding+LLM chunk-level alignment (pipeline-generated, known to have noise). The panel sits to the left of the AI reading panel; both can be open simultaneously and independently resized.
 
@@ -397,7 +402,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 - [x] Inline split-view AI reader panel with draggable divider and independent scrolling
 - [x] AI panel auto-open in reader for one-click access to interpretation
 - [x] Meta-question detection in chat — recognizes "who are you / what can you do" and skips RAG
-- [x] **Trilingual cross-canon parallel reading (MVP)** — 5 sutras × 142 LLM-verified chunk alignments across CBETA / SuttaCentral / 84000
+- [x] **Trilingual cross-canon parallel reading** — 10 pair definitions, 3,400+ LLM-verified chunk alignments across CBETA / SuttaCentral / 84000 (incl. Lotus Sutra 法华 ↔ Toh 113, the full Āgama ↔ Nikāya corpus, and the original 5 MVP classics)
 - [x] Chat citation drawer with multi-language tabs (汉 / 巴 / 藏 side-by-side)
 - [x] Reader "多语对读" inline sidebar — dual tabs: sutta-level SC-authoritative parallels + legacy chunk-level RAG alignment; coexists with AI panel, independent drag-resize
 - [x] GFM markdown tables in AI answers (remark-gfm) — comparative responses render as proper tables
