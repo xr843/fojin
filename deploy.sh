@@ -129,14 +129,30 @@ elif ! is_known_commit "$BE_BASE"; then
   backend_image_changed=true
 elif [ "$BE_BASE" != "$NEW_REV" ]; then
   BE_DIFF="$(git diff --name-only "$BE_BASE" "$NEW_REV")"
-  if echo "$BE_DIFF" | grep -q '^backend/'; then
-    log "backend/ 自 ${BE_BASE:0:7} 起有变更 — 触发 restart。"
-    echo "$BE_DIFF" | grep '^backend/' | sed 's/^/    /'
+  # Live API path: backend/ minus dirs that don't ride the uvicorn process.
+  # - backend/scripts/   : CLI tools (build_alignments, build_works, audits, …)
+  # - backend/tests/     : pytest fixtures / unit tests
+  # - backend/eval/      : RAG eval harness
+  # - backend/alembic/   : migration files (apply via `alembic upgrade`, not restart)
+  # Changing any of these MUST NOT bounce a running uvicorn — and, more importantly,
+  # MUST NOT kill long-running scripts a developer has launched via `docker exec`.
+  BE_LIVE_DIFF="$(echo "$BE_DIFF" | grep -E '^backend/' | grep -vE '^backend/(scripts|tests|eval|alembic)/' || true)"
+  if [ -n "$BE_LIVE_DIFF" ]; then
+    log "backend/ live-API 路径自 ${BE_BASE:0:7} 起有变更 — 触发 restart。"
+    echo "$BE_LIVE_DIFF" | sed 's/^/    /'
     backend_changed=true
-    if echo "$BE_DIFF" | grep -qE '^backend/(Dockerfile|requirements[^/]*\.txt|pyproject\.toml)$'; then
+    if echo "$BE_LIVE_DIFF" | grep -qE '^backend/(Dockerfile|requirements[^/]*\.txt|pyproject\.toml)$'; then
       log "backend 依赖/Dockerfile 改动 — 升级为 rebuild image。"
       backend_image_changed=true
     fi
+  elif echo "$BE_DIFF" | grep -q '^backend/'; then
+    # Pure scripts/tests/eval/alembic change — log but don't restart.
+    log "backend/ 仅有 scripts/tests/eval/alembic 改动 — 跳过 restart（不影响 uvicorn，也不杀正在跑的脚本）。"
+    echo "$BE_DIFF" | grep '^backend/' | sed 's/^/    /'
+    # Still bump the marker so we don't keep re-evaluating the same untouched
+    # diff every cron tick — otherwise the next deploy.sh run will see the same
+    # `BE_DIFF` and re-log this skip message indefinitely.
+    echo "$NEW_REV" > "$BACKEND_RESTART_MARKER"
   fi
 fi
 
