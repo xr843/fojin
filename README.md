@@ -32,7 +32,7 @@ Buddhist texts are scattered across hundreds of databases worldwide — CBETA, S
 | Find a sutra across databases | **Multi-dimensional search** across 10,500+ texts from 503 sources |
 | Read the full text online | **8,900+ texts** with 23,500+ volumes of full content, CBETA-style layout |
 | Compare translations | **Parallel reading** in 30 languages side by side |
-| Compare sutras across Buddhist canons | **Trilingual cross-canon parallel reading** — 3,400+ LLM-verified chunk alignments across Chinese / Pali / Tibetan covering Heart Sutra, Vimalakīrti, **Lotus Sutra (法华 ↔ Toh 113, 259 pairs)**, Satipaṭṭhāna + the full Āgama ↔ Nikāya corpus (MN/DN/SN/AN), Dhammapada |
+| Compare sutras across Buddhist canons | **Trilingual cross-canon parallel reading** — 3,500+ LLM-verified chunk alignments across Chinese / Pali / Tibetan covering Heart Sutra, Vimalakīrti, **Lotus Sutra (法华 ↔ Toh 113, 259 pairs)**, **8,000-verse Prajñāpāramitā (小品般若 ↔ Toh 11, 127 pairs)**, Satipaṭṭhāna + the full Āgama ↔ Nikāya corpus (MN/DN/SN/AN), Dhammapada |
 | Look up Buddhist terms | **32 dictionaries**, 748K entries (Chinese/Sanskrit/Pali/Tibetan/English) |
 | Explore relationships | **Knowledge graph** with 31K+ entities and 28K+ relations (23K lineage chains) |
 | Discover similar texts | **Semantic similarity** powered by 678K+ embedding vectors (pgvector + HNSW) |
@@ -155,6 +155,7 @@ Compare translations side by side — Classical Chinese, Sanskrit, Pali, Tibetan
 | Sutra / Corpus | Source | Target | Pairs | Type |
 |---|---|---|---:|---|
 | **《妙法蓮華經》Lotus Sutra** (2026-06-08) | T0262 罗什 (Chinese) | Toh 113 Kangyur (Tibetan) | **259** | 汉 ↔ 藏 |
+| **《小品般若波羅蜜經》8,000-verse Prajñāpāramitā** (2026-06-09) | T0227 罗什 (Chinese) | Toh 11 Aṣṭasāhasrikā (Tibetan) | **127** | 汉 ↔ 藏 |
 | 《維摩詰所說經》Vimalakīrti | T0475 罗什 (Chinese) | Toh 176 (Tibetan) | 20 | 汉 ↔ 藏 |
 | 《般若波羅蜜多心經》Heart Sutra | T0252 (Chinese) | Toh 21 Kangyur (Tibetan) | 6 | 汉 ↔ 藏 |
 | Mahāsatipaṭṭhāna Sutta 念处经 | MN 10 (Pali) | T0026 中阿含 (Chinese) | 50 | 巴 ↔ 汉 |
@@ -165,7 +166,7 @@ Compare translations side by side — Classical Chinese, Sanskrit, Pali, Tibetan
 | **Saṃyutta Nikāya 56 ↔ 杂阿含** | SN 56 suttas (Pali) | T0099 (Chinese) | ~150 | 巴 ↔ 汉 |
 | **Aṅguttara Nikāya 4 ↔ 增一阿含** | AN 4 suttas (Pali) | T0125 (Chinese) | ~400 | 巴 ↔ 汉 |
 
-Confidence distribution: all pairs ≥ 0.80; 88% ≥ 0.95. Hand-verified precision on the original MVP sample: **100%**. The Lotus Sutra batch (2026-06-08) cost $1.70 in DeepSeek API calls for 259 accepted pairs out of 3,029 LLM-verified candidates.
+Confidence distribution: all pairs ≥ 0.75. Hand-verified precision on the original MVP sample: **100%**. Mahāyāna 汉藏 batches: Lotus Sutra (2026-06-08) at $1.70 / 259 pairs (8.6% accept rate); 8,000-verse Prajñāpāramitā (2026-06-09) at $3.64 / 127 pairs (3.4% accept rate, lower because the sūtra's repetitive paratactic style yields fewer 1:1 chunk-level correspondences).
 
 **How to use:**
 
@@ -402,7 +403,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 - [x] Inline split-view AI reader panel with draggable divider and independent scrolling
 - [x] AI panel auto-open in reader for one-click access to interpretation
 - [x] Meta-question detection in chat — recognizes "who are you / what can you do" and skips RAG
-- [x] **Trilingual cross-canon parallel reading** — 10 pair definitions, 3,400+ LLM-verified chunk alignments across CBETA / SuttaCentral / 84000 (incl. Lotus Sutra 法华 ↔ Toh 113, the full Āgama ↔ Nikāya corpus, and the original 5 MVP classics)
+- [x] **Trilingual cross-canon parallel reading** — 11 pair definitions, 3,500+ LLM-verified chunk alignments across CBETA / SuttaCentral / 84000 (incl. Lotus Sutra 法华 ↔ Toh 113, 8,000-verse Prajñāpāramitā 小品般若 ↔ Toh 11, the full Āgama ↔ Nikāya corpus, and the original 5 MVP classics)
 - [x] Chat citation drawer with multi-language tabs (汉 / 巴 / 藏 side-by-side)
 - [x] Reader "多语对读" inline sidebar — dual tabs: sutta-level SC-authoritative parallels + legacy chunk-level RAG alignment; coexists with AI panel, independent drag-resize
 - [x] GFM markdown tables in AI answers (remark-gfm) — comparative responses render as proper tables
