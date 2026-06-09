@@ -27,8 +27,9 @@ async def _slow_first_token(delay: float):
     yield "late"
 
 
-async def _raises_mid_stream():
-    yield "ok"
+async def _raises_after_n(n: int):
+    for i in range(n):
+        yield f"chunk-{i}"
     raise RuntimeError("boom")
 
 
@@ -66,20 +67,24 @@ async def test_ping_emitted_when_inner_idle_longer_than_interval():
 
 
 @pytest.mark.anyio
-async def test_exception_from_inner_propagates():
+async def test_exception_from_inner_propagates_after_buffered_content():
     """An exception raised by the inner generator must surface on the
-    consumer side after any already-buffered ``content`` is delivered, so
-    the existing ``except (httpx.TimeoutException, ...)`` in
-    ``send_message_stream`` keeps its fallback semantics.
+    consumer side ONLY after every already-yielded ``content`` chunk is
+    delivered — the producer side puts items into a queue, so a naive
+    implementation could swallow buffered content if the error skipped
+    ahead. We yield several items before raising to lock the FIFO contract
+    that ``send_message_stream``'s post-first-token error path depends on
+    (it records ``full_answer`` from every delivered chunk and only then
+    emits the "回答中途中断" SSE error event).
     """
     events: list[tuple[str, object]] = []
     with pytest.raises(RuntimeError, match="boom"):
         async for kind, payload in _interleave_heartbeat(
-            _raises_mid_stream(), heartbeat_interval=1.0
+            _raises_after_n(8), heartbeat_interval=1.0
         ):
             events.append((kind, payload))
 
-    assert events == [("content", "ok")]
+    assert events == [("content", f"chunk-{i}") for i in range(8)]
 
 
 @pytest.mark.anyio
@@ -111,6 +116,9 @@ async def test_consumer_cancellation_cleans_up_producer():
     with pytest.raises(asyncio.CancelledError):
         await task
 
-    # Give the event loop one tick to let the producer's cancellation finalise.
-    await asyncio.sleep(0)
+    # The cancellation chain (consumer → wrapper.finally → producer.cancel →
+    # inner gen.except CancelledError → cancelled.set()) crosses several
+    # event-loop ticks. Wait up to 1s rather than asserting on a single
+    # ``sleep(0)`` so the test doesn't flake under shared-runner load.
+    await asyncio.wait_for(cancelled.wait(), timeout=1.0)
     assert cancelled.is_set(), "inner producer was not cancelled when consumer aborted"

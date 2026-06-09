@@ -1155,16 +1155,18 @@ async def _interleave_heartbeat(inner_gen, heartbeat_interval: float):
     outer fallback / retry logic is unchanged.
     """
     queue: asyncio.Queue = asyncio.Queue(maxsize=64)
-    _DONE = object()
 
     async def _producer():
         try:
             async for chunk in inner_gen:
                 await queue.put(("content", chunk))
-            await queue.put(("done", _DONE))
+            await queue.put(("done", None))
         except asyncio.CancelledError:
             raise
         except Exception as exc:
+            # If the consumer already exited (e.g. cancelled the wrapper before
+            # we got here), this put would block until the outer ``finally``
+            # cancels us — which is fine, just non-obvious from this line alone.
             await queue.put(("error", exc))
 
     task = asyncio.create_task(_producer())
