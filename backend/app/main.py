@@ -21,6 +21,29 @@ try:
 except ImportError:
     _HAS_DIANJIN = False
 
+# Lift application loggers to INFO so the ~13 ``logger.info`` calls we
+# already place at notable boundaries (auth events, chat phase markers,
+# model fallback, attachment parse failures, etc.) actually surface in
+# ``docker logs fojin-backend``. Python's root logger defaults to WARNING
+# and uvicorn never reconfigures it, so anything under the ``app.*``
+# namespace was silently dropped — a chronic diagnostic gap (see
+# feedback_log_before_second_guess and the 2026-06-09 T1579 juan-7
+# reader-mode incident write-up). Scoped to ``app.*`` to avoid spamming
+# logs with INFO from third-party libraries (sqlalchemy, httpx, etc.).
+_app_logger = logging.getLogger("app")
+_app_logger.setLevel(logging.INFO)
+if not _app_logger.handlers:
+    _h = logging.StreamHandler()
+    _h.setFormatter(logging.Formatter(
+        "%(asctime)s %(levelname)s %(name)s: %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
+    ))
+    _app_logger.addHandler(_h)
+    # Don't propagate to root — uvicorn doesn't install a handler there
+    # and the lastResort filter would re-drop INFO anyway, but it also
+    # avoids duplicate lines if a future change adds a root handler.
+    _app_logger.propagate = False
+
 logger = logging.getLogger(__name__)
 from datetime import UTC
 
