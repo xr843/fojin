@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import time as _time
@@ -31,6 +32,14 @@ logger = logging.getLogger(__name__)
 # Free daily limits for users without their own API key
 FREE_DAILY_LIMIT_USER = 200      # Logged-in users — effectively unlimited for normal use, caps abuse
 FREE_DAILY_LIMIT_ANONYMOUS = 10  # Anonymous users (encourage registration)
+
+# SSE keepalive cadence during LLM streaming. Sized for the tightest
+# documented idle-cut on the path: Cloudflare free-plan edge ≈100s,
+# nginx ``proxy_read_timeout`` 120s. 25s gives ~4× headroom on both,
+# while staying quiet enough that a fast-streaming model rarely emits
+# a heartbeat at all. Comment-style SSE (``:\n\n``) is ignored by
+# browsers per spec, so this is invisible to the frontend consumer.
+LLM_STREAM_HEARTBEAT_INTERVAL_S = 25.0
 
 # Provider → base URL mapping (most are OpenAI-compatible; Anthropic uses its own format)
 PROVIDER_URLS = {
@@ -1122,6 +1131,68 @@ async def send_message(
     )
 
 
+async def _interleave_heartbeat(inner_gen, heartbeat_interval: float):
+    """Wrap an async generator so heartbeat markers interleave during idle gaps.
+
+    Yields ``("content", chunk)`` for each item produced by ``inner_gen`` and
+    ``("ping", None)`` whenever ``heartbeat_interval`` seconds pass without a
+    new chunk. The caller is expected to translate ``ping`` into a comment-style
+    SSE frame (``: keepalive\\n\\n``) so intermediate proxies see traffic and
+    don't reap an idle connection.
+
+    Why this exists: ``/chat/stream`` in reader mode (``page_content`` set)
+    runs DeepSeek V4 Pro for up to 120s on a long juan. When the model pauses
+    generation for tens of seconds near the end, the underlying TCP stays
+    quiet, and Cloudflare's free-plan edge (~100s) or nginx
+    ``proxy_read_timeout`` (120s) silently sever the connection. The frontend
+    XHR sees ``onerror`` (not a clean ``done`` event) and shows the
+    "网络错误，请稍后重试" toast even though the answer was almost complete.
+    See ``feedback_log_before_second_guess`` and the 2026-06-09 reader-mode
+    incident on T1579 juan 7.
+
+    Exceptions from ``inner_gen`` (e.g. ``httpx.TimeoutException``) are
+    re-raised on the consumer side after the producer task finishes, so the
+    outer fallback / retry logic is unchanged.
+    """
+    queue: asyncio.Queue = asyncio.Queue(maxsize=64)
+
+    async def _producer():
+        try:
+            async for chunk in inner_gen:
+                await queue.put(("content", chunk))
+            await queue.put(("done", None))
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            # If the consumer already exited (e.g. cancelled the wrapper before
+            # we got here), this put would block until the outer ``finally``
+            # cancels us — which is fine, just non-obvious from this line alone.
+            await queue.put(("error", exc))
+
+    task = asyncio.create_task(_producer())
+    try:
+        while True:
+            try:
+                kind, payload = await asyncio.wait_for(
+                    queue.get(), timeout=heartbeat_interval
+                )
+            except TimeoutError:
+                yield ("ping", None)
+                continue
+            if kind == "done":
+                return
+            if kind == "error":
+                raise payload  # type: ignore[misc]
+            yield ("content", payload)
+    finally:
+        if not task.done():
+            task.cancel()
+            try:
+                await task
+            except BaseException:
+                pass
+
+
 async def send_message_stream(
     user_id: int | None,
     message: str,
@@ -1270,10 +1341,20 @@ async def send_message_stream(
 
     full_answer = ""
     received_first_token = False
+    phase2_start = _time.monotonic()
     try:
         for idx, (att_url, att_key, att_model, att_provider, is_fb) in enumerate(attempts):
             try:
-                async for content in _stream_llm_once(att_url, att_key, att_model, att_provider):
+                async for kind, content in _interleave_heartbeat(
+                    _stream_llm_once(att_url, att_key, att_model, att_provider),
+                    heartbeat_interval=LLM_STREAM_HEARTBEAT_INTERVAL_S,
+                ):
+                    if kind == "ping":
+                        # SSE comment frame — browsers ignore lines starting
+                        # with ":", but the bytes keep CF/nginx from reaping
+                        # the connection while the LLM pauses generation.
+                        yield ": keepalive\n\n"
+                        continue
                     if not received_first_token:
                         received_first_token = True
                         if is_fb:
@@ -1324,6 +1405,14 @@ async def send_message_stream(
         yield f"data: {json.dumps({'type': 'error', 'message': error_msg}, ensure_ascii=False)}\n\n"
         full_answer = full_answer or error_msg
 
+    logger.info(
+        "chat/stream phase-2 LLM done in %.2fs (%d chars, session_id=%s, provider=%s)",
+        _time.monotonic() - phase2_start,
+        len(full_answer),
+        chat_session.id if chat_session else 0,
+        provider,
+    )
+
     # Citation guard: rewrite any 【《X》第N卷】 not anchored in the
     # retrieved sources. The user has already seen the raw stream; we
     # emit a final 'citation_correction' event so the frontend can swap
@@ -1339,10 +1428,17 @@ async def send_message_stream(
     # text, a late `token` would re-append the LLM's raw output and
     # silently re-introduce the hallucination this guard exists to
     # prevent.
+    cg_start = _time.monotonic()
     corrected_answer, _citation_mutations = enforce_citation_whitelist(full_answer, sources)
     # Quote verifier runs after citation_guard so flagged-and-stripped
     # citations don't carry their quotes into a second annotation.
     corrected_answer, _quote_mutations = verify_quoted_content(corrected_answer, sources)
+    logger.info(
+        "chat/stream phase-cg %.2fs (citations=%d, quotes=%d)",
+        _time.monotonic() - cg_start,
+        len(_citation_mutations),
+        len(_quote_mutations),
+    )
     # Emit one merged `citation_correction` event covering both
     # rewrites (citation + quote annotations) so the frontend swap is a
     # single state mutation rather than two.
@@ -1375,6 +1471,7 @@ async def send_message_stream(
     # storage path) is out of scope for this refactor.
     assistant_msg_id: int | None = None
     if chat_session:
+        save_start = _time.monotonic()
         try:
             async with sessionmaker() as db_save:
                 assistant_msg_id = await _save_messages(
@@ -1389,6 +1486,12 @@ async def send_message_stream(
                 "not persisted (session_id=%s, user_id=%s)",
                 chat_session.id, user_id,
             )
+        logger.info(
+            "chat/stream phase-3 save %.2fs (session_id=%s, assistant_msg_id=%s)",
+            _time.monotonic() - save_start,
+            chat_session.id,
+            assistant_msg_id,
+        )
         # db_save closed before the message_id yield below.
 
         # Emit the real chat_messages.id so the frontend can swap the
