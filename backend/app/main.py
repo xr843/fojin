@@ -102,7 +102,7 @@ async def lifespan(app: FastAPI):
 
         async with async_session() as session:
             app.state.gaiji_normalizer = await build_normalizer(session)
-    except Exception:  # noqa: BLE001
+    except Exception:
         # Log loudly but do not block startup — search still works,
         # just without gaiji alternates.
         logging.getLogger("app").exception(
