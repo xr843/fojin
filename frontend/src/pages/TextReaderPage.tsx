@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Typography, Spin, Button, Select, Breadcrumb, Row, Col, message, Tooltip } from "antd";
+import { Typography, Spin, Button, Select, Breadcrumb, Row, Col, message, Tooltip, Tag } from "antd";
 import {
   HomeOutlined,
   LeftOutlined,
@@ -551,8 +551,26 @@ export default function TextReaderPage() {
 
       {/* Header */}
       <div className="reader-header">
-        <Typography.Title level={3}>
+        <Typography.Title level={3} style={{ marginBottom: 4 }}>
           {content?.title_zh || juanList?.title_zh || "加载中..."}
+          {content?.canon_label && (
+            <Tooltip
+              title="本经所属藏经（底本）— 据 CBETA 编号推导"
+              placement="right"
+            >
+              <Tag
+                color="geekblue"
+                style={{
+                  marginLeft: 12,
+                  verticalAlign: "middle",
+                  fontSize: 13,
+                  fontWeight: "normal",
+                }}
+              >
+                {content.canon_label}
+              </Tag>
+            </Tooltip>
+          )}
         </Typography.Title>
 
         <div className="reader-nav">

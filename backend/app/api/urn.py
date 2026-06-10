@@ -33,7 +33,16 @@ async def urn_resolve(
         ...,
         min_length=8,
         max_length=300,
-        description="fojin URN, e.g. fojin:cbeta/T0001.1#p0001a01",
+        description=(
+            "fojin URN, e.g. `fojin:cbeta/T0001.1#p0001a01`.\n\n"
+            "**Anchor (the part after `#`) must be URL-encoded as `%23` in "
+            "HTTP clients**, otherwise the browser or curl will treat `#` "
+            "as a fragment delimiter and strip everything after it before "
+            "sending the request — the server then sees an anchor-less URN "
+            "and silently returns `anchor: null`.\n\n"
+            "Example (anchor preserved):\n"
+            "`/api/urn/resolve?urn=fojin:cbeta/T0001.1%23p0001a01`"
+        ),
     ),
     db: AsyncSession = Depends(get_db),
 ):
