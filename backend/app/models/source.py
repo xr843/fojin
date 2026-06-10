@@ -38,6 +38,20 @@ class DataSource(Base):
     # When the source first entered its current continuous unreachable streak;
     # NULL when not unreachable. now() - unreachable_since is the streak length.
     unreachable_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # License / rights metadata. NULL = unknown (not yet audited).
+    # license_spdx prefers SPDX identifier (CC-BY-4.0, CC0-1.0, CC-BY-NC-SA-3.0)
+    # or "proprietary" / "public-domain" / "unknown" when SPDX does not apply.
+    license_spdx: Mapped[str | None] = mapped_column(String(50))
+    license_url: Mapped[str | None] = mapped_column(String(500))
+    license_notes: Mapped[str | None] = mapped_column(Text)
+    attribution_required: Mapped[bool | None] = mapped_column(Boolean)
+    commercial_allowed: Mapped[bool | None] = mapped_column(Boolean)
+    redistribution_allowed: Mapped[bool | None] = mapped_column(Boolean)
+    # Specifically governs whether full-text may be embedded for AI/RAG indexing.
+    # Decoupled from redistribution_allowed: some sources permit linking but not
+    # embedding, or permit embedding for research but not commercial.
+    embedding_allowed: Mapped[bool | None] = mapped_column(Boolean)
+    license_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # embedding column is vector(1024), managed via raw SQL; not mapped here
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

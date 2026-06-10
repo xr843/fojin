@@ -48,6 +48,14 @@ class DataSourceResponse(BaseModel):
     health_status: str = "ok"
     health_checked_at: datetime | None = None
     health_detail: str | None = None
+    license_spdx: str | None = None
+    license_url: str | None = None
+    license_notes: str | None = None
+    attribution_required: bool | None = None
+    commercial_allowed: bool | None = None
+    redistribution_allowed: bool | None = None
+    embedding_allowed: bool | None = None
+    license_verified_at: datetime | None = None
     created_at: datetime
     distributions: list[SourceDistributionResponse] = Field(default_factory=list)
 
