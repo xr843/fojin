@@ -61,6 +61,42 @@ def _person_nationality(props: dict | None) -> str:
     return (props.get("nationality") or props.get("country") or "").strip()
 
 
+# Mirror of frontend AUTHORITY_MAP in PersonPage.tsx — keep both in sync
+# when adding a new authority. Sharing one source-of-truth would require
+# either a JSON file both sides read (over-engineered) or a code-gen step
+# (more moving parts than 6 lines deserve). The cost is symmetric: 6
+# lines here, 6 lines there.
+_AUTHORITY_URI_BUILDERS: dict[str, object] = {
+    "wikidata": lambda i: f"https://www.wikidata.org/wiki/{i}",
+    "dila": lambda i: f"https://authority.dila.edu.tw/person/?fromInner={i}",
+    "bdrc": lambda i: f"https://library.bdrc.io/show/bdr:{i}",
+    "viaf": lambda i: f"https://viaf.org/viaf/{i}",
+    "loc": lambda i: f"https://id.loc.gov/authorities/names/{i}",
+}
+
+
+def _same_as_uris(external_ids: dict | None) -> list[str]:
+    """Build owl:sameAs URIs from external_ids — Wave 2.4 SSR parity.
+
+    The frontend SPA route /person/:id already renders sameAs via
+    react-helmet (PR #674). The SSR route /persons/:id previously
+    exposed only schema.org identifier[] — Googlebot/crawlers that
+    don't execute JS thus missed the sameAs linkage. This restores
+    parity: same payload across both routes.
+    """
+    if not isinstance(external_ids, dict):
+        return []
+    out: list[str] = []
+    for key, value in external_ids.items():
+        if not value:
+            continue
+        builder = _AUTHORITY_URI_BUILDERS.get(key)
+        if builder is None:
+            continue
+        out.append(builder(str(value)))
+    return out
+
+
 def _build_person_jsonld(entity: KGEntity, *, canonical: str) -> dict:
     name = (entity.name_zh or "").strip() or f"佛教人物 #{entity.id}"
     payload: dict = {
@@ -92,6 +128,9 @@ def _build_person_jsonld(entity: KGEntity, *, canonical: str) -> dict:
                     ids.append({"@type": "PropertyValue", "propertyID": key, "value": str(value)})
         if ids:
             payload["identifier"] = ids
+        same_as = _same_as_uris(entity.external_ids)
+        if same_as:
+            payload["sameAs"] = same_as
     return payload
 
 
