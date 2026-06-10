@@ -52,7 +52,8 @@ class Gaiji(Base):
     # when no Unicode form is available.
     image_url: Mapped[str | None] = mapped_column(String(500))
     # Reference to the MoE 異體字字典 variant_id when CBETA links one.
-    moe_variant_id: Mapped[str | None] = mapped_column(String(50))
+    # Empirically up to 60 chars (comma-joined multi-IDs); widened in 0151.
+    moe_variant_id: Mapped[str | None] = mapped_column(String(100))
     # Provenance — which upstream produced this row, frozen at ingest time
     # so re-imports can detect upstream changes via cb_code + upstream_version.
     source: Mapped[str] = mapped_column(String(20), server_default="cbeta", nullable=False)
