@@ -91,6 +91,25 @@ async def lifespan(app: FastAPI):
     # Startup
     app.state.redis = aioredis.from_url(settings.redis_url, decode_responses=True)
     await init_es()
+
+    # Build the gaiji normalizer once and share across requests. ~10MB
+    # in-memory snapshot of 31k CBETA gaiji entries; rebuilt only on
+    # backend restart. Failure here is non-fatal — searches degrade
+    # gracefully to the pre-1.3c2 path (no gaiji expansion).
+    try:
+        from app.database import async_session
+        from app.services.gaiji import build_normalizer
+
+        async with async_session() as session:
+            app.state.gaiji_normalizer = await build_normalizer(session)
+    except Exception:  # noqa: BLE001
+        # Log loudly but do not block startup — search still works,
+        # just without gaiji alternates.
+        logging.getLogger("app").exception(
+            "gaiji normalizer build failed; search will run without gaiji expansion"
+        )
+        app.state.gaiji_normalizer = None
+
     yield
     # Shutdown
     if _HAS_DIANJIN:

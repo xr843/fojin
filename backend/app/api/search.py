@@ -1,7 +1,7 @@
 import asyncio
 import time
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -140,6 +140,7 @@ async def cross_language_search(
 
 @router.get("/search/content")
 async def content_search(
+    request: Request,
     q: str = Query("", max_length=200, description="搜索关键词"),
     page: int = Query(1, ge=1, description="页码"),
     size: int = Query(20, ge=1, le=100, description="每页数量"),
@@ -150,7 +151,10 @@ async def content_search(
 
     全文内容搜索。搜索经文正文并高亮显示匹配段落。Rate limit: 30/min."""
     es = get_es()
-    return await search_content(es, q, page, size, sources, lang)
+    gaiji_normalizer = getattr(request.app.state, "gaiji_normalizer", None)
+    return await search_content(
+        es, q, page, size, sources, lang, gaiji_normalizer=gaiji_normalizer
+    )
 
 
 @router.get("/search/semantic", response_model=SemanticSearchResponse)

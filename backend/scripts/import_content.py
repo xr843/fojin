@@ -31,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.config import settings
 from app.core.elasticsearch import CONTENT_INDEX_NAME
 from app.core.xml_parser import find_all_xml_files, parse_tei_xml
+from app.services.gaiji import GaijiNormalizer, build_normalizer, normalize_for_index
 from app.models.text import BuddhistText
 
 DEFAULT_XML_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "xml-p5")
@@ -114,6 +115,7 @@ async def import_work(
     es: AsyncElasticsearch,
     bt: BuddhistText,
     xml_dir: str,
+    gaiji_normalizer: "GaijiNormalizer | None" = None,
 ) -> int:
     """Import content for a single work. Returns number of juans imported."""
     xml_files = find_all_xml_files(bt.cbeta_id, xml_dir)
@@ -163,9 +165,19 @@ async def import_work(
         .values(has_content=True, content_char_count=total_chars)
     )
 
-    # Index content into Elasticsearch
+    # Index content into Elasticsearch. When a gaiji normalizer is
+    # provided, replace CBETA composition expressions and PUA codepoints
+    # with their best Unicode equivalent in the indexed copy. The
+    # raw content in PostgreSQL (text_contents.content above) is
+    # preserved verbatim — only the ES copy is normalized so search
+    # recall matches user expectation.
     async def gen_es_actions():
         for j in unique_juans:
+            indexed_content = (
+                normalize_for_index(j["content"], gaiji_normalizer)
+                if gaiji_normalizer is not None
+                else j["content"]
+            )
             yield {
                 "_index": CONTENT_INDEX_NAME,
                 "_id": f"{bt.id}_{j['juan_num']}_lzh",
@@ -176,7 +188,7 @@ async def import_work(
                     "translator": bt.translator,
                     "dynasty": bt.dynasty,
                     "juan_num": j["juan_num"],
-                    "content": j["content"],
+                    "content": indexed_content,
                     "char_count": j["char_count"],
                     "lang": "lzh",
                     "source_code": "cbeta",
@@ -195,6 +207,7 @@ async def import_collection(
     xml_dir: str,
     limit: int = 0,
     resume_after: str | None = None,
+    gaiji_normalizer: "GaijiNormalizer | None" = None,
 ) -> tuple[int, int, str | None]:
     """Import all works in a collection. Returns (imported_count, juan_count, last_cbeta_id)."""
     async with session_factory() as session:
@@ -224,7 +237,9 @@ async def import_collection(
         last_id = None
 
         for i, bt in enumerate(texts):
-            n_juans = await import_work(session, es, bt, xml_dir)
+            n_juans = await import_work(
+                session, es, bt, xml_dir, gaiji_normalizer=gaiji_normalizer
+            )
             if n_juans > 0:
                 imported += 1
                 total_juans += n_juans
@@ -268,6 +283,18 @@ async def main():
     session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     es = AsyncElasticsearch(settings.es_host)
 
+    # Build the gaiji normalizer once. ~10MB in-memory snapshot of 31k
+    # CBETA gaiji entries. If the gaiji table is empty (script run on a
+    # fresh dev DB before 0151) we proceed without normalization rather
+    # than failing — raw indexing remains correct, just under-recalls.
+    async with session_factory() as gaiji_session:
+        try:
+            gaiji_normalizer = await build_normalizer(gaiji_session)
+            print(f"  gaiji normalizer built: {gaiji_normalizer.size()} entries")
+        except Exception as exc:
+            print(f"  WARN: gaiji normalizer build failed ({exc}); indexing raw content")
+            gaiji_normalizer = None
+
     try:
         if args.work:
             # Single work mode
@@ -281,7 +308,9 @@ async def main():
                 if bt is None:
                     print(f"  Work '{args.work}' not found in database. Run import_catalog.py first.")
                     return
-                n_juans = await import_work(session, es, bt, args.xml_dir)
+                n_juans = await import_work(
+                    session, es, bt, args.xml_dir, gaiji_normalizer=gaiji_normalizer
+                )
                 await session.commit()
                 print(f"  Imported {n_juans} juans for {args.work}")
 
@@ -313,6 +342,7 @@ async def main():
                 imported, juans, last_id = await import_collection(
                     session_factory, es, col, args.xml_dir,
                     limit=args.limit, resume_after=col_resume,
+                    gaiji_normalizer=gaiji_normalizer,
                 )
                 total_imported += imported
                 total_juans += juans
@@ -335,6 +365,7 @@ async def main():
             imported, juans, _ = await import_collection(
                 session_factory, es, args.collection, args.xml_dir,
                 limit=args.limit, resume_after=resume_after,
+                gaiji_normalizer=gaiji_normalizer,
             )
 
             clear_checkpoint()

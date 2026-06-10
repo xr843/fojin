@@ -18,9 +18,35 @@ from app.schemas.text import (
     SemanticSearchResponse,
 )
 from app.services.embedding import generate_embedding
+from app.services.gaiji import GaijiNormalizer, expand_for_query
 from app.services.rag_retrieval import MIN_RELEVANCE_SCORE
 
 logger = logging.getLogger(__name__)
+
+
+def _gaiji_should_clauses(query: str, normalizer: GaijiNormalizer | None) -> list[dict]:
+    """Build ES should-clauses that match the gaiji alternates for each
+    distinct character in the query.
+
+    Returns an empty list when no normalizer is configured or no character
+    in the query is a known gaiji glyph — in that case the caller's
+    existing single-match query is used unchanged (zero behavior change
+    for non-gaiji searches).
+    """
+    if not normalizer or not query:
+        return []
+    clauses: list[dict] = []
+    seen_alternates: set[str] = set()
+    for char in dict.fromkeys(query):  # preserve order, dedupe
+        for alt in expand_for_query(char, normalizer):
+            if alt in seen_alternates:
+                continue
+            seen_alternates.add(alt)
+            # match_phrase keeps the composition bracket / PUA codepoint
+            # intact in indexed content; a regular match would tokenize
+            # the brackets away under the cjk_content analyzer.
+            clauses.append({"match_phrase": {"content": alt}})
+    return clauses
 
 
 # Language code to primary title field mapping
@@ -320,12 +346,20 @@ async def search_content(
     size: int = 20,
     sources: str | None = None,
     lang: str | None = None,
+    gaiji_normalizer: GaijiNormalizer | None = None,
 ) -> dict:
-    """Search full-text content in Elasticsearch."""
+    """Search full-text content in Elasticsearch.
+
+    When ``gaiji_normalizer`` is provided, the query is expanded with
+    OR-clauses matching the CBETA gaiji alternate spellings of each
+    character (composition expressions and PUA codepoints), so that
+    searches like "款" also match passages encoded as "[肄-聿+欠]".
+    Passing ``None`` preserves the pre-1.3c2 behavior exactly.
+    """
     if not query:
         return {"total": 0, "page": page, "size": size, "results": []}
 
-    content_query: dict = {
+    primary_clause: dict = {
         "match": {
             "content": {
                 "query": query,
@@ -333,6 +367,22 @@ async def search_content(
             }
         }
     }
+
+    gaiji_clauses = _gaiji_should_clauses(query, gaiji_normalizer)
+    if gaiji_clauses:
+        content_query: dict = {
+            "bool": {
+                "should": [primary_clause, *gaiji_clauses],
+                "minimum_should_match": 1,
+            }
+        }
+        logger.info(
+            "gaiji query expansion: query=%r added %d alternate clauses",
+            query,
+            len(gaiji_clauses),
+        )
+    else:
+        content_query = primary_clause
 
     # Wrap in bool query if sources or lang filter is present
     filter_clauses = []

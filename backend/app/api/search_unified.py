@@ -26,7 +26,7 @@ import asyncio
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -88,6 +88,7 @@ async def _dict_top_hits(q: str) -> list[dict]:
 
 @router.get("/search/unified")
 async def search_unified(
+    request: Request,
     q: str = Query(..., min_length=1, max_length=200, description="Unified search query"),
     sources: str | None = Query(None, description="Comma-separated source codes filter"),
     lang: str | None = Query(None),
@@ -112,8 +113,11 @@ async def search_unified(
     # search_semantic uses the request-scoped session; catalog/content use ES.
     # dict opens its own session for concurrency safety
     # (a single AsyncSession can't service two concurrent execute() calls).
+    gaiji_normalizer = getattr(request.app.state, "gaiji_normalizer", None)
     catalog_coro = search_texts(es, q, page=1, size=10, sources=sources, lang=lang, db=db)
-    content_coro = search_content(es, q, page=1, size=5, sources=sources, lang=lang)
+    content_coro = search_content(
+        es, q, page=1, size=5, sources=sources, lang=lang, gaiji_normalizer=gaiji_normalizer
+    )
     semantic_coro = search_semantic(db, q, size=5, lang=lang, sources=sources)
     dict_coro = _dict_top_hits(q)
 
