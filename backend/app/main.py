@@ -77,6 +77,7 @@ from app.api import (
     sources,
     stats,
     texts,
+    urn,
     works,
 )
 
@@ -449,6 +450,9 @@ app.include_router(works.router, prefix="/api")
 
 # Citations
 app.include_router(citations.router, prefix="/api")
+
+# URN resolver — stable text references
+app.include_router(urn.router, prefix="/api")
 
 # Phase 4 routers
 app.include_router(exports.router, prefix="/api")
