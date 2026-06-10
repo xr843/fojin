@@ -4,6 +4,51 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.text import BuddhistText
 
 
+# ── Canon (底本) derivation ────────────────────────────────────────
+# Logic mirrors scripts/build_works.py:canon_from_cbeta_id so that
+# the runtime API surface and the offline FRBR Work-spine builder
+# agree on which canon a given cbeta_id maps to. Keep both in sync
+# when adding a new prefix.
+
+_CANON_LABELS_ZH: dict[str, str] = {
+    "taisho": "大正藏",
+    "xuzang": "卍续藏",
+    "pali": "巴利三藏",
+    "kangyur": "甘珠尔",
+    "gretil": "梵文 GRETIL",
+}
+
+
+def canon_from_cbeta_id(cbeta_id: str | None) -> str | None:
+    """Map a cbeta_id prefix to its canon code.
+
+    T... → taisho, X... → xuzang, SC-... → pali, 84K-toh... → kangyur,
+    GRETIL-... → gretil, VRI-... → pali. Unknown prefix → None.
+    """
+    if not cbeta_id:
+        return None
+    if cbeta_id.startswith("SC-"):
+        return "pali"
+    if cbeta_id.startswith("84K-toh"):
+        return "kangyur"
+    if cbeta_id.startswith("GRETIL-"):
+        return "gretil"
+    if cbeta_id.startswith("VRI-"):
+        return "pali"
+    if cbeta_id.startswith("T"):
+        return "taisho"
+    if cbeta_id.startswith("X"):
+        return "xuzang"
+    return None
+
+
+def canon_label_zh(canon: str | None) -> str | None:
+    """Return the Chinese display label for a canon code, or None."""
+    if not canon:
+        return None
+    return _CANON_LABELS_ZH.get(canon)
+
+
 async def get_text_by_id(session: AsyncSession, text_id: int) -> BuddhistText | None:
     result = await session.execute(
         select(BuddhistText).where(BuddhistText.id == text_id)

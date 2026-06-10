@@ -108,7 +108,12 @@ async def get_text(text_id: int, db: AsyncSession = Depends(get_db)):
     text = await get_text_by_id(db, text_id)
     if not text:
         raise TextNotFoundError(text_id=text_id)
-    return text
+    from app.services.text import canon_from_cbeta_id, canon_label_zh
+
+    response = TextResponseBase.model_validate(text)
+    response.canon = canon_from_cbeta_id(text.cbeta_id)
+    response.canon_label = canon_label_zh(response.canon)
+    return response
 
 
 @router.get("/texts/{text_id}/juans", response_model=JuanListResponse)
