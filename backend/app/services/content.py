@@ -101,6 +101,9 @@ async def get_juan_content(
     prev_juan = all_juans[idx - 1] if idx > 0 else None
     next_juan = all_juans[idx + 1] if idx < len(all_juans) - 1 else None
 
+    from app.services.text import canon_from_cbeta_id, canon_label_zh
+
+    canon = canon_from_cbeta_id(bt.cbeta_id)
     return JuanContentResponse(
         text_id=text_id,
         cbeta_id=bt.cbeta_id,
@@ -112,4 +115,6 @@ async def get_juan_content(
         lang=tc.lang,
         prev_juan=prev_juan,
         next_juan=next_juan,
+        canon=canon,
+        canon_label=canon_label_zh(canon),
     )

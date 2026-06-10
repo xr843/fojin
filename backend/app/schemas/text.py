@@ -32,6 +32,12 @@ class TextResponseBase(TextBase):
     content_char_count: int = 0
     lang: str = "lzh"
     created_at: datetime
+    # Canon (底本) derived from cbeta_id prefix at serialization time.
+    # canon is the machine code (taisho/xuzang/pali/kangyur/gretil);
+    # canon_label is the Chinese display string (大正藏 / 卍续藏 / …).
+    # Both NULL when the cbeta_id prefix is unrecognized.
+    canon: str | None = None
+    canon_label: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -72,6 +78,10 @@ class JuanContentResponse(BaseModel):
     lang: str = "lzh"
     prev_juan: int | None = None
     next_juan: int | None = None
+    # Reader-side base-edition (底本) declaration. Same provenance as
+    # TextResponseBase.canon — derived from cbeta_id prefix.
+    canon: str | None = None
+    canon_label: str | None = None
 
 
 class RelatedTranslation(BaseModel):
