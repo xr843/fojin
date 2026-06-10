@@ -4,6 +4,7 @@ from app.models.audit import AdminAuditLog
 from app.models.chat import ChatAttachment, ChatMessage, ChatSession, TextEmbedding
 from app.models.dictionary import DictionaryEntry
 from app.models.feed import AcademicFeed, SourceUpdate
+from app.models.gaiji import Gaiji
 from app.models.hot_question import HotQuestion
 from app.models.iiif import IIIFManifest
 from app.models.knowledge_graph import KGEntity, KGRelation
@@ -26,6 +27,7 @@ __all__ = [
     "ChatSession",
     "DataSource",
     "DictionaryEntry",
+    "Gaiji",
     "HotQuestion",
     "IIIFManifest",
     "KGEntity",
