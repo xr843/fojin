@@ -51,6 +51,24 @@ def test_parse_work_id_with_hyphen() -> None:
     assert q.juan == 2
 
 
+@pytest.mark.parametrize("scheme", [
+    "sc", "suttacentral", "84k", "kangyur", "gretil", "sa", "vri", "pali",
+])
+def test_parse_accepts_extended_schemes(scheme: str) -> None:
+    """Scheme expansion (Wave 2.1 follow-up) — these were 422 before."""
+    p = parse_urn(f"fojin:{scheme}/mn10")
+    assert p.scheme == scheme
+    assert p.work_id == "mn10"
+
+
+def test_extended_scheme_with_juan_and_anchor() -> None:
+    p = parse_urn("fojin:sc/mn10.2#segment-3")
+    assert p.scheme == "sc"
+    assert p.work_id == "mn10"
+    assert p.juan == 2
+    assert p.anchor == "segment-3"
+
+
 # ──────────────────────────────────────────────────────────────────────
 # parse_urn — error paths
 
@@ -118,3 +136,36 @@ def test_build_url_anchor_without_juan_is_dropped() -> None:
     URL builder against degenerate ParsedURN literals."""
     p = _p("cbeta", "T0001", juan=None, anchor="p0001a01")
     assert build_reader_url(p, text_id=42) == "/texts/42"
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Scheme → cbeta_id prefix expansion (Wave 2.1 follow-up)
+
+
+def test_expand_work_id_cbeta_passthrough() -> None:
+    """cbeta scheme is a no-op — the payload IS the cbeta_id."""
+    from app.services.urn import _expand_work_id
+
+    assert _expand_work_id(_p("cbeta", "T0001")) == "T0001"
+    assert _expand_work_id(_p("cbeta", "X0123")) == "X0123"
+
+
+@pytest.mark.parametrize("scheme,payload,expected_cbeta_id", [
+    ("sc", "mn10", "SC-mn10"),
+    ("suttacentral", "an1.1", "SC-an1.1"),
+    ("84k", "11", "84K-toh11"),
+    ("kangyur", "267", "84K-toh267"),
+    ("gretil", "ramayana", "GRETIL-ramayana"),
+    ("sa", "abhidh_k", "GRETIL-abhidh_k"),
+    ("vri", "dn1", "VRI-dn1"),
+    ("pali", "mn10", "VRI-mn10"),
+])
+def test_expand_work_id_applies_scheme_prefix(
+    scheme: str, payload: str, expected_cbeta_id: str
+) -> None:
+    from app.services.urn import _expand_work_id
+
+    # work_id_regex allows letters/digits/_/- — payloads like "an1.1"
+    # contain '.' which the parser routes to juan. For the prefix
+    # expansion unit test we bypass that and construct ParsedURN by hand.
+    assert _expand_work_id(_p(scheme, payload)) == expected_cbeta_id

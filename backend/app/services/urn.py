@@ -41,10 +41,28 @@ from app.services.text import get_text_id_by_cbeta
 logger = logging.getLogger(__name__)
 
 
-# Restrict to the schemes we currently understand. Unknown schemes
-# are an error, not a silent fall-through — we'd rather break loudly
-# than redirect to a wrong place.
-_KNOWN_SCHEMES = frozenset({"cbeta"})
+# Each scheme maps to the prefix the work_id payload is rewritten
+# with before db lookup. The prefix mirrors the cbeta_id convention
+# in fojin's data — see scripts/build_works.py:canon_from_cbeta_id
+# for the reverse mapping. "cbeta" is a passthrough (no prefix) so
+# that pre-existing T*/X* URNs keep working unchanged.
+#
+# Multiple schemes can point at the same prefix when the upstream
+# provider uses several names interchangeably (sc → "SC-", suttacentral
+# → "SC-"); both resolve identically.
+_SCHEME_PREFIXES: dict[str, str] = {
+    "cbeta": "",         # T0001, X0123 → look up as-is
+    "sc": "SC-",         # fojin:sc/mn10 → SC-mn10
+    "suttacentral": "SC-",
+    "84k": "84K-toh",    # fojin:84k/11 → 84K-toh11 (Tohoku catalog)
+    "kangyur": "84K-toh",
+    "gretil": "GRETIL-",
+    "sa": "GRETIL-",     # fojin:sa/<work> → GRETIL-<work>
+    "vri": "VRI-",
+    "pali": "VRI-",
+}
+
+_KNOWN_SCHEMES = frozenset(_SCHEME_PREFIXES.keys())
 
 # The path body before # / before the optional ".juan" suffix. CBETA
 # IDs in the wild use [A-Za-z0-9-]; we allow that plus underscore for
@@ -142,23 +160,42 @@ def build_reader_url(parsed: ParsedURN, *, text_id: int) -> str:
     return base
 
 
+def _expand_work_id(parsed: ParsedURN) -> str:
+    """Apply the scheme-specific prefix to the URN's work_id payload.
+
+    For "cbeta" the prefix is empty so the work_id is returned
+    verbatim. For e.g. "sc" the result is "SC-" + payload. This
+    keeps the URN form scholar-friendly (``fojin:sc/mn10``) while
+    the lookup path matches the cbeta_id stored in the db.
+    """
+    prefix = _SCHEME_PREFIXES.get(parsed.scheme, "")
+    return f"{prefix}{parsed.work_id}"
+
+
 async def resolve_urn(
     db: AsyncSession, parsed: ParsedURN
 ) -> tuple[int | None, str | None]:
     """Resolve a parsed URN to (text_id, reader_url) or (None, None).
 
     Returns (None, None) when the referenced work is not in the
-    database — letting the API layer respond with 404 instead of
-    redirecting to a nonexistent page.
+    database — letting the API layer respond with 200 + exists=false
+    instead of 404, so external citers distinguish "I don't know that
+    URN" from "your URL is malformed".
     """
-    if parsed.scheme != "cbeta":
-        # Future schemes route here; today's URN parser already
-        # rejects them, so this branch is defense-in-depth.
+    if parsed.scheme not in _KNOWN_SCHEMES:
+        # Defense in depth — parse_urn already rejects unknown schemes,
+        # so this is unreachable in normal operation.
         return None, None
 
-    text_id = await get_text_id_by_cbeta(db, parsed.work_id)
+    cbeta_id = _expand_work_id(parsed)
+    text_id = await get_text_id_by_cbeta(db, cbeta_id)
     if text_id is None:
-        logger.info("urn resolve miss: scheme=%s work=%s", parsed.scheme, parsed.work_id)
+        logger.info(
+            "urn resolve miss: scheme=%s work=%s cbeta_id=%s",
+            parsed.scheme,
+            parsed.work_id,
+            cbeta_id,
+        )
         return None, None
 
     return text_id, build_reader_url(parsed, text_id=text_id)
