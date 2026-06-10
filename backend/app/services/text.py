@@ -3,7 +3,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.text import BuddhistText
 
-
 # ── Canon (底本) derivation ────────────────────────────────────────
 # Logic mirrors scripts/build_works.py:canon_from_cbeta_id so that
 # the runtime API surface and the offline FRBR Work-spine builder
