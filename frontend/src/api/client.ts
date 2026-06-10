@@ -152,6 +152,11 @@ export interface JuanContentResponse {
   char_count: number;
   prev_juan: number | null;
   next_juan: number | null;
+  // Base-edition (底本) — derived from cbeta_id prefix by the backend.
+  // canon is the machine code (taisho / xuzang / pali / kangyur / gretil);
+  // canon_label is the Chinese display string (大正藏 / 卍续藏 / …).
+  canon?: string | null;
+  canon_label?: string | null;
 }
 
 export interface MatchedJuan {
