@@ -6,6 +6,7 @@
  */
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { Helmet } from "react-helmet-async";
 import {
   Spin,
   Typography,
@@ -24,6 +25,119 @@ import {
 import { getKGEntity } from "../api/client";
 import type { EntityRelationItem } from "../api/client";
 import "../styles/person.css";
+
+// ── 外部权威库 URI 映射 ────────────────────────────────────────────
+// fojin 不发明自己的 entity URI；改为把权威库的稳定 ID 暴露出来作为
+// LOD 节点的桥梁（参见 ctext.org Linked Open Data 模式）。新增权威
+// 库只需在此表添加一项。
+
+interface SameAsLink {
+  key: string;          // external_ids 的 key（wikidata / dila / ...）
+  authorityLabel: string; // 显示给用户的中文权威库名
+  idLabel: string;      // 例如 "Q12345" or "P0000001"
+  url: string;          // 直接可点击的稳定 URL
+}
+
+const AUTHORITY_MAP: Record<
+  string,
+  { label: string; urlFor: (id: string) => string }
+> = {
+  wikidata: {
+    label: "Wikidata",
+    urlFor: (id) => `https://www.wikidata.org/wiki/${encodeURIComponent(id)}`,
+  },
+  dila: {
+    label: "DILA 人名规范",
+    urlFor: (id) =>
+      `https://authority.dila.edu.tw/person/?fromInner=${encodeURIComponent(id)}`,
+  },
+  bdrc: {
+    label: "BDRC",
+    urlFor: (id) =>
+      `https://library.bdrc.io/show/bdr:${encodeURIComponent(id)}`,
+  },
+  viaf: {
+    label: "VIAF",
+    urlFor: (id) => `https://viaf.org/viaf/${encodeURIComponent(id)}`,
+  },
+  loc: {
+    label: "LoC 名称权威",
+    urlFor: (id) =>
+      `https://id.loc.gov/authorities/names/${encodeURIComponent(id)}`,
+  },
+};
+
+function buildSameAsLinks(
+  externalIds: Record<string, string> | null | undefined,
+): SameAsLink[] {
+  if (!externalIds) return [];
+  const links: SameAsLink[] = [];
+  for (const [key, value] of Object.entries(externalIds)) {
+    if (!value) continue;
+    const entry = AUTHORITY_MAP[key];
+    if (!entry) continue; // 未知权威库静默跳过——不要破前端
+    links.push({
+      key,
+      authorityLabel: entry.label,
+      idLabel: value,
+      url: entry.urlFor(value),
+    });
+  }
+  return links;
+}
+
+interface PersonJsonLd {
+  "@context": "https://schema.org";
+  "@type": "Person";
+  name: string;
+  url?: string;
+  alternateName?: string[];
+  description?: string;
+  identifier?: Array<{
+    "@type": "PropertyValue";
+    propertyID: string;
+    value: string;
+  }>;
+  sameAs?: string[];
+}
+
+function buildPersonJsonLd(
+  entity: {
+    id: number;
+    name_zh: string;
+    name_en?: string | null;
+    name_sa?: string | null;
+    name_pi?: string | null;
+    name_bo?: string | null;
+    description?: string | null;
+    external_ids?: Record<string, string> | null;
+  },
+  sameAs: SameAsLink[],
+): PersonJsonLd {
+  const alt = [entity.name_en, entity.name_sa, entity.name_pi, entity.name_bo].filter(
+    (a): a is string => Boolean(a),
+  );
+  const payload: PersonJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    name: entity.name_zh || `佛教人物 #${entity.id}`,
+    url: `https://fojin.app/person/${entity.id}`,
+  };
+  if (alt.length) payload.alternateName = alt;
+  if (entity.description) payload.description = entity.description.slice(0, 500);
+  if (entity.external_ids) {
+    const ids = Object.entries(entity.external_ids)
+      .filter(([, v]) => Boolean(v))
+      .map(([k, v]) => ({
+        "@type": "PropertyValue" as const,
+        propertyID: k,
+        value: String(v),
+      }));
+    if (ids.length) payload.identifier = ids;
+  }
+  if (sameAs.length) payload.sameAs = sameAs.map((s) => s.url);
+  return payload;
+}
 
 // ── 属性提取（与 seo_persons.py 逻辑对等） ─────────────────────────
 
@@ -164,7 +278,8 @@ export default function PersonPage() {
   const dynasty = personDynasty(props);
   const nationality = personNationality(props);
   const school = personSchool(props);
-  const wikidataQid = entity.external_ids?.["wikidata"];
+  const sameAsLinks = buildSameAsLinks(entity.external_ids);
+  const jsonLd = buildPersonJsonLd(entity, sameAsLinks);
 
   // ── 关系分组 ──
   const relationsByPredicate: Record<string, EntityRelationItem[]> = {};
@@ -183,8 +298,26 @@ export default function PersonPage() {
 
   const metaBits = [dynasty, nationality, school].filter(Boolean);
 
+  const helmetTitle = `${entity.name_zh}${dates} — 佛教人物 | 佛津 FoJin`;
+  const helmetDesc = (
+    entity.description ||
+    `${entity.name_zh}${metaBits.length ? "（" + metaBits.join(" · ") + "）" : ""} — 佛教数字人文知识图谱`
+  ).slice(0, 200);
+
   return (
     <div className="person-page">
+      <Helmet>
+        <title>{helmetTitle}</title>
+        <meta name="description" content={helmetDesc} />
+        <link rel="canonical" href={`https://fojin.app/person/${entity.id}`} />
+        <meta property="og:type" content="profile" />
+        <meta property="og:title" content={helmetTitle} />
+        <meta property="og:description" content={helmetDesc} />
+        <meta property="og:url" content={`https://fojin.app/person/${entity.id}`} />
+        <meta property="og:site_name" content="佛津 FoJin" />
+        <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
+      </Helmet>
+
       {/* ── 面包屑 ── */}
       <nav className="person-breadcrumb">
         <span
@@ -263,18 +396,23 @@ export default function PersonPage() {
           </Typography.Paragraph>
         )}
 
-        {/* 外部链接 */}
-        {wikidataQid && (
+        {/* 标准标识符 — 标记 fojin 为 LOD 节点的桥梁 */}
+        {sameAsLinks.length > 0 && (
           <div className="person-extlinks">
-            <a
-              href={`https://www.wikidata.org/wiki/${wikidataQid}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="person-extlink"
-            >
-              <LinkOutlined style={{ marginRight: 4 }} />
-              Wikidata {wikidataQid}
-            </a>
+            <div className="person-extlinks-label">标准标识符</div>
+            {sameAsLinks.map((link) => (
+              <a
+                key={link.key}
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="person-extlink"
+                title={`${link.authorityLabel} 权威库`}
+              >
+                <LinkOutlined style={{ marginRight: 4 }} />
+                {link.authorityLabel} {link.idLabel}
+              </a>
+            ))}
           </div>
         )}
 
