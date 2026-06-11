@@ -370,7 +370,7 @@ async def main() -> None:
         "--source",
         type=str,
         default=None,
-        help="Only fetch a specific feed source (e.g. 84000_blog)",
+        help="Only fetch a specific feed source (e.g. suttacentral_forum)",
     )
     parser.add_argument(
         "--stats",
