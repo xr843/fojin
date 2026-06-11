@@ -303,6 +303,28 @@ export default function ChatPage() {
     setSaveHintDismissed(true);
     try { window.localStorage.setItem(SAVE_HINT_KEY, String(Date.now())); } catch { /* ignore */ }
   }, []);
+  // CTA：先暂存游客对话再去登录——navigate 卸载本组件，不存就把用户
+  // 想保存的对话当场销毁。LoginPage 读 returnTo 回跳，本组件 mount 恢复。
+  const goLoginKeepingTranscript = useCallback(() => {
+    try {
+      sessionStorage.setItem("fojin.chat.guestTranscript", JSON.stringify(messages));
+      sessionStorage.setItem("fojin.login.returnTo", "/chat");
+    } catch { /* ignore */ }
+    navigate("/login");
+  }, [messages, navigate]);
+  // 登录归来恢复暂存对话（无论登录成功与否，回到 /chat 都不该丢对话）
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("fojin.chat.guestTranscript");
+      if (!raw) return;
+      sessionStorage.removeItem("fojin.chat.guestTranscript");
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        setMessages((prev) => (prev.length === 0 ? parsed : prev));
+      }
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [attachments, setAttachments] = useState<ChatAttachmentMeta[]>([]);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -1252,30 +1274,34 @@ export default function ChatPage() {
                 </div>
               </div>
             ))}
-            {/* 游客转化钩子：拿到第一条完整回复后提示保存历史（可关闭，14 天静默） */}
-            {!user && !sending && !saveHintDismissed && messages.some((m) => m.role === "assistant") && (
-              <Alert
-                type="info"
-                showIcon
-                closable
-                onClose={dismissSaveHint}
-                style={{ margin: "4px 0 8px", fontSize: 12 }}
-                message={
-                  <span>
-                    {t("chat.guest_save_hint")}
-                    <a onClick={() => navigate("/login")} style={{ marginLeft: 4 }}>
-                      {t("chat.guest_save_hint_cta")}
-                    </a>
-                  </span>
-                }
-              />
-            )}
             {/* Streaming cursor is shown inline via ▌ in the message bubble */}
             <div ref={bottomRef} />
           </div>
 
           {/* Input */}
           <div style={{ padding: "12px 0", borderTop: "1px solid rgba(217,208,193,0.5)" }}>
+            {/* 游客转化钩子：拿到第一条成功回复后提示保存历史（可关闭，14 天
+                静默）。固定在输入区上方而非消息流末尾：消息流尾部的 mount 受
+                scrollToBottom 时序影响可能落在视口外，用户永远看不到。
+                排除失败哨兵回复——在报错下面劝人"保存这段对话"很荒谬。 */}
+            {!user && !sending && !saveHintDismissed
+              && messages.some((m) => m.role === "assistant" && m.content !== "请求失败，请重试") && (
+              <Alert
+                type="info"
+                showIcon
+                closable
+                onClose={dismissSaveHint}
+                style={{ marginBottom: 8, fontSize: 12 }}
+                message={
+                  <span>
+                    {t("chat.guest_save_hint")}
+                    <a onClick={goLoginKeepingTranscript} style={{ marginLeft: 4 }}>
+                      {t("chat.guest_save_hint_cta")}
+                    </a>
+                  </span>
+                }
+              />
+            )}
             <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 13, color: "#8b7355", whiteSpace: "nowrap" }}>{t("chat.master_mode")}</span>
               <Select
