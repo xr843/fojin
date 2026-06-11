@@ -209,10 +209,10 @@ function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useN
     <div className="coll-card" style={{ marginBottom: 24 }}>
       <div className="coll-section" style={{ padding: "16px 20px" }}>
         <div className="coll-section-title">
-          <TranslationOutlined /> 跨藏对照（{data.entries.length} 部经 · {data.total_pairs.toLocaleString()} 组对齐段落）
+          <TranslationOutlined /> 跨藏对照（{new Set(data.entries.map((e) => e.text_id)).size} 部经 · {data.total_pairs.toLocaleString()} 组对齐段落）
         </div>
         <p style={{ fontSize: 12, color: "var(--fj-ink-muted)", margin: "4px 0 12px" }}>
-          以下经典已建立逐段跨语对照（AI 对齐 + 置信度过滤），点击进入双栏对读。
+          以下经典已建立逐段跨语对照（AI 对齐 + 置信度过滤），点击进入阅读器，正文旁即可逐段查看对照。
         </p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {data.entries.map((e) => {
@@ -223,7 +223,10 @@ function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useN
                 className="source-btn"
                 style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
                 onClick={() =>
-                  navigate(`/parallel/${e.text_id}?compare=${e.sample_partner_id}&juan=1`)
+                  // 阅读器而非 /parallel：sample_juan 保证该卷有锚点；reader 的
+                  // 按段对照面板不依赖对本侧 text_contents 的卷结构（对本整本
+                  // 存为 juan 1，/parallel 在 juan>1 时对本栏全空）。
+                  navigate(`/texts/${e.text_id}/read?juan=${e.sample_juan}`)
                 }
               >
                 <span>{e.title_zh}</span>

@@ -419,9 +419,12 @@ class CatalogEntry(BaseModel):
     pair_count: int              # total aligned chunk pairs
     partner_count: int           # distinct counterpart texts (e.g. SC suttas)
     avg_confidence: float
-    # A representative counterpart for building a /parallel deep link.
-    # For multi-partner rows (阿含 ↔ dozens of suttas) the reader's relation
-    # panel lists the rest once the user lands there.
+    # Deep-link target: the reader page at the lzh juan with the most
+    # anchors. (NOT the /parallel page: 3 of 10 texts have zero anchors at
+    # juan 1, and counterpart texts store their whole content as juan 1, so
+    # /parallel?juan=N>1 renders a blank partner column.) The reader's
+    # per-chunk alignment panel works on any juan that has anchors.
+    sample_juan: int
     sample_partner_id: int
     sample_partner_title: str
 
@@ -445,12 +448,18 @@ async def get_alignment_catalog(db: AsyncSession = Depends(get_db)):
             sql_text(
                 """
                 WITH normalized AS (
-                    SELECT text_a_id AS lzh_id, text_b_id AS other_id,
+                    -- NULL-lang rows are deliberately dropped by both
+                    -- branches ('!=' is NULL-hostile); langs come from
+                    -- buddhist_texts.lang (non-nullable) in practice.
+                    SELECT text_a_id AS lzh_id, text_a_juan_num AS lzh_juan,
+                           text_b_id AS other_id,
                            text_b_lang AS other_lang, confidence
                     FROM alignment_pairs
-                    WHERE text_a_lang = 'lzh' AND text_b_id IS NOT NULL
+                    WHERE text_a_lang = 'lzh' AND text_b_lang != 'lzh'
+                          AND text_b_id IS NOT NULL
                     UNION ALL
-                    SELECT text_b_id AS lzh_id, text_a_id AS other_id,
+                    SELECT text_b_id AS lzh_id, text_b_juan_num AS lzh_juan,
+                           text_a_id AS other_id,
                            text_a_lang AS other_lang, confidence
                     FROM alignment_pairs
                     WHERE text_b_lang = 'lzh' AND text_a_lang != 'lzh'
@@ -463,7 +472,9 @@ async def get_alignment_catalog(db: AsyncSession = Depends(get_db)):
                        count(*) AS pair_count,
                        count(DISTINCT n.other_id) AS partner_count,
                        round(avg(n.confidence)::numeric, 2) AS avg_confidence,
-                       -- counterpart with the most pairs = best deep-link target
+                       -- juan with the most anchors = best reader landing
+                       mode() WITHIN GROUP (ORDER BY n.lzh_juan) AS sample_juan,
+                       -- counterpart with the most pairs (panel shows the rest)
                        mode() WITHIN GROUP (ORDER BY n.other_id) AS sample_partner_id
                 FROM normalized n
                 JOIN buddhist_texts bt ON bt.id = n.lzh_id
@@ -474,7 +485,7 @@ async def get_alignment_catalog(db: AsyncSession = Depends(get_db)):
         )
     ).fetchall()
 
-    partner_ids = {r[7] for r in rows}
+    partner_ids = {r[8] for r in rows}
     partner_titles: dict[int, str] = {}
     if partner_ids:
         for pid, title in (
@@ -497,8 +508,9 @@ async def get_alignment_catalog(db: AsyncSession = Depends(get_db)):
             pair_count=r[4],
             partner_count=r[5],
             avg_confidence=float(r[6] or 0),
-            sample_partner_id=r[7],
-            sample_partner_title=partner_titles.get(r[7], ""),
+            sample_juan=r[7] or 1,
+            sample_partner_id=r[8],
+            sample_partner_title=partner_titles.get(r[8], ""),
         )
         for r in rows
     ]

@@ -1293,6 +1293,7 @@ export interface AlignmentCatalogEntry {
   pair_count: number;
   partner_count: number;
   avg_confidence: number;
+  sample_juan: number;
   sample_partner_id: number;
   sample_partner_title: string;
 }
