@@ -293,6 +293,8 @@ function AcademicTab() {
             { value: "translation", label: t("activity.categoryTranslation") },
             { value: "news", label: t("activity.categoryNews") },
             { value: "digitization", label: t("activity.categoryDigitization") },
+            { value: "community", label: t("activity.categoryCommunity") },
+            { value: "digitization", label: t("activity.categoryDigitization") },
             { value: "conference", label: t("activity.categoryConference") },
           ]}
         />
