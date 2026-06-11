@@ -1285,6 +1285,28 @@ export async function getJuanAlignment(
   return data;
 }
 
+export interface AlignmentCatalogEntry {
+  text_id: number;
+  cbeta_id: string;
+  title_zh: string;
+  other_lang: string;
+  pair_count: number;
+  partner_count: number;
+  avg_confidence: number;
+  sample_partner_id: number;
+  sample_partner_title: string;
+}
+
+export interface AlignmentCatalogResponse {
+  entries: AlignmentCatalogEntry[];
+  total_pairs: number;
+}
+
+export async function getAlignmentCatalog(): Promise<AlignmentCatalogResponse> {
+  const { data } = await api.get<AlignmentCatalogResponse>("/alignment/catalog");
+  return data;
+}
+
 export interface CanonicalParallel {
   related_text_id: number;
   related_cbeta_id: string;
