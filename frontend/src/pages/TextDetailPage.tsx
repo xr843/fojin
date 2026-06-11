@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useQuery } from "@tanstack/react-query";
@@ -20,6 +20,7 @@ import {
 } from "@ant-design/icons";
 import { getTextDetail } from "../api/client";
 import { buildCbetaReadUrl } from "../utils/sourceUrls";
+import { getLastPosition } from "../utils/readingHistory";
 import BookmarkButton from "../components/BookmarkButton";
 import { RelatedTextsStandalone as RelatedTexts } from "../components/RelatedTexts";
 import OtherVersions from "../components/OtherVersions";
@@ -32,6 +33,9 @@ export default function TextDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [citationOpen, setCitationOpen] = useState(false);
+  // 续读：有本地阅读记录时，主按钮变为"继续阅读·第N卷"。
+  // useMemo 按 id 重算：相关经典跳转复用同一路由实例，useState 初始化会 stale。
+  const lastRead = useMemo(() => getLastPosition(Number(id)), [id]);
 
   const { data: text, isLoading } = useQuery({
     queryKey: ["text", id],
@@ -176,9 +180,15 @@ export default function TextDetailPage() {
               type="primary"
               size="large"
               icon={<BookOutlined />}
-              onClick={() => navigate(`/texts/${text.id}/read`)}
+              onClick={() =>
+                navigate(
+                  lastRead
+                    ? `/texts/${text.id}/read?juan=${lastRead.juan}`
+                    : `/texts/${text.id}/read`,
+                )
+              }
             >
-              在线阅读
+              {lastRead ? `继续阅读 · 第${lastRead.juan}卷` : "在线阅读"}
             </Button>
           )}
           {cbetaUrl && (

@@ -18,8 +18,15 @@ import { InfoCircleOutlined, CloseOutlined } from "@ant-design/icons";
 import SourceSelector from "../components/SourceSelector";
 import { getStats, getSources, getFilters } from "../api/client";
 import { getLangName } from "../utils/sourceUrls";
+import { getReadingHistory } from "../utils/readingHistory";
 import { useAuthStore } from "../stores/authStore";
 import "../styles/home.css"; // mobile-responsive v2.1
+
+/** 代码点级截断：CBETA 题名偶含扩展 B 区汉字，String.slice 会撕裂代理对。 */
+function truncateTitle(title: string, max = 12): string {
+  const chars = Array.from(title);
+  return chars.length > max ? `${chars.slice(0, max).join("")}…` : title;
+}
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -30,6 +37,8 @@ export default function HomePage() {
   const [query, setQuery] = useState("");
   const [tipDismissed, setTipDismissed] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  // 一次性读取，避免每次 render 触碰 localStorage
+  const [recentReading] = useState(() => getReadingHistory().slice(0, 3));
 
   const { data: stats } = useQuery({ queryKey: ["stats"], queryFn: getStats });
   const { data: sources } = useQuery({ queryKey: ["sources"], queryFn: getSources, enabled: sourceOpen });
@@ -125,6 +134,23 @@ export default function HomePage() {
             </button>
           ))}
         </div>
+
+        {/* 续读入口：有本地阅读记录才出现，复用热门检索的样式 */}
+        {recentReading.length > 0 && (
+          <div className="home-hot-tags">
+            <span className="home-hot-label">{t("home.continue_reading")}</span>
+            {recentReading.map((e) => (
+              <button
+                key={e.textId}
+                className="home-hot-tag"
+                onClick={() => navigate(`/texts/${e.textId}/read?juan=${e.juan}`)}
+                title={e.title}
+              >
+                《{truncateTitle(e.title)}》{t("home.juan_n", { n: e.juan })}
+              </button>
+            ))}
+          </div>
+        )}
 
         {!user && !tipDismissed && (
           <div className="home-tip">
