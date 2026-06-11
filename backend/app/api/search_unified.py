@@ -26,13 +26,12 @@ import asyncio
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Query, Request
 from sqlalchemy import case, func, or_, select
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app.core.elasticsearch import get_es
-from app.database import async_session, get_db
+from app.database import async_session
 from app.models.dictionary import DictionaryEntry
 from app.services.search import (
     search_content,
@@ -92,7 +91,6 @@ async def search_unified(
     q: str = Query(..., min_length=1, max_length=200, description="Unified search query"),
     sources: str | None = Query(None, description="Comma-separated source codes filter"),
     lang: str | None = Query(None),
-    db: AsyncSession = Depends(get_db),
 ):
     """Run all search backends in parallel and return sectioned results.
 
@@ -110,21 +108,36 @@ async def search_unified(
     """
     es = get_es()
 
-    # search_semantic uses the request-scoped session; catalog/content use ES.
-    # dict opens its own session for concurrency safety
-    # (a single AsyncSession can't service two concurrent execute() calls).
+    # EVERY db-touching section opens its own session: a single AsyncSession
+    # cannot service two concurrent execute() calls, and under gather() the
+    # loser dies with "session is provisioning a new connection; concurrent
+    # operations are not permitted" — which _attach silently swallowed,
+    # rendering the catalog section (with the base-text top hit) as null
+    # while commentaries from the content section still displayed. catalog
+    # only needs db for the related-translations enrich; semantic needs it
+    # for pgvector. The request-scoped Depends(get_db) is gone entirely so
+    # this endpoint no longer pins a pool connection for its whole lifetime.
     gaiji_normalizer = getattr(request.app.state, "gaiji_normalizer", None)
-    catalog_coro = search_texts(es, q, page=1, size=10, sources=sources, lang=lang, db=db)
+
+    async def catalog_coro():
+        async with async_session() as session:
+            return await search_texts(
+                es, q, page=1, size=10, sources=sources, lang=lang, db=session
+            )
+
+    async def semantic_coro():
+        async with async_session() as session:
+            return await search_semantic(session, q, size=5, lang=lang, sources=sources)
+
     content_coro = search_content(
         es, q, page=1, size=5, sources=sources, lang=lang, gaiji_normalizer=gaiji_normalizer
     )
-    semantic_coro = search_semantic(db, q, size=5, lang=lang, sources=sources)
     dict_coro = _dict_top_hits(q)
 
     catalog_r, content_r, semantic_r, dict_r = await asyncio.gather(
-        catalog_coro,
+        catalog_coro(),
         content_coro,
-        semantic_coro,
+        semantic_coro(),
         dict_coro,
         return_exceptions=True,
     )
