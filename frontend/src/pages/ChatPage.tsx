@@ -289,6 +289,20 @@ export default function ChatPage() {
   const [sessionId, setSessionId] = useState<number | undefined>();
   const [messages, setMessages] = useState<ChatMessageItem[]>([]);
   const [sending, setSending] = useState(false);
+  // 游客转化钩子：游客拿到第一条 AI 回复后提示"登录可保存历史"。
+  // 数据背景：月 730 chat 用户 vs 65 注册——多数游客不知道对话会丢。
+  // 关闭后 14 天静默（localStorage）。
+  const SAVE_HINT_KEY = "fojin.chat.saveHintDismissedAt";
+  const [saveHintDismissed, setSaveHintDismissed] = useState(() => {
+    try {
+      const ts = Number(window.localStorage.getItem(SAVE_HINT_KEY));
+      return Number.isFinite(ts) && Date.now() - ts < 14 * 86400_000;
+    } catch { return false; }
+  });
+  const dismissSaveHint = useCallback(() => {
+    setSaveHintDismissed(true);
+    try { window.localStorage.setItem(SAVE_HINT_KEY, String(Date.now())); } catch { /* ignore */ }
+  }, []);
   const [attachments, setAttachments] = useState<ChatAttachmentMeta[]>([]);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -1238,6 +1252,24 @@ export default function ChatPage() {
                 </div>
               </div>
             ))}
+            {/* 游客转化钩子：拿到第一条完整回复后提示保存历史（可关闭，14 天静默） */}
+            {!user && !sending && !saveHintDismissed && messages.some((m) => m.role === "assistant") && (
+              <Alert
+                type="info"
+                showIcon
+                closable
+                onClose={dismissSaveHint}
+                style={{ margin: "4px 0 8px", fontSize: 12 }}
+                message={
+                  <span>
+                    {t("chat.guest_save_hint")}
+                    <a onClick={() => navigate("/login")} style={{ marginLeft: 4 }}>
+                      {t("chat.guest_save_hint_cta")}
+                    </a>
+                  </span>
+                }
+              />
+            )}
             {/* Streaming cursor is shown inline via ▌ in the message bubble */}
             <div ref={bottomRef} />
           </div>
