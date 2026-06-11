@@ -750,7 +750,38 @@ async def process_pair(
     return stats
 
 
-async def main_async(pair_key: str, dry_run: bool, limit_chunks: int | None, threshold: float, max_spend_usd: float, force_reasoning_model: bool, commit_every: int) -> None:
+def parse_juans(spec: str) -> list[int]:
+    """Parse a --juans CLI spec into a sorted, deduplicated juan list.
+
+    Accepts comma-separated items; each item is a single juan number ("5")
+    or an inclusive range ("1-3"):
+        "1,2,3"  -> [1, 2, 3]
+        "1-3"    -> [1, 2, 3]
+        "1-3,7"  -> [1, 2, 3, 7]
+    Raises ValueError on empty items, non-numeric input, reversed ranges,
+    or juan numbers < 1.
+    """
+    juans: set[int] = set()
+    for raw_item in spec.split(","):
+        item = raw_item.strip()
+        if not item:
+            raise ValueError(f"empty item in --juans spec: {spec!r}")
+        if "-" in item:
+            start_s, _, end_s = item.partition("-")
+            if not start_s.strip() or not end_s.strip():
+                raise ValueError(f"malformed range {item!r} in --juans spec")
+            start, end = int(start_s), int(end_s)
+            if start > end:
+                raise ValueError(f"reversed range {item!r} in --juans spec")
+            juans.update(range(start, end + 1))
+        else:
+            juans.add(int(item))
+    if any(j < 1 for j in juans):
+        raise ValueError(f"juan numbers must be >= 1: {spec!r}")
+    return sorted(juans)
+
+
+async def main_async(pair_key: str, dry_run: bool, limit_chunks: int | None, threshold: float, max_spend_usd: float, force_reasoning_model: bool, commit_every: int, juans: list[int] | None = None) -> None:
     pairs_to_run = (
         MVP_PAIRS if pair_key == "all"
         else [p for p in MVP_PAIRS if p.key == pair_key]
@@ -759,6 +790,16 @@ async def main_async(pair_key: str, dry_run: bool, limit_chunks: int | None, thr
         logger.error("❌ No MVP pair with key=%s (available: %s)",
                      pair_key, [p.key for p in MVP_PAIRS])
         sys.exit(1)
+
+    if juans:
+        if len(pairs_to_run) != 1:
+            logger.error("❌ --juans requires a single --pair, not 'all'")
+            sys.exit(1)
+        # Runtime override of the pair's static juan filter: lets a huge
+        # single-text_a pair (e.g. 25k-Prajñā, 815 chunks ≈ 11h) be split
+        # into separate 2-3h sessions per juan slice across multiple days.
+        pairs_to_run[0].text_a_juan_filter = juans
+        logger.info("Juan slice override: text_a restricted to juans %s", juans)
 
     effective_model = VERIFY_LLM_MODEL or settings.llm_model
     if effective_model in REASONING_MODELS_DENYLIST and not dry_run and not force_reasoning_model:
@@ -824,9 +865,20 @@ if __name__ == "__main__":
              "on single-text_a pairs (e.g. lotus_zh_bo: 182 chunks otherwise "
              "held one transaction open ~3h). Set higher for faster pairs.",
     )
+    parser.add_argument(
+        "--juans",
+        type=parse_juans,
+        default=None,
+        metavar="SPEC",
+        help="Restrict text_a to a juan slice, e.g. '1-3' or '1,2,5' or '1-3,7'. "
+             "Only valid with a single --pair. Lets a huge pair (25k-Prajñā: "
+             "815 chunks ≈ 11h) run as separate 2-3h sessions per slice; "
+             "each slice ships partial coverage immediately.",
+    )
     args = parser.parse_args()
 
     asyncio.run(main_async(
         args.pair, args.dry_run, args.limit_chunks, args.threshold,
         args.max_spend_usd, args.force_reasoning_model, args.commit_every,
+        args.juans,
     ))
