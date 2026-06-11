@@ -404,3 +404,117 @@ async def ai_diff(
         model=model,
         analysis=analysis,
     )
+
+
+# ---------------------------------------------------------------------------
+# Catalog: which texts have cross-canon alignments at all (discoverability)
+# ---------------------------------------------------------------------------
+
+class CatalogEntry(BaseModel):
+    """One lzh text's cross-canon alignment coverage, aggregated per language."""
+    text_id: int                 # the lzh (Chinese) side
+    cbeta_id: str
+    title_zh: str
+    other_lang: str              # pi / bo / sa
+    pair_count: int              # total aligned chunk pairs
+    partner_count: int           # distinct counterpart texts (e.g. SC suttas)
+    avg_confidence: float
+    # Deep-link target: the reader page at the lzh juan with the most
+    # anchors. (NOT the /parallel page: 3 of 10 texts have zero anchors at
+    # juan 1, and counterpart texts store their whole content as juan 1, so
+    # /parallel?juan=N>1 renders a blank partner column.) The reader's
+    # per-chunk alignment panel works on any juan that has anchors.
+    sample_juan: int
+    sample_partner_id: int
+    sample_partner_title: str
+
+
+class AlignmentCatalogResponse(BaseModel):
+    entries: list[CatalogEntry]
+    total_pairs: int
+
+
+@router.get("/catalog", response_model=AlignmentCatalogResponse)
+async def get_alignment_catalog(db: AsyncSession = Depends(get_db)):
+    """All texts with cross-canon alignment coverage, lzh-side normalized.
+
+    alignment_pairs stores direction by pipeline cost (smaller text = text_a),
+    so the Chinese text can sit on either side. UNION both orientations into
+    (lzh_text, other_lang) rows, then aggregate. Small table (thousands of
+    rows), no pagination needed.
+    """
+    rows = (
+        await db.execute(
+            sql_text(
+                """
+                WITH normalized AS (
+                    -- NULL-lang rows are deliberately dropped by both
+                    -- branches ('!=' is NULL-hostile); langs come from
+                    -- buddhist_texts.lang (non-nullable) in practice.
+                    SELECT text_a_id AS lzh_id, text_a_juan_num AS lzh_juan,
+                           text_b_id AS other_id,
+                           text_b_lang AS other_lang, confidence
+                    FROM alignment_pairs
+                    WHERE text_a_lang = 'lzh' AND text_b_lang != 'lzh'
+                          AND text_b_id IS NOT NULL
+                    UNION ALL
+                    SELECT text_b_id AS lzh_id, text_b_juan_num AS lzh_juan,
+                           text_a_id AS other_id,
+                           text_a_lang AS other_lang, confidence
+                    FROM alignment_pairs
+                    WHERE text_b_lang = 'lzh' AND text_a_lang != 'lzh'
+                          AND text_a_id IS NOT NULL
+                )
+                SELECT n.lzh_id,
+                       bt.cbeta_id,
+                       bt.title_zh,
+                       n.other_lang,
+                       count(*) AS pair_count,
+                       count(DISTINCT n.other_id) AS partner_count,
+                       round(avg(n.confidence)::numeric, 2) AS avg_confidence,
+                       -- juan with the most anchors = best reader landing
+                       mode() WITHIN GROUP (ORDER BY n.lzh_juan) AS sample_juan,
+                       -- counterpart with the most pairs (panel shows the rest)
+                       mode() WITHIN GROUP (ORDER BY n.other_id) AS sample_partner_id
+                FROM normalized n
+                JOIN buddhist_texts bt ON bt.id = n.lzh_id
+                GROUP BY n.lzh_id, bt.cbeta_id, bt.title_zh, n.other_lang
+                ORDER BY pair_count DESC
+                """
+            )
+        )
+    ).fetchall()
+
+    partner_ids = {r[8] for r in rows}
+    partner_titles: dict[int, str] = {}
+    if partner_ids:
+        for pid, title in (
+            await db.execute(
+                sql_text(
+                    "SELECT id, COALESCE(NULLIF(title_zh, ''), title_en, cbeta_id) "
+                    "FROM buddhist_texts WHERE id = ANY(:ids)"
+                ),
+                {"ids": list(partner_ids)},
+            )
+        ).fetchall():
+            partner_titles[pid] = title or ""
+
+    entries = [
+        CatalogEntry(
+            text_id=r[0],
+            cbeta_id=r[1] or "",
+            title_zh=r[2] or "",
+            other_lang=r[3] or "",
+            pair_count=r[4],
+            partner_count=r[5],
+            avg_confidence=float(r[6] or 0),
+            sample_juan=r[7] or 1,
+            sample_partner_id=r[8],
+            sample_partner_title=partner_titles.get(r[8], ""),
+        )
+        for r in rows
+    ]
+    return AlignmentCatalogResponse(
+        entries=entries,
+        total_pairs=sum(e.pair_count for e in entries),
+    )

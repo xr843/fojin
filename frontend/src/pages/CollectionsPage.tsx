@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { Input, Tag, Empty } from "antd";
@@ -20,6 +21,7 @@ import collections, {
   type CollectionLink,
   type ResourceCategory,
 } from "../data/collections";
+import { getAlignmentCatalog } from "../api/client";
 import "../styles/sources.css";
 import "../styles/collections.css";
 
@@ -187,7 +189,64 @@ function CollectionCard({ coll, cbetaMap }: { coll: Collection; cbetaMap: Record
   );
 }
 
+const LANG_LABELS: Record<string, { label: string; color: string }> = {
+  pi: { label: "巴利", color: "green" },
+  bo: { label: "藏文", color: "purple" },
+  sa: { label: "梵文", color: "orange" },
+};
+
+/** 跨藏对照专区：哪些经有逐段对照语料（可发现性入口）。
+    API 失败/空数据时整块隐身，可与 backend 端点解耦部署。 */
+function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useNavigate> }) {
+  const { data } = useQuery({
+    queryKey: ["alignmentCatalog"],
+    queryFn: getAlignmentCatalog,
+    staleTime: 3600_000,
+    retry: 1,
+  });
+  if (!data || data.entries.length === 0) return null;
+  return (
+    <div className="coll-card" style={{ marginBottom: 24 }}>
+      <div className="coll-section" style={{ padding: "16px 20px" }}>
+        <div className="coll-section-title">
+          <TranslationOutlined /> 跨藏对照（{new Set(data.entries.map((e) => e.text_id)).size} 部经 · {data.total_pairs.toLocaleString()} 组对齐段落）
+        </div>
+        <p style={{ fontSize: 12, color: "var(--fj-ink-muted)", margin: "4px 0 12px" }}>
+          以下经典已建立逐段跨语对照（AI 对齐 + 置信度过滤），点击进入阅读器，正文旁即可逐段查看对照。
+        </p>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {data.entries.map((e) => {
+            const lang = LANG_LABELS[e.other_lang] ?? { label: e.other_lang, color: "default" };
+            return (
+              <button
+                key={`${e.text_id}-${e.other_lang}`}
+                className="source-btn"
+                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                onClick={() =>
+                  // 阅读器而非 /parallel：sample_juan 保证该卷有锚点；reader 的
+                  // 按段对照面板不依赖对本侧 text_contents 的卷结构（对本整本
+                  // 存为 juan 1，/parallel 在 juan>1 时对本栏全空）。
+                  navigate(`/texts/${e.text_id}/read?juan=${e.sample_juan}`)
+                }
+              >
+                <span>{e.title_zh}</span>
+                <Tag color={lang.color} style={{ margin: 0, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}>
+                  {lang.label}
+                </Tag>
+                <span style={{ fontSize: 11, color: "var(--fj-ink-muted)" }}>
+                  {e.pair_count} 段{e.partner_count > 1 ? ` · ${e.partner_count} 部对本` : ""}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CollectionsPage() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [showTop, setShowTop] = useState(false);
   const [cbetaMap, setCbetaMap] = useState<Record<string, number>>({});
@@ -256,6 +315,8 @@ export default function CollectionsPage() {
           style={{ width: 320 }}
         />
       </div>
+
+      <ParallelCatalogSection navigate={navigate} />
 
       <div className="sources-stats-bar">
         当前显示 <strong>{filtered.length}</strong> / {collections.length} 个专题
