@@ -190,7 +190,7 @@ export default function SutraLandingPage() {
                 size="large"
                 icon={<ReadOutlined />}
                 block
-                onClick={() => navigate(`/texts/${sutra.cbeta_id}/read`)}
+                onClick={() => navigate(`/texts/${sutra.text_id}/read`)}
               >
                 开始阅读
               </Button>
@@ -200,7 +200,7 @@ export default function SutraLandingPage() {
                 size="large"
                 icon={<BookOutlined />}
                 block
-                onClick={() => navigate(`/texts/${sutra.cbeta_id}`)}
+                onClick={() => navigate(`/texts/${sutra.text_id}`)}
               >
                 经典详情
               </Button>

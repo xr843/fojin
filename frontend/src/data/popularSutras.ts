@@ -6,6 +6,8 @@
 export interface SutraInfo {
   slug: string;
   cbeta_id: string;
+  /** buddhist_texts.id — /texts/:id routes take the NUMERIC id, not cbeta_id */
+  text_id: number;
   title_zh: string;
   title_en: string;
   title_sa: string;
@@ -22,6 +24,7 @@ export const popularSutras: SutraInfo[] = [
   {
     slug: "heart-sutra",
     cbeta_id: "T0251",
+    text_id: 9,
     title_zh: "般若波罗蜜多心经",
     title_en: "Heart Sutra",
     title_sa: "Prajnaparamitahrdaya Sutra",
@@ -51,6 +54,7 @@ export const popularSutras: SutraInfo[] = [
   {
     slug: "diamond-sutra",
     cbeta_id: "T0235",
+    text_id: 7,
     title_zh: "金刚般若波罗蜜经",
     title_en: "Diamond Sutra",
     title_sa: "Vajracchedika Prajnaparamita Sutra",
@@ -79,6 +83,7 @@ export const popularSutras: SutraInfo[] = [
   {
     slug: "lotus-sutra",
     cbeta_id: "T0262",
+    text_id: 6513,
     title_zh: "妙法莲华经",
     title_en: "Lotus Sutra",
     title_sa: "Saddharma Pundarika Sutra",
@@ -108,6 +113,7 @@ export const popularSutras: SutraInfo[] = [
   {
     slug: "avatamsaka-sutra",
     cbeta_id: "T0279",
+    text_id: 12,
     title_zh: "大方广佛华严经",
     title_en: "Avatamsaka Sutra",
     title_sa: "Avatamsaka Sutra",
@@ -136,6 +142,7 @@ export const popularSutras: SutraInfo[] = [
   {
     slug: "shurangama-sutra",
     cbeta_id: "T0945",
+    text_id: 65,
     title_zh: "大佛顶如来密因修证了义诸菩萨万行首楞严经",
     title_en: "Shurangama Sutra",
     title_sa: "Surangama Sutra",
@@ -165,6 +172,7 @@ export const popularSutras: SutraInfo[] = [
   {
     slug: "amitabha-sutra",
     cbeta_id: "T0366",
+    text_id: 20,
     title_zh: "佛说阿弥陀经",
     title_en: "Amitabha Sutra",
     title_sa: "Sukhavativyuha Sutra",
@@ -194,6 +202,7 @@ export const popularSutras: SutraInfo[] = [
   {
     slug: "ksitigarbha-sutra",
     cbeta_id: "T0412",
+    text_id: 24,
     title_zh: "地藏菩萨本愿经",
     title_en: "Ksitigarbha Sutra",
     title_sa: "Ksitigarbha Pranidhana Sutra",
@@ -222,6 +231,7 @@ export const popularSutras: SutraInfo[] = [
   {
     slug: "medicine-buddha-sutra",
     cbeta_id: "T0450",
+    text_id: 26,
     title_zh: "药师琉璃光如来本愿功德经",
     title_en: "Medicine Buddha Sutra",
     title_sa: "Bhaisajyaguru-vaidurya-prabharaja Sutra",
@@ -251,6 +261,7 @@ export const popularSutras: SutraInfo[] = [
   {
     slug: "platform-sutra",
     cbeta_id: "T2008",
+    text_id: 58,
     title_zh: "六祖大师法宝坛经",
     title_en: "Platform Sutra",
     title_sa: "",
@@ -280,6 +291,7 @@ export const popularSutras: SutraInfo[] = [
   {
     slug: "vimalakirti-sutra",
     cbeta_id: "T0475",
+    text_id: 28,
     title_zh: "维摩诘所说经",
     title_en: "Vimalakirti Sutra",
     title_sa: "Vimalakirti Nirdesa Sutra",
