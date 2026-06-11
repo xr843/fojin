@@ -92,6 +92,62 @@ _root_text_id_cache: dict[str, int | None] = {}
 _AMBIGUOUS_SHORT_ALIASES = {"心经", "心經", "坛经", "壇經"}
 _JING_COMPOUND_TAIL = set("济濟验驗常过過营營历歷理典商销銷书書文手度络絡费費办辦纬緯由")
 
+# --- 义理术语→本典 (doctrine-term root slot, Case 2 of 本经召回缺口) ----------
+# Abstract doctrine questions name no sutra ("缘起性空怎么理解"), so
+# _detect_named_root never fires, and the foundational treatise (中论,
+# 成唯识论…) loses the cosine race to dense later commentaries that repeat
+# the term more often (BM25 would skew the same way — commentaries have
+# higher term density than the source text, which is why hybrid keyword
+# retrieval is NOT the fix here). Same curated-map + reserved-slot approach
+# as the named-sutra fix above, keyed on high-precision doctrine terms.
+# Only unambiguous multi-char terms; root availability prod-verified
+# 2026-06-11 (all 10 texts have content + embeddings).
+_DOCTRINE_TERM_ROOTS: dict[str, str] = {
+    # 中观 → 中论 T1564
+    "缘起性空": "T1564", "緣起性空": "T1564", "性空缘起": "T1564", "性空緣起": "T1564",
+    "八不中道": "T1564", "空性": "T1564", "自性空": "T1564", "毕竟空": "T1564", "畢竟空": "T1564",
+    # 唯识 → 成唯识论 T1585
+    "唯识": "T1585", "唯識": "T1585", "阿赖耶": "T1585", "阿賴耶": "T1585",
+    "末那识": "T1585", "末那識": "T1585", "三自性": "T1585",
+    "遍计所执": "T1585", "遍計所執": "T1585", "依他起": "T1585", "圆成实": "T1585", "圓成實": "T1585",
+    "转识成智": "T1585", "轉識成智": "T1585", "八识": "T1585", "八識": "T1585",
+    # 佛性/如来藏 → 大般涅槃经 T0374
+    "佛性": "T0374", "如来藏": "T0374", "如來藏": "T0374",
+    "一阐提": "T0374", "一闡提": "T0374", "常乐我净": "T0374", "常樂我淨": "T0374",
+    # 天台 → 摩诃止观 T1911
+    "一念三千": "T1911", "三谛圆融": "T1911", "三諦圓融": "T1911",
+    "一心三观": "T1911", "一心三觀": "T1911",
+    # 华严 → 华严经 T0279
+    "法界缘起": "T0279", "法界緣起": "T0279", "四法界": "T0279",
+    "事事无碍": "T0279", "事事無礙": "T0279", "十玄门": "T0279", "十玄門": "T0279",
+    "六相圆融": "T0279", "六相圓融": "T0279", "因陀罗网": "T0279", "因陀羅網": "T0279",
+    # 净土 → 阿弥陀经 T0366
+    "念佛法门": "T0366", "念佛法門": "T0366", "净土法门": "T0366", "淨土法門": "T0366",
+    "带业往生": "T0366", "帶業往生": "T0366", "西方极乐": "T0366", "西方極樂": "T0366",
+    # 禅宗 → 六祖坛经 T2008
+    "明心见性": "T2008", "明心見性": "T2008", "顿悟": "T2008", "頓悟": "T2008",
+    "本来面目": "T2008", "本來面目": "T2008", "直指人心": "T2008", "见性成佛": "T2008", "見性成佛": "T2008",
+    # 不二 → 维摩诘经 T0475
+    "不二法门": "T0475", "不二法門": "T0475",
+    # 法华 → 法华经 T0262
+    "一佛乘": "T0262", "会三归一": "T0262", "會三歸一": "T0262", "开权显实": "T0262", "開權顯實": "T0262",
+    # 根本教义 → 杂阿含 T0099
+    "四圣谛": "T0099", "四聖諦": "T0099", "八正道": "T0099",
+    "十二因缘": "T0099", "十二因緣": "T0099", "四念处": "T0099", "四念處": "T0099",
+    "三法印": "T0099",
+}
+_DOCTRINE_KEYS_BY_LEN = sorted(_DOCTRINE_TERM_ROOTS, key=len, reverse=True)
+
+
+def _detect_doctrine_root(query: str) -> str | None:
+    """Return the root cbeta_id for the longest curated doctrine term present in
+    the query, or None. Longest-match mirrors _detect_named_root so nested terms
+    ("缘起性空" ⊃ "空性") resolve to the more specific mapping."""
+    for term in _DOCTRINE_KEYS_BY_LEN:
+        if term in query:
+            return _DOCTRINE_TERM_ROOTS[term]
+    return None
+
 
 def _detect_named_root(query: str) -> str | None:
     """Return the canonical root cbeta_id of the longest curated sutra alias that
@@ -134,11 +190,18 @@ async def _resolve_root_text_id(db: AsyncSession, cbeta_id: str) -> int | None:
 async def _inject_root_sutra_slot(
     db: AsyncSession, query: str, query_embedding: list[float], search_results: list[dict]
 ) -> list[dict]:
-    """If the query names a root sutra and that root isn't already in the final
-    context, prepend its best-matching chunk into a reserved slot (keeping the
-    total at MAX_CONTEXT_CHUNKS). No-op when no sutra is named or the root is
-    already present. See 本经召回缺口 note above."""
-    cbeta_id = _detect_named_root(query)
+    """Reserve a context slot for the foundational text the query is about.
+
+    Two-tier detection, mirroring the two cases of the 本经召回缺口:
+      1. Named sutra (Case 1): user explicitly names a root sutra → its best
+         chunk takes slot #1 (the user asked for THIS text).
+      2. Doctrine term (Case 2): no sutra named, but the query contains a
+         curated doctrine term (空性, 唯识, …) → the foundational treatise's
+         best chunk takes the LAST slot. It belongs in context, but the user
+         didn't name it, so it must not displace the reranked top hits.
+    No-op when neither fires or the root is already present."""
+    named = _detect_named_root(query)
+    cbeta_id = named or _detect_doctrine_root(query)
     if not cbeta_id:
         return search_results
     root_tid = await _resolve_root_text_id(db, cbeta_id)
@@ -149,11 +212,14 @@ async def _inject_root_sutra_slot(
     root_hits = await similarity_search(db, query_embedding, limit=1, scope_text_ids=[root_tid])
     if not root_hits:
         return search_results
-    logger.debug("本经召回保底: reserved slot for root %s (text_id=%d)", cbeta_id, root_tid)
     others = [r for r in search_results if r["text_id"] != root_tid]
-    # Root keeps its raw cosine (lower than the others' blended rerank scores);
-    # it sits at slot 1 by construction — do NOT re-sort search_results after this.
-    return [root_hits[0]] + others[: MAX_CONTEXT_CHUNKS - 1]
+    if named:
+        logger.debug("本经召回保底: slot #1 for named root %s (text_id=%d)", cbeta_id, root_tid)
+        # Root keeps its raw cosine (lower than the others' blended rerank
+        # scores); it sits at slot 1 by construction — do NOT re-sort after this.
+        return [root_hits[0], *others[: MAX_CONTEXT_CHUNKS - 1]]
+    logger.debug("义理本典保底: last slot for doctrine root %s (text_id=%d)", cbeta_id, root_tid)
+    return [*others[: MAX_CONTEXT_CHUNKS - 1], root_hits[0]]
 
 
 def _format_source_label(result: dict) -> str:
