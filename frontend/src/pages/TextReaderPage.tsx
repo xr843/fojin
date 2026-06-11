@@ -246,6 +246,23 @@ function getInitialFontSize(): number {
   return 18;
 }
 
+/**
+ * 找到 el 实际所在的滚动容器。AI 面板打开时（默认即打开）reader.css 把
+ * .reader-with-sidebar 锁高、滚动权交给 .reader-container；面板关闭时滚动
+ * 的是 document（返回 null）。续读与 highlight 深链都必须按真实 scroller 操作。
+ */
+function findScrollContainer(el: HTMLElement): HTMLElement | null {
+  let p = el.parentElement;
+  while (p) {
+    const style = getComputedStyle(p);
+    if ((style.overflowY === "auto" || style.overflowY === "scroll") && p.scrollHeight > p.clientHeight) {
+      return p;
+    }
+    p = p.parentElement;
+  }
+  return null;
+}
+
 /** 划词查辞典浮层状态 */
 export default function TextReaderPage() {
   const { id } = useParams<{ id: string }>();
@@ -483,29 +500,36 @@ export default function TextReaderPage() {
     }
   }, [textId, textDetail]);
 
-  // 续读 · 恢复滚动位置。与 highlight_chunk 同一套坐标系：阅读锚点取
-  // 视口上 1/3 处（scrollTo 公式的逆运算），所以记录与恢复互为逆变换。
+  // 续读 · 恢复滚动位置。坐标系说明：阅读锚点取视口上 1/3 处。测量公式
+  // (innerHeight/3 - rect.top) / rect.height 只依赖 viewport 坐标，对
+  // document 滚动和 .reader-container 元素滚动（AI 面板打开时 reader.css
+  // 把滚动权交给容器）都成立；恢复用 scrollBy 增量同理对两种 scroller 通用。
   useEffect(() => {
     const resume = resumeRef.current;
     if (!resume || resume.juan !== juanNum) return;
     if (!content?.content) return;
-    resumeRef.current = null; // 一次性消费，卷间切换不再触发
     const raf = requestAnimationFrame(() => {
+      // 消费 ref 放在 rAF 内：StrictMode 下 effect 第一轮的 cleanup 会取消
+      // rAF，此时 ref 未消费，第二轮才能重试（否则暖缓存时续读静默失效）。
+      if (!resumeRef.current) return;
+      resumeRef.current = null;
       const el = readerContentRef.current;
       if (!el) return;
       if (resume.ratio > 0.03) {
         const rect = el.getBoundingClientRect();
-        const divTopAbs = rect.top + window.scrollY;
-        const target = Math.max(divTopAbs + rect.height * resume.ratio - window.innerHeight / 3, 0);
-        window.scrollTo({ top: target });
+        const delta = rect.top + rect.height * resume.ratio - window.innerHeight / 3;
+        const scroller = findScrollContainer(el);
+        if (scroller) scroller.scrollTop += delta;
+        else window.scrollBy({ top: delta });
       }
       message.info(`已定位到上次阅读位置 · 第${resume.juan}卷`, 2.5);
     });
     return () => cancelAnimationFrame(raf);
   }, [content, juanNum]);
 
-  // 续读 · 记录阅读位置。trailing-throttle 1.5s；进卷时也记录一次，
-  // 这样未滚动就离开的卷切换也会留下记录。
+  // 续读 · 记录阅读位置。trailing-throttle 1.5s；进卷时也记录一次；卸载时
+  // flush 未落盘的最后位置。capture: true 是关键 —— AI 面板打开时滚动发生在
+  // .reader-container 上，scroll 事件不冒泡，只有捕获阶段能在 window 收到。
   useEffect(() => {
     if (!content?.content) return;
     let timer: number | undefined;
@@ -515,13 +539,11 @@ export default function TextReaderPage() {
       if (!el) return;
       const rect = el.getBoundingClientRect();
       if (rect.height <= 0) return;
-      const divTopAbs = rect.top + window.scrollY;
-      const anchorY = window.scrollY + window.innerHeight / 3;
       recordReading({
         textId,
         title: content.title_zh || `文本 ${textId}`,
         juan: juanNum,
-        ratio: (anchorY - divTopAbs) / rect.height,
+        ratio: (window.innerHeight / 3 - rect.top) / rect.height,
       });
     };
     const onScroll = () => {
@@ -529,10 +551,13 @@ export default function TextReaderPage() {
       timer = window.setTimeout(record, 1500);
     };
     onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("scroll", onScroll, { passive: true, capture: true });
     return () => {
-      window.removeEventListener("scroll", onScroll);
-      if (timer !== undefined) window.clearTimeout(timer);
+      window.removeEventListener("scroll", onScroll, { capture: true });
+      if (timer !== undefined) {
+        window.clearTimeout(timer);
+        record(); // flush：离开页面/换卷前把最后 1.5s 内的滚动落盘
+      }
     };
   }, [content, textId, juanNum]);
 
@@ -556,15 +581,16 @@ export default function TextReaderPage() {
     const ratio = Math.min(chunkCharOffset / totalChars, 0.95);
 
     // Wait for paint so the DOM reflects the juan's full rendered height.
-    // The reader content div is not itself scrollable — the document is —
-    // so compute an absolute page-level y offset from the div's bounding rect.
+    // Scroll the REAL scroller: with the AI panel open (the default) reader.css
+    // hands scrolling to .reader-container, where window.scrollTo is a no-op.
     const raf = requestAnimationFrame(() => {
       const el = readerContentRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
-      const divTopAbs = rect.top + window.scrollY;
-      const target = Math.max(divTopAbs + rect.height * ratio - window.innerHeight / 3, 0);
-      window.scrollTo({ top: target, behavior: "smooth" });
+      const delta = rect.top + rect.height * ratio - window.innerHeight / 3;
+      const scroller = findScrollContainer(el);
+      if (scroller) scroller.scrollTo({ top: scroller.scrollTop + delta, behavior: "smooth" });
+      else window.scrollBy({ top: delta, behavior: "smooth" });
     });
     return () => cancelAnimationFrame(raf);
   }, [highlightChunkIndex, content, textId, juanNum]);

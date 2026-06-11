@@ -28,6 +28,7 @@ function readAll(): ReadingEntry[] {
       (e): e is ReadingEntry =>
         e &&
         typeof e.textId === "number" &&
+        typeof e.title === "string" &&
         typeof e.juan === "number" &&
         typeof e.ratio === "number" &&
         typeof e.ts === "number",
@@ -49,6 +50,7 @@ function writeAll(entries: ReadingEntry[]): void {
 /** 记录（或更新）一条阅读位置；同一 text 只保留最新一条，列表按时间倒序。 */
 export function recordReading(entry: Omit<ReadingEntry, "ts">): void {
   if (!Number.isFinite(entry.textId) || entry.textId <= 0) return;
+  if (!Number.isFinite(entry.juan) || entry.juan < 1) return;
   const rest = readAll().filter((e) => e.textId !== entry.textId);
   writeAll([{ ...entry, ratio: clamp01(entry.ratio), ts: Date.now() }, ...rest]);
 }

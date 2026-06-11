@@ -22,6 +22,12 @@ import { getReadingHistory } from "../utils/readingHistory";
 import { useAuthStore } from "../stores/authStore";
 import "../styles/home.css"; // mobile-responsive v2.1
 
+/** 代码点级截断：CBETA 题名偶含扩展 B 区汉字，String.slice 会撕裂代理对。 */
+function truncateTitle(title: string, max = 12): string {
+  const chars = Array.from(title);
+  return chars.length > max ? `${chars.slice(0, max).join("")}…` : title;
+}
+
 export default function HomePage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -140,7 +146,7 @@ export default function HomePage() {
                 onClick={() => navigate(`/texts/${e.textId}/read?juan=${e.juan}`)}
                 title={e.title}
               >
-                《{e.title.length > 12 ? `${e.title.slice(0, 12)}…` : e.title}》{t("home.juan_n", { n: e.juan })}
+                《{truncateTitle(e.title)}》{t("home.juan_n", { n: e.juan })}
               </button>
             ))}
           </div>

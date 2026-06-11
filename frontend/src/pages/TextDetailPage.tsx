@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useQuery } from "@tanstack/react-query";
@@ -33,8 +33,9 @@ export default function TextDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [citationOpen, setCitationOpen] = useState(false);
-  // 续读：有本地阅读记录时，主按钮变为"继续阅读·第N卷"
-  const [lastRead] = useState(() => getLastPosition(Number(id)));
+  // 续读：有本地阅读记录时，主按钮变为"继续阅读·第N卷"。
+  // useMemo 按 id 重算：相关经典跳转复用同一路由实例，useState 初始化会 stale。
+  const lastRead = useMemo(() => getLastPosition(Number(id)), [id]);
 
   const { data: text, isLoading } = useQuery({
     queryKey: ["text", id],
