@@ -167,3 +167,35 @@ This probe is **the first action** when we open Batch 2 work — costs nothing, 
 - No FRBR Work spine governance work — that line is still parked per the 2026-06-01 decision in `project_fojin_frbr_works.md`. Mahāyāna 汉藏 alignment growth happens at the chunk-level table, not the Work table.
 - No frontend changes. The existing 「跨藏对照」 / 「按段对读」 panel handles new pairs transparently.
 - No new dictionary or RAG work. Alignment-pipeline progress is the entire scope of this roadmap.
+
+---
+
+## 2026-06-11 update — upstream availability findings (Batch 2 mid-flight)
+
+Investigated while juan 1-7 of `prajna_25k_zh_bo` was running. **The "84000 ingest
+expansion" premise above is wrong** — there is no ingest gap to expand:
+
+1. **We already ingest everything 84000 publishes.** `84000/data-tei` kangyur
+   translations = 396 XML files (full published set, checked 2026-06-11); prod has
+   371 Toh texts embedded — the delta is multi-chapter file merging, not missing
+   coverage. The "371 of ~1109 Toh works" figure compared against the *catalog*,
+   not against what upstream has actually translated.
+2. **Toh 119 (Mahāparinirvāṇa), Toh 506 (Śūraṅgama), Toh 107 (Laṅkāvatāra) are
+   simply unpublished by 84000.** Verified by toh-number AND by title keywords
+   (nirvana/lanka/heroic) against the full file list — the only hit is Toh 589,
+   a few-page Laṅkāvatāra dhāraṇī with no alignment value. These three are
+   **blocked on upstream publication**, not on our pipeline. The Batch 2b probe
+   (§ above) is settled: chunks == 0, park it. Re-check upstream ~semiannually.
+3. **Ratnakūṭa (寶積部) is ready NOW.** Prod check 2026-06-11: all **49 Toh
+   45–93 texts imported and embedded, 9,572 chunks total** (largest: Toh 56 =
+   2,112). The Batch 4 deferral above was based on assumed missing data; the
+   data is there. Batch 3 = T0310 (3,979 lzh chunks, 120 juans, 49 assemblies)
+   ↔ multi-target text_b over Toh 45–93. One whole run would be ~72h / ~$44,
+   so it MUST go through `--juans` slicing (~15 slices of ~270 chunks); the
+   pgvector search over the pooled 9,572-chunk target set replaces any manual
+   assembly→Toh mapping table.
+4. **大集經 T0397** stays in research (fragmented in Kangyur, no single Toh).
+
+Net effect on the Batch 2 closure criteria: drop `laṅkāvatāra_zh_bo` (upstream-
+blocked); Batch 2 closes with 25k-Prajñā alone, and Batch 3 (Ratnakūṭa) is
+unblocked and designed.
