@@ -57,6 +57,28 @@ class TestParseJuans:
         with pytest.raises(ValueError, match="malformed range"):
             ba.parse_juans("1-")
 
+    def test_negative_single_item_rejected(self):
+        # "-3" partitions into ("", "-", "3") -> malformed range; pin it so a
+        # refactor to split("-")/regex can't silently start accepting it.
+        with pytest.raises(ValueError, match="malformed range"):
+            ba.parse_juans("-3")
+
+    def test_double_dash_rejected(self):
+        with pytest.raises(ValueError):
+            ba.parse_juans("1--3")
+
+    def test_oversized_range_rejected(self):
+        # Must raise BEFORE materializing the range (OOM guard on the VPS).
+        with pytest.raises(ValueError, match="too large"):
+            ba.parse_juans("1-99999999")
+
+    def test_argtype_wrapper_raises_argument_type_error(self):
+        import argparse
+
+        with pytest.raises(argparse.ArgumentTypeError, match="reversed range"):
+            ba._parse_juans_argtype("3-1")
+        assert ba._parse_juans_argtype("1-3") == [1, 2, 3]
+
 
 class TestJuansPairGuard:
     def test_juans_with_all_pairs_exits(self):
