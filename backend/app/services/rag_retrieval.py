@@ -100,8 +100,12 @@ _JING_COMPOUND_TAIL = set("济濟验驗常过過营營历歷理典商销銷书�
 # higher term density than the source text, which is why hybrid keyword
 # retrieval is NOT the fix here). Same curated-map + reserved-slot approach
 # as the named-sutra fix above, keyed on high-precision doctrine terms.
-# Only unambiguous multi-char terms; root availability prod-verified
-# 2026-06-11 (all 10 texts have content + embeddings).
+# Multi-char terms only; root availability prod-verified 2026-06-11 (all
+# mapped texts have content + embeddings). Known accepted false positives
+# (deliberate trade-off, cost confined to the last slot on a Buddhist
+# site): lexicalized chengyu 不二法门/本来面目/直指人心 and secular 顿悟
+# also fire in everyday usage. Cross-boundary traps (毕竟空闲, 真空性质)
+# are guarded via _AMBIGUOUS_DOCTRINE_TAILS below.
 _DOCTRINE_TERM_ROOTS: dict[str, str] = {
     # 中观 → 中论 T1564
     "缘起性空": "T1564", "緣起性空": "T1564", "性空缘起": "T1564", "性空緣起": "T1564",
@@ -117,13 +121,18 @@ _DOCTRINE_TERM_ROOTS: dict[str, str] = {
     # 天台 → 摩诃止观 T1911
     "一念三千": "T1911", "三谛圆融": "T1911", "三諦圓融": "T1911",
     "一心三观": "T1911", "一心三觀": "T1911",
-    # 华严 → 华严经 T0279
-    "法界缘起": "T0279", "法界緣起": "T0279", "四法界": "T0279",
-    "事事无碍": "T0279", "事事無礙": "T0279", "十玄门": "T0279", "十玄門": "T0279",
-    "六相圆融": "T0279", "六相圓融": "T0279", "因陀罗网": "T0279", "因陀羅網": "T0279",
-    # 净土 → 阿弥陀经 T0366
+    # 华严宗义 → 华严五教章 T1866 (法藏)：四法界/十玄/六相 are patriarch-treatise
+    # vocabulary — the 80-juan sutra never states them as doctrines, so a scoped
+    # search over T0279 returns weakly related chunks. T1866 expounds them
+    # directly (202 chunks, prod-verified). 因陀罗网 stays on the sutra: the
+    # 帝网 imagery genuinely lives there.
+    "法界缘起": "T1866", "法界緣起": "T1866", "四法界": "T1866",
+    "事事无碍": "T1866", "事事無礙": "T1866", "十玄门": "T1866", "十玄門": "T1866",
+    "六相圆融": "T1866", "六相圓融": "T1866",
+    "因陀罗网": "T0279", "因陀羅網": "T0279",
+    # 净土 → 阿弥陀经 T0366；带业往生的经证是观经下品下生 → T0365
     "念佛法门": "T0366", "念佛法門": "T0366", "净土法门": "T0366", "淨土法門": "T0366",
-    "带业往生": "T0366", "帶業往生": "T0366", "西方极乐": "T0366", "西方極樂": "T0366",
+    "带业往生": "T0365", "帶業往生": "T0365", "西方极乐": "T0366", "西方極樂": "T0366",
     # 禅宗 → 六祖坛经 T2008
     "明心见性": "T2008", "明心見性": "T2008", "顿悟": "T2008", "頓悟": "T2008",
     "本来面目": "T2008", "本來面目": "T2008", "直指人心": "T2008", "见性成佛": "T2008", "見性成佛": "T2008",
@@ -138,14 +147,38 @@ _DOCTRINE_TERM_ROOTS: dict[str, str] = {
 }
 _DOCTRINE_KEYS_BY_LEN = sorted(_DOCTRINE_TERM_ROOTS, key=len, reverse=True)
 
+# Cross-boundary guard, same mechanism as _AMBIGUOUS_SHORT_ALIASES: these terms'
+# last char also heads common secular compounds, so 毕竟空|闲时间 ("after all,
+# little free time") or 真空|性质 ("properties of vacuum", matching 空+性 across
+# the word boundary) must not fire. Reject an occurrence when the next char
+# completes such a compound; accept if ANY occurrence has a clean tail.
+_AMBIGUOUS_DOCTRINE_TAILS: dict[str, set[str]] = {
+    "毕竟空": set("气氣调調间間白闲閒着隙位缺旷曠地"),
+    "畢竟空": set("气氣调調间間白闲閒着隙位缺旷曠地"),
+    "空性": set("质質能格"),
+}
+
 
 def _detect_doctrine_root(query: str) -> str | None:
     """Return the root cbeta_id for the longest curated doctrine term present in
-    the query, or None. Longest-match mirrors _detect_named_root so nested terms
-    ("缘起性空" ⊃ "空性") resolve to the more specific mapping."""
+    the query, or None. Longest-match mirrors _detect_named_root; no key currently
+    nests inside another, so the sort is future-proofing for added terms (e.g. a
+    bare "缘起" entry must never shadow "法界缘起")."""
     for term in _DOCTRINE_KEYS_BY_LEN:
-        if term in query:
-            return _DOCTRINE_TERM_ROOTS[term]
+        if term not in query:
+            continue
+        bad_tails = _AMBIGUOUS_DOCTRINE_TAILS.get(term)
+        if bad_tails:
+            start, real = 0, False
+            while (pos := query.find(term, start)) != -1:
+                tail = query[pos + len(term): pos + len(term) + 1]
+                if not tail or tail not in bad_tails:
+                    real = True
+                    break
+                start = pos + 1
+            if not real:
+                continue
+        return _DOCTRINE_TERM_ROOTS[term]
     return None
 
 
