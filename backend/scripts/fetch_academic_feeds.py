@@ -11,10 +11,9 @@ import asyncio
 import logging
 import os
 import sys
-from datetime import datetime, timezone
-from email.utils import parsedate_to_datetime
-
 import xml.etree.ElementTree as _stdlib_ET
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 
 import httpx
 from defusedxml import ElementTree as ET
@@ -36,19 +35,18 @@ logger = logging.getLogger(__name__)
 # Feed registry
 # ---------------------------------------------------------------------------
 
+# Registry pruned 2026-06-11 after a per-source audit from the production VPS
+# (Aliyun SG IP). Removed — all five had produced 0 rows:
+#   cbeta            https://www.cbeta.org/cbreader/feed.php — 404 (site revamp);
+#                    /news/feed exists but serves 403 to this IP even with a
+#                    browser UA
+#   84000_blog       https://84000.co/feed/ — 404, nothing under /news/ or /blog/
+#   buddhistdoor     valid RSS from residential IPs, but the VPS receives a
+#                    well-formed feed with ZERO <item>s (IP-based stripping)
+#   lions_roar       403 from the VPS regardless of UA (IP block)
+#   accesstoinsight  frozen archive site; rss.xml serves HTML, content stopped
+#                    updating years ago
 FEED_REGISTRY: list[dict] = [
-    {
-        "name": "cbeta",
-        "url": "https://www.cbeta.org/cbreader/feed.php",
-        "category": "digitization",
-        "language": "zh",
-    },
-    {
-        "name": "84000_blog",
-        "url": "https://84000.co/feed/",
-        "category": "translation",
-        "language": "en",
-    },
     {
         "name": "bdrc_news",
         "url": "https://www.bdrc.io/feed/",
@@ -62,33 +60,28 @@ FEED_REGISTRY: list[dict] = [
         "language": "en",
     },
     {
-        "name": "buddhistdoor",
-        "url": "https://www.buddhistdoor.net/feed/",
-        "category": "news",
-        "language": "en",
-    },
-    {
-        "name": "lions_roar",
-        "url": "https://www.lionsroar.com/feed/",
-        "category": "news",
-        "language": "en",
-    },
-    {
         "name": "tricycle",
         "url": "https://tricycle.org/feed/",
         "category": "news",
         "language": "en",
     },
     {
-        "name": "accesstoinsight",
-        "url": "https://www.accesstoinsight.org/rss.xml",
-        "category": "translation",
-        "language": "en",
-    },
-    {
         "name": "iabs",
         "url": "https://journals.ub.uni-heidelberg.de/index.php/jiabs/gateway/plugin/WebFeedGatewayPlugin/atom",
         "category": "paper",
+        "language": "en",
+    },
+    # Added 2026-06-11, both verified reachable from the VPS with real items:
+    {
+        "name": "jbe",  # Journal of Buddhist Ethics — peer-reviewed OA journal
+        "url": "https://blogs.dickinson.edu/buddhistethics/feed/",
+        "category": "paper",
+        "language": "en",
+    },
+    {
+        "name": "suttacentral_forum",  # Discourse "latest" — EBT scholarship community
+        "url": "https://discourse.suttacentral.net/latest.rss",
+        "category": "community",
         "language": "en",
     },
 ]
@@ -132,7 +125,7 @@ def _parse_iso_date(date_str: str | None) -> datetime | None:
         try:
             dt = datetime.strptime(date_str, fmt)
             if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
+                dt = dt.replace(tzinfo=UTC)
             return dt
         except ValueError:
             continue
@@ -377,7 +370,7 @@ async def main() -> None:
         "--source",
         type=str,
         default=None,
-        help="Only fetch a specific feed source (e.g. 84000_blog)",
+        help="Only fetch a specific feed source (e.g. suttacentral_forum)",
     )
     parser.add_argument(
         "--stats",

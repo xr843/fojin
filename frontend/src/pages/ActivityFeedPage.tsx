@@ -270,15 +270,12 @@ function AcademicTab() {
           value={feedSource}
           onChange={(v) => { setFeedSource(v); setPage(1); }}
           options={[
-            { value: "cbeta", label: "CBETA" },
-            { value: "84000_blog", label: "84000" },
             { value: "bdrc_news", label: "BDRC" },
             { value: "bdk_america", label: "BDK America" },
-            { value: "buddhistdoor", label: "Buddhistdoor" },
-            { value: "lions_roar", label: "Lion's Roar" },
             { value: "tricycle", label: "Tricycle" },
-            { value: "accesstoinsight", label: "Access to Insight" },
             { value: "iabs", label: "IABS" },
+            { value: "jbe", label: "J. Buddhist Ethics" },
+            { value: "suttacentral_forum", label: "SuttaCentral Forum" },
           ]}
         />
         <span className="filter-label">{t("activity.filterCategory")}:</span>
@@ -293,7 +290,7 @@ function AcademicTab() {
             { value: "translation", label: t("activity.categoryTranslation") },
             { value: "news", label: t("activity.categoryNews") },
             { value: "digitization", label: t("activity.categoryDigitization") },
-            { value: "conference", label: t("activity.categoryConference") },
+            { value: "community", label: t("activity.categoryCommunity") },
           ]}
         />
         <span className="filter-label">{t("activity.filterDays")}:</span>

@@ -15,7 +15,7 @@ import {
   RobotOutlined,
   GithubOutlined,
   GlobalOutlined,
-  // NotificationOutlined,
+  NotificationOutlined,
   // FieldTimeOutlined,
   // BarChartOutlined,
 } from "@ant-design/icons";
@@ -78,8 +78,9 @@ export default function Layout() {
     { icon: <ApartmentOutlined />, label: t("nav.kg"), path: "/kg" },
     { icon: <GlobalOutlined />, label: t("nav.geo"), path: "/map" },
     { icon: <BookOutlined />, label: t("nav.collections"), path: "/collections" },
-    // TODO: 佛学动态暂时隐藏，待加入cron定时抓取后重新上线
-    // { icon: <NotificationOutlined />, label: t("nav.activity"), path: "/activity" },
+    // 佛学动态 2026-06-11 重新上线：feed cron 自 #211 时代已每日运行，源清单
+    // 同日已审计换血（见 backend/scripts/fetch_academic_feeds.py 注释）
+    { icon: <NotificationOutlined />, label: t("nav.activity"), path: "/activity" },
     // TODO: 时间线和数据总览暂时隐藏，待优化后重新上线
     // { icon: <FieldTimeOutlined />, label: t("nav.timeline"), path: "/timeline" },
     // { icon: <BarChartOutlined />, label: t("nav.dashboard"), path: "/dashboard" },
