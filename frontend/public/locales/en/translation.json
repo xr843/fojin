@@ -58,6 +58,8 @@
   "home.selected_sources": "{{count}} selected",
   "home.select_source": "Select source",
   "home.hot_label": "Popular",
+  "home.continue_reading": "Continue reading",
+  "home.juan_n": "Fascicle {{n}}",
   "home.hot_tags": [
     "Diamond Sutra",
     "Heart Sutra",

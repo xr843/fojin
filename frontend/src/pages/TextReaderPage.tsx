@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Typography, Spin, Button, Select, Breadcrumb, Row, Col, message, Tooltip, Tag } from "antd";
+import { getLastPosition, recordReading } from "../utils/readingHistory";
 import {
   HomeOutlined,
   LeftOutlined,
@@ -255,7 +256,24 @@ export default function TextReaderPage() {
   const initialJuan = initialJuanParam ? parseInt(initialJuanParam, 10) : 1;
   const highlightChunkParam = searchParams.get("highlight_chunk");
   const highlightChunkIndex = highlightChunkParam ? parseInt(highlightChunkParam, 10) : null;
-  const [juanNum, setJuanNum] = useState(Number.isFinite(initialJuan) && initialJuan > 0 ? initialJuan : 1);
+  // 续读：URL 显式指定卷或深链高亮时尊重 URL；否则恢复上次阅读位置。
+  // resumeRef 在首次渲染时一次性决定，供后续滚动恢复 effect 消费。
+  const resumeRef = useRef<{ juan: number; ratio: number } | null>(null);
+  const [juanNum, setJuanNum] = useState(() => {
+    const last = highlightChunkParam ? null : getLastPosition(Number(id));
+    if (initialJuanParam && Number.isFinite(initialJuan) && initialJuan > 0) {
+      // URL 显式指定卷：尊重 URL；若与记录同卷（如详情页"继续阅读"），仍恢复滚动。
+      if (last && last.juan === initialJuan && last.ratio > 0.03) {
+        resumeRef.current = { juan: initialJuan, ratio: last.ratio };
+      }
+      return initialJuan;
+    }
+    if (last && last.juan > 0 && (last.juan > 1 || last.ratio > 0.03)) {
+      resumeRef.current = { juan: last.juan, ratio: last.ratio };
+      return last.juan;
+    }
+    return 1;
+  });
   const [fontSize, setFontSize] = useState(getInitialFontSize);
   const [citationOpen, setCitationOpen] = useState(false);
   const [annotationOpen, setAnnotationOpen] = useState(false);
@@ -464,6 +482,59 @@ export default function TextReaderPage() {
       umami.track("read", { id: String(textId), title: textDetail.title_zh || "" });
     }
   }, [textId, textDetail]);
+
+  // 续读 · 恢复滚动位置。与 highlight_chunk 同一套坐标系：阅读锚点取
+  // 视口上 1/3 处（scrollTo 公式的逆运算），所以记录与恢复互为逆变换。
+  useEffect(() => {
+    const resume = resumeRef.current;
+    if (!resume || resume.juan !== juanNum) return;
+    if (!content?.content) return;
+    resumeRef.current = null; // 一次性消费，卷间切换不再触发
+    const raf = requestAnimationFrame(() => {
+      const el = readerContentRef.current;
+      if (!el) return;
+      if (resume.ratio > 0.03) {
+        const rect = el.getBoundingClientRect();
+        const divTopAbs = rect.top + window.scrollY;
+        const target = Math.max(divTopAbs + rect.height * resume.ratio - window.innerHeight / 3, 0);
+        window.scrollTo({ top: target });
+      }
+      message.info(`已定位到上次阅读位置 · 第${resume.juan}卷`, 2.5);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [content, juanNum]);
+
+  // 续读 · 记录阅读位置。trailing-throttle 1.5s；进卷时也记录一次，
+  // 这样未滚动就离开的卷切换也会留下记录。
+  useEffect(() => {
+    if (!content?.content) return;
+    let timer: number | undefined;
+    const record = () => {
+      timer = undefined;
+      const el = readerContentRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      if (rect.height <= 0) return;
+      const divTopAbs = rect.top + window.scrollY;
+      const anchorY = window.scrollY + window.innerHeight / 3;
+      recordReading({
+        textId,
+        title: content.title_zh || `文本 ${textId}`,
+        juan: juanNum,
+        ratio: (anchorY - divTopAbs) / rect.height,
+      });
+    };
+    const onScroll = () => {
+      if (timer !== undefined) return;
+      timer = window.setTimeout(record, 1500);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [content, textId, juanNum]);
 
   // Deep-link from the chat citation drawer: ?highlight_chunk=N
   // Chunks are 500 chars wide with 50-char overlap (see scripts/archive/misc/generate_embeddings.py),

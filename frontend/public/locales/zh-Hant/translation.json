@@ -58,6 +58,8 @@
   "home.selected_sources": "已選 {{count}} 源",
   "home.select_source": "選擇資料來源",
   "home.hot_label": "熱門檢索",
+  "home.continue_reading": "繼續閱讀",
+  "home.juan_n": "第{{n}}卷",
   "home.hot_tags": [
     "金剛經",
     "心經",
