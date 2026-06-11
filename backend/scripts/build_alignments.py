@@ -280,6 +280,19 @@ MVP_PAIRS: list[AlignmentPair] = [
         text_b=TextResolver(source_code="84000", text_id=5165),  # Toh 11 Aṣṭasāhasrikā Prajñāpāramitā, 4706 chunks
         description="T0227《小品般若波罗蜜经》罗什译 ↔ 84000 Toh 11 Aṣṭasāhasrikā Prajñāpāramitā 藏译",
     ),
+    # ------------------------------------------------------------------
+    # Batch 2a (2026-06-11): 25k 颂般若 — 般若部头牌，815 lzh chunks ≈ 11h
+    # 整跑。必须配 --juans 分卷跑（4 片: 1-7 / 8-14 / 15-21 / 22-27，每片
+    # ~190-230 chunks ≈ 3-4h）。text_id 经 prod 2026-06-11 实测核对：
+    # text_a_id=6 (815 chunks, 27 juans), text_b_id=5163 (12,022 chunks)。
+    # ------------------------------------------------------------------
+    AlignmentPair(
+        key="prajna_25k_zh_bo",
+        name="二万五千颂般若 汉藏",
+        text_a=TextResolver(source_code="cbeta", text_id=6),     # T0223 摩訶般若波羅蜜經 (鸠摩罗什), 815 chunks
+        text_b=TextResolver(source_code="84000", text_id=5163),  # 84K-toh9 Pañcaviṃśatisāhasrikā, 12022 chunks
+        description="T0223《摩訶般若波羅蜜經》罗什译 ↔ 84000 Toh 9 Pañcaviṃśatisāhasrikā Prajñāpāramitā 藏译",
+    ),
 ]
 
 
@@ -862,7 +875,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--pair",
         required=True,
-        help="Pair key: heart|satipatthana|dhammacakka|dhamma_pali|vimalakirti|agama_mn|agama_dn|agama_sn56|agama_an4|lotus_zh_bo|prajna_8k_zh_bo|all",
+        help="Pair key: heart|satipatthana|dhammacakka|dhamma_pali|vimalakirti|agama_mn|agama_dn|agama_sn56|agama_an4|lotus_zh_bo|prajna_8k_zh_bo|prajna_25k_zh_bo|all",
     )
     parser.add_argument("--dry-run", action="store_true", help="Skip LLM calls, print embedding candidates only")
     parser.add_argument("--limit-chunks", type=int, default=None, help="Cap chunks per text (for smoke testing)")
