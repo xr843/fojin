@@ -102,14 +102,8 @@
         </ul>
       </div>
     </noscript>
-    <script>
-      // Force refresh stale service workers (one-time cleanup for cached old versions)
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(regs) {
-          regs.forEach(function(reg) { reg.update(); });
-        });
-      }
-    </script>
+    <!-- External file: inline scripts are blocked by the CSP (script-src 'self') -->
+    <script src="/sw-update.js" defer></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
