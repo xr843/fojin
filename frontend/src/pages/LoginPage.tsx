@@ -8,6 +8,20 @@ import api from "../api/client";
 
 const { Title, Text } = Typography;
 
+/**
+ * 登录成功后的回跳目标。用 sessionStorage 而非 location.state：OAuth 流程
+ * 经第三方往返后 state 必然丢失，sessionStorage 两条路径通吃。
+ * 只接受站内相对路径，防 open-redirect。
+ */
+function consumeReturnTo(): string {
+  try {
+    const v = sessionStorage.getItem("fojin.login.returnTo");
+    sessionStorage.removeItem("fojin.login.returnTo");
+    if (v && v.startsWith("/") && !v.startsWith("//")) return v;
+  } catch { /* ignore */ }
+  return "/";
+}
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -39,7 +53,7 @@ export default function LoginPage() {
           });
           setAuth(token, user);
           message.success(`${provider === "github" ? "GitHub" : "Google"} 登录成功`);
-          navigate("/", { replace: true });
+          navigate(consumeReturnTo(), { replace: true });
         } catch {
           message.error("第三方登录失败，请重试");
           navigate("/login", { replace: true });
@@ -57,7 +71,7 @@ export default function LoginPage() {
       });
       setAuth(tokenData.access_token, user);
       message.success(t("auth.login_success"));
-      navigate("/");
+      navigate(consumeReturnTo());
     } catch (err: any) {
       message.error(err.response?.data?.detail || t("auth.login_fail"));
     } finally {

@@ -192,6 +192,8 @@
   "chat.unlimited_usage": "可无限使用。",
   "chat.login": "登录",
   "chat.login_quota_hint": "后即可畅享 AI 佛典问答。配置自己的 API Key 可无限使用。",
+  "chat.guest_save_hint": "当前对话不会被保存，刷新或离开后即丢失。登录后会话自动保存，可随时回看。",
+  "chat.guest_save_hint_cta": "登录保存",
   "chat.hot_questions": [
     "《心经》中「色不异空」的含义是什么？",
     "鸠摩罗什与玄奘的翻译风格有何不同？",

@@ -192,6 +192,8 @@
   "chat.unlimited_usage": "for unlimited usage.",
   "chat.login": "Log in",
   "chat.login_quota_hint": " to enjoy the AI Buddhist assistant. Configure your own API Key for unlimited usage.",
+  "chat.guest_save_hint": "This conversation won't be saved — it's gone after refresh. Sign in to keep your chat history.",
+  "chat.guest_save_hint_cta": "Sign in to save",
   "chat.hot_questions": [
     "What does 'form is emptiness' mean in the Heart Sutra?",
     "How do Kumārajīva and Xuanzang's translation styles differ?",
