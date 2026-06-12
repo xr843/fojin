@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as d3 from "d3";
+import { useTranslation } from "react-i18next";
 import { CompressOutlined } from "@ant-design/icons";
 import { escapeHtml } from "../utils/sanitize";
 
@@ -46,26 +47,28 @@ const TYPE_COLORS: Record<string, string> = {
   dynasty:   "#b35c8a",  // 洋紫
 };
 
-const TYPE_LABELS: Record<string, string> = {
-  person: "人物",
-  text: "典籍",
-  monastery: "寺院",
-  school: "宗派",
-  place: "地点",
-  concept: "概念",
-  dynasty: "朝代",
+/* i18n key maps — translated at render time via t(); shared by the KG
+   surfaces (graph legend, stats panel, mentions panel, entity cards). */
+const TYPE_LABEL_KEYS: Record<string, string> = {
+  person: "geo.type_person",
+  text: "geo.type_text",
+  monastery: "geo.type_temple",
+  school: "geo.type_school",
+  place: "geo.type_place",
+  concept: "geo.type_concept",
+  dynasty: "geo.type_dynasty",
 };
 
-const PREDICATE_LABELS: Record<string, string> = {
-  translated: "翻译",
-  active_in: "所处",
-  alt_translation: "异译",
-  parallel_text: "平行文本",
-  member_of_school: "宗派",
-  teacher_of: "师承",
-  cites: "引用",
-  commentary_on: "注疏",
-  associated_with: "相关",
+const PREDICATE_LABEL_KEYS: Record<string, string> = {
+  translated: "kg.pred_translated",
+  active_in: "kg.pred_active_in",
+  alt_translation: "kg.pred_alt_translation",
+  parallel_text: "kg.pred_parallel_text",
+  member_of_school: "kg.pred_member_of_school",
+  teacher_of: "geo.lineage",
+  cites: "kg.pred_cites",
+  commentary_on: "kg.pred_commentary_on",
+  associated_with: "kg.pred_associated_with",
 };
 
 const PREDICATE_COLORS: Record<string, string> = {
@@ -80,7 +83,7 @@ const PREDICATE_COLORS: Record<string, string> = {
   associated_with:  "#5b8c6b",  // 翡翠
 };
 
-export { TYPE_COLORS, TYPE_LABELS, PREDICATE_LABELS, PREDICATE_COLORS };
+export { TYPE_COLORS, TYPE_LABEL_KEYS, PREDICATE_LABEL_KEYS, PREDICATE_COLORS };
 
 export default function ForceGraph({
   nodes,
@@ -91,6 +94,7 @@ export default function ForceGraph({
   onNodeExpand,
   expandedNodeIds,
 }: ForceGraphProps) {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -243,14 +247,16 @@ export default function ForceGraph({
         d3.select(this)
           .attr("stroke-opacity", 0.9)
           .attr("stroke-width", 3);
-        const label = PREDICATE_LABELS[d.predicate] || d.predicate;
+        const label = PREDICATE_LABEL_KEYS[d.predicate]
+          ? t(PREDICATE_LABEL_KEYS[d.predicate])
+          : d.predicate;
         const parts = [`<strong>${escapeHtml(label)}</strong>`];
         if (d.provenance)
-          parts.push(`<span style="color:#9a8e7a">来源: ${escapeHtml(d.provenance)}</span>`);
+          parts.push(`<span style="color:#9a8e7a">${escapeHtml(t("kg.tooltip_source"))}: ${escapeHtml(d.provenance)}</span>`);
         if (d.evidence)
-          parts.push(`<span style="color:#7a6e5c">证据: ${escapeHtml(d.evidence)}</span>`);
+          parts.push(`<span style="color:#7a6e5c">${escapeHtml(t("kg.tooltip_evidence"))}: ${escapeHtml(d.evidence)}</span>`);
         if (d.confidence < 1)
-          parts.push(`<span style="color:#b08d57">置信度: ${d.confidence}</span>`);
+          parts.push(`<span style="color:#b08d57">${escapeHtml(t("kg.tooltip_confidence"))}: ${d.confidence}</span>`);
         showTooltip(parts.join("<br>"), event.offsetX, event.offsetY);
       })
       .on("mouseout", function (_event: any, d: any) {
@@ -368,11 +374,13 @@ export default function ForceGraph({
           });
 
         // Tooltip — include expand hint if node hasn't been expanded yet
-        const typeLabel = TYPE_LABELS[d.entity_type] || d.entity_type;
+        const typeLabel = TYPE_LABEL_KEYS[d.entity_type]
+          ? t(TYPE_LABEL_KEYS[d.entity_type])
+          : d.entity_type;
         let html = `<strong>${escapeHtml(d.name)}</strong> <span style="color:#9a8e7a">${escapeHtml(typeLabel)}</span>`;
         if (d.description) html += `<br><span style="color:#7a6e5c;font-size:11px">${escapeHtml(d.description)}</span>`;
         if (onNodeExpand && !expandedNodeIds?.has(d.id)) {
-          html += `<br><span style="color:#b08d57;font-size:10px">双击展开邻域</span>`;
+          html += `<br><span style="color:#b08d57;font-size:10px">${escapeHtml(t("kg.dblclick_expand"))}</span>`;
         }
         showTooltip(html, event.offsetX, event.offsetY);
       })
@@ -474,11 +482,11 @@ export default function ForceGraph({
     return () => {
       simulation.stop();
     };
-  }, [nodes, links, width, height, onNodeClick, onNodeExpand, expandedNodeIds, showTooltip, hideTooltip]);
+  }, [nodes, links, width, height, onNodeClick, onNodeExpand, expandedNodeIds, showTooltip, hideTooltip, t]);
 
   return (
-    <div ref={containerRef} style={{ width: "100%", position: "relative" }} role="img" aria-label="知识图谱可视化">
-      <span className="sr-only">知识图谱：包含节点和关系的可视化网络图</span>
+    <div ref={containerRef} style={{ width: "100%", position: "relative" }} role="img" aria-label={t("kg.graph_aria")}>
+      <span className="sr-only">{t("kg.graph_sr_desc")}</span>
       <svg
         ref={svgRef}
         width={width}
@@ -490,7 +498,7 @@ export default function ForceGraph({
         <button
           type="button"
           onClick={() => fitToViewRef.current?.()}
-          title="将整张图谱缩放到适应窗口"
+          title={t("kg.fit_view_tip")}
           style={{
             position: "absolute",
             top: 10,
@@ -511,7 +519,7 @@ export default function ForceGraph({
           }}
         >
           <CompressOutlined />
-          适应窗口
+          {t("kg.fit_view")}
         </button>
       )}
       {/* Custom tooltip */}

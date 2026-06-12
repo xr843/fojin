@@ -9,8 +9,9 @@
  */
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Spin, Empty, Tag } from "antd";
-import { TYPE_COLORS, TYPE_LABELS } from "../ForceGraph";
+import { TYPE_COLORS, TYPE_LABEL_KEYS } from "../ForceGraph";
 import { getKGEntityMentions } from "../../api/client";
 import type { KGMentionItem } from "../../api/client";
 
@@ -25,6 +26,7 @@ export default function KGMentionsPanel({
   entityName,
   onEntityClick,
 }: KGMentionsPanelProps) {
+  const { t } = useTranslation();
   const [mentions, setMentions] = useState<KGMentionItem[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +43,7 @@ export default function KGMentionsPanel({
       })
       .catch((e) => {
         if (cancelled) return;
-        setError(e?.message ?? "加载失败");
+        setError(e?.message ?? t("kg.load_failed"));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -49,7 +51,7 @@ export default function KGMentionsPanel({
     return () => {
       cancelled = true;
     };
-  }, [entityId]);
+  }, [entityId, t]);
 
   if (loading) {
     return (
@@ -60,14 +62,14 @@ export default function KGMentionsPanel({
   }
 
   if (error) {
-    return <div className="kg-mentions-error">提及加载失败：{error}</div>;
+    return <div className="kg-mentions-error">{t("kg.mentions_load_failed", { msg: error })}</div>;
   }
 
   if (!mentions || mentions.length === 0) {
     return (
       <Empty
         image={Empty.PRESENTED_IMAGE_SIMPLE}
-        description={`「${entityName}」描述中也没有可关联的已知实体`}
+        description={t("kg.mentions_empty", { name: entityName })}
       />
     );
   }
@@ -75,15 +77,15 @@ export default function KGMentionsPanel({
   return (
     <div className="kg-mentions-panel">
       <div className="kg-mentions-header">
-        <span className="kg-mentions-title">描述中提及的实体</span>
+        <span className="kg-mentions-title">{t("kg.mentions_title")}</span>
         <span className="kg-mentions-hint">
-          推断关联（非结构化）— 共 {mentions.length} 条
+          {t("kg.mentions_hint", { n: mentions.length })}
         </span>
       </div>
       <div className="kg-mentions-list">
         {mentions.map((m) => {
           const color = TYPE_COLORS[m.entity_type] ?? "#888";
-          const label = TYPE_LABELS[m.entity_type] ?? m.entity_type;
+          const label = TYPE_LABEL_KEYS[m.entity_type] ? t(TYPE_LABEL_KEYS[m.entity_type]) : m.entity_type;
           return (
             <button
               type="button"

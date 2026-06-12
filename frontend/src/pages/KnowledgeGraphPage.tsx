@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Input, Select, Spin, Empty, Slider, Checkbox, Alert, Tooltip, Segmented } from "antd";
 import {
@@ -15,8 +16,8 @@ import {
 } from "@ant-design/icons";
 import ForceGraph, {
   TYPE_COLORS,
-  TYPE_LABELS,
-  PREDICATE_LABELS,
+  TYPE_LABEL_KEYS,
+  PREDICATE_LABEL_KEYS,
   PREDICATE_COLORS,
 } from "../components/ForceGraph";
 import EntityCard from "../components/EntityCard";
@@ -29,26 +30,26 @@ import "../styles/kg.css";
 const { Search } = Input;
 
 const ENTITY_TYPES = [
-  { value: "", label: "全部类型" },
-  { value: "person", label: "人物" },
-  { value: "text", label: "典籍" },
-  { value: "monastery", label: "寺院" },
-  { value: "school", label: "宗派" },
-  { value: "place", label: "地点" },
-  { value: "concept", label: "概念" },
-  { value: "dynasty", label: "朝代" },
+  { value: "", labelKey: "kg.all_types" },
+  { value: "person", labelKey: "geo.type_person" },
+  { value: "text", labelKey: "geo.type_text" },
+  { value: "monastery", labelKey: "geo.type_temple" },
+  { value: "school", labelKey: "geo.type_school" },
+  { value: "place", labelKey: "geo.type_place" },
+  { value: "concept", labelKey: "geo.type_concept" },
+  { value: "dynasty", labelKey: "geo.type_dynasty" },
 ];
 
 const ALL_PREDICATES = [
-  { value: "translated", label: "翻译" },
-  { value: "teacher_of", label: "师承" },
-  { value: "member_of_school", label: "宗派" },
-  { value: "cites", label: "引用" },
-  { value: "commentary_on", label: "注疏" },
-  { value: "active_in", label: "所处" },
-  { value: "alt_translation", label: "异译" },
-  { value: "parallel_text", label: "平行文本" },
-  { value: "associated_with", label: "相关" },
+  { value: "translated", labelKey: "kg.pred_translated" },
+  { value: "teacher_of", labelKey: "geo.lineage" },
+  { value: "member_of_school", labelKey: "kg.pred_member_of_school" },
+  { value: "cites", labelKey: "kg.pred_cites" },
+  { value: "commentary_on", labelKey: "kg.pred_commentary_on" },
+  { value: "active_in", labelKey: "kg.pred_active_in" },
+  { value: "alt_translation", labelKey: "kg.pred_alt_translation" },
+  { value: "parallel_text", labelKey: "kg.pred_parallel_text" },
+  { value: "associated_with", labelKey: "kg.pred_associated_with" },
 ];
 
 const ALL_PREDICATE_VALUES = ALL_PREDICATES.map((p) => p.value);
@@ -56,79 +57,71 @@ const ALL_PREDICATE_VALUES = ALL_PREDICATES.map((p) => p.value);
 // One-line plain-language gloss for each relation type — surfaced as a
 // tooltip on the filter checkboxes so terms like 「异译」「平行文本」
 // don't gate casual users out of the graph.
-const PREDICATE_DESC: Record<string, string> = {
-  translated: "某人翻译了某部典籍",
-  teacher_of: "师徒之间的传法承继关系",
-  member_of_school: "人物所归属的宗派",
-  cites: "一部典籍引用了另一部典籍",
-  commentary_on: "对某部典籍的注释或疏解",
-  active_in: "人物活跃的朝代或地域",
-  alt_translation: "同一原典的不同译本（异译）",
-  parallel_text: "跨语言或跨藏经对应的平行文本",
-  associated_with: "其它相关联系",
-};
-
-const TYPE_LABEL_MAP: Record<string, string> = {
-  person: "人物",
-  text: "典籍",
-  monastery: "寺院",
-  school: "宗派",
-  place: "地点",
-  concept: "概念",
-  dynasty: "朝代",
+const PREDICATE_DESC_KEYS: Record<string, string> = {
+  translated: "kg.pred_desc_translated",
+  teacher_of: "kg.pred_desc_teacher_of",
+  member_of_school: "kg.pred_desc_member_of_school",
+  cites: "kg.pred_desc_cites",
+  commentary_on: "kg.pred_desc_commentary_on",
+  active_in: "kg.pred_desc_active_in",
+  alt_translation: "kg.pred_desc_alt_translation",
+  parallel_text: "kg.pred_desc_parallel_text",
+  associated_with: "kg.pred_desc_associated_with",
 };
 
 // Curated entry points for the "推荐探索" strip. Every name below was
 // verified against the production /kg/entities API to resolve to at
 // least one related entity, so a chip never lands on an empty graph.
-const CURATED_GROUPS: { title: string; items: { label: string; type: string }[] }[] = [
+// Item labels are entity names sent verbatim to the search API (and the
+// graph data is Chinese-canonical), so they stay untranslated.
+const CURATED_GROUPS: { titleKey: string; items: { label: string; type: string }[] }[] = [
   {
-    title: "高僧大德",
+    titleKey: "kg.curated_masters",
     items: [
-      { label: "玄奘", type: "person" },
-      { label: "鸠摩罗什", type: "person" },
-      { label: "不空", type: "person" },
-      { label: "义净", type: "person" },
-      { label: "法显", type: "person" },
-      { label: "龙树", type: "person" },
-      { label: "世亲", type: "person" },
-      { label: "无著", type: "person" },
-      { label: "法藏", type: "person" },
-      { label: "惠能", type: "person" },
-      { label: "智顗", type: "person" },
-      { label: "道宣", type: "person" },
+      { label: "玄奘", type: "person" }, // i18n-exempt
+      { label: "鸠摩罗什", type: "person" }, // i18n-exempt
+      { label: "不空", type: "person" }, // i18n-exempt
+      { label: "义净", type: "person" }, // i18n-exempt
+      { label: "法显", type: "person" }, // i18n-exempt
+      { label: "龙树", type: "person" }, // i18n-exempt
+      { label: "世亲", type: "person" }, // i18n-exempt
+      { label: "无著", type: "person" }, // i18n-exempt
+      { label: "法藏", type: "person" }, // i18n-exempt
+      { label: "惠能", type: "person" }, // i18n-exempt
+      { label: "智顗", type: "person" }, // i18n-exempt
+      { label: "道宣", type: "person" }, // i18n-exempt
     ],
   },
   {
-    title: "八大宗派",
+    titleKey: "kg.curated_schools",
     items: [
-      { label: "天台宗", type: "school" },
-      { label: "华严宗", type: "school" },
-      { label: "法相宗", type: "school" },
-      { label: "三论宗", type: "school" },
-      { label: "律宗", type: "school" },
-      { label: "净土宗", type: "school" },
-      { label: "禅宗", type: "school" },
-      { label: "密宗", type: "school" },
+      { label: "天台宗", type: "school" }, // i18n-exempt
+      { label: "华严宗", type: "school" }, // i18n-exempt
+      { label: "法相宗", type: "school" }, // i18n-exempt
+      { label: "三论宗", type: "school" }, // i18n-exempt
+      { label: "律宗", type: "school" }, // i18n-exempt
+      { label: "净土宗", type: "school" }, // i18n-exempt
+      { label: "禅宗", type: "school" }, // i18n-exempt
+      { label: "密宗", type: "school" }, // i18n-exempt
     ],
   },
   {
-    title: "核心概念",
+    titleKey: "kg.curated_concepts",
     items: [
-      { label: "缘起", type: "concept" },
-      { label: "四圣谛", type: "concept" },
-      { label: "八正道", type: "concept" },
-      { label: "十二因缘", type: "concept" },
-      { label: "三法印", type: "concept" },
-      { label: "空性", type: "concept" },
-      { label: "中道", type: "concept" },
-      { label: "般若", type: "concept" },
-      { label: "涅槃", type: "concept" },
-      { label: "菩提", type: "concept" },
-      { label: "佛性", type: "concept" },
-      { label: "菩提心", type: "concept" },
-      { label: "唯识", type: "concept" },
-      { label: "如来藏", type: "concept" },
+      { label: "缘起", type: "concept" }, // i18n-exempt
+      { label: "四圣谛", type: "concept" }, // i18n-exempt
+      { label: "八正道", type: "concept" }, // i18n-exempt
+      { label: "十二因缘", type: "concept" }, // i18n-exempt
+      { label: "三法印", type: "concept" }, // i18n-exempt
+      { label: "空性", type: "concept" }, // i18n-exempt
+      { label: "中道", type: "concept" }, // i18n-exempt
+      { label: "般若", type: "concept" }, // i18n-exempt
+      { label: "涅槃", type: "concept" }, // i18n-exempt
+      { label: "菩提", type: "concept" }, // i18n-exempt
+      { label: "佛性", type: "concept" }, // i18n-exempt
+      { label: "菩提心", type: "concept" }, // i18n-exempt
+      { label: "唯识", type: "concept" }, // i18n-exempt
+      { label: "如来藏", type: "concept" }, // i18n-exempt
     ],
   },
 ];
@@ -167,6 +160,7 @@ function mergeGraphData(
 }
 
 export default function KnowledgeGraphPage() {
+  const { t } = useTranslation();
   // 响应式 isMobile：监听 resize，避免旋转/窗口变化后失效
   const [isMobile, setIsMobile] = useState(
     () => typeof window !== "undefined" && window.innerWidth <= 768
@@ -186,7 +180,7 @@ export default function KnowledgeGraphPage() {
 
   // Initialise all view state from the URL once, so a shared/bookmarked
   // /kg?q=…&id=…&depth=…&rels=… link restores the exact same view.
-  const [query, setQuery] = useState(() => searchParams.get("q") || "玄奘");
+  const [query, setQuery] = useState(() => searchParams.get("q") || "玄奘"); // i18n-exempt — default search seed, sent to the API
   const [entityType, setEntityType] = useState(() => searchParams.get("type") || "");
   const [selectedEntityId, setSelectedEntityId] = useState<number | null>(() => {
     const id = searchParams.get("id");
@@ -423,27 +417,28 @@ export default function KnowledgeGraphPage() {
       {/* Header */}
       <div className="kg-header">
         <ApartmentOutlined />
-        <h3>知识图谱</h3>
+        <h3>{t("nav.kg")}</h3>
         {kgStats && (
-          <Tooltip title="查看统计">
+          <Tooltip title={t("kg.view_stats")}>
             <span
               className="kg-stats-toggle"
               onClick={() => setShowStats(!showStats)}
             >
               <BarChartOutlined />
               <span className="kg-stats-summary">
-                {kgStats.total_entities.toLocaleString()} 实体 / {kgStats.total_relations.toLocaleString()} 关系
+                {t("kg.n_entities", { n: kgStats.total_entities.toLocaleString() })}{" / "}
+                {t("kg.n_relations", { n: kgStats.total_relations.toLocaleString() })}
               </span>
             </span>
           </Tooltip>
         )}
-        <Tooltip title="佛教人物时间轴">
+        <Tooltip title={t("kg.timeline_title")}>
           <span
             className={`kg-timeline-toggle${showTimeline ? " active" : ""}`}
             onClick={() => setShowTimeline((v) => !v)}
           >
             <FieldTimeOutlined />
-            <span>佛教人物时间轴</span>
+            <span>{t("kg.timeline_title")}</span>
           </span>
         </Tooltip>
       </div>
@@ -452,10 +447,10 @@ export default function KnowledgeGraphPage() {
           <div className="kg-timeline-header">
             <span className="kg-timeline-title">
               <FieldTimeOutlined style={{ marginRight: 6 }} />
-              佛教人物时间轴
+              {t("kg.timeline_title")}
             </span>
             <span style={{ fontSize: 11, color: "#9a8e7a" }}>
-              点击实体可查看详情
+              {t("kg.timeline_hint")}
             </span>
           </div>
           <div className="kg-timeline-body">
@@ -471,21 +466,21 @@ export default function KnowledgeGraphPage() {
       {showStats && kgStats && (
         <div className="kg-stats-panel">
           <div className="kg-stats-group">
-            <span className="kg-stats-group-title">实体</span>
+            <span className="kg-stats-group-title">{t("kg.entities_label")}</span>
             {Object.entries(kgStats.entities).map(([type, count]) => (
               <span key={type} className="kg-stats-item">
                 <span className="kg-legend-dot" style={{ background: TYPE_COLORS[type] || "#888" }} />
-                {TYPE_LABEL_MAP[type] || type}
+                {TYPE_LABEL_KEYS[type] ? t(TYPE_LABEL_KEYS[type]) : type}
                 <span className="kg-stats-count">{count.toLocaleString()}</span>
               </span>
             ))}
           </div>
           <div className="kg-stats-group">
-            <span className="kg-stats-group-title">关系</span>
+            <span className="kg-stats-group-title">{t("kg.relations_label")}</span>
             {Object.entries(kgStats.relations).map(([pred, count]) => (
               <span key={pred} className="kg-stats-item">
                 <span className="kg-legend-line" style={{ background: PREDICATE_COLORS[pred] || "#bbb5a6" }} />
-                {PREDICATE_LABELS[pred] || pred}
+                {PREDICATE_LABEL_KEYS[pred] ? t(PREDICATE_LABEL_KEYS[pred]) : pred}
                 <span className="kg-stats-count">{count.toLocaleString()}</span>
               </span>
             ))}
@@ -497,7 +492,7 @@ export default function KnowledgeGraphPage() {
       <div className="kg-toolbar">
         <div className="kg-toolbar-main">
           <Search
-            placeholder={isMobile ? "搜索实体…" : "搜索实体（人物、典籍、宗派…）"}
+            placeholder={isMobile ? t("kg.search_placeholder_short") : t("kg.search_placeholder")}
             allowClear
             enterButton={<SearchOutlined />}
             onSearch={handleSearch}
@@ -507,30 +502,30 @@ export default function KnowledgeGraphPage() {
             style={{ width: 110 }}
             value={entityType}
             onChange={setEntityType}
-            options={ENTITY_TYPES}
+            options={ENTITY_TYPES.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
           />
           <div className="kg-depth-control">
-            <span className="kg-depth-label">深度</span>
+            <span className="kg-depth-label">{t("kg.depth")}</span>
             <Slider
               min={1}
               max={4}
               value={graphDepth}
               onChange={setGraphDepth}
               style={{ width: 80 }}
-              tooltip={{ formatter: (v) => `${v} 层` }}
+              tooltip={{ formatter: (v) => t("kg.depth_layers", { n: v }) }}
             />
           </div>
         </div>
         <div className="kg-predicate-bar">
-          <span className="kg-predicate-label">关系:</span>
+          <span className="kg-predicate-label">{t("kg.relations_filter")}</span>
           <Checkbox.Group
             value={selectedPredicates}
             onChange={(vals) => setSelectedPredicates(vals as string[])}
             options={ALL_PREDICATES.map((p) => ({
               value: p.value,
               label: (
-                <Tooltip title={PREDICATE_DESC[p.value]}>
-                  <span>{p.label}</span>
+                <Tooltip title={t(PREDICATE_DESC_KEYS[p.value])}>
+                  <span>{t(p.labelKey)}</span>
                 </Tooltip>
               ),
             }))}
@@ -554,14 +549,14 @@ export default function KnowledgeGraphPage() {
           }}
         >
           <CompassOutlined />
-          <span className="kg-curated-title">推荐探索</span>
+          <span className="kg-curated-title">{t("kg.curated_title")}</span>
           {curatedOpen ? <DownOutlined /> : <RightOutlined />}
         </div>
         {curatedOpen && (
           <div className="kg-curated-body">
             {CURATED_GROUPS.map((g) => (
-              <div key={g.title} className="kg-curated-group">
-                <span className="kg-curated-group-title">{g.title}</span>
+              <div key={g.titleKey} className="kg-curated-group">
+                <span className="kg-curated-group-title">{t(g.titleKey)}</span>
                 <div className="kg-curated-chips">
                   {g.items.map((item) => (
                     <button
@@ -592,7 +587,7 @@ export default function KnowledgeGraphPage() {
                 label: (
                   <span className="kg-tab-label">
                     <UnorderedListOutlined />
-                    <span>搜索结果</span>
+                    <span>{t("kg.search_results")}</span>
                   </span>
                 ),
               },
@@ -601,7 +596,7 @@ export default function KnowledgeGraphPage() {
                 label: (
                   <span className="kg-tab-label">
                     <ApartmentOutlined />
-                    <span>图谱</span>
+                    <span>{t("kg.tab_graph")}</span>
                   </span>
                 ),
               },
@@ -610,7 +605,7 @@ export default function KnowledgeGraphPage() {
                 label: (
                   <span className="kg-tab-label">
                     <ProfileOutlined />
-                    <span>详情</span>
+                    <span>{t("kg.tab_detail")}</span>
                   </span>
                 ),
               },
@@ -628,10 +623,10 @@ export default function KnowledgeGraphPage() {
           <div className="kg-sidebar">
             <div className="kg-sidebar-card">
               <div className="kg-sidebar-title">
-                搜索结果
+                {t("kg.search_results")}
                 {searchResults && (
                   <span style={{ fontWeight: 400, color: "#9a8e7a", marginLeft: 6, fontSize: 11 }}>
-                    {searchResults.total} 条
+                    {t("kg.result_count", { n: searchResults.total })}
                   </span>
                 )}
               </div>
@@ -644,7 +639,7 @@ export default function KnowledgeGraphPage() {
                   <div style={{ padding: 32 }}>
                     <Empty
                       image={Empty.PRESENTED_IMAGE_SIMPLE}
-                      description={query ? "未找到相关实体" : "输入关键词搜索"}
+                      description={query ? t("kg.no_entities_found") : t("kg.enter_keyword")}
                     />
                   </div>
                 ) : (
@@ -667,11 +662,11 @@ export default function KnowledgeGraphPage() {
                         <span
                           className={`kg-type-tag kg-type-tag--${entity.entity_type}`}
                         >
-                          {TYPE_LABEL_MAP[entity.entity_type] || entity.entity_type}
+                          {TYPE_LABEL_KEYS[entity.entity_type] ? t(TYPE_LABEL_KEYS[entity.entity_type]) : entity.entity_type}
                         </span>
                         {entity.relation_count != null && entity.relation_count > 0 && (
                           <span className="kg-result-degree">
-                            {entity.relation_count} 关系
+                            {t("kg.n_relations", { n: entity.relation_count })}
                           </span>
                         )}
                       </div>
@@ -713,8 +708,11 @@ export default function KnowledgeGraphPage() {
                       showIcon
                       message={
                         isMobile
-                          ? `节点过多（${displayGraph.nodes.length}），请减小深度或按需展开`
-                          : `图谱节点超出（${displayGraph.nodes.length} 节点 / ${displayGraph.links.length} 边），可减小深度、过滤关系类型，或双击节点按需展开`
+                          ? t("kg.too_many_nodes", { n: displayGraph.nodes.length })
+                          : t("kg.graph_truncated", {
+                              nodes: displayGraph.nodes.length,
+                              edges: displayGraph.links.length,
+                            })
                       }
                       closable
                     />
@@ -731,20 +729,20 @@ export default function KnowledgeGraphPage() {
                 {/* HTML Legend */}
                 <div className="kg-legend">
                   <div className="kg-legend-section">
-                    <span className="kg-legend-title">节点</span>
+                    <span className="kg-legend-title">{t("kg.nodes_label")}</span>
                     {usedNodeTypes.map((type) => (
                       <span key={type} className="kg-legend-item">
                         <span
                           className="kg-legend-dot"
                           style={{ background: TYPE_COLORS[type] || "#888" }}
                         />
-                        {TYPE_LABELS[type] || type}
+                        {TYPE_LABEL_KEYS[type] ? t(TYPE_LABEL_KEYS[type]) : type}
                       </span>
                     ))}
                   </div>
                   <div style={{ width: 1, height: 16, background: "#e8e0d4" }} />
                   <div className="kg-legend-section">
-                    <span className="kg-legend-title">关系</span>
+                    <span className="kg-legend-title">{t("kg.relations_label")}</span>
                     {usedPredicates.map((pred) => (
                       <span key={pred} className="kg-legend-item">
                         <span
@@ -753,7 +751,7 @@ export default function KnowledgeGraphPage() {
                             background: PREDICATE_COLORS[pred] || "#bbb5a6",
                           }}
                         />
-                        {PREDICATE_LABELS[pred] || pred}
+                        {PREDICATE_LABEL_KEYS[pred] ? t(PREDICATE_LABEL_KEYS[pred]) : pred}
                       </span>
                     ))}
                   </div>
@@ -763,7 +761,7 @@ export default function KnowledgeGraphPage() {
               <div className="kg-graph-empty">
                 <Empty
                   image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description="选择实体查看知识图谱"
+                  description={t("kg.select_entity_hint")}
                 />
               </div>
             )}
@@ -788,7 +786,7 @@ export default function KnowledgeGraphPage() {
               <div className="kg-detail-empty">
                 <Empty
                   image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description="点击节点查看详情"
+                  description={t("kg.click_node_hint")}
                 />
               </div>
             )}

@@ -7,72 +7,74 @@ import {
   UserOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import type { EntityRelationItem } from "../api/client";
 
-const TYPE_LABELS: Record<string, { label: string; className: string }> = {
-  person:    { label: "人物", className: "kg-type-tag kg-type-tag--person" },
-  text:      { label: "典籍", className: "kg-type-tag kg-type-tag--text" },
-  monastery: { label: "寺院", className: "kg-type-tag kg-type-tag--monastery" },
-  school:    { label: "宗派", className: "kg-type-tag kg-type-tag--school" },
-  place:     { label: "地点", className: "kg-type-tag kg-type-tag--place" },
-  concept:   { label: "概念", className: "kg-type-tag kg-type-tag--concept" },
-  dynasty:   { label: "朝代", className: "kg-type-tag kg-type-tag--dynasty" },
+const TYPE_META: Record<string, { labelKey: string; className: string }> = {
+  person:    { labelKey: "geo.type_person", className: "kg-type-tag kg-type-tag--person" },
+  text:      { labelKey: "geo.type_text", className: "kg-type-tag kg-type-tag--text" },
+  monastery: { labelKey: "geo.type_temple", className: "kg-type-tag kg-type-tag--monastery" },
+  school:    { labelKey: "geo.type_school", className: "kg-type-tag kg-type-tag--school" },
+  place:     { labelKey: "geo.type_place", className: "kg-type-tag kg-type-tag--place" },
+  concept:   { labelKey: "geo.type_concept", className: "kg-type-tag kg-type-tag--concept" },
+  dynasty:   { labelKey: "geo.type_dynasty", className: "kg-type-tag kg-type-tag--dynasty" },
 };
 
-const PREDICATE_LABELS: Record<string, string> = {
-  translated: "翻译",
-  active_in: "所处",
-  alt_translation: "异译",
-  parallel_text: "平行文本",
-  member_of_school: "属于宗派",
-  teacher_of: "师承",
-  cites: "引用",
-  commentary_on: "注疏",
-  associated_with: "相关",
+const PREDICATE_LABEL_KEYS: Record<string, string> = {
+  translated: "kg.pred_translated",
+  active_in: "kg.pred_active_in",
+  alt_translation: "kg.pred_alt_translation",
+  parallel_text: "kg.pred_parallel_text",
+  member_of_school: "entity.pred_member_of_school",
+  teacher_of: "geo.lineage",
+  cites: "kg.pred_cites",
+  commentary_on: "kg.pred_commentary_on",
+  associated_with: "kg.pred_associated_with",
 };
 
-/* 属性键中英映射 */
-const PROPERTY_LABELS: Record<string, string> = {
-  role: "角色",
-  dynasty: "朝代",
-  period: "时期",
-  birth: "出生",
-  death: "去世",
-  birthplace: "出生地",
-  school: "宗派",
-  tradition: "传承",
-  title: "称号",
-  aka: "别名",
-  dates: "年代",
-  region: "地区",
-  location: "位置",
-  founded: "创建",
-  founder: "创始人",
-  language: "语言",
-  author: "作者",
-  translator: "译者",
-  year_start: "生年",
-  year_end: "卒年",
+/* 属性键 → i18n key 映射 */
+const PROPERTY_LABEL_KEYS: Record<string, string> = {
+  role: "entity.prop_role",
+  dynasty: "entity.prop_dynasty",
+  period: "entity.prop_period",
+  birth: "entity.prop_birth",
+  death: "entity.prop_death",
+  birthplace: "entity.prop_birthplace",
+  school: "entity.prop_school",
+  tradition: "entity.prop_tradition",
+  title: "entity.prop_title",
+  aka: "entity.prop_aka",
+  dates: "entity.prop_dates",
+  region: "entity.prop_region",
+  location: "entity.prop_location",
+  founded: "entity.prop_founded",
+  founder: "entity.prop_founder",
+  language: "entity.prop_language",
+  author: "entity.prop_author",
+  translator: "entity.prop_translator",
+  year_start: "entity.prop_year_start",
+  year_end: "entity.prop_year_end",
 };
 
 /* Relation-source provenance labels. A relation's `source` records where
    the assertion came from — an authoritative catalogue, auto-extracted
    metadata, or hand-seeded data. Surfacing it lets a scholar judge how
    much to trust an edge instead of taking every relation at face value. */
-const SOURCE_LABELS: Record<string, string> = {
-  dila_catalog: "DILA 规范目录",
-  dila: "DILA 规范库",
-  "auto:cbeta_metadata": "CBETA 元数据",
-  "seed:lineage": "师承谱系（人工校订）",
-  "seed:person_place": "人物地理（人工校订）",
-  "seed:school_affiliation": "宗派归属（人工校订）",
+const SOURCE_LABEL_KEYS: Record<string, string> = {
+  dila_catalog: "entity.source_dila_catalog",
+  dila: "entity.source_dila",
+  "auto:cbeta_metadata": "entity.source_cbeta_metadata",
+  "seed:lineage": "entity.source_seed_lineage",
+  "seed:person_place": "entity.source_seed_person_place",
+  "seed:school_affiliation": "entity.source_seed_school_affiliation",
 };
 
-function prettifySource(source: string): string {
-  if (SOURCE_LABELS[source]) return SOURCE_LABELS[source];
-  if (source.startsWith("seed:")) return "人工校订";
-  if (source.startsWith("auto:")) return "自动提取";
-  if (source.startsWith("dila")) return "DILA 规范库";
+function prettifySource(t: TFunction, source: string): string {
+  if (SOURCE_LABEL_KEYS[source]) return t(SOURCE_LABEL_KEYS[source]);
+  if (source.startsWith("seed:")) return t("entity.source_seed_generic");
+  if (source.startsWith("auto:")) return t("entity.source_auto_generic");
+  if (source.startsWith("dila")) return t("entity.source_dila");
   return source;
 }
 
@@ -97,11 +99,11 @@ interface EntityCardProps {
 }
 
 export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
-  const meta = TYPE_LABELS[entity.entity_type] || {
-    label: entity.entity_type,
-    className: "kg-type-tag",
-  };
+  const meta = TYPE_META[entity.entity_type];
+  const metaLabel = meta ? t(meta.labelKey) : entity.entity_type;
+  const metaClassName = meta?.className ?? "kg-type-tag";
 
   // Group relations by predicate
   const relationsByPredicate: Record<string, EntityRelationItem[]> = {};
@@ -128,8 +130,8 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
         >
           {entity.name_zh}
         </span>
-        <span className={meta.className} style={{ marginLeft: 8 }}>
-          {meta.label}
+        <span className={metaClassName} style={{ marginLeft: 8 }}>
+          {metaLabel}
         </span>
       </div>
 
@@ -152,7 +154,7 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
           style={{ padding: 0, marginBottom: 10, color: "#8b2500", fontSize: 12 }}
           onClick={() => navigate(`/texts/${entity.text_id}`)}
         >
-          查看关联经文
+          {t("entity.view_linked_text")}
         </Button>
       )}
       {entity.entity_type === "concept" && (
@@ -165,7 +167,7 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
             navigate(`/dict/${encodeURIComponent(entity.name_zh)}`)
           }
         >
-          查辞典释义
+          {t("entity.view_dict")}
         </Button>
       )}
       {entity.entity_type === "person" && (
@@ -176,7 +178,7 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
           style={{ padding: 0, marginBottom: 10, color: "#8b2500", fontSize: 12 }}
           onClick={() => navigate(`/person/${entity.id}`)}
         >
-          人物主页
+          {t("entity.person_page")}
         </Button>
       )}
 
@@ -184,25 +186,25 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
       <div style={{ marginBottom: 10 }}>
         {entity.name_sa && (
           <div style={{ fontSize: 12, color: "#5c4f3d", marginBottom: 2 }}>
-            <span style={{ color: "#9a8e7a", display: "inline-block", width: 48 }}>梵文</span>
+            <span style={{ color: "#9a8e7a", display: "inline-block", width: 48 }}>{t("lang.sa")}</span>
             {entity.name_sa}
           </div>
         )}
         {entity.name_pi && (
           <div style={{ fontSize: 12, color: "#5c4f3d", marginBottom: 2 }}>
-            <span style={{ color: "#9a8e7a", display: "inline-block", width: 48 }}>巴利文</span>
+            <span style={{ color: "#9a8e7a", display: "inline-block", width: 48 }}>{t("lang.pi")}</span>
             {entity.name_pi}
           </div>
         )}
         {entity.name_bo && (
           <div style={{ fontSize: 12, color: "#5c4f3d", marginBottom: 2 }}>
-            <span style={{ color: "#9a8e7a", display: "inline-block", width: 48 }}>藏文</span>
+            <span style={{ color: "#9a8e7a", display: "inline-block", width: 48 }}>{t("lang.bo")}</span>
             {entity.name_bo}
           </div>
         )}
         {entity.name_en && (
           <div style={{ fontSize: 12, color: "#5c4f3d", marginBottom: 2 }}>
-            <span style={{ color: "#9a8e7a", display: "inline-block", width: 48 }}>英文</span>
+            <span style={{ color: "#9a8e7a", display: "inline-block", width: 48 }}>{t("lang.en")}</span>
             {entity.name_en}
           </div>
         )}
@@ -220,7 +222,7 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
           }}
         >
           {Object.entries(entity.properties)
-            .filter(([key]) => key in PROPERTY_LABELS)
+            .filter(([key]) => key in PROPERTY_LABEL_KEYS)
             .filter(([key]) => !["latitude", "longitude", "geo_source", "province", "city", "district"].includes(key) && !key.startsWith("wikidata:"))
             .map(([key, value]) => (
             <div
@@ -228,7 +230,7 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
               style={{ fontSize: 12, color: "#5c4f3d", marginBottom: 2 }}
             >
               <span style={{ color: "#9a8e7a", display: "inline-block", width: 48 }}>
-                {PROPERTY_LABELS[key] || key}
+                {PROPERTY_LABEL_KEYS[key] ? t(PROPERTY_LABEL_KEYS[key]) : key}
               </span>
               {String(value)}
             </div>
@@ -279,7 +281,7 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
               marginBottom: 8,
             }}
           >
-            关系
+            {t("kg.relations_label")}
           </div>
           {Object.entries(relationsByPredicate).map(([predicate, rels]) => {
             return (
@@ -294,7 +296,7 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
                     gap: 4,
                   }}
                 >
-                  {PREDICATE_LABELS[predicate] || predicate}
+                  {PREDICATE_LABEL_KEYS[predicate] ? t(PREDICATE_LABEL_KEYS[predicate]) : predicate}
                   <span
                     style={{
                       background: "#f0ebe2",
@@ -308,10 +310,9 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
                   </span>
                 </div>
                 {rels.map((rel) => {
-                  const targetMeta = TYPE_LABELS[rel.target_type] || {
-                    label: rel.target_type,
-                    className: "kg-type-tag",
-                  };
+                  const targetMeta = TYPE_META[rel.target_type];
+                  const targetLabel = targetMeta ? t(targetMeta.labelKey) : rel.target_type;
+                  const targetClassName = targetMeta?.className ?? "kg-type-tag";
                   return (
                     <div
                       key={`${rel.predicate}-${rel.target_id}-${rel.direction}`}
@@ -342,12 +343,12 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
                           style={{ color: "#d9d0c1", fontSize: 9 }}
                         />
                       )}
-                      <span className={targetMeta.className} style={{ fontSize: 9, lineHeight: "16px", padding: "0 4px" }}>
-                        {targetMeta.label}
+                      <span className={targetClassName} style={{ fontSize: 9, lineHeight: "16px", padding: "0 4px" }}>
+                        {targetLabel}
                       </span>
                       <span>{rel.target_name}</span>
                       {rel.source && (
-                        <Tooltip title={`关系出处：${rel.source}`}>
+                        <Tooltip title={t("entity.relation_source_tooltip", { source: rel.source })}>
                           <span
                             style={{
                               fontSize: 10,
@@ -356,7 +357,7 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
                               flexShrink: 0,
                             }}
                           >
-                            据 {prettifySource(rel.source)}
+                            {t("entity.source_according_to", { name: prettifySource(t, rel.source) })}
                           </span>
                         </Tooltip>
                       )}

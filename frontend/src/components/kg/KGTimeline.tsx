@@ -11,6 +11,8 @@
  */
 
 import { useMemo, useRef, useState, useEffect, useLayoutEffect } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { Spin, Empty, Tooltip, Drawer, List } from "antd";
 import { TYPE_COLORS } from "../ForceGraph";
 import type { KGTimelineEntity } from "../../api/client";
@@ -23,17 +25,17 @@ interface KGTimelineProps {
 }
 
 // 年份格式化：负数显示为 BCE，正数直接显示
-function formatYear(year: number): string {
-  if (year < 0) return `公元前 ${Math.abs(year)}`;
-  return `公元 ${year}`;
+function formatYear(t: TFunction, year: number): string {
+  if (year < 0) return t("geo.year_bce", { n: Math.abs(year) });
+  return t("geo.year_ce", { n: year });
 }
 
 // Bucket 时间范围标签：endInclusive 越过当前年份时显示「至今」
 // （avoid 「公元 2049」 这种落到未来的别扭文案，与 dynasty band 「現代 — 至今」一致）
-function formatBucketRange(startYear: number, endInclusive: number): string {
+function formatBucketRange(t: TFunction, startYear: number, endInclusive: number): string {
   const now = new Date().getFullYear();
-  const tail = endInclusive > now ? "至今" : formatYear(endInclusive);
-  return `${formatYear(startYear)} — ${tail}`;
+  const tail = endInclusive > now ? t("kg.to_present") : formatYear(t, endInclusive);
+  return `${formatYear(t, startYear)} — ${tail}`;
 }
 
 // 每个 entity_type 在时间轴上的垂直分组序号
@@ -61,21 +63,22 @@ const MIN_DENSE_BAR_HEIGHT = 6;
 // 朝代分段（非重叠版本，用于底部学术信息条带）
 // 边界做了简化：北宋/遼/金、南宋/金/元、隋/南北朝 等并存期取主流。
 // 颜色用交错的两种暖色调，与正文柱条主色（#b85450 person）拉开。
+// 朝代名是史学专名（与底层数据一致，繁体书写），不随 UI 语言切换。
 const DYNASTIES: { name: string; startYear: number; endYear: number; fill: string }[] = [
-  { name: "西晉", startYear: 265, endYear: 317, fill: "#e8dccc" },
-  { name: "東晉", startYear: 317, endYear: 420, fill: "#d6c9b3" },
-  { name: "南北朝", startYear: 420, endYear: 589, fill: "#e8dccc" },
-  { name: "隋", startYear: 589, endYear: 618, fill: "#d6c9b3" },
-  { name: "唐", startYear: 618, endYear: 907, fill: "#e8dccc" },
-  { name: "五代", startYear: 907, endYear: 960, fill: "#d6c9b3" },
-  { name: "北宋", startYear: 960, endYear: 1127, fill: "#e8dccc" },
-  { name: "南宋", startYear: 1127, endYear: 1279, fill: "#d6c9b3" },
-  { name: "元", startYear: 1279, endYear: 1368, fill: "#e8dccc" },
-  { name: "明", startYear: 1368, endYear: 1644, fill: "#d6c9b3" },
-  { name: "清", startYear: 1644, endYear: 1912, fill: "#e8dccc" },
-  { name: "民國", startYear: 1912, endYear: 1949, fill: "#d6c9b3" },
+  { name: "西晉", startYear: 265, endYear: 317, fill: "#e8dccc" }, // i18n-exempt
+  { name: "東晉", startYear: 317, endYear: 420, fill: "#d6c9b3" }, // i18n-exempt
+  { name: "南北朝", startYear: 420, endYear: 589, fill: "#e8dccc" }, // i18n-exempt
+  { name: "隋", startYear: 589, endYear: 618, fill: "#d6c9b3" }, // i18n-exempt
+  { name: "唐", startYear: 618, endYear: 907, fill: "#e8dccc" }, // i18n-exempt
+  { name: "五代", startYear: 907, endYear: 960, fill: "#d6c9b3" }, // i18n-exempt
+  { name: "北宋", startYear: 960, endYear: 1127, fill: "#e8dccc" }, // i18n-exempt
+  { name: "南宋", startYear: 1127, endYear: 1279, fill: "#d6c9b3" }, // i18n-exempt
+  { name: "元", startYear: 1279, endYear: 1368, fill: "#e8dccc" }, // i18n-exempt
+  { name: "明", startYear: 1368, endYear: 1644, fill: "#d6c9b3" }, // i18n-exempt
+  { name: "清", startYear: 1644, endYear: 1912, fill: "#e8dccc" }, // i18n-exempt
+  { name: "民國", startYear: 1912, endYear: 1949, fill: "#d6c9b3" }, // i18n-exempt
   // 現代 endYear 用当前年份动态求值，tooltip 显示「至今」。
-  { name: "現代", startYear: 1949, endYear: new Date().getFullYear(), fill: "#e8dccc" },
+  { name: "現代", startYear: 1949, endYear: new Date().getFullYear(), fill: "#e8dccc" }, // i18n-exempt
 ];
 const DYNASTY_LABEL_MIN_W = 8;    // 段宽 < 8px 才完全省略；其余靠 textLength 压缩
 
@@ -112,6 +115,7 @@ export default function KGTimeline({
   onEntityClick,
   selectedEntityId,
 }: KGTimelineProps) {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(800);
   const [openBucket, setOpenBucket] = useState<PersonBucket | null>(null);
@@ -223,7 +227,7 @@ export default function KGTimeline({
     return (
       <div className="kg-timeline-wrap" ref={containerRef}>
         <div className="kg-timeline-empty">
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无时间数据" />
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("kg.no_timeline_data")} />
         </div>
       </div>
     );
@@ -235,7 +239,7 @@ export default function KGTimeline({
         width={width}
         height={svgHeight}
         className="kg-timeline-svg"
-        aria-label="知识图谱时间轴"
+        aria-label={t("kg.timeline_aria")}
       >
         {/* ── 坐标轴底线 ── */}
         <line
@@ -266,7 +270,7 @@ export default function KGTimeline({
                 fill="#9a8e7a"
                 fontFamily="'Noto Serif SC', serif"
               >
-                {y < 0 ? `前${Math.abs(y)}` : y}
+                {y < 0 ? t("kg.year_bce_short", { n: Math.abs(y) }) : y}
               </text>
             </g>
           );
@@ -296,7 +300,11 @@ export default function KGTimeline({
           return (
             <Tooltip
               key={d.name}
-              title={`${d.name}（公元 ${d.startYear} — ${d.name === "現代" ? "至今" : d.endYear}）`}
+              title={t("kg.dynasty_tooltip", {
+                name: d.name,
+                start: d.startYear,
+                end: d.name === "現代" ? t("kg.to_present") : d.endYear,
+              })}
               placement="top"
             >
               <g style={{ cursor: "help" }}>
@@ -369,12 +377,16 @@ export default function KGTimeline({
                       .join("、");
                     const more =
                       bucket.entities.length > 5
-                        ? `…等 ${bucket.entities.length} 人`
+                        ? t("kg.bucket_more", { n: bucket.entities.length })
                         : "";
                     return (
                       <Tooltip
                         key={`bucket-${bucket.startYear}`}
-                        title={`${formatBucketRange(bucket.startYear, bucket.endYear - 1)}\u3000${bucket.entities.length} 人物：${sample}${more}（点击查看全部）`}
+                        title={t("kg.bucket_tooltip", {
+                          range: formatBucketRange(t, bucket.startYear, bucket.endYear - 1),
+                          n: bucket.entities.length,
+                          names: `${sample}${more}`,
+                        })}
                         placement="top"
                         overlayStyle={{ maxWidth: 320 }}
                       >
@@ -393,7 +405,7 @@ export default function KGTimeline({
                           onClick={() => setOpenBucket(bucket)}
                           tabIndex={0}
                           role="button"
-                          aria-label={`${formatBucketRange(bucket.startYear, bucket.endYear - 1)} ${bucket.entities.length} 人物`}
+                          aria-label={`${formatBucketRange(t, bucket.startYear, bucket.endYear - 1)} ${t("kg.n_people", { n: bucket.entities.length })}`}
                           onKeyDown={(ev) => {
                             if (ev.key === "Enter" || ev.key === " ") {
                               ev.preventDefault();
@@ -417,7 +429,11 @@ export default function KGTimeline({
                     return (
                       <Tooltip
                         key={e.id}
-                        title={`${e.name_zh}（${formatYear(e.year_start)} — ${formatYear(e.year_end)}）`}
+                        title={t("kg.entity_year_range", {
+                          name: e.name_zh,
+                          start: formatYear(t, e.year_start),
+                          end: formatYear(t, e.year_end),
+                        })}
                         placement="top"
                       >
                         <rect
@@ -450,7 +466,10 @@ export default function KGTimeline({
                   return (
                     <Tooltip
                       key={e.id}
-                      title={`${e.name_zh}（${formatYear(e.year_start)}）`}
+                      title={t("kg.entity_year_single", {
+                        name: e.name_zh,
+                        year: formatYear(t, e.year_start),
+                      })}
                       placement="top"
                     >
                       <circle
@@ -490,14 +509,14 @@ export default function KGTimeline({
               className="kg-timeline-legend-swatch"
               style={{ background: TYPE_COLORS[etype] ?? "#888" }}
             />
-            {etype === "person" ? "人物" : etype === "dynasty" ? "朝代" : etype}
+            {etype === "person" ? t("geo.type_person") : etype === "dynasty" ? t("geo.type_dynasty") : etype}
             <span className="kg-timeline-legend-count">
               {rowGroups[etype].length}
             </span>
           </span>
         ))}
         <span className="kg-timeline-legend-hint">
-          密集时段折叠为柱条，点击展开
+          {t("kg.timeline_legend_hint")}
         </span>
       </div>
 
@@ -505,7 +524,10 @@ export default function KGTimeline({
       <Drawer
         title={
           openBucket
-            ? `${formatBucketRange(openBucket.startYear, openBucket.endYear - 1)}\u3000${openBucket.entities.length} 位人物`
+            ? t("kg.bucket_drawer_title", {
+                range: formatBucketRange(t, openBucket.startYear, openBucket.endYear - 1),
+                n: openBucket.entities.length,
+              })
             : ""
         }
         placement="right"
@@ -519,9 +541,9 @@ export default function KGTimeline({
             size="small"
             dataSource={openBucket.entities}
             renderItem={(e) => {
-              const yearLabel = `${formatYear(e.year_start)}${
+              const yearLabel = `${formatYear(t, e.year_start)}${
                 e.year_end != null && e.year_end !== e.year_start
-                  ? ` — ${formatYear(e.year_end)}`
+                  ? ` — ${formatYear(t, e.year_end)}`
                   : ""
               }`;
               const open = () => {
