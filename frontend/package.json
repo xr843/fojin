@@ -14,7 +14,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "i18n:scan": "node scripts/scan-hardcoded-zh.mjs",
+    "i18n:check": "node scripts/scan-hardcoded-zh.mjs --check"
   },
   "dependencies": {
     "@ant-design/charts": "^2.6.7",

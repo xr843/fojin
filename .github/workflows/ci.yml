@@ -55,6 +55,9 @@ jobs:
       - name: Lint (ESLint)
         run: npx eslint src/ --max-warnings 50
 
+      - name: i18n ratchet (no new hardcoded Chinese)
+        run: npm run i18n:check
+
       - name: Type check
         run: npx tsc -b --noEmit
 
