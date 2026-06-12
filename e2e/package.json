@@ -1,0 +1,11 @@
+{
+  "name": "fojin-e2e",
+  "private": true,
+  "description": "Post-deploy smoke tests against the live site (or any BASE_URL)",
+  "scripts": {
+    "smoke": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}

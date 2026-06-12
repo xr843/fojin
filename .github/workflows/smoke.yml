@@ -1,0 +1,55 @@
+name: Production smoke
+
+# Post-deploy monitoring, NOT a PR gate — never mark this workflow as a
+# required check (it doesn't run on PRs at all).
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Target base URL"
+        default: "https://fojin.app"
+        required: false
+  schedule:
+    - cron: "17 1,13 * * *" # twice daily, UTC
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Smoke against production
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: e2e
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
+      # On master pushes the webhook CD needs a few minutes to build and
+      # restart containers; give it a head start so we test the new deploy,
+      # not the old one.
+      - name: Wait for CD rollout
+        if: github.event_name == 'push'
+        run: sleep 300
+
+      - name: Install Playwright
+        run: npm install && npx playwright install --with-deps chromium
+
+      - name: Run smoke suite
+        env:
+          BASE_URL: ${{ github.event.inputs.base_url || 'https://fojin.app' }}
+        run: npx playwright test
+
+      - name: Upload traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-traces
+          path: e2e/test-results/
+          retention-days: 7

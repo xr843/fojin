@@ -225,8 +225,31 @@ if $frontend_changed; then
     if [ "$i" -eq 15 ]; then fail "frontend 健康检查超时 (30s)"; fi
     sleep 2
   done
-  echo "    注意: 入口文件 hash 可能不变, 确认前端真上线请抓一个 lazy chunk,"
-  echo "          不要只凭首页 200 判断。"
+  # 自动断言取代"请手动抓 lazy chunk"提示 (2026-06 #706/#708 部署事故教训):
+  # 首页 200 不等于新版上线 —— 必须验证 index 引用的资产真实可取、
+  # 且容器内 locale 文件和本次部署的代码一致。
+  FE_BASE="http://localhost:${FE_PORT}"
+
+  # (a) index.html 引用的 entry JS 必须 200
+  ENTRY_JS="$(curl -sf "${FE_BASE}/" | grep -oE '/assets/index-[A-Za-z0-9_-]+\.js' | head -1 || true)"
+  if [ -z "$ENTRY_JS" ]; then fail "index.html 里找不到 entry JS 引用"; fi
+  curl -sf "${FE_BASE}${ENTRY_JS}" >/dev/null || fail "entry JS 404: ${ENTRY_JS}"
+
+  # (b) entry 引用的第一个 lazy chunk 也必须 200 (entry hash 不变时这才是真信号)
+  LAZY_CHUNK="$(curl -sf "${FE_BASE}${ENTRY_JS}" | grep -oE '[A-Za-z0-9_-]+-[A-Za-z0-9_-]{8}\.js' | grep -v '^index-' | head -1 || true)"
+  if [ -n "$LAZY_CHUNK" ]; then
+    curl -sf "${FE_BASE}/assets/${LAZY_CHUNK}" >/dev/null || fail "lazy chunk 404: ${LAZY_CHUNK}"
+    echo "    lazy chunk OK (${LAZY_CHUNK})"
+  fi
+
+  # (c) 容器内 en locale 的 key 数必须和本次部署的源码一致
+  #     (#708 教训: 服务旧 translation.json 时新 key 全部静默回退中文)
+  REPO_EN_KEYS="$(python3 -c "import json;print(len(json.load(open('frontend/public/locales/en/translation.json'))))" 2>/dev/null || echo 0)"
+  SERVED_EN_KEYS="$(curl -sf "${FE_BASE}/locales/en/translation.json" | python3 -c "import json,sys;print(len(json.load(sys.stdin)))" 2>/dev/null || echo -1)"
+  if [ "$REPO_EN_KEYS" != "$SERVED_EN_KEYS" ]; then
+    fail "en locale 不一致: repo=${REPO_EN_KEYS} keys, 容器返回=${SERVED_EN_KEYS} keys"
+  fi
+  echo "    locale OK (en ${SERVED_EN_KEYS} keys, 与 repo 一致)"
 fi
 
 docker compose ps
