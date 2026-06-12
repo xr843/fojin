@@ -1,3 +1,4 @@
+import type { TFunction } from "i18next";
 /**
  * 统一的外部数据源搜索 URL 构建器
  * 所有需要生成外部搜索链接的组件都应使用此文件
@@ -136,6 +137,16 @@ export const LANG_NAMES: Record<string, string> = {
 
 export function getLangName(code: string): string {
   return LANG_NAMES[code] || code;
+}
+
+/**
+ * Locale-aware language name for display. getLangName returns the Chinese
+ * data name (used as grouping/dedup keys); this resolves through lang.*
+ * translation keys with the Chinese name as fallback. Pass t from
+ * useTranslation so language switches re-render callers.
+ */
+export function localizedLangName(code: string, t: TFunction): string {
+  return t(`lang.${code}`, { defaultValue: LANG_NAMES[code] || code });
 }
 
 /** 中文名称 → ISO 代码反向映射（处理数据库中未规范化的语言名） */
