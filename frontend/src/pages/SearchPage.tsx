@@ -543,7 +543,7 @@ export default function SearchPage() {
                 >
                   &ldquo;{data.suggestion}&rdquo;
                 </a>
-                ？
+                {t("search.dym_qmark")}
               </div>
             )}
 
