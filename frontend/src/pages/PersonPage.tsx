@@ -7,6 +7,8 @@
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import {
   Spin,
   Typography,
@@ -33,35 +35,35 @@ import "../styles/person.css";
 
 interface SameAsLink {
   key: string;          // external_ids 的 key（wikidata / dila / ...）
-  authorityLabel: string; // 显示给用户的中文权威库名
+  authorityLabelKey: string; // 权威库名的 i18n key，渲染时 t() 取值
   idLabel: string;      // 例如 "Q12345" or "P0000001"
   url: string;          // 直接可点击的稳定 URL
 }
 
 const AUTHORITY_MAP: Record<
   string,
-  { label: string; urlFor: (id: string) => string }
+  { labelKey: string; urlFor: (id: string) => string }
 > = {
   wikidata: {
-    label: "Wikidata",
+    labelKey: "person.authority_wikidata",
     urlFor: (id) => `https://www.wikidata.org/wiki/${encodeURIComponent(id)}`,
   },
   dila: {
-    label: "DILA 人名规范",
+    labelKey: "person.authority_dila",
     urlFor: (id) =>
       `https://authority.dila.edu.tw/person/?fromInner=${encodeURIComponent(id)}`,
   },
   bdrc: {
-    label: "BDRC",
+    labelKey: "person.authority_bdrc",
     urlFor: (id) =>
       `https://library.bdrc.io/show/bdr:${encodeURIComponent(id)}`,
   },
   viaf: {
-    label: "VIAF",
+    labelKey: "person.authority_viaf",
     urlFor: (id) => `https://viaf.org/viaf/${encodeURIComponent(id)}`,
   },
   loc: {
-    label: "LoC 名称权威",
+    labelKey: "person.authority_loc",
     urlFor: (id) =>
       `https://id.loc.gov/authorities/names/${encodeURIComponent(id)}`,
   },
@@ -78,7 +80,7 @@ function buildSameAsLinks(
     if (!entry) continue; // 未知权威库静默跳过——不要破前端
     links.push({
       key,
-      authorityLabel: entry.label,
+      authorityLabelKey: entry.labelKey,
       idLabel: value,
       url: entry.urlFor(value),
     });
@@ -120,7 +122,7 @@ function buildPersonJsonLd(
   const payload: PersonJsonLd = {
     "@context": "https://schema.org",
     "@type": "Person",
-    name: entity.name_zh || `佛教人物 #${entity.id}`,
+    name: entity.name_zh || `佛教人物 #${entity.id}`, // i18n-exempt — JSON-LD payload for crawlers, not rendered UI
     url: `https://fojin.app/person/${entity.id}`,
   };
   if (alt.length) payload.alternateName = alt;
@@ -172,16 +174,16 @@ function personSchool(props: Record<string, unknown> | null | undefined): string
 
 // ── 关系分组与标签 ──────────────────────────────────────────────────
 
-const PREDICATE_LABELS: Record<string, string> = {
-  translated: "翻译",
-  active_in: "所处",
-  alt_translation: "异译",
-  parallel_text: "平行文本",
-  member_of_school: "属于宗派",
-  teacher_of: "师承",
-  cites: "引用",
-  commentary_on: "注疏",
-  associated_with: "相关",
+const PREDICATE_LABEL_KEYS: Record<string, string> = {
+  translated: "kg.pred_translated",
+  active_in: "kg.pred_active_in",
+  alt_translation: "kg.pred_alt_translation",
+  parallel_text: "kg.pred_parallel_text",
+  member_of_school: "entity.pred_member_of_school",
+  teacher_of: "geo.lineage",
+  cites: "kg.pred_cites",
+  commentary_on: "kg.pred_commentary_on",
+  associated_with: "kg.pred_associated_with",
 };
 
 // 按展示优先级排列
@@ -197,30 +199,30 @@ const PREDICATE_ORDER = [
   "parallel_text",
 ];
 
-const TYPE_LABELS: Record<string, { label: string; className: string }> = {
-  person:    { label: "人物", className: "kg-type-tag kg-type-tag--person" },
-  text:      { label: "典籍", className: "kg-type-tag kg-type-tag--text" },
-  monastery: { label: "寺院", className: "kg-type-tag kg-type-tag--monastery" },
-  school:    { label: "宗派", className: "kg-type-tag kg-type-tag--school" },
-  place:     { label: "地点", className: "kg-type-tag kg-type-tag--place" },
-  concept:   { label: "概念", className: "kg-type-tag kg-type-tag--concept" },
-  dynasty:   { label: "朝代", className: "kg-type-tag kg-type-tag--dynasty" },
+const TYPE_META: Record<string, { labelKey: string; className: string }> = {
+  person:    { labelKey: "geo.type_person", className: "kg-type-tag kg-type-tag--person" },
+  text:      { labelKey: "geo.type_text", className: "kg-type-tag kg-type-tag--text" },
+  monastery: { labelKey: "geo.type_temple", className: "kg-type-tag kg-type-tag--monastery" },
+  school:    { labelKey: "geo.type_school", className: "kg-type-tag kg-type-tag--school" },
+  place:     { labelKey: "geo.type_place", className: "kg-type-tag kg-type-tag--place" },
+  concept:   { labelKey: "geo.type_concept", className: "kg-type-tag kg-type-tag--concept" },
+  dynasty:   { labelKey: "geo.type_dynasty", className: "kg-type-tag kg-type-tag--dynasty" },
 };
 
-const SOURCE_LABELS: Record<string, string> = {
-  dila_catalog: "DILA 规范目录",
-  dila: "DILA 规范库",
-  "auto:cbeta_metadata": "CBETA 元数据",
-  "seed:lineage": "师承谱系（人工校订）",
-  "seed:person_place": "人物地理（人工校订）",
-  "seed:school_affiliation": "宗派归属（人工校订）",
+const SOURCE_LABEL_KEYS: Record<string, string> = {
+  dila_catalog: "entity.source_dila_catalog",
+  dila: "entity.source_dila",
+  "auto:cbeta_metadata": "entity.source_cbeta_metadata",
+  "seed:lineage": "entity.source_seed_lineage",
+  "seed:person_place": "entity.source_seed_person_place",
+  "seed:school_affiliation": "entity.source_seed_school_affiliation",
 };
 
-function prettifySource(source: string): string {
-  if (SOURCE_LABELS[source]) return SOURCE_LABELS[source];
-  if (source.startsWith("seed:")) return "人工校订";
-  if (source.startsWith("auto:")) return "自动提取";
-  if (source.startsWith("dila")) return "DILA 规范库";
+function prettifySource(t: TFunction, source: string): string {
+  if (SOURCE_LABEL_KEYS[source]) return t(SOURCE_LABEL_KEYS[source]);
+  if (source.startsWith("seed:")) return t("entity.source_seed_generic");
+  if (source.startsWith("auto:")) return t("entity.source_auto_generic");
+  if (source.startsWith("dila")) return t("entity.source_dila");
   return source;
 }
 
@@ -234,6 +236,7 @@ function targetLink(rel: EntityRelationItem): string {
 // ── 主组件 ─────────────────────────────────────────────────────────
 
 export default function PersonPage() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
@@ -260,13 +263,13 @@ export default function PersonPage() {
         <Empty
           description={
             <span style={{ fontFamily: '"Noto Serif SC", serif', color: "#7a6e5c" }}>
-              未找到该人物
+              {t("person.not_found")}
             </span>
           }
           style={{ padding: "80px 0" }}
         />
         <div style={{ textAlign: "center" }}>
-          <Button onClick={() => navigate("/kg")}>返回知识图谱</Button>
+          <Button onClick={() => navigate("/kg")}>{t("person.back_to_kg")}</Button>
         </div>
       </div>
     );
@@ -298,10 +301,13 @@ export default function PersonPage() {
 
   const metaBits = [dynasty, nationality, school].filter(Boolean);
 
-  const helmetTitle = `${entity.name_zh}${dates} — 佛教人物 | 佛津 FoJin`;
+  const helmetTitle = t("person.helmet_title", { name: entity.name_zh, dates });
   const helmetDesc = (
     entity.description ||
-    `${entity.name_zh}${metaBits.length ? "（" + metaBits.join(" · ") + "）" : ""} — 佛教数字人文知识图谱`
+    t("person.helmet_desc_fallback", {
+      name: entity.name_zh,
+      meta: metaBits.length ? "（" + metaBits.join(" · ") + "）" : "",
+    })
   ).slice(0, 200);
 
   return (
@@ -314,7 +320,7 @@ export default function PersonPage() {
         <meta property="og:title" content={helmetTitle} />
         <meta property="og:description" content={helmetDesc} />
         <meta property="og:url" content={`https://fojin.app/person/${entity.id}`} />
-        <meta property="og:site_name" content="佛津 FoJin" />
+        <meta property="og:site_name" content={t("person.og_site_name")} />
         <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
       </Helmet>
 
@@ -324,14 +330,14 @@ export default function PersonPage() {
           className="person-breadcrumb-link"
           onClick={() => navigate("/")}
         >
-          首页
+          {t("person.breadcrumb_home")}
         </span>
         <span className="person-breadcrumb-sep">›</span>
         <span
           className="person-breadcrumb-link"
           onClick={() => navigate("/kg")}
         >
-          知识图谱
+          {t("nav.kg")}
         </span>
         <span className="person-breadcrumb-sep">›</span>
         <span className="person-breadcrumb-current">{entity.name_zh}</span>
@@ -346,7 +352,7 @@ export default function PersonPage() {
               {entity.name_zh}
               {dates && <span className="person-dates">{dates}</span>}
             </h1>
-            <span className="kg-type-tag kg-type-tag--person">人物</span>
+            <span className="kg-type-tag kg-type-tag--person">{t("geo.type_person")}</span>
           </div>
 
           {/* 元信息徽章行 */}
@@ -364,25 +370,25 @@ export default function PersonPage() {
           <div className="person-altnames">
             {entity.name_sa && (
               <div className="person-altname-row">
-                <span className="person-altname-lang">梵文</span>
+                <span className="person-altname-lang">{t("lang.sa")}</span>
                 <span className="person-altname-val">{entity.name_sa}</span>
               </div>
             )}
             {entity.name_pi && (
               <div className="person-altname-row">
-                <span className="person-altname-lang">巴利</span>
+                <span className="person-altname-lang">{t("person.lang_pi")}</span>
                 <span className="person-altname-val">{entity.name_pi}</span>
               </div>
             )}
             {entity.name_bo && (
               <div className="person-altname-row">
-                <span className="person-altname-lang">藏文</span>
+                <span className="person-altname-lang">{t("lang.bo")}</span>
                 <span className="person-altname-val">{entity.name_bo}</span>
               </div>
             )}
             {entity.name_en && (
               <div className="person-altname-row">
-                <span className="person-altname-lang">英文</span>
+                <span className="person-altname-lang">{t("lang.en")}</span>
                 <span className="person-altname-val">{entity.name_en}</span>
               </div>
             )}
@@ -399,7 +405,7 @@ export default function PersonPage() {
         {/* 标准标识符 — 标记 fojin 为 LOD 节点的桥梁 */}
         {sameAsLinks.length > 0 && (
           <div className="person-extlinks">
-            <div className="person-extlinks-label">标准标识符</div>
+            <div className="person-extlinks-label">{t("person.identifiers")}</div>
             {sameAsLinks.map((link) => (
               <a
                 key={link.key}
@@ -407,10 +413,10 @@ export default function PersonPage() {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="person-extlink"
-                title={`${link.authorityLabel} 权威库`}
+                title={t("person.authority_tooltip", { name: t(link.authorityLabelKey) })}
               >
                 <LinkOutlined style={{ marginRight: 4 }} />
-                {link.authorityLabel} {link.idLabel}
+                {t(link.authorityLabelKey)} {link.idLabel}
               </a>
             ))}
           </div>
@@ -423,7 +429,7 @@ export default function PersonPage() {
             onClick={() => navigate(`/kg?id=${entity.id}`)}
             className="person-kg-btn"
           >
-            在知识图谱中查看
+            {t("person.view_in_kg")}
           </Button>
         </div>
       </div>
@@ -431,23 +437,22 @@ export default function PersonPage() {
       {/* ── 关系面板 ── */}
       {sortedPredicates.length > 0 && (
         <div className="person-card person-relations-card">
-          <h2 className="person-section-title">关系网络</h2>
+          <h2 className="person-section-title">{t("person.relations_title")}</h2>
           {sortedPredicates.map((predicate) => {
             const rels = relationsByPredicate[predicate];
             return (
               <div key={predicate} className="person-rel-group">
                 <div className="person-rel-group-head">
                   <span className="person-rel-label">
-                    {PREDICATE_LABELS[predicate] || predicate}
+                    {PREDICATE_LABEL_KEYS[predicate] ? t(PREDICATE_LABEL_KEYS[predicate]) : predicate}
                   </span>
                   <span className="person-rel-count">{rels.length}</span>
                 </div>
                 <div className="person-rel-items">
                   {rels.map((rel) => {
-                    const tMeta = TYPE_LABELS[rel.target_type] || {
-                      label: rel.target_type,
-                      className: "kg-type-tag",
-                    };
+                    const relMeta = TYPE_META[rel.target_type];
+                    const relTypeLabel = relMeta ? t(relMeta.labelKey) : rel.target_type;
+                    const relTypeClassName = relMeta?.className ?? "kg-type-tag";
                     return (
                       <Link
                         key={`${rel.predicate}-${rel.target_id}-${rel.direction}`}
@@ -460,16 +465,16 @@ export default function PersonPage() {
                           <ArrowLeftOutlined className="person-rel-arrow" />
                         )}
                         <span
-                          className={tMeta.className}
+                          className={relTypeClassName}
                           style={{ fontSize: 9, lineHeight: "16px", padding: "0 4px" }}
                         >
-                          {tMeta.label}
+                          {relTypeLabel}
                         </span>
                         <span className="person-rel-name">{rel.target_name}</span>
                         {rel.source && (
-                          <Tooltip title={`关系出处：${rel.source}`}>
+                          <Tooltip title={t("entity.relation_source_tooltip", { source: rel.source })}>
                             <span className="person-rel-source">
-                              据 {prettifySource(rel.source)}
+                              {t("entity.source_according_to", { name: prettifySource(t, rel.source) })}
                             </span>
                           </Tooltip>
                         )}
@@ -491,7 +496,7 @@ export default function PersonPage() {
             image={Empty.PRESENTED_IMAGE_SIMPLE}
             description={
               <span style={{ color: "#9a8e7a", fontFamily: '"Noto Serif SC", serif' }}>
-                暂无关系数据
+                {t("person.no_relations")}
               </span>
             }
           />
