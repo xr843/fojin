@@ -14,6 +14,10 @@
  * adding new debt is not. After fixing a page, run with --update to lower
  * the baseline so it can't regress.
  *
+ * Note: renaming or splitting a file trips the ratchet (the new path has an
+ * implicit baseline of 0) — run --update and commit the baseline with the
+ * rename. Same for intentionally moving strings between files.
+ *
  * Exemptions:
  *   - anything inside a t(...) call (keys like region.中国 are legitimate)
  *   - comments, import paths, type space (AST-level, automatic)
@@ -164,7 +168,13 @@ for (const [file, count] of Object.entries(counts)) {
   if (count > allowed) {
     failed = true;
     console.error(`✗ ${file}: ${count} hardcoded Chinese strings (baseline ${allowed})`);
-    for (const { line, text } of results[file]) console.error(`    ${line}: ${text}`);
+    // Cap the listing — a 1,000-line legacy file would bury the new string.
+    for (const { line, text } of results[file].slice(0, 20)) {
+      console.error(`    ${line}: ${text}`);
+    }
+    if (results[file].length > 20) {
+      console.error(`    … and ${results[file].length - 20} more (run i18n:scan for the full list)`);
+    }
   }
 }
 
@@ -172,7 +182,8 @@ if (failed) {
   console.error(
     "\nNew hardcoded Chinese detected. Move strings into t() keys (all three locales)," +
       "\nor append  // i18n-exempt  for non-UI data values." +
-      "\nIf you intentionally reduced debt elsewhere, run: npm run i18n:scan -- --update"
+      "\nRenamed/split a file, or intentionally moved/reduced debt? Run:" +
+      "\n  npm run i18n:scan -- --update   (and commit the baseline)"
   );
   process.exit(1);
 }
