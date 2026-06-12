@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { test, expect } from "@playwright/test";
 
 /**
@@ -26,7 +27,11 @@ test("home page loads without fatal console errors", async ({ page }) => {
 
 test("catalog search returns result cards", async ({ page }) => {
   await page.goto("/search?q=般若&tab=catalog");
-  await expect(page.locator(".s-card").first()).toBeVisible({ timeout: 20_000 });
+  // Loading skeletons also use .s-card — assert on the result title, which
+  // only real ResultCards render, or a hung search API would pass.
+  await expect(page.locator(".s-card .s-card-title").first()).toBeVisible({
+    timeout: 20_000,
+  });
 });
 
 test("language switcher opens and switches the UI to English", async ({ page }) => {
@@ -46,18 +51,24 @@ test("english locale file is current and the search page renders in English", as
   request,
 }) => {
   // Guard against the PR #708 incident class: a stale/short translation file
-  // means new keys silently fall back to Chinese. 300 ≈ the post-#706 floor.
+  // means new keys silently fall back to Chinese. The floor derives from the
+  // checked-out repo's en file (90%, absorbing small refactors and the
+  // master-vs-prod skew between scheduled runs and deploys).
+  // Path is cwd-relative; both local runs and CI execute from e2e/.
+  const repoKeys = Object.keys(
+    JSON.parse(readFileSync("../frontend/public/locales/en/translation.json", "utf8"))
+  ).length;
   const res = await request.get("/locales/en/translation.json");
   expect(res.ok()).toBeTruthy();
   const keys = Object.keys(await res.json());
-  expect(keys.length).toBeGreaterThanOrEqual(300);
+  expect(keys.length).toBeGreaterThanOrEqual(Math.floor(repoKeys * 0.9));
   expect(res.headers()["cache-control"] || "").toContain("no-cache");
 
   await page.addInitScript(() => localStorage.setItem("i18nextLng", "en"));
   await page.goto("/search?q=wise+attention");
   const tabs = page.locator(".ant-tabs-tab");
   await expect(tabs.first()).toBeVisible({ timeout: 20_000 });
-  await expect(tabs.first()).toHaveText("All");
+  await expect(tabs.first()).toHaveText("All", { timeout: 10_000 });
   await expect(page.locator(".s-mode-bar")).not.toContainText("搜经典");
 });
 

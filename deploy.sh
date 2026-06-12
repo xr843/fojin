@@ -244,6 +244,8 @@ if $frontend_changed; then
 
   # (c) 容器内 en locale 的 key 数必须和本次部署的源码一致
   #     (#708 教训: 服务旧 translation.json 时新 key 全部静默回退中文)
+  command -v python3 >/dev/null || fail "python3 不在 PATH — locale 断言无法执行"
+  [ -f frontend/public/locales/en/translation.json ] || fail "repo 里找不到 en translation.json"
   REPO_EN_KEYS="$(python3 -c "import json;print(len(json.load(open('frontend/public/locales/en/translation.json'))))" 2>/dev/null || echo 0)"
   SERVED_EN_KEYS="$(curl -sf "${FE_BASE}/locales/en/translation.json" | python3 -c "import json,sys;print(len(json.load(sys.stdin)))" 2>/dev/null || echo -1)"
   if [ "$REPO_EN_KEYS" != "$SERVED_EN_KEYS" ]; then
