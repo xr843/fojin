@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Checkbox, Spin, Empty, Tooltip, Switch, AutoComplete } from "antd";
 import { GlobalOutlined, BarChartOutlined, SearchOutlined } from "@ant-design/icons";
+import { useTranslation } from "react-i18next";
 import * as OpenCC from "opencc-js";
 import DeckGLMap from "../components/kg-map/DeckGLMap";
 import MapEntityPopup from "../components/kg-map/MapEntityPopup";
@@ -10,10 +11,10 @@ import type { KGGeoEntity } from "../api/client";
 import "../styles/kg-map.css";
 
 const ENTITY_TYPE_OPTIONS = [
-  { value: "monastery", label: "寺院" },
-  { value: "place", label: "地点" },
-  { value: "person", label: "人物" },
-  { value: "school", label: "宗派" },
+  { value: "monastery", labelKey: "geo.type_temple" },
+  { value: "place", labelKey: "geo.type_place" },
+  { value: "person", labelKey: "geo.type_person" },
+  { value: "school", labelKey: "geo.type_school" },
 ];
 
 const s2t = OpenCC.Converter({ from: "cn", to: "tw" });
@@ -27,6 +28,7 @@ const TYPE_CSS_COLORS: Record<string, string> = {
 };
 
 export default function KGMapPage() {
+  const { t } = useTranslation();
 
   const [entityTypes, setEntityTypes] = useState<string[]>([
     "monastery",
@@ -138,16 +140,16 @@ export default function KGMapPage() {
       {/* Header */}
       <div className="kg-map-header">
         <GlobalOutlined />
-        <h3>佛教地理</h3>
+        <h3>{t("geo.title")}</h3>
         {geoData && (
           <Tooltip
-            title="人物：展示 Wikidata、城市/省份匹配，以及 desc_match_v3（按朝代国别打分的寺院描述匹配，覆盖中日韩台）。师承推断与旧版描述贪心匹配已剔除。寺院：来自高德 V3 全量抓取。"
+            title={t("geo.stats_tooltip")}
           >
             <span className="kg-map-stats" style={{ cursor: "help" }}>
               <BarChartOutlined />
               <span>
-                {filteredEntities.length.toLocaleString()} 个标注
-                {chineseOnly && <span className="kg-map-stats-filter"> · 纯中文</span>}
+                {t("geo.marker_count", { n: filteredEntities.length.toLocaleString() })}
+                {chineseOnly && <span className="kg-map-stats-filter"> · {t("geo.chinese_only")}</span>}
               </span>
             </span>
           </Tooltip>
@@ -157,19 +159,19 @@ export default function KGMapPage() {
       {/* Toolbar */}
       <div className="kg-map-toolbar">
         <div className="kg-map-toolbar-row">
-          <span className="kg-map-filter-label">实体类型:</span>
+          <span className="kg-map-filter-label">{t("geo.entity_types")}:</span>
           <Checkbox.Group
             value={entityTypes}
             onChange={(vals) => setEntityTypes(vals as string[])}
-            options={ENTITY_TYPE_OPTIONS}
+            options={ENTITY_TYPE_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
           />
           <Checkbox
             checked={showArcs}
             onChange={(e) => setShowArcs(e.target.checked)}
           >
-            师承传线
+            {t("geo.type_lineage")}
           </Checkbox>
-          <span className="kg-map-filter-label">纯中文:</span>
+          <span className="kg-map-filter-label">{t("geo.chinese_only")}:</span>
           <Switch
             size="small"
             checked={chineseOnly}
@@ -181,7 +183,7 @@ export default function KGMapPage() {
             onSearch={setSearchQuery}
             onChange={setSearchQuery}
             onSelect={handleSearchSelect}
-            placeholder="搜索/寺院、地点、人物"
+            placeholder={t("geo.search_placeholder")}
             allowClear
             style={{ width: 280, marginLeft: "auto" }}
             popupMatchSelectWidth={380}
@@ -200,7 +202,7 @@ export default function KGMapPage() {
           <div className="kg-map-loading">
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="暂无地理数据"
+              description={t("geo.no_data")}
             />
           </div>
         ) : (
@@ -216,16 +218,16 @@ export default function KGMapPage() {
             />
 
             <div className="kg-map-legend">
-              {ENTITY_TYPE_OPTIONS.filter((t) => entityTypes.includes(t.value)).map((t) => (
-                <span key={t.value} className="kg-map-legend-item">
-                  <span className="kg-legend-dot" style={{ background: TYPE_CSS_COLORS[t.value] || "#888" }} />
-                  {t.label}
+              {ENTITY_TYPE_OPTIONS.filter((o) => entityTypes.includes(o.value)).map((o) => (
+                <span key={o.value} className="kg-map-legend-item">
+                  <span className="kg-legend-dot" style={{ background: TYPE_CSS_COLORS[o.value] || "#888" }} />
+                  {t(o.labelKey)}
                 </span>
               ))}
               {showArcs && (
                 <span className="kg-map-legend-item">
                   <span className="kg-legend-line" style={{ background: "#eab308" }} />
-                  师承
+                  {t("geo.lineage")}
                 </span>
               )}
             </div>

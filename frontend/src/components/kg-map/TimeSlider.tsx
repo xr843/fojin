@@ -1,6 +1,8 @@
 import { useEffect, useRef, useCallback } from "react";
 import { Slider, Button, Switch, Tooltip } from "antd";
 import { CaretRightOutlined, PauseOutlined, InfoCircleOutlined } from "@ant-design/icons";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 interface TimeSliderProps {
   min: number;
@@ -11,9 +13,9 @@ interface TimeSliderProps {
   onPlayToggle: () => void;
 }
 
-function formatYear(year: number): string {
-  if (year < 0) return `公元前${Math.abs(year)}年`;
-  return `公元${year}年`;
+function formatYear(t: TFunction, year: number): string {
+  if (year < 0) return t("geo.year_bce", { n: Math.abs(year) });
+  return t("geo.year_ce", { n: year });
 }
 
 export default function TimeSlider({
@@ -24,6 +26,7 @@ export default function TimeSlider({
   onChange,
   onPlayToggle,
 }: TimeSliderProps) {
+  const { t } = useTranslation();
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const valueRef = useRef(value);
   valueRef.current = value;
@@ -65,8 +68,8 @@ export default function TimeSlider({
           checked={enabled}
           onChange={handleSwitchChange}
         />
-        <span className="kg-time-slider-label">时间筛选</span>
-        <Tooltip title="仅对有年代数据的实体生效（约 300 个人物/寺院）。无年代的实体始终显示。">
+        <span className="kg-time-slider-label">{t("geo.time_filter")}</span>
+        <Tooltip title={t("geo.time_filter_tip")}>
           <InfoCircleOutlined style={{ color: "#999", fontSize: 12, cursor: "help" }} />
         </Tooltip>
 
@@ -80,7 +83,7 @@ export default function TimeSlider({
               onClick={onPlayToggle}
             />
             <span className="kg-time-current">
-              {formatYear(value)}
+              {formatYear(t, value)}
             </span>
             <div className="kg-time-slider-track">
               <Slider
@@ -89,7 +92,7 @@ export default function TimeSlider({
                 step={25}
                 value={value}
                 onChange={(v) => onChange(v as number)}
-                tooltip={{ formatter: (v) => v != null ? formatYear(v) : "" }}
+                tooltip={{ formatter: (v) => v != null ? formatYear(t, v) : "" }}
               />
             </div>
           </>

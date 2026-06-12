@@ -4,6 +4,8 @@ import type { StyleSpecification } from "maplibre-gl";
 import DeckGL from "@deck.gl/react";
 import { ScatterplotLayer, ArcLayer } from "@deck.gl/layers";
 import type { PickingInfo } from "@deck.gl/core";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { escapeHtml } from "../../utils/sanitize";
 import type { KGGeoEntity, KGLineageArc } from "../../api/client";
@@ -62,6 +64,7 @@ export default function DeckGLMap({
   onEntityClick,
   focusEntity,
 }: DeckGLMapProps) {
+  const { t } = useTranslation();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [arcTooltip, setArcTooltip] = useState<ArcTooltipState | null>(null);
   const [viewState, setViewState] = useState<typeof INITIAL_VIEW_STATE & { transitionDuration?: number }>(INITIAL_VIEW_STATE);
@@ -105,23 +108,23 @@ export default function DeckGLMap({
         if (cancelled || !style.layers) return;
         const twReplace = [
           "case",
-          ["==", ["get", "iso_a2"], "TW"], "台灣省",
-          ["==", ["get", "ISO_A2"], "TW"], "台灣省",
-          ["==", ["get", "iso_3166_1"], "TW"], "台灣省",
-          ["==", ["get", "iso_3166_1_alpha_2"], "TW"], "台灣省",
-          ["==", ["get", "name"], "中華民國"], "台灣省",
-          ["==", ["get", "name"], "中华民国"], "台灣省",
-          ["==", ["get", "name"], "Taiwan"], "台灣省",
-          ["==", ["get", "name"], "Republic of China"], "台灣省",
-          ["==", ["get", "name:zh"], "中華民國"], "台灣省",
-          ["==", ["get", "name:zh"], "中华民国"], "台灣省",
-          ["==", ["get", "name:zh-Hant"], "中華民國"], "台灣省",
-          ["==", ["get", "name:zh-Hant"], "臺灣"], "台灣省",
-          ["==", ["get", "name:zh-Hant"], "台灣"], "台灣省",
-          ["==", ["get", "name:zh-Hans"], "中华民国"], "台灣省",
-          ["==", ["get", "name:zh-Hans"], "台湾"], "台灣省",
-          ["==", ["get", "name:en"], "Taiwan"], "台灣省",
-          ["==", ["get", "name:en"], "Republic of China"], "台灣省",
+          ["==", ["get", "iso_a2"], "TW"], "台灣省", // i18n-exempt
+          ["==", ["get", "ISO_A2"], "TW"], "台灣省", // i18n-exempt
+          ["==", ["get", "iso_3166_1"], "TW"], "台灣省", // i18n-exempt
+          ["==", ["get", "iso_3166_1_alpha_2"], "TW"], "台灣省", // i18n-exempt
+          ["==", ["get", "name"], "中華民國"], "台灣省", // i18n-exempt
+          ["==", ["get", "name"], "中华民国"], "台灣省", // i18n-exempt
+          ["==", ["get", "name"], "Taiwan"], "台灣省", // i18n-exempt
+          ["==", ["get", "name"], "Republic of China"], "台灣省", // i18n-exempt
+          ["==", ["get", "name:zh"], "中華民國"], "台灣省", // i18n-exempt
+          ["==", ["get", "name:zh"], "中华民国"], "台灣省", // i18n-exempt
+          ["==", ["get", "name:zh-Hant"], "中華民國"], "台灣省", // i18n-exempt
+          ["==", ["get", "name:zh-Hant"], "臺灣"], "台灣省", // i18n-exempt
+          ["==", ["get", "name:zh-Hant"], "台灣"], "台灣省", // i18n-exempt
+          ["==", ["get", "name:zh-Hans"], "中华民国"], "台灣省", // i18n-exempt
+          ["==", ["get", "name:zh-Hans"], "台湾"], "台灣省", // i18n-exempt
+          ["==", ["get", "name:en"], "Taiwan"], "台灣省", // i18n-exempt
+          ["==", ["get", "name:en"], "Republic of China"], "台灣省", // i18n-exempt
           [
             "coalesce",
             ["get", "name:zh-Hans"],
@@ -318,6 +321,10 @@ export default function DeckGLMap({
         const e = tooltip.entity;
         const flag = detectCountryFlag(e.description, e.name_en, e.name_zh);
         const countryName = detectCountryName(e.description, e.name_en, e.name_zh);
+        // Country names are canonical zh data values — translate at display time.
+        const countryLabel = countryName
+          ? t(COUNTRY_KEY_OVERRIDES[countryName] ?? `region.${countryName}`, countryName)
+          : null;
         const script = detectScript(e.name_zh);
         const isLocalName = script !== 'cjk';
         const source = detectSource(e.description);
@@ -329,7 +336,7 @@ export default function DeckGLMap({
             <div className="tooltip-header">
               <span className="tooltip-flag">{flag}</span>
               <span className="tooltip-type">
-                {TYPE_LABEL_MAP[e.entity_type] || e.entity_type}
+                {TYPE_LABEL_KEYS[e.entity_type] ? t(TYPE_LABEL_KEYS[e.entity_type]) : e.entity_type}
               </span>
             </div>
             <div
@@ -342,14 +349,14 @@ export default function DeckGLMap({
                 dangerouslySetInnerHTML={{ __html: escapeHtml(e.name_en) }}
               />
             )}
-            {isLocalName && countryName && (
+            {isLocalName && countryLabel && (
               <div className="tooltip-local-notice">
-                💡 本地名称 · 国家: {countryName}
+                {t("geo.local_name_country", { name: countryLabel })}
               </div>
             )}
             {(e.year_start !== null || e.year_end !== null) && (
               <div className="tooltip-meta">
-                📜 {formatYearRange(e.year_start, e.year_end)}
+                📜 {formatYearRange(t, e.year_start, e.year_end)}
               </div>
             )}
             {e.description && (
@@ -358,7 +365,7 @@ export default function DeckGLMap({
                 dangerouslySetInnerHTML={{ __html: escapeHtml(e.description) }}
               />
             )}
-            {source && <div className="tooltip-source">数据: {source}</div>}
+            {source && <div className="tooltip-source">{t("geo.data_source", { name: source })}</div>}
           </div>
         );
       })()}
@@ -369,7 +376,7 @@ export default function DeckGLMap({
           style={{ left: arcTooltip.x + 12, top: arcTooltip.y - 12 }}
         >
           <div className="tooltip-header">
-            <span className="tooltip-type">师承</span>
+            <span className="tooltip-type">{t("geo.lineage")}</span>
           </div>
           <div
             className="tooltip-name"
@@ -378,12 +385,12 @@ export default function DeckGLMap({
             }}
           />
           {arcTooltip.arc.year !== null && (
-            <div className="tooltip-meta">📜 {formatYear(arcTooltip.arc.year)}</div>
+            <div className="tooltip-meta">📜 {formatYear(t, arcTooltip.arc.year)}</div>
           )}
           {arcTooltip.arc.school && (
             <div
               className="tooltip-desc"
-              dangerouslySetInnerHTML={{ __html: `宗派: ${escapeHtml(arcTooltip.arc.school)}` }}
+              dangerouslySetInnerHTML={{ __html: `${escapeHtml(t("geo.school_label"))}: ${escapeHtml(arcTooltip.arc.school)}` }}
             />
           )}
         </div>
@@ -392,15 +399,15 @@ export default function DeckGLMap({
   );
 }
 
-function formatYear(year: number): string {
-  if (year < 0) return `公元前${Math.abs(year)}年`;
-  return `公元${year}年`;
+function formatYear(t: TFunction, year: number): string {
+  if (year < 0) return t("geo.year_bce", { n: Math.abs(year) });
+  return t("geo.year_ce", { n: year });
 }
 
-function formatYearRange(start: number | null, end: number | null): string {
-  if (start !== null && end !== null) return `${formatYear(start)} — ${formatYear(end)}`;
-  if (start !== null) return `${formatYear(start)} —`;
-  if (end !== null) return `— ${formatYear(end)}`;
+function formatYearRange(t: TFunction, start: number | null, end: number | null): string {
+  if (start !== null && end !== null) return `${formatYear(t, start)} — ${formatYear(t, end)}`;
+  if (start !== null) return `${formatYear(t, start)} —`;
+  if (end !== null) return `— ${formatYear(t, end)}`;
   return "";
 }
 
@@ -427,27 +434,40 @@ const COUNTRY_FLAGS: Record<string, string> = {
   "澳大利亚": "🇦🇺", "Australia": "🇦🇺",
 };
 
+/** Match-term → canonical zh country name. Values are matching/lookup data
+    (haystack.includes), translated at display time via `region.*` keys with
+    COUNTRY_KEY_OVERRIDES for names whose region.* zh value differs. */
 const COUNTRY_NAMES_ZH: Record<string, string> = {
-  "中国": "中国", "China": "中国", "Chinese": "中国",
-  "日本": "日本", "Japan": "日本", "Japanese": "日本",
-  "韩国": "韩国", "Korea": "韩国", "Korean": "韩国",
-  "印度": "印度", "India": "印度", "Indian": "印度",
-  "泰国": "泰国", "Thailand": "泰国", "Thai": "泰国",
-  "越南": "越南", "Vietnam": "越南", "Vietnamese": "越南",
-  "缅甸": "缅甸", "Myanmar": "缅甸", "Burmese": "缅甸",
-  "斯里兰卡": "斯里兰卡", "Sri Lanka": "斯里兰卡",
-  "柬埔寨": "柬埔寨", "Cambodia": "柬埔寨",
-  "西藏": "西藏", "Tibet": "西藏", "Tibetan": "西藏",
-  "蒙古": "蒙古", "Mongolia": "蒙古",
-  "不丹": "不丹", "Bhutan": "不丹",
-  "尼泊尔": "尼泊尔", "Nepal": "尼泊尔",
-  "美国": "美国", "United States": "美国", "American": "美国",
-  "德国": "德国", "Germany": "德国", "German": "德国",
-  "法国": "法国", "France": "法国", "French": "法国",
-  "英国": "英国", "British": "英国",
-  "台湾": "台湾", "Taiwan": "台湾",
-  "巴西": "巴西", "Brazil": "巴西",
-  "澳大利亚": "澳大利亚", "Australia": "澳大利亚",
+  "中国": "中国", "China": "中国", "Chinese": "中国", // i18n-exempt
+  "日本": "日本", "Japan": "日本", "Japanese": "日本", // i18n-exempt
+  "韩国": "韩国", "Korea": "韩国", "Korean": "韩国", // i18n-exempt
+  "印度": "印度", "India": "印度", "Indian": "印度", // i18n-exempt
+  "泰国": "泰国", "Thailand": "泰国", "Thai": "泰国", // i18n-exempt
+  "越南": "越南", "Vietnam": "越南", "Vietnamese": "越南", // i18n-exempt
+  "缅甸": "缅甸", "Myanmar": "缅甸", "Burmese": "缅甸", // i18n-exempt
+  "斯里兰卡": "斯里兰卡", "Sri Lanka": "斯里兰卡", // i18n-exempt
+  "柬埔寨": "柬埔寨", "Cambodia": "柬埔寨", // i18n-exempt
+  "西藏": "西藏", "Tibet": "西藏", "Tibetan": "西藏", // i18n-exempt
+  "蒙古": "蒙古", "Mongolia": "蒙古", // i18n-exempt
+  "不丹": "不丹", "Bhutan": "不丹", // i18n-exempt
+  "尼泊尔": "尼泊尔", "Nepal": "尼泊尔", // i18n-exempt
+  "美国": "美国", "United States": "美国", "American": "美国", // i18n-exempt
+  "德国": "德国", "Germany": "德国", "German": "德国", // i18n-exempt
+  "法国": "法国", "France": "法国", "French": "法国", // i18n-exempt
+  "英国": "英国", "British": "英国", // i18n-exempt
+  "台湾": "台湾", "Taiwan": "台湾", // i18n-exempt
+  "巴西": "巴西", "Brazil": "巴西", // i18n-exempt
+  "澳大利亚": "澳大利亚", "Australia": "澳大利亚", // i18n-exempt
+};
+
+/** zh country names whose `region.*` locale entry has a DIFFERENT zh value
+    (e.g. region.中国 renders 中国大陆) — these use dedicated geo.* keys so the
+    zh tooltip stays byte-identical. */
+const COUNTRY_KEY_OVERRIDES: Record<string, string> = {
+  "中国": "geo.country_cn",
+  "西藏": "geo.country_tibet",
+  "台湾": "geo.country_tw",
+  "巴西": "geo.country_br",
 };
 
 function detectCountryFlag(
@@ -490,12 +510,12 @@ function detectSource(desc: string | null): string | null {
   return null;
 }
 
-const TYPE_LABEL_MAP: Record<string, string> = {
-  person: "人物",
-  text: "典籍",
-  monastery: "寺院",
-  school: "宗派",
-  place: "地点",
-  concept: "概念",
-  dynasty: "朝代",
+const TYPE_LABEL_KEYS: Record<string, string> = {
+  person: "geo.type_person",
+  text: "geo.type_text",
+  monastery: "geo.type_temple",
+  school: "geo.type_school",
+  place: "geo.type_place",
+  concept: "geo.type_concept",
+  dynasty: "geo.type_dynasty",
 };

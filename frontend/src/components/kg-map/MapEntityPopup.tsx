@@ -1,5 +1,7 @@
 import { Button } from "antd";
 import { CloseOutlined, EnvironmentOutlined } from "@ant-design/icons";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import type { KGGeoEntity } from "../../api/client";
 
 interface MapEntityPopupProps {
@@ -7,25 +9,25 @@ interface MapEntityPopupProps {
   onClose: () => void;
 }
 
-const TYPE_LABEL_MAP: Record<string, string> = {
-  person: "人物",
-  text: "典籍",
-  monastery: "寺院",
-  school: "宗派",
-  place: "地点",
-  concept: "概念",
-  dynasty: "朝代",
+const TYPE_LABEL_KEYS: Record<string, string> = {
+  person: "geo.type_person",
+  text: "geo.type_text",
+  monastery: "geo.type_temple",
+  school: "geo.type_school",
+  place: "geo.type_place",
+  concept: "geo.type_concept",
+  dynasty: "geo.type_dynasty",
 };
 
-function formatYear(year: number): string {
-  if (year < 0) return `公元前${Math.abs(year)}年`;
-  return `公元${year}年`;
+function formatYear(t: TFunction, year: number): string {
+  if (year < 0) return t("geo.year_bce", { n: Math.abs(year) });
+  return t("geo.year_ce", { n: year });
 }
 
-function formatYearRange(start: number | null, end: number | null): string {
-  if (start !== null && end !== null) return `${formatYear(start)} — ${formatYear(end)}`;
-  if (start !== null) return `${formatYear(start)} —`;
-  if (end !== null) return `— ${formatYear(end)}`;
+function formatYearRange(t: TFunction, start: number | null, end: number | null): string {
+  if (start !== null && end !== null) return `${formatYear(t, start)} — ${formatYear(t, end)}`;
+  if (start !== null) return `${formatYear(t, start)} —`;
+  if (end !== null) return `— ${formatYear(t, end)}`;
   return "";
 }
 
@@ -33,7 +35,8 @@ export default function MapEntityPopup({
   entity,
   onClose,
 }: MapEntityPopupProps) {
-  const yearText = formatYearRange(entity.year_start, entity.year_end);
+  const { t } = useTranslation();
+  const yearText = formatYearRange(t, entity.year_start, entity.year_end);
   const address = [entity.province, entity.city, entity.district].filter(Boolean).join("");
 
   return (
@@ -41,7 +44,7 @@ export default function MapEntityPopup({
       <div className="kg-map-popup">
         <div className="kg-map-popup-header">
           <span className={`kg-type-tag kg-type-tag--${entity.entity_type}`}>
-            {TYPE_LABEL_MAP[entity.entity_type] || entity.entity_type}
+            {TYPE_LABEL_KEYS[entity.entity_type] ? t(TYPE_LABEL_KEYS[entity.entity_type]) : entity.entity_type}
           </span>
           <Button
             type="text"
