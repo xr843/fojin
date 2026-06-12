@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Button, Form, Input, message } from "antd";
 import { SendOutlined } from "@ant-design/icons";
+import { useTranslation } from "react-i18next";
 import { submitSourceSuggestion } from "../../api/client";
 
 export default function SuggestSourceForm() {
+  const { t } = useTranslation();
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -15,7 +17,7 @@ export default function SuggestSourceForm() {
       setSubmitted(true);
       form.resetFields();
     } catch {
-      message.error("提交失败，请稍后再试");
+      message.error(t("sources.suggest_submit_failed"));
     } finally {
       setSubmitting(false);
     }
@@ -24,13 +26,13 @@ export default function SuggestSourceForm() {
   return (
     <div className="sources-suggest">
       <div className="sources-suggest-header">
-        <h2 className="sources-suggest-title">推荐数据源</h2>
+        <h2 className="sources-suggest-title">{t("sources.suggest_title")}</h2>
         <p className="sources-suggest-desc">
-          如果您知道尚未收录的佛教数字资源网站，欢迎推荐给我们
+          {t("sources.suggest_desc")}
         </p>
       </div>
       {submitted ? (
-        <div className="sources-suggest-success">感谢您的推荐！我们会尽快查阅。</div>
+        <div className="sources-suggest-success">{t("sources.suggest_thanks")}</div>
       ) : (
         <Form
           form={form}
@@ -41,28 +43,28 @@ export default function SuggestSourceForm() {
           <div className="sources-suggest-row">
             <Form.Item
               name="name"
-              label="网站名称"
-              rules={[{ required: true, message: "请输入网站名称" }]}
+              label={t("sources.suggest_name_label")}
+              rules={[{ required: true, message: t("sources.suggest_name_required") }]}
               style={{ flex: 1 }}
             >
-              <Input placeholder="例：CBETA 在线阅读" />
+              <Input placeholder={t("sources.suggest_name_placeholder")} />
             </Form.Item>
             <Form.Item
               name="url"
-              label="网站 URL"
+              label={t("sources.suggest_url_label")}
               rules={[
-                { required: true, message: "请输入网站地址" },
-                { type: "url", message: "请输入有效的网址" },
+                { required: true, message: t("sources.suggest_url_required") },
+                { type: "url", message: t("sources.suggest_url_invalid") },
               ]}
               style={{ flex: 1 }}
             >
               <Input placeholder="https://..." />
             </Form.Item>
           </div>
-          <Form.Item name="description" label="简要说明">
+          <Form.Item name="description" label={t("sources.suggest_desc_label")}>
             <Input.TextArea
               rows={3}
-              placeholder="简要描述该网站收录的内容、语种、特色等（选填）"
+              placeholder={t("sources.suggest_desc_placeholder")}
               maxLength={2000}
               showCount
             />
@@ -75,7 +77,7 @@ export default function SuggestSourceForm() {
               icon={<SendOutlined />}
               className="sources-suggest-btn"
             >
-              提交推荐
+              {t("sources.suggest_submit")}
             </Button>
           </Form.Item>
         </Form>
