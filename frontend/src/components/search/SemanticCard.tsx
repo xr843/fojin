@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Tag, Button, Progress } from "antd";
 import { LinkOutlined, ReadOutlined } from "@ant-design/icons";
 import { Link } from "react-router-dom";
@@ -6,6 +7,7 @@ import type { SemanticSearchHit } from "../../api/client";
 
 /** 语义搜索结果卡片：展示向量匹配的经文片段和相似度分数 */
 export default function SemanticCard({ hit, rank }: { hit: SemanticSearchHit; rank: number }) {
+  const { t } = useTranslation();
   const cbetaUrl = hit.cbeta_id ? buildCbetaReadUrl(hit.cbeta_id) : null;
   const scorePercent = Math.round(hit.similarity_score * 100);
 
@@ -39,7 +41,7 @@ export default function SemanticCard({ hit, rank }: { hit: SemanticSearchHit; ra
             <Tag color="geekblue" style={{ fontSize: 11 }}>{hit.source_code}</Tag>
           )}
           <Tag color="purple" style={{ fontSize: 11 }}>
-            第{hit.juan_num}卷
+            {t("search.juan_n", { num: hit.juan_num })}
           </Tag>
         </div>
 
@@ -67,7 +69,7 @@ export default function SemanticCard({ hit, rank }: { hit: SemanticSearchHit; ra
           {hit.has_content && (
             <Link to={`/read/${hit.text_id}/${hit.juan_num}`}>
               <Button size="small" icon={<ReadOutlined />}>
-                阅读
+                {t("search.read")}
               </Button>
             </Link>
           )}

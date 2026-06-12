@@ -1,11 +1,20 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Tag, Button } from "antd";
 import { LinkOutlined } from "@ant-design/icons";
 import { sanitizeHighlight } from "../../utils/sanitize";
 import { buildCbetaReadUrl } from "../../utils/sourceUrls";
 import type { ContentSearchHit } from "../../api/client";
 
+const LANG_KEYS: Record<string, string> = {
+  pi: "lang.pi",
+  en: "lang.en",
+  bo: "lang.bo",
+  sa: "lang.sa",
+};
+
 export default function ContentCard({ hit, rank }: { hit: ContentSearchHit; rank: number }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const hasMore = hit.matched_juan_count > 1;
   const cbetaUrl = buildCbetaReadUrl(hit.cbeta_id);
@@ -20,14 +29,14 @@ export default function ContentCard({ hit, rank }: { hit: ContentSearchHit; rank
           {hit.translator && <Tag style={{ fontSize: 11 }}>{hit.dynasty ? `[${hit.dynasty}] ` : ""}{hit.translator}</Tag>}
           {hit.lang && hit.lang !== "lzh" && (
             <Tag color="blue" style={{ fontSize: 11 }}>
-              {{ pi: "巴利文", en: "英文", bo: "藏文", sa: "梵文" }[hit.lang] || hit.lang}
+              {LANG_KEYS[hit.lang] ? t(LANG_KEYS[hit.lang]) : hit.lang}
             </Tag>
           )}
-          <Tag color="orange" style={{ fontSize: 11 }}>{hit.matched_juan_count} 卷匹配</Tag>
+          <Tag color="orange" style={{ fontSize: 11 }}>{t("search.juan_match_count", { n: hit.matched_juan_count })}</Tag>
         </div>
         {/* 最佳匹配卷 */}
         <div className="s-content-juan">
-          <div className="s-content-juan-label">第{hit.juan_num}卷（最佳匹配）</div>
+          <div className="s-content-juan-label">{t("search.juan_best", { num: hit.juan_num })}</div>
           {hit.highlight.map((h, j) => (
             <div key={j} className="s-card-meta" style={{ lineHeight: 1.7 }}
               dangerouslySetInnerHTML={{ __html: `...${sanitizeHighlight(h)}...` }} />
@@ -36,7 +45,7 @@ export default function ContentCard({ hit, rank }: { hit: ContentSearchHit; rank
             <Button type="primary" size="small" icon={<LinkOutlined />}
               style={{ background: "#8b2500", borderColor: "#8b2500", marginTop: 6 }}
               href={cbetaUrl} target="_blank" rel="noopener noreferrer">
-              CBETA 阅读
+              {t("search.cbeta_read")}
             </Button>
           )}
         </div>
@@ -45,7 +54,7 @@ export default function ContentCard({ hit, rank }: { hit: ContentSearchHit; rank
           .filter((j) => j.juan_num !== hit.juan_num)
           .map((j) => (
             <div key={j.juan_num} className="s-content-juan">
-              <div className="s-content-juan-label">第{j.juan_num}卷</div>
+              <div className="s-content-juan-label">{t("search.juan_n", { num: j.juan_num })}</div>
               {j.highlight.map((h, k) => (
                 <div key={k} className="s-card-meta" style={{ lineHeight: 1.7 }}
                   dangerouslySetInnerHTML={{ __html: `...${sanitizeHighlight(h)}...` }} />
@@ -55,7 +64,7 @@ export default function ContentCard({ hit, rank }: { hit: ContentSearchHit; rank
         {hasMore && (
           <Button type="link" size="small" onClick={() => setExpanded(!expanded)}
             style={{ padding: 0, fontSize: 12, marginTop: 4 }}>
-            {expanded ? "收起" : `展开其他 ${hit.matched_juan_count - 1} 卷匹配`}
+            {expanded ? t("search.collapse") : t("search.expand_juans", { n: hit.matched_juan_count - 1 })}
           </Button>
         )}
       </div>

@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Empty } from "antd";
 import type { UnifiedSearchResponse } from "../../api/client";
 import ResultCard from "./ResultCard";
@@ -17,6 +18,7 @@ interface Props {
  * Used by SearchPage's "全部 / All" tab (default landing tab).
  */
 export default function UnifiedResults({ data }: Props) {
+  const { t } = useTranslation();
   const sections = data.sections;
 
   const dictionary = sections.dictionary ?? [];
@@ -49,7 +51,7 @@ export default function UnifiedResults({ data }: Props) {
   if (!hasAny) {
     return (
       <div style={{ marginTop: 32 }}>
-        <Empty description={`未找到「${data.query}」的相关结果`} />
+        <Empty description={t("search.no_results_for_query", { query: data.query })} />
       </div>
     );
   }
@@ -70,7 +72,7 @@ export default function UnifiedResults({ data }: Props) {
           dedicated dictionary page so it doesn't push the text results down. */}
       {dictionary.length > 0 && (
         <section className="s-unified-section">
-          <h3 style={sectionTitleStyle}>{"🔤"} 辞典释义</h3>
+          <h3 style={sectionTitleStyle}>{"🔤"} {t("search.section_dictionary")}</h3>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {dictionary.slice(0, 2).map((entry) => (
               <Link
@@ -101,7 +103,7 @@ export default function UnifiedResults({ data }: Props) {
                 </div>
                 {entry.source && (
                   <div style={{ fontSize: 12, color: "#9a8e7a", marginTop: 4 }}>
-                    出处：{entry.source}
+                    {t("search.dict_source_label", { source: entry.source })}
                   </div>
                 )}
               </Link>
@@ -112,7 +114,7 @@ export default function UnifiedResults({ data }: Props) {
               to={`/dictionary?q=${encodeURIComponent(data.query)}`}
               style={{ display: "inline-block", marginTop: 8, fontSize: 13, color: "var(--fj-accent)" }}
             >
-              查看全部 {dictionary.length} 条辞典释义 →
+              {t("search.view_all_dict_count", { n: dictionary.length })}
             </Link>
           )}
         </section>
@@ -121,7 +123,7 @@ export default function UnifiedResults({ data }: Props) {
       {/* 经文标题 */}
       {catalogResults.length > 0 && (
         <section className="s-unified-section">
-          <h3 style={sectionTitleStyle}>{"📖"} 经文标题</h3>
+          <h3 style={sectionTitleStyle}>{"📖"} {t("search.section_titles")}</h3>
           {catalogResults.slice(0, 5).map((hit, i) => (
             <ResultCard key={hit.id} hit={hit} rank={i + 1} />
           ))}
@@ -131,7 +133,7 @@ export default function UnifiedResults({ data }: Props) {
       {/* 经文内文片段 */}
       {mergedSnippets.length > 0 && (
         <section className="s-unified-section">
-          <h3 style={sectionTitleStyle}>{"🔍"} 经文内文片段</h3>
+          <h3 style={sectionTitleStyle}>{"🔍"} {t("search.section_content")}</h3>
           {mergedSnippets.map((item, i) =>
             item.kind === "content" ? (
               <ContentCard key={item.key} hit={item.hit} rank={i + 1} />

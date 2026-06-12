@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Tag } from "antd";
 import { LinkOutlined, EyeOutlined } from "@ant-design/icons";
 import { buildSearchUrl } from "../../utils/sourceUrls";
@@ -12,20 +13,21 @@ import type { DataSource } from "../../api/client";
  * tag and the "馆藏: {name}" line were dropped — they added no information.
  */
 export default function ExternalCard({ source, query }: { source: DataSource; query: string }) {
+  const { t } = useTranslation();
   const url = buildSearchUrl(source.code, query) || "#";
   return (
     <div className="s-ext-row">
       <span className="s-ext-row-name">{source.name_zh}</span>
-      {source.region && <Tag style={{ fontSize: 11, margin: 0 }}>{source.region}</Tag>}
+      {source.region && <Tag style={{ fontSize: 11, margin: 0 }}>{t(`region.${source.region}`, source.region)}</Tag>}
       <span className="s-ext-row-spacer" />
       <a
         className="s-card-btn-primary"
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        aria-label={`前往 ${source.name_zh} 搜索 ${query}`}
+        aria-label={t("search.search_at_source_aria", { name: source.name_zh, query })}
       >
-        <LinkOutlined /> 前往原站搜索
+        <LinkOutlined /> {t("search.search_at_source")}
       </a>
       {source.base_url && (
         <a
@@ -33,9 +35,9 @@ export default function ExternalCard({ source, query }: { source: DataSource; qu
           href={source.base_url}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label={`访问 ${source.name_zh} 主页`}
+          aria-label={t("search.visit_homepage_aria", { name: source.name_zh })}
         >
-          <EyeOutlined /> 访问主页
+          <EyeOutlined /> {t("search.visit_homepage")}
         </a>
       )}
     </div>
