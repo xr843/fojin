@@ -81,8 +81,18 @@ export default function SourcesPage() {
     [updateParam],
   );
   const setLangFilter = useCallback(
-    (v: string) => updateParam("tl", v, "all"),
-    [updateParam],
+    (v: string) => {
+      updateParam("tl", v, "all");
+      // Clean a lingering legacy filter value, or the read fallback springs
+      // it back (e.g. old link ?lang=sa → user picks "All" → still sa).
+      if (
+        legacyLangParam &&
+        !(SUPPORTED_UI_LANGS as readonly string[]).includes(legacyLangParam)
+      ) {
+        updateParam("lang", "", "");
+      }
+    },
+    [updateParam, legacyLangParam],
   );
   const setFieldFilter = useCallback(
     (v: string) => updateParam("field", v, "all"),
