@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
+import { SUPPORTED_UI_LANGS } from "../i18n";
 import { useQuery } from "@tanstack/react-query";
 import {
   Pagination, Empty, Checkbox, Input, Tag, Button, Tabs, Result, Select, Typography, Skeleton, AutoComplete, Alert,
@@ -88,7 +89,15 @@ export default function SearchPage() {
     return () => { cancelled = true; };
   }, [query, navigate]);
 
-  const langFilter = searchParams.get("lang") || "";
+  // #709: the text-language filter param was renamed `lang` → `tl`. The old
+  // name collided with i18next's querystring detector — selecting the
+  // "English" filter and refreshing flipped (and persisted via localStorage)
+  // the entire UI language. Legacy ?lang= links still resolve as filters for
+  // unambiguous codes; UI locale codes (zh/zh-Hant/en) belong to i18n.
+  const legacyLangParam = searchParams.get("lang") || "";
+  const legacyLangIsFilter =
+    legacyLangParam !== "" && !(SUPPORTED_UI_LANGS as readonly string[]).includes(legacyLangParam);
+  const langFilter = searchParams.get("tl") || (legacyLangIsFilter ? legacyLangParam : "");
   const dictLang = searchParams.get("dict_lang") || "";
   const [dictPage, setDictPage] = useState(1);
   const [dynasty] = useState<string>();
@@ -291,6 +300,8 @@ export default function SearchPage() {
         <link rel="canonical" href={`https://fojin.app/search${(() => { const p = new URLSearchParams(); if (query) p.set("q", query); if (page > 1) p.set("page", String(page)); return p.toString() ? `?${p.toString()}` : ""; })()}`} />
         <link rel="alternate" hrefLang="x-default" href={`https://fojin.app/search${query ? `?q=${encodeURIComponent(query)}` : ""}`} />
         <link rel="alternate" hrefLang="zh" href={`https://fojin.app/search${query ? `?q=${encodeURIComponent(query)}` : ""}`} />
+        <link rel="alternate" hrefLang="en" href={`https://fojin.app/search?${new URLSearchParams({ ...(query ? { q: query } : {}), lang: "en" }).toString()}`} />
+        <link rel="alternate" hrefLang="zh-Hant" href={`https://fojin.app/search?${new URLSearchParams({ ...(query ? { q: query } : {}), lang: "zh-Hant" }).toString()}`} />
         {query && page > 1 && (
           <link rel="prev" href={`https://fojin.app/search?${new URLSearchParams({ q: query, ...(page > 2 ? { page: String(page - 1) } : {}) }).toString()}`} />
         )}
@@ -453,7 +464,7 @@ export default function SearchPage() {
                   <Select
                     size="small"
                     value={langFilter || "all"}
-                    onChange={(v) => { setPage(1); updateUrl({ lang: v === "all" ? "" : v }); }}
+                    onChange={(v) => { setPage(1); updateUrl({ tl: v === "all" ? "" : v, ...(legacyLangIsFilter ? { lang: "" } : {}) }); }}
                     style={{ width: 110 }}
                     options={[
                       { value: "all", label: t("search.lang_all") },
