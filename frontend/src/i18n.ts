@@ -5,13 +5,18 @@ import LanguageDetector from "i18next-browser-languagedetector";
 // Inline zh so the default language is available synchronously (no FOUT)
 import zhTranslation from "../public/locales/zh/translation.json";
 
+// UI locale codes — these own the `?lang=` query param (detector below).
+// Text/source language FILTERS must use a different param (`tl`, see #709)
+// and treat these codes as not-a-filter when reading legacy links.
+export const SUPPORTED_UI_LANGS = ["zh", "zh-Hant", "en"] as const;
+
 i18n
   .use(HttpBackend)
   .use(LanguageDetector)
   .use(initReactI18next)
   .init({
     fallbackLng: "zh",
-    supportedLngs: ["zh", "zh-Hant", "en"],
+    supportedLngs: [...SUPPORTED_UI_LANGS],
     load: "currentOnly",
     keySeparator: false,
     nsSeparator: false,

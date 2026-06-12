@@ -5,6 +5,7 @@ import { Helmet } from "react-helmet-async";
 import { Empty, Input, Select, Skeleton } from "antd";
 import { SearchOutlined, ThunderboltOutlined, VerticalAlignTopOutlined } from "@ant-design/icons";
 import { getSources, type DataSource } from "../api/client";
+import { SUPPORTED_UI_LANGS } from "../i18n";
 import { getLangName, hasDirectSearchUrl, normalizeLangCode } from "../utils/sourceUrls";
 import SourceCard from "./sources/SourceCard";
 import SuggestSourceForm from "./sources/SuggestSourceForm";
@@ -36,7 +37,14 @@ export default function SourcesPage() {
   // URL params are the source of truth; defaults live here, not in state.
   const search = searchParams.get("q") ?? "";
   const regionFilter = searchParams.get("region") ?? "all";
-  const langFilter = searchParams.get("lang") ?? "all";
+  // #709: filter param renamed `lang` → `tl` (collision with the i18next
+  // querystring detector). Legacy ?lang= links resolve for non-UI codes.
+  const legacyLangParam = searchParams.get("lang") ?? "";
+  const langFilter =
+    searchParams.get("tl") ??
+    (legacyLangParam && !(SUPPORTED_UI_LANGS as readonly string[]).includes(legacyLangParam)
+      ? legacyLangParam
+      : "all");
   const fieldFilter = searchParams.get("field") ?? "all";
   const fulltextOnly = searchParams.get("fulltext") === "1";
   const searchQuery = searchParams.get("try") ?? "";
@@ -73,8 +81,18 @@ export default function SourcesPage() {
     [updateParam],
   );
   const setLangFilter = useCallback(
-    (v: string) => updateParam("lang", v, "all"),
-    [updateParam],
+    (v: string) => {
+      updateParam("tl", v, "all");
+      // Clean a lingering legacy filter value, or the read fallback springs
+      // it back (e.g. old link ?lang=sa → user picks "All" → still sa).
+      if (
+        legacyLangParam &&
+        !(SUPPORTED_UI_LANGS as readonly string[]).includes(legacyLangParam)
+      ) {
+        updateParam("lang", "", "");
+      }
+    },
+    [updateParam, legacyLangParam],
   );
   const setFieldFilter = useCallback(
     (v: string) => updateParam("field", v, "all"),
