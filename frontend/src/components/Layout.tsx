@@ -20,6 +20,7 @@ import {
   // BarChartOutlined,
 } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
+import { currentUILang } from "../i18n";
 import { useAuthStore } from "../stores/authStore";
 import { getPendingSuggestionCount, getPendingFeedbackCount } from "../api/client";
 import FeedbackButton from "./FeedbackButton";
@@ -234,7 +235,7 @@ export default function Layout() {
                 { key: "en", label: "English" },
               ],
               onClick: ({ key }) => i18n.changeLanguage(key),
-              selectedKeys: [i18n.resolvedLanguage ?? i18n.language],
+              selectedKeys: [currentUILang(i18n)],
             }}
           >
             <Button
@@ -243,7 +244,7 @@ export default function Layout() {
               style={{ color: inkMuted, fontSize: 13 }}
               aria-label={t("a11y.button.switch_language")}
             >
-              <span className="header-lang-text">{t(`language.${i18n.resolvedLanguage ?? i18n.language}`)}</span>
+              <span className="header-lang-text">{t(`language.${currentUILang(i18n)}`)}</span>
             </Button>
           </Dropdown>
           {user ? (

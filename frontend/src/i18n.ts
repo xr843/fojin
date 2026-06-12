@@ -10,6 +10,25 @@ import zhTranslation from "../public/locales/zh/translation.json";
 // and treat these codes as not-a-filter when reading legacy links.
 export const SUPPORTED_UI_LANGS = ["zh", "zh-Hant", "en"] as const;
 
+/**
+ * The UI language to display/select in language pickers.
+ *
+ * Do NOT use i18n.resolvedLanguage for this: with partialBundledLanguages +
+ * HttpBackend, a returning non-zh visitor inits before their locale file
+ * arrives, so resolvedLanguage resolves to the zh fallback — and i18next only
+ * recomputes it on changeLanguage, never on the later "loaded" event. The
+ * header then renders an English UI with a「中文」label. i18n.language always
+ * reflects the target language; we just normalize it onto our supported set.
+ */
+export function currentUILang(instance: typeof i18n = i18n): string {
+  const lng = instance.language ?? "";
+  if ((SUPPORTED_UI_LANGS as readonly string[]).includes(lng)) return lng;
+  if (lng.startsWith("zh-Hant")) return "zh-Hant";
+  const base = lng.split("-")[0];
+  if ((SUPPORTED_UI_LANGS as readonly string[]).includes(base)) return base;
+  return instance.resolvedLanguage ?? "zh";
+}
+
 i18n
   .use(HttpBackend)
   .use(LanguageDetector)

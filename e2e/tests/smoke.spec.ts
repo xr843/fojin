@@ -70,6 +70,12 @@ test("english locale file is current and the search page renders in English", as
   await expect(tabs.first()).toBeVisible({ timeout: 20_000 });
   await expect(tabs.first()).toHaveText("All", { timeout: 10_000 });
   await expect(page.locator(".s-mode-bar")).not.toContainText("搜经典");
+  // Returning-visitor path (locale from localStorage, init-time async load):
+  // the header language label must show the active language, not the stale
+  // resolvedLanguage fallback (was「中文」on an all-English page).
+  await expect(page.locator(".header-lang-text")).toHaveText("English", {
+    timeout: 10_000,
+  });
 });
 
 test("reader opens the Heart Sutra via CBETA id redirect", async ({ page, request }) => {
