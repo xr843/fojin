@@ -9,6 +9,7 @@ import {
   WarningOutlined,
 } from "@ant-design/icons";
 import type { DataSource } from "../../api/client";
+import { localizedSourceName } from "../../utils/sourceName";
 import { buildSearchUrl, getLangName } from "../../utils/sourceUrls";
 import { LANG_ORDER, getChannelLabel, trackSourceClick } from "./constants";
 
@@ -98,7 +99,7 @@ export default function SourceCard({ source: s, searchQuery }: SourceCardProps) 
           <GlobalOutlined />
         </span>
         <div className="source-card-titles">
-          <span className="source-card-name">{s.name_zh}</span>
+          <span className="source-card-name">{localizedSourceName(s)}</span>
           {s.name_en && <span className="source-card-name-en">{s.name_en}</span>}
         </div>
         <div className="source-card-badges">

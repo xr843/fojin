@@ -14,6 +14,7 @@ import { searchTexts, searchContent, searchDictionary, searchCrossLanguage, sear
 import type { DictGroupedSearchResponse } from "../api/client";
 import { hasDirectSearchUrl } from "../utils/sourceUrls";
 import { addSearchHistory, getSearchHistory, type SearchHistoryItem } from "../utils/history";
+import { localizedSourceName } from "../utils/sourceName";
 import { ResultCard, ExternalSourcesSection, DictCard, ContentCard, CrossLangCard, SemanticCard, UnifiedResults } from "../components/search";
 import "../styles/search.css";
 import "../styles/sources.css";
@@ -237,14 +238,16 @@ export default function SearchPage() {
     return counts;
   }, [extSearchable]);
 
-  /* 馆藏列表：只列出外部可搜索源，带数量 */
+  /* 馆藏列表：只列出外部可搜索源，带数量。filter key 固定用 name_zh，
+     显示名按 locale 走 name_en (#707)。 */
   const institutionList = useMemo(() => {
-    const counts: Record<string, number> = {};
+    const counts = new Map<string, { count: number; nameEn: string | null }>();
     extSearchable.forEach((s) => {
-      counts[s.name_zh] = (counts[s.name_zh] || 0) + 1;
+      const entry = counts.get(s.name_zh) ?? { count: 0, nameEn: s.name_en ?? null };
+      entry.count += 1;
+      counts.set(s.name_zh, entry);
     });
-    return Object.entries(counts)
-      .map(([name, count]) => ({ name, count }))
+    return Array.from(counts, ([name, { count, nameEn }]) => ({ name, nameEn, count }))
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "zh"));
   }, [extSearchable]);
 
@@ -398,13 +401,13 @@ export default function SearchPage() {
             <div className="s-filter-group">
               <div className="s-filter-title">🏛 {t("search.filter_institution")}</div>
               <div className="s-filter-scroll">
-                {institutionList.map(({ name, count }) => (
+                {institutionList.map(({ name, nameEn, count }) => (
                   <label key={name} className="s-filter-item">
                     <Checkbox
                       checked={institutionFilter.has(name)}
                       onChange={() => toggleInstitution(name)}
                     />
-                    <span className="s-filter-name">{name}</span>
+                    <span className="s-filter-name">{localizedSourceName({ name_zh: name, name_en: nameEn })}</span>
                     <span className="s-filter-count">{count}</span>
                   </label>
                 ))}

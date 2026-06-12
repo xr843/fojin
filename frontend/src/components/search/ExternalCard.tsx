@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Tag } from "antd";
 import { LinkOutlined, EyeOutlined } from "@ant-design/icons";
 import { buildSearchUrl } from "../../utils/sourceUrls";
+import { localizedSourceName } from "../../utils/sourceName";
 import type { DataSource } from "../../api/client";
 
 /**
@@ -17,7 +18,7 @@ export default function ExternalCard({ source, query }: { source: DataSource; qu
   const url = buildSearchUrl(source.code, query) || "#";
   return (
     <div className="s-ext-row">
-      <span className="s-ext-row-name">{source.name_zh}</span>
+      <span className="s-ext-row-name">{localizedSourceName(source)}</span>
       {source.region && <Tag style={{ fontSize: 11, margin: 0 }}>{t(`region.${source.region}`, source.region)}</Tag>}
       <span className="s-ext-row-spacer" />
       <a
@@ -25,7 +26,7 @@ export default function ExternalCard({ source, query }: { source: DataSource; qu
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        aria-label={t("search.search_at_source_aria", { name: source.name_zh, query })}
+        aria-label={t("search.search_at_source_aria", { name: localizedSourceName(source), query })}
       >
         <LinkOutlined /> {t("search.search_at_source")}
       </a>
@@ -35,7 +36,7 @@ export default function ExternalCard({ source, query }: { source: DataSource; qu
           href={source.base_url}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label={t("search.visit_homepage_aria", { name: source.name_zh })}
+          aria-label={t("search.visit_homepage_aria", { name: localizedSourceName(source) })}
         >
           <EyeOutlined /> {t("search.visit_homepage")}
         </a>
