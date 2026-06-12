@@ -1,4 +1,5 @@
 import { Tag, Tooltip } from "antd";
+import { useTranslation } from "react-i18next";
 import {
   ApiOutlined,
   FileImageOutlined,
@@ -22,31 +23,32 @@ interface SourceCardProps {
 // nothing — only problems get a badge, to keep healthy cards uncluttered.
 const HEALTH_BADGE: Record<
   Exclude<DataSource["health_status"], "ok">,
-  { label: string; color: string; tip: string }
+  { labelKey: string; color: string; tipKey: string }
 > = {
   degraded: {
-    label: "访问受限",
+    labelKey: "sources.health_degraded",
     color: "gold",
-    tip: "原站可达，但目标页面返回错误（如 403/404）。链接可能已失效，建议核对后再访问。",
+    tipKey: "sources.health_degraded_tip",
   },
   cert_invalid: {
-    label: "证书异常",
+    labelKey: "sources.health_cert_invalid",
     color: "orange",
-    tip: "原站 HTTPS 证书校验失败，浏览器访问时可能弹出安全警告。",
+    tipKey: "sources.health_cert_invalid_tip",
   },
   unreachable: {
-    label: "巡检未达",
+    labelKey: "sources.health_unreachable",
     color: "default",
-    tip: "本站自动巡检从单一服务器未能连接该源——多为数据中心 IP 被目标站限制或临时网络问题，你的浏览器通常仍可正常访问。长期持续不可达的源会被定期复核、必要时下架。",
+    tipKey: "sources.health_unreachable_tip",
   },
   moved: {
-    label: "站点已迁移",
+    labelKey: "sources.health_moved",
     color: "volcano",
-    tip: "原站已重定向到其他域名，原链接可能已迁移。",
+    tipKey: "sources.health_moved_tip",
   },
 };
 
 export default function SourceCard({ source: s, searchQuery }: SourceCardProps) {
+  const { t } = useTranslation();
   const langs = [
     ...new Map(
       (s.languages || "")
@@ -79,14 +81,14 @@ export default function SourceCard({ source: s, searchQuery }: SourceCardProps) 
   const healthDetailLine =
     health && s.health_detail
       ? s.health_status === "moved"
-        ? `现重定向至：${s.health_detail}`
-        : `详情：${s.health_detail}`
+        ? t("sources.health_redirect", { detail: s.health_detail })
+        : t("sources.health_detail", { detail: s.health_detail })
       : null;
   const healthTooltip = health
     ? [
-        health.tip,
+        t(health.tipKey),
         healthDetailLine,
-        healthCheckedAt ? `最近巡检：${healthCheckedAt}` : null,
+        healthCheckedAt ? t("sources.health_last_checked", { date: healthCheckedAt }) : null,
       ]
         .filter(Boolean)
         .join("\n")
@@ -106,40 +108,40 @@ export default function SourceCard({ source: s, searchQuery }: SourceCardProps) 
           {health && (
             <Tooltip title={<span style={{ whiteSpace: "pre-line" }}>{healthTooltip}</span>}>
               <Tag color={health.color} className="source-card-badge">
-                <WarningOutlined /> {health.label}
+                <WarningOutlined /> {t(health.labelKey)}
               </Tag>
             </Tooltip>
           )}
           {s.has_local_fulltext && (
-            <Tooltip title="正文已入库 FoJin 数据库，可在站内直接阅读、引用与全文检索">
+            <Tooltip title={t("sources.cap_local_tip")}>
               <Tag color="green" className="source-card-badge">
-                <ReadOutlined /> 已入库
+                <ReadOutlined /> {t("sources.badge_local")}
               </Tag>
             </Tooltip>
           )}
           {s.has_remote_fulltext && !s.has_local_fulltext && (
-            <Tooltip title="全文托管在原站，跳转后可阅读，本站仅做导航与去重">
+            <Tooltip title={t("sources.cap_remote_tip")}>
               <Tag color="cyan" className="source-card-badge">
-                <ReadOutlined /> 外站全文
+                <ReadOutlined /> {t("sources.cap_remote")}
               </Tag>
             </Tooltip>
           )}
           {s.supports_search && (
-            <Tooltip title="原站提供搜索功能；若已注册 URL 模板，下方会出现「搜索」直达按钮">
+            <Tooltip title={t("sources.badge_searchable_tip")}>
               <Tag color="blue" className="source-card-badge">
-                <SearchOutlined /> 可搜索
+                <SearchOutlined /> {t("sources.badge_searchable")}
               </Tag>
             </Tooltip>
           )}
           {s.supports_iiif && (
-            <Tooltip title="提供 IIIF 或高清扫描影像（写本、刻本、绘画等）">
+            <Tooltip title={t("sources.badge_iiif_tip")}>
               <Tag color="purple" className="source-card-badge">
-                <FileImageOutlined /> 影像
+                <FileImageOutlined /> {t("sources.cap_iiif")}
               </Tag>
             </Tooltip>
           )}
           {s.supports_api && (
-            <Tooltip title="提供机读 API（REST / RDF / IIIF 等），可程序化调用">
+            <Tooltip title={t("sources.cap_api_tip")}>
               <Tag color="orange" className="source-card-badge">
                 <ApiOutlined /> API
               </Tag>
@@ -152,7 +154,7 @@ export default function SourceCard({ source: s, searchQuery }: SourceCardProps) 
 
       {distributions.length > 0 && (
         <div className="source-card-dists">
-          <div className="source-card-dists-title">官方分发端</div>
+          <div className="source-card-dists-title">{t("sources.distributions_title")}</div>
           <div className="source-card-dists-list">
             {distributions.map((d) => (
               <a
@@ -173,7 +175,7 @@ export default function SourceCard({ source: s, searchQuery }: SourceCardProps) 
               >
                 <span className="source-dist-name">{d.name}</span>
                 <span className="source-dist-meta">
-                  {getChannelLabel(d.channel_type)}
+                  {getChannelLabel(d.channel_type, t)}
                   {d.format ? ` · ${d.format}` : ""}
                 </span>
               </a>
@@ -202,7 +204,7 @@ export default function SourceCard({ source: s, searchQuery }: SourceCardProps) 
               if (e.button === 1) trackSourceClick(s.code, "visit");
             }}
           >
-            <GlobalOutlined /> 访问网站
+            <GlobalOutlined /> {t("sources.visit_site")}
           </a>
         )}
         {searchUrl && (
@@ -220,7 +222,7 @@ export default function SourceCard({ source: s, searchQuery }: SourceCardProps) 
               }
             }}
           >
-            <LinkOutlined /> 搜索「{searchQuery}」
+            <LinkOutlined /> {t("sources.search_query_button", { query: searchQuery })}
           </a>
         )}
       </div>

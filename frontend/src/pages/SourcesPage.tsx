@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
+import { useTranslation } from "react-i18next";
 import { Empty, Input, Select, Skeleton } from "antd";
 import { SearchOutlined, ThunderboltOutlined, VerticalAlignTopOutlined } from "@ant-design/icons";
 import { getSources, type DataSource } from "../api/client";
@@ -23,15 +24,16 @@ type Capability = "direct" | "local" | "remote" | "iiif" | "api";
 const VALID_GROUP_BY: readonly GroupBy[] = ["region", "field", "lang"] as const;
 const VALID_CAPABILITY: readonly Capability[] = ["direct", "local", "remote", "iiif", "api"] as const;
 
-const CAPABILITY_LABELS: Record<Capability, { label: string; tip: string }> = {
-  direct: { label: "可一键直达", tip: "已注册站内搜索模板，点击卡片「搜索」即可跳到对应站点的结果页" },
-  local: { label: "已入库全文", tip: "正文已入库 FoJin 数据库，可在站内直接阅读、引用与全文检索" },
-  remote: { label: "外站全文", tip: "全文托管在原站，跳转后可阅读，本站仅做导航与去重" },
-  iiif: { label: "影像", tip: "提供 IIIF 或高清扫描影像，适合写本、刻本、绘画等视觉资源" },
-  api: { label: "API", tip: "提供机读 API（REST / RDF / IIIF 等），可程序化调用" },
+const CAPABILITY_LABELS: Record<Capability, { labelKey: string; tipKey: string }> = {
+  direct: { labelKey: "sources.cap_direct", tipKey: "sources.cap_direct_tip" },
+  local: { labelKey: "sources.cap_local", tipKey: "sources.cap_local_tip" },
+  remote: { labelKey: "sources.cap_remote", tipKey: "sources.cap_remote_tip" },
+  iiif: { labelKey: "sources.cap_iiif", tipKey: "sources.cap_iiif_tip" },
+  api: { labelKey: "sources.cap_api", tipKey: "sources.cap_api_tip" },
 };
 
 export default function SourcesPage() {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // URL params are the source of truth; defaults live here, not in state.
@@ -181,7 +183,7 @@ export default function SourcesPage() {
     const fieldSet = new Set<string>();
 
     for (const s of sources ?? []) {
-      regionSet.add(s.region || "其他");
+      regionSet.add(s.region || "其他"); // i18n-exempt
 
       if (s.languages) {
         for (const raw of s.languages.split(",")) {
@@ -200,8 +202,8 @@ export default function SourcesPage() {
     }
 
     const regionArr = Array.from(regionSet).sort((a, b) => {
-      if (a === "其他") return 1;
-      if (b === "其他") return -1;
+      if (a === "其他") return 1; // i18n-exempt
+      if (b === "其他") return -1; // i18n-exempt
       const ia = REGION_ORDER.indexOf(a);
       const ib = REGION_ORDER.indexOf(b);
       return (ia === -1 ? 98 : ia) - (ib === -1 ? 98 : ib);
@@ -236,7 +238,7 @@ export default function SourcesPage() {
           return false;
         }
       }
-      if (regionFilter !== "all" && (s.region || "其他") !== regionFilter) return false;
+      if (regionFilter !== "all" && (s.region || "其他") !== regionFilter) return false; // i18n-exempt
       if (langFilter !== "all") {
         const langs = (s.languages || "").split(",").map((l) => l.trim());
         const filterName = getLangName(langFilter);
@@ -268,16 +270,17 @@ export default function SourcesPage() {
     };
     for (const s of filtered) {
       if (groupBy === "region") {
-        addTo(s.region || "其他", s);
+        addTo(s.region || "其他", s); // i18n-exempt
       } else if (groupBy === "field") {
         const fields = (s.research_fields || "")
           .split(",")
           .map((f) => f.trim())
           .filter(Boolean);
         if (fields.length === 0) {
-          addTo("其他", s);
+          addTo("其他", s); // i18n-exempt
         } else {
-          fields.forEach((f) => addTo(FIELD_NAMES[f] || f, s));
+          // Group by field CODE; translated to a display name at render time.
+          fields.forEach((f) => addTo(f, s));
         }
       } else {
         const langs = (s.languages || "")
@@ -285,7 +288,7 @@ export default function SourcesPage() {
           .map((l) => l.trim())
           .filter(Boolean);
         if (langs.length === 0) {
-          addTo("其他", s);
+          addTo("其他", s); // i18n-exempt
         } else {
           const seen = new Set<string>();
           langs.forEach((l) => {
@@ -309,11 +312,11 @@ export default function SourcesPage() {
       groupBy === "region"
         ? REGION_ORDER
         : groupBy === "field"
-          ? FIELD_ORDER.map((f) => FIELD_NAMES[f] || f)
+          ? FIELD_ORDER
           : LANG_ORDER.map((l) => getLangName(l));
     return Object.entries(map).sort(([a], [b]) => {
-      if (a === "其他") return 1;
-      if (b === "其他") return -1;
+      if (a === "其他") return 1; // i18n-exempt
+      if (b === "其他") return -1; // i18n-exempt
       const ia = orderList.indexOf(a);
       const ib = orderList.indexOf(b);
       return (ia === -1 ? 98 : ia) - (ib === -1 ? 98 : ib);
@@ -333,6 +336,15 @@ export default function SourcesPage() {
       api: all.filter((s) => s.supports_api).length,
     };
   }, [sources]);
+
+  // Group keys are raw data values (zh region names / field codes / language
+  // display names) — translate at display time, falling back to the raw value.
+  const groupLabel = (name: string): string => {
+    if (name === "其他") return t("region.其他", name); // i18n-exempt
+    if (groupBy === "region") return t(`region.${name}`, name);
+    if (groupBy === "field") return t(`field.${name}`, FIELD_NAMES[name] || name);
+    return name;
+  };
 
   if (isLoading) {
     return (
@@ -358,13 +370,13 @@ export default function SourcesPage() {
   return (
     <div className="sources-page">
       <Helmet>
-        <title>数据源导航 | 佛津</title>
+        <title>{t("sources.page_title")}</title>
         <meta
           name="description"
           content={
             total > 0
-              ? `聚合全球 ${total} 个佛教数字资源，覆盖图书馆、大学、研究机构、数字项目等。`
-              : "聚合全球佛教数字资源，覆盖图书馆、大学、研究机构、数字项目等。"
+              ? t("sources.page_desc", { n: total })
+              : t("sources.page_desc_default")
           }
         />
         <link rel="canonical" href="https://fojin.app/sources" />
@@ -372,9 +384,9 @@ export default function SourcesPage() {
         <link rel="alternate" hrefLang="zh" href="https://fojin.app/sources" />
       </Helmet>
       <div className="sources-header">
-        <h1 className="sources-title">数据源导航</h1>
-        <p className="sources-desc">聚合全球 {total} 个佛教数字资源 · 点击下方能力筛选</p>
-        <div className="sources-cap-chips" role="group" aria-label="按能力过滤">
+        <h1 className="sources-title">{t("sources.heading")}</h1>
+        <p className="sources-desc">{t("sources.subtitle", { n: total })}</p>
+        <div className="sources-cap-chips" role="group" aria-label={t("sources.filter_by_capability_aria")}>
           {(
             [
               { key: "direct", count: counters.directSearch },
@@ -394,11 +406,11 @@ export default function SourcesPage() {
                 type="button"
                 className={`sources-cap-chip sources-cap-chip-${key}${active ? " is-active" : ""}`}
                 onClick={() => toggleCapability(key)}
-                title={CAPABILITY_LABELS[key].tip}
+                title={t(CAPABILITY_LABELS[key].tipKey)}
                 aria-pressed={active}
               >
                 <strong>{count}</strong>
-                <span>{CAPABILITY_LABELS[key].label}</span>
+                <span>{t(CAPABILITY_LABELS[key].labelKey)}</span>
               </button>
             );
           })}
@@ -407,9 +419,9 @@ export default function SourcesPage() {
               type="button"
               className="sources-cap-chip-clear"
               onClick={() => setCapability(null)}
-              aria-label="清除能力筛选"
+              aria-label={t("sources.clear_capability_aria")}
             >
-              清除
+              {t("sources.clear")}
             </button>
           )}
         </div>
@@ -419,16 +431,16 @@ export default function SourcesPage() {
         <div className="sources-hero-search-head">
           <ThunderboltOutlined className="sources-hero-search-icon" />
           <div className="sources-hero-search-copy">
-            <div className="sources-hero-search-title">一次输入，一键直达 {counters.directSearch} 个数据源</div>
+            <div className="sources-hero-search-title">{t("sources.hero_title", { n: counters.directSearch })}</div>
             <div className="sources-hero-search-sub">
-              敲入一个关键词，下方每张已接入模板的卡片会生成对应数据源的站内搜索直链
+              {t("sources.hero_sub")}
             </div>
           </div>
         </div>
         <Input.Search
-          placeholder="例：般若、涅槃、慈悲、阿含"
+          placeholder={t("sources.hero_placeholder")}
           size="large"
-          enterButton="生成直达"
+          enterButton={t("sources.hero_button")}
           allowClear
           value={tryInput}
           onChange={(e) => setTryInput(e.target.value)}
@@ -449,7 +461,7 @@ export default function SourcesPage() {
         />
         {searchQuery && (
           <div className="sources-hero-search-result" role="status" aria-live="polite">
-            已为 {counters.directSearch} 个数据源生成「{searchQuery}」直达链接 —— 下滑查看每张卡片的「搜索」按钮
+            {t("sources.hero_result", { n: counters.directSearch, query: searchQuery })}
           </div>
         )}
       </div>
@@ -457,27 +469,27 @@ export default function SourcesPage() {
       <div className="sources-trust">
         <div className="sources-trust-items">
           <div className="sources-trust-item">
-            <div className="sources-trust-title">来源可溯</div>
+            <div className="sources-trust-title">{t("sources.trust_provenance")}</div>
             <div className="sources-trust-desc">
-              所有数据均来自 CBETA、BDRC、SAT、SuttaCentral 等学术机构公开发布的数字资源，每条记录保留原始来源标识与链接。
+              {t("sources.trust_provenance_tip")}
             </div>
           </div>
           <div className="sources-trust-item">
-            <div className="sources-trust-title">定期同步</div>
+            <div className="sources-trust-title">{t("sources.trust_sync")}</div>
             <div className="sources-trust-desc">
-              通过 Git、API、批量导入等渠道与上游数据源保持同步，确保收录内容反映最新发布状态。
+              {t("sources.trust_sync_tip")}
             </div>
           </div>
           <div className="sources-trust-item">
-            <div className="sources-trust-title">自动去重</div>
+            <div className="sources-trust-title">{t("sources.trust_dedup")}</div>
             <div className="sources-trust-desc">
-              跨数据源自动识别同一典籍的不同收录，合并为统一记录，保留各源的独立编号与访问链接。
+              {t("sources.trust_dedup_tip")}
             </div>
           </div>
           <div className="sources-trust-item">
-            <div className="sources-trust-title">覆盖广泛</div>
+            <div className="sources-trust-title">{t("sources.trust_coverage")}</div>
             <div className="sources-trust-desc">
-              涵盖 {regions.length} 个国家和地区、{languages.length} 种语言，覆盖汉传、藏传、南传、梵文等多种佛教传统。
+              {t("sources.trust_coverage_tip", { regions: regions.length, langs: languages.length })}
             </div>
           </div>
         </div>
@@ -486,7 +498,7 @@ export default function SourcesPage() {
       <div className="sources-toolbar">
         <Input
           prefix={<SearchOutlined style={{ color: "#9a8e7a" }} />}
-          placeholder="搜索数据源名称、描述..."
+          placeholder={t("sources.search_placeholder")}
           allowClear
           value={searchInput}
           onChange={(e) => handleSearchInputChange(e.target.value)}
@@ -497,8 +509,8 @@ export default function SourcesPage() {
           onChange={setRegionFilter}
           style={{ width: 140 }}
           options={[
-            { value: "all", label: `全部地区 (${regions.length})` },
-            ...regions.map((r) => ({ value: r, label: r })),
+            { value: "all", label: t("sources.all_regions", { n: regions.length }) },
+            ...regions.map((r) => ({ value: r, label: t(`region.${r}`, r) })),
           ]}
         />
         <Select
@@ -506,7 +518,7 @@ export default function SourcesPage() {
           onChange={setLangFilter}
           style={{ width: 140 }}
           options={[
-            { value: "all", label: `全部语种 (${languages.length})` },
+            { value: "all", label: t("sources.all_langs", { n: languages.length }) },
             ...languages.map((l) => ({ value: l, label: getLangName(l) })),
           ]}
         />
@@ -515,40 +527,40 @@ export default function SourcesPage() {
           onChange={setFieldFilter}
           style={{ width: 150 }}
           options={[
-            { value: "all", label: `研究领域 (${researchFields.length})` },
-            ...researchFields.map((f) => ({ value: f, label: FIELD_NAMES[f] || f })),
+            { value: "all", label: t("sources.all_fields", { n: researchFields.length }) },
+            ...researchFields.map((f) => ({ value: f, label: t(`field.${f}`, FIELD_NAMES[f] || f) })),
           ]}
         />
         <button
           type="button"
           className={`sources-toggle-chip${fulltextOnly ? " is-active" : ""}`}
           onClick={() => setFulltextOnly(!fulltextOnly)}
-          title="只显示已入库或外站可读全文的源（隐藏纯链接目录）"
+          title={t("sources.fulltext_only_tip")}
         >
-          {fulltextOnly ? "✓ " : ""}仅看全文 ({counters.local + counters.remote})
+          {fulltextOnly ? "✓ " : ""}{t("sources.fulltext_only", { n: counters.local + counters.remote })}
         </button>
         <Select
           value={groupBy}
           onChange={setGroupBy}
           style={{ width: 130 }}
           options={[
-            { value: "region", label: "按地区分组" },
-            { value: "field", label: "按研究领域" },
-            { value: "lang", label: "按语种" },
+            { value: "region", label: t("sources.group_by_region") },
+            { value: "field", label: t("sources.group_by_field") },
+            { value: "lang", label: t("sources.group_by_lang") },
           ]}
         />
       </div>
 
       <div className="sources-stats-bar">
-        当前显示 <strong>{filtered.length}</strong> / {total} 个数据源
-        {groupBy !== "region" && ` · ${grouped.length} 个分组`}
+        {t("sources.stats_showing")} <strong>{filtered.length}</strong> / {total} {t("sources.stats_unit")}
+        {groupBy !== "region" && ` · ${t("sources.stats_groups", { n: grouped.length })}`}
         {groupBy !== "region" && (
-          <span className="sources-stats-hint">（一个数据源可归属多个{groupBy === "field" ? "研究领域" : "语种"}）</span>
+          <span className="sources-stats-hint">{groupBy === "field" ? t("sources.stats_hint_field") : t("sources.stats_hint_lang")}</span>
         )}
       </div>
 
       {filtered.length === 0 ? (
-        <Empty description="无匹配数据源" style={{ marginTop: 60 }} />
+        <Empty description={t("sources.no_match")} style={{ marginTop: 60 }} />
       ) : (
         <div className="sources-groups">
           {grouped.map(([groupName, items]) => {
@@ -559,7 +571,7 @@ export default function SourcesPage() {
             return (
               <div key={groupName} className="sources-group">
                 <div className="sources-group-header">
-                  <span className="sources-group-name">{groupName}</span>
+                  <span className="sources-group-name">{groupLabel(groupName)}</span>
                   <span className="sources-group-count">{items.length}</span>
                 </div>
                 <div className="sources-grid">
@@ -575,8 +587,8 @@ export default function SourcesPage() {
                     aria-expanded={isExpanded}
                   >
                     {isExpanded
-                      ? `收起 ${groupName}`
-                      : `展开全部 ${items.length} 个 (还有 ${items.length - GROUP_COLLAPSE_LIMIT} 个)`}
+                      ? t("sources.collapse_group", { group: groupLabel(groupName) })
+                      : t("sources.expand_group", { n: items.length, remaining: items.length - GROUP_COLLAPSE_LIMIT })}
                   </button>
                 )}
               </div>
@@ -591,7 +603,7 @@ export default function SourcesPage() {
         <button
           className="sources-back-top"
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          aria-label="回到顶部"
+          aria-label={t("sources.back_to_top_aria")}
         >
           <VerticalAlignTopOutlined />
           <span>Top</span>
