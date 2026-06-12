@@ -12,3 +12,13 @@ import i18n, { currentUILang } from "../i18n";
 export function localizedSourceName(s: { name_zh: string; name_en?: string | null }): string {
   return currentUILang(i18n) === "en" && s.name_en ? s.name_en : s.name_zh;
 }
+
+/**
+ * The source's name in the OTHER locale, for subtitles under the main name.
+ * English UI shows the Chinese name and vice versa; returns null when it
+ * would just repeat the main display name.
+ */
+export function alternateSourceName(s: { name_zh: string; name_en?: string | null }): string | null {
+  const alt = currentUILang(i18n) === "en" ? s.name_zh : s.name_en ?? null;
+  return alt && alt !== localizedSourceName(s) ? alt : null;
+}

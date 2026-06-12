@@ -7,7 +7,7 @@ import { Empty, Input, Select, Skeleton } from "antd";
 import { SearchOutlined, ThunderboltOutlined, VerticalAlignTopOutlined } from "@ant-design/icons";
 import { getSources, type DataSource } from "../api/client";
 import { SUPPORTED_UI_LANGS } from "../i18n";
-import { getLangName, hasDirectSearchUrl, normalizeLangCode } from "../utils/sourceUrls";
+import { getLangName, hasDirectSearchUrl, localizedLangName, normalizeLangCode } from "../utils/sourceUrls";
 import SourceCard from "./sources/SourceCard";
 import SuggestSourceForm from "./sources/SuggestSourceForm";
 import {
@@ -343,6 +343,9 @@ export default function SourcesPage() {
     if (name === "其他") return t("region.其他", name); // i18n-exempt
     if (groupBy === "region") return t(`region.${name}`, name);
     if (groupBy === "field") return t(`field.${name}`, FIELD_NAMES[name] || name);
+    // language groups are keyed by the Chinese data name — reverse to the
+    // ISO code and resolve through lang.* keys
+    if (groupBy === "lang") return localizedLangName(normalizeLangCode(name), t);
     return name;
   };
 
@@ -519,7 +522,7 @@ export default function SourcesPage() {
           style={{ width: 140 }}
           options={[
             { value: "all", label: t("sources.all_langs", { n: languages.length }) },
-            ...languages.map((l) => ({ value: l, label: getLangName(l) })),
+            ...languages.map((l) => ({ value: l, label: localizedLangName(normalizeLangCode(l), t) })),
           ]}
         />
         <Select

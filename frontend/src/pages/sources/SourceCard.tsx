@@ -10,8 +10,8 @@ import {
   WarningOutlined,
 } from "@ant-design/icons";
 import type { DataSource } from "../../api/client";
-import { localizedSourceName } from "../../utils/sourceName";
-import { buildSearchUrl, getLangName } from "../../utils/sourceUrls";
+import { localizedSourceName, alternateSourceName } from "../../utils/sourceName";
+import { buildSearchUrl, getLangName, localizedLangName } from "../../utils/sourceUrls";
 import { LANG_ORDER, getChannelLabel, trackSourceClick } from "./constants";
 
 interface SourceCardProps {
@@ -102,7 +102,9 @@ export default function SourceCard({ source: s, searchQuery }: SourceCardProps) 
         </span>
         <div className="source-card-titles">
           <span className="source-card-name">{localizedSourceName(s)}</span>
-          {s.name_en && <span className="source-card-name-en">{s.name_en}</span>}
+          {alternateSourceName(s) && (
+            <span className="source-card-name-en">{alternateSourceName(s)}</span>
+          )}
         </div>
         <div className="source-card-badges">
           {health && (
@@ -187,7 +189,7 @@ export default function SourceCard({ source: s, searchQuery }: SourceCardProps) 
       <div className="source-card-langs">
         {langs.map((l) => (
           <span key={l} className="source-lang-tag">
-            {getLangName(l)}
+            {localizedLangName(l, t)}
           </span>
         ))}
       </div>
