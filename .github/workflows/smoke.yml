@@ -1,0 +1,76 @@
+name: Production smoke
+
+# Post-deploy monitoring, NOT a PR gate — never mark this workflow as a
+# required check (it doesn't run on PRs at all).
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Target base URL"
+        default: "https://fojin.app"
+        required: false
+  schedule:
+    - cron: "17 1,13 * * *" # twice daily, UTC
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: Smoke against production
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: e2e
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      # On master pushes the webhook CD needs minutes to rebuild containers.
+      # We can't poll a commit hash (no version endpoint yet), but the en
+      # locale key count is a deterministic deploy signal whenever locales
+      # changed; when they didn't, any moment is equally valid to test. Wait
+      # until served == repo, give up after 12 min and test anyway (the
+      # functional specs are mostly version-independent).
+      - name: Wait for CD rollout
+        if: github.event_name == 'push'
+        run: |
+          REPO_KEYS=$(node -e "console.log(Object.keys(require('../frontend/public/locales/en/translation.json')).length)")
+          echo "repo en keys: $REPO_KEYS"
+          for i in $(seq 1 24); do
+            SERVED=$(curl -sf --max-time 10 https://fojin.app/locales/en/translation.json | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(Object.keys(JSON.parse(d)).length))" 2>/dev/null || echo -1)
+            if [ "$SERVED" = "$REPO_KEYS" ]; then
+              echo "locale in sync after $((i*30))s (served=$SERVED)"
+              exit 0
+            fi
+            echo "waiting for CD... served=$SERVED ($((i*30))s)"
+            sleep 30
+          done
+          echo "::warning::CD rollout not confirmed after 12min — testing anyway"
+
+      - name: Install Playwright
+        run: npm ci && npx playwright install --with-deps chromium
+
+      - name: Run smoke suite
+        env:
+          BASE_URL: ${{ github.event.inputs.base_url || 'https://fojin.app' }}
+        run: npx playwright test
+
+      - name: Upload traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-traces
+          path: e2e/test-results/
+          retention-days: 7
