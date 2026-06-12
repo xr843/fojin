@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Select, Tooltip } from "antd";
 import { PictureOutlined } from "@ant-design/icons";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { fetchChatModels, type ChatModelOption } from "../api/chatModels";
 import deepseekLogo from "../assets/llm-logos/deepseek.svg";
 import qwenLogo from "../assets/llm-logos/qwen.svg";
@@ -27,7 +29,7 @@ const FALLBACK_OPTIONS: ChatModelOption[] = [
     id: "deepseek:v4-pro",
     provider: "deepseek",
     label: "DeepSeek V4 Pro",
-    description: "默认模型",
+    description: "默认模型", // i18n-exempt — mirrors the backend catalog payload; real descriptions arrive from the API as data
     vision: false,
     available: true,
     requires_byok: false,
@@ -47,8 +49,8 @@ interface SelectGroup {
   options: SelectOption[];
 }
 
-function buildLabel(model: ChatModelOption): React.ReactNode {
-  const suffix = model.available ? "" : "（需配置 Key）";
+function buildLabel(model: ChatModelOption, t: TFunction): React.ReactNode {
+  const suffix = model.available ? "" : t("chat.model_requires_key");
   const text = `${model.label}${suffix}`;
   const logoSrc = PROVIDER_LOGO[model.provider];
   return (
@@ -71,7 +73,7 @@ function buildLabel(model: ChatModelOption): React.ReactNode {
   );
 }
 
-function groupByProvider(models: ChatModelOption[]): SelectGroup[] {
+function groupByProvider(models: ChatModelOption[], t: TFunction): SelectGroup[] {
   const groups = new Map<string, ChatModelOption[]>();
   for (const m of models) {
     const arr = groups.get(m.provider) ?? [];
@@ -85,7 +87,7 @@ function groupByProvider(models: ChatModelOption[]): SelectGroup[] {
       title: provider,
       options: items.map((m) => ({
         value: m.id,
-        label: buildLabel(m),
+        label: buildLabel(m, t),
         title: m.description,
         disabled: !m.available,
       })),
@@ -95,6 +97,7 @@ function groupByProvider(models: ChatModelOption[]): SelectGroup[] {
 }
 
 export default function ChatModelSelector({ value, onChange }: ChatModelSelectorProps) {
+  const { t } = useTranslation();
   const [models, setModels] = useState<ChatModelOption[] | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -130,8 +133,8 @@ export default function ChatModelSelector({ value, onChange }: ChatModelSelector
 
   const groupedOptions = useMemo<SelectGroup[]>(() => {
     if (!models) return [];
-    return groupByProvider(models);
-  }, [models]);
+    return groupByProvider(models, t);
+  }, [models, t]);
 
   return (
     <Select

@@ -10,6 +10,7 @@ import {
   searchDictionaryGrouped,
 } from "../api/client";
 import type { DictEntry, DictGroupedResult } from "../api/client";
+import { localizedSourceName } from "../utils/sourceName";
 import "../styles/dictionary.css";
 
 const LANG_COLORS: Record<string, string> = {
@@ -25,17 +26,20 @@ const LANG_COLORS: Record<string, string> = {
   mnc: "lime",
 };
 
-const LANG_LABELS: Record<string, string> = {
-  zh: "中文",
-  lzh: "中文",
-  pi: "巴利文",
-  sa: "梵文",
-  bo: "藏文",
-  en: "英文",
-  ja: "日文",
-  ko: "韩文",
-  mn: "蒙古文",
-  mnc: "满文",
+// Language code → i18n key. lzh deliberately maps to lang.zh (not lang.lzh)
+// to preserve the page's existing zh display "中文" for both codes; the
+// dedupe below also relies on zh/lzh collapsing to one tag.
+const LANG_LABEL_KEYS: Record<string, string> = {
+  zh: "lang.zh",
+  lzh: "lang.zh",
+  pi: "lang.pi",
+  sa: "lang.sa",
+  bo: "lang.bo",
+  en: "lang.en",
+  ja: "lang.ja",
+  ko: "lang.ko",
+  mn: "lang.mn",
+  mnc: "lang.mnc",
 };
 
 function truncate(text: string, max: number): string {
@@ -44,6 +48,7 @@ function truncate(text: string, max: number): string {
 }
 
 function EntryItem({ entry }: { entry: DictEntry }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -68,7 +73,7 @@ function EntryItem({ entry }: { entry: DictEntry }) {
           color={LANG_COLORS[entry.lang] || "default"}
           style={{ fontSize: 11, marginLeft: 8 }}
         >
-          {LANG_LABELS[entry.lang] || entry.lang}
+          {LANG_LABEL_KEYS[entry.lang] ? t(LANG_LABEL_KEYS[entry.lang]) : entry.lang}
         </Tag>
         {entry.source_name && (
           <Tag color="orange" style={{ fontSize: 11, marginLeft: 4 }}>
@@ -90,6 +95,7 @@ function EntryItem({ entry }: { entry: DictEntry }) {
 const COLLAPSE_THRESHOLD = 3;
 
 function DictGroup({ group, defaultExpanded = false }: { group: DictGroupedResult; defaultExpanded?: boolean }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(defaultExpanded);
   const hasMore = group.entries.length > COLLAPSE_THRESHOLD;
   const visibleEntries = expanded ? group.entries : group.entries.slice(0, COLLAPSE_THRESHOLD);
@@ -118,7 +124,7 @@ function DictGroup({ group, defaultExpanded = false }: { group: DictGroupedResul
             onClick={() => setExpanded(!expanded)}
             style={{ color: "var(--fj-accent)", fontSize: 13 }}
           >
-            {expanded ? "收起" : `展开全部 ${group.entries.length} 条`}
+            {expanded ? t("dict.collapse") : t("dict.expand_all", { n: group.entries.length })}
           </Button>
         </div>
       )}
@@ -193,6 +199,9 @@ export default function DictionaryPage() {
 
   const isSearching = query.length > 0;
 
+  const browsedSource =
+    sourceFilter && sources ? sources.find((s) => s.code === sourceFilter) ?? null : null;
+
   return (
     <div className="dict-page">
       <Helmet>
@@ -204,17 +213,17 @@ export default function DictionaryPage() {
         <h1 className="dict-title">{t("nav.dictionary")}</h1>
         <p className="dict-subtitle">
           {sources
-            ? `${sources.length} 部权威辞典 · ${totalEntries.toLocaleString()}+ 词条 · 中梵巴藏英蒙满七语`
-            : "佛学辞典综合检索"}
+            ? t("dict.subtitle", { n: sources.length, entries: totalEntries.toLocaleString() })
+            : t("dict.subtitle_default")}
         </p>
 
         {/* Search */}
         <div className="dict-search-box">
           <Input.Search
             size="large"
-            placeholder="搜索佛学术语..."
+            placeholder={t("dict.search_placeholder")}
             prefix={<SearchOutlined style={{ color: "var(--fj-ink-muted)" }} />}
-            enterButton="搜 索"
+            enterButton={t("dict.search_button")}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onSearch={handleSearch}
@@ -253,9 +262,9 @@ export default function DictionaryPage() {
                     }
                   }}
                 >
-                  <div className="dict-source-card-name">{src.name_zh}</div>
+                  <div className="dict-source-card-name">{localizedSourceName(src)}</div>
                   <div className="dict-source-card-count">
-                    {src.entry_count.toLocaleString()} 词条
+                    {t("dict.entry_count", { n: src.entry_count.toLocaleString() })}
                   </div>
                   {src.description && (
                     <div style={{ fontSize: 12, color: "var(--fj-ink-muted)", marginTop: 4, lineHeight: 1.5 }}>
@@ -263,13 +272,13 @@ export default function DictionaryPage() {
                     </div>
                   )}
                   <div className="dict-source-card-langs">
-                    {[...new Map(src.languages.map((l) => [LANG_LABELS[l] || l, l])).values()].map((lang) => (
+                    {[...new Map(src.languages.map((l) => [LANG_LABEL_KEYS[l] || l, l])).values()].map((lang) => (
                       <Tag
                         key={lang}
                         color={LANG_COLORS[lang] || "default"}
                         style={{ fontSize: 11, margin: 0 }}
                       >
-                        {LANG_LABELS[lang] || lang}
+                        {LANG_LABEL_KEYS[lang] ? t(LANG_LABEL_KEYS[lang]) : lang}
                       </Tag>
                     ))}
                   </div>
@@ -277,7 +286,7 @@ export default function DictionaryPage() {
               ))}
             </div>
           ) : (
-            <Empty description="暂无辞典数据" />
+            <Empty description={t("dict.no_sources")} />
           )}
         </>
       )}
@@ -298,25 +307,27 @@ export default function DictionaryPage() {
               }}
               style={{ color: "var(--fj-accent)", fontSize: 13, padding: 0, marginRight: 16 }}
             >
-              返回辞典列表
+              {t("dict.back_to_list")}
             </Button>
-            {sourceFilter && sources && (
+            {browsedSource && (
               <span style={{ fontSize: 14, color: "var(--fj-ink)", fontWeight: 500 }}>
-                正在浏览：{sources.find(s => s.code === sourceFilter)?.name_zh}
-                （{sources.find(s => s.code === sourceFilter)?.entry_count.toLocaleString()} 条）
+                {t("dict.browsing", {
+                  name: localizedSourceName(browsedSource),
+                  n: browsedSource.entry_count.toLocaleString(),
+                })}
               </span>
             )}
-            <span style={{ fontSize: 13, color: "var(--fj-ink-muted)" }}>语言:</span>
+            <span style={{ fontSize: 13, color: "var(--fj-ink-muted)" }}>{t("dict.language_label")}</span>
             <Select
               value={langFilter}
               onChange={setLangFilter}
               style={{ width: 120 }}
               size="small"
               options={[
-                { value: "all", label: "全部" },
+                { value: "all", label: t("dict.all_languages") },
                 ...availableLangs.map((l) => ({
                   value: l,
-                  label: LANG_LABELS[l] || l,
+                  label: LANG_LABEL_KEYS[l] ? t(LANG_LABEL_KEYS[l]) : l,
                 })),
               ]}
             />
@@ -329,7 +340,7 @@ export default function DictionaryPage() {
           ) : searchResult && searchResult.groups.length > 0 ? (
             <>
               <div className="dict-result-stats">
-                共找到 <strong>{searchResult.total}</strong> 条结果
+                {t("dict.results_found_prefix")} <strong>{searchResult.total}</strong> {t("dict.results_found_suffix")}
               </div>
               {searchResult.groups.map((group) => (
                 <DictGroup key={group.source_code} group={group} defaultExpanded={!!sourceFilter} />
@@ -342,13 +353,13 @@ export default function DictionaryPage() {
                     total={searchResult.total}
                     onChange={(p) => setPage(p)}
                     showSizeChanger={false}
-                    showTotal={(total) => `共 ${total} 条`}
+                    showTotal={(total) => t("dict.total_n", { n: total })}
                   />
                 </div>
               )}
             </>
           ) : (
-            <Empty description={`未找到"${query}"的相关词条`} />
+            <Empty description={t("dict.no_results", { query })} />
           )}
 
           {/* Ask AI floating button */}
@@ -359,7 +370,7 @@ export default function DictionaryPage() {
               style={{ background: "var(--fj-accent)", borderColor: "var(--fj-accent)" }}
               onClick={() => navigate(`/chat?q=${encodeURIComponent(query)}`)}
             >
-              问小津
+              {t("dict.ask_ai")}
             </Button>
           </div>
         </>

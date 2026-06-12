@@ -98,6 +98,13 @@ function parseFollowUps(content: string): { cleanContent: string; suggestions: s
 
 const CITATION_URL_SCHEME = "fojin-citation";
 
+// Streaming placeholder / failure sentinels. These exact strings are stored
+// in message state and compared by identity in several places below; the
+// display sites render t("chat.thinking") / t("chat.request_failed") instead,
+// so the stored sentinel survives a UI language switch.
+const THINKING_SENTINEL = "正在检索经文并生成回答..."; // i18n-exempt
+const REQUEST_FAILED_SENTINEL = "请求失败，请重试"; // i18n-exempt
+
 // rehype-sanitize's defaultSchema strips any <a href> whose protocol is not
 // in its allowlist (http, https, mailto, tel, …). We add our custom citation
 // scheme so the citation-drawer machinery below can intercept it instead of
@@ -196,7 +203,7 @@ function injectCitationLinks(content: string, sources: ChatSource[] | null): str
       // so the label matches the link target — this also turns a literal
       // 第N卷 placeholder the LLM left unsubstituted into a real number.
       // Non-卷 qualifiers (卷上, 第十八愿) carry no 第…卷 slot and are kept.
-      const label = tail.replace(/第[^】卷]*卷/, `第${juan}卷`);
+      const label = tail.replace(/第[^】卷]*卷/, `第${juan}卷`); // i18n-exempt — rewrites the LLM's Chinese citation marker, must match answer text
       return `[【《${title}》${label}】](${url})`;
     },
   );
@@ -264,11 +271,12 @@ function groupSessionsByDate(sessions: ChatSessionItem[]): { label: string; item
     else groups.older.push(s);
   }
 
+  // label is an i18n key — render with t(group.label)
   const result: { label: string; items: ChatSessionItem[] }[] = [];
-  if (groups.today.length) result.push({ label: "今天", items: groups.today });
-  if (groups.yesterday.length) result.push({ label: "昨天", items: groups.yesterday });
-  if (groups.week.length) result.push({ label: "本周", items: groups.week });
-  if (groups.older.length) result.push({ label: "更早", items: groups.older });
+  if (groups.today.length) result.push({ label: "chat.session_group_today", items: groups.today });
+  if (groups.yesterday.length) result.push({ label: "chat.session_group_yesterday", items: groups.yesterday });
+  if (groups.week.length) result.push({ label: "chat.session_group_week", items: groups.week });
+  if (groups.older.length) result.push({ label: "chat.session_group_older", items: groups.older });
   return result;
 }
 
@@ -532,7 +540,7 @@ export default function ChatPage() {
       // 加载历史会话时滚到顶部，让用户先看到问题
       setTimeout(() => messagesTopRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
     } catch {
-      message.error("加载会话失败");
+      message.error(t("chat.load_session_failed"));
     }
   };
 
@@ -546,7 +554,7 @@ export default function ChatPage() {
       setCurrentPage(nextPage);
       setHasOlderMessages(nextPage * 50 < data.total);
     } catch {
-      message.error("加载历史消息失败");
+      message.error(t("chat.load_older_failed"));
     } finally {
       setLoadingOlder(false);
     }
@@ -561,10 +569,10 @@ export default function ChatPage() {
 
   const handleDeleteSession = (sid: number) => {
     Modal.confirm({
-      title: "删除会话",
-      content: "删除后无法恢复，确定要删除这个会话吗？",
-      okText: "删除",
-      cancelText: "取消",
+      title: t("chat.delete_session_title"),
+      content: t("chat.delete_session_confirm"),
+      okText: t("chat.delete"),
+      cancelText: t("chat.cancel"),
       okButtonProps: { danger: true },
       onOk: async () => {
         try {
@@ -572,7 +580,7 @@ export default function ChatPage() {
           if (sessionId === sid) handleNewChat();
           refetchSessions();
         } catch {
-          message.error("删除失败");
+          message.error(t("chat.delete_failed"));
         }
       },
     });
@@ -594,27 +602,27 @@ export default function ChatPage() {
     e.target.value = "";
     if (!file) return;
     if (attachments.length >= MAX_ATTACHMENTS) {
-      message.warning(`最多同时上传 ${MAX_ATTACHMENTS} 个附件`);
+      message.warning(t("chat.attachments_max", { n: MAX_ATTACHMENTS }));
       return;
     }
     if (file.size > MAX_ATTACHMENT_BYTES) {
-      message.error("文件超过 10MB 限制");
+      message.error(t("chat.attachment_too_large"));
       return;
     }
     setUploadingAttachment(true);
     try {
       const meta = await uploadChatAttachment(file);
       setAttachments((prev) => [...prev, meta]);
-      message.success(`已上传 ${meta.filename}（${meta.char_count} 字）`);
+      message.success(t("chat.attachment_uploaded", { filename: meta.filename, n: meta.char_count }));
     } catch (err: unknown) {
       const detail =
         (err as { response?: { data?: { detail?: string } } })?.response
           ?.data?.detail;
-      message.error(detail || "上传失败，请稍后重试");
+      message.error(detail || t("chat.upload_failed"));
     } finally {
       setUploadingAttachment(false);
     }
-  }, [attachments.length]);
+  }, [attachments.length, t]);
 
   const handleRemoveAttachment = useCallback((id: number) => {
     setAttachments((prev) => prev.filter((a) => a.id !== id));
@@ -646,7 +654,7 @@ export default function ChatPage() {
     const assistantMsg: ChatMessageItem = {
       id: assistantId,
       role: "assistant",
-      content: "正在检索经文并生成回答...",
+      content: THINKING_SENTINEL,
       sources: null,
       created_at: new Date().toISOString(),
     };
@@ -675,7 +683,7 @@ export default function ChatPage() {
         setMessages((prev) =>
           prev.map((m) => {
             if (m.id !== assistantId) return m;
-            const current = m.content === "正在检索经文并生成回答..." ? "" : m.content;
+            const current = m.content === THINKING_SENTINEL ? "" : m.content;
             return { ...m, content: current + content };
           }),
         );
@@ -732,8 +740,8 @@ export default function ChatPage() {
         message.error(errMsg);
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === assistantId && m.content === "正在检索经文并生成回答..."
-              ? { ...m, content: "请求失败，请重试" }
+            m.id === assistantId && m.content === THINKING_SENTINEL
+              ? { ...m, content: REQUEST_FAILED_SENTINEL }
               : m,
           ),
         );
@@ -814,29 +822,31 @@ export default function ChatPage() {
     setSearchParams({}, { replace: true });
 
     const msg = source
-      ? `关于《${source}》中的这段经文：\n\n> ${context}\n\n${q}`
-      : `关于这段经文：\n\n> ${context}\n\n${q}`;
+      ? `关于《${source}》中的这段经文：\n\n> ${context}\n\n${q}` // i18n-exempt — chat message payload sent to the zh RAG pipeline
+      : `关于这段经文：\n\n> ${context}\n\n${q}`; // i18n-exempt — chat message payload sent to the zh RAG pipeline
     handleSendMessage(msg);
   }, [searchParams, setSearchParams, handleSendMessage]);
 
   const handleExport = useCallback(() => {
     if (messages.length === 0) {
-      message.warning("暂无对话内容可导出");
+      message.warning(t("chat.export_empty"));
       return;
     }
     const sessionTitle = sessions?.find((s) => s.id === sessionId)?.title || t("chat.new_chat");
     const now = new Date().toLocaleString("zh-CN");
-    let md = `# ${sessionTitle}\n导出时间: ${now}\n\n`;
+    let md = `# ${sessionTitle}\n${t("chat.export_time", { time: now })}\n\n`;
     for (const m of messages) {
       if (m.role === "user") {
-        md += `## 用户\n${m.content}\n\n`;
+        md += `## ${t("chat.export_role_user")}\n${m.content}\n\n`;
       } else {
         const { cleanContent } = parseFollowUps(m.content);
-        md += `## AI 助手\n${cleanContent}\n\n`;
+        md += `## ${t("chat.export_role_assistant")}\n${cleanContent}\n\n`;
         if (m.sources && m.sources.length > 0) {
-          md += "**引用来源:**\n";
+          md += `**${t("chat.export_sources_label")}**\n`;
           for (const s of m.sources) {
-            const title = s.title_zh ? `《${s.title_zh}》第${s.juan_num}卷` : `文本#${s.text_id} 第${s.juan_num}卷`;
+            const title = s.title_zh
+              ? t("chat.export_source_titled", { title: s.title_zh, n: s.juan_num })
+              : t("chat.export_source_untitled", { id: s.text_id, n: s.juan_num });
             md += `- 📖 ${title} (${Math.round(s.score * 100)}%)\n`;
           }
           md += "\n";
@@ -878,7 +888,7 @@ export default function ChatPage() {
                 {groupedSessions.map((group) => (
                   <div key={group.label}>
                     <div style={{ fontSize: 11, color: "var(--fj-ink-muted)", opacity: 0.6, padding: "6px 12px 2px", fontWeight: 500 }}>
-                      {group.label}
+                      {t(group.label)}
                     </div>
                     {group.items.map((s) => (
                       <div key={s.id}
@@ -932,7 +942,7 @@ export default function ChatPage() {
           </Button>}
           {!sidebarCollapsed && sessions && sessions.length > 5 && (
             <Input
-              placeholder="搜索会话..."
+              placeholder={t("chat.search_sessions")}
               size="small"
               allowClear
               value={sessionFilter}
@@ -944,7 +954,7 @@ export default function ChatPage() {
             {groupedSessions.map((group) => (
               <div key={group.label}>
                 <div style={{ fontSize: 11, color: "var(--fj-ink-muted)", opacity: 0.6, padding: "6px 12px 2px", fontWeight: 500 }}>
-                  {group.label}
+                  {t(group.label)}
                 </div>
                 {group.items.map((s) => (
                   <div key={s.id}
@@ -986,11 +996,11 @@ export default function ChatPage() {
                 icon={<MenuOutlined />}
                 onClick={() => setSidebarOpen(true)}
               >
-                会话列表
+                {t("chat.session_list")}
               </Button>
             ) : <div />}
             {messages.length > 0 && (
-              <Tooltip title="导出对话为 Markdown">
+              <Tooltip title={t("chat.export_tooltip")}>
                 <Button
                   type="text"
                   icon={<DownloadOutlined />}
@@ -1120,11 +1130,13 @@ export default function ChatPage() {
                   wordBreak: "break-word",
                 }}>
                   {m.role === "assistant" ? (
-                    m.content === "正在检索经文并生成回答..." ? (
+                    m.content === THINKING_SENTINEL ? (
                       <div className="chat-thinking">
-                        正在检索经文并生成回答
+                        {t("chat.thinking")}
                         <span className="chat-thinking-dots"><span /><span /><span /></span>
                       </div>
+                    ) : m.content === REQUEST_FAILED_SENTINEL ? (
+                      t("chat.request_failed")
                     ) : (() => {
                       const isStreaming = streamingIdRef.current === m.id;
                       const { cleanContent, suggestions } = isStreaming
@@ -1177,9 +1189,9 @@ export default function ChatPage() {
                   )}
                 </div>
                 {/* Action buttons outside bubble */}
-                {m.content !== "正在检索经文并生成回答..." && streamingIdRef.current !== m.id && (
+                {m.content !== THINKING_SENTINEL && streamingIdRef.current !== m.id && (
                   <div style={{ marginTop: 4, display: "flex", gap: 4 }}>
-                    <Tooltip title="复制">
+                    <Tooltip title={t("chat.copy")}>
                       <Button
                         type="text" size="small" icon={<CopyOutlined />}
                         style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
@@ -1188,12 +1200,12 @@ export default function ChatPage() {
                             ? parseFollowUps(m.content).cleanContent
                             : m.content;
                           navigator.clipboard.writeText(textToCopy);
-                          message.success("已复制");
+                          message.success(t("chat.copied"));
                         }}
                       />
                     </Tooltip>
-                      {m.role === "assistant" && m.content !== "请求失败，请重试" && (
-                        <Tooltip title="生成分享卡片">
+                      {m.role === "assistant" && m.content !== REQUEST_FAILED_SENTINEL && (
+                        <Tooltip title={t("chat.share_card_tooltip")}>
                           <Button
                             type="text" size="small" icon={<ShareAltOutlined />}
                             style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
@@ -1207,7 +1219,7 @@ export default function ChatPage() {
                                 }
                               }
                               setShareTarget({
-                                question: question || "佛典问答",
+                                question: question || t("chat.share_default_question"),
                                 answer: parseFollowUps(m.content).cleanContent,
                                 sources: m.sources,
                               });
@@ -1223,7 +1235,7 @@ export default function ChatPage() {
                         // streaming-but-not-yet-saved window would PUT
                         // to a nonexistent id and 404 silently.
                         <>
-                          <Tooltip title="有帮助">
+                          <Tooltip title={t("chat.feedback_helpful")}>
                             <Button
                               type="text" size="small"
                               icon={m.feedback === "up" ? <LikeFilled /> : <LikeOutlined />}
@@ -1237,7 +1249,7 @@ export default function ChatPage() {
                               }}
                             />
                           </Tooltip>
-                          <Tooltip title="没帮助">
+                          <Tooltip title={t("chat.feedback_not_helpful")}>
                             <Button
                               type="text" size="small"
                               icon={m.feedback === "down" ? <DislikeFilled /> : <DislikeOutlined />}
@@ -1253,8 +1265,8 @@ export default function ChatPage() {
                           </Tooltip>
                         </>
                       )}
-                      {m.role === "assistant" && m.content === "请求失败，请重试" && (
-                        <Tooltip title="重试">
+                      {m.role === "assistant" && m.content === REQUEST_FAILED_SENTINEL && (
+                        <Tooltip title={t("chat.retry")}>
                           <Button
                             type="text" size="small" icon={<ReloadOutlined />}
                             style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
@@ -1285,7 +1297,7 @@ export default function ChatPage() {
                 scrollToBottom 时序影响可能落在视口外，用户永远看不到。
                 排除失败哨兵回复——在报错下面劝人"保存这段对话"很荒谬。 */}
             {!user && !sending && !saveHintDismissed
-              && messages.some((m) => m.role === "assistant" && m.content !== "请求失败，请重试") && (
+              && messages.some((m) => m.role === "assistant" && m.content !== REQUEST_FAILED_SENTINEL) && (
               <Alert
                 type="info"
                 showIcon
@@ -1314,32 +1326,32 @@ export default function ChatPage() {
                 options={[
                   { value: "", label: `🟢 ${t("chat.general_assistant")}` },
                   {
-                    label: "汉传",
+                    label: t("chat.tradition_han"),
                     options: [
-                      { value: "zhiyi", label: "🪷 智顗（天台宗）" },
-                      { value: "huineng", label: "🪷 慧能（禅宗）" },
-                      { value: "xuanzang", label: "🪷 玄奘（唯识宗）" },
-                      { value: "fazang", label: "🪷 法藏（华严宗）" },
-                      { value: "kumarajiva", label: "🪷 鸠摩罗什（中观）" },
-                      { value: "yinguang", label: "🪷 印光（净土宗）" },
-                      { value: "ouyi", label: "🪷 蕅益（跨宗派）" },
-                      { value: "xuyun", label: "🪷 虚云（禅宗）" },
+                      { value: "zhiyi", label: t("chat.master_zhiyi") },
+                      { value: "huineng", label: t("chat.master_huineng") },
+                      { value: "xuanzang", label: t("chat.master_xuanzang") },
+                      { value: "fazang", label: t("chat.master_fazang") },
+                      { value: "kumarajiva", label: t("chat.master_kumarajiva") },
+                      { value: "yinguang", label: t("chat.master_yinguang") },
+                      { value: "ouyi", label: t("chat.master_ouyi") },
+                      { value: "xuyun", label: t("chat.master_xuyun") },
                     ],
                   },
                   {
-                    label: "藏传",
+                    label: t("chat.tradition_tibetan"),
                     options: [
-                      { value: "atisha", label: "🏔️ 阿底峡（噶当派·三士道）" },
-                      { value: "tsongkhapa", label: "🏔️ 宗喀巴（格鲁派·道次第）" },
-                      { value: "milarepa", label: "🏔️ 米拉日巴（噶举派·大手印）" },
+                      { value: "atisha", label: t("chat.master_atisha") },
+                      { value: "tsongkhapa", label: t("chat.master_tsongkhapa") },
+                      { value: "milarepa", label: t("chat.master_milarepa") },
                     ],
                   },
                   {
-                    label: "南传",
+                    label: t("chat.tradition_theravada"),
                     options: [
-                      { value: "buddhaghosa", label: "🌿 觉音尊者（上座部论师·清净道论）" },
-                      { value: "mahasi-sayadaw", label: "🌿 马哈希尊者（缅甸内观·标记法）" },
-                      { value: "ajahn-chah", label: "🌿 阿姜查（泰国森林禅林派）" },
+                      { value: "buddhaghosa", label: t("chat.master_buddhaghosa") },
+                      { value: "mahasi-sayadaw", label: t("chat.master_mahasi") },
+                      { value: "ajahn-chah", label: t("chat.master_ajahn_chah") },
                     ],
                   },
                 ]}
@@ -1363,7 +1375,7 @@ export default function ChatPage() {
                   e.preventDefault();
                   handleSend();
                 }}
-                placeholder={tabSuggestions.length > 0 ? `${tabSuggestions[(tabIndexRef.current + 1) % tabSuggestions.length]}    ⇥ Tab    ⇧⏎ 换行` : t("chat.input_placeholder")}
+                placeholder={tabSuggestions.length > 0 ? `${tabSuggestions[(tabIndexRef.current + 1) % tabSuggestions.length]}    ⇥ Tab    ⇧⏎ ${t("chat.newline_hint")}` : t("chat.input_placeholder")}
                 disabled={sending}
                 autoSize={{ minRows: 2, maxRows: 8 }}
                 variant="borderless"
@@ -1392,7 +1404,7 @@ export default function ChatPage() {
                 style={{ display: "none" }}
               />
               <div className="chat-input-toolbar">
-                <Tooltip title="附件上传 (PDF/TXT/MD/DOCX/CSV/HTML, ≤10MB)">
+                <Tooltip title={t("chat.attachment_tooltip")}>
                   <Button
                     type="text"
                     size="small"
