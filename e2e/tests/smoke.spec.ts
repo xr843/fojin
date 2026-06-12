@@ -76,6 +76,14 @@ test("english locale file is current and the search page renders in English", as
   await expect(page.locator(".header-lang-text")).toHaveText("English", {
     timeout: 10_000,
   });
+  // Source names are DB data (name_en, #707) — the institution facet and the
+  // external-source launcher rows must render English names, not name_zh.
+  const firstInstitution = page.locator(".s-filter-group").nth(1).locator(".s-filter-name").first();
+  await expect(firstInstitution).toBeVisible({ timeout: 20_000 });
+  await expect(firstInstitution).not.toContainText(/[\u4e00-\u9fff]/);
+  const firstLauncher = page.locator(".s-ext-row-name").first();
+  await expect(firstLauncher).toBeVisible({ timeout: 20_000 });
+  await expect(firstLauncher).not.toContainText(/[\u4e00-\u9fff]/);
 });
 
 test("reader opens the Heart Sutra via CBETA id redirect", async ({ page, request }) => {

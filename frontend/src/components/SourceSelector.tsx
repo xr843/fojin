@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { Input, Select, Checkbox, Button, Tag } from "antd";
 import { SearchOutlined, LinkOutlined } from "@ant-design/icons";
 import type { DataSource } from "../api/client";
+import { localizedSourceName } from "../utils/sourceName";
 
 interface SourceSelectorProps {
   sources: DataSource[];
@@ -120,7 +121,7 @@ export default function SourceSelector({ sources, selected, onChange }: SourceSe
               }}
             />
             <span className="src-item-name">
-              {s.name_zh}
+              {localizedSourceName(s)}
               {s.access_type === "local" && (
                 <Tag color="green" style={{ marginLeft: 6, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}>
                   本地
