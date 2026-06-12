@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
+import { useTranslation } from "react-i18next";
 import { Input, Tag, Empty } from "antd";
 import {
   SearchOutlined,
@@ -33,8 +34,9 @@ const RESOURCE_ICONS: Record<ResourceCategory, React.ReactNode> = {
   temple: <GlobalOutlined />,
 };
 
-function TextItem({ t, navigate, cbetaMap }: { t: CollectionText; navigate: ReturnType<typeof useNavigate>; cbetaMap: Record<string, number> }) {
-  const textId = t.cbeta_id ? cbetaMap[t.cbeta_id] : undefined;
+function TextItem({ text, navigate, cbetaMap }: { text: CollectionText; navigate: ReturnType<typeof useNavigate>; cbetaMap: Record<string, number> }) {
+  const { t } = useTranslation();
+  const textId = text.cbeta_id ? cbetaMap[text.cbeta_id] : undefined;
   return (
     <div className="coll-text-item">
       <div className="coll-text-main">
@@ -43,27 +45,27 @@ function TextItem({ t, navigate, cbetaMap }: { t: CollectionText; navigate: Retu
           style={textId ? { cursor: "pointer", color: "var(--fj-accent)" } : undefined}
           onClick={textId ? () => navigate(`/texts/${textId}`) : undefined}
         >
-          {t.title}
+          {text.title}
         </span>
-        {t.cbeta_id && (
+        {text.cbeta_id && (
           <Tag
             color={textId ? "green" : "volcano"}
             style={{ fontSize: 10, margin: 0, lineHeight: "16px", padding: "0 4px", cursor: "pointer" }}
-            onClick={() => textId ? navigate(`/texts/${textId}`) : navigate(`/search?q=${encodeURIComponent(t.cbeta_id!)}`)}
+            onClick={() => textId ? navigate(`/texts/${textId}`) : navigate(`/search?q=${encodeURIComponent(text.cbeta_id!)}`)}
           >
-            {t.cbeta_id}
+            {text.cbeta_id}
           </Tag>
         )}
         {textId && (
           <Tag color="green" style={{ fontSize: 10, margin: 0, lineHeight: "16px", padding: "0 4px" }}>
-            已收录
+            {t("collections.indexed")}
           </Tag>
         )}
       </div>
       <div className="coll-text-meta">
-        {t.dynasty && <span>[{t.dynasty}]</span>}
-        {t.author && <span>{t.author}</span>}
-        {t.note && <span className="coll-text-note">— {t.note}</span>}
+        {text.dynasty && <span>[{text.dynasty}]</span>}
+        {text.author && <span>{text.author}</span>}
+        {text.note && <span className="coll-text-note">— {text.note}</span>}
       </div>
     </div>
   );
@@ -113,6 +115,7 @@ function ResourceTabs({ resources }: { resources: Collection["resources"] }) {
 }
 
 function CollectionCard({ coll, cbetaMap }: { coll: Collection; cbetaMap: Record<string, number> }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
 
@@ -120,6 +123,9 @@ function CollectionCard({ coll, cbetaMap }: { coll: Collection; cbetaMap: Record
     (sum, k) => sum + (coll.resources[k]?.length || 0),
     0,
   );
+
+  // Strip the data-layer suffix to build the on-site search query term.
+  const searchName = coll.name.replace("系列", ""); // i18n-exempt
 
   return (
     <div className="coll-card">
@@ -129,12 +135,12 @@ function CollectionCard({ coll, cbetaMap }: { coll: Collection; cbetaMap: Record
           <h3 className="coll-card-name">{coll.name}</h3>
           <Tag color="geekblue" style={{ fontSize: 11, marginLeft: 8 }}>{coll.tradition}</Tag>
           <span className="coll-card-count">
-            {coll.mainTexts.length + coll.commentaries.length} 部典籍 · {totalResources} 个资源
+            {t("collections.card_stats", { texts: coll.mainTexts.length + coll.commentaries.length, resources: totalResources })}
           </span>
         </div>
         <p className="coll-card-desc">{coll.description}</p>
         <span className="coll-card-toggle">
-          {expanded ? "收起 ▲" : "展开查看 ▼"}
+          {expanded ? `${t("search.collapse")} ▲` : `${t("collections.expand")} ▼`}
         </span>
       </div>
 
@@ -143,11 +149,11 @@ function CollectionCard({ coll, cbetaMap }: { coll: Collection; cbetaMap: Record
           {/* 主要经典 */}
           <div className="coll-section">
             <div className="coll-section-title">
-              <ReadOutlined /> 主要经典（{coll.mainTexts.length}）
+              <ReadOutlined /> {t("collections.main_texts", { n: coll.mainTexts.length })}
             </div>
             <div className="coll-text-list">
-              {coll.mainTexts.map((t) => (
-                <TextItem key={t.cbeta_id || t.title} t={t} navigate={navigate} cbetaMap={cbetaMap} />
+              {coll.mainTexts.map((tx) => (
+                <TextItem key={tx.cbeta_id || tx.title} text={tx} navigate={navigate} cbetaMap={cbetaMap} />
               ))}
             </div>
           </div>
@@ -156,11 +162,11 @@ function CollectionCard({ coll, cbetaMap }: { coll: Collection; cbetaMap: Record
           {coll.commentaries.length > 0 && (
             <div className="coll-section">
               <div className="coll-section-title">
-                <BookOutlined /> 注疏论释（{coll.commentaries.length}）
+                <BookOutlined /> {t("collections.commentaries", { n: coll.commentaries.length })}
               </div>
               <div className="coll-text-list">
-                {coll.commentaries.map((t) => (
-                  <TextItem key={t.cbeta_id || t.title} t={t} navigate={navigate} cbetaMap={cbetaMap} />
+                {coll.commentaries.map((tx) => (
+                  <TextItem key={tx.cbeta_id || tx.title} text={tx} navigate={navigate} cbetaMap={cbetaMap} />
                 ))}
               </div>
             </div>
@@ -169,7 +175,7 @@ function CollectionCard({ coll, cbetaMap }: { coll: Collection; cbetaMap: Record
           {/* 分类资源 */}
           <div className="coll-section">
             <div className="coll-section-title">
-              <LinkOutlined /> 相关资源（{totalResources}）
+              <LinkOutlined /> {t("collections.resources", { n: totalResources })}
             </div>
             <ResourceTabs resources={coll.resources} />
           </div>
@@ -178,9 +184,9 @@ function CollectionCard({ coll, cbetaMap }: { coll: Collection; cbetaMap: Record
           <div className="coll-card-actions">
             <button
               className="source-btn source-btn-search"
-              onClick={() => navigate(`/search?q=${encodeURIComponent(coll.name.replace("系列", ""))}`)}
+              onClick={() => navigate(`/search?q=${encodeURIComponent(searchName)}`)}
             >
-              <SearchOutlined /> 在佛津搜索「{coll.name.replace("系列", "")}」
+              <SearchOutlined /> {t("collections.search_in_fojin", { name: searchName })}
             </button>
           </div>
         </div>
@@ -189,15 +195,17 @@ function CollectionCard({ coll, cbetaMap }: { coll: Collection; cbetaMap: Record
   );
 }
 
-const LANG_LABELS: Record<string, { label: string; color: string }> = {
-  pi: { label: "巴利", color: "green" },
-  bo: { label: "藏文", color: "purple" },
-  sa: { label: "梵文", color: "orange" },
+// Language chips reuse the shared lang.* locale family (keys match other_lang codes).
+const LANG_LABELS: Record<string, { labelKey: string; color: string }> = {
+  pi: { labelKey: "lang.pi", color: "green" },
+  bo: { labelKey: "lang.bo", color: "purple" },
+  sa: { labelKey: "lang.sa", color: "orange" },
 };
 
 /** 跨藏对照专区：哪些经有逐段对照语料（可发现性入口）。
     API 失败/空数据时整块隐身，可与 backend 端点解耦部署。 */
 function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useNavigate> }) {
+  const { t } = useTranslation();
   const { data } = useQuery({
     queryKey: ["alignmentCatalog"],
     queryFn: getAlignmentCatalog,
@@ -209,14 +217,14 @@ function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useN
     <div className="coll-card" style={{ marginBottom: 24 }}>
       <div className="coll-section" style={{ padding: "16px 20px" }}>
         <div className="coll-section-title">
-          <TranslationOutlined /> 跨藏对照（{new Set(data.entries.map((e) => e.text_id)).size} 部经 · {data.total_pairs.toLocaleString()} 组对齐段落）
+          <TranslationOutlined /> {t("collections.alignment_title", { texts: new Set(data.entries.map((e) => e.text_id)).size, pairs: data.total_pairs.toLocaleString() })}
         </div>
         <p style={{ fontSize: 12, color: "var(--fj-ink-muted)", margin: "4px 0 12px" }}>
-          以下经典已建立逐段跨语对照（AI 对齐 + 置信度过滤），点击进入阅读器，正文旁即可逐段查看对照。
+          {t("collections.alignment_desc")}
         </p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {data.entries.map((e) => {
-            const lang = LANG_LABELS[e.other_lang] ?? { label: e.other_lang, color: "default" };
+            const lang = LANG_LABELS[e.other_lang];
             return (
               <button
                 key={`${e.text_id}-${e.other_lang}`}
@@ -230,11 +238,11 @@ function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useN
                 }
               >
                 <span>{e.title_zh}</span>
-                <Tag color={lang.color} style={{ margin: 0, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}>
-                  {lang.label}
+                <Tag color={lang?.color ?? "default"} style={{ margin: 0, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}>
+                  {lang ? t(lang.labelKey) : e.other_lang}
                 </Tag>
                 <span style={{ fontSize: 11, color: "var(--fj-ink-muted)" }}>
-                  {e.pair_count} 段{e.partner_count > 1 ? ` · ${e.partner_count} 部对本` : ""}
+                  {t("collections.pair_count", { n: e.pair_count })}{e.partner_count > 1 ? ` · ${t("collections.partner_count", { n: e.partner_count })}` : ""}
                 </span>
               </button>
             );
@@ -246,6 +254,7 @@ function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useN
 }
 
 export default function CollectionsPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [showTop, setShowTop] = useState(false);
@@ -294,21 +303,21 @@ export default function CollectionsPage() {
   return (
     <div className="sources-page">
       <Helmet>
-        <title>经典专题 | 佛津</title>
-        <meta name="description" content="按经论系列分类浏览佛教经典，包含主要经典、注疏论释及相关资源。" />
+        <title>{t("collections.page_title")}</title>
+        <meta name="description" content={t("collections.page_desc")} />
       </Helmet>
 
       <div className="sources-header">
-        <h1 className="sources-title">经典专题</h1>
+        <h1 className="sources-title">{t("collections.title")}</h1>
         <p className="sources-desc">
-          {collections.length} 个经论系列 · {totalTexts} 部典籍 · {totalResources} 个外部资源
+          {t("collections.subtitle", { series: collections.length, texts: totalTexts, resources: totalResources })}
         </p>
       </div>
 
       <div className="sources-toolbar">
         <Input
           prefix={<SearchOutlined style={{ color: "#9a8e7a" }} />}
-          placeholder="搜索经典名称、传统、作者..."
+          placeholder={t("collections.search_placeholder")}
           allowClear
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -319,11 +328,11 @@ export default function CollectionsPage() {
       <ParallelCatalogSection navigate={navigate} />
 
       <div className="sources-stats-bar">
-        当前显示 <strong>{filtered.length}</strong> / {collections.length} 个专题
+        {t("sources.stats_showing")} <strong>{filtered.length}</strong> / {collections.length} {t("collections.stats_unit")}
       </div>
 
       {filtered.length === 0 ? (
-        <Empty description="无匹配专题" style={{ marginTop: 60 }} />
+        <Empty description={t("collections.no_match")} style={{ marginTop: 60 }} />
       ) : (
         <div className="coll-list">
           {filtered.map((c) => (
@@ -336,7 +345,7 @@ export default function CollectionsPage() {
         <button
           className="sources-back-top"
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          aria-label="回到顶部"
+          aria-label={t("sources.back_to_top_aria")}
         >
           <VerticalAlignTopOutlined />
           <span>Top</span>
