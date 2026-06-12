@@ -64,7 +64,7 @@ export default function HomePage() {
     : 0;
   const srcCount = stats?.source_count ?? 0;
   const srcLabel = selectedSources.size > 0
-    ? t("home.selected_sources", { count: selectedSources.size })
+    ? t("home.selected_sources", { n: selectedSources.size })
     : t("home.all_sources");
   const rawTags = t("home.hot_tags", { returnObjects: true });
   const hotTags = Array.isArray(rawTags) ? rawTags : [];

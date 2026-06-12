@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Tag, Button } from "antd";
 import { EyeOutlined, TranslationOutlined } from "@ant-design/icons";
 import BookmarkButton from "../BookmarkButton";
@@ -6,13 +7,14 @@ import { sanitizeHighlight } from "../../utils/sanitize";
 import { getSourceLabel } from "../../utils/sourceUrls";
 import type { CrossLanguageSearchHit } from "../../api/client";
 
-const LANG_LABELS: Record<string, string> = {
-  lzh: "汉文",
-  zh: "汉文",
-  pi: "巴利文",
-  en: "English",
-  bo: "藏文",
-  sa: "梵文",
+// lzh/zh both render as Classical Chinese — see lang.* keys in translation.json
+const LANG_KEYS: Record<string, string> = {
+  lzh: "lang.lzh",
+  zh: "lang.lzh",
+  pi: "lang.pi",
+  en: "lang.en",
+  bo: "lang.bo",
+  sa: "lang.sa",
 };
 
 const LANG_COLORS: Record<string, string> = {
@@ -32,9 +34,11 @@ interface TitleEntry {
 
 export default function CrossLangCard({ hit, rank }: { hit: CrossLanguageSearchHit; rank: number }) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const titleHtml = hit.highlight?.title_zh?.[0] ?? hit.title_zh;
   const sourceName = hit.source_code ? getSourceLabel(hit.source_code) : null;
   const relatedTranslations = hit.related_translations || [];
+  const langLabel = (lang: string) => (LANG_KEYS[lang] ? t(LANG_KEYS[lang]) : lang);
 
   // Collect all available titles for this text
   const titles: TitleEntry[] = [];
@@ -45,21 +49,21 @@ export default function CrossLangCard({ hit, rank }: { hit: CrossLanguageSearchH
 
   return (
     <div className="s-card">
-      <div className="s-card-rank">排序<br />#{rank}</div>
+      <div className="s-card-rank">{t("search.rank")}<br />#{rank}</div>
       <div className="s-card-body">
         <div className="s-card-title" dangerouslySetInnerHTML={{ __html: sanitizeHighlight(titleHtml) }} />
         {/* Show all available titles in other languages */}
         {titles.length > 0 && (
           <div className="s-card-alt-titles" style={{ marginBottom: 6 }}>
-            {titles.map((t) => (
-              <div key={t.lang} style={{ fontSize: 12, color: "#6b5e4d", lineHeight: 1.6 }}>
-                <Tag color={LANG_COLORS[t.lang] || "default"} style={{ fontSize: 10, padding: "0 4px", lineHeight: "18px" }}>
-                  {LANG_LABELS[t.lang] || t.lang}
+            {titles.map((entry) => (
+              <div key={entry.lang} style={{ fontSize: 12, color: "#6b5e4d", lineHeight: 1.6 }}>
+                <Tag color={LANG_COLORS[entry.lang] || "default"} style={{ fontSize: 10, padding: "0 4px", lineHeight: "18px" }}>
+                  {langLabel(entry.lang)}
                 </Tag>
-                {t.highlighted ? (
-                  <span dangerouslySetInnerHTML={{ __html: sanitizeHighlight(t.highlighted) }} />
+                {entry.highlighted ? (
+                  <span dangerouslySetInnerHTML={{ __html: sanitizeHighlight(entry.highlighted) }} />
                 ) : (
-                  <span>{t.title}</span>
+                  <span>{entry.title}</span>
                 )}
               </div>
             ))}
@@ -69,24 +73,24 @@ export default function CrossLangCard({ hit, rank }: { hit: CrossLanguageSearchH
           {sourceName && (
             <Tag color="volcano" style={{ fontSize: 11 }}>{sourceName}</Tag>
           )}
-          <Tag style={{ fontSize: 11 }}>{hit.has_content ? "本地全文" : "目录数据"}</Tag>
+          <Tag style={{ fontSize: 11 }}>{hit.has_content ? t("search.local_fulltext") : t("search.catalog_data")}</Tag>
           {hit.category && <Tag style={{ fontSize: 11 }}>{hit.category}</Tag>}
           <Tag color={LANG_COLORS[hit.lang] || "default"} style={{ fontSize: 11 }}>
-            {LANG_LABELS[hit.lang] || hit.lang}
+            {langLabel(hit.lang)}
           </Tag>
         </div>
         <div className="s-card-meta">
           {hit.translator && (
-            <span>主要责任者: {hit.dynasty ? `[${hit.dynasty}] ` : ""}{hit.translator}</span>
+            <span>{t("search.translator_label")}: {hit.dynasty ? `[${hit.dynasty}] ` : ""}{hit.translator}</span>
           )}
         </div>
         <div className="s-card-meta">
-          <span>编号: {hit.cbeta_id}</span>
+          <span>{t("search.cbeta_id_label")}: {hit.cbeta_id}</span>
         </div>
         {relatedTranslations.length > 0 && (
           <div className="s-card-translations">
             <TranslationOutlined style={{ fontSize: 12, color: "#9a8e7a", marginRight: 4 }} />
-            <span style={{ fontSize: 12, color: "#9a8e7a", marginRight: 6 }}>关联翻译:</span>
+            <span style={{ fontSize: 12, color: "#9a8e7a", marginRight: 6 }}>{t("search.related_translations")}</span>
             {relatedTranslations.map((rt) => (
               <Tag
                 key={rt.id}
@@ -94,7 +98,7 @@ export default function CrossLangCard({ hit, rank }: { hit: CrossLanguageSearchH
                 style={{ fontSize: 11, cursor: "pointer", marginBottom: 2 }}
                 onClick={() => navigate(`/texts/${rt.id}`)}
               >
-                {LANG_LABELS[rt.lang] || rt.lang}
+                {langLabel(rt.lang)}
                 {rt.title ? ` - ${rt.title.length > 20 ? rt.title.slice(0, 20) + "..." : rt.title}` : ""}
               </Tag>
             ))}
@@ -103,7 +107,7 @@ export default function CrossLangCard({ hit, rank }: { hit: CrossLanguageSearchH
         <div className="s-card-actions">
           <Button type="primary" size="small" icon={<EyeOutlined />}
             onClick={() => navigate(`/texts/${hit.id}`)}>
-            查看详情
+            {t("search.view_details")}
           </Button>
           <BookmarkButton textId={hit.id} size="small" />
         </div>

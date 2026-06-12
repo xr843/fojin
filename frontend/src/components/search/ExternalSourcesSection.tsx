@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import ExternalCard from "./ExternalCard";
 import type { DataSource } from "../../api/client";
 
@@ -42,6 +43,7 @@ export default function ExternalSourcesSection({
   sources: DataSource[];
   query: string;
 }) {
+  const { t } = useTranslation();
   const [expandedPrimary, setExpandedPrimary] = useState(false);
   const [showOther, setShowOther] = useState(false);
 
@@ -66,7 +68,7 @@ export default function ExternalSourcesSection({
   return (
     <>
       <div className="s-ext-divider">
-        可在以下 {sources.length} 个外部数据源继续搜索「{query}」
+        {t("search.continue_external", { n: sources.length, query })}
       </div>
 
       {visiblePrimary.map((s) => (
@@ -79,7 +81,7 @@ export default function ExternalSourcesSection({
           className="s-ext-toggle"
           onClick={() => setExpandedPrimary((v) => !v)}
         >
-          {expandedPrimary ? "收起" : `展开剩余 ${primary.length - INITIAL_VISIBLE} 个来源`}
+          {expandedPrimary ? t("search.collapse") : t("search.expand_remaining", { n: primary.length - INITIAL_VISIBLE })}
         </button>
       )}
 
@@ -90,7 +92,7 @@ export default function ExternalSourcesSection({
             className="s-ext-toggle"
             onClick={() => setShowOther((v) => !v)}
           >
-            {showOther ? "收起其他语种来源" : `其他语种来源（${other.length}）`}
+            {showOther ? t("search.collapse_other_lang") : t("search.other_lang_sources", { n: other.length })}
           </button>
           {showOther &&
             other.map((s) => <ExternalCard key={s.code} source={s} query={query} />)}

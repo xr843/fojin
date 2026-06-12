@@ -280,8 +280,8 @@ export default function SearchPage() {
     });
   }, [regionCounts]);
 
-  const pageTitle = query ? `${query} — 搜索 | 佛津` : "搜索 | 佛津";
-  const pageDesc = query ? `在佛津搜索"${query}"的结果` : "搜索全球佛教古籍数字资源";
+  const pageTitle = query ? t("search.page_title", { query }) : t("search.page_title_default");
+  const pageDesc = query ? t("search.page_desc", { query }) : t("search.page_desc_default");
 
   return (
     <div className="s-page">
@@ -309,8 +309,8 @@ export default function SearchPage() {
           style={{ maxWidth: 640, width: "100%" }}
         >
           <Input.Search
-            placeholder="输入书名、作者或版本"
-            enterButton={<><SearchOutlined /> 搜索</>}
+            placeholder={t("search.input_placeholder")}
+            enterButton={<><SearchOutlined /> {t("search.button")}</>}
             size="large"
             onSearch={handleSearch}
           />
@@ -320,7 +320,7 @@ export default function SearchPage() {
       {/* 已选数据源标签 */}
       {selectedSources && (
         <div style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 8 }}>
-          <span style={{ fontSize: 12, color: "#9a8e7a", lineHeight: "24px" }}>筛选数据源：</span>
+          <span style={{ fontSize: 12, color: "#9a8e7a", lineHeight: "24px" }}>{t("search.filter_sources_label")}</span>
           {selectedSources.split(",").filter(Boolean).map((code) => (
             <Tag key={code} closable onClose={() => clearSource(code)} color="volcano" style={{ fontSize: 11 }}>
               {code}
@@ -335,29 +335,27 @@ export default function SearchPage() {
           activeKey={tab}
           onChange={(k) => { setPage(1); updateUrl({ tab: k }); }}
           items={[
-            { key: "all", label: "全部" },
-            { key: "catalog", label: "搜经典" },
-            { key: "content", label: "搜经文" },
+            { key: "all", label: t("search.tab_all") },
+            { key: "catalog", label: t("search.tab_catalog") },
+            { key: "content", label: t("search.tab_content") },
           ]}
           size="small"
         />
         <div className="s-mode-hint">
           {tab === "all"
-            ? "一站式综合检索：辞典释义、经文标题、内文片段一次呈现"
+            ? t("search.subtitle_all")
             : tab === "catalog"
-            ? "按经名、译者、编号检索，自动匹配所有语种标题与翻译版本"
-            : tab === "content"
-            ? "AI 语义理解 + 关键词精确匹配，在 34.7 万段经文中检索"
-            : "AI 语义理解 + 关键词精确匹配，在 34.7 万段经文中检索"}
+            ? t("search.subtitle_catalog")
+            : t("search.subtitle_content")}
         </div>
       </div>
 
       {query.length === 0 ? (
         <div style={{ marginTop: 80, textAlign: "center" }}>
-          <Empty description="请输入搜索关键词" />
+          <Empty description={t("search.enter_keyword")} />
           {searchHistory.length > 0 && (
             <div style={{ marginTop: 24 }}>
-              <Typography.Text type="secondary" style={{ fontSize: 13 }}>最近搜索：</Typography.Text>
+              <Typography.Text type="secondary" style={{ fontSize: 13 }}>{t("search.recent_searches")}</Typography.Text>
               <div style={{ marginTop: 8, display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
                 {searchHistory.map((h) => (
                   <Tag key={h.query} style={{ cursor: "pointer" }} onClick={() => handleSearch(h.query)}>{h.query}</Tag>
@@ -371,7 +369,7 @@ export default function SearchPage() {
           {/* 左侧筛选（辞典 Tab 不显示） */}
           {tab !== "dictionary" && <aside className="s-sidebar">
             <div className="s-filter-group">
-              <div className="s-filter-title">🌐 国家/地区</div>
+              <div className="s-filter-title">🌐 {t("search.filter_region")}</div>
               <div className="s-filter-scroll">
                 {sortedRegions.map((r) => (
                   <label key={r} className="s-filter-item">
@@ -379,7 +377,7 @@ export default function SearchPage() {
                       checked={regionFilter.has(r)}
                       onChange={() => toggleRegion(r)}
                     />
-                    <span className="s-filter-name">{r}</span>
+                    <span className="s-filter-name">{t(`region.${r}`, r)}</span>
                     <span className="s-filter-count">{regionCounts[r]}</span>
                   </label>
                 ))}
@@ -387,7 +385,7 @@ export default function SearchPage() {
             </div>
 
             <div className="s-filter-group">
-              <div className="s-filter-title">🏛 馆藏</div>
+              <div className="s-filter-title">🏛 {t("search.filter_institution")}</div>
               <div className="s-filter-scroll">
                 {institutionList.map(({ name, count }) => (
                   <label key={name} className="s-filter-item">
@@ -422,9 +420,9 @@ export default function SearchPage() {
                 {!unifiedLoading && unifiedError && (
                   <Result
                     status="error"
-                    title="搜索失败"
-                    subTitle="搜索服务暂时不可用，请稍后重试。"
-                    extra={<Button type="primary" onClick={() => refetchUnified()}>重试</Button>}
+                    title={t("search.failed_title")}
+                    subTitle={t("search.failed_subtitle")}
+                    extra={<Button type="primary" onClick={() => refetchUnified()}>{t("search.retry")}</Button>}
                   />
                 )}
                 {!unifiedLoading && !unifiedError && unifiedData && (
@@ -440,14 +438,14 @@ export default function SearchPage() {
             <div className="s-result-header">
               <span className="s-result-count">
                 {tab === "dictionary"
-                  ? <>辞典找到 <strong>{localTotal.toLocaleString()}</strong> 条词条</>
+                  ? t("search.found_dict", { n: localTotal.toLocaleString() })
                   : tab === "content"
-                  ? <>在 <strong>{localTotal.toLocaleString()}</strong> 部经典中找到匹配（共 {(contentData?.total_juans || 0).toLocaleString()} 卷）</>
+                  ? t("search.found_catalog", { n: localTotal.toLocaleString(), juans: (contentData?.total_juans || 0).toLocaleString() })
                   : tab === "semantic"
-                  ? <>语义搜索找到 <strong>{localTotal.toLocaleString()}</strong> 条相关结果</>
+                  ? t("search.found_semantic", { n: localTotal.toLocaleString() })
                   : tab === "crosslang"
-                  ? <>跨语言搜索找到 <strong>{localTotal.toLocaleString()}</strong> 条结果</>
-                  : <>找到 <strong>{localTotal.toLocaleString()}</strong> 条结果</>
+                  ? t("search.found_crosslang", { n: localTotal.toLocaleString() })
+                  : t("search.found_results", { n: localTotal.toLocaleString() })
                 }
               </span>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -458,12 +456,12 @@ export default function SearchPage() {
                     onChange={(v) => { setPage(1); updateUrl({ lang: v === "all" ? "" : v }); }}
                     style={{ width: 110 }}
                     options={[
-                      { value: "all", label: "全部语种" },
-                      { value: "lzh", label: "汉文" },
-                      { value: "pi", label: "巴利文" },
-                      { value: "en", label: "英文" },
-                      { value: "bo", label: "藏文" },
-                      { value: "sa", label: "梵文" },
+                      { value: "all", label: t("search.lang_all") },
+                      { value: "lzh", label: t("lang.lzh") },
+                      { value: "pi", label: t("lang.pi") },
+                      { value: "en", label: t("lang.en") },
+                      { value: "bo", label: t("lang.bo") },
+                      { value: "sa", label: t("lang.sa") },
                     ]}
                   />
                 )}
@@ -474,9 +472,9 @@ export default function SearchPage() {
                     onChange={(v) => { setPage(1); updateUrl({ sort: v }); }}
                     style={{ width: 120 }}
                     options={[
-                      { value: "relevance", label: "相关度" },
-                      { value: "title", label: "按经名" },
-                      { value: "dynasty", label: "按朝代" },
+                      { value: "relevance", label: t("search.sort_relevance") },
+                      { value: "title", label: t("search.sort_title") },
+                      { value: "dynasty", label: t("search.sort_dynasty") },
                     ]}
                   />
                 )}
@@ -487,10 +485,10 @@ export default function SearchPage() {
                   onChange={(v) => { setDictPage(1); updateUrl({ dict_lang: v === "all" ? "" : v }); }}
                   style={{ width: 120 }}
                   options={[
-                    { value: "all", label: "全部语种" },
-                    { value: "zh", label: "中文" },
-                    { value: "pi", label: "巴利文" },
-                    { value: "sa", label: "梵文" },
+                    { value: "all", label: t("search.lang_all") },
+                    { value: "zh", label: t("lang.zh") },
+                    { value: "pi", label: t("lang.pi") },
+                    { value: "sa", label: t("lang.sa") },
                   ]}
                 />
               )}
@@ -501,11 +499,11 @@ export default function SearchPage() {
             {!dictCardDismissed && dictKnowledge && dictKnowledge.groups.length > 0 && tab !== "dictionary" && (
               <div className="s-dict-knowledge">
                 <div className="s-dict-knowledge-header">
-                  <span className="s-dict-knowledge-title">{"\uD83D\uDCD6"} 辞典释义「{query}」</span>
+                  <span className="s-dict-knowledge-title">{"\uD83D\uDCD6"} {t("search.dict_gloss_title", { query })}</span>
                   <button
                     className="s-dict-knowledge-close"
                     onClick={() => setDictCardDismissed(true)}
-                    aria-label="关闭辞典释义"
+                    aria-label={t("search.dict_gloss_close")}
                   >
                     <CloseOutlined />
                   </button>
@@ -526,7 +524,7 @@ export default function SearchPage() {
                 </div>
                 <div className="s-dict-knowledge-footer">
                   <Link to={`/dictionary?q=${encodeURIComponent(query)}`}>
-                    查看全部辞典释义 →
+                    {t("search.view_all_dict")}
                   </Link>
                 </div>
               </div>
@@ -545,7 +543,7 @@ export default function SearchPage() {
                 >
                   &ldquo;{data.suggestion}&rdquo;
                 </a>
-                ？
+                {t("search.dym_qmark")}
               </div>
             )}
 
@@ -583,9 +581,9 @@ export default function SearchPage() {
             {!loading && isError && tab === "catalog" && (
               <Result
                 status="error"
-                title="搜索失败"
-                subTitle="搜索服务暂时不可用，请稍后重试。"
-                extra={<Button type="primary" onClick={() => refetch()}>重试</Button>}
+                title={t("search.failed_title")}
+                subTitle={t("search.failed_subtitle")}
+                extra={<Button type="primary" onClick={() => refetch()}>{t("search.retry")}</Button>}
               />
             )}
 
@@ -610,12 +608,12 @@ export default function SearchPage() {
             )}
 
             {/* 语义搜索结果 */}
-            {!loading && tab === "content" && semanticData && semanticData.results.length > 0 && (<><div style={{margin: "16px 0 8px", fontSize: 13, color: "#9a8e7a"}}>⚡ AI 语义匹配</div>{semanticData.results.map((hit, i) => (
+            {!loading && tab === "content" && semanticData && semanticData.results.length > 0 && (<><div style={{margin: "16px 0 8px", fontSize: 13, color: "#9a8e7a"}}>⚡ {t("search.semantic_match")}</div>{semanticData.results.map((hit, i) => (
               <SemanticCard key={`${hit.text_id}_${hit.juan_num}`} hit={hit} rank={i + 1} />
             ))}</>)}
 
             {/* 跨语言结果 */}
-            {!loading && tab === "catalog" && crossLangData && crossLangData.results.length > 0 && (<><div style={{margin: "16px 0 8px", fontSize: 13, color: "#9a8e7a", borderTop: "1px solid #e8e0d4", paddingTop: 12}}>🌐 跨语言匹配</div>{crossLangData.results.map((hit, i) => (
+            {!loading && tab === "catalog" && crossLangData && crossLangData.results.length > 0 && (<><div style={{margin: "16px 0 8px", fontSize: 13, color: "#9a8e7a", borderTop: "1px solid #e8e0d4", paddingTop: 12}}>🌐 {t("search.crosslang_match")}</div>{crossLangData.results.map((hit, i) => (
               <CrossLangCard key={hit.id} hit={hit} rank={i + 1 + (page - 1) * 20} />
             ))}</>)}
 
@@ -660,7 +658,7 @@ export default function SearchPage() {
         <button
           className="sources-back-top"
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          aria-label="回到顶部"
+          aria-label={t("search.back_to_top")}
         >
           <VerticalAlignTopOutlined />
           <span>Top</span>
