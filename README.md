@@ -6,7 +6,7 @@
 
 **503 sources. 30 languages. 30 countries. 23,500+ full-text volumes. One search.**
 
-Aggregating the world's Buddhist digital heritage — 10,500+ texts with 23,500+ volumes of full content in Pali, Classical Chinese, Tibetan, and Sanskrit from 503 data sources. **The first LLM-driven trilingual cross-canon parallel reading platform** (CBETA × SuttaCentral × 84000), with chunk-level alignment verified by LLM, plus CBETA-style reading, AI-powered Q&A with 8 Buddhist master personas (RAG + tradition-scoped retrieval + citations), knowledge graph with 31K+ entities and 28K+ relations visualized on a 50K-entity Deck.GL geo map, 32 dictionaries with 748K entries across 6 languages, timeline visualization, activity feed, collections, citations, annotations, bookmarks, and multi-language parallel reading.
+Aggregating the world's Buddhist digital heritage — 10,500+ texts with 23,500+ volumes of full content in Pali, Classical Chinese, Tibetan, and Sanskrit from 503 data sources. **The first LLM-driven trilingual cross-canon parallel reading platform** (CBETA × SuttaCentral × 84000), with chunk-level alignment verified by LLM, plus CBETA-style reading, AI-powered Q&A with 14 Buddhist master personas (RAG + tradition-scoped retrieval + citations), knowledge graph with 31K+ entities and 28K+ relations visualized on a 50K-entity Deck.GL geo map, 32 dictionaries with 748K entries across 6 languages, timeline visualization, activity feed, collections, citations, annotations, bookmarks, and multi-language parallel reading.
 
 [Live Demo](https://fojin.app) &nbsp;&middot;&nbsp; [API Docs](https://fojin.app/docs) &nbsp;&middot;&nbsp; [中文文档](./docs/README_zh.md) &nbsp;&middot;&nbsp; [Discussions](https://github.com/xr843/fojin/discussions) &nbsp;&middot;&nbsp; [Discord](https://discord.gg/76SZeuJekq) &nbsp;&middot;&nbsp; [Report Bug](https://github.com/xr843/fojin/issues)
 
@@ -37,7 +37,7 @@ Buddhist texts are scattered across hundreds of databases worldwide — CBETA, S
 | Explore relationships | **Knowledge graph** with 31K+ entities and 28K+ relations (23K lineage chains) |
 | Discover similar texts | **Semantic similarity** powered by 678K+ embedding vectors (pgvector + HNSW) |
 | Ask questions about texts | **AI Q&A** ("XiaoJin") with RAG, reranking, clickable citations, multi-language citation drawer, and follow-up suggestions |
-| Learn from a specific master | **Master Persona Mode** — 8 historical Buddhist masters, each with tradition-specific RAG scope |
+| Learn from a specific master | **Master Persona Mode** — 14 historical Buddhist masters, each with tradition-specific RAG scope |
 | Explore Buddhist geography | **Knowledge Graph Map** — 50K+ geo entities, monastery locations, lineage arcs on Deck.GL |
 | Track source updates | **Activity Feed** — real-time updates from 503 data sources |
 | Explore history visually | **Timeline & Dashboard** — dynasty charts, translation trends, category analytics |
@@ -150,7 +150,7 @@ Compare translations side by side — Classical Chinese, Sanskrit, Pali, Tibetan
 
 **The first LLM-driven cross-canon parallel reading system for Buddhist texts.** No other platform provides this: CBETA (汉文), SuttaCentral (Pali), and 84000 (Tibetan) each operate in their own language silo. FoJin bridges them via LLM-verified chunk-level alignment.
 
-**Current coverage (3,400+ chunk-level alignments across 10 pair definitions):**
+**Current coverage (3,500+ chunk-level alignments across 11 pair definitions):**
 
 | Sutra / Corpus | Source | Target | Pairs | Type |
 |---|---|---|---:|---|
@@ -205,7 +205,7 @@ Ask questions in natural language. XiaoJin answers based on canonical Buddhist t
 
 ### Master Persona Mode (法师模式)
 
-Select a specific Buddhist master to receive answers in their teaching style, grounded in their tradition's core scriptures. 8 historical masters available:
+Select a specific Buddhist master to receive answers in their teaching style, grounded in their tradition's core scriptures. 14 historical masters available:
 
 | Master | Tradition | Core Teachings |
 |--------|-----------|----------------|
@@ -217,6 +217,12 @@ Select a specific Buddhist master to receive answers in their teaching style, gr
 | 印光 Yinguang | 净土宗 | 信愿行、持名念佛、敦伦尽分 |
 | 蕅益 Ouyi | 天台/净土·跨宗派 | 教宗天台行归净土、六信、性相融会 |
 | 虚云 Xuyun | 禅宗·五宗兼嗣 | 参话头、起疑情、老实修行 |
+| 米拉日巴 Milarepa | 藏传·噶举派 | 雪山闭关瑜伽士、那洛六法、以道歌说法 |
+| 阿姜查 Ajahn Chah | 南传·泰国森林禅林派 | 正念、放下、朴素生活化教学 |
+| 宗喀巴 Tsongkhapa | 藏传·格鲁派 | 菩提道次第、三主要道、应成中观 |
+| 阿底峡 Atiśa Dīpaṃkara | 藏传·噶当派（印藏桥梁） | 菩提道灯论、三士道、七因果 |
+| 觉音 Buddhaghosa | 南传·上座部论师 | 清净道论、戒定慧、七清净十六观智 |
+| 马哈希 Mahasi Sayadaw | 南传·缅甸内观传统 | 标记现象法、腹部起伏、四念处密集禅修 |
 
 Each master has a 100-150 line enriched system prompt with lineage, core doctrines, speaking style, teaching methods, key allusions, and terminology table. When a master is selected, RAG retrieval is **scoped to their core scriptures** (e.g., selecting Zhiyi only searches 《摩诃止观》《法华玄义》 etc.), providing more precise citations.
 
@@ -286,7 +292,7 @@ FoJin aggregates data from major Buddhist digital projects worldwide. Sources ar
 | Database | PostgreSQL 15 + pgvector (HNSW index) + pg_trgm |
 | Search | Elasticsearch 8 (ICU tokenizer) |
 | Cache | Redis 7 |
-| AI | RAG (678K+ vectors, BGE-M3, HNSW) + 8 master personas + multi-provider LLM (OpenAI/Anthropic/DeepSeek/DashScope/Gemini/+10 more) |
+| AI | RAG (678K+ vectors, BGE-M3, HNSW) + 14 master personas + multi-provider LLM (OpenAI/Anthropic/DeepSeek/DashScope/Gemini/+10 more) |
 | Deploy | Docker Compose, Nginx (gzip, security headers), Cloudflare CDN |
 | CI | GitHub Actions (lint, test, security scan) |
 
@@ -397,7 +403,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 - [x] Nanshan Vinaya Dictionary (3,200+ Buddhist precept terms)
 - [x] CBETA full-text import — Taishō (T) + Xuzangjing (X): 3,600+ texts, 143M characters, 432K embedding vectors
 - [x] Dictionary expansion — 32 dictionaries, 748K entries (DPD, Apte, Mahāvyutpatti, Buddhadatta, Pentaglot, buddhaspace 7 dicts)
-- [x] Master Persona Mode — 8 Buddhist masters with tradition-scoped RAG (powered by [Master-skill](https://github.com/xr843/Master-skill))
+- [x] Master Persona Mode — 14 Buddhist masters with tradition-scoped RAG (powered by [Master-skill](https://github.com/xr843/Master-skill))
 - [x] Knowledge Graph Map — 50K+ geo entities, Deck.GL + MapLibre, lineage arcs
 - [x] Activity Feed — real-time source update tracking, academic feeds
 - [x] Inline split-view AI reader panel with draggable divider and independent scrolling
