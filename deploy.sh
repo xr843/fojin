@@ -76,6 +76,19 @@ is_known_commit() {
   git rev-parse --verify --quiet "$1^{commit}" >/dev/null 2>&1
 }
 
+# --- 0. 并发锁 ---------------------------------------------------------------
+# 串行化 deploy.sh 的并发运行 (cron 与手动, 或两次手动): 两个并发的
+# `docker compose build` 会在 RAM 受限的 VPS 上把 dockerd 推向 OOM。
+# 注意: 仓外的 webhook CD 若不经由 deploy.sh, 必须自己也取这把同一文件锁
+# ($STATE_DIR/deploy.lock) 才能完全堵住与它的竞争 — 否则只挡住 deploy.sh 自身。
+# 非阻塞获取: 抢不到锁就干净退出 (另一个 deploy 已在处理同一份代码)。
+DEPLOY_LOCK="$STATE_DIR/deploy.lock"
+exec 200>"$DEPLOY_LOCK"
+if ! flock -n 200; then
+  warn "另一个 deploy 正在运行 (lock: $DEPLOY_LOCK) — 退出，避免并发 build 触发 OOM。"
+  exit 0
+fi
+
 # --- 1. 取最新代码 -----------------------------------------------------------
 log "Fetching origin/$BRANCH ..."
 OLD_REV="$(git rev-parse HEAD)"
