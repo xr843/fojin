@@ -7,6 +7,7 @@ Usage:
     python scripts/sync_dila_combined.py
 """
 import asyncio
+import fcntl
 import json
 import os
 import re
@@ -282,4 +283,19 @@ async def main():
 
 
 if __name__ == "__main__":
+    # Concurrency guard: an overlapping run (cron firing while a slow run is
+    # still scanning the DILA API, or a manual run alongside cron) would read
+    # the same `existing` snapshot and both INSERT — producing duplicate
+    # person rows (already observed in prod: 21 dila_ids duplicated). Take an
+    # exclusive non-blocking file lock; if another run holds it, exit cleanly.
+    # The lock auto-releases when the process exits. Lives in the container's
+    # /tmp, shared across the `docker compose exec` invocations cron uses.
+    # The handle must outlive a `with` block; closing the file releases the
+    # flock, so we deliberately keep it open for the process lifetime.
+    _lock_fh = open("/tmp/fojin-sync-dila.lock", "w")  # noqa: SIM115
+    try:
+        fcntl.flock(_lock_fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        print("Another sync_dila run is in progress — exiting to avoid duplicate inserts.")
+        sys.exit(0)
     asyncio.run(main())
