@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -602,6 +602,20 @@ export default function TextReaderPage() {
     staleTime: 3600000,
   });
 
+  // reflowText is a full line-by-line parse of the juan body (tens of thousands
+  // of chars). Memoize on the raw content so font-size changes, bookmark toggles,
+  // dict-popover opens, and AI-panel resize-drags don't re-parse the whole text
+  // on every render. Keyed on content only — render-time concerns (font size) are
+  // CSS, not part of the parse.
+  const reflowedContent = useMemo(
+    () => (content?.content ? reflowText(content.content) : []),
+    [content?.content],
+  );
+  const reflowedCompare = useMemo(
+    () => (compareContent?.content ? reflowText(compareContent.content) : []),
+    [compareContent?.content],
+  );
+
   const changeFontSize = (delta: number) => {
     setFontSize((prev) => {
       const next = Math.min(Math.max(prev + delta, FONT_SIZE_MIN), FONT_SIZE_MAX);
@@ -787,7 +801,7 @@ export default function TextReaderPage() {
                   className="reader-body"
                   style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
                 >
-                  {reflowText(content.content).map(renderSegment)}
+                  {reflowedContent.map(renderSegment)}
                 </div>
               </div>
             </Col>
@@ -802,7 +816,7 @@ export default function TextReaderPage() {
                     style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
                   >
                     {compareContent?.content
-                      ? reflowText(compareContent.content).map(renderSegment)
+                      ? reflowedCompare.map(renderSegment)
                       : "暂无内容"}
                   </div>
                 )}
@@ -814,7 +828,7 @@ export default function TextReaderPage() {
             className="reader-body"
             style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
           >
-            {reflowText(content.content).map(renderSegment)}
+            {reflowedContent.map(renderSegment)}
           </div>
         )
       ) : (
