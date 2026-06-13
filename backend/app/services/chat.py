@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core.crypto import decrypt_api_key
+from app.core.deps import resolve_optional_user
 from app.core.exceptions import (
     AccessDeniedError,
     NotFoundError,
@@ -1265,6 +1266,11 @@ async def send_message_stream(
     hot_question_id: int | None = None,
     model_id: str | None = None,
     attachment_ids: list[int] | None = None,
+    # token: production SSE path passes the raw bearer token; the user is then
+    # resolved INSIDE the prep-phase session (see Phase-1 below) instead of via
+    # Depends(get_optional_user), which would pin a PG connection for the whole
+    # 60-120s stream. Tests inject user_id/user directly and leave token=None.
+    token: str | None = None,
     sessionmaker=async_session,
 ):
     """Async generator yielding SSE events for streaming chat responses.
@@ -1306,9 +1312,21 @@ async def send_message_stream(
     prep_error: Exception | None = None
     async with sessionmaker() as db_prep:
         try:
+            # Production SSE path: resolve the user from the raw token inside
+            # THIS short-lived prep session, so no request-scoped session is
+            # held across the LLM stream. Tests pass user_id/user directly
+            # (token=None) and skip this. user_id is reassigned here so the
+            # later prep-error / save-failure logs report the right id.
+            if token is not None:
+                user = await resolve_optional_user(token, db_prep)
+                user_id = user.id if user else None
+            # Anonymous quota keys on client_ip; logged-in users key on user_id
+            # (preserves the old chat_stream behaviour of only passing the IP
+            # when there is no authenticated user).
+            effective_client_ip = client_ip if user is None else None
             prep_result = await _prepare_chat(
                 db_prep, user_id, message, session_id, user,
-                client_ip=client_ip, redis=redis, master_id=master_id,
+                client_ip=effective_client_ip, redis=redis, master_id=master_id,
                 text_id=text_id, juan_num=juan_num,
                 selected_text=selected_text, page_content=page_content,
                 hot_question_id=hot_question_id, model_id=model_id,

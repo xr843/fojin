@@ -83,26 +83,28 @@ async def chat(
 async def chat_stream(
     request: Request,
     data: ChatRequest,
-    user: User | None = Depends(get_optional_user),
 ):
     """Stream AI answer via Server-Sent Events (SSE). Same as POST /chat but with real-time token streaming.
 
     SSE 流式发送消息并获取 AI 回答.
 
-    Intentionally does **not** depend on ``get_db``: this endpoint returns a
-    StreamingResponse whose generator's lifetime is the LLM-stream window
-    (60-120s), and a single DI-supplied session held across that window
-    pinned a PG connection per active stream — the production pool
-    exhaustion in project_fojin_db_pool_streaming. The generator owns its
-    own sessions internally, one for prep and one for save, neither
-    held across the LLM I/O.
+    Holds **no** request-scoped DB session. The endpoint takes neither
+    ``Depends(get_db)`` nor ``Depends(get_optional_user)`` — the latter
+    carries its own ``get_db`` yield-dependency, which FastAPI keeps checked
+    out until the StreamingResponse body is fully sent, i.e. the entire
+    60-120s LLM window, pinning a PG connection per active stream
+    (project_fojin_db_pool_streaming). Instead the raw bearer token is read
+    off the request and the user is resolved INSIDE the generator's
+    short-lived prep session. The generator owns two short-lived sessions
+    (prep + save) and holds none across the LLM I/O.
     """
-    user_id = user.id if user else None
-    client_ip = _get_client_ip(request) if not user else None
+    auth_header = request.headers.get("Authorization", "")
+    token = auth_header[7:].strip() if auth_header[:7].lower() == "bearer " else None
+    client_ip = _get_client_ip(request)
     redis = getattr(request.app.state, "redis", None)
     return StreamingResponse(
         send_message_stream(
-            user_id, data.message, data.session_id, user=user,
+            None, data.message, data.session_id, token=token,
             client_ip=client_ip, redis=redis, master_id=data.master_id,
             text_id=data.text_id, juan_num=data.juan_num, selected_text=data.selected_text, page_content=data.page_content,
             hot_question_id=data.hot_question_id, model_id=data.model_id,

@@ -6,15 +6,15 @@ from app.config import settings
 engine = create_async_engine(
     settings.database_url,
     echo=False,
-    # Pool sized for streaming workload. /chat/stream is a Server-Sent
-    # Events endpoint and FastAPI holds the dependency-injected session
-    # for the entire stream duration (60-120s with LLM latency), so a
-    # single user with 1-2 simultaneous tabs plus an SEO crawler hitting
-    # /dict/* can pin the previous 10+20 budget within minutes. The
-    # right long-term fix is to release the session between the prep
-    # phase and the LLM-streaming phase inside `send_message_stream`;
-    # until that lands, 30+90 keeps the service well clear of PG's
-    # default 100-connection budget while masking the streaming-hold.
+    # Pool stays at 30+90 for now. /chat/stream's streaming session-hold is
+    # GONE (it no longer takes get_db/get_optional_user — see send_message_stream),
+    # which removes the dominant masker. BUT the /exports/* endpoints
+    # (export_metadata_csv / export_kg_json / export_kg_jsonld) still hold a
+    # request-scoped get_db session across their full keyset-paginated dump
+    # generators (10k+ rows) — the same streaming-hold pattern. Cutting back to
+    # the pre-masking 10+20 must wait until those get the same short-lived
+    # per-batch session treatment, else a few concurrent exports could exhaust
+    # the pool the way chat used to (project_fojin_db_pool_streaming).
     pool_size=30,
     max_overflow=90,
     pool_pre_ping=True,
