@@ -149,6 +149,17 @@ elif [ "$BE_BASE" != "$NEW_REV" ]; then
     # Pure scripts/tests/eval/alembic change — log but don't restart.
     log "backend/ 仅有 scripts/tests/eval/alembic 改动 — 跳过 restart（不影响 uvicorn，也不杀正在跑的脚本）。"
     echo "$BE_DIFF" | grep '^backend/' | sed 's/^/    /'
+    # Pure-migration changes still need applying: entrypoint.sh only runs
+    # `alembic upgrade head` on container START, and we intentionally do NOT
+    # restart here (would kill long-running `docker exec` scripts). Without
+    # this, a migration-only PR (e.g. a new data source) deploys "successfully"
+    # but the migration stays unapplied until some unrelated app/ change later
+    # triggers a restart. `upgrade head` is idempotent — no-op if already at head.
+    if echo "$BE_DIFF" | grep -q '^backend/alembic/'; then
+      log "检测到 alembic 迁移改动 — 运行 alembic upgrade head（容器不重启）。"
+      docker compose exec -T backend alembic upgrade head \
+        || fail "alembic upgrade head 失败 — 迁移未应用，请人工处理。"
+    fi
     # Still bump the marker so we don't keep re-evaluating the same untouched
     # diff every cron tick — otherwise the next deploy.sh run will see the same
     # `BE_DIFF` and re-log this skip message indefinitely.
