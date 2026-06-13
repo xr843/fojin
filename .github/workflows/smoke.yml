@@ -11,8 +11,15 @@ on:
         required: false
   schedule:
     - cron: "17 1,13 * * *" # twice daily, UTC
-  push:
-    branches: [master]
+  # Fire only AFTER a deploy actually succeeds — not on push. Running on
+  # push raced the webhook CD and produced systematic false negatives:
+  # the suite hit prod before backend/DB/SSR rolled out, so an i18n/DB/SSR
+  # push could go red and the *next* unrelated run would flip it green.
+  # Intent: the VPS deploy.sh health check, once it passes, triggers this
+  # via `gh api repos/xr843/fojin/dispatches -f event_type=deploy-success`
+  # — i.e. "test only once the deploy has completed."
+  repository_dispatch:
+    types: [deploy-success]
 
 permissions:
   contents: read
@@ -37,14 +44,16 @@ jobs:
           cache: npm
           cache-dependency-path: e2e/package-lock.json
 
-      # On master pushes the webhook CD needs minutes to rebuild containers.
-      # We can't poll a commit hash (no version endpoint yet), but the en
-      # locale key count is a deterministic deploy signal whenever locales
-      # changed; when they didn't, any moment is equally valid to test. Wait
-      # until served == repo, give up after 12 min and test anyway (the
-      # functional specs are mostly version-independent).
+      # Conservative belt-and-suspenders: after a deploy-success dispatch the
+      # containers should already be up, but the webhook CD can still be
+      # mid-rebuild. We can't poll a commit hash (no version endpoint yet), but
+      # the en locale key count is a deterministic deploy signal whenever
+      # locales changed; when they didn't, any moment is equally valid to test.
+      # Wait until served == repo, give up after 12 min and test anyway (the
+      # functional specs are mostly version-independent). Harmless under
+      # schedule/workflow_dispatch since this step is gated to the dispatch.
       - name: Wait for CD rollout
-        if: github.event_name == 'push'
+        if: github.event_name == 'repository_dispatch'
         run: |
           REPO_KEYS=$(node -e "console.log(Object.keys(require('../frontend/public/locales/en/translation.json')).length)")
           echo "repo en keys: $REPO_KEYS"
