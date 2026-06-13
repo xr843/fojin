@@ -1,13 +1,14 @@
 """Stats aggregation service for dashboard and timeline endpoints."""
 
 import hashlib
-import json
 import logging
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import cache_get as _cache_get
+from app.core.cache import cache_set
 from app.core.dynasty_config import resolve_dynasty
 from app.models.chat import ChatMessage, ChatSession
 from app.models.dictionary import DictionaryEntry
@@ -22,27 +23,9 @@ OVERVIEW_CACHE_KEY = "stats:overview"
 OVERVIEW_CACHE_TTL = 3600  # 1 hour
 
 
-async def _cache_get(redis, key: str) -> dict | None:
-    """Safely get and deserialize a cached value."""
-    if redis is None:
-        return None
-    try:
-        raw = await redis.get(key)
-        if raw and isinstance(raw, str):
-            return json.loads(raw)
-    except Exception:
-        logger.debug("Cache miss or error for key=%s", key)
-    return None
-
-
 async def _cache_set(redis, key: str, value: dict, ttl: int = OVERVIEW_CACHE_TTL) -> None:
-    """Safely cache a serialized value."""
-    if redis is None:
-        return
-    try:
-        await redis.setex(key, ttl, json.dumps(value, ensure_ascii=False, default=str))
-    except Exception:
-        logger.debug("Cache set error for key=%s", key)
+    """Cache a value with this service's default TTL (delegates to core.cache)."""
+    await cache_set(redis, key, value, ttl)
 
 
 async def get_overview(db: AsyncSession, redis=None) -> dict:
