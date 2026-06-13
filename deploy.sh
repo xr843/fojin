@@ -76,6 +76,19 @@ is_known_commit() {
   git rev-parse --verify --quiet "$1^{commit}" >/dev/null 2>&1
 }
 
+# --- 0. 并发锁 ---------------------------------------------------------------
+# 串行化 deploy.sh 的并发运行 (cron 与手动, 或两次手动): 两个并发的
+# `docker compose build` 会在 RAM 受限的 VPS 上把 dockerd 推向 OOM。
+# 注意: 仓外的 webhook CD 若不经由 deploy.sh, 必须自己也取这把同一文件锁
+# ($STATE_DIR/deploy.lock) 才能完全堵住与它的竞争 — 否则只挡住 deploy.sh 自身。
+# 非阻塞获取: 抢不到锁就干净退出 (另一个 deploy 已在处理同一份代码)。
+DEPLOY_LOCK="$STATE_DIR/deploy.lock"
+exec 200>"$DEPLOY_LOCK"
+if ! flock -n 200; then
+  warn "另一个 deploy 正在运行 (lock: $DEPLOY_LOCK) — 退出，避免并发 build 触发 OOM。"
+  exit 0
+fi
+
 # --- 1. 取最新代码 -----------------------------------------------------------
 log "Fetching origin/$BRANCH ..."
 OLD_REV="$(git rev-parse HEAD)"
@@ -149,6 +162,17 @@ elif [ "$BE_BASE" != "$NEW_REV" ]; then
     # Pure scripts/tests/eval/alembic change — log but don't restart.
     log "backend/ 仅有 scripts/tests/eval/alembic 改动 — 跳过 restart（不影响 uvicorn，也不杀正在跑的脚本）。"
     echo "$BE_DIFF" | grep '^backend/' | sed 's/^/    /'
+    # Pure-migration changes still need applying: entrypoint.sh only runs
+    # `alembic upgrade head` on container START, and we intentionally do NOT
+    # restart here (would kill long-running `docker exec` scripts). Without
+    # this, a migration-only PR (e.g. a new data source) deploys "successfully"
+    # but the migration stays unapplied until some unrelated app/ change later
+    # triggers a restart. `upgrade head` is idempotent — no-op if already at head.
+    if echo "$BE_DIFF" | grep -q '^backend/alembic/'; then
+      log "检测到 alembic 迁移改动 — 运行 alembic upgrade head（容器不重启）。"
+      docker compose exec -T backend alembic upgrade head \
+        || fail "alembic upgrade head 失败 — 迁移未应用，请人工处理。"
+    fi
     # Still bump the marker so we don't keep re-evaluating the same untouched
     # diff every cron tick — otherwise the next deploy.sh run will see the same
     # `BE_DIFF` and re-log this skip message indefinitely.
