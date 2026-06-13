@@ -1,4 +1,3 @@
-import json
 import logging
 from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -6,6 +5,8 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import Date, and_, case, cast, distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import cache_get as _cache_get
+from app.core.cache import cache_set
 from app.models.annotation import Annotation
 from app.models.audit import AdminAuditLog
 from app.models.chat import ChatMessage, ChatSession
@@ -109,25 +110,9 @@ async def _counts_with_buckets(
     return row[0], row[1], row[2]
 
 
-async def _cache_get(redis, key: str) -> dict | None:
-    if redis is None:
-        return None
-    try:
-        raw = await redis.get(key)
-        if raw and isinstance(raw, str):
-            return json.loads(raw)
-    except Exception:
-        logger.debug("Cache miss/error for key=%s", key)
-    return None
-
-
 async def _cache_set(redis, key: str, value: dict, ttl: int = OVERVIEW_CACHE_TTL) -> None:
-    if redis is None:
-        return
-    try:
-        await redis.setex(key, ttl, json.dumps(value, ensure_ascii=False, default=str))
-    except Exception:
-        logger.debug("Cache set error for key=%s", key)
+    """Cache a value with this service's default TTL (delegates to core.cache)."""
+    await cache_set(redis, key, value, ttl)
 
 
 async def get_trends(db: AsyncSession, days: int = 30, redis=None) -> dict:
