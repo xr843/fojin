@@ -92,8 +92,10 @@ async def _fetch_reverse_index(
 ) -> list[dict]:
     """Return up to N sutras containing this headword in their content.
 
-    Uses a vanilla ILIKE — text_contents.content is GiST-trigram-indexed so
-    a single-term substring match is sub-second for the largest sutras.
+    Uses a vanilla ILIKE — text_contents.content has a GIN trigram index
+    (ix_text_contents_content_trgm, migration 0157) so a single-term substring
+    match is sub-second. Without that index this seq-scans the 406MB table and,
+    under crawler load, piles up and exhausts the connection pool.
     """
     if len(headword) > _MAX_HEADWORD_LEN:
         return []
