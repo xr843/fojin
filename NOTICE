@@ -67,6 +67,17 @@ Usage: Metadata mapping and IIIF manifest links only; no content stored locally.
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
+MITRA / Dharmamitra (Sebastian Nehrdich & Kurt Keutzer, UC Berkeley)
+https://github.com/dharmamitra/mitra-parallel — arXiv:2601.06400
+License: CC BY-SA 4.0 (attribution, share-alike)
+Usage: Sentence-level Sanskrit/Tibetan ↔ Buddhist-Chinese parallel passages
+imported into the mitra_alignments table and surfaced in the reader's
+cross-canon parallel panel. The Chinese side is anchored to local CBETA chunks
+by verbatim substring match; the Sanskrit/Tibetan side is stored inline.
+Note: Derived alignment data is share-alike — redistribution must remain CC BY-SA 4.0.
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
 Dictionary Sources
 --------------------------------------------------------------------------------
 - DDB (Digital Dictionary of Buddhism) — CC BY-NC-SA
