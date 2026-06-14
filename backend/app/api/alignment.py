@@ -19,9 +19,20 @@ from app.database import get_db
 
 router = APIRouter(prefix="/alignment", tags=["alignment"])
 
+# A fojin chunk (paragraph) can contain many MITRA sentence-level parallels;
+# cap per chunk so the reader panel stays bounded on dense texts.
+MITRA_CHUNK_LIMIT = 50
+
 
 class ParallelPair(BaseModel):
-    """One aligned parallel passage."""
+    """One aligned parallel passage.
+
+    source="fojin": both sides are fojin chunks (from alignment_pairs); text_id/
+    juan_num/chunk_index deep-link to the counterpart in the reader.
+    source="mitra-parallel": the foreign side is an inline Sanskrit/Tibetan
+    sentence from MITRA (CC BY-SA 4.0) with no fojin chunk — chunk_text holds the
+    foreign text and text_id/juan_num/chunk_index are 0 (no deep-link target).
+    """
     text_id: int
     juan_num: int
     chunk_index: int
@@ -31,6 +42,7 @@ class ParallelPair(BaseModel):
     confidence: float = 1.0
     original_preview: str | None = None
     original_lang: str | None = None
+    source: str = "fojin"
 
 
 class ChunkAlignmentResponse(BaseModel):
@@ -166,6 +178,31 @@ async def get_chunk_alignment(
                 original_lang=original_lang,
             ))
 
+    # MITRA cross-lingual parallels (inline Sanskrit/Tibetan, CC BY-SA 4.0).
+    # The foreign side has no fojin chunk, so chunk_text carries the foreign
+    # sentence and the deep-link ids are 0. A fojin chunk (a paragraph) can hold
+    # many MITRA sentence-pairs, so this uses its own larger cap.
+    mitra_rows = (await db.execute(
+        sql_text(
+            "SELECT foreign_text, foreign_lang, confidence "
+            "FROM mitra_alignments "
+            "WHERE text_id = :tid AND juan_num = :juan AND chunk_index = :cidx "
+            "ORDER BY foreign_lang, id LIMIT :limit"
+        ),
+        {"tid": text_id, "juan": juan_num, "cidx": chunk_index, "limit": MITRA_CHUNK_LIMIT},
+    )).fetchall()
+    for foreign_text, foreign_lang, conf in mitra_rows:
+        parallels.append(ParallelPair(
+            text_id=0,
+            juan_num=0,
+            chunk_index=0,
+            chunk_text=foreign_text,
+            lang=foreign_lang or "sa",
+            title="MITRA 平行（藏）" if foreign_lang == "bo" else "MITRA 平行（梵）",
+            confidence=float(conf) if conf is not None else 1.0,
+            source="mitra-parallel",
+        ))
+
     return ChunkAlignmentResponse(
         source_text_id=text_id,
         source_juan_num=juan_num,
@@ -203,13 +240,20 @@ async def get_juan_alignment(
             SELECT DISTINCT te.chunk_index, te.chunk_text
             FROM text_embeddings te
             WHERE te.text_id = :tid AND te.juan_num = :juan
-            AND EXISTS (
-                SELECT 1 FROM alignment_pairs ap
-                WHERE ap.text_a_chunk_index IS NOT NULL
-                AND (
-                    (ap.text_a_id = te.text_id AND ap.text_a_juan_num = te.juan_num AND ap.text_a_chunk_index = te.chunk_index)
-                    OR
-                    (ap.text_b_id = te.text_id AND ap.text_b_juan_num = te.juan_num AND ap.text_b_chunk_index = te.chunk_index)
+            AND (
+                EXISTS (
+                    SELECT 1 FROM alignment_pairs ap
+                    WHERE ap.text_a_chunk_index IS NOT NULL
+                    AND (
+                        (ap.text_a_id = te.text_id AND ap.text_a_juan_num = te.juan_num AND ap.text_a_chunk_index = te.chunk_index)
+                        OR
+                        (ap.text_b_id = te.text_id AND ap.text_b_juan_num = te.juan_num AND ap.text_b_chunk_index = te.chunk_index)
+                    )
+                )
+                OR EXISTS (
+                    SELECT 1 FROM mitra_alignments ma
+                    WHERE ma.text_id = te.text_id AND ma.juan_num = te.juan_num
+                    AND ma.chunk_index = te.chunk_index
                 )
             )
             ORDER BY te.chunk_index
