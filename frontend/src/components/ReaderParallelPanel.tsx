@@ -276,20 +276,35 @@ function ChunkView({ textId, juanNum }: Props) {
                   }}>
                     {entry.chunk_text}
                   </div>
-                  {entry.parallels.map((p, idx) => (
-                    <div key={`${p.text_id}-${p.juan_num}-${p.chunk_index}-${idx}`}
+                  {entry.parallels.map((p, idx) => {
+                    const isMitra = p.source === "mitra-parallel";
+                    // MITRA stores the actual Skt/Tib inline (not an English
+                    // translation), so for MITRA drop the English-translation
+                    // suffix by taking the first token of the existing label.
+                    // Derived from LANG_LABEL so no new hardcoded string is added.
+                    const langLabel = isMitra
+                      ? (LANG_LABEL[p.lang] || p.lang).split(" ")[0]
+                      : (LANG_LABEL[p.lang] || p.lang);
+                    return (
+                    <div key={`${p.source || "fojin"}-${p.text_id}-${p.juan_num}-${p.chunk_index}-${idx}`}
                       style={{ padding: "10px 12px", marginBottom: 10, borderRadius: 4,
                         background: "#fff", border: "1px solid #e8e8e8" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
                         <Tag color={LANG_COLOR[p.lang] || "default"} style={{ margin: 0 }}>
-                          {LANG_LABEL[p.lang] || p.lang}
+                          {langLabel}
                         </Tag>
-                        <span style={{ fontSize: 12, color: "#666" }}>
-                          《{p.title || "其他藏经"}》第 {p.juan_num} 卷
-                        </span>
-                        <span style={{ fontSize: 11, color: "#999", marginLeft: "auto" }}>
-                          置信度 {(p.confidence * 100).toFixed(0)}%
-                        </span>
+                        {isMitra ? (
+                          <Tag color="volcano" style={{ margin: 0 }}>MITRA</Tag>
+                        ) : (
+                          <span style={{ fontSize: 12, color: "#666" }}>
+                            《{p.title || "其他藏经"}》第 {p.juan_num} 卷
+                          </span>
+                        )}
+                        {!isMitra && (
+                          <span style={{ fontSize: 11, color: "#999", marginLeft: "auto" }}>
+                            置信度 {(p.confidence * 100).toFixed(0)}%
+                          </span>
+                        )}
                       </div>
                       <div lang={p.lang} style={{
                         fontSize: 13,
@@ -311,18 +326,25 @@ function ChunkView({ textId, juanNum }: Props) {
                           {p.original_preview.length >= 500 && "…"}
                         </div>
                       )}
-                      <div style={{ marginTop: 8, fontSize: 12 }}>
-                        <Link
-                          to={`/texts/${p.text_id}/read?juan=${p.juan_num}`}
-                          target="_blank" rel="noopener noreferrer"
-                          style={{ color: "#5b8c6b" }}
-                        >
-                          <BookOutlined style={{ marginRight: 4 }} />
-                          阅读全文 →
-                        </Link>
-                      </div>
+                      {isMitra ? (
+                        <div style={{ marginTop: 8, fontSize: 11, color: "#999" }}>
+                          MITRA · CC BY-SA 4.0
+                        </div>
+                      ) : (
+                        <div style={{ marginTop: 8, fontSize: 12 }}>
+                          <Link
+                            to={`/texts/${p.text_id}/read?juan=${p.juan_num}`}
+                            target="_blank" rel="noopener noreferrer"
+                            style={{ color: "#5b8c6b" }}
+                          >
+                            <BookOutlined style={{ marginRight: 4 }} />
+                            阅读全文 →
+                          </Link>
+                        </div>
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ),
             }))}

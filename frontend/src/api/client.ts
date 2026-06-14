@@ -1239,6 +1239,8 @@ export interface ParallelPair {
   confidence: number;
   original_preview?: string | null;
   original_lang?: string | null;
+  /** "fojin" (alignment_pairs, deep-linkable) | "mitra-parallel" (inline Skt/Tib, CC BY-SA 4.0, no deep-link). */
+  source?: string;
 }
 
 export interface ChunkAlignmentResponse {
