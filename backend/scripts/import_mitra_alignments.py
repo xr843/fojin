@@ -39,8 +39,10 @@ from collections import defaultdict
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import text as sql_text
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.pool import NullPool
 
-from app.database import async_session
+from app.config import settings
 
 # The 10 texts validated end-to-end in the pilot (default scope).
 PILOT_TAISHO = [
@@ -81,10 +83,10 @@ def _juan_of(seg: str) -> int | None:
     return int(m.group(1)) if m else None
 
 
-async def _load_chunks(db, taisho: str):
+async def _load_chunks(conn, taisho: str):
     """Return (text_id, tj_index, t_index) for one Taishō text, or (None, ...)."""
     rows = (
-        await db.execute(
+        await conn.execute(
             sql_text(
                 """
                 SELECT te.text_id, te.juan_num, te.chunk_index, te.chunk_text
@@ -167,14 +169,14 @@ def _pairs_for(tsv_dir: str, taisho: str):
                 yield base, zh_seg, zh, fo_seg, fo
 
 
-async def _import_one(db, taisho: str, tsv_dir: str, dry: bool) -> tuple[int, int]:
-    text_id, tj_index, t_index = await _load_chunks(db, taisho)
+async def _import_one(conn, taisho: str, tsv_dir: str, dry: bool) -> tuple[int, int]:
+    text_id, tj_index, t_index = await _load_chunks(conn, taisho)
     if text_id is None:
         print(f"  {taisho}: not in fojin (skip)")
         return 0, 0
 
     if not dry:
-        await db.execute(
+        await conn.execute(
             sql_text("DELETE FROM mitra_alignments WHERE text_id = :tid"), {"tid": text_id}
         )
 
@@ -211,13 +213,13 @@ async def _import_one(db, taisho: str, tsv_dir: str, dry: bool) -> tuple[int, in
             }
         )
         if not dry and len(batch) >= 5000:
-            await db.execute(INSERT, batch)
+            await conn.execute(INSERT, batch)
             batch = []
 
     if not dry:
         if batch:
-            await db.execute(INSERT, batch)
-        await db.commit()
+            await conn.execute(INSERT, batch)
+        await conn.commit()
 
     pct = loc * 100 // max(cand, 1)
     print(f"  {taisho} (text_id={text_id}): cand={cand} localized={loc} ({pct}%)")
@@ -254,11 +256,21 @@ async def main() -> int:
 
     t0 = time.time()
     tot_c = tot_l = 0
-    async with async_session() as db:
-        for taisho in targets:
-            c, lcount = await _import_one(db, taisho, args.mitra_dir, args.dry_run)
-            tot_c += c
-            tot_l += lcount
+    # Dedicated NullPool engine + a single connection held for the whole run.
+    # The app's pooled session re-checks-out a connection after every commit;
+    # on fojin's connection-starved Postgres (app pool 30+90 can exceed
+    # max_connections, shared with umami) that re-checkout fails mid-run with
+    # "too many clients". One long-lived connection only needs a free slot once,
+    # at startup, and adds exactly one connection of pressure.
+    engine = create_async_engine(settings.database_url, poolclass=NullPool)
+    try:
+        async with engine.connect() as conn:
+            for taisho in targets:
+                c, lcount = await _import_one(conn, taisho, args.mitra_dir, args.dry_run)
+                tot_c += c
+                tot_l += lcount
+    finally:
+        await engine.dispose()
     pct = tot_l * 100 // max(tot_c, 1)
     print(f"TOTAL: cand={tot_c} localized={tot_l} ({pct}%) in {time.time() - t0:.1f}s")
     return 0
