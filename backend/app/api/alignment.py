@@ -136,7 +136,13 @@ async def get_chunk_alignment(
                 (ap.text_b_id = :tid AND ap.text_b_juan_num = :juan AND ap.text_b_chunk_index = :cidx)
             )
             AND ap.text_a_chunk_index IS NOT NULL
-            ORDER BY ap.confidence DESC
+            -- confidence is coarse and heavily tied (e.g. 0.9 for hundreds of
+            -- pairs), so confidence-only ordering picks an arbitrary 5 under the
+            -- LIMIT. Tiebreak on the counterpart identity (output cols 1,2,3 =
+            -- other_tid/other_juan/other_cidx) so this single-chunk endpoint and
+            -- the batched juan endpoint always select the SAME rows in the SAME
+            -- order — otherwise the "多语对读" panel and a chunk deep-link disagree.
+            ORDER BY ap.confidence DESC, 1, 2, 3
             LIMIT :limit
         """),
         {"tid": text_id, "juan": juan_num, "cidx": chunk_index, "limit": limit},
@@ -316,12 +322,13 @@ async def get_juan_alignment(
             SELECT source_cidx, other_tid, other_juan, other_cidx, other_lang, confidence
             FROM (
                 SELECT *, ROW_NUMBER() OVER (
-                    PARTITION BY source_cidx ORDER BY confidence DESC
+                    PARTITION BY source_cidx
+                    ORDER BY confidence DESC, other_tid, other_juan, other_cidx
                 ) AS rn
                 FROM matched
             ) t
             WHERE rn <= :pair_limit
-            ORDER BY source_cidx, confidence DESC
+            ORDER BY source_cidx, confidence DESC, other_tid, other_juan, other_cidx
         """),
         {"tid": text_id, "juan": juan_num, "cidxs": cidxs, "pair_limit": PAIR_LIMIT},
     )).fetchall()
