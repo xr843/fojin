@@ -15,6 +15,15 @@ services:
     # every connection. Raised to 3g; host has the headroom.
     mem_limit: 3g
     cpus: 1.0
+    # Docker's default /dev/shm is 64MB. Postgres puts parallel-worker shared
+    # memory there, so a parallel VACUUM / VACUUM ANALYZE on a large table
+    # (e.g. mitra_alignments ~800MB) fails with "could not resize shared memory
+    # segment ... No space left on device". 256MB is ample for maintenance and
+    # stays well under mem_limit (it's a lazily-allocated tmpfs). Autovacuum is
+    # single-process and unaffected either way. NOTE: applying a change here
+    # needs an explicit `docker compose up -d postgres` (brief DB blip) — the
+    # path-aware deploy.sh does not recreate postgres on a compose-only change.
+    shm_size: 256m
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-fojin}
       POSTGRES_USER: ${POSTGRES_USER:-fojin}
