@@ -57,6 +57,11 @@ _CJK = re.compile(r"[㐀-䶿一-鿿\U00020000-\U0002a6df]")
 _TIB = re.compile(r"[ༀ-࿿]")
 _ZH_SEG = re.compile(r"^T\d+n\d+")
 
+# Localization tuning.
+_SEP = "\x00"          # chunk separator in the per-juan concat (never appears in normalized text)
+_MIN_LEN = 4           # skip MITRA sentences shorter than this (normalized length)
+_CROSS_JUAN_MIN = 12   # only allow the cross-juan fallback for sentences at least this long
+
 INSERT = sql_text(
     """
     INSERT INTO mitra_alignments
@@ -116,11 +121,21 @@ async def _load_chunks(conn, taisho: str):
         parts: list[str] = []
         cur = 0
         for cidx, nt in chunks:
+            if not nt:
+                # Skip chunks that normalize to empty (all punctuation/markup):
+                # they can't contain a match and would create duplicate offsets
+                # that make the bisect lookup ambiguous.
+                continue
             offs.append(cur)
             idxs.append(cidx)
             parts.append(nt)
-            cur += len(nt)
-        concat = "".join(parts)
+            cur += len(nt) + len(_SEP)
+        if not parts:
+            continue
+        # Join with a sentinel so a sentence that straddles a chunk boundary is
+        # NOT found across the seam (it would otherwise be mis-attributed to the
+        # chunk where its first char lands, or match spuriously at the join).
+        concat = _SEP.join(parts)
         tj_index[juan] = (concat, offs, idxs)
         t_index.append((juan, concat, offs, idxs))
     return text_id, tj_index, t_index
@@ -128,19 +143,31 @@ async def _load_chunks(conn, taisho: str):
 
 def _locate(ns: str, juan: int | None, tj_index, t_index):
     """Find the fojin chunk containing the normalized sentence. Returns
-    (chunk_index, juan, scope) where scope is 'juan' | 'taisho' | 'none'."""
+    (chunk_index, juan, scope) where scope is 'juan' | 'taisho' | 'none'.
+
+    The cross-juan ('taisho') fallback only fires for sufficiently long
+    sentences AND only when the match is unique across juans. Short formulaic
+    phrases (爾時世尊, 如是我聞) recur in many juans; taking the first hit would
+    anchor them to an arbitrary wrong juan, so an ambiguous match is dropped.
+    """
     hit = tj_index.get(juan) if juan is not None else None
     if hit:
         concat, offs, idxs = hit
         p = concat.find(ns)
         if p >= 0:
             return idxs[bisect.bisect_right(offs, p) - 1], juan, "juan"
-    for j, concat, offs, idxs in t_index:
-        if j == juan:
-            continue
-        p = concat.find(ns)
-        if p >= 0:
-            return idxs[bisect.bisect_right(offs, p) - 1], j, "taisho"
+    if len(ns) >= _CROSS_JUAN_MIN:
+        match: tuple[int, int] | None = None
+        for j, concat, offs, idxs in t_index:
+            if j == juan:
+                continue
+            p = concat.find(ns)
+            if p >= 0:
+                if match is not None:
+                    return None, None, "none"  # found in >1 juan → ambiguous, drop
+                match = (idxs[bisect.bisect_right(offs, p) - 1], j)
+        if match is not None:
+            return match[0], match[1], "taisho"
     return None, None, "none"
 
 
@@ -175,29 +202,29 @@ async def _import_one(conn, taisho: str, tsv_dir: str, dry: bool) -> tuple[int, 
         print(f"  {taisho}: not in fojin (skip)")
         return 0, 0
 
-    if not dry:
-        await conn.execute(
-            sql_text("DELETE FROM mitra_alignments WHERE text_id = :tid"), {"tid": text_id}
-        )
-
+    # Localize first (pure CPU), building the full row set BEFORE any write, so
+    # the DELETE's row locks are held only for the quick delete+insert window,
+    # not during the localization loop. In dry-run we only count (no rows held).
     cand = loc = 0
-    batch: list[dict] = []
+    rows: list[dict] = []
     for base, zh_seg, zh, fo_seg, fo in _pairs_for(tsv_dir, taisho):
         ns = _norm(zh)
-        if len(ns) < 4:
+        if len(ns) < _MIN_LEN:
             continue
         cand += 1
         ci, fj, scope = _locate(ns, _juan_of(zh_seg), tj_index, t_index)
         if ci is None:
             continue
         loc += 1
+        if dry:
+            continue
         # Tibetan text is stored in Tibetan script; Sanskrit in IAST/Devanagari.
         # Script detection is ground truth here (verified on the pilot corpus:
         # 119,067 Tibetan rows all carry Tibetan script). Do NOT classify by the
         # segment id's Derge "D" token — it is embedded mid-id (e.g. K10D0095)
         # and false-positives on Sanskrit ids.
         folang = "bo" if _TIB.search(fo) else "sa"
-        batch.append(
+        rows.append(
             {
                 "text_id": text_id,
                 "taisho_id": taisho,
@@ -212,13 +239,13 @@ async def _import_one(conn, taisho: str, tsv_dir: str, dry: bool) -> tuple[int, 
                 "match_scope": scope,
             }
         )
-        if not dry and len(batch) >= 5000:
-            await conn.execute(INSERT, batch)
-            batch = []
 
     if not dry:
-        if batch:
-            await conn.execute(INSERT, batch)
+        await conn.execute(
+            sql_text("DELETE FROM mitra_alignments WHERE text_id = :tid"), {"tid": text_id}
+        )
+        for i in range(0, len(rows), 5000):
+            await conn.execute(INSERT, rows[i : i + 5000])
         await conn.commit()
 
     pct = loc * 100 // max(cand, 1)
@@ -263,16 +290,28 @@ async def main() -> int:
     # "too many clients". One long-lived connection only needs a free slot once,
     # at startup, and adds exactly one connection of pressure.
     engine = create_async_engine(settings.database_url, poolclass=NullPool)
+    failed: list[str] = []
     try:
         async with engine.connect() as conn:
             for taisho in targets:
-                c, lcount = await _import_one(conn, taisho, args.mitra_dir, args.dry_run)
-                tot_c += c
-                tot_l += lcount
+                try:
+                    c, lcount = await _import_one(conn, taisho, args.mitra_dir, args.dry_run)
+                    tot_c += c
+                    tot_l += lcount
+                except Exception as e:
+                    # One bad text must not abort the whole run. Roll back the
+                    # aborted transaction so the shared connection stays usable.
+                    await conn.rollback()
+                    failed.append(taisho)
+                    print(f"  {taisho}: FAILED ({type(e).__name__}: {e})")
     finally:
         await engine.dispose()
     pct = tot_l * 100 // max(tot_c, 1)
     print(f"TOTAL: cand={tot_c} localized={tot_l} ({pct}%) in {time.time() - t0:.1f}s")
+    if failed:
+        tail = " …" if len(failed) > 30 else ""
+        print(f"FAILED ({len(failed)}): {', '.join(failed[:30])}{tail}")
+        return 1
     return 0
 
 
