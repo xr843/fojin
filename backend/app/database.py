@@ -6,17 +6,20 @@ from app.config import settings
 engine = create_async_engine(
     settings.database_url,
     echo=False,
-    # Pool stays at 30+90 for now. /chat/stream's streaming session-hold is
-    # GONE (it no longer takes get_db/get_optional_user — see send_message_stream),
-    # which removes the dominant masker. BUT the /exports/* endpoints
-    # (export_metadata_csv / export_kg_json / export_kg_jsonld) still hold a
-    # request-scoped get_db session across their full keyset-paginated dump
-    # generators (10k+ rows) — the same streaming-hold pattern. Cutting back to
-    # the pre-masking 10+20 must wait until those get the same short-lived
-    # per-batch session treatment, else a few concurrent exports could exhaust
-    # the pool the way chat used to (project_fojin_db_pool_streaming).
-    pool_size=30,
-    max_overflow=90,
+    # Pool back to 10+20 (max 30 connections). The two streaming session-holds
+    # that forced the temporary 30+90 inflation are both gone now:
+    #  - /chat/stream no longer takes get_db/get_optional_user (see
+    #    send_message_stream);
+    #  - /exports/* (export_metadata_csv / export_kg_json / export_kg_jsonld) now
+    #    fetch each keyset batch in a short-lived per-batch session and drop the
+    #    unused get_optional_user dep, so they no longer pin a request-scoped
+    #    connection across a slow multi-MB download (see exports._fetch_batch).
+    # 30+90 also over-committed the server: max_connections is 100 and umami
+    # shares this Postgres, so a fully-saturated app pool could starve umami /
+    # migrations / admin scripts. 10+20 leaves comfortable headroom
+    # (project_fojin_db_pool_streaming).
+    pool_size=10,
+    max_overflow=20,
     pool_pre_ping=True,
     pool_recycle=3600,
     # Per-connection guards (asyncpg GUCs). These apply ONLY to the app's
