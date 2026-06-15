@@ -12,6 +12,7 @@ surfaced via original_preview so the panel can display both sides.
 """
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
+from sqlalchemy import bindparam
 from sqlalchemy import text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,6 +23,10 @@ router = APIRouter(prefix="/alignment", tags=["alignment"])
 # A fojin chunk (paragraph) can contain many MITRA sentence-level parallels;
 # cap per chunk so the reader panel stays bounded on dense texts.
 MITRA_CHUNK_LIMIT = 50
+
+# Per-chunk cap on fojin↔fojin parallels in the juan index, matching the
+# single-chunk endpoint's default limit.
+PAIR_LIMIT = 5
 
 
 class ParallelPair(BaseModel):
@@ -261,13 +266,176 @@ async def get_juan_alignment(
         {"tid": text_id, "juan": juan_num},
     )).fetchall()
 
+    chunk_list = [(int(r[0]), r[1]) for r in rows]
+    if not chunk_list:
+        return JuanAlignmentResponse(
+            text_id=text_id,
+            juan_num=juan_num,
+            total_chunks=total_chunks,
+            chunks_with_parallels=0,
+            entries=[],
+        )
+    cidxs = [c[0] for c in chunk_list]
+
+    # --- Batched fetch (replaces the old per-chunk get_chunk_alignment N+1) ---
+    # The juan panel used to call get_chunk_alignment once per chunk, each
+    # firing up to ~12 queries (1 pairs + ≤5 chunk lookups + ≤5 previews + 1
+    # MITRA). That was O(chunks) round-trips. The block below fetches the whole
+    # juan in a constant ~4 set-based queries and assembles in Python.
+    #
+    # alignment_pairs has zero intra-text/intra-juan rows (verified), so every
+    # qualifying pair matches exactly one side; a single CASE selects the source
+    # chunk and its counterpart. ROW_NUMBER caps each source chunk at PAIR_LIMIT
+    # by confidence, mirroring get_chunk_alignment's per-chunk LIMIT.
+    pair_rows = (await db.execute(
+        sql_text("""
+            WITH base AS (
+                SELECT ap.text_a_id, ap.text_a_juan_num, ap.text_a_chunk_index, ap.text_a_lang,
+                       ap.text_b_id, ap.text_b_juan_num, ap.text_b_chunk_index, ap.text_b_lang,
+                       ap.confidence,
+                       (ap.text_a_id = :tid AND ap.text_a_juan_num = :juan
+                        AND ap.text_a_chunk_index = ANY(:cidxs)) AS a_is_src
+                FROM alignment_pairs ap
+                WHERE ap.text_a_chunk_index IS NOT NULL
+                  AND (
+                    (ap.text_a_id = :tid AND ap.text_a_juan_num = :juan AND ap.text_a_chunk_index = ANY(:cidxs))
+                    OR
+                    (ap.text_b_id = :tid AND ap.text_b_juan_num = :juan AND ap.text_b_chunk_index = ANY(:cidxs))
+                  )
+            ),
+            matched AS (
+                SELECT
+                    CASE WHEN a_is_src THEN text_a_chunk_index ELSE text_b_chunk_index END AS source_cidx,
+                    CASE WHEN a_is_src THEN text_b_id ELSE text_a_id END AS other_tid,
+                    CASE WHEN a_is_src THEN text_b_juan_num ELSE text_a_juan_num END AS other_juan,
+                    CASE WHEN a_is_src THEN text_b_chunk_index ELSE text_a_chunk_index END AS other_cidx,
+                    CASE WHEN a_is_src THEN text_b_lang ELSE text_a_lang END AS other_lang,
+                    confidence
+                FROM base
+            )
+            SELECT source_cidx, other_tid, other_juan, other_cidx, other_lang, confidence
+            FROM (
+                SELECT *, ROW_NUMBER() OVER (
+                    PARTITION BY source_cidx ORDER BY confidence DESC
+                ) AS rn
+                FROM matched
+            ) t
+            WHERE rn <= :pair_limit
+            ORDER BY source_cidx, confidence DESC
+        """),
+        {"tid": text_id, "juan": juan_num, "cidxs": cidxs, "pair_limit": PAIR_LIMIT},
+    )).fetchall()
+
+    pairs_by_src: dict[int, list] = {}
+    te_keys: set[tuple] = set()
+    tc_keys: set[tuple] = set()
+    for source_cidx, other_tid, other_juan, other_cidx, other_lang, conf in pair_rows:
+        pairs_by_src.setdefault(source_cidx, []).append(
+            (other_tid, other_juan, other_cidx, other_lang, conf)
+        )
+        te_keys.add((other_tid, other_juan, other_cidx))
+        if other_lang in ("pi", "sa"):
+            tc_keys.add((other_tid, other_juan, other_lang))
+
+    # Batched chunk_text + title for every counterpart chunk.
+    te_map: dict[tuple, tuple] = {}
+    if te_keys:
+        te_rows = (await db.execute(
+            sql_text("""
+                SELECT te.text_id, te.juan_num, te.chunk_index, te.chunk_text,
+                       COALESCE(bt.title_zh, bt.title_sa, bt.title_pi, bt.title_en, '')
+                FROM text_embeddings te
+                LEFT JOIN buddhist_texts bt ON bt.id = te.text_id
+                WHERE (te.text_id, te.juan_num, te.chunk_index) IN :keys
+            """).bindparams(bindparam("keys", expanding=True)),
+            {"keys": list(te_keys)},
+        )).fetchall()
+        for tid_, juan_, cidx_, ctext, title in te_rows:
+            te_map[(tid_, juan_, cidx_)] = (ctext, title)
+
+    # Batched original-language preview for pi/sa counterparts.
+    tc_map: dict[tuple, tuple] = {}
+    if tc_keys:
+        tc_rows = (await db.execute(
+            sql_text("""
+                SELECT DISTINCT ON (text_id, juan_num, lang)
+                       text_id, juan_num, lang, LEFT(content, 500)
+                FROM text_contents
+                WHERE (text_id, juan_num, lang) IN :triples
+                ORDER BY text_id, juan_num, lang
+            """).bindparams(bindparam("triples", expanding=True)),
+            {"triples": list(tc_keys)},
+        )).fetchall()
+        for tid_, juan_, lang_, preview in tc_rows:
+            if preview:
+                tc_map[(tid_, juan_, lang_)] = (lang_, preview)
+
+    # Batched MITRA cross-lingual parallels, capped per chunk (mirrors the
+    # single-chunk endpoint's MITRA_CHUNK_LIMIT and foreign_lang, id ordering).
+    mitra_by_src: dict[int, list] = {}
+    mitra_rows = (await db.execute(
+        sql_text("""
+            SELECT chunk_index, foreign_text, foreign_lang, confidence
+            FROM (
+                SELECT chunk_index, foreign_text, foreign_lang, confidence,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY chunk_index ORDER BY foreign_lang, id
+                       ) AS rn
+                FROM mitra_alignments
+                WHERE text_id = :tid AND juan_num = :juan AND chunk_index = ANY(:cidxs)
+            ) t
+            WHERE rn <= :mlimit
+            ORDER BY chunk_index, rn
+        """),
+        {"tid": text_id, "juan": juan_num, "cidxs": cidxs, "mlimit": MITRA_CHUNK_LIMIT},
+    )).fetchall()
+    for chunk_index, foreign_text, foreign_lang, conf in mitra_rows:
+        mitra_by_src.setdefault(chunk_index, []).append(
+            (foreign_text, foreign_lang, conf)
+        )
+
+    # Assemble entries in chunk order: fojin parallels first (confidence desc),
+    # then MITRA — the same per-chunk shape get_chunk_alignment produces.
     entries: list[JuanAlignmentEntry] = []
-    for chunk_idx, chunk_text in rows:
-        alignment_resp = await get_chunk_alignment(text_id, juan_num, chunk_idx, 5, db)
+    for chunk_idx, chunk_text in chunk_list:
+        parallels: list[ParallelPair] = []
+        for other_tid, other_juan, other_cidx, other_lang, conf in pairs_by_src.get(chunk_idx, []):
+            te = te_map.get((other_tid, other_juan, other_cidx))
+            if not te:
+                continue
+            ctext, title = te
+            original_preview = None
+            original_lang = None
+            if other_lang in ("pi", "sa"):
+                tc = tc_map.get((other_tid, other_juan, other_lang))
+                if tc:
+                    original_lang, original_preview = tc
+            parallels.append(ParallelPair(
+                text_id=other_tid,
+                juan_num=other_juan,
+                chunk_index=other_cidx,
+                chunk_text=ctext,
+                lang=other_lang or "lzh",
+                title=title or "",
+                confidence=float(conf),
+                original_preview=original_preview,
+                original_lang=original_lang,
+            ))
+        for foreign_text, foreign_lang, conf in mitra_by_src.get(chunk_idx, []):
+            parallels.append(ParallelPair(
+                text_id=0,
+                juan_num=0,
+                chunk_index=0,
+                chunk_text=foreign_text,
+                lang=foreign_lang or "sa",
+                title="MITRA 平行（藏）" if foreign_lang == "bo" else "MITRA 平行（梵）",
+                confidence=float(conf) if conf is not None else 1.0,
+                source="mitra-parallel",
+            ))
         entries.append(JuanAlignmentEntry(
             chunk_index=chunk_idx,
             chunk_text=chunk_text,
-            parallels=alignment_resp.parallels,
+            parallels=parallels,
         ))
 
     return JuanAlignmentResponse(
