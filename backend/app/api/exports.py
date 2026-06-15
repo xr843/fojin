@@ -8,11 +8,9 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import get_optional_user
-from app.database import get_db
+from app.database import async_session, get_db
 from app.models.knowledge_graph import KGEntity, KGRelation
 from app.models.text import BuddhistText
-from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +18,27 @@ router = APIRouter(prefix="/exports", tags=["exports"])
 
 # Batch size for streaming exports
 BATCH_SIZE = 500
+
+
+async def _fetch_batch(stmt):
+    """Run one keyset-paginated batch in a short-lived session.
+
+    The pooled connection is checked out only for the duration of this single
+    query, then returned to the pool *before* we yield the batch to the client.
+    This is the key to not pinning a connection for the whole streaming
+    response: a slow client downloading 10k+ rows no longer holds a DB
+    connection hostage while bytes trickle over the wire. Keyset pagination is
+    stateless (carried by ``last_id`` in the caller), so each batch is fully
+    independent.
+
+    The returned ORM objects are detached when the session closes, but stay
+    usable: the sessionmaker uses ``expire_on_commit=False`` and every attribute
+    these exporters read is a plain column loaded by the SELECT — no lazy
+    relationship access happens after detach.
+    """
+    async with async_session() as session:
+        result = await session.execute(stmt)
+        return result.scalars().all()
 
 
 @router.get("/stats")
@@ -40,8 +59,6 @@ async def export_metadata_csv(
     dynasty: str | None = Query(None, description="按朝代筛选"),
     category: str | None = Query(None, description="按分类筛选"),
     lang: str | None = Query(None, description="按语言筛选"),
-    user: User | None = Depends(get_optional_user),
-    db: AsyncSession = Depends(get_db),
 ):
     """导出佛典元数据为 CSV 格式，支持分批流式输出。"""
     stmt = select(BuddhistText).order_by(BuddhistText.id)
@@ -66,9 +83,9 @@ async def export_metadata_csv(
         # Stream rows using keyset pagination
         last_id = 0
         while True:
-            batch_stmt = stmt.where(BuddhistText.id > last_id).limit(BATCH_SIZE)
-            result = await db.execute(batch_stmt)
-            texts = result.scalars().all()
+            texts = await _fetch_batch(
+                stmt.where(BuddhistText.id > last_id).limit(BATCH_SIZE)
+            )
             if not texts:
                 break
 
@@ -95,8 +112,6 @@ async def export_metadata_csv(
 @router.get("/kg.json")
 async def export_kg_json(
     entity_type: str | None = Query(None, description="按实体类型筛选"),
-    user: User | None = Depends(get_optional_user),
-    db: AsyncSession = Depends(get_db),
 ):
     """导出知识图谱为 JSON 格式，分批流式输出。"""
     entity_stmt = select(KGEntity).order_by(KGEntity.id)
@@ -111,10 +126,9 @@ async def export_kg_json(
         first = True
         entity_ids: set[int] = set()
         while True:
-            result = await db.execute(
+            entities = await _fetch_batch(
                 entity_stmt.where(KGEntity.id > last_id).limit(BATCH_SIZE)
             )
-            entities = result.scalars().all()
             if not entities:
                 break
             for e in entities:
@@ -155,10 +169,9 @@ async def export_kg_json(
         first = True
         if not skip_relations:
             while True:
-                result = await db.execute(
+                relations = await _fetch_batch(
                     rel_stmt.where(KGRelation.id > last_id).limit(BATCH_SIZE)
                 )
-                relations = result.scalars().all()
                 if not relations:
                     break
                 for r in relations:
@@ -188,8 +201,6 @@ async def export_kg_json(
 @router.get("/kg.jsonld")
 async def export_kg_jsonld(
     entity_type: str | None = Query(None, description="按实体类型筛选"),
-    user: User | None = Depends(get_optional_user),
-    db: AsyncSession = Depends(get_db),
 ):
     """导出知识图谱为 JSON-LD 格式，使用标准语义词汇。"""
     entity_stmt = select(KGEntity).order_by(KGEntity.id)
@@ -222,10 +233,9 @@ async def export_kg_jsonld(
         # Stream entities using keyset pagination
         entity_ids: set[int] = set()
         while True:
-            result = await db.execute(
+            entities = await _fetch_batch(
                 entity_stmt.where(KGEntity.id > last_id).limit(BATCH_SIZE)
             )
-            entities = result.scalars().all()
             if not entities:
                 break
             for e in entities:
@@ -272,10 +282,9 @@ async def export_kg_jsonld(
         last_id = 0
         if not skip_relations:
             while True:
-                result = await db.execute(
+                relations = await _fetch_batch(
                     rel_stmt.where(KGRelation.id > last_id).limit(BATCH_SIZE)
                 )
-                relations = result.scalars().all()
                 if not relations:
                     break
                 for r in relations:
