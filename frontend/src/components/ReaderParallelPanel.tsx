@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Empty, Spin, Alert, Collapse, Tag, Progress, Tabs, Button } from "antd";
 import { LinkOutlined, BookOutlined, ExpandAltOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
@@ -365,13 +365,30 @@ function ChunkView({ textId, juanNum }: Props) {
  * 「对读」= 相关但不同的经文之间的平行关系。
  */
 export default function ReaderParallelPanel({ textId, juanNum }: Props) {
+  // Default-tab selection: most Mahayana texts have no SuttaCentral (按经对读)
+  // parallel but DO have MITRA 段级 parallels, so landing on an empty 按经对读
+  // reads as "no data". When canonical is empty, default to 按段对读. The query
+  // shares CanonicalView's cache key (deduped). activeKey=undefined means
+  // "auto"; a user click pins it. Reset on textId change so auto re-applies.
+  const [activeKey, setActiveKey] = useState<string | undefined>(undefined);
+  useEffect(() => setActiveKey(undefined), [textId]);
+  const { data: canonical } = useQuery({
+    queryKey: ["canonical-parallels", textId],
+    queryFn: () => getCanonicalParallels(textId),
+    enabled: textId > 0,
+    staleTime: 10 * 60 * 1000,
+    retry: false,
+  });
+  const effectiveKey =
+    activeKey ?? (canonical ? (canonical.total > 0 ? "canonical" : "chunk") : "canonical");
   return (
     <div className="reader-parallel-panel">
       <div style={{ padding: "0 12px" }}>
         <OtherVersions textId={textId} />
       </div>
       <Tabs
-        defaultActiveKey="canonical"
+        activeKey={effectiveKey}
+        onChange={setActiveKey}
         size="small"
         style={{ padding: "0 12px" }}
         items={[
