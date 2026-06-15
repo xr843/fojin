@@ -372,15 +372,21 @@ export default function ReaderParallelPanel({ textId, juanNum }: Props) {
   // "auto"; a user click pins it. Reset on textId change so auto re-applies.
   const [activeKey, setActiveKey] = useState<string | undefined>(undefined);
   useEffect(() => setActiveKey(undefined), [textId]);
-  const { data: canonical } = useQuery({
+  const { data: canonical, isSuccess, isError } = useQuery({
     queryKey: ["canonical-parallels", textId],
     queryFn: () => getCanonicalParallels(textId),
     enabled: textId > 0,
     staleTime: 10 * 60 * 1000,
     retry: false,
   });
+  // Once the canonical query has SETTLED (success or error), default to 按段对读
+  // unless canonical actually has content. Treating the error path as "empty" is
+  // deliberate: a failed canonical query must not strand the user on the empty
+  // 按经对读 tab when MITRA 段级 parallels exist in 按段对读. While still loading,
+  // hold on canonical to avoid a flash. A user click (activeKey) always wins.
+  const settled = isSuccess || isError;
   const effectiveKey =
-    activeKey ?? (canonical ? (canonical.total > 0 ? "canonical" : "chunk") : "canonical");
+    activeKey ?? (settled ? ((canonical?.total ?? 0) > 0 ? "canonical" : "chunk") : "canonical");
   return (
     <div className="reader-parallel-panel">
       <div style={{ padding: "0 12px" }}>
