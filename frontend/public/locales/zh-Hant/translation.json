@@ -547,7 +547,7 @@
   "collections.alignment_desc": "以下經典已建立逐段跨語對照（AI 與學術語料對齊），點擊進入閱讀器，正文旁即可逐段查看對照。",
   "collections.pair_count": "{{n}} 段",
   "collections.partner_count": "{{n}} 部對本",
-  "collections.alignment_more": "顯示覆蓋最多的前 {{n}} 項（共 {{total}} 項）",
+  "collections.alignment_more": "顯示覆蓋最多的 {{n}} 部 · 共 {{total}} 部經",
   "kg.all_types": "全部類型",
   "kg.pred_translated": "翻譯",
   "kg.pred_member_of_school": "宗派",

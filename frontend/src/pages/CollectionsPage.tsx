@@ -212,49 +212,69 @@ function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useN
     staleTime: 3600_000,
     retry: 1,
   });
-  // Catalog now spans ~1500 (text × lang) rows (mitra coverage merged in);
-  // entries arrive sorted by pair_count desc, so cap to the most-covered to
-  // keep this discovery card bounded. Full browse is a follow-up (dedicated page).
-  const TOP_N = 48;
-  if (!data || data.entries.length === 0) return null;
+  // The catalog spans ~1500 (text × lang) rows (mitra coverage merged in).
+  // This is a discovery card, not the full index: dedupe by text (a work with
+  // both 藏 and 梵 parallels is ONE entry, not two) and show only the most-
+  // covered handful. Full browse/filter is a dedicated page (follow-up).
+  const TOP_N = 12;
+  const groups = useMemo(() => {
+    if (!data) return [];
+    const m = new Map<
+      number,
+      { text_id: number; title: string; sample_juan: number; total: number; langs: { lang: string; count: number }[] }
+    >();
+    for (const e of data.entries) {
+      let g = m.get(e.text_id);
+      if (!g) {
+        g = { text_id: e.text_id, title: e.title_zh || e.cbeta_id, sample_juan: e.sample_juan, total: 0, langs: [] };
+        m.set(e.text_id, g);
+      }
+      g.langs.push({ lang: e.other_lang, count: e.pair_count });
+      g.total += e.pair_count;
+    }
+    const arr = [...m.values()];
+    arr.forEach((g) => g.langs.sort((a, b) => b.count - a.count));
+    return arr.sort((a, b) => b.total - a.total);
+  }, [data]);
+
+  if (!data || groups.length === 0) return null;
   return (
     <div className="coll-card" style={{ marginBottom: 24 }}>
       <div className="coll-section" style={{ padding: "16px 20px" }}>
         <div className="coll-section-title">
-          <TranslationOutlined /> {t("collections.alignment_title", { texts: new Set(data.entries.map((e) => e.text_id)).size, pairs: data.total_pairs.toLocaleString() })}
+          <TranslationOutlined /> {t("collections.alignment_title", { texts: groups.length, pairs: data.total_pairs.toLocaleString() })}
         </div>
         <p style={{ fontSize: 12, color: "var(--fj-ink-muted)", margin: "4px 0 12px" }}>
           {t("collections.alignment_desc")}
         </p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {data.entries.slice(0, TOP_N).map((e) => {
-            const lang = LANG_LABELS[e.other_lang];
-            return (
-              <button
-                key={`${e.text_id}-${e.other_lang}`}
-                className="source-btn"
-                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-                onClick={() =>
-                  // 阅读器而非 /parallel：sample_juan 保证该卷有锚点；reader 的
-                  // 按段对照面板不依赖对本侧 text_contents 的卷结构（对本整本
-                  // 存为 juan 1，/parallel 在 juan>1 时对本栏全空）。
-                  navigate(`/texts/${e.text_id}/read?juan=${e.sample_juan}`)
-                }
-              >
-                <span>{e.title_zh || e.cbeta_id}</span>
-                <Tag color={lang?.color ?? "default"} style={{ margin: 0, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}>
-                  {lang ? t(lang.labelKey) : e.other_lang}
-                </Tag>
-                <span style={{ fontSize: 11, color: "var(--fj-ink-muted)" }}>
-                  {t("collections.pair_count", { n: e.pair_count })}{e.partner_count > 1 ? ` · ${t("collections.partner_count", { n: e.partner_count })}` : ""}
-                </span>
-              </button>
-            );
-          })}
+          {groups.slice(0, TOP_N).map((g) => (
+            <button
+              key={g.text_id}
+              className="source-btn"
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+              // 阅读器而非 /parallel：sample_juan 保证该卷有锚点（对本整本存为
+              // juan 1，/parallel 在 juan>1 时对本栏全空）。
+              onClick={() => navigate(`/texts/${g.text_id}/read?juan=${g.sample_juan}`)}
+            >
+              <span>{g.title}</span>
+              {g.langs.map((l) => {
+                const lang = LANG_LABELS[l.lang];
+                return (
+                  <span key={l.lang} style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                    <Tag color={lang?.color ?? "default"} style={{ margin: 0, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}>
+                      {lang ? t(lang.labelKey) : l.lang}
+                    </Tag>
+                    <span style={{ fontSize: 11, color: "var(--fj-ink-muted)" }}>{t("collections.pair_count", { n: l.count })}</span>
+                  </span>
+                );
+              })}
+            </button>
+          ))}
         </div>
-        {data.entries.length > TOP_N && (
+        {groups.length > TOP_N && (
           <p style={{ fontSize: 11, color: "var(--fj-ink-muted)", margin: "12px 0 0" }}>
-            {t("collections.alignment_more", { n: TOP_N, total: data.entries.length })}
+            {t("collections.alignment_more", { n: TOP_N, total: groups.length })}
           </p>
         )}
       </div>

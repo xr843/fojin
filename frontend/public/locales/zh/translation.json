@@ -547,7 +547,7 @@
   "collections.alignment_desc": "以下经典已建立逐段跨语对照（AI 与学术语料对齐），点击进入阅读器，正文旁即可逐段查看对照。",
   "collections.pair_count": "{{n}} 段",
   "collections.partner_count": "{{n}} 部对本",
-  "collections.alignment_more": "显示覆盖最多的前 {{n}} 项（共 {{total}} 项）",
+  "collections.alignment_more": "显示覆盖最多的 {{n}} 部 · 共 {{total}} 部经",
   "kg.all_types": "全部类型",
   "kg.pred_translated": "翻译",
   "kg.pred_member_of_school": "宗派",
