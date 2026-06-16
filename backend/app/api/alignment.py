@@ -16,9 +16,18 @@ from sqlalchemy import bindparam
 from sqlalchemy import text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import cache_get, cache_set
 from app.database import get_db
 
 router = APIRouter(prefix="/alignment", tags=["alignment"])
+
+# Catalog merges alignment_pairs (small) with mitra_alignments (~896K rows).
+# A single UNION+GROUP BY with mode()/count(DISTINCT)/array_agg over 896K runs
+# ~77s on prod — far over the app statement_timeout (30s). Instead aggregate the
+# two sources separately (mitra side is a cheap count + mode(juan), ~7s) and
+# merge in Python, then cache the result (mitra coverage changes only on import).
+ALIGNMENT_CATALOG_CACHE_KEY = "alignment:catalog:v2"
+ALIGNMENT_CATALOG_TTL = 1800  # 30 min
 
 # A fojin chunk (paragraph) can contain many MITRA sentence-level parallels;
 # cap per chunk so the reader panel stays bounded on dense texts.
@@ -635,17 +644,21 @@ class CatalogEntry(BaseModel):
     cbeta_id: str
     title_zh: str
     other_lang: str              # pi / bo / sa
-    pair_count: int              # total aligned chunk pairs
-    partner_count: int           # distinct counterpart texts (e.g. SC suttas)
-    avg_confidence: float
+    pair_count: int              # total aligned chunk pairs (fojin + mitra)
+    partner_count: int           # distinct fojin counterpart texts (mitra has no fojin partner)
+    # fojin (alignment_pairs) confidence only; None for mitra-only coverage
+    # (mitra_alignments.confidence is a constant 1.0 import flag, not a quality
+    # score — real mitra quality comes from mitra_e_score once backfilled).
+    avg_confidence: float | None = None
+    sources: list[str] = []      # contributing sources: "fojin" (verified) / "mitra" (parallel)
     # Deep-link target: the reader page at the lzh juan with the most
     # anchors. (NOT the /parallel page: 3 of 10 texts have zero anchors at
     # juan 1, and counterpart texts store their whole content as juan 1, so
     # /parallel?juan=N>1 renders a blank partner column.) The reader's
     # per-chunk alignment panel works on any juan that has anchors.
     sample_juan: int
-    sample_partner_id: int
-    sample_partner_title: str
+    sample_partner_id: int | None = None
+    sample_partner_title: str = ""
 
 
 class AlignmentCatalogResponse(BaseModel):
@@ -657,83 +670,126 @@ class AlignmentCatalogResponse(BaseModel):
 async def get_alignment_catalog(db: AsyncSession = Depends(get_db)):
     """All texts with cross-canon alignment coverage, lzh-side normalized.
 
-    alignment_pairs stores direction by pipeline cost (smaller text = text_a),
-    so the Chinese text can sit on either side. UNION both orientations into
-    (lzh_text, other_lang) rows, then aggregate. Small table (thousands of
-    rows), no pagination needed.
+    Two sources, aggregated separately then merged (see module note above):
+    - alignment_pairs: fojin chunk <-> fojin chunk (has a counterpart text_id).
+    - mitra_alignments: fojin chunk <-> inline foreign text (no fojin partner).
+    Result is cached (mitra coverage changes only on import/backfill).
     """
-    rows = (
+    from app.main import app
+
+    redis = getattr(app.state, "redis", None)
+    cached = await cache_get(redis, ALIGNMENT_CATALOG_CACHE_KEY)
+    if cached is not None:
+        return AlignmentCatalogResponse(**cached)
+
+    # 1. fojin side (alignment_pairs) — small table, full aggregation w/ partners.
+    fojin_rows = (
         await db.execute(
             sql_text(
                 """
                 WITH normalized AS (
-                    -- NULL-lang rows are deliberately dropped by both
-                    -- branches ('!=' is NULL-hostile); langs come from
-                    -- buddhist_texts.lang (non-nullable) in practice.
                     SELECT text_a_id AS lzh_id, text_a_juan_num AS lzh_juan,
-                           text_b_id AS other_id,
-                           text_b_lang AS other_lang, confidence
+                           text_b_id AS other_id, text_b_lang AS other_lang, confidence
                     FROM alignment_pairs
-                    WHERE text_a_lang = 'lzh' AND text_b_lang != 'lzh'
-                          AND text_b_id IS NOT NULL
+                    WHERE text_a_lang = 'lzh' AND text_b_lang != 'lzh' AND text_b_id IS NOT NULL
                     UNION ALL
-                    SELECT text_b_id AS lzh_id, text_b_juan_num AS lzh_juan,
-                           text_a_id AS other_id,
-                           text_a_lang AS other_lang, confidence
+                    SELECT text_b_id, text_b_juan_num, text_a_id, text_a_lang, confidence
                     FROM alignment_pairs
-                    WHERE text_b_lang = 'lzh' AND text_a_lang != 'lzh'
-                          AND text_a_id IS NOT NULL
+                    WHERE text_b_lang = 'lzh' AND text_a_lang != 'lzh' AND text_a_id IS NOT NULL
                 )
-                SELECT n.lzh_id,
-                       bt.cbeta_id,
-                       bt.title_zh,
-                       n.other_lang,
-                       count(*) AS pair_count,
+                SELECT n.lzh_id, n.other_lang, count(*) AS pair_count,
                        count(DISTINCT n.other_id) AS partner_count,
                        round(avg(n.confidence)::numeric, 2) AS avg_confidence,
-                       -- juan with the most anchors = best reader landing
                        mode() WITHIN GROUP (ORDER BY n.lzh_juan) AS sample_juan,
-                       -- counterpart with the most pairs (panel shows the rest)
                        mode() WITHIN GROUP (ORDER BY n.other_id) AS sample_partner_id
                 FROM normalized n
-                JOIN buddhist_texts bt ON bt.id = n.lzh_id
-                GROUP BY n.lzh_id, bt.cbeta_id, bt.title_zh, n.other_lang
-                ORDER BY pair_count DESC
+                GROUP BY n.lzh_id, n.other_lang
                 """
             )
         )
     ).fetchall()
 
-    partner_ids = {r[8] for r in rows}
-    partner_titles: dict[int, str] = {}
-    if partner_ids:
-        for pid, title in (
+    # 2. mitra side (mitra_alignments) — bulk; cheap count + mode(juan), NO join/
+    #    distinct/array_agg (those pushed the unified query to ~77s on 896K rows).
+    #    Once mitra_e_score is backfilled, add: WHERE mitra_e_score >= 0.30
+    mitra_rows = (
+        await db.execute(
+            sql_text(
+                """
+                SELECT text_id, foreign_lang, count(*) AS pair_count,
+                       mode() WITHIN GROUP (ORDER BY juan_num) AS sample_juan
+                FROM mitra_alignments
+                GROUP BY text_id, foreign_lang
+                """
+            )
+        )
+    ).fetchall()
+
+    # 3. merge by (text_id, other_lang)
+    merged: dict[tuple[int, str], dict] = {}
+    for lzh_id, lang, pc, partner_count, avg_conf, sjuan, spid in fojin_rows:
+        merged[(lzh_id, lang)] = {
+            "text_id": lzh_id, "other_lang": lang, "pair_count": pc,
+            "partner_count": partner_count,
+            "avg_confidence": float(avg_conf) if avg_conf is not None else None,
+            "sample_juan": sjuan or 1, "sample_partner_id": spid,
+            "sources": ["fojin"],
+        }
+    for text_id, lang, pc, sjuan in mitra_rows:
+        key = (text_id, lang)
+        e = merged.get(key)
+        if e:  # text has both fojin-verified and mitra parallels for this lang
+            e["pair_count"] += pc
+            e["sources"].append("mitra")  # keep fojin sample_juan (anchored)
+        else:
+            merged[key] = {
+                "text_id": text_id, "other_lang": lang, "pair_count": pc,
+                "partner_count": 0, "avg_confidence": None,
+                "sample_juan": sjuan or 1, "sample_partner_id": None,
+                "sources": ["mitra"],
+            }
+
+    # 4. titles: lzh title for every text + display title for fojin partners
+    partner_ids = {e["sample_partner_id"] for e in merged.values() if e["sample_partner_id"] is not None}
+    all_ids = {k[0] for k in merged} | partner_ids
+    title_map: dict[int, tuple[str, str]] = {}  # id -> (cbeta_id, display_title)
+    if all_ids:
+        for tid, cbeta, disp in (
             await db.execute(
                 sql_text(
-                    "SELECT id, COALESCE(NULLIF(title_zh, ''), title_en, cbeta_id) "
+                    "SELECT id, COALESCE(cbeta_id, ''), "
+                    "COALESCE(NULLIF(title_zh, ''), title_en, cbeta_id, '') "
                     "FROM buddhist_texts WHERE id = ANY(:ids)"
                 ),
-                {"ids": list(partner_ids)},
+                {"ids": list(all_ids)},
             )
         ).fetchall():
-            partner_titles[pid] = title or ""
+            title_map[tid] = (cbeta or "", disp or "")
 
     entries = [
         CatalogEntry(
-            text_id=r[0],
-            cbeta_id=r[1] or "",
-            title_zh=r[2] or "",
-            other_lang=r[3] or "",
-            pair_count=r[4],
-            partner_count=r[5],
-            avg_confidence=float(r[6] or 0),
-            sample_juan=r[7] or 1,
-            sample_partner_id=r[8],
-            sample_partner_title=partner_titles.get(r[8], ""),
+            text_id=e["text_id"],
+            cbeta_id=title_map.get(e["text_id"], ("", ""))[0],
+            title_zh=title_map.get(e["text_id"], ("", ""))[1],
+            other_lang=e["other_lang"],
+            pair_count=e["pair_count"],
+            partner_count=e["partner_count"],
+            avg_confidence=e["avg_confidence"],
+            sources=e["sources"],
+            sample_juan=e["sample_juan"],
+            sample_partner_id=e["sample_partner_id"],
+            sample_partner_title=(
+                title_map.get(e["sample_partner_id"], ("", ""))[1]
+                if e["sample_partner_id"] is not None else ""
+            ),
         )
-        for r in rows
+        for e in merged.values()
     ]
-    return AlignmentCatalogResponse(
+    entries.sort(key=lambda x: x.pair_count, reverse=True)
+
+    resp = AlignmentCatalogResponse(
         entries=entries,
         total_pairs=sum(e.pair_count for e in entries),
     )
+    await cache_set(redis, ALIGNMENT_CATALOG_CACHE_KEY, resp.model_dump(mode="json"), ALIGNMENT_CATALOG_TTL)
+    return resp
