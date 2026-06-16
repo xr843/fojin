@@ -15,8 +15,8 @@ import {
   RobotOutlined,
   GithubOutlined,
   GlobalOutlined,
-  FieldTimeOutlined,
   BarChartOutlined,
+  // FieldTimeOutlined,  // timeline nav deferred (pending polish)
   // NotificationOutlined,  // activity nav deferred (empty Source-Updates subtab)
 } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
@@ -79,8 +79,9 @@ export default function Layout() {
     { icon: <ApartmentOutlined />, label: t("nav.kg"), path: "/kg" },
     { icon: <GlobalOutlined />, label: t("nav.geo"), path: "/map" },
     { icon: <BookOutlined />, label: t("nav.collections"), path: "/collections" },
-    { icon: <FieldTimeOutlined />, label: t("nav.timeline"), path: "/timeline" },
     { icon: <BarChartOutlined />, label: t("nav.dashboard"), path: "/dashboard" },
+    // 历史时间线(/timeline)暂不放导航：待打磨后再上线（路由仍可直达 /timeline）。
+    // { icon: <FieldTimeOutlined />, label: t("nav.timeline"), path: "/timeline" },
     // 佛学动态(/activity)仍暂不放导航：Source-Updates 子标签无数据流（空）；
     // 待隐掉该空子标签后再放（feed cron 每日跑、/activity 路由仍可直达）。
     // { icon: <NotificationOutlined />, label: t("nav.activity"), path: "/activity" },
