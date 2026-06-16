@@ -548,6 +548,8 @@
   "collections.pair_count": "{{n}} passages",
   "collections.partner_count": "{{n}} parallel versions",
   "collections.alignment_more": "Top {{n}} shown · {{total}} texts in total",
+  "crosscanon.entry_title": "Cross-canon parallels",
+  "crosscanon.entry_hint": "read passage-by-passage",
   "kg.all_types": "All types",
   "kg.pred_translated": "Translated",
   "kg.pred_member_of_school": "School",

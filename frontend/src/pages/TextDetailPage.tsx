@@ -24,6 +24,7 @@ import { getLastPosition } from "../utils/readingHistory";
 import BookmarkButton from "../components/BookmarkButton";
 import { RelatedTextsStandalone as RelatedTexts } from "../components/RelatedTexts";
 import OtherVersions from "../components/OtherVersions";
+import CrossCanonEntry from "../components/CrossCanonEntry";
 import CitationGenerator from "../components/CitationGenerator";
 import { addViewHistory } from "../utils/history";
 
@@ -219,6 +220,8 @@ export default function TextDetailPage() {
           open={citationOpen}
           onClose={() => setCitationOpen(false)}
         />
+
+        <CrossCanonEntry textId={text.id} />
 
         <OtherVersions textId={text.id} />
 

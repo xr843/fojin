@@ -548,6 +548,8 @@
   "collections.pair_count": "{{n}} 段",
   "collections.partner_count": "{{n}} 部对本",
   "collections.alignment_more": "显示覆盖最多的 {{n}} 部 · 共 {{total}} 部经",
+  "crosscanon.entry_title": "跨藏对照",
+  "crosscanon.entry_hint": "藏/梵逐段对读",
   "kg.all_types": "全部类型",
   "kg.pred_translated": "翻译",
   "kg.pred_member_of_school": "宗派",
