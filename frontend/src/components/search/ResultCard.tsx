@@ -1,11 +1,13 @@
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Tag, Button } from "antd";
 import { EyeOutlined, TranslationOutlined } from "@ant-design/icons";
 import BookmarkButton from "../BookmarkButton";
 import { sanitizeHighlight } from "../../utils/sanitize";
 import { getSourceLabel } from "../../utils/sourceUrls";
-import type { SearchHit } from "../../api/client";
+import { getAlignmentCatalog, type SearchHit } from "../../api/client";
 
 // lzh/zh both render as Classical Chinese — see lang.* keys in translation.json
 const LANG_KEYS: Record<string, string> = {
@@ -34,6 +36,21 @@ export default function ResultCard({ hit, rank }: { hit: SearchHit; rank: number
   const relatedTranslations = hit.related_translations || [];
   const langLabel = (lang: string) => (LANG_KEYS[lang] ? t(LANG_KEYS[lang]) : lang);
 
+  // Badge texts that have cross-canon (藏/梵) parallels. Reuses the cached
+  // alignment catalog (one fetch per session, shared with the collections card
+  // and the text-detail entry); clicking the card lands on the detail page where
+  // the prominent CrossCanonEntry card opens the reader's parallel view.
+  const { data: catalog } = useQuery({
+    queryKey: ["alignmentCatalog"],
+    queryFn: getAlignmentCatalog,
+    staleTime: 3600_000,
+    retry: 1,
+  });
+  const hasCrossCanon = useMemo(
+    () => !!catalog && catalog.entries.some((e) => e.text_id === hit.id),
+    [catalog, hit.id],
+  );
+
   return (
     <div className="s-card">
       <div className="s-card-rank">{t("search.rank")}<br />#{rank}</div>
@@ -44,6 +61,9 @@ export default function ResultCard({ hit, rank }: { hit: SearchHit; rank: number
             <Tag color="volcano" style={{ fontSize: 11 }}>{sourceName}</Tag>
           )}
           <Tag style={{ fontSize: 11 }}>{hit.has_content ? t("search.local_fulltext") : t("search.catalog_data")}</Tag>
+          {hasCrossCanon && (
+            <Tag color="cyan" style={{ fontSize: 11 }}>{t("crosscanon.entry_title")}</Tag>
+          )}
           {hit.category && <Tag style={{ fontSize: 11 }}>{hit.category}</Tag>}
           {hit.lang && hit.lang !== "lzh" && (
             <Tag color="blue" style={{ fontSize: 11 }}>
