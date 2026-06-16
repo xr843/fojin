@@ -273,8 +273,10 @@ function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useN
           ))}
         </div>
         {groups.length > TOP_N && (
-          <p style={{ fontSize: 11, color: "var(--fj-ink-muted)", margin: "12px 0 0" }}>
-            {t("collections.alignment_more", { n: TOP_N, total: groups.length })}
+          <p style={{ fontSize: 12, margin: "12px 0 0" }}>
+            <a onClick={() => navigate("/cross-canon")} style={{ cursor: "pointer", color: "var(--fj-accent)" }}>
+              {t("collections.alignment_more", { n: TOP_N, total: groups.length })} →
+            </a>
           </p>
         )}
       </div>
