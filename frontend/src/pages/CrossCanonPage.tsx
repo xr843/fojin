@@ -33,6 +33,7 @@ export default function CrossCanonPage() {
   const [langFilter, setLangFilter] = useState<"all" | "both" | "bo" | "sa">("all");
   const [section, setSection] = useState<string>("");
   const [q, setQ] = useState("");
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const { data, isLoading } = useQuery({
     queryKey: ["alignmentCatalog"],
@@ -145,37 +146,71 @@ export default function CrossCanonPage() {
       ) : grouped.length === 0 ? (
         <Empty description={t("crosscanon.empty")} />
       ) : (
-        grouped.map(({ section: s, works: ws }) => (
-          <div key={s} style={{ marginBottom: 22 }}>
-            <div style={{ fontWeight: 600, margin: "8px 0", fontSize: 15 }}>
-              {s}{" "}
-              <span style={{ fontWeight: 400, fontSize: 12, color: "var(--fj-ink-muted)" }}>· {ws.length}</span>
+        grouped.map(({ section: s, works: ws }, idx) => {
+          // accordion: collapsed by default (the page is a clean index of 部);
+          // first group opens by default so it's not an empty wall of headers.
+          // A specific 部 filter shows that one section already expanded.
+          const open =
+            section !== "" || expanded.has(s) || (section === "" && expanded.size === 0 && idx === 0);
+          return (
+            <div key={s} style={{ borderBottom: "1px solid #ece5d8" }}>
+              <div
+                onClick={() => {
+                  if (section !== "") return;
+                  setExpanded((prev) => {
+                    const n = new Set(prev);
+                    if (n.has(s)) n.delete(s);
+                    else n.add(s);
+                    return n;
+                  });
+                }}
+                style={{
+                  cursor: section !== "" ? "default" : "pointer",
+                  fontWeight: 600,
+                  fontSize: 15,
+                  padding: "10px 4px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  userSelect: "none",
+                }}
+              >
+                {section === "" && (
+                  <span style={{ fontSize: 11, color: "var(--fj-ink-muted)", width: 12, display: "inline-block" }}>
+                    {open ? "▾" : "▸"}
+                  </span>
+                )}
+                <span>{s}</span>
+                <span style={{ fontWeight: 400, fontSize: 12, color: "var(--fj-ink-muted)" }}>· {ws.length}</span>
+              </div>
+              {open && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: "0 4px 14px" }}>
+                  {ws.map((w) => (
+                    <button
+                      key={w.text_id}
+                      className="source-btn"
+                      style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                      onClick={() => navigate(`/texts/${w.text_id}/read?juan=${w.sample_juan}`)}
+                    >
+                      <span>{w.title}</span>
+                      {w.langs.map((l) => {
+                        const lang = LANG_LABELS[l.lang];
+                        return (
+                          <span key={l.lang} style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                            <Tag color={lang?.color ?? "default"} style={{ margin: 0, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}>
+                              {lang ? t(lang.labelKey) : l.lang}
+                            </Tag>
+                            <span style={{ fontSize: 11, color: "var(--fj-ink-muted)" }}>{t("collections.pair_count", { n: l.count })}</span>
+                          </span>
+                        );
+                      })}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {ws.map((w) => (
-                <button
-                  key={w.text_id}
-                  className="source-btn"
-                  style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-                  onClick={() => navigate(`/texts/${w.text_id}/read?juan=${w.sample_juan}`)}
-                >
-                  <span>{w.title}</span>
-                  {w.langs.map((l) => {
-                    const lang = LANG_LABELS[l.lang];
-                    return (
-                      <span key={l.lang} style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
-                        <Tag color={lang?.color ?? "default"} style={{ margin: 0, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}>
-                          {lang ? t(lang.labelKey) : l.lang}
-                        </Tag>
-                        <span style={{ fontSize: 11, color: "var(--fj-ink-muted)" }}>{t("collections.pair_count", { n: l.count })}</span>
-                      </span>
-                    );
-                  })}
-                </button>
-              ))}
-            </div>
-          </div>
-        ))
+          );
+        })
       )}
     </div>
   );
