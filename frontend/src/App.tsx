@@ -31,6 +31,7 @@ const SutraLandingPage = lazy(() => import("./pages/SutraLandingPage"));
 const WorkDetailPage = lazy(() => import("./pages/WorkDetailPage"));
 const ExportsPage = lazy(() => import("./pages/ExportsPage"));
 const CollectionsPage = lazy(() => import("./pages/CollectionsPage"));
+const CrossCanonPage = lazy(() => import("./pages/CrossCanonPage"));
 const TopicsPage = lazy(() => import("./pages/TopicsPage"));
 const AdminSuggestionsPage = lazy(() => import("./pages/AdminSuggestionsPage"));
 const AdminDashboardPage = lazy(() => import("./pages/AdminDashboardPage"));
@@ -76,6 +77,7 @@ function App() {
             <Route path="/texts/:id/read" element={<TextReaderPage />} />
             <Route path="/sources" element={<SourcesPage />} />
             <Route path="/collections" element={<CollectionsPage />} />
+            <Route path="/cross-canon" element={<CrossCanonPage />} />
             <Route path="/topics" element={<TopicsPage />} />
             <Route path="/sutras/:slug" element={<SutraLandingPage />} />
             <Route path="/works/:slug" element={<RouteErrorBoundary><WorkDetailPage /></RouteErrorBoundary>} />
