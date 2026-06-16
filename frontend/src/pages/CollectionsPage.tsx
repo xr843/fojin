@@ -212,6 +212,10 @@ function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useN
     staleTime: 3600_000,
     retry: 1,
   });
+  // Catalog now spans ~1500 (text × lang) rows (mitra coverage merged in);
+  // entries arrive sorted by pair_count desc, so cap to the most-covered to
+  // keep this discovery card bounded. Full browse is a follow-up (dedicated page).
+  const TOP_N = 48;
   if (!data || data.entries.length === 0) return null;
   return (
     <div className="coll-card" style={{ marginBottom: 24 }}>
@@ -223,7 +227,7 @@ function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useN
           {t("collections.alignment_desc")}
         </p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {data.entries.map((e) => {
+          {data.entries.slice(0, TOP_N).map((e) => {
             const lang = LANG_LABELS[e.other_lang];
             return (
               <button
@@ -237,7 +241,7 @@ function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useN
                   navigate(`/texts/${e.text_id}/read?juan=${e.sample_juan}`)
                 }
               >
-                <span>{e.title_zh}</span>
+                <span>{e.title_zh || e.cbeta_id}</span>
                 <Tag color={lang?.color ?? "default"} style={{ margin: 0, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}>
                   {lang ? t(lang.labelKey) : e.other_lang}
                 </Tag>
@@ -248,6 +252,11 @@ function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useN
             );
           })}
         </div>
+        {data.entries.length > TOP_N && (
+          <p style={{ fontSize: 11, color: "var(--fj-ink-muted)", margin: "12px 0 0" }}>
+            {t("collections.alignment_more", { n: TOP_N, total: data.entries.length })}
+          </p>
+        )}
       </div>
     </div>
   );

@@ -1294,9 +1294,10 @@ export interface AlignmentCatalogEntry {
   other_lang: string;
   pair_count: number;
   partner_count: number;
-  avg_confidence: number;
+  avg_confidence: number | null;        // fojin-verified only; null for mitra-only
+  sources: string[];                    // "fojin" (verified) / "mitra" (parallel)
   sample_juan: number;
-  sample_partner_id: number;
+  sample_partner_id: number | null;     // mitra coverage has no fojin partner
   sample_partner_title: string;
 }
 
