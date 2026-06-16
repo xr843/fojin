@@ -547,7 +547,7 @@
   "collections.alignment_desc": "These texts have passage-level cross-language alignments (AI- and scholarship-aligned). Click to open the reader and view parallels alongside the main text.",
   "collections.pair_count": "{{n}} passages",
   "collections.partner_count": "{{n}} parallel versions",
-  "collections.alignment_more": "Showing the top {{n}} most-covered of {{total}}",
+  "collections.alignment_more": "Top {{n}} shown · {{total}} texts in total",
   "kg.all_types": "All types",
   "kg.pred_translated": "Translated",
   "kg.pred_member_of_school": "School",
