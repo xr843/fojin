@@ -9,7 +9,7 @@ elasticsearch[async]==8.17.0
 redis[hiredis]==5.2.1
 httpx==0.28.1
 PyJWT==2.13.0
-cryptography==46.0.7
+cryptography==48.0.1
 bcrypt==4.1.1
 defusedxml==0.7.1
 lxml==6.1.0
@@ -18,7 +18,7 @@ openai==1.58.0
 tiktoken==0.8.0
 opencc-python-reimplemented==0.1.7
 Pillow==12.2.0
-python-multipart==0.0.27
+python-multipart==0.0.31
 pypdf==6.12.0
 python-docx==1.1.2
 beautifulsoup4==4.12.3
