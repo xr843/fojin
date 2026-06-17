@@ -15,7 +15,7 @@ import {
   RobotOutlined,
   GithubOutlined,
   GlobalOutlined,
-  BarChartOutlined,
+  // BarChartOutlined,   // dashboard nav deferred (pending polish)
   // FieldTimeOutlined,  // timeline nav deferred (pending polish)
   // NotificationOutlined,  // activity nav deferred (empty Source-Updates subtab)
 } from "@ant-design/icons";
@@ -79,7 +79,8 @@ export default function Layout() {
     { icon: <ApartmentOutlined />, label: t("nav.kg"), path: "/kg" },
     { icon: <GlobalOutlined />, label: t("nav.geo"), path: "/map" },
     { icon: <BookOutlined />, label: t("nav.collections"), path: "/collections" },
-    { icon: <BarChartOutlined />, label: t("nav.dashboard"), path: "/dashboard" },
+    // 数据总览(/dashboard)暂不放导航：待打磨后再上线（路由仍可直达 /dashboard）。
+    // { icon: <BarChartOutlined />, label: t("nav.dashboard"), path: "/dashboard" },
     // 历史时间线(/timeline)暂不放导航：待打磨后再上线（路由仍可直达 /timeline）。
     // { icon: <FieldTimeOutlined />, label: t("nav.timeline"), path: "/timeline" },
     // 佛学动态(/activity)仍暂不放导航：Source-Updates 子标签无数据流（空）；
