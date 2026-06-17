@@ -272,34 +272,45 @@ async def test_quota_increment_uses_explicit_update():
 
 @pytest.mark.anyio
 async def test_attachments_consumed_uses_explicit_update():
-    """``_mark_attachments_consumed`` must persist via UPDATE statement,
-    not by setting ``row.consumed_at = now`` on rows loaded by a different
-    session. Same root cause as quota regression — detached rows ignored
-    by ``flush()``. Regression for code-review C2 (which has security
-    implications: ``consumed_at IS NULL`` is the anti-enumeration
-    mitigation for anonymous uploads, schemas/chat.py)."""
-    from unittest.mock import AsyncMock, MagicMock
+    """``_mark_attachments_consumed`` must persist via UPDATE statement on
+    plain ids, not by mutating ORM rows. It takes ``pending_ids: list[int]``
+    so the streaming caller can snapshot them while the rows are still bound
+    (the prep session detaches+expires them on close — reading .id there
+    would raise DetachedInstanceError and silently skip the stamp). Regression
+    for code-review C2 (security: ``consumed_at IS NULL`` is the
+    anti-enumeration mitigation for anonymous uploads, schemas/chat.py)."""
+    from unittest.mock import AsyncMock
 
     from app.services.chat import _mark_attachments_consumed
-
-    row1 = MagicMock()
-    row1.id = 11
-    row1.consumed_at = None
-    row2 = MagicMock()
-    row2.id = 22
-    row2.consumed_at = None
 
     db = AsyncMock()
     db.execute = AsyncMock()
     db.commit = AsyncMock()
 
-    await _mark_attachments_consumed(db, [row1, row2])
+    await _mark_attachments_consumed(db, [11, 22])
 
     assert db.execute.await_count == 1, (
         "_mark_attachments_consumed must issue an explicit UPDATE so "
-        "consumed_at persists for rows loaded by a foreign session."
+        "consumed_at persists for the given ids."
     )
     assert db.commit.await_count == 1
+
+
+@pytest.mark.anyio
+async def test_empty_pending_ids_is_noop():
+    """No attachments → no UPDATE, no commit (fast path)."""
+    from unittest.mock import AsyncMock
+
+    from app.services.chat import _mark_attachments_consumed
+
+    db = AsyncMock()
+    db.execute = AsyncMock()
+    db.commit = AsyncMock()
+
+    await _mark_attachments_consumed(db, [])
+
+    assert db.execute.await_count == 0
+    assert db.commit.await_count == 0
 
 
 @pytest.mark.anyio
@@ -362,3 +373,198 @@ async def test_anonymous_user_skips_save_phase():
         f"anonymous flow should open exactly one session (prep), got {len(counting.opens)}"
     )
     assert len(counting.closes) == 1
+
+
+class _DetachOnCloseSessionmaker:
+    """Sessionmaker that detaches a target row when its session closes —
+    faithfully reproducing SQLAlchemy's behaviour. The real prep session
+    leaves an open transaction (create_session's ``refresh()`` + quota
+    ``flush()`` never commit), so ``close()`` rolls it back, and a rollback
+    EXPIRES every loaded instance. Reading ``chat_session.id`` afterwards
+    then raises ``DetachedInstanceError``.
+
+    The first ``close`` (the prep session) flips ``row._detached`` so any
+    later ``.id`` read raises — exactly the production failure mode that the
+    legacy ``MagicMock`` fixture (``.id = 42``, never detaches) could not
+    catch.
+    """
+
+    def __init__(self, row):
+        self._row = row
+        self.closes = 0
+
+    def __call__(self):
+        outer = self
+
+        class _SessCM:
+            async def __aenter__(self_inner):
+                return AsyncMock()
+
+            async def __aexit__(self_inner, *_):
+                outer.closes += 1
+                outer._row._detached = True
+                return False
+
+        return _SessCM()
+
+
+class _DetachableSessionRow:
+    """Stand-in for a ChatSession ORM row: ``.id`` is readable while the
+    owning session is open, and raises ``DetachedInstanceError`` once the
+    session closes — the SQLAlchemy contract after a rollback-on-close."""
+
+    def __init__(self, real_id: int):
+        self._real_id = real_id
+        self._detached = False
+
+    @property
+    def id(self) -> int:
+        if self._detached:
+            from sqlalchemy.orm.exc import DetachedInstanceError
+
+            raise DetachedInstanceError(
+                "Instance <ChatSession> is not bound to a Session; "
+                "attribute refresh operation cannot proceed"
+            )
+        return self._real_id
+
+
+@pytest.mark.anyio
+async def test_session_id_read_before_prep_session_closes():
+    """``chat_session.id`` must be captured INSIDE the prep ``async with``
+    block, while the ORM row is still bound. The prep session's
+    rollback-on-close expires the row, so any ``.id`` read AFTER the block
+    raises ``DetachedInstanceError`` — the SSE generator then dies before
+    emitting any answer or ``done``, and the frontend hangs forever on
+    "正在检索经文并生成回答".
+
+    Regression for the production incident where new-conversation chats
+    stuck in that state. The pre-fix code read ``chat_session.id`` at the
+    ``session_id`` yield (and again in the save phase); this test detaches
+    the row exactly when the prep session closes, so the buggy path raises
+    and the fixed path (int captured in-block) yields ``session_id: 42``.
+    """
+    sources = _make_fake_sources()
+    row = _DetachableSessionRow(42)
+    prepare_return = (
+        row, "https://api.example.com/v1", "fake-key", "test-model",
+        False, "openai", sources, [{"role": "user", "content": "测试"}], [],
+    )
+    sessionmaker = _DetachOnCloseSessionmaker(row)
+    mock_client_cls = _make_mock_httpx_client(["般", "若"])
+
+    with patch("app.services.chat._prepare_chat", new_callable=AsyncMock, return_value=prepare_return), \
+         patch("app.services.chat._save_messages", new_callable=AsyncMock, return_value=99), \
+         patch("app.services.chat._mark_attachments_consumed", new_callable=AsyncMock), \
+         patch("app.services.chat.httpx.AsyncClient", mock_client_cls):
+        from app.services.chat import send_message_stream
+
+        chunks = []
+        async for chunk in send_message_stream(
+            user_id=1, message="测试", sessionmaker=sessionmaker,
+        ):
+            chunks.append(chunk)
+
+    # The session_id event must carry the real id (42), captured before the
+    # prep session closed. Pre-fix this read raised DetachedInstanceError and
+    # the generator never reached this event.
+    sid_events = [c for c in chunks if '"type": "session_id"' in c]
+    assert sid_events, f"no session_id event emitted; chunks={chunks!r}"
+    assert '"session_id": 42' in sid_events[0], (
+        f"session_id must be the captured int 42, got {sid_events[0]!r}"
+    )
+    # And the stream finished cleanly — the user gets a terminal event so the
+    # UI leaves the "正在检索…" state.
+    assert any('"type": "done"' in c for c in chunks), (
+        f"done event missing — frontend would hang. chunks={chunks!r}"
+    )
+
+
+class _DetachableAttachmentRow:
+    """ChatAttachment stand-in: ``.id`` / ``.consumed_at`` readable while the
+    prep session is bound, raising once it closes — the same rollback-on-close
+    contract as the chat_session row."""
+
+    def __init__(self, real_id: int):
+        self._real_id = real_id
+        self._detached = False
+
+    def _check(self):
+        if self._detached:
+            from sqlalchemy.orm.exc import DetachedInstanceError
+
+            raise DetachedInstanceError(
+                "Instance <ChatAttachment> is not bound to a Session"
+            )
+
+    @property
+    def id(self) -> int:
+        self._check()
+        return self._real_id
+
+    @property
+    def consumed_at(self):
+        self._check()
+        return None
+
+
+@pytest.mark.anyio
+async def test_attachment_ids_captured_before_prep_session_closes():
+    """The streaming save phase must call ``_mark_attachments_consumed`` with
+    plain ids snapshotted INSIDE the prep block — never the detached ORM
+    rows. After the prep session closes (rollback-on-close), reading
+    ``row.id`` / ``row.consumed_at`` raises DetachedInstanceError, which
+    ``_mark_attachments_consumed``'s try/except would swallow — silently
+    skipping the ``consumed_at`` stamp and defeating the single-use
+    anti-enumeration guard for anonymous uploads.
+
+    Locks the contract: the save call receives ``[7]`` (the captured int),
+    not the row object. A revert to passing rows fails this assertion.
+    """
+    sources = _make_fake_sources()
+    chat_row = _DetachableSessionRow(1)
+    attach_row = _DetachableAttachmentRow(7)
+    prepare_return = (
+        chat_row, "https://api.example.com/v1", "fake-key", "test-model",
+        False, "openai", sources, [{"role": "user", "content": "测试"}],
+        [attach_row],
+    )
+
+    mock_client_cls = _make_mock_httpx_client(["般", "若"])
+    mark_spy = AsyncMock()
+
+    # The prep close must detach BOTH rows (they belong to the same session).
+    class _BothDetachSessionmaker:
+        def __call__(self_inner):
+            class _SessCM:
+                async def __aenter__(self_cm):
+                    return AsyncMock()
+
+                async def __aexit__(self_cm, *_):
+                    chat_row._detached = True
+                    attach_row._detached = True
+                    return False
+
+            return _SessCM()
+
+    with patch("app.services.chat._prepare_chat", new_callable=AsyncMock, return_value=prepare_return), \
+         patch("app.services.chat._save_messages", new_callable=AsyncMock, return_value=99), \
+         patch("app.services.chat._mark_attachments_consumed", mark_spy), \
+         patch("app.services.chat.httpx.AsyncClient", mock_client_cls):
+        from app.services.chat import send_message_stream
+
+        chunks = []
+        async for chunk in send_message_stream(
+            user_id=1, message="测试", sessionmaker=_BothDetachSessionmaker(),
+        ):
+            chunks.append(chunk)
+
+    assert mark_spy.await_count == 1, (
+        f"_mark_attachments_consumed must be called once; chunks={chunks!r}"
+    )
+    passed_ids = mark_spy.await_args.args[1]
+    assert passed_ids == [7], (
+        "save phase must pass plain ids captured before the prep session "
+        f"closed, not detached rows. got {passed_ids!r}"
+    )
+    assert any('"type": "done"' in c for c in chunks)

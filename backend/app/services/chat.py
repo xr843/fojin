@@ -916,25 +916,26 @@ async def _load_and_render_attachments(
 
 
 async def _mark_attachments_consumed(
-    db: AsyncSession, attachments: list[ChatAttachment]
+    db: AsyncSession, pending_ids: list[int]
 ) -> None:
-    """Best-effort: stamp ``consumed_at`` so a future GC cron can prune
-    orphaned uploads. Failures here must not break the chat response —
-    the message is already saved by the time we get called.
+    """Best-effort: stamp ``consumed_at`` on the given attachment ids so a
+    future GC cron can prune orphaned uploads. Failures here must not break
+    the chat response — the message is already saved by the time we get
+    called.
 
-    Uses an explicit UPDATE rather than ``row.consumed_at = now`` because
-    ``attachments`` are loaded by ``_load_and_render_attachments`` in the
-    prep-phase session which closes before this runs (see
-    send_message_stream's two-phase session split). Mutating attributes
-    on detached rows silently no-ops on commit, which would defeat the
+    Takes plain ids rather than ORM rows: in the streaming path the
+    attachments are loaded by ``_load_and_render_attachments`` in the
+    prep-phase session, which closes (and rolls back, expiring its
+    instances) before this runs (see send_message_stream's two-phase
+    session split). Reading ``row.id`` / ``row.consumed_at`` on those
+    detached rows raises DetachedInstanceError — caught by the try/except
+    below, which would then silently SKIP the stamp and defeat the
     ``consumed_at IS NULL`` single-use mitigation that defends against
-    anonymous-upload id-enumeration (see schemas/chat.py
-    ``attachment_ids`` docstring). The UPDATE-by-id form persists
-    regardless of which session originally loaded the rows.
+    anonymous-upload id-enumeration (see schemas/chat.py ``attachment_ids``
+    docstring). Callers compute ``pending_ids`` while the rows are still
+    bound. The UPDATE keeps its own ``consumed_at IS NULL`` guard so a
+    concurrent consume doesn't overwrite the original timestamp.
     """
-    if not attachments:
-        return
-    pending_ids = [row.id for row in attachments if row.consumed_at is None]
     if not pending_ids:
         return
     now = datetime.now(UTC)
@@ -948,11 +949,6 @@ async def _mark_attachments_consumed(
             .values(consumed_at=now)
         )
         await db.commit()
-        # Patch in-memory rows so the caller's view (e.g. follow-up
-        # references via the same request) is coherent.
-        for row in attachments:
-            if row.consumed_at is None:
-                row.consumed_at = now
     except Exception:  # pragma: no cover — db quirks shouldn't surface to user
         logger.exception("Failed to mark attachments consumed")
         await db.rollback()
@@ -1173,7 +1169,11 @@ async def send_message(
         await _save_messages(db, chat_session.id, message, answer, sources)
         log_mutations(chat_session.id, _citation_mutations)
         log_quote_mutations(chat_session.id, _quote_mutations)
-        await _mark_attachments_consumed(db, attachments)
+        # Rows are still bound to this request session here, so reading
+        # .id/.consumed_at is safe (unlike the streaming save phase).
+        await _mark_attachments_consumed(
+            db, [a.id for a in attachments if a.consumed_at is None]
+        )
 
         # Auto-generate a better session title for new sessions (first message)
         if chat_session.title == message[:50]:
@@ -1310,6 +1310,10 @@ async def send_message_stream(
     # defeating the point of the split.
     prep_result = None
     prep_error: Exception | None = None
+    # Captured INSIDE the prep block (see below) as plain scalars so no
+    # detached ORM attribute is read after the session closes.
+    chat_session_id = 0
+    pending_attachment_ids: list[int] = []
     async with sessionmaker() as db_prep:
         try:
             # Production SSE path: resolve the user from the raw token inside
@@ -1332,6 +1336,25 @@ async def send_message_stream(
                 hot_question_id=hot_question_id, model_id=model_id,
                 attachment_ids=attachment_ids,
             )
+            # Capture the ORM rows' plain scalar values WHILE the instances
+            # are still bound to db_prep. On block exit, close() rolls back the
+            # still-open prep transaction (create_session's refresh() + quota
+            # flush() leave it open), and a rollback EXPIRES every instance —
+            # independent of expire_on_commit=False. Any lazy attribute read
+            # AFTER the block then raises DetachedInstanceError. For
+            # chat_session.id that killed the SSE generator before any answer
+            # or 'done' reached the client, so the frontend hung forever on
+            # "正在检索经文并生成回答". The same hazard applies to the
+            # attachment rows consumed in the post-stream save phase: reading
+            # their .id/.consumed_at there would raise inside
+            # _mark_attachments_consumed's try/except and silently skip the
+            # single-use consumed_at stamp (the anti-enumeration guard). So
+            # snapshot both here while still bound.
+            _prep_cs = prep_result[0]
+            chat_session_id = _prep_cs.id if _prep_cs else 0
+            pending_attachment_ids = [
+                a.id for a in prep_result[-1] if a.consumed_at is None
+            ]
         except (ValidationError, QuotaExceededError, AccessDeniedError, ServiceError) as exc:
             prep_error = exc
     # db_prep is closed here — connection returned to the pool before any
@@ -1353,12 +1376,15 @@ async def send_message_stream(
         return
 
     (
-        chat_session, api_url, api_key, model, is_byok, provider,
-        sources, llm_messages, attachments,
+        _chat_session, api_url, api_key, model, is_byok, provider,
+        sources, llm_messages, _attachments,
     ) = prep_result
+    # NOTE: ``_chat_session`` and ``_attachments`` are detached here (prep
+    # session closed) — never read their lazy attributes. Use the scalars
+    # ``chat_session_id`` / ``pending_attachment_ids`` captured above.
 
     # Yield session_id immediately so frontend gets a fast response
-    yield f"data: {json.dumps({'type': 'session_id', 'session_id': chat_session.id if chat_session else 0}, ensure_ascii=False)}\n\n"
+    yield f"data: {json.dumps({'type': 'session_id', 'session_id': chat_session_id}, ensure_ascii=False)}\n\n"
 
     # --- Phase 3: stream LLM (with fallback on connect-before-first-token failures) ---
     async def _stream_llm_once(u: str, k: str, m: str, p: str):
@@ -1484,7 +1510,7 @@ async def send_message_stream(
         "chat/stream phase-2 LLM done in %.2fs (%d chars, session_id=%s, provider=%s)",
         _time.monotonic() - phase2_start,
         len(full_answer),
-        chat_session.id if chat_session else 0,
+        chat_session_id,
         provider,
     )
 
@@ -1545,26 +1571,26 @@ async def send_message_stream(
     # this failure mode; the alternative (silently retry / different
     # storage path) is out of scope for this refactor.
     assistant_msg_id: int | None = None
-    if chat_session:
+    if chat_session_id:
         save_start = _time.monotonic()
         try:
             async with sessionmaker() as db_save:
                 assistant_msg_id = await _save_messages(
-                    db_save, chat_session.id, message, corrected_answer, sources
+                    db_save, chat_session_id, message, corrected_answer, sources
                 )
-                log_mutations(chat_session.id, _citation_mutations)
-                log_quote_mutations(chat_session.id, _quote_mutations)
-                await _mark_attachments_consumed(db_save, attachments)
+                log_mutations(chat_session_id, _citation_mutations)
+                log_quote_mutations(chat_session_id, _quote_mutations)
+                await _mark_attachments_consumed(db_save, pending_attachment_ids)
         except Exception:
             logger.exception(
                 "chat/stream phase-3 save failed; user got the reply but it is "
                 "not persisted (session_id=%s, user_id=%s)",
-                chat_session.id, user_id,
+                chat_session_id, user_id,
             )
         logger.info(
             "chat/stream phase-3 save %.2fs (session_id=%s, assistant_msg_id=%s)",
             _time.monotonic() - save_start,
-            chat_session.id,
+            chat_session_id,
             assistant_msg_id,
         )
         # db_save closed before the message_id yield below.
