@@ -10,6 +10,9 @@ chunk_text stored in text_embeddings is the English translation (Sujato /
 84000). The real Pāli / Tibetan source, when available in text_contents, is
 surfaced via original_preview so the panel can display both sides.
 """
+import asyncio
+import logging
+
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy import bindparam
@@ -19,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.cache import cache_get, cache_set
 from app.database import get_db
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/alignment", tags=["alignment"])
 
 # Catalog merges alignment_pairs (small) with mitra_alignments (~896K rows).
@@ -26,8 +30,16 @@ router = APIRouter(prefix="/alignment", tags=["alignment"])
 # ~77s on prod — far over the app statement_timeout (30s). Instead aggregate the
 # two sources separately (mitra side is a cheap count + mode(juan), ~7s) and
 # merge in Python, then cache the result (mitra coverage changes only on import).
+#
+# Even split + merged the compute is ~20-25s on prod, which is the whole
+# surfacing line's data layer (search badge, detail card, /collections,
+# /cross-canon). To keep any real user from ever paying that, a background loop
+# (started in main.lifespan) re-warms the cache every WARM_INTERVAL, and the TTL
+# is set comfortably longer so the entry never lapses between refreshes. A cold
+# request (e.g. right after a redis flush) still self-heals via the compute path.
 ALIGNMENT_CATALOG_CACHE_KEY = "alignment:catalog:v2"
-ALIGNMENT_CATALOG_TTL = 1800  # 30 min
+ALIGNMENT_CATALOG_TTL = 25200  # 7h — must exceed WARM_INTERVAL so the loop keeps it warm
+ALIGNMENT_CATALOG_WARM_INTERVAL = 21600  # 6h — background re-warm cadence (< TTL)
 
 # A fojin chunk (paragraph) can contain many MITRA sentence-level parallels;
 # cap per chunk so the reader panel stays bounded on dense texts.
@@ -681,7 +693,19 @@ async def get_alignment_catalog(db: AsyncSession = Depends(get_db)):
     cached = await cache_get(redis, ALIGNMENT_CATALOG_CACHE_KEY)
     if cached is not None:
         return AlignmentCatalogResponse(**cached)
+    return await compute_alignment_catalog(db, redis)
 
+
+async def compute_alignment_catalog(
+    db: AsyncSession, redis
+) -> AlignmentCatalogResponse:
+    """Heavy compute for the cross-canon catalog; caches and returns it.
+
+    Pulled out of the endpoint so the lifespan warm loop can refresh the cache
+    off the request path (see ALIGNMENT_CATALOG_* constants). A user request only
+    reaches here on a cache miss (cold start / redis flush), which self-heals by
+    re-populating the cache for the next caller.
+    """
     # 1. fojin side (alignment_pairs) — small table, full aggregation w/ partners.
     fojin_rows = (
         await db.execute(
@@ -793,3 +817,30 @@ async def get_alignment_catalog(db: AsyncSession = Depends(get_db)):
     )
     await cache_set(redis, ALIGNMENT_CATALOG_CACHE_KEY, resp.model_dump(mode="json"), ALIGNMENT_CATALOG_TTL)
     return resp
+
+
+async def warm_alignment_catalog(redis) -> None:
+    """Recompute the catalog and refresh its cache, off the request path.
+
+    Opens its own DB session (called from the lifespan loop, not a request).
+    Best-effort: any failure is logged and swallowed so it never affects the app.
+    """
+    from app.database import async_session
+
+    try:
+        async with async_session() as session:
+            resp = await compute_alignment_catalog(session, redis)
+        logger.info("alignment catalog warmed: %d entries", len(resp.entries))
+    except Exception:
+        logger.exception("alignment catalog warm failed")
+
+
+async def catalog_warm_loop(redis) -> None:
+    """Background task: warm the catalog at startup, then every WARM_INTERVAL.
+
+    Keeps the (long-TTL) cache populated so no real user ever pays the ~20-25s
+    cold compute. Cancelled on shutdown by the lifespan handler.
+    """
+    while True:
+        await warm_alignment_catalog(redis)
+        await asyncio.sleep(ALIGNMENT_CATALOG_WARM_INTERVAL)

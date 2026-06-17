@@ -1,7 +1,8 @@
+import asyncio
 import logging
 import os
 import time
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 import redis.asyncio as aioredis
 from fastapi import FastAPI, Request, Response
@@ -111,8 +112,21 @@ async def lifespan(app: FastAPI):
         )
         app.state.gaiji_normalizer = None
 
+    # Background loop: keep the cross-canon catalog cache warm so no real user
+    # ever pays the ~20-25s cold compute (see app.api.alignment.ALIGNMENT_CATALOG_*).
+    from app.api.alignment import catalog_warm_loop
+
+    app.state.catalog_warm_task = asyncio.create_task(catalog_warm_loop(app.state.redis))
+
     yield
     # Shutdown
+    warm_task = getattr(app.state, "catalog_warm_task", None)
+    if warm_task is not None:
+        warm_task.cancel()
+        # Await the cancellation so it actually completes before the loop closes
+        # (otherwise asyncio emits "Task exception was never retrieved" on teardown).
+        with suppress(asyncio.CancelledError):
+            await warm_task
     if _HAS_DIANJIN:
         await get_dianjin_client().close()
     await app.state.redis.close()
