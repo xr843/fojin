@@ -705,5 +705,6 @@
   "reader.apparatus.empty": "No critical apparatus for this fascicle",
   "reader.apparatus.summary": "{{n}} variant readings against witness canons",
   "reader.apparatus.omission": "(omitted)",
-  "reader.apparatus.corrector": "(corr. {{resp}})"
+  "reader.apparatus.corrector": "(corr. {{resp}})",
+  "reader.apparatus.note": "Apparatus note"
 }

@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, type ReactNode } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Helmet } from "react-helmet-async";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Typography, Spin, Button, Select, Breadcrumb, Row, Col, message, Tooltip, Tag } from "antd";
+import { Typography, Spin, Button, Select, Breadcrumb, Row, Col, message, Tooltip, Tag, Popover } from "antd";
 import { getLastPosition, recordReading } from "../utils/readingHistory";
 import {
   HomeOutlined,
@@ -18,11 +18,10 @@ import {
   GlobalOutlined,
   DiffOutlined,
 } from "@ant-design/icons";
-import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBookmark, addBookmark, removeBookmark, searchDictionaryGrouped } from "../api/client";
+import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBookmark, addBookmark, removeBookmark, searchDictionaryGrouped, getJuanApparatus, type ApparatusEntryItem } from "../api/client";
 import { useAuthStore } from "../stores/authStore";
 import CitationGenerator from "../components/CitationGenerator";
 import AnnotationPanel from "../components/AnnotationPanel";
-import ApparatusPanel from "../components/ApparatusPanel";
 import { ReaderDictPopover } from "../components/ReaderDictPopover";
 import { DICT_POPOVER_INIT, MAX_WORD_LEN, type DictPopoverState } from "../components/ReaderDictPopover.types";
 import ReaderAIPanel from "../components/ReaderAIPanel";
@@ -45,15 +44,17 @@ const FONT_SIZE_MAX = 28;
 const FONT_SIZE_STEP = 2;
 const FONT_SIZE_KEY = "fojin-reader-font-size";
 
-/** Segment type for rendering */
+/** Segment type for rendering. For text-bearing segments, `offsets[k]` is the
+ * raw-content char offset of `text[k]` — used to place inline critical-apparatus
+ * (校勘异文) markers at the right characters even though reflow re-segments the body. */
 type TextSegment =
-  | { type: "prose"; text: string }
-  | { type: "verse"; text: string }
+  | { type: "prose"; text: string; offsets: number[] }
+  | { type: "verse"; text: string; offsets: number[] }
   | { type: "break" }
-  | { type: "head"; text: string }
-  | { type: "juan"; text: string }
-  | { type: "byline"; text: string }
-  | { type: "section"; text: string };
+  | { type: "head"; text: string; offsets: number[] }
+  | { type: "juan"; text: string; offsets: number[] }
+  | { type: "byline"; text: string; offsets: number[] }
+  | { type: "section"; text: string; offsets: number[] };
 
 /**
  * Reflow raw text into segments matching CBETA Online layout.
@@ -70,13 +71,32 @@ type TextSegment =
  */
 function reflowText(raw: string): TextSegment[] {
   const lines = raw.split("\n");
+  // Raw-content offset where each line starts (chars + the dropped "\n").
+  const lineStart: number[] = [];
+  for (let i = 0, off = 0; i < lines.length; i++) {
+    lineStart[i] = off;
+    off += lines[i].length + 1;
+  }
+  // Trim a line and return the raw offset of each surviving char. Stored CBETA
+  // content is already per-line stripped, so leading whitespace is usually 0,
+  // but we account for it so offsets stay exact.
+  const trimmedOf = (i: number): { text: string; offsets: number[] } => {
+    const lead = lines[i].length - lines[i].trimStart().length;
+    const text = lines[i].trim();
+    const offsets: number[] = new Array(text.length);
+    for (let k = 0; k < text.length; k++) offsets[k] = lineStart[i] + lead + k;
+    return { text, offsets };
+  };
+
   const segments: TextSegment[] = [];
   let proseBuf = "";
+  let proseOffsets: number[] = [];
 
   const flushProse = () => {
     if (proseBuf) {
-      segments.push({ type: "prose", text: proseBuf });
+      segments.push({ type: "prose", text: proseBuf, offsets: proseOffsets });
       proseBuf = "";
+      proseOffsets = [];
     }
   };
 
@@ -143,7 +163,7 @@ function reflowText(raw: string): TextSegment[] {
   let lastNonEmptyLine = "";
 
   for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trim();
+    const { text: trimmed, offsets: tOffsets } = trimmedOf(i);
 
     // Blank line → paragraph break, but ONLY if the previous non-empty line
     // ends with sentence-final punctuation. CBETA XML <p> boundaries sometimes
@@ -164,25 +184,25 @@ function reflowText(raw: string): TextSegment[] {
     // Structural elements: head, juan, byline, section
     if (isJuan(trimmed)) {
       flushProse();
-      segments.push({ type: "juan", text: trimmed });
+      segments.push({ type: "juan", text: trimmed, offsets: tOffsets });
       continue;
     }
 
     if (isByline(trimmed)) {
       flushProse();
-      segments.push({ type: "byline", text: trimmed });
+      segments.push({ type: "byline", text: trimmed, offsets: tOffsets });
       continue;
     }
 
     if (isSection(trimmed)) {
       flushProse();
-      segments.push({ type: "section", text: trimmed });
+      segments.push({ type: "section", text: trimmed, offsets: tOffsets });
       continue;
     }
 
     if (isHead(trimmed, relIdx)) {
       flushProse();
-      segments.push({ type: "head", text: trimmed });
+      segments.push({ type: "head", text: trimmed, offsets: tOffsets });
       continue;
     }
 
@@ -195,6 +215,7 @@ function reflowText(raw: string): TextSegment[] {
       inVerseBlock = false;
       if (proseBuf) flushProse();
       proseBuf = trimmed;
+      proseOffsets = tOffsets.slice();
       continue;
     }
 
@@ -202,6 +223,7 @@ function reflowText(raw: string): TextSegment[] {
     if (hasVerseMarker) {
       beforeFirstProse = false;
       proseBuf += trimmed;
+      proseOffsets.push(...tOffsets);
       flushProse();
       inVerseBlock = true;
       continue;
@@ -210,7 +232,7 @@ function reflowText(raw: string): TextSegment[] {
     // Verse mode (after 頌曰 or at opening before first 論曰)
     if ((inVerseBlock || beforeFirstProse) && isVerse(trimmed)) {
       flushProse();
-      segments.push({ type: "verse", text: trimmed });
+      segments.push({ type: "verse", text: trimmed, offsets: tOffsets });
       continue;
     }
 
@@ -224,21 +246,86 @@ function reflowText(raw: string): TextSegment[] {
 
     // Default: merge into prose paragraph
     proseBuf += trimmed;
+    proseOffsets.push(...tOffsets);
   }
   flushProse();
   return segments;
 }
 
-function renderSegment(seg: TextSegment, i: number) {
-  switch (seg.type) {
-    case "break": return <br key={i} />;
-    case "head": return <p key={i} className="text-head">{seg.text}</p>;
-    case "juan": return <p key={i} className="text-juan">{seg.text}</p>;
-    case "byline": return <p key={i} className="text-byline">{seg.text}</p>;
-    case "section": return <p key={i} className="text-section">{seg.text}</p>;
-    case "verse": return <p key={i} className="text-verse">{seg.text}</p>;
-    case "prose": return <p key={i} className="text-prose">{seg.text}</p>;
+type TFn = (key: string, opts?: Record<string, unknown>) => string;
+// start/end are UTF-16 offsets into the content string (converted from the
+// backend's Python code-point offsets) so they index the reflowed segments.
+interface ApparatusNumbered { entry: ApparatusEntryItem; no: number; start: number; end: number }
+type ApparatusCtx = { numbered: ApparatusNumbered[]; t: TFn } | null;
+
+/** CBETA-style inline apparatus marker: a clickable superscript [n] placed
+ * right after the lemma; clicking opens a 校注 popover with base text + variants. */
+function ApparatusMarker({ no, entry, t }: { no: number; entry: ApparatusEntryItem; t: TFn }) {
+  const content = (
+    <div style={{ maxWidth: 320 }}>
+      <div style={{ marginBottom: 6 }}>
+        {entry.lemma_siglum && <Tag color="gold" style={{ marginInlineEnd: 4 }}>{entry.lemma_siglum}</Tag>}
+        <span style={{ fontWeight: 600 }}>{entry.lemma}</span>
+      </div>
+      {entry.readings.map((r, idx) => (
+        <div key={idx} style={{ marginTop: 2 }}>
+          {r.witnesses.map((w) => (
+            <Tag key={w} style={{ marginInlineEnd: 2 }}>{w}</Tag>
+          ))}
+          <span>{r.is_omission ? t("reader.apparatus.omission") : r.reading}</span>
+          {r.resp && (
+            <span style={{ color: "#999", fontSize: 12, marginInlineStart: 4 }}>
+              {t("reader.apparatus.corrector", { resp: r.resp })}
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+  return (
+    <Popover content={content} title={t("reader.apparatus.note")} trigger="click">
+      <sup className="apparatus-marker">[{no}]</sup>
+    </Popover>
+  );
+}
+
+/** Splice inline apparatus markers into a text-bearing segment by mapping each
+ * entry's raw char offset to a position within the reflowed segment text. */
+function renderSegmentChildren(seg: Extract<TextSegment, { text: string }>, numbered: ApparatusNumbered[], t: TFn): ReactNode {
+  const { text, offsets } = seg;
+  if (!numbered.length || !offsets.length) return text;
+  const segStart = offsets[0];
+  const segEnd = offsets[offsets.length - 1];
+  const offToLocal = new Map<number, number>();
+  for (let k = 0; k < offsets.length; k++) offToLocal.set(offsets[k], k);
+  const marks: { pos: number; m: ApparatusNumbered }[] = [];
+  for (const m of numbered) {
+    const cs = m.start;
+    if (cs < segStart || cs > segEnd || !offToLocal.has(cs)) continue;
+    // Marker goes right after the lemma. The lemma's chars are contiguous in the
+    // reflowed segment (any "\n" between source lines was dropped), so its end is
+    // locStart + the lemma's own length — robust when the lemma is followed by or
+    // spans a line break (where char_end would point at a dropped "\n").
+    const pos = Math.min(offToLocal.get(cs)! + m.entry.lemma.length, text.length);
+    marks.push({ pos, m });
   }
+  if (!marks.length) return text;
+  marks.sort((a, b) => a.pos - b.pos);
+  const nodes: ReactNode[] = [];
+  let cursor = 0;
+  for (const { pos, m } of marks) {
+    if (pos > cursor) nodes.push(text.slice(cursor, pos));
+    nodes.push(<ApparatusMarker key={`ap${m.no}`} no={m.no} entry={m.entry} t={t} />);
+    cursor = Math.max(cursor, pos);
+  }
+  if (cursor < text.length) nodes.push(text.slice(cursor));
+  return nodes;
+}
+
+function renderSegment(seg: TextSegment, i: number, ctx?: ApparatusCtx) {
+  if (seg.type === "break") return <br key={i} />;
+  const children = ctx ? renderSegmentChildren(seg, ctx.numbered, ctx.t) : seg.text;
+  return <p key={i} className={`text-${seg.type}`}>{children}</p>;
 }
 
 function getInitialFontSize(): number {
@@ -298,7 +385,7 @@ export default function TextReaderPage() {
   const { t } = useTranslation();
   const [citationOpen, setCitationOpen] = useState(false);
   const [annotationOpen, setAnnotationOpen] = useState(false);
-  const [apparatusOpen, setApparatusOpen] = useState(false);
+  const [apparatusOn, setApparatusOn] = useState(false);
   const [parallelPanelOpen, setParallelPanelOpen] = useState(false);
 
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
@@ -621,6 +708,41 @@ export default function TextReaderPage() {
     [compareContent?.content],
   );
 
+  // Critical apparatus (校勘异文): fetched lazily only when the 校勘 toggle is on.
+  const { data: apparatusData } = useQuery({
+    queryKey: ["juanApparatus", textId, juanNum],
+    queryFn: () => getJuanApparatus(Number(textId), juanNum),
+    enabled: apparatusOn && !!textId,
+    staleTime: 3600000,
+  });
+  // Number aligned entries 1..N in reading order, converting the backend's
+  // Python code-point offsets to JS UTF-16 offsets (CJK Ext-B etc. are
+  // surrogate pairs — 1 code point but 2 UTF-16 units — so a raw index would
+  // drift after the first supplementary char).
+  const apparatusNumbered = useMemo<ApparatusNumbered[]>(() => {
+    const raw = content?.content;
+    if (!apparatusData?.entries || !raw) return [];
+    const cpToU16: number[] = [];
+    let u = 0;
+    for (const ch of raw) {
+      cpToU16.push(u);
+      u += ch.length;
+    }
+    cpToU16.push(u); // sentinel for an offset at end-of-string
+    const conv = (cp: number) => (cp >= 0 && cp < cpToU16.length ? cpToU16[cp] : u);
+    return [...apparatusData.entries]
+      .sort((a, b) => a.char_start - b.char_start)
+      .map((entry, idx) => ({
+        entry,
+        no: idx + 1,
+        start: conv(entry.char_start),
+        end: conv(entry.char_end),
+      }));
+  }, [apparatusData, content?.content]);
+  const apparatusCtx: ApparatusCtx = apparatusOn && apparatusNumbered.length
+    ? { numbered: apparatusNumbered, t }
+    : null;
+
   const changeFontSize = (delta: number) => {
     setFontSize((prev) => {
       const next = Math.min(Math.max(prev + delta, FONT_SIZE_MIN), FONT_SIZE_MAX);
@@ -745,9 +867,9 @@ export default function TextReaderPage() {
           <Tooltip title={t("reader.apparatus.tooltip")}>
             <Button
               size="small"
-              type={apparatusOpen ? "primary" : "default"}
+              type={apparatusOn ? "primary" : "default"}
               icon={<DiffOutlined />}
-              onClick={() => setApparatusOpen((v) => !v)}
+              onClick={() => setApparatusOn((v) => !v)}
             >
               {t("reader.apparatus.toggle")}
             </Button>
@@ -816,7 +938,7 @@ export default function TextReaderPage() {
                   className="reader-body"
                   style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
                 >
-                  {reflowedContent.map(renderSegment)}
+                  {reflowedContent.map((seg, i) => renderSegment(seg, i, apparatusCtx))}
                 </div>
               </div>
             </Col>
@@ -831,7 +953,7 @@ export default function TextReaderPage() {
                     style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
                   >
                     {compareContent?.content
-                      ? reflowedCompare.map(renderSegment)
+                      ? reflowedCompare.map((seg, i) => renderSegment(seg, i))
                       : "暂无内容"}
                   </div>
                 )}
@@ -843,7 +965,7 @@ export default function TextReaderPage() {
             className="reader-body"
             style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
           >
-            {reflowedContent.map(renderSegment)}
+            {reflowedContent.map((seg, i) => renderSegment(seg, i, apparatusCtx))}
           </div>
         )
       ) : (
@@ -890,13 +1012,6 @@ export default function TextReaderPage() {
         juanNum={juanNum}
         visible={annotationOpen}
         onClose={() => setAnnotationOpen(false)}
-      />
-
-      <ApparatusPanel
-        textId={textId}
-        juanNum={juanNum}
-        visible={apparatusOpen}
-        onClose={() => setApparatusOpen(false)}
       />
 
     </div>
