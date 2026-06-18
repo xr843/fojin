@@ -28,7 +28,7 @@ router = APIRouter(prefix="/alignment", tags=["alignment"])
 # Catalog merges alignment_pairs (small) with mitra_alignments (~896K rows).
 # A single UNION+GROUP BY with mode()/count(DISTINCT)/array_agg over 896K runs
 # ~77s on prod — far over the app statement_timeout (30s). Instead aggregate the
-# two sources separately (mitra side is a cheap count + mode(juan), ~7s) and
+# two sources separately (mitra side is a cheap count + min(juan), ~7s) and
 # merge in Python, then cache the result (mitra coverage changes only on import).
 #
 # Even split + merged the compute is ~20-25s on prod, which is the whole
@@ -724,7 +724,7 @@ async def compute_alignment_catalog(
                 SELECT n.lzh_id, n.other_lang, count(*) AS pair_count,
                        count(DISTINCT n.other_id) AS partner_count,
                        round(avg(n.confidence)::numeric, 2) AS avg_confidence,
-                       mode() WITHIN GROUP (ORDER BY n.lzh_juan) AS sample_juan,
+                       min(n.lzh_juan) AS sample_juan,
                        mode() WITHIN GROUP (ORDER BY n.other_id) AS sample_partner_id
                 FROM normalized n
                 GROUP BY n.lzh_id, n.other_lang
@@ -733,7 +733,7 @@ async def compute_alignment_catalog(
         )
     ).fetchall()
 
-    # 2. mitra side (mitra_alignments) — bulk; cheap count + mode(juan), NO join/
+    # 2. mitra side (mitra_alignments) — bulk; cheap count + min(juan), NO join/
     #    distinct/array_agg (those pushed the unified query to ~77s on 896K rows).
     #    Once mitra_e_score is backfilled, add: WHERE mitra_e_score >= 0.30
     mitra_rows = (
@@ -741,7 +741,7 @@ async def compute_alignment_catalog(
             sql_text(
                 """
                 SELECT text_id, foreign_lang, count(*) AS pair_count,
-                       mode() WITHIN GROUP (ORDER BY juan_num) AS sample_juan
+                       min(juan_num) AS sample_juan
                 FROM mitra_alignments
                 GROUP BY text_id, foreign_lang
                 """

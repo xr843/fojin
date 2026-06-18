@@ -31,7 +31,8 @@ export default function CrossCanonEntry({ textId }: { textId: number }) {
     const langs = rows
       .map((r) => ({ lang: r.other_lang, count: r.pair_count }))
       .sort((a, b) => b.count - a.count);
-    // land on the juan with the most anchors (the highest-count language's sample)
+    // land on the first aligned juan (sample_juan = min juan with parallels) of
+    // the highest-count language — the natural start of the comparison, not mid-text.
     const sampleJuan = rows.reduce((best, r) => (r.pair_count > best.pair_count ? r : best)).sample_juan;
     return { langs, sampleJuan };
   }, [data, textId]);
