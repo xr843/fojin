@@ -15,11 +15,13 @@ import {
   HeartFilled,
   RobotOutlined,
   GlobalOutlined,
+  DiffOutlined,
 } from "@ant-design/icons";
 import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBookmark, addBookmark, removeBookmark, searchDictionaryGrouped } from "../api/client";
 import { useAuthStore } from "../stores/authStore";
 import CitationGenerator from "../components/CitationGenerator";
 import AnnotationPanel from "../components/AnnotationPanel";
+import ApparatusPanel from "../components/ApparatusPanel";
 import { ReaderDictPopover } from "../components/ReaderDictPopover";
 import { DICT_POPOVER_INIT, MAX_WORD_LEN, type DictPopoverState } from "../components/ReaderDictPopover.types";
 import ReaderAIPanel from "../components/ReaderAIPanel";
@@ -294,6 +296,7 @@ export default function TextReaderPage() {
   const [fontSize, setFontSize] = useState(getInitialFontSize);
   const [citationOpen, setCitationOpen] = useState(false);
   const [annotationOpen, setAnnotationOpen] = useState(false);
+  const [apparatusOpen, setApparatusOpen] = useState(false);
   const [parallelPanelOpen, setParallelPanelOpen] = useState(false);
 
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
@@ -737,6 +740,16 @@ export default function TextReaderPage() {
           >
             引用
           </Button>
+          <Tooltip title="校勘异文（底本与宋/元/明等校本的异读）">
+            <Button
+              size="small"
+              type={apparatusOpen ? "primary" : "default"}
+              icon={<DiffOutlined />}
+              onClick={() => setApparatusOpen((v) => !v)}
+            >
+              校勘
+            </Button>
+          </Tooltip>
           <Tooltip title="跨藏对照（其他版本 · 经级/段级对读）">
             <Button
               size="small"
@@ -875,6 +888,13 @@ export default function TextReaderPage() {
         juanNum={juanNum}
         visible={annotationOpen}
         onClose={() => setAnnotationOpen(false)}
+      />
+
+      <ApparatusPanel
+        textId={textId}
+        juanNum={juanNum}
+        visible={apparatusOpen}
+        onClose={() => setApparatusOpen(false)}
       />
 
     </div>
