@@ -802,3 +802,14 @@
   cursor: pointer;
 }
 .cbeta-line-locator button:hover { background: rgba(255, 255, 255, 0.12); }
+
+/* Visible 大正 page·column markers (页码 toggle), shown at column boundaries */
+.cbeta-pageref {
+  font-size: 0.62em;
+  color: #999;
+  vertical-align: super;
+  margin: 0 3px;
+  user-select: none;
+  font-family: ui-monospace, monospace;
+  white-space: nowrap;
+}
