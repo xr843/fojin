@@ -7,7 +7,7 @@ query/transform logic is exercised without a DB.
 
 from unittest.mock import AsyncMock, MagicMock
 
-from app.services.content import get_juan_apparatus
+from app.services.content import get_juan_apparatus, get_juan_line_anchors
 
 
 def _reading(**kw):
@@ -53,4 +53,28 @@ async def test_get_juan_apparatus_maps_entries_and_readings():
 async def test_get_juan_apparatus_empty_when_none():
     session = _session_returning([])
     out = await get_juan_apparatus(session, text_id=1, juan_num=9)
+    assert out == []
+
+
+def _session_rows(rows):
+    """Mock session whose execute().all() returns (col, col) tuples."""
+    result = MagicMock()
+    result.all.return_value = rows
+    session = AsyncMock()
+    session.execute.return_value = result
+    return session
+
+
+async def test_get_juan_line_anchors_maps_rows():
+    session = _session_rows([(0, "0001a01"), (17, "0001a02"), (33, "0001a03")])
+    out = await get_juan_line_anchors(session, text_id=1, juan_num=1)
+    assert out == [
+        {"char_offset": 0, "line_ref": "0001a01"},
+        {"char_offset": 17, "line_ref": "0001a02"},
+        {"char_offset": 33, "line_ref": "0001a03"},
+    ]
+
+
+async def test_get_juan_line_anchors_empty():
+    out = await get_juan_line_anchors(_session_rows([]), text_id=1, juan_num=9)
     assert out == []

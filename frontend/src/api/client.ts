@@ -566,6 +566,23 @@ export async function getJuanApparatus(textId: number, juanNum: number): Promise
   return data;
 }
 
+// CBETA <lb> page-column-line anchors (校勘行锚 / 引用定位)
+export interface LineAnchorItem {
+  char_offset: number;
+  line_ref: string;
+}
+
+export interface JuanLineAnchorsResponse {
+  text_id: TextId;
+  juan_num: number;
+  anchors: LineAnchorItem[];
+}
+
+export async function getJuanLineAnchors(textId: number, juanNum: number): Promise<JuanLineAnchorsResponse> {
+  const { data } = await api.get<JuanLineAnchorsResponse>(`/texts/${textId}/juans/${juanNum}/line-anchors`);
+  return data;
+}
+
 // Content search
 export async function searchContent(params: {
   q: string;

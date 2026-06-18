@@ -762,3 +762,43 @@
 .apparatus-marker:hover {
   text-decoration: underline;
 }
+
+/* CBETA <lb> line anchors — zero-width inline markers for citation locating */
+.cbeta-line {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+.cbeta-line-flash {
+  animation: cbeta-line-flash-kf 2.2s ease-out;
+}
+@keyframes cbeta-line-flash-kf {
+  0%, 30% { background: rgba(184, 134, 11, 0.18); }
+  100% { background: transparent; }
+}
+/* On-demand citation locator bar (shown at the selection) */
+.cbeta-line-locator {
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  background: #1f1f1f;
+  color: #fff;
+  border-radius: 6px;
+  font-size: 13px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  white-space: nowrap;
+}
+.cbeta-line-locator-ref { font-weight: 600; color: #ffd666; }
+.cbeta-line-locator button {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: #fff;
+  border-radius: 4px;
+  padding: 1px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.cbeta-line-locator button:hover { background: rgba(255, 255, 255, 0.12); }

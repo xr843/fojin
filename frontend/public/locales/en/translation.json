@@ -706,5 +706,9 @@
   "reader.apparatus.summary": "{{n}} variant readings against witness canons",
   "reader.apparatus.omission": "(omitted)",
   "reader.apparatus.corrector": "(corr. {{resp}})",
-  "reader.apparatus.note": "Apparatus note"
+  "reader.apparatus.note": "Apparatus note",
+  "reader.lineref.copy_citation": "Copy citation",
+  "reader.lineref.copy_link": "Copy link",
+  "reader.lineref.copied": "Copied",
+  "reader.lineref.citation": "{{title}} (CBETA {{id}}, fasc. {{juan}}, {{ref}})"
 }
