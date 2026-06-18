@@ -13,7 +13,12 @@ from app.models.source import DataSource
 from app.models.text import BuddhistText
 from app.models.user import ReadingHistory, User
 from app.schemas.text import JuanContentResponse, JuanLanguagesResponse, JuanListResponse, TextResponseBase
-from app.services.content import get_juan_content, get_juan_languages, get_juan_list
+from app.services.content import (
+    get_juan_apparatus,
+    get_juan_content,
+    get_juan_languages,
+    get_juan_list,
+)
 from app.services.text import get_text_by_id, get_text_count, get_text_id_by_cbeta
 
 router = APIRouter(tags=["texts"])
@@ -81,6 +86,27 @@ class SimilarPassagesResponse(BaseModel):
     text_id: int
     juan_num: int
     passages: list[SimilarPassageItem]
+
+
+class ApparatusReadingItem(BaseModel):
+    reading: str
+    witnesses: list[str] = []
+    resp: str | None = None
+    is_omission: bool = False
+
+
+class ApparatusEntryItem(BaseModel):
+    char_start: int
+    char_end: int
+    lemma: str
+    lemma_siglum: str | None = None
+    readings: list[ApparatusReadingItem] = []
+
+
+class JuanApparatusResponse(BaseModel):
+    text_id: int
+    juan_num: int
+    entries: list[ApparatusEntryItem] = []
 
 
 class ChunkContextItem(BaseModel):
@@ -167,6 +193,21 @@ async def read_juan(
         await db.commit()
 
     return result
+
+
+@router.get("/texts/{text_id}/juans/{juan_num}/apparatus", response_model=JuanApparatusResponse)
+async def read_juan_apparatus(
+    text_id: int,
+    juan_num: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Critical apparatus (校勘异文) for a juan: variant readings of the base
+    text (底本) against witness canons (宋/元/明…), positioned by char offset.
+
+    获取某一卷的校勘异文（底本与宋元明等校本的异读），按字符位置标注。
+    Loaded lazily by the reader — a major text can carry thousands of entries."""
+    entries = await get_juan_apparatus(db, text_id, juan_num)
+    return JuanApparatusResponse(text_id=text_id, juan_num=juan_num, entries=entries)
 
 
 @router.get("/stats")
