@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import ARRAY, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import ARRAY, JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -96,8 +96,10 @@ class ApparatusReading(Base):
         Integer, ForeignKey("text_apparatus.id", ondelete="CASCADE"), index=True
     )
     reading: Mapped[str] = mapped_column(Text, server_default="")
-    # Resolved sigla, e.g. ["【宋】", "【元】"].
-    witnesses: Mapped[list[str]] = mapped_column(ARRAY(String), server_default="{}")
+    # Resolved sigla, e.g. ["【宋】", "【元】"]. Native varchar[] on Postgres
+    # (prod); JSON under SQLite so the test suite's create_all works (CI builds
+    # the full metadata on SQLite). Migration 0158 sets the Postgres default.
+    witnesses: Mapped[list[str]] = mapped_column(ARRAY(String).with_variant(JSON, "sqlite"))
     resp: Mapped[str | None] = mapped_column(String(100))
     is_omission: Mapped[bool] = mapped_column(Boolean, server_default="false")
 
