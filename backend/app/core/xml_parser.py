@@ -21,6 +21,15 @@ logger = logging.getLogger(__name__)
 TEI_NS = "http://www.tei-c.org/ns/1.0"
 CB_NS = "http://www.cbeta.org/ns/1.0"
 NSMAP = {"tei": TEI_NS, "cb": CB_NS}
+XML_ID = "{http://www.w3.org/XML/1998/namespace}id"
+
+# <anchor> and <lb> markers are emitted into the extracted text as control-char
+# sentinels (\x00 never appears in CBETA text) so their position within the
+# FINAL cleaned juan content can be recovered. They are stripped out before the
+# content is stored; the recovered offsets drive the standoff critical apparatus
+# (校勘异文) and <lb> page-col-line anchors.
+#   anchor:  \x00A:<xml:id>\x00      line:  \x00L:<n>\x00
+_SENTINEL_RE = re.compile("\x00([AL]):([^\x00]*)\x00")
 
 # Elements whose text content we want to extract (leaf content elements)
 CONTENT_TAGS = {
@@ -143,12 +152,76 @@ def _extract_text(elem) -> str:
             parts.append(_resolve_gaiji(child))
             if child.tail:
                 parts.append(child.tail)
+        elif child.tag == f"{{{TEI_NS}}}anchor":
+            # Standoff apparatus anchor — emit a sentinel so its offset in the
+            # cleaned content can be recovered (see _clean_anchors).
+            aid = child.get(XML_ID)
+            if aid:
+                parts.append(f"\x00A:{aid}\x00")
+            if child.tail:
+                parts.append(child.tail)
+        elif child.tag == f"{{{TEI_NS}}}lb":
+            # Page-column-line marker (e.g. n="0001a09").
+            n = child.get("n")
+            if n:
+                parts.append(f"\x00L:{n}\x00")
+            if child.tail:
+                parts.append(child.tail)
         else:
             parts.append(_extract_text(child))
             if child.tail:
                 parts.append(child.tail)
 
     return "".join(parts)
+
+
+def _extract_reading_text(elem) -> str:
+    """Extract the textual reading of an apparatus <lem>/<rdg>.
+
+    Unlike _extract_text this does NOT bail on SKIP_TAGS — <rdg> is itself a
+    skip tag in the body, but here we want its content. Resolves gaiji, drops
+    nested editorial <note>, and treats <space> (omission) as empty.
+    """
+    parts: list[str] = []
+    if elem.text:
+        parts.append(elem.text)
+    for child in elem:
+        ctag = child.tag
+        if ctag == f"{{{TEI_NS}}}g":
+            parts.append(_resolve_gaiji(child))
+        elif ctag in (f"{{{TEI_NS}}}note", f"{{{TEI_NS}}}space"):
+            pass
+        else:
+            parts.append(_extract_reading_text(child))
+        if child.tail:
+            parts.append(child.tail)
+    return "".join(parts)
+
+
+def _clean_anchors(text: str) -> tuple[str, dict[str, int], list[dict]]:
+    """Strip anchor/line sentinels from text, recovering their char offsets.
+
+    Returns (clean_text, {anchor_id: offset}, [{"offset": o, "line": ref}]).
+    Offsets are indices into clean_text. Walking sentinels left-to-right and
+    tracking only the cleaned length keeps every offset exact.
+    """
+    anchors: dict[str, int] = {}
+    line_anchors: list[dict] = []
+    out: list[str] = []
+    clean_len = 0
+    i = 0
+    for m in _SENTINEL_RE.finditer(text):
+        chunk = text[i:m.start()]
+        out.append(chunk)
+        clean_len += len(chunk)
+        kind, payload = m.group(1), m.group(2)
+        if kind == "A":
+            anchors[payload] = clean_len
+        else:
+            line_anchors.append({"offset": clean_len, "line": payload})
+        i = m.end()
+    out.append(text[i:])
+    return "".join(out), anchors, line_anchors
 
 
 def parse_tei_xml(xml_path: str | Path) -> list[dict]:
@@ -183,11 +256,14 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
         # Keep blank lines (paragraph boundaries) but strip leading/trailing empties
         text = "\n".join(current_lines)
         text = text.strip()
-        if text:
+        clean, anchors, line_anchors = _clean_anchors(text)
+        if clean:
             juans.append({
                 "juan_num": current_juan,
-                "content": text,
-                "char_count": len(text.replace("\n", "").replace(" ", "")),
+                "content": clean,
+                "char_count": len(clean.replace("\n", "").replace(" ", "")),
+                "anchors": anchors,
+                "line_anchors": line_anchors,
             })
         current_lines = []
 
@@ -289,11 +365,14 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
     # If no juans were found but there is content, treat everything as juan 1
     if not juans and current_lines:
         text = "\n".join(line for line in current_lines if line.strip()).strip()
-        if text:
+        clean, anchors, line_anchors = _clean_anchors(text)
+        if clean:
             juans.append({
                 "juan_num": 1,
-                "content": text,
-                "char_count": len(text.replace("\n", "").replace(" ", "")),
+                "content": clean,
+                "char_count": len(clean.replace("\n", "").replace(" ", "")),
+                "anchors": anchors,
+                "line_anchors": line_anchors,
             })
 
     # Last resort: a preface-only work (no scripture body at all). Emit the
@@ -301,11 +380,14 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
     # silently skip, leaving the work with has_content=False and unindexed.
     if not juans and preface_lines:
         text = "\n".join(preface_lines).strip()
-        if text:
+        clean, anchors, line_anchors = _clean_anchors(text)
+        if clean:
             juans.append({
                 "juan_num": 1,
-                "content": text,
-                "char_count": len(text.replace("\n", "").replace(" ", "")),
+                "content": clean,
+                "char_count": len(clean.replace("\n", "").replace(" ", "")),
+                "anchors": anchors,
+                "line_anchors": line_anchors,
             })
 
     return juans
@@ -405,3 +487,157 @@ def find_all_xml_files(cbeta_id: str, xml_base_dir: str) -> list[Path]:
         all_files.extend(vol_dir.glob(multi_pattern))
 
     return sorted(set(all_files))
+
+
+# --------------------------------------------------------------------------
+# Critical apparatus (校勘异文) — standoff <app> parsing
+# --------------------------------------------------------------------------
+
+def parse_witnesses(root) -> dict[str, str]:
+    """Map witness xml:id → readable siglum, e.g. {"wit1": "【宋】"}.
+
+    Each text declares its own witness list, so sigla MUST be resolved per-file;
+    the same xml:id means different canons in different texts.
+    """
+    out: dict[str, str] = {}
+    for w in root.findall(f".//{{{TEI_NS}}}witness"):
+        wid = w.get(XML_ID)
+        if wid:
+            out[wid] = "".join(w.itertext()).strip()
+    return out
+
+
+def parse_resp(root) -> dict[str, str]:
+    """Map respStmt xml:id → corrector name, e.g. {"resp2": "Taisho"}."""
+    out: dict[str, str] = {}
+    for rs in root.findall(f".//{{{TEI_NS}}}respStmt"):
+        rid = rs.get(XML_ID)
+        if not rid:
+            continue
+        name = rs.find(f"{{{TEI_NS}}}name")
+        out[rid] = (name.text or "").strip() if name is not None else ""
+    return out
+
+
+def _sigla(wit_attr: str | None, witnesses: dict[str, str]) -> list[str]:
+    """Resolve a space-separated wit="#wit1 #wit2" attribute to sigla."""
+    sigla = []
+    for ref in (wit_attr or "").split():
+        wid = ref.lstrip("#")
+        sigla.append(witnesses.get(wid, wid))
+    return sigla
+
+
+def parse_apparatus(root, witnesses: dict[str, str], resps: dict[str, str]) -> list[dict]:
+    """Parse all standoff <app> entries (in <back>) into structured dicts.
+
+    Each entry: {app_n, from, to, lemma, lemma_siglum, readings:[...]}.
+    A reading: {reading, witnesses:[siglum], resp, is_omission}.
+    """
+    apps: list[dict] = []
+    for app in root.findall(f".//{{{TEI_NS}}}app"):
+        frm = (app.get("from") or "").lstrip("#")
+        to = (app.get("to") or "").lstrip("#")
+        lem = app.find(f"{{{TEI_NS}}}lem")
+        if lem is None:
+            continue
+        lemma = _extract_reading_text(lem).strip()
+        lem_sigla = _sigla(lem.get("wit"), witnesses)
+        readings: list[dict] = []
+        for rdg in app.findall(f"{{{TEI_NS}}}rdg"):
+            reading = _extract_reading_text(rdg).strip()
+            # <space/> with no text content marks an omission in that witness.
+            is_omission = rdg.find(f"{{{TEI_NS}}}space") is not None and not reading
+            resp_ids = (rdg.get("resp") or "").split()
+            resp = resps.get(resp_ids[0].lstrip("#"), "") if resp_ids else ""
+            readings.append({
+                "reading": reading,
+                "witnesses": _sigla(rdg.get("wit"), witnesses),
+                "resp": resp,
+                "is_omission": is_omission,
+            })
+        app_n = frm[3:] if frm.startswith("beg") else frm  # beg0001004 → 0001004
+        apps.append({
+            "app_n": app_n,
+            "from": frm,
+            "to": to,
+            "lemma": lemma,
+            "lemma_siglum": lem_sigla[0] if lem_sigla else "",
+            "readings": readings,
+        })
+    return apps
+
+
+def parse_tei_apparatus(xml_path: str | Path) -> dict:
+    """Parse a CBETA file's critical apparatus, resolved to content offsets.
+
+    Returns {"witnesses": {id: siglum}, "entries": [...]}, where each entry is
+    {app_n, juan_num, char_start, char_end, lemma, lemma_siglum, aligned,
+    readings}. `aligned` is True iff content[char_start:char_end] == lemma —
+    the offsets are computed against the same body parse import_content stores,
+    so an unaligned entry (cross-juan span, anchor inside a skipped tag, …) is
+    flagged rather than silently mispositioned.
+    """
+    xml_path = Path(xml_path)
+    if not xml_path.exists():
+        return {"witnesses": {}, "entries": []}
+    try:
+        tree = etree.parse(str(xml_path))
+    except etree.XMLSyntaxError:
+        return {"witnesses": {}, "entries": []}
+    root = tree.getroot()
+
+    witnesses = parse_witnesses(root)
+    resps = parse_resp(root)
+    apps = parse_apparatus(root, witnesses, resps)
+
+    # Map every anchor id → (juan_num, offset) from the body parse.
+    juans = parse_tei_xml(xml_path)
+    contents: dict[int, str] = {}
+    anchor_loc: dict[str, tuple[int, int]] = {}
+    line_anchors: list[dict] = []
+    for j in juans:
+        contents[j["juan_num"]] = j["content"]
+        for aid, off in j.get("anchors", {}).items():
+            anchor_loc[aid] = (j["juan_num"], off)
+        for la in j.get("line_anchors", []):
+            line_anchors.append({"juan_num": j["juan_num"], "offset": la["offset"], "line": la["line"]})
+
+    entries: list[dict] = []
+    for app in apps:
+        loc_f = anchor_loc.get(app["from"])
+        loc_t = anchor_loc.get(app["to"])
+        if not loc_f or not loc_t or loc_f[0] != loc_t[0]:
+            # Anchor missing or span crosses a juan boundary — keep the variant
+            # but mark it unaligned (no resolvable position in stored content).
+            entries.append({
+                "app_n": app["app_n"],
+                "juan_num": loc_f[0] if loc_f else (loc_t[0] if loc_t else None),
+                "char_start": None,
+                "char_end": None,
+                "lemma": app["lemma"],
+                "lemma_siglum": app["lemma_siglum"],
+                "aligned": False,
+                "readings": app["readings"],
+            })
+            continue
+        juan_num, start = loc_f
+        _, end = loc_t
+        # The span may contain "\n" the parser inserted at line/paragraph
+        # boundaries; the lemma text does not. Offsets are still correct, so
+        # compare with whitespace stripped.
+        span = contents.get(juan_num, "")[start:end]
+        # Empty lemma would "align" to any whitespace-only span — require a
+        # non-empty lemma so a malformed <lem> is flagged, not falsely matched.
+        aligned = bool(app["lemma"]) and span.replace("\n", "").replace(" ", "") == app["lemma"]
+        entries.append({
+            "app_n": app["app_n"],
+            "juan_num": juan_num,
+            "char_start": start,
+            "char_end": end,
+            "lemma": app["lemma"],
+            "lemma_siglum": app["lemma_siglum"],
+            "aligned": aligned,
+            "readings": app["readings"],
+        })
+    return {"witnesses": witnesses, "entries": entries, "line_anchors": line_anchors}

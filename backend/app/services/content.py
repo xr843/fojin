@@ -1,7 +1,8 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from app.models.text import BuddhistText, TextContent
+from app.models.text import BuddhistText, TextApparatus, TextContent
 from app.schemas.text import JuanContentResponse, JuanInfo, JuanLanguagesResponse, JuanListResponse
 
 
@@ -118,3 +119,37 @@ async def get_juan_content(
         canon=canon,
         canon_label=canon_label_zh(canon),
     )
+
+
+async def get_juan_apparatus(session: AsyncSession, text_id: int, juan_num: int) -> list[dict]:
+    """Aligned critical-apparatus (校勘异文) entries for one juan, ordered by
+    position. Unaligned entries (no resolvable offset) are excluded — the reader
+    renders by char offset, so only aligned rows are returned."""
+    result = await session.execute(
+        select(TextApparatus)
+        .where(
+            TextApparatus.text_id == text_id,
+            TextApparatus.juan_num == juan_num,
+            TextApparatus.aligned.is_(True),
+        )
+        .options(selectinload(TextApparatus.readings))
+        .order_by(TextApparatus.char_start)
+    )
+    return [
+        {
+            "char_start": e.char_start,
+            "char_end": e.char_end,
+            "lemma": e.lemma,
+            "lemma_siglum": e.lemma_siglum,
+            "readings": [
+                {
+                    "reading": r.reading,
+                    "witnesses": list(r.witnesses or []),
+                    "resp": r.resp,
+                    "is_omission": r.is_omission,
+                }
+                for r in e.readings
+            ],
+        }
+        for e in result.scalars().all()
+    ]

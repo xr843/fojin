@@ -10,7 +10,13 @@ from app.models.iiif import IIIFManifest
 from app.models.knowledge_graph import KGEntity, KGRelation
 from app.models.relation import TextRelation
 from app.models.source import DataSource, SourceDistribution, TextIdentifier
-from app.models.text import BuddhistText, TextContent
+from app.models.text import (
+    ApparatusReading,
+    BuddhistText,
+    TextApparatus,
+    TextContent,
+    TextLineAnchor,
+)
 from app.models.user import Bookmark, ReadingHistory, User
 from app.models.work import Work, WorkAlias, WorkWitness
 
@@ -20,6 +26,7 @@ __all__ = [
     "AiDiffCache",
     "Annotation",
     "AnnotationReview",
+    "ApparatusReading",
     "Bookmark",
     "BuddhistText",
     "ChatAttachment",
@@ -35,9 +42,11 @@ __all__ = [
     "ReadingHistory",
     "SourceDistribution",
     "SourceUpdate",
+    "TextApparatus",
     "TextContent",
     "TextEmbedding",
     "TextIdentifier",
+    "TextLineAnchor",
     "TextRelation",
     "User",
     "Work",
