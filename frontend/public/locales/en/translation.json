@@ -548,6 +548,7 @@
   "collections.pair_count": "{{n}} passages",
   "collections.partner_count": "{{n}} parallel versions",
   "collections.alignment_more": "Top {{n}} shown · {{total}} texts in total",
+  "collections.col_text": "Text",
   "crosscanon.entry_title": "Cross-canon parallels",
   "crosscanon.entry_hint": "read passage-by-passage",
   "crosscanon.page_desc": "{{texts}} texts · {{pairs}} aligned passages",
