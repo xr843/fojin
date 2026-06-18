@@ -239,16 +239,26 @@ async def sync_to_db(persons: dict):
                     props["death_year"] = p["death_year"]
                 if p.get("gender"):
                     props["gender"] = p["gender"]
-                await session.execute(text("""
+                # ON CONFLICT against the partial unique index added in migration
+                # 0159 (ux_kg_entities_dila) makes the database the source of
+                # truth for dila uniqueness — the read-snapshot + flock above
+                # only guard same-host concurrency, so a concurrent cron/webhook/
+                # manual run could otherwise re-insert a duplicate. The predicate
+                # must match the partial index. rowcount counts only real inserts
+                # (DO NOTHING skips return 0).
+                result = await session.execute(text("""
                     INSERT INTO kg_entities (entity_type, name_zh, name_en, description, properties, external_ids)
                     VALUES ('person', :nz, :ne, :desc, :props::json, :ext::json)
+                    ON CONFLICT ((external_ids->>'dila'))
+                    WHERE external_ids->>'dila' IS NOT NULL
+                    DO NOTHING
                 """), {
                     "nz": p["name_zh"], "ne": p.get("name_en", ""),
                     "desc": p.get("desc", ""),
                     "props": json.dumps(props, ensure_ascii=False),
                     "ext": json.dumps({"dila": p["aid"]}),
                 })
-                inserted += 1
+                inserted += result.rowcount or 0
             await session.commit()
 
         # Get max ID after insert
