@@ -38,6 +38,10 @@ class TextResponseBase(TextBase):
     # Both NULL when the cbeta_id prefix is unrecognized.
     canon: str | None = None
     canon_label: str | None = None
+    # Goryeo (Tripitaka Koreana) cross-reference: K-number + KABC reader URL,
+    # NULL when the text has no Goryeo parallel.
+    goryeo_k: str | None = None
+    kabc_url: str | None = None
 
     model_config = {"from_attributes": True}
 

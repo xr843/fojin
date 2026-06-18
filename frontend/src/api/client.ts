@@ -128,6 +128,9 @@ export interface TextDetail {
   content_char_count: number;
   lang: string;
   created_at: string;
+  // Goryeo (Tripitaka Koreana) cross-reference, null when no Goryeo parallel.
+  goryeo_k?: string | null;
+  kabc_url?: string | null;
 }
 
 export interface JuanInfo {

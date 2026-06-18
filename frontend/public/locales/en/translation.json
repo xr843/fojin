@@ -710,5 +710,9 @@
   "reader.lineref.copy_citation": "Copy citation",
   "reader.lineref.copy_link": "Copy link",
   "reader.lineref.copied": "Copied",
-  "reader.lineref.citation": "{{title}} (CBETA {{id}}, fasc. {{juan}}, {{ref}})"
+  "reader.lineref.citation": "{{title}} (CBETA {{id}}, fasc. {{juan}}, {{ref}})",
+  "reader.kabc.link": "Goryeo {{k}}",
+  "reader.kabc.tooltip": "View this sutra's Goryeo (Tripitaka Koreana) edition on KABC (Dongguk Univ.)",
+  "reader.pageref.toggle": "Page refs",
+  "reader.pageref.tooltip": "Show Taishō page·column markers (page boundaries) in the text"
 }

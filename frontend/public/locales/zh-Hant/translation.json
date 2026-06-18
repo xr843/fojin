@@ -710,5 +710,9 @@
   "reader.lineref.copy_citation": "複製引用",
   "reader.lineref.copy_link": "複製連結",
   "reader.lineref.copied": "已複製",
-  "reader.lineref.citation": "《{{title}}》卷{{juan}}（CBETA {{id}}, {{ref}}）"
+  "reader.lineref.citation": "《{{title}}》卷{{juan}}（CBETA {{id}}, {{ref}}）",
+  "reader.kabc.link": "高麗藏 {{k}}",
+  "reader.kabc.tooltip": "在 KABC（東國大學）查看本經的高麗再雕藏版",
+  "reader.pageref.toggle": "頁碼",
+  "reader.pageref.tooltip": "在正文顯示大正藏頁·欄（頁邊界）"
 }
