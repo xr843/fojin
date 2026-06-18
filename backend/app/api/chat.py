@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from pathlib import Path
 from uuid import uuid4
@@ -171,9 +172,12 @@ async def upload_chat_attachment(
     upload_dir.mkdir(parents=True, exist_ok=True)
     disk_name = f"{uuid4().hex}{ext}"
     storage_path = str(upload_dir / disk_name)
+    # Disk write and parse both run off the event loop: a 10MB PDF parse is
+    # 200-500ms of pure-CPU pypdf/docx work and would otherwise freeze the
+    # whole worker (stalling every concurrent request, including in-flight
+    # /chat/stream) for the duration of one upload.
     try:
-        with open(storage_path, "wb") as fh:
-            fh.write(file_bytes)
+        await asyncio.to_thread(Path(storage_path).write_bytes, file_bytes)
     except OSError as exc:
         logger.exception("Failed to persist chat attachment to disk")
         raise HTTPException(status_code=500, detail=f"文件保存失败：{exc}") from exc
@@ -181,7 +185,9 @@ async def upload_chat_attachment(
     parsed_text: str | None = None
     parse_error: str | None = None
     try:
-        parsed_text = parse_attachment(file_bytes, filename, file.content_type or "")
+        parsed_text = await asyncio.to_thread(
+            parse_attachment, file_bytes, filename, file.content_type or ""
+        )
     except ValueError as exc:
         parse_error = str(exc)[:500]
         logger.info("Attachment parse failed for %s: %s", filename, parse_error)

@@ -1,5 +1,6 @@
 """RAG retrieval: pgvector semantic similarity search + reranking."""
 
+import asyncio
 import logging
 import re
 import time
@@ -12,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app.config import settings
+from app.database import async_session
 from app.models.dictionary import DictionaryEntry
 from app.schemas.chat import ChatSource
 from app.services.embedding import generate_embedding, similarity_search, source_similarity_search
@@ -594,16 +596,43 @@ async def retrieve_rag_context(
             # Per-language top-k retrieval, then alignment-aware merging.
             # scope_text_ids (master persona mode) bypasses parallel mode
             # since master's scriptures are already filtered to a specific set.
-            lzh_hits = await similarity_search(db, query_embedding, limit=PARALLEL_LZH_K, lang_list=["lzh"])
-            pi_hits = await similarity_search(db, query_embedding, limit=PARALLEL_PI_K, lang_list=["pi"])
-            bo_hits = await similarity_search(db, query_embedding, limit=PARALLEL_BO_K, lang_list=["bo"])
+            #
+            # The three language searches and the source search are mutually
+            # independent (same query_embedding, no shared state), so run them
+            # concurrently instead of serially. Each MUST get its own session:
+            # one AsyncSession multiplexes a single asyncpg connection and
+            # cannot run concurrent queries ("another operation is in progress").
+            # Returned rows are plain dicts, so they stay valid after the
+            # session closes. During this sub-second window an in-flight
+            # /chat/stream holds up to 5 pooled connections (1 prep session +
+            # 4 search) before the LLM-streaming phase releases them all
+            # (pool 10+20) — fine at this site's concurrency, but watch
+            # pg_stat_activity if traffic grows.
+            async def _vsearch(limit, lang_list):
+                async with async_session() as s:
+                    return await similarity_search(
+                        s, query_embedding, limit=limit, lang_list=lang_list
+                    )
+
+            async def _ssearch():
+                async with async_session() as s:
+                    return await source_similarity_search(
+                        s, query_embedding, limit=3, min_score=0.5
+                    )
+
+            lzh_hits, pi_hits, bo_hits, source_results = await asyncio.gather(
+                _vsearch(PARALLEL_LZH_K, ["lzh"]),
+                _vsearch(PARALLEL_PI_K, ["pi"]),
+                _vsearch(PARALLEL_BO_K, ["bo"]),
+                _ssearch(),
+            )
             text_results = _merge_with_alignment_sync(lzh_hits, pi_hits, bo_hits)
         else:
             text_results = await similarity_search(
                 db, query_embedding, limit=pgvector_limit, scope_text_ids=scope_text_ids
             )
+            source_results = await source_similarity_search(db, query_embedding, limit=3, min_score=0.5)
 
-        source_results = await source_similarity_search(db, query_embedding, limit=3, min_score=0.5)
         logger.debug("TIMING: pgvector search took %.2fs", time.monotonic() - t1)
 
         # Filter out low-relevance chunks and deduplicate by (text_id, juan_num)
