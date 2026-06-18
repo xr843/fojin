@@ -705,5 +705,6 @@
   "reader.apparatus.empty": "此卷暫無校勘異文",
   "reader.apparatus.summary": "底本與宋 / 元 / 明 / 麗等校本的異讀，共 {{n}} 條",
   "reader.apparatus.omission": "（無此字）",
-  "reader.apparatus.corrector": "（{{resp}} 校）"
+  "reader.apparatus.corrector": "（{{resp}} 校）",
+  "reader.apparatus.note": "校註"
 }
