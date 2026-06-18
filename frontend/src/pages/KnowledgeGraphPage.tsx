@@ -375,11 +375,19 @@ export default function KnowledgeGraphPage() {
     if (isMobile) setMobileTab("graph");
   };
 
-  const handleGraphNodeClick = (node: { id: number }) => {
-    setSelectedEntityId(node.id);
-    // 移动端：点击图谱节点后自动切到详情 Tab
-    if (isMobile) setMobileTab("detail");
-  };
+  // Memoised so its identity is stable across KGPage re-renders. ForceGraph's
+  // d3 effect lists onNodeClick in its deps; an inline function would be a new
+  // reference every render and rebuild the entire force simulation (selectAll
+  // remove + re-layout) on any unrelated state change. onNodeExpand is already
+  // memoised for the same reason.
+  const handleGraphNodeClick = useCallback(
+    (node: { id: number }) => {
+      setSelectedEntityId(node.id);
+      // 移动端：点击图谱节点后自动切到详情 Tab
+      if (isMobile) setMobileTab("detail");
+    },
+    [isMobile],
+  );
 
   // 点击「推荐探索」入口：相当于一次带类型过滤的搜索
   const handleCurated = (label: string, type: string) => {
