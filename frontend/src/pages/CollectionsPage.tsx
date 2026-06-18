@@ -15,6 +15,7 @@ import {
   FileImageOutlined,
   VerticalAlignTopOutlined,
 } from "@ant-design/icons";
+import { api } from "../api/client";
 import collections, {
   RESOURCE_CATEGORIES,
   type Collection,
@@ -302,10 +303,17 @@ export default function CollectionsPage() {
       [...c.mainTexts, ...c.commentaries].map((t) => t.cbeta_id).filter(Boolean),
     );
     if (allIds.length === 0) return;
-    fetch(`/api/texts/lookup-cbeta?ids=${encodeURIComponent(allIds.join(","))}`)
-      .then((r) => r.json())
-      .then((data) => setCbetaMap(data))
-      .catch(() => {});
+    // Go through the shared axios instance (interceptors + non-2xx → throw)
+    // instead of a bare fetch whose `.then(r => r.json())` ignored the status
+    // and whose `.catch(() => {})` swallowed failures silently. CBETA links are
+    // progressive enhancement, so a failure still degrades gracefully — but it
+    // must be visible in the console, not dropped.
+    api
+      .get<Record<string, number>>("/texts/lookup-cbeta", { params: { ids: allIds.join(",") } })
+      .then((r) => setCbetaMap(r.data))
+      .catch((err) => {
+        console.warn("CBETA id 映射加载失败，相关外链将不可用", err);
+      });
   }, []);
 
   const filtered = useMemo(() => {
