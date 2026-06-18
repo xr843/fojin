@@ -697,5 +697,12 @@
   "lang.nl": "Dutch",
   "lang.pt": "Portuguese",
   "lang.ne": "Nepali",
-  "lang.hi": "Hindi"
+  "lang.hi": "Hindi",
+  "reader.apparatus.toggle": "Apparatus",
+  "reader.apparatus.tooltip": "Critical apparatus (base text vs. Song/Yuan/Ming/Goryeo witnesses)",
+  "reader.apparatus.title": "Apparatus · Fascicle {{n}}",
+  "reader.apparatus.empty": "No critical apparatus for this fascicle",
+  "reader.apparatus.summary": "{{n}} variant readings against witness canons",
+  "reader.apparatus.omission": "(omitted)",
+  "reader.apparatus.corrector": "(corr. {{resp}})"
 }

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Helmet } from "react-helmet-async";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Typography, Spin, Button, Select, Breadcrumb, Row, Col, message, Tooltip, Tag } from "antd";
@@ -15,11 +16,13 @@ import {
   HeartFilled,
   RobotOutlined,
   GlobalOutlined,
+  DiffOutlined,
 } from "@ant-design/icons";
 import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBookmark, addBookmark, removeBookmark, searchDictionaryGrouped } from "../api/client";
 import { useAuthStore } from "../stores/authStore";
 import CitationGenerator from "../components/CitationGenerator";
 import AnnotationPanel from "../components/AnnotationPanel";
+import ApparatusPanel from "../components/ApparatusPanel";
 import { ReaderDictPopover } from "../components/ReaderDictPopover";
 import { DICT_POPOVER_INIT, MAX_WORD_LEN, type DictPopoverState } from "../components/ReaderDictPopover.types";
 import ReaderAIPanel from "../components/ReaderAIPanel";
@@ -292,8 +295,10 @@ export default function TextReaderPage() {
     return 1;
   });
   const [fontSize, setFontSize] = useState(getInitialFontSize);
+  const { t } = useTranslation();
   const [citationOpen, setCitationOpen] = useState(false);
   const [annotationOpen, setAnnotationOpen] = useState(false);
+  const [apparatusOpen, setApparatusOpen] = useState(false);
   const [parallelPanelOpen, setParallelPanelOpen] = useState(false);
 
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
@@ -737,6 +742,16 @@ export default function TextReaderPage() {
           >
             引用
           </Button>
+          <Tooltip title={t("reader.apparatus.tooltip")}>
+            <Button
+              size="small"
+              type={apparatusOpen ? "primary" : "default"}
+              icon={<DiffOutlined />}
+              onClick={() => setApparatusOpen((v) => !v)}
+            >
+              {t("reader.apparatus.toggle")}
+            </Button>
+          </Tooltip>
           <Tooltip title="跨藏对照（其他版本 · 经级/段级对读）">
             <Button
               size="small"
@@ -875,6 +890,13 @@ export default function TextReaderPage() {
         juanNum={juanNum}
         visible={annotationOpen}
         onClose={() => setAnnotationOpen(false)}
+      />
+
+      <ApparatusPanel
+        textId={textId}
+        juanNum={juanNum}
+        visible={apparatusOpen}
+        onClose={() => setApparatusOpen(false)}
       />
 
     </div>

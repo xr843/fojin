@@ -539,6 +539,33 @@ export async function getJuanLanguages(textId: number, juanNum: number): Promise
   return data;
 }
 
+// Critical apparatus (校勘异文)
+export interface ApparatusReadingItem {
+  reading: string;
+  witnesses: string[];
+  resp: string | null;
+  is_omission: boolean;
+}
+
+export interface ApparatusEntryItem {
+  char_start: number;
+  char_end: number;
+  lemma: string;
+  lemma_siglum: string | null;
+  readings: ApparatusReadingItem[];
+}
+
+export interface JuanApparatusResponse {
+  text_id: TextId;
+  juan_num: number;
+  entries: ApparatusEntryItem[];
+}
+
+export async function getJuanApparatus(textId: number, juanNum: number): Promise<JuanApparatusResponse> {
+  const { data } = await api.get<JuanApparatusResponse>(`/texts/${textId}/juans/${juanNum}/apparatus`);
+  return data;
+}
+
 // Content search
 export async function searchContent(params: {
   q: string;

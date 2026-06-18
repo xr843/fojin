@@ -697,5 +697,12 @@
   "lang.nl": "荷兰文",
   "lang.pt": "葡萄牙文",
   "lang.ne": "尼泊尔文",
-  "lang.hi": "印地文"
+  "lang.hi": "印地文",
+  "reader.apparatus.toggle": "校勘",
+  "reader.apparatus.tooltip": "校勘异文（底本与宋/元/明等校本的异读）",
+  "reader.apparatus.title": "校勘异文 · 第{{n}}卷",
+  "reader.apparatus.empty": "此卷暂无校勘异文",
+  "reader.apparatus.summary": "底本与宋 / 元 / 明 / 麗等校本的异读，共 {{n}} 条",
+  "reader.apparatus.omission": "（无此字）",
+  "reader.apparatus.corrector": "（{{resp}} 校）"
 }
