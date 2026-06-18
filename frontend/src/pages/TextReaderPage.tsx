@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Helmet } from "react-helmet-async";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Typography, Spin, Button, Select, Breadcrumb, Row, Col, message, Tooltip, Tag } from "antd";
@@ -294,6 +295,7 @@ export default function TextReaderPage() {
     return 1;
   });
   const [fontSize, setFontSize] = useState(getInitialFontSize);
+  const { t } = useTranslation();
   const [citationOpen, setCitationOpen] = useState(false);
   const [annotationOpen, setAnnotationOpen] = useState(false);
   const [apparatusOpen, setApparatusOpen] = useState(false);
@@ -740,14 +742,14 @@ export default function TextReaderPage() {
           >
             引用
           </Button>
-          <Tooltip title="校勘异文（底本与宋/元/明等校本的异读）">
+          <Tooltip title={t("reader.apparatus.tooltip")}>
             <Button
               size="small"
               type={apparatusOpen ? "primary" : "default"}
               icon={<DiffOutlined />}
               onClick={() => setApparatusOpen((v) => !v)}
             >
-              校勘
+              {t("reader.apparatus.toggle")}
             </Button>
           </Tooltip>
           <Tooltip title="跨藏对照（其他版本 · 经级/段级对读）">

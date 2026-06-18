@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Drawer, List, Tag, Typography, Empty, Spin, Space } from "antd";
 import { getJuanApparatus, type ApparatusEntryItem } from "../api/client";
 
@@ -17,11 +18,8 @@ interface ApparatusPanelProps {
  * (宋/元/明/麗…). Footnote-style list; inline highlighting is a later iteration
  * (the reader reflows text, so char offsets don't map to the rendered DOM).
  */
-function readingText(reading: string, isOmission: boolean): string {
-  return isOmission ? "（無此字）" : reading;
-}
-
 export default function ApparatusPanel({ textId, juanNum, visible, onClose }: ApparatusPanelProps) {
+  const { t } = useTranslation();
   const { data, isLoading } = useQuery({
     queryKey: ["juanApparatus", textId, juanNum],
     queryFn: () => getJuanApparatus(textId, juanNum),
@@ -32,7 +30,7 @@ export default function ApparatusPanel({ textId, juanNum, visible, onClose }: Ap
 
   return (
     <Drawer
-      title={`校勘异文 · 第${juanNum}卷`}
+      title={t("reader.apparatus.title", { n: juanNum })}
       placement="right"
       width={440}
       open={visible}
@@ -43,11 +41,11 @@ export default function ApparatusPanel({ textId, juanNum, visible, onClose }: Ap
           <Spin />
         </div>
       ) : entries.length === 0 ? (
-        <Empty description="此卷暂无校勘异文" />
+        <Empty description={t("reader.apparatus.empty")} />
       ) : (
         <>
           <Text type="secondary" style={{ display: "block", marginBottom: 12 }}>
-            底本与宋 / 元 / 明 / 麗等校本的异读，共 {entries.length} 条
+            {t("reader.apparatus.summary", { n: entries.length })}
           </Text>
           <List
             size="small"
@@ -68,10 +66,10 @@ export default function ApparatusPanel({ textId, juanNum, visible, onClose }: Ap
                               {w}
                             </Tag>
                           ))}
-                          <Text>{readingText(r.reading, r.is_omission)}</Text>
+                          <Text>{r.is_omission ? t("reader.apparatus.omission") : r.reading}</Text>
                           {r.resp && (
                             <Text type="secondary" style={{ fontSize: 12 }}>
-                              （{r.resp} 校）
+                              {t("reader.apparatus.corrector", { resp: r.resp })}
                             </Text>
                           )}
                         </Space>
