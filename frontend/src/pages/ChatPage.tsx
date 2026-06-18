@@ -1,9 +1,9 @@
-import { useState, useRef, useCallback, useMemo, useEffect, lazy, Suspense, type ReactNode } from "react";
+import { useState, useRef, useCallback, useMemo, useEffect, lazy, Suspense, memo, type ReactNode } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
 import { Input, Button, message, Alert, Tooltip, Modal, Select, Tag, Spin } from "antd";
-import Markdown, { defaultUrlTransform } from "react-markdown";
+import Markdown, { defaultUrlTransform, type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import {
@@ -57,7 +57,7 @@ import {
   uploadChatAttachment,
   type ChatAttachmentMeta,
 } from "../api/chatAttachments";
-import { useAuthStore } from "../stores/authStore";
+import { useAuthStore, type UserProfile } from "../stores/authStore";
 
 const MAX_ATTACHMENTS = 5;
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
@@ -279,6 +279,180 @@ function groupSessionsByDate(sessions: ChatSessionItem[]): { label: string; item
   if (groups.older.length) result.push({ label: "chat.session_group_older", items: groups.older });
   return result;
 }
+
+interface MessageBubbleProps {
+  m: ChatMessageItem;
+  isStreaming: boolean;
+  sending: boolean;
+  user: UserProfile | null;
+  markdownComponents: Components;
+  onSuggestionClick: (q: string) => void;
+  onShare: (m: ChatMessageItem) => void;
+  onRetry: (m: ChatMessageItem) => void;
+  onFeedback: (m: ChatMessageItem, dir: "up" | "down") => void;
+}
+
+/** One chat message row, memoised on (m, isStreaming, sending, user). A streaming
+    token swaps only the streaming message's object identity (onToken does {...m}),
+    so only THAT bubble re-renders — history is skipped. Previously the markdown
+    preprocessing (parseFollowUps / injectCitationLinks / tightenLists + the
+    react-markdown render) re-ran for every historical message on every token,
+    which was the dominant "越聊越卡" jank in long conversations. */
+function MessageBubbleInner({
+  m, isStreaming, sending, user, markdownComponents,
+  onSuggestionClick, onShare, onRetry, onFeedback,
+}: MessageBubbleProps) {
+  // Read t here (not as a prop): on a mid-conversation language switch, i18next's
+  // subscription re-renders the bubble — which memo does NOT block, since memo
+  // only short-circuits parent-driven, prop-equal re-renders — so tooltips/toasts
+  // update immediately, without `t` having to enter the comparator (and without
+  // risking the per-token memo skip if t's identity weren't stable).
+  const { t } = useTranslation();
+  const isAssistantText =
+    m.role === "assistant" && m.content !== THINKING_SENTINEL && m.content !== REQUEST_FAILED_SENTINEL;
+
+  // While streaming the 追问 block is incomplete, so skip parseFollowUps then
+  // (matches the previous inline behaviour). Memoised so a re-render that isn't
+  // a content change (e.g. `sending` toggling) doesn't re-parse.
+  const { cleanContent, suggestions } = useMemo(() => {
+    if (!isAssistantText) return { cleanContent: "", suggestions: [] as string[] };
+    return isStreaming ? { cleanContent: m.content, suggestions: [] as string[] } : parseFollowUps(m.content);
+  }, [isAssistantText, isStreaming, m.content]);
+
+  const rendered = useMemo(
+    () => (isAssistantText ? tightenLists(injectCitationLinks(cleanContent, m.sources)) + (isStreaming ? " ▌" : "") : ""),
+    [isAssistantText, cleanContent, m.sources, isStreaming],
+  );
+
+  return (
+    <div style={{
+      display: "flex", gap: 12, marginBottom: 16, padding: "0 16px",
+      flexDirection: m.role === "user" ? "row-reverse" : "row",
+    }}>
+      <div style={{
+        width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        background: m.role === "user" ? "var(--fj-accent)" : "rgba(217,208,193,0.5)",
+        color: m.role === "user" ? "#fff" : "var(--fj-ink)", fontSize: 14,
+      }}>
+        {m.role === "user" ? <UserOutlined /> : <RobotOutlined />}
+      </div>
+      <div style={{ maxWidth: "75%", display: "flex", flexDirection: "column", alignItems: m.role === "user" ? "flex-end" : "flex-start" }}>
+        <div style={{
+          padding: "10px 16px", borderRadius: 12,
+          background: m.role === "user" ? "var(--fj-accent)" : "rgba(217,208,193,0.2)",
+          color: m.role === "user" ? "#fff" : "var(--fj-ink)",
+          fontSize: 14, lineHeight: 1.8, whiteSpace: "pre-wrap", wordBreak: "break-word",
+        }}>
+          {m.role === "assistant" ? (
+            m.content === THINKING_SENTINEL ? (
+              <div className="chat-thinking">
+                {t("chat.thinking")}
+                <span className="chat-thinking-dots"><span /><span /><span /></span>
+              </div>
+            ) : m.content === REQUEST_FAILED_SENTINEL ? (
+              t("chat.request_failed")
+            ) : (
+              <>
+                <div className="chat-markdown">
+                  <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[[rehypeSanitize, CHAT_SANITIZE_SCHEMA]]} urlTransform={chatUrlTransform} components={markdownComponents}>{rendered}</Markdown>
+                </div>
+                {suggestions.length > 0 && !sending && (
+                  <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {suggestions.map((q, i) => (
+                      <span
+                        key={i}
+                        onClick={() => onSuggestionClick(q)}
+                        style={{
+                          display: "inline-block", padding: "4px 12px", borderRadius: 14,
+                          border: "1px solid var(--fj-gold, #b08d57)", color: "var(--fj-gold, #b08d57)",
+                          fontSize: 12, cursor: "pointer", background: "transparent", transition: "all 0.2s", lineHeight: 1.6,
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(176,141,87,0.1)"; e.currentTarget.style.color = "var(--fj-accent)"; e.currentTarget.style.borderColor = "var(--fj-accent)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--fj-gold, #b08d57)"; e.currentTarget.style.borderColor = "var(--fj-gold, #b08d57)"; }}
+                      >
+                        {q}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </>
+            )
+          ) : (
+            m.content
+          )}
+        </div>
+        {/* Action buttons outside bubble */}
+        {m.content !== THINKING_SENTINEL && !isStreaming && (
+          <div style={{ marginTop: 4, display: "flex", gap: 4 }}>
+            <Tooltip title={t("chat.copy")}>
+              <Button
+                type="text" size="small" icon={<CopyOutlined />}
+                style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
+                onClick={() => {
+                  const textToCopy = m.role === "assistant" ? parseFollowUps(m.content).cleanContent : m.content;
+                  navigator.clipboard.writeText(textToCopy);
+                  message.success(t("chat.copied"));
+                }}
+              />
+            </Tooltip>
+            {m.role === "assistant" && m.content !== REQUEST_FAILED_SENTINEL && (
+              <Tooltip title={t("chat.share_card_tooltip")}>
+                <Button
+                  type="text" size="small" icon={<ShareAltOutlined />}
+                  style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
+                  onClick={() => onShare(m)}
+                />
+              </Tooltip>
+            )}
+            {/* Hide feedback affordances until the real chat_messages.id has
+                replaced the in-flight Date.now() placeholder (≥ ~1.7e12); a click
+                during the streaming-but-not-yet-saved window would PUT to a
+                nonexistent id and 404 silently. */}
+            {m.role === "assistant" && user && m.id < 1e12 && (
+              <>
+                <Tooltip title={t("chat.feedback_helpful")}>
+                  <Button
+                    type="text" size="small"
+                    icon={m.feedback === "up" ? <LikeFilled /> : <LikeOutlined />}
+                    style={{ color: m.feedback === "up" ? "var(--fj-accent)" : "var(--fj-ink-muted)", fontSize: 12 }}
+                    onClick={() => onFeedback(m, "up")}
+                  />
+                </Tooltip>
+                <Tooltip title={t("chat.feedback_not_helpful")}>
+                  <Button
+                    type="text" size="small"
+                    icon={m.feedback === "down" ? <DislikeFilled /> : <DislikeOutlined />}
+                    style={{ color: m.feedback === "down" ? "#e74c3c" : "var(--fj-ink-muted)", fontSize: 12 }}
+                    onClick={() => onFeedback(m, "down")}
+                  />
+                </Tooltip>
+              </>
+            )}
+            {m.role === "assistant" && m.content === REQUEST_FAILED_SENTINEL && (
+              <Tooltip title={t("chat.retry")}>
+                <Button
+                  type="text" size="small" icon={<ReloadOutlined />}
+                  style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
+                  onClick={() => onRetry(m)}
+                />
+              </Tooltip>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export const MessageBubble = memo(
+  MessageBubbleInner,
+  (prev, next) =>
+    prev.m === next.m &&
+    prev.isStreaming === next.isStreaming &&
+    prev.sending === next.sending &&
+    prev.user === next.user,
+);
 
 export default function ChatPage() {
   const navigate = useNavigate();
@@ -775,6 +949,42 @@ export default function ChatPage() {
     await handleSendMessage(input);
   }, [input, handleSendMessage]);
 
+  // Hoisted so MessageBubble can stay memoised. These depend on `messages`, so
+  // their identity changes when the list does — but the memo comparator ignores
+  // callback props, and the history is append-only, so a memoised historical
+  // bubble keeps a closure over an older `messages` whose relevant prefix (the
+  // preceding user question / the message to retry) is unchanged. Feedback uses
+  // the functional setMessages form, so it's correct regardless of staleness.
+  const handleShareMessage = useCallback((m: ChatMessageItem) => {
+    const idx = messages.findIndex((x) => x.id === m.id);
+    let question = "";
+    for (let i = idx - 1; i >= 0; i--) {
+      if (messages[i].role === "user") { question = messages[i].content; break; }
+    }
+    setShareTarget({
+      question: question || t("chat.share_default_question"),
+      answer: parseFollowUps(m.content).cleanContent,
+      sources: m.sources,
+    });
+  }, [messages, t]);
+
+  const handleRetryMessage = useCallback((m: ChatMessageItem) => {
+    const idx = messages.findIndex((x) => x.id === m.id);
+    const userMsg = idx > 0 ? messages[idx - 1] : null;
+    if (userMsg && userMsg.role === "user") {
+      setMessages((prev) => prev.filter((x) => x.id !== m.id && x.id !== userMsg.id));
+      handleSendMessage(userMsg.content);
+    }
+  }, [messages, handleSendMessage]);
+
+  const handleFeedbackMessage = useCallback((m: ChatMessageItem, dir: "up" | "down") => {
+    const newFeedback = m.feedback === dir ? null : dir;
+    setMessages((prev) => prev.map((x) => x.id === m.id ? { ...x, feedback: newFeedback } : x));
+    updateChatMessageFeedback(m.id, newFeedback as "up" | "down" | null).catch(() => {
+      setMessages((prev) => prev.map((x) => x.id === m.id ? { ...x, feedback: m.feedback } : x));
+    });
+  }, []);
+
   // Tab key: cycle through suggested questions when input is empty
   const tabSuggestions = useMemo(() => {
     // Prefer follow-up suggestions from the last assistant message
@@ -1102,189 +1312,18 @@ export default function ChatPage() {
               </div>
             )}
             {messages.map((m) => (
-              <div key={m.id} style={{
-                display: "flex",
-                gap: 12,
-                marginBottom: 16,
-                padding: "0 16px",
-                flexDirection: m.role === "user" ? "row-reverse" : "row",
-              }}>
-                <div style={{
-                  width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  background: m.role === "user" ? "var(--fj-accent)" : "rgba(217,208,193,0.5)",
-                  color: m.role === "user" ? "#fff" : "var(--fj-ink)",
-                  fontSize: 14,
-                }}>
-                  {m.role === "user" ? <UserOutlined /> : <RobotOutlined />}
-                </div>
-                <div style={{ maxWidth: "75%", display: "flex", flexDirection: "column", alignItems: m.role === "user" ? "flex-end" : "flex-start" }}>
-                <div style={{
-                  padding: "10px 16px",
-                  borderRadius: 12,
-                  background: m.role === "user" ? "var(--fj-accent)" : "rgba(217,208,193,0.2)",
-                  color: m.role === "user" ? "#fff" : "var(--fj-ink)",
-                  fontSize: 14,
-                  lineHeight: 1.8,
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
-                }}>
-                  {m.role === "assistant" ? (
-                    m.content === THINKING_SENTINEL ? (
-                      <div className="chat-thinking">
-                        {t("chat.thinking")}
-                        <span className="chat-thinking-dots"><span /><span /><span /></span>
-                      </div>
-                    ) : m.content === REQUEST_FAILED_SENTINEL ? (
-                      t("chat.request_failed")
-                    ) : (() => {
-                      const isStreaming = streamingIdRef.current === m.id;
-                      const { cleanContent, suggestions } = isStreaming
-                        ? { cleanContent: m.content, suggestions: [] }
-                        : parseFollowUps(m.content);
-                      return (
-                        <>
-                          <div className="chat-markdown">
-                            <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[[rehypeSanitize, CHAT_SANITIZE_SCHEMA]]} urlTransform={chatUrlTransform} components={markdownComponents}>{tightenLists(injectCitationLinks(cleanContent, m.sources)) + (isStreaming ? " ▌" : "")}</Markdown>
-                          </div>
-                          {suggestions.length > 0 && !sending && (
-                            <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>
-                              {suggestions.map((q, i) => (
-                                <span
-                                  key={i}
-                                  onClick={() => handleSendMessage(q)}
-                                  style={{
-                                    display: "inline-block",
-                                    padding: "4px 12px",
-                                    borderRadius: 14,
-                                    border: "1px solid var(--fj-gold, #b08d57)",
-                                    color: "var(--fj-gold, #b08d57)",
-                                    fontSize: 12,
-                                    cursor: "pointer",
-                                    background: "transparent",
-                                    transition: "all 0.2s",
-                                    lineHeight: 1.6,
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = "rgba(176,141,87,0.1)";
-                                    e.currentTarget.style.color = "var(--fj-accent)";
-                                    e.currentTarget.style.borderColor = "var(--fj-accent)";
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = "transparent";
-                                    e.currentTarget.style.color = "var(--fj-gold, #b08d57)";
-                                    e.currentTarget.style.borderColor = "var(--fj-gold, #b08d57)";
-                                  }}
-                                >
-                                  {q}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()
-                  ) : (
-                    m.content
-                  )}
-                </div>
-                {/* Action buttons outside bubble */}
-                {m.content !== THINKING_SENTINEL && streamingIdRef.current !== m.id && (
-                  <div style={{ marginTop: 4, display: "flex", gap: 4 }}>
-                    <Tooltip title={t("chat.copy")}>
-                      <Button
-                        type="text" size="small" icon={<CopyOutlined />}
-                        style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
-                        onClick={() => {
-                          const textToCopy = m.role === "assistant"
-                            ? parseFollowUps(m.content).cleanContent
-                            : m.content;
-                          navigator.clipboard.writeText(textToCopy);
-                          message.success(t("chat.copied"));
-                        }}
-                      />
-                    </Tooltip>
-                      {m.role === "assistant" && m.content !== REQUEST_FAILED_SENTINEL && (
-                        <Tooltip title={t("chat.share_card_tooltip")}>
-                          <Button
-                            type="text" size="small" icon={<ShareAltOutlined />}
-                            style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
-                            onClick={() => {
-                              const idx = messages.findIndex((x) => x.id === m.id);
-                              let question = "";
-                              for (let i = idx - 1; i >= 0; i--) {
-                                if (messages[i].role === "user") {
-                                  question = messages[i].content;
-                                  break;
-                                }
-                              }
-                              setShareTarget({
-                                question: question || t("chat.share_default_question"),
-                                answer: parseFollowUps(m.content).cleanContent,
-                                sources: m.sources,
-                              });
-                            }}
-                          />
-                        </Tooltip>
-                      )}
-                      {m.role === "assistant" && user && m.id < 1e12 && (
-                        // Hide feedback affordances until the real
-                        // chat_messages.id has replaced the in-flight
-                        // Date.now() placeholder (Date.now() ≥ ~1.7e12,
-                        // real DB ids ≪ 1e12). A click during the
-                        // streaming-but-not-yet-saved window would PUT
-                        // to a nonexistent id and 404 silently.
-                        <>
-                          <Tooltip title={t("chat.feedback_helpful")}>
-                            <Button
-                              type="text" size="small"
-                              icon={m.feedback === "up" ? <LikeFilled /> : <LikeOutlined />}
-                              style={{ color: m.feedback === "up" ? "var(--fj-accent)" : "var(--fj-ink-muted)", fontSize: 12 }}
-                              onClick={() => {
-                                const newFeedback = m.feedback === "up" ? null : "up";
-                                setMessages((prev) => prev.map((x) => x.id === m.id ? { ...x, feedback: newFeedback } : x));
-                                updateChatMessageFeedback(m.id, newFeedback as "up" | "down" | null).catch(() => {
-                                  setMessages((prev) => prev.map((x) => x.id === m.id ? { ...x, feedback: m.feedback } : x));
-                                });
-                              }}
-                            />
-                          </Tooltip>
-                          <Tooltip title={t("chat.feedback_not_helpful")}>
-                            <Button
-                              type="text" size="small"
-                              icon={m.feedback === "down" ? <DislikeFilled /> : <DislikeOutlined />}
-                              style={{ color: m.feedback === "down" ? "#e74c3c" : "var(--fj-ink-muted)", fontSize: 12 }}
-                              onClick={() => {
-                                const newFeedback = m.feedback === "down" ? null : "down";
-                                setMessages((prev) => prev.map((x) => x.id === m.id ? { ...x, feedback: newFeedback } : x));
-                                updateChatMessageFeedback(m.id, newFeedback as "up" | "down" | null).catch(() => {
-                                  setMessages((prev) => prev.map((x) => x.id === m.id ? { ...x, feedback: m.feedback } : x));
-                                });
-                              }}
-                            />
-                          </Tooltip>
-                        </>
-                      )}
-                      {m.role === "assistant" && m.content === REQUEST_FAILED_SENTINEL && (
-                        <Tooltip title={t("chat.retry")}>
-                          <Button
-                            type="text" size="small" icon={<ReloadOutlined />}
-                            style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
-                            onClick={() => {
-                              const idx = messages.findIndex((x) => x.id === m.id);
-                              const userMsg = idx > 0 ? messages[idx - 1] : null;
-                              if (userMsg && userMsg.role === "user") {
-                                setMessages((prev) => prev.filter((x) => x.id !== m.id && x.id !== userMsg.id));
-                                handleSendMessage(userMsg.content);
-                              }
-                            }}
-                          />
-                        </Tooltip>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
+              <MessageBubble
+                key={m.id}
+                m={m}
+                isStreaming={streamingIdRef.current === m.id}
+                sending={sending}
+                user={user}
+                markdownComponents={markdownComponents}
+                onSuggestionClick={handleSendMessage}
+                onShare={handleShareMessage}
+                onRetry={handleRetryMessage}
+                onFeedback={handleFeedbackMessage}
+              />
             ))}
             {/* Streaming cursor is shown inline via ▌ in the message bubble */}
             <div ref={bottomRef} />
