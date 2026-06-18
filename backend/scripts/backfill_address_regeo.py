@@ -12,6 +12,7 @@ import math
 import os
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -61,6 +62,39 @@ def _transform_lon(x, y):
     return ret
 
 
+# Amap infocodes meaning "too fast" (per-second / concurrency QPS) — retryable
+# with backoff. Daily-quota exhaustion (10003) and key/param errors are NOT
+# retried (backoff can't recover them within the run).
+_AMAP_QPS_INFOCODES = {"10019", "10021", "10029"}
+
+
+def _amap_get_with_retry(url: str, retries: int = 3) -> dict | None:
+    """GET the Amap regeo URL with backoff on transient failures (HTTP 429/5xx,
+    network errors, timeouts, and the per-second QPS infocodes above).
+
+    The old code did a single bare urlopen, so one Amap hiccup dropped that
+    monastery for the whole daily cron run — and the free tier's ~per-second
+    limit makes those hiccups common. Returns the parsed JSON, or None when
+    every attempt failed (caller treats that as "skip, retry next run")."""
+    delay = 1.5
+    for attempt in range(retries):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                data = json.loads(resp.read())
+            if data.get("status") == "1" or data.get("infocode") not in _AMAP_QPS_INFOCODES:
+                return data  # success, or a non-retryable failure (quota/param/key)
+        except urllib.error.HTTPError as e:
+            if e.code != 429 and e.code < 500:
+                return None  # client error (bad key/param) — retrying won't help
+        except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError):
+            pass  # transient network / parse error — fall through to retry
+        if attempt < retries - 1:
+            time.sleep(delay)
+            delay *= 2  # 1.5s → 3s
+    return None
+
+
 def regeo(lng_wgs, lat_wgs) -> dict | None:
     lng_gcj, lat_gcj = wgs84_to_gcj02(lng_wgs, lat_wgs)
     params = urllib.parse.urlencode({
@@ -70,10 +104,8 @@ def regeo(lng_wgs, lat_wgs) -> dict | None:
         "output": "json",
     })
     url = f"{AMAP_REGEO_URL}?{params}"
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        data = json.loads(resp.read())
-    if data.get("status") != "1":
+    data = _amap_get_with_retry(url)
+    if not data or data.get("status") != "1":
         return None
     comp = data.get("regeocode", {}).get("addressComponent", {})
     province = comp.get("province", "")
