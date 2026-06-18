@@ -5,11 +5,14 @@ from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import jittered_ttl
 from app.core.exceptions import KGEntityNotFoundError
 from app.database import get_db
 
 KG_GEO_CACHE_TTL = 1800  # 30 min
 KG_LINEAGE_CACHE_TTL = 1800
+KG_STATS_CACHE_TTL = 3600  # 1 hour — recomputed on import, fine to be ~1h stale
+KG_TIMELINE_CACHE_TTL = 3600
 from app.schemas.knowledge_graph import (
     KGEntityDetailResponse,
     KGEntityResponse,
@@ -122,15 +125,31 @@ async def get_kg_entity_graph(
 
 
 @router.get("/stats")
-async def kg_stats(db: AsyncSession = Depends(get_db)):
+async def kg_stats(request: Request, db: AsyncSession = Depends(get_db)):
     """Get knowledge graph statistics (entity and relation counts by type).
 
-    获取知识图谱统计信息（各类型实体与关系数量）。"""
-    return await get_kg_stats(db)
+    获取知识图谱统计信息（各类型实体与关系数量）。
+
+    Cached: the underlying query is two full GROUP BY COUNT(*) scans over
+    kg_entities/kg_relations and the result only changes when the KG is
+    re-imported, so a ~1h cache is plenty and keeps the dashboard off the
+    hot path."""
+    redis_client = getattr(request.app.state, "redis", None)
+    cache_key = "kg:stats"
+    if redis_client:
+        cached = await redis_client.get(cache_key)
+        if cached:
+            return Response(content=cached, media_type="application/json")
+    stats = await get_kg_stats(db)
+    payload = json.dumps(stats, ensure_ascii=False, default=str)
+    if redis_client:
+        await redis_client.setex(cache_key, jittered_ttl(KG_STATS_CACHE_TTL), payload)
+    return Response(content=payload, media_type="application/json")
 
 
 @router.get("/timeline", response_model=KGTimelineResponse)
 async def get_kg_timeline(
+    request: Request,
     entity_type: str | None = Query(
         None,
         description="Filter by entity type (e.g. 'person', 'dynasty'). Omit for all temporal entities.",
@@ -140,12 +159,30 @@ async def get_kg_timeline(
 ):
     """Get knowledge graph entities with temporal data for timeline display.
 
-    返回携带有效起始年份的知识图谱实体，用于时间轴可视化。BCE年份以负整数表示。"""
+    返回携带有效起始年份的知识图谱实体，用于时间轴可视化。BCE年份以负整数表示。
+
+    Cached like /stats: scans kg_entities filtering on the JSON year fields
+    and only changes on KG re-import."""
+    redis_client = getattr(request.app.state, "redis", None)
+    cache_key = None
+    if redis_client:
+        key_payload = json.dumps(
+            {"t": entity_type, "l": limit}, sort_keys=True, separators=(",", ":")
+        )
+        cache_key = f"kg:timeline:{hashlib.sha1(key_payload.encode()).hexdigest()}"  # nosec B324
+        cached = await redis_client.get(cache_key)
+        if cached:
+            return Response(content=cached, media_type="application/json")
+
     entities, total = await get_timeline_entities(db, entity_type, limit)
-    return KGTimelineResponse(
+    response = KGTimelineResponse(
         entities=[KGTimelineEntity(**e) for e in entities],
         total=total,
     )
+    payload = response.model_dump_json()
+    if redis_client and cache_key:
+        await redis_client.setex(cache_key, jittered_ttl(KG_TIMELINE_CACHE_TTL), payload)
+    return Response(content=payload, media_type="application/json")
 
 
 @router.get("/geo", response_model=KGGeoResponse)
@@ -195,7 +232,7 @@ async def get_kg_geo_entities(
     )
     payload = response.model_dump_json()
     if redis_client and cache_key:
-        await redis_client.setex(cache_key, KG_GEO_CACHE_TTL, payload)
+        await redis_client.setex(cache_key, jittered_ttl(KG_GEO_CACHE_TTL), payload)
     return Response(content=payload, media_type="application/json")
 
 
@@ -228,7 +265,7 @@ async def get_kg_lineage_arcs(
     response = KGLineageArcsResponse(arcs=arcs, total=total)
     payload = response.model_dump_json()
     if redis_client and cache_key:
-        await redis_client.setex(cache_key, KG_LINEAGE_CACHE_TTL, payload)
+        await redis_client.setex(cache_key, jittered_ttl(KG_LINEAGE_CACHE_TTL), payload)
     return Response(content=payload, media_type="application/json")
 
 

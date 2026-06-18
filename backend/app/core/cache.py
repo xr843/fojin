@@ -12,8 +12,24 @@ The ``redis`` argument may be ``None`` (caching disabled), in which case
 
 import json
 import logging
+import random
 
 logger = logging.getLogger(__name__)
+
+
+def jittered_ttl(ttl: int, spread: float = 0.15) -> int:
+    """Apply ±spread random jitter to a TTL.
+
+    A batch of keys written in the same request/loop (e.g. the KG geo /
+    lineage / stats / timeline caches, or a sweep of stats keys) would
+    otherwise all expire on the same tick, so when a hot key lapses several
+    concurrent requests miss together and stampede the expensive backing
+    query at once. Spreading the expiry smooths that herd. Returns ≥1s.
+    """
+    delta = int(ttl * spread)
+    if delta <= 0:
+        return max(1, ttl)
+    return max(1, ttl + random.randint(-delta, delta))  # nosec B311 — jitter, not crypto
 
 
 async def cache_get(redis, key: str) -> dict | None:
@@ -34,6 +50,6 @@ async def cache_set(redis, key: str, value: dict, ttl: int) -> None:
     if redis is None:
         return
     try:
-        await redis.setex(key, ttl, json.dumps(value, ensure_ascii=False, default=str))
+        await redis.setex(key, jittered_ttl(ttl), json.dumps(value, ensure_ascii=False, default=str))
     except Exception:
         logger.debug("Cache set error for key=%s", key)
