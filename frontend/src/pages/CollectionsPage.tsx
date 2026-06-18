@@ -203,6 +203,10 @@ const LANG_LABELS: Record<string, { labelKey: string; color: string }> = {
   sa: { labelKey: "lang.sa", color: "orange" },
 };
 
+// Muted CSS tints for the cross-canon table column headers — a quiet language
+// cue without the 24 saturated antd Tags the old chip grid stacked up.
+const LANG_TINT: Record<string, string> = { bo: "#7c5cbf", sa: "#bd7b3a", pi: "#3f9268" };
+
 /** 跨藏对照专区：哪些经有逐段对照语料（可发现性入口）。
     API 失败/空数据时整块隐身，可与 backend 端点解耦部署。 */
 function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useNavigate> }) {
@@ -222,12 +226,12 @@ function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useN
     if (!data) return [];
     const m = new Map<
       number,
-      { text_id: number; title: string; sample_juan: number; total: number; langs: { lang: string; count: number }[] }
+      { text_id: number; title: string; cbeta_id: string; sample_juan: number; total: number; langs: { lang: string; count: number }[] }
     >();
     for (const e of data.entries) {
       let g = m.get(e.text_id);
       if (!g) {
-        g = { text_id: e.text_id, title: e.title_zh || e.cbeta_id, sample_juan: e.sample_juan, total: 0, langs: [] };
+        g = { text_id: e.text_id, title: e.title_zh || e.cbeta_id, cbeta_id: e.cbeta_id, sample_juan: e.sample_juan, total: 0, langs: [] };
         m.set(e.text_id, g);
       }
       g.langs.push({ lang: e.other_lang, count: e.pair_count });
@@ -239,6 +243,24 @@ function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useN
   }, [data]);
 
   if (!data || groups.length === 0) return null;
+
+  // Show the most-covered TOP_N as an aligned table. The previous flex-wrap of
+  // variable-width chips left a ragged right edge and repeated the 藏文/梵文/段
+  // labels on every chip; a table left-aligns the names into one column, right-
+  // aligns tabular-number counts under single 藏文/梵文 column headers, and a
+  // muted cbeta id disambiguates same-titled translations (e.g. 60卷/80卷 華嚴經).
+  const shown = groups.slice(0, TOP_N);
+  const LANG_ORDER = ["bo", "sa", "pi"];
+  // Canonical bo/sa/pi columns first, then any other language present so a
+  // stray lang's pair_count is never silently dropped from the table.
+  const present = [...new Set(shown.flatMap((g) => g.langs.map((l) => l.lang)))];
+  const langCols = [
+    ...LANG_ORDER.filter((lc) => present.includes(lc)),
+    ...present.filter((lc) => !LANG_ORDER.includes(lc)),
+  ];
+  const countFor = (g: (typeof shown)[number], lang: string) =>
+    g.langs.find((l) => l.lang === lang)?.count;
+
   return (
     <div className="coll-card" style={{ marginBottom: 24 }}>
       <div className="coll-section" style={{ padding: "16px 20px" }}>
@@ -248,30 +270,55 @@ function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useN
         <p style={{ fontSize: 12, color: "var(--fj-ink-muted)", margin: "4px 0 12px" }}>
           {t("collections.alignment_desc")}
         </p>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {groups.slice(0, TOP_N).map((g) => (
-            <button
-              key={g.text_id}
-              className="source-btn"
-              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-              // 阅读器而非 /parallel：sample_juan 保证该卷有锚点（对本整本存为
-              // juan 1，/parallel 在 juan>1 时对本栏全空）。
-              onClick={() => navigate(`/texts/${g.text_id}/read?juan=${g.sample_juan}`)}
-            >
-              <span>{g.title}</span>
-              {g.langs.map((l) => {
-                const lang = LANG_LABELS[l.lang];
-                return (
-                  <span key={l.lang} style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
-                    <Tag color={lang?.color ?? "default"} style={{ margin: 0, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}>
-                      {lang ? t(lang.labelKey) : l.lang}
-                    </Tag>
-                    <span style={{ fontSize: 11, color: "var(--fj-ink-muted)" }}>{t("collections.pair_count", { n: l.count })}</span>
-                  </span>
-                );
-              })}
-            </button>
-          ))}
+        <div className="cc-table-wrap">
+          <table className="cc-table">
+            <thead>
+              <tr>
+                <th className="cc-th cc-name-col">{t("collections.col_text")}</th>
+                {langCols.map((lc) => (
+                  <th key={lc} className="cc-th cc-num" style={{ color: LANG_TINT[lc] }}>
+                    {t(LANG_LABELS[lc]?.labelKey ?? lc)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((g) => (
+                // 阅读器而非 /parallel：sample_juan 保证该卷有锚点（对本整本存为
+                // juan 1，/parallel 在 juan>1 时对本栏全空）。
+                <tr
+                  key={g.text_id}
+                  className="cc-row"
+                  role="link"
+                  tabIndex={0}
+                  onClick={() => navigate(`/texts/${g.text_id}/read?juan=${g.sample_juan}`)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      navigate(`/texts/${g.text_id}/read?juan=${g.sample_juan}`);
+                    }
+                  }}
+                >
+                  <td className="cc-name-col">
+                    <span className="cc-title">{g.title}</span>
+                    {/* title falls back to cbeta_id when title_zh is empty —
+                        don't print the id twice ("T0279 T0279") in that case. */}
+                    {g.cbeta_id && g.cbeta_id !== g.title && (
+                      <span className="cc-cbeta">{g.cbeta_id}</span>
+                    )}
+                  </td>
+                  {langCols.map((lc) => {
+                    const c = countFor(g, lc);
+                    return (
+                      <td key={lc} className="cc-num">
+                        {c != null ? c.toLocaleString() : <span className="cc-empty">—</span>}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
         {groups.length > TOP_N && (
           <p style={{ fontSize: 12, margin: "12px 0 0" }}>

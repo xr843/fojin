@@ -548,6 +548,7 @@
   "collections.pair_count": "{{n}} 段",
   "collections.partner_count": "{{n}} 部对本",
   "collections.alignment_more": "显示覆盖最多的 {{n}} 部 · 共 {{total}} 部经",
+  "collections.col_text": "经典名称",
   "crosscanon.entry_title": "跨藏对照",
   "crosscanon.entry_hint": "藏/梵逐段对读",
   "crosscanon.page_desc": "{{texts}} 部经 · {{pairs}} 组逐段跨语对照",
