@@ -706,5 +706,9 @@
   "reader.apparatus.summary": "底本與宋 / 元 / 明 / 麗等校本的異讀，共 {{n}} 條",
   "reader.apparatus.omission": "（無此字）",
   "reader.apparatus.corrector": "（{{resp}} 校）",
-  "reader.apparatus.note": "校註"
+  "reader.apparatus.note": "校註",
+  "reader.lineref.copy_citation": "複製引用",
+  "reader.lineref.copy_link": "複製連結",
+  "reader.lineref.copied": "已複製",
+  "reader.lineref.citation": "《{{title}}》卷{{juan}}（CBETA {{id}}, {{ref}}）"
 }

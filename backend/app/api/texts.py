@@ -17,6 +17,7 @@ from app.services.content import (
     get_juan_apparatus,
     get_juan_content,
     get_juan_languages,
+    get_juan_line_anchors,
     get_juan_list,
 )
 from app.services.text import get_text_by_id, get_text_count, get_text_id_by_cbeta
@@ -107,6 +108,17 @@ class JuanApparatusResponse(BaseModel):
     text_id: int
     juan_num: int
     entries: list[ApparatusEntryItem] = []
+
+
+class LineAnchorItem(BaseModel):
+    char_offset: int
+    line_ref: str
+
+
+class JuanLineAnchorsResponse(BaseModel):
+    text_id: int
+    juan_num: int
+    anchors: list[LineAnchorItem] = []
 
 
 class ChunkContextItem(BaseModel):
@@ -208,6 +220,20 @@ async def read_juan_apparatus(
     Loaded lazily by the reader — a major text can carry thousands of entries."""
     entries = await get_juan_apparatus(db, text_id, juan_num)
     return JuanApparatusResponse(text_id=text_id, juan_num=juan_num, entries=entries)
+
+
+@router.get("/texts/{text_id}/juans/{juan_num}/line-anchors", response_model=JuanLineAnchorsResponse)
+async def read_juan_line_anchors(
+    text_id: int,
+    juan_num: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """CBETA <lb> page-column-line anchors for a juan (char_offset → line_ref).
+
+    获取某一卷的页·栏·行锚点，供阅读器按需定位引用与 URN 跳行。
+    Loaded lazily by the reader; a juan can carry several hundred anchors."""
+    anchors = await get_juan_line_anchors(db, text_id, juan_num)
+    return JuanLineAnchorsResponse(text_id=text_id, juan_num=juan_num, anchors=anchors)
 
 
 @router.get("/stats")

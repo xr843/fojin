@@ -2,7 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.text import BuddhistText, TextApparatus, TextContent
+from app.models.text import BuddhistText, TextApparatus, TextContent, TextLineAnchor
 from app.schemas.text import JuanContentResponse, JuanInfo, JuanLanguagesResponse, JuanListResponse
 
 
@@ -153,3 +153,15 @@ async def get_juan_apparatus(session: AsyncSession, text_id: int, juan_num: int)
         }
         for e in result.scalars().all()
     ]
+
+
+async def get_juan_line_anchors(session: AsyncSession, text_id: int, juan_num: int) -> list[dict]:
+    """CBETA <lb> page-column-line anchors for one juan, ordered by position.
+    Each: {char_offset, line_ref} (line_ref e.g. "0001a09"). Drives the reader's
+    on-demand citation locator and URN #anchor scroll-to-line."""
+    result = await session.execute(
+        select(TextLineAnchor.char_offset, TextLineAnchor.line_ref)
+        .where(TextLineAnchor.text_id == text_id, TextLineAnchor.juan_num == juan_num)
+        .order_by(TextLineAnchor.char_offset)
+    )
+    return [{"char_offset": off, "line_ref": ref} for off, ref in result.all()]

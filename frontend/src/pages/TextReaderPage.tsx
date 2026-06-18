@@ -18,7 +18,7 @@ import {
   GlobalOutlined,
   DiffOutlined,
 } from "@ant-design/icons";
-import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBookmark, addBookmark, removeBookmark, searchDictionaryGrouped, getJuanApparatus, type ApparatusEntryItem } from "../api/client";
+import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBookmark, addBookmark, removeBookmark, searchDictionaryGrouped, getJuanApparatus, getJuanLineAnchors, type ApparatusEntryItem } from "../api/client";
 import { useAuthStore } from "../stores/authStore";
 import CitationGenerator from "../components/CitationGenerator";
 import AnnotationPanel from "../components/AnnotationPanel";
@@ -256,7 +256,24 @@ type TFn = (key: string, opts?: Record<string, unknown>) => string;
 // start/end are UTF-16 offsets into the content string (converted from the
 // backend's Python code-point offsets) so they index the reflowed segments.
 interface ApparatusNumbered { entry: ApparatusEntryItem; no: number; start: number; end: number }
-type ApparatusCtx = { numbered: ApparatusNumbered[]; t: TFn } | null;
+// off = UTF-16 offset of a CBETA <lb> line anchor within the content.
+interface LineAnchorConv { off: number; ref: string }
+type ReaderCtx = { numbered: ApparatusNumbered[]; lineAnchors: LineAnchorConv[]; t: TFn } | null;
+
+/** Build a map from Python code-point index → JS UTF-16 index for `raw`.
+ * Backend offsets are code-point indices; supplementary-plane CJK (surrogate
+ * pairs) would otherwise drift the mapping. Index `[n]` = UTF-16 offset; the
+ * final sentinel covers an offset at end-of-string. */
+function cpToU16Map(raw: string): number[] {
+  const map: number[] = [];
+  let u = 0;
+  for (const ch of raw) {
+    map.push(u);
+    u += ch.length;
+  }
+  map.push(u);
+  return map;
+}
 
 /** CBETA-style inline apparatus marker: a clickable superscript [n] placed
  * right after the lemma; clicking opens a 校注 popover with base text + variants. */
@@ -289,16 +306,28 @@ function ApparatusMarker({ no, entry, t }: { no: number; entry: ApparatusEntryIt
   );
 }
 
-/** Splice inline apparatus markers into a text-bearing segment by mapping each
- * entry's raw char offset to a position within the reflowed segment text. */
-function renderSegmentChildren(seg: Extract<TextSegment, { text: string }>, numbered: ApparatusNumbered[], t: TFn): ReactNode {
+/** Splice into a text-bearing segment, by content offset: visible apparatus
+ * markers (校勘 [n]) after each lemma, and zero-width line-anchor spans (carrying
+ * the CBETA page-col-line ref) for the on-demand citation locator and URN scroll. */
+function renderSegmentChildren(seg: Extract<TextSegment, { text: string }>, ctx: NonNullable<ReaderCtx>): ReactNode {
+  const { numbered, lineAnchors, t } = ctx;
   const { text, offsets } = seg;
-  if (!numbered.length || !offsets.length) return text;
+  if (!offsets.length || (!numbered.length && !lineAnchors.length)) return text;
   const segStart = offsets[0];
   const segEnd = offsets[offsets.length - 1];
   const offToLocal = new Map<number, number>();
   for (let k = 0; k < offsets.length; k++) offToLocal.set(offsets[k], k);
-  const marks: { pos: number; m: ApparatusNumbered }[] = [];
+
+  // order: line anchors (0) before apparatus markers (1) when at the same position.
+  const ins: { pos: number; order: number; node: ReactNode }[] = [];
+  for (const la of lineAnchors) {
+    if (la.off < segStart || la.off > segEnd || !offToLocal.has(la.off)) continue;
+    ins.push({
+      pos: offToLocal.get(la.off)!,
+      order: 0,
+      node: <span key={`ln${la.ref}`} className="cbeta-line" data-ref={la.ref} />,
+    });
+  }
   for (const m of numbered) {
     const cs = m.start;
     if (cs < segStart || cs > segEnd || !offToLocal.has(cs)) continue;
@@ -307,25 +336,40 @@ function renderSegmentChildren(seg: Extract<TextSegment, { text: string }>, numb
     // locStart + the lemma's own length — robust when the lemma is followed by or
     // spans a line break (where char_end would point at a dropped "\n").
     const pos = Math.min(offToLocal.get(cs)! + m.entry.lemma.length, text.length);
-    marks.push({ pos, m });
+    ins.push({ pos, order: 1, node: <ApparatusMarker key={`ap${m.no}`} no={m.no} entry={m.entry} t={t} /> });
   }
-  if (!marks.length) return text;
-  marks.sort((a, b) => a.pos - b.pos);
+  if (!ins.length) return text;
+  ins.sort((a, b) => a.pos - b.pos || a.order - b.order);
   const nodes: ReactNode[] = [];
   let cursor = 0;
-  for (const { pos, m } of marks) {
-    if (pos > cursor) nodes.push(text.slice(cursor, pos));
-    nodes.push(<ApparatusMarker key={`ap${m.no}`} no={m.no} entry={m.entry} t={t} />);
-    cursor = Math.max(cursor, pos);
+  for (const it of ins) {
+    if (it.pos > cursor) nodes.push(text.slice(cursor, it.pos));
+    nodes.push(it.node);
+    cursor = Math.max(cursor, it.pos);
   }
   if (cursor < text.length) nodes.push(text.slice(cursor));
   return nodes;
 }
 
-function renderSegment(seg: TextSegment, i: number, ctx?: ApparatusCtx) {
+function renderSegment(seg: TextSegment, i: number, ctx?: ReaderCtx) {
   if (seg.type === "break") return <br key={i} />;
-  const children = ctx ? renderSegmentChildren(seg, ctx.numbered, ctx.t) : seg.text;
+  const children = ctx ? renderSegmentChildren(seg, ctx) : seg.text;
   return <p key={i} className={`text-${seg.type}`}>{children}</p>;
+}
+
+/** CBETA line ref (e.g. "0001a09") of the embedded <span class="cbeta-line">
+ * nearest before `startNode` — i.e. the page-col-line the selection sits in. */
+function nearestLineRef(container: HTMLElement, startNode: Node): string | null {
+  let ref: string | null = null;
+  for (const el of Array.from(container.querySelectorAll<HTMLElement>(".cbeta-line"))) {
+    const pos = el.compareDocumentPosition(startNode);
+    if (pos === 0 || pos & Node.DOCUMENT_POSITION_FOLLOWING) {
+      ref = el.dataset.ref ?? ref; // el is at/before the selection → candidate
+    } else {
+      break; // anchors are in document order; rest are after the selection
+    }
+  }
+  return ref;
 }
 
 function getInitialFontSize(): number {
@@ -463,7 +507,12 @@ export default function TextReaderPage() {
 
   // 划词查辞典
   const [dictPopover, setDictPopover] = useState<DictPopoverState>(DICT_POPOVER_INIT);
-  const closeDictPopover = useCallback(() => setDictPopover(DICT_POPOVER_INIT), []);
+  // On-demand citation locator: the CBETA line ref at the current selection.
+  const [lineLocator, setLineLocator] = useState<{ ref: string; x: number; y: number } | null>(null);
+  const closeDictPopover = useCallback(() => {
+    setDictPopover(DICT_POPOVER_INIT);
+    setLineLocator(null);
+  }, []);
 
   const handleTextSelect = useCallback(async () => {
     const sel = window.getSelection();
@@ -477,6 +526,11 @@ export default function TextReaderPage() {
     const rect = range.getBoundingClientRect();
     const x = rect.left + rect.width / 2;
     const y = rect.bottom;
+
+    // Citation locator: CBETA page-col-line at the selection (needs embedded anchors).
+    const containerEl = readerContentRef.current;
+    const ref = containerEl ? nearestLineRef(containerEl, range.startContainer) : null;
+    setLineLocator(ref ? { ref, x, y: rect.top } : null);
 
     // 短词查辞典；整句选择只显示「问小津」，不查辞典
     const isWord = text.length <= MAX_WORD_LEN;
@@ -716,32 +770,58 @@ export default function TextReaderPage() {
     staleTime: 3600000,
   });
   // Number aligned entries 1..N in reading order, converting the backend's
-  // Python code-point offsets to JS UTF-16 offsets (CJK Ext-B etc. are
-  // surrogate pairs — 1 code point but 2 UTF-16 units — so a raw index would
-  // drift after the first supplementary char).
+  // Python code-point offsets to JS UTF-16 offsets (see cpToU16Map).
   const apparatusNumbered = useMemo<ApparatusNumbered[]>(() => {
     const raw = content?.content;
     if (!apparatusData?.entries || !raw) return [];
-    const cpToU16: number[] = [];
-    let u = 0;
-    for (const ch of raw) {
-      cpToU16.push(u);
-      u += ch.length;
-    }
-    cpToU16.push(u); // sentinel for an offset at end-of-string
-    const conv = (cp: number) => (cp >= 0 && cp < cpToU16.length ? cpToU16[cp] : u);
+    const m = cpToU16Map(raw);
+    const conv = (cp: number) => (cp >= 0 && cp < m.length ? m[cp] : m[m.length - 1]);
     return [...apparatusData.entries]
       .sort((a, b) => a.char_start - b.char_start)
-      .map((entry, idx) => ({
-        entry,
-        no: idx + 1,
-        start: conv(entry.char_start),
-        end: conv(entry.char_end),
-      }));
+      .map((entry, idx) => ({ entry, no: idx + 1, start: conv(entry.char_start), end: conv(entry.char_end) }));
   }, [apparatusData, content?.content]);
-  const apparatusCtx: ApparatusCtx = apparatusOn && apparatusNumbered.length
-    ? { numbered: apparatusNumbered, t }
+
+  // CBETA <lb> line anchors for citation locating + URN scroll. Fetched for
+  // every juan (small read); offsets converted code-point → UTF-16 like apparatus.
+  const { data: lineAnchorData } = useQuery({
+    queryKey: ["juanLineAnchors", textId, juanNum],
+    queryFn: () => getJuanLineAnchors(Number(textId), juanNum),
+    enabled: !!textId,
+    staleTime: 3600000,
+  });
+  const lineAnchors = useMemo<LineAnchorConv[]>(() => {
+    const raw = content?.content;
+    if (!lineAnchorData?.anchors || !raw) return [];
+    const m = cpToU16Map(raw);
+    const conv = (cp: number) => (cp >= 0 && cp < m.length ? m[cp] : m[m.length - 1]);
+    return lineAnchorData.anchors.map((a) => ({ off: conv(a.char_offset), ref: a.line_ref }));
+  }, [lineAnchorData, content?.content]);
+
+  // One context drives both inline layers. Apparatus markers only when toggled on;
+  // line anchors always embedded (invisible) so selection/URN can locate a line.
+  const readerCtx: ReaderCtx = (apparatusOn && apparatusNumbered.length) || lineAnchors.length
+    ? { numbered: apparatusOn ? apparatusNumbered : [], lineAnchors, t }
     : null;
+
+  // URN deep-link: ?anchor=p0001a09 → scroll to that CBETA line + brief flash.
+  useEffect(() => {
+    const anchorParam = searchParams.get("anchor");
+    if (!anchorParam || !lineAnchors.length) return;
+    const ref = anchorParam.replace(/^p/, "");
+    const raf = requestAnimationFrame(() => {
+      const el = readerContentRef.current?.querySelector<HTMLElement>(
+        `.cbeta-line[data-ref="${CSS.escape(ref)}"]`,
+      );
+      if (!el) return;
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+      const p = el.closest("p");
+      if (p) {
+        p.classList.add("cbeta-line-flash");
+        setTimeout(() => p.classList.remove("cbeta-line-flash"), 2200);
+      }
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [searchParams, lineAnchors, juanNum]);
 
   const changeFontSize = (delta: number) => {
     setFontSize((prev) => {
@@ -938,7 +1018,7 @@ export default function TextReaderPage() {
                   className="reader-body"
                   style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
                 >
-                  {reflowedContent.map((seg, i) => renderSegment(seg, i, apparatusCtx))}
+                  {reflowedContent.map((seg, i) => renderSegment(seg, i, readerCtx))}
                 </div>
               </div>
             </Col>
@@ -965,7 +1045,7 @@ export default function TextReaderPage() {
             className="reader-body"
             style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
           >
-            {reflowedContent.map((seg, i) => renderSegment(seg, i, apparatusCtx))}
+            {reflowedContent.map((seg, i) => renderSegment(seg, i, readerCtx))}
           </div>
         )
       ) : (
@@ -976,6 +1056,34 @@ export default function TextReaderPage() {
         onClose={closeDictPopover}
         onAsk={handleAskXiaojin}
       />
+      {lineLocator && content && (
+        <div
+          className="cbeta-line-locator"
+          style={{ position: "fixed", left: lineLocator.x, top: Math.max(lineLocator.y - 40, 8), transform: "translateX(-50%)" }}
+        >
+          <span className="cbeta-line-locator-ref">{content.cbeta_id} · {lineLocator.ref}</span>
+          <button
+            type="button"
+            onClick={() => {
+              navigator.clipboard?.writeText(
+                t("reader.lineref.citation", { title: content.title_zh, juan: juanNum, id: content.cbeta_id, ref: lineLocator.ref }),
+              );
+              message.success(t("reader.lineref.copied"));
+            }}
+          >
+            {t("reader.lineref.copy_citation")}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              navigator.clipboard?.writeText(`fojin:cbeta/${content.cbeta_id}.${juanNum}#p${lineLocator.ref}`);
+              message.success(t("reader.lineref.copied"));
+            }}
+          >
+            {t("reader.lineref.copy_link")}
+          </button>
+        </div>
+      )}
       </div>
 
       {/* Bottom navigation */}
