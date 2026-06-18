@@ -18,6 +18,7 @@ Usage:
 import argparse
 import asyncio
 import json
+import logging
 import os
 import sys
 
@@ -27,8 +28,16 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.config import settings
-from app.core.xml_parser import find_all_xml_files, parse_tei_apparatus, parse_tei_xml
-from app.models.text import ApparatusReading, BuddhistText, TextApparatus, TextLineAnchor
+from app.core.xml_parser import find_all_xml_files, parse_tei_apparatus
+from app.models.text import (
+    ApparatusReading,
+    BuddhistText,
+    TextApparatus,
+    TextContent,
+    TextLineAnchor,
+)
+
+logger = logging.getLogger("import_apparatus")
 
 # CBETA canon collections that carry a standoff apparatus. Non-CBETA sources
 # (SuttaCentral SC-, GRETIL) have no <app> and simply yield nothing.
@@ -61,7 +70,11 @@ def clear_checkpoint():
 
 
 async def import_work(session: AsyncSession, bt: BuddhistText, xml_dir: str) -> dict:
-    """Parse + store apparatus and line anchors for one work.
+    """Parse + store apparatus and line anchors for one work, then commit.
+
+    Alignment is validated against the body content ALREADY STORED in
+    text_contents (not the freshly parsed XML), so XML/DB drift can only
+    downgrade an entry to aligned=False — never silently misposition it.
 
     Returns counts: {entries, aligned, skipped_no_juan, readings, line_anchors}.
     """
@@ -69,29 +82,47 @@ async def import_work(session: AsyncSession, bt: BuddhistText, xml_dir: str) -> 
     if not xml_files:
         return {}
 
+    # Stored body content this work's offsets must match.
+    res = await session.execute(
+        select(TextContent.juan_num, TextContent.content).where(TextContent.text_id == bt.id)
+    )
+    stored_content = {jn: c for jn, c in res.all()}
+    if not stored_content:
+        logger.warning("%s: no stored content — run import_content first; skipping", bt.cbeta_id)
+        return {}
+
     # Collect apparatus entries + line anchors across all files of the work.
     entries: list[dict] = []
     line_rows: list[dict] = []
     seen_app: set[tuple] = set()
     seen_line: set[tuple] = set()
+    drift = 0
     for xml_file in xml_files:
-        for e in parse_tei_apparatus(xml_file)["entries"]:
+        data = parse_tei_apparatus(xml_file)
+        for e in data["entries"]:
             if e["juan_num"] is None:
-                # Unlocatable (sidelined preface / anchor in a skipped tag).
-                entries.append(e)  # counted, not stored
+                entries.append(e)  # unlocatable (preface/skipped tag) — counted, not stored
                 continue
             key = (e["juan_num"], e["app_n"])
             if key in seen_app:
                 continue
             seen_app.add(key)
+            # Re-validate against the stored body, not the parsed XML.
+            if e["aligned"] and e["char_start"] is not None:
+                span = stored_content.get(e["juan_num"], "")[e["char_start"]:e["char_end"]]
+                if span.replace("\n", "").replace(" ", "") != e["lemma"]:
+                    e = {**e, "aligned": False}
+                    drift += 1
             entries.append(e)
-        for j in parse_tei_xml(xml_file):
-            for la in j.get("line_anchors", []):
-                key = (j["juan_num"], la["line"])
-                if key in seen_line:
-                    continue
-                seen_line.add(key)
-                line_rows.append({"juan_num": j["juan_num"], **la})
+        for la in data["line_anchors"]:
+            key = (la["juan_num"], la["line"])
+            if key in seen_line:
+                continue
+            seen_line.add(key)
+            line_rows.append(la)
+
+    if drift:
+        logger.warning("%s: %d entries failed stored-content re-validation (XML/DB drift)", bt.cbeta_id, drift)
 
     # Idempotent reinsert.
     await session.execute(delete(TextApparatus).where(TextApparatus.text_id == bt.id))
@@ -131,6 +162,11 @@ async def import_work(session: AsyncSession, bt: BuddhistText, xml_dir: str) -> 
             char_offset=la["offset"],
             line_ref=la["line"],
         ))
+
+    # Commit + clear the identity map per work so memory stays bounded across a
+    # large collection (T01n0001 alone is ~3k entries + ~11k line anchors).
+    await session.commit()
+    session.expunge_all()
 
     stored = sum(1 for e in entries if e["juan_num"] is not None)
     return {

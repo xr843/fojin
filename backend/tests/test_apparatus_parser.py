@@ -137,6 +137,33 @@ def test_apparatus_aligns_across_line_break(tmp_path):
     assert entry["aligned"] is True
 
 
+GAIJI_RDG_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<TEI xmlns="http://www.tei-c.org/ns/1.0" xmlns:cb="http://www.cbeta.org/ns/1.0">
+<teiHeader><fileDesc><titleStmt><title>x</title></titleStmt>
+<publicationStmt><p>x</p></publicationStmt>
+<sourceDesc><bibl>x</bibl></sourceDesc></fileDesc>
+<encodingDesc><tagsDecl><namespace name="x"><tagUsage gi="x"><listWit>
+<witness xml:id="wit.orig">【大】</witness>
+<witness xml:id="wit1">【宋】</witness>
+</listWit></tagUsage></namespace></tagsDecl></encodingDesc></teiHeader>
+<text><body>
+<milestone n="1" unit="juan"/>
+<p><anchor xml:id="beg1"/>慧<anchor xml:id="end1"/>命。</p>
+</body>
+<back><cb:div type="apparatus"><head>校注</head><p>
+<app from="#beg1" to="#end1"><lem wit="#wit.orig">慧</lem><rdg wit="#wit1">大<g ref="#CB99999">慧</g></rdg></app>
+</p></cb:div></back>
+</text></TEI>
+"""
+
+
+def test_apparatus_reading_resolves_gaiji(tmp_path):
+    """A <g> gaiji inside a <rdg> is resolved (here via the non-PUA text fallback)."""
+    result = parse_tei_apparatus(_write(tmp_path, GAIJI_RDG_XML))
+    entry = next(e for e in result["entries"] if e["lemma"] == "慧")
+    assert entry["readings"][0]["reading"] == "大慧"
+
+
 def test_apparatus_omission_reading(tmp_path):
     """<rdg><space/></rdg> marks a witness that omits the lemma."""
     result = parse_tei_apparatus(_write(tmp_path, APP_XML))

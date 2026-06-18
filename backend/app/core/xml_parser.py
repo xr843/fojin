@@ -595,10 +595,13 @@ def parse_tei_apparatus(xml_path: str | Path) -> dict:
     juans = parse_tei_xml(xml_path)
     contents: dict[int, str] = {}
     anchor_loc: dict[str, tuple[int, int]] = {}
+    line_anchors: list[dict] = []
     for j in juans:
         contents[j["juan_num"]] = j["content"]
         for aid, off in j.get("anchors", {}).items():
             anchor_loc[aid] = (j["juan_num"], off)
+        for la in j.get("line_anchors", []):
+            line_anchors.append({"juan_num": j["juan_num"], "offset": la["offset"], "line": la["line"]})
 
     entries: list[dict] = []
     for app in apps:
@@ -624,7 +627,9 @@ def parse_tei_apparatus(xml_path: str | Path) -> dict:
         # boundaries; the lemma text does not. Offsets are still correct, so
         # compare with whitespace stripped.
         span = contents.get(juan_num, "")[start:end]
-        aligned = span.replace("\n", "").replace(" ", "") == app["lemma"]
+        # Empty lemma would "align" to any whitespace-only span — require a
+        # non-empty lemma so a malformed <lem> is flagged, not falsely matched.
+        aligned = bool(app["lemma"]) and span.replace("\n", "").replace(" ", "") == app["lemma"]
         entries.append({
             "app_n": app["app_n"],
             "juan_num": juan_num,
@@ -635,4 +640,4 @@ def parse_tei_apparatus(xml_path: str | Path) -> dict:
             "aligned": aligned,
             "readings": app["readings"],
         })
-    return {"witnesses": witnesses, "entries": entries}
+    return {"witnesses": witnesses, "entries": entries, "line_anchors": line_anchors}
