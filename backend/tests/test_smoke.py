@@ -320,6 +320,14 @@ async def test_kg_entity_detail(client):
     # Mock the DB session; get_entity() calls session.get(KGEntity, id)
     mock_session = AsyncMock()
     mock_session.get = AsyncMock(return_value=fake_entity)
+    # The detail route also calls get_entity_relations(), which runs
+    # session.execute(...).fetchall(). Without configuring it, AsyncMock
+    # returns a coroutine for fetchall() and the relations comprehension
+    # raises "TypeError: 'coroutine' object is not iterable". This entity
+    # has no relations in the smoke test.
+    mock_relations_result = MagicMock()
+    mock_relations_result.fetchall.return_value = []
+    mock_session.execute = AsyncMock(return_value=mock_relations_result)
 
     app.dependency_overrides[real_get_db] = lambda: mock_session
     try:

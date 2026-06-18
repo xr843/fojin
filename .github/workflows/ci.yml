@@ -32,7 +32,7 @@ jobs:
         run: pip install ruff==0.9.7 && ruff check app/
 
       - name: Run tests
-        run: python -m pytest -q tests/ --ignore=tests/test_annotations_workflow.py -k "not test_kg_entity_detail"
+        run: python -m pytest -q tests/
 
   frontend:
     name: Frontend build
