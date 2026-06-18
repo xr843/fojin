@@ -3,6 +3,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from app.core.exceptions import AccessDeniedError, ValidationError
 from app.services.annotation import (
     create_annotation,
     submit_annotation,
@@ -41,34 +42,28 @@ async def test_submit_draft_to_pending():
 
 @pytest.mark.anyio
 async def test_submit_non_draft_raises():
-    """submit_annotation on a non-draft annotation should raise 400."""
-    from fastapi import HTTPException
-
+    """submit_annotation on a non-draft annotation should raise ValidationError (→ 422)."""
     ann = _make_annotation(status="pending", user_id=1)
     mock_session = AsyncMock()
     mock_result = MagicMock()
     mock_result.scalar_one_or_none.return_value = ann
     mock_session.execute.return_value = mock_result
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(ValidationError):
         await submit_annotation(mock_session, annotation_id=1, user_id=1)
-    assert exc_info.value.status_code == 400
 
 
 @pytest.mark.anyio
 async def test_submit_wrong_user_raises():
-    """submit_annotation by a different user should raise 403."""
-    from fastapi import HTTPException
-
+    """submit_annotation by a different user should raise AccessDeniedError (→ 403)."""
     ann = _make_annotation(status="draft", user_id=1)
     mock_session = AsyncMock()
     mock_result = MagicMock()
     mock_result.scalar_one_or_none.return_value = ann
     mock_session.execute.return_value = mock_result
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(AccessDeniedError):
         await submit_annotation(mock_session, annotation_id=1, user_id=999)
-    assert exc_info.value.status_code == 403
 
 
 @pytest.mark.anyio
@@ -80,7 +75,7 @@ async def test_review_approve():
     mock_result.scalar_one_or_none.return_value = ann
     mock_session.execute.return_value = mock_result
 
-    with patch("app.services.annotation.AnnotationReview"):
+    with patch("app.models.annotation.AnnotationReview"):
         result = await review_annotation(mock_session, 1, reviewer_id=2, action="approve")
     assert result.status == "approved"
 
@@ -94,7 +89,7 @@ async def test_review_reject():
     mock_result.scalar_one_or_none.return_value = ann
     mock_session.execute.return_value = mock_result
 
-    with patch("app.services.annotation.AnnotationReview"):
+    with patch("app.models.annotation.AnnotationReview"):
         result = await review_annotation(mock_session, 1, reviewer_id=2, action="reject")
     assert result.status == "rejected"
 
@@ -108,22 +103,19 @@ async def test_review_request_change():
     mock_result.scalar_one_or_none.return_value = ann
     mock_session.execute.return_value = mock_result
 
-    with patch("app.services.annotation.AnnotationReview"):
+    with patch("app.models.annotation.AnnotationReview"):
         result = await review_annotation(mock_session, 1, reviewer_id=2, action="request_change")
     assert result.status == "draft"
 
 
 @pytest.mark.anyio
 async def test_review_non_pending_raises():
-    """review_annotation on a non-pending annotation should raise 400."""
-    from fastapi import HTTPException
-
+    """review_annotation on a non-pending annotation should raise ValidationError (→ 422)."""
     ann = _make_annotation(status="draft", user_id=1)
     mock_session = AsyncMock()
     mock_result = MagicMock()
     mock_result.scalar_one_or_none.return_value = ann
     mock_session.execute.return_value = mock_result
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(ValidationError):
         await review_annotation(mock_session, 1, reviewer_id=2, action="approve")
-    assert exc_info.value.status_code == 400
