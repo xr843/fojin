@@ -257,10 +257,8 @@ type TFn = (key: string, opts?: Record<string, unknown>) => string;
 // backend's Python code-point offsets) so they index the reflowed segments.
 interface ApparatusNumbered { entry: ApparatusEntryItem; no: number; start: number; end: number }
 // off = UTF-16 offset of a CBETA <lb> line anchor within the content.
-// col = page+column of the line_ref (e.g. "0355a" from "0355a11"); colStart
-// marks the first anchor of each column, where the visible page-ref is shown.
-interface LineAnchorConv { off: number; ref: string; col: string; colStart: boolean }
-type ReaderCtx = { numbered: ApparatusNumbered[]; lineAnchors: LineAnchorConv[]; showPageRefs: boolean; t: TFn } | null;
+interface LineAnchorConv { off: number; ref: string }
+type ReaderCtx = { numbered: ApparatusNumbered[]; lineAnchors: LineAnchorConv[]; t: TFn } | null;
 
 /** Build a map from Python code-point index → JS UTF-16 index for `raw`.
  * Backend offsets are code-point indices; supplementary-plane CJK (surrogate
@@ -312,7 +310,7 @@ function ApparatusMarker({ no, entry, t }: { no: number; entry: ApparatusEntryIt
  * markers (校勘 [n]) after each lemma, and zero-width line-anchor spans (carrying
  * the CBETA page-col-line ref) for the on-demand citation locator and URN scroll. */
 function renderSegmentChildren(seg: Extract<TextSegment, { text: string }>, ctx: NonNullable<ReaderCtx>): ReactNode {
-  const { numbered, lineAnchors, showPageRefs, t } = ctx;
+  const { numbered, lineAnchors, t } = ctx;
   const { text, offsets } = seg;
   if (!offsets.length || (!numbered.length && !lineAnchors.length)) return text;
   const segStart = offsets[0];
@@ -325,12 +323,8 @@ function renderSegmentChildren(seg: Extract<TextSegment, { text: string }>, ctx:
   for (const la of lineAnchors) {
     if (la.off < segStart || la.off > segEnd || !offToLocal.has(la.off)) continue;
     const pos = offToLocal.get(la.off)!;
-    // Always: zero-width anchor for the citation locator + URN scroll.
+    // Zero-width anchor for the citation locator + URN scroll.
     ins.push({ pos, order: 0, node: <span key={`ln${la.ref}`} className="cbeta-line" data-ref={la.ref} /> });
-    // Page-refs toggle: a visible 大正 page·column marker at each column start.
-    if (showPageRefs && la.colStart) {
-      ins.push({ pos, order: 1, node: <span key={`pr${la.ref}`} className="cbeta-pageref">{la.col}</span> });
-    }
   }
   for (const m of numbered) {
     const cs = m.start;
@@ -434,7 +428,6 @@ export default function TextReaderPage() {
   const [citationOpen, setCitationOpen] = useState(false);
   const [annotationOpen, setAnnotationOpen] = useState(false);
   const [apparatusOn, setApparatusOn] = useState(false);
-  const [pageRefsOn, setPageRefsOn] = useState(false);
   const [parallelPanelOpen, setParallelPanelOpen] = useState(false);
 
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
@@ -799,20 +792,13 @@ export default function TextReaderPage() {
     if (!lineAnchorData?.anchors || !raw) return [];
     const m = cpToU16Map(raw);
     const conv = (cp: number) => (cp >= 0 && cp < m.length ? m[cp] : m[m.length - 1]);
-    let prevCol = "";
-    return lineAnchorData.anchors.map((a) => {
-      const col = a.line_ref.slice(0, 5); // "0355a11" → "0355a" (page + column)
-      const colStart = col !== prevCol;
-      prevCol = col;
-      return { off: conv(a.char_offset), ref: a.line_ref, col, colStart };
-    });
+    return lineAnchorData.anchors.map((a) => ({ off: conv(a.char_offset), ref: a.line_ref }));
   }, [lineAnchorData, content?.content]);
 
-  // One context drives both inline layers. Apparatus markers only when toggled on;
-  // line anchors always embedded (invisible) so selection/URN can locate a line;
-  // visible page·column markers only when the 页码 toggle is on.
+  // One context drives the inline layers: apparatus markers (only when toggled on)
+  // and always-embedded zero-width line anchors (so selection/URN can locate a line).
   const readerCtx: ReaderCtx = (apparatusOn && apparatusNumbered.length) || lineAnchors.length
-    ? { numbered: apparatusOn ? apparatusNumbered : [], lineAnchors, showPageRefs: pageRefsOn, t }
+    ? { numbered: apparatusOn ? apparatusNumbered : [], lineAnchors, t }
     : null;
 
   // URN deep-link: ?anchor=p0001a09 → scroll to that CBETA line + brief flash.
@@ -964,15 +950,6 @@ export default function TextReaderPage() {
               onClick={() => setApparatusOn((v) => !v)}
             >
               {t("reader.apparatus.toggle")}
-            </Button>
-          </Tooltip>
-          <Tooltip title={t("reader.pageref.tooltip")}>
-            <Button
-              size="small"
-              type={pageRefsOn ? "primary" : "default"}
-              onClick={() => setPageRefsOn((v) => !v)}
-            >
-              {t("reader.pageref.toggle")}
             </Button>
           </Tooltip>
           <Tooltip title="跨藏对照（其他版本 · 经级/段级对读）">

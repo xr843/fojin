@@ -713,7 +713,5 @@
   "reader.lineref.citation": "《{{title}}》卷{{juan}}（CBETA {{id}}, {{ref}}）",
   "reader.kabc.link": "高麗藏 {{k}}",
   "reader.kabc.button": "高麗藏",
-  "reader.kabc.tooltip": "在 KABC（東國大學）查看本經的高麗再雕藏版（{{k}}）",
-  "reader.pageref.toggle": "頁碼",
-  "reader.pageref.tooltip": "在正文顯示大正藏頁·欄（頁邊界）"
+  "reader.kabc.tooltip": "在 KABC（東國大學）查看本經的高麗再雕藏版（{{k}}）"
 }
