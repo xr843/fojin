@@ -901,23 +901,6 @@ export default function TextReaderPage() {
               </Tag>
             </Tooltip>
           )}
-          {textDetail?.kabc_url && (
-            <Tooltip title={t("reader.kabc.tooltip")} placement="right">
-              <a
-                href={textDetail.kabc_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ verticalAlign: "middle" }}
-              >
-                <Tag
-                  color="green"
-                  style={{ marginLeft: 8, verticalAlign: "middle", fontSize: 13, fontWeight: "normal", cursor: "pointer" }}
-                >
-                  {t("reader.kabc.link", { k: textDetail.goryeo_k })}
-                </Tag>
-              </a>
-            </Tooltip>
-          )}
         </Typography.Title>
 
         <div className="reader-nav">
@@ -1002,6 +985,17 @@ export default function TextReaderPage() {
               跨藏对照
             </Button>
           </Tooltip>
+          {textDetail?.kabc_url && (
+            <Tooltip title={t("reader.kabc.tooltip", { k: textDetail.goryeo_k })}>
+              <Button
+                size="small"
+                icon={<GlobalOutlined />}
+                onClick={() => window.open(textDetail.kabc_url!, "_blank", "noopener")}
+              >
+                {t("reader.kabc.button")}
+              </Button>
+            </Tooltip>
+          )}
           <div className="reader-font-controls">
             <Button
               size="small"
