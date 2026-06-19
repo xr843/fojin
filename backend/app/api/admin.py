@@ -1,3 +1,5 @@
+from datetime import date as date_cls
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,6 +8,7 @@ from app.core.role_guard import require_role
 from app.database import get_db
 from app.models.user import User
 from app.schemas.admin import (
+    ActiveUserDayDetail,
     AdminAnnotationListResponse,
     AdminAuditLogListResponse,
     AdminModuleUsage,
@@ -16,6 +19,7 @@ from app.schemas.admin import (
     AdminUserUpdate,
 )
 from app.services.admin_service import (
+    daily_active_user_detail,
     get_overview,
     get_trends,
     list_annotations_for_review,
@@ -49,6 +53,19 @@ async def stats_trends(
 
     redis = getattr(app.state, "redis", None)
     return AdminTrends(**(await get_trends(db, days, redis)))
+
+
+@router.get("/stats/active-users", response_model=ActiveUserDayDetail)
+async def stats_active_users(
+    date: date_cls = Query(..., description="Local-day (Asia/Shanghai) to break down, YYYY-MM-DD"),
+    _user=Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Per-user breakdown of who was active (chatted or read) on a given day.
+
+    Drill-down for the active-users trend point; not cached (admin-only, low
+    volume, must reflect the live day)."""
+    return ActiveUserDayDetail(**(await daily_active_user_detail(db, date)))
 
 
 @router.get("/stats/module-usage", response_model=AdminModuleUsage)

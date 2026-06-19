@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Card, Col, Row, Statistic, Spin, Segmented, Empty, Tooltip, Typography, message } from "antd";
+import { Card, Col, Row, Statistic, Spin, Segmented, Empty, Tooltip, Typography, message, DatePicker, Table, Tag } from "antd";
+import dayjs, { type Dayjs } from "dayjs";
 import {
   UserOutlined,
   MessageOutlined,
@@ -24,8 +25,10 @@ import {
   getAdminOverview,
   getAdminTrends,
   getAdminModuleUsage,
+  getAdminActiveUsers,
   type AdminOverview,
   type ModuleEventItem,
+  type ActiveUserDetail,
 } from "../api/client";
 import { getPlatformActivity } from "../api/feed";
 
@@ -72,7 +75,96 @@ function PendingCard({ overview }: { overview: AdminOverview }) {
   );
 }
 
+function ActiveUsersCard({ date, onDateChange }: { date: string | null; onDateChange: (d: string) => void }) {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["adminActiveUsers", date],
+    queryFn: () => getAdminActiveUsers(date!),
+    enabled: !!date,
+    staleTime: 60_000,
+  });
+
+  const columns = [
+    {
+      title: "用户",
+      key: "user",
+      render: (_: unknown, r: ActiveUserDetail) => (
+        <Link to={`/admin/users?q=${encodeURIComponent(r.username ?? String(r.user_id))}`}>
+          {r.display_name || r.username || `#${r.user_id}`}
+        </Link>
+      ),
+    },
+    { title: "邮箱", dataIndex: "email", key: "email", render: (v: string | null) => v || "—" },
+    {
+      title: "角色",
+      dataIndex: "role",
+      key: "role",
+      render: (v: string) => (v === "admin" ? <Tag color="gold">管理员</Tag> : <Tag>用户</Tag>),
+    },
+    {
+      title: "提问数",
+      dataIndex: "chat_messages",
+      key: "chat_messages",
+      sorter: (a: ActiveUserDetail, b: ActiveUserDetail) => a.chat_messages - b.chat_messages,
+      defaultSortOrder: "descend" as const,
+    },
+    {
+      title: "读经数",
+      dataIndex: "texts_read",
+      key: "texts_read",
+      sorter: (a: ActiveUserDetail, b: ActiveUserDetail) => a.texts_read - b.texts_read,
+    },
+    {
+      title: "自带 Key",
+      dataIndex: "api_provider",
+      key: "api_provider",
+      render: (v: string | null) => (v ? <Tag color="green">{v}</Tag> : "—"),
+    },
+    {
+      title: "最后活跃",
+      dataIndex: "last_active_at",
+      key: "last_active_at",
+      render: (v: string | null) =>
+        v ? new Date(v).toLocaleString("zh-CN", { hour12: false }) : "—",
+    },
+  ];
+
+  return (
+    <Card
+      title={`当日活跃用户${data ? `（${data.total} 人）` : ""}`}
+      style={{ marginTop: 16 }}
+      extra={
+        <DatePicker
+          value={date ? dayjs(date) : null}
+          onChange={(d: Dayjs | null) => d && onDateChange(d.format("YYYY-MM-DD"))}
+          allowClear={false}
+        />
+      }
+    >
+      {isError ? (
+        <Empty description="加载失败" />
+      ) : isLoading ? (
+        <div style={{ textAlign: "center", padding: 24 }}><Spin /></div>
+      ) : !data || data.users.length === 0 ? (
+        <Empty description="当日无活跃用户（登录用户的提问/读经）" />
+      ) : (
+        <Table
+          rowKey="user_id"
+          size="small"
+          columns={columns}
+          dataSource={data.users}
+          pagination={data.users.length > 20 ? { pageSize: 20 } : false}
+        />
+      )}
+      <Text type="secondary" style={{ fontSize: 12 }}>
+        “活跃”= 当天发过提问或读过经文的登录用户（与上方趋势图口径一致）；匿名访客无身份不计入。点击趋势图上的点可切换日期。
+        本表为实时数据，趋势图有约 5 分钟缓存，查看“今天”时两者人数可能略有出入。
+      </Text>
+    </Card>
+  );
+}
+
 export default function AdminDashboardPage() {
+  const [activeDate, setActiveDate] = useState<string | null>(null);
   const overviewQuery = useQuery({
     queryKey: ["adminOverview"],
     queryFn: getAdminOverview,
@@ -110,6 +202,11 @@ export default function AdminDashboardPage() {
     ...trends.active_users.map((d) => ({ ...d, type: "活跃用户" })),
   ];
 
+  // Latest day in the trend = default selection for the active-users table.
+  const latestDay = trends.active_users.length
+    ? trends.active_users[trends.active_users.length - 1].date
+    : null;
+
   const lineConfig = {
     data: chartData,
     xField: "date",
@@ -119,6 +216,13 @@ export default function AdminDashboardPage() {
     height: 360,
     axis: {
       x: { labelAutoRotate: false },
+    },
+    // Click any point to drill the active-users table to that day.
+    onReady: ({ chart }: { chart: { on: (ev: string, cb: (e: { data?: { data?: { date?: string } } }) => void) => void } }) => {
+      chart.on("element:click", (e) => {
+        const d = e?.data?.data?.date;
+        if (d) setActiveDate(d);
+      });
     },
   };
 
@@ -190,6 +294,11 @@ export default function AdminDashboardPage() {
         >
           <Line {...lineConfig} />
         </Card>
+
+        <ActiveUsersCard
+          date={activeDate ?? latestDay}
+          onDateChange={setActiveDate}
+        />
 
         <PlatformActivityCard />
         <ModuleUsageCard />
