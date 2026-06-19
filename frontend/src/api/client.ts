@@ -1105,6 +1105,24 @@ export interface AdminTrends {
   active_users: DailyCount[];
 }
 
+export interface ActiveUserDetail {
+  user_id: UserId;
+  username: string | null;
+  display_name: string | null;
+  email: string | null;
+  role: string;
+  chat_messages: number;
+  texts_read: number;
+  last_active_at: string | null;
+  api_provider: string | null;
+}
+
+export interface ActiveUserDayDetail {
+  date: string;
+  total: number;
+  users: ActiveUserDetail[];
+}
+
 export interface AdminUserItem {
   id: UserId;
   username: string;
@@ -1135,6 +1153,11 @@ export async function getAdminOverview(): Promise<AdminOverview> {
 
 export async function getAdminTrends(days: number = 30): Promise<AdminTrends> {
   const { data } = await api.get<AdminTrends>("/admin/stats/trends", { params: { days } });
+  return data;
+}
+
+export async function getAdminActiveUsers(date: string): Promise<ActiveUserDayDetail> {
+  const { data } = await api.get<ActiveUserDayDetail>("/admin/stats/active-users", { params: { date } });
   return data;
 }
 

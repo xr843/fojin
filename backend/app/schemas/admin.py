@@ -29,6 +29,26 @@ class AdminTrends(BaseModel):
     active_users: list[DailyCount]
 
 
+class ActiveUserDetail(BaseModel):
+    """One logged-in user who was active (chatted or read) on a given local day."""
+
+    user_id: int
+    username: str | None = None
+    display_name: str | None = None
+    email: str | None = None
+    role: str
+    chat_messages: int  # role='user' messages that day
+    texts_read: int  # ReadingHistory rows touched that day
+    last_active_at: datetime | None = None
+    api_provider: str | None = None  # BYOK provider, null = uses platform key
+
+
+class ActiveUserDayDetail(BaseModel):
+    date: str
+    total: int
+    users: list[ActiveUserDetail]
+
+
 class AdminUserItem(BaseModel):
     id: int
     username: str

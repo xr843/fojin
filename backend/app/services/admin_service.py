@@ -211,6 +211,69 @@ async def _daily_active_users(
     return _fill_missing_days(rows, date_grid)
 
 
+async def daily_active_user_detail(db: AsyncSession, target_day: date) -> dict:
+    """Who was active on a given local day, and what they did.
+
+    Mirrors _daily_active_users (chat OR read counts a user as active) but
+    returns the per-user breakdown instead of just a count. Only logged-in
+    users (chat sessions / reading history carry a user_id); anonymous chat
+    has no identity to show.
+
+    Day bounds use a half-open UTC range from _local_midnight_utc (index-
+    friendly range scan on created_at) rather than _daily_active_users'
+    cast(timezone('Asia/Shanghai', ts), Date) bucketing. The two partition
+    every day identically — and the detail total reconciles with the trend
+    point — ONLY because LOCAL_TZ is Asia/Shanghai (UTC+8, no DST), so each
+    local day is one contiguous UTC interval. If LOCAL_TZ ever moves to a DST
+    zone, switch this to _local_day to stay consistent across the transition.
+    """
+    start = _local_midnight_utc(target_day)
+    end = _local_midnight_utc(target_day + timedelta(days=1))
+
+    chat_rows = (await db.execute(
+        select(ChatSession.user_id, func.count().label("n"))
+        .select_from(ChatMessage)
+        .join(ChatSession, ChatMessage.session_id == ChatSession.id)
+        .where(
+            ChatMessage.created_at >= start,
+            ChatMessage.created_at < end,
+            ChatMessage.role == "user",
+            ChatSession.user_id.is_not(None),
+        )
+        .group_by(ChatSession.user_id)
+    )).all()
+    read_rows = (await db.execute(
+        select(ReadingHistory.user_id, func.count().label("n"))
+        .where(ReadingHistory.last_read_at >= start, ReadingHistory.last_read_at < end)
+        .group_by(ReadingHistory.user_id)
+    )).all()
+
+    chat_by_uid = {uid: n for uid, n in chat_rows}
+    read_by_uid = {uid: n for uid, n in read_rows}
+    uids = set(chat_by_uid) | set(read_by_uid)
+    if not uids:
+        return {"date": target_day.isoformat(), "total": 0, "users": []}
+
+    users = (await db.execute(select(User).where(User.id.in_(uids)))).scalars().all()
+    detail = [
+        {
+            "user_id": u.id,
+            "username": u.username,
+            "display_name": u.display_name,
+            "email": u.email,
+            "role": u.role,
+            "chat_messages": chat_by_uid.get(u.id, 0),
+            "texts_read": read_by_uid.get(u.id, 0),
+            "last_active_at": u.last_active_at,
+            "api_provider": u.api_provider,
+        }
+        for u in users
+    ]
+    # Busiest first: chat is the heavier signal, then reading.
+    detail.sort(key=lambda d: (d["chat_messages"], d["texts_read"]), reverse=True)
+    return {"date": target_day.isoformat(), "total": len(detail), "users": detail}
+
+
 async def list_users(
     db: AsyncSession,
     page: int = 1,
