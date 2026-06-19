@@ -990,7 +990,15 @@ export default function TextReaderPage() {
               <Button
                 size="small"
                 icon={<GlobalOutlined />}
-                onClick={() => window.open(textDetail.kabc_url!, "_blank", "noopener")}
+                onClick={() =>
+                  window.open(
+                    // Jump to the current juan in KABC: work URL + _T_{juan:03d}
+                    // (Goryeo juan numbering matches Taishō for the vast majority).
+                    `${textDetail.kabc_url}_T_${String(juanNum).padStart(3, "0")}`,
+                    "_blank",
+                    "noopener",
+                  )
+                }
               >
                 {t("reader.kabc.button")}
               </Button>
