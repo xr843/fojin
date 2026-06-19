@@ -907,9 +907,12 @@ export default function TextReaderPage() {
                 href={textDetail.kabc_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ marginLeft: 8, verticalAlign: "middle" }}
+                style={{ verticalAlign: "middle" }}
               >
-                <Tag color="green" style={{ fontSize: 13, fontWeight: "normal", cursor: "pointer" }}>
+                <Tag
+                  color="green"
+                  style={{ marginLeft: 8, verticalAlign: "middle", fontSize: 13, fontWeight: "normal", cursor: "pointer" }}
+                >
                   {t("reader.kabc.link", { k: textDetail.goryeo_k })}
                 </Tag>
               </a>
