@@ -196,8 +196,9 @@ export default function AdminDashboardPage() {
   const overview = overviewQuery.data!;
   const trends = trendsQuery.data!;
 
+  // 新注册线已移除：日注册量只有个位数，和消息数(数十~数百)共用一个 Y 轴会被
+  // 压成贴底直线读不出；新增用户已在顶部统计卡 + 日环比呈现。
   const chartData = [
-    ...trends.registrations.map((d) => ({ ...d, type: "新注册" })),
     ...trends.messages.map((d) => ({ ...d, type: "消息数" })),
     ...trends.active_users.map((d) => ({ ...d, type: "活跃用户" })),
   ];
@@ -434,6 +435,18 @@ function PlatformActivityCard() {
   const positiveRate =
     ratedCount > 0 ? `${((data.chat.positive_feedback / ratedCount) * 100).toFixed(1)}%` : "—";
 
+  // 未引经率 = 无来源的 AI 回答 / AI 回答总数。粗略质量信号：含真·RAG 召回缺口，
+  // 但也含寒暄/身份类提问(本就无需引经)和 AI 出错回答,故不等于纯检索失败率。
+  const failRate =
+    data.chat.assistant_messages > 0
+      ? `${((data.chat.assistant_no_source / data.chat.assistant_messages) * 100).toFixed(1)}%`
+      : "—";
+  // 自带 Key 占活跃用户比例（其余跑平台 key = 你补贴的成本）
+  const byokRate =
+    data.users.active_users > 0
+      ? `${((data.users.byok_active_users / data.users.active_users) * 100).toFixed(0)}%`
+      : "—";
+
   return (
     <Card
       title="平台活跃度"
@@ -457,6 +470,20 @@ function PlatformActivityCard() {
         </Col>
         <Col xs={12} sm={6}>
           <Statistic title="活跃用户" value={data.users.active_users} />
+        </Col>
+        <Col xs={12} sm={6}>
+          <Tooltip title="本期活跃且在本期之前就注册的老用户（留存信号）">
+            <Statistic
+              title="回访用户"
+              value={data.users.returning_users}
+              valueStyle={{ color: data.users.returning_users > data.users.new_users ? "#52c41a" : undefined }}
+            />
+          </Tooltip>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Tooltip title={`${data.users.byok_active_users} 个活跃用户自带 API Key（占活跃 ${byokRate}），其余跑平台 Key`}>
+            <Statistic title="自带Key" value={`${data.users.byok_active_users}（${byokRate}）`} />
+          </Tooltip>
         </Col>
       </Row>
 
@@ -482,26 +509,23 @@ function PlatformActivityCard() {
             />
           </Tooltip>
         </Col>
+        <Col xs={12} sm={6}>
+          <Tooltip title={`${data.chat.assistant_no_source} / ${data.chat.assistant_messages} 条 AI 回答未引用经文来源。含三类：RAG 没召回到经文（真·检索缺口）、寒暄/身份类提问（本就无需引经）、AI 服务出错。越低越好，用作粗略质量信号`}>
+            <Statistic
+              title="未引经率"
+              value={failRate}
+              valueStyle={{ color: data.chat.assistant_messages > 0 && data.chat.assistant_no_source / data.chat.assistant_messages > 0.3 ? "#cf1322" : undefined }}
+            />
+          </Tooltip>
+        </Col>
       </Row>
 
-      {/* 口径：reading_history 仅记录登录用户；全站(含匿名)阅读量见
-          「板块使用情况」面板的「在线阅读」。 */}
+      {/* 阅读次数仅记录登录用户；全站(含匿名)阅读量见「板块使用情况」的「在线阅读」。
+          已移除「阅读经文数(unique)」「本期新增经文」(批量灌入、平时恒为0,信号低)。 */}
       <Text type="secondary" style={{ fontSize: 12 }}>阅读（仅登录用户）</Text>
       <Row gutter={[16, 16]} style={{ marginTop: 4, marginBottom: 16 }}>
         <Col xs={12} sm={6}>
           <Statistic title="阅读次数" value={data.reading.total_reads} prefix={<BookOutlined />} />
-        </Col>
-        <Col xs={12} sm={6}>
-          <Statistic title="阅读经文数" value={data.reading.unique_texts_read} />
-        </Col>
-      </Row>
-
-      {/* 静态总量(经文总数/数据源)已移出 — 本面板只放随时间范围变化的
-          周期指标；总量见首页。 */}
-      <Text type="secondary" style={{ fontSize: 12 }}>内容</Text>
-      <Row gutter={[16, 16]} style={{ marginTop: 4, marginBottom: 16 }}>
-        <Col xs={12} sm={6}>
-          <Statistic title="本期新增经文" value={data.content.new_texts} prefix={<DatabaseOutlined />} />
         </Col>
       </Row>
 
