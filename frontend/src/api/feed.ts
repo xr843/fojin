@@ -55,6 +55,7 @@ export interface PlatformActivity {
     total_messages: number;
     total_sessions: number;
     positive_feedback: number;
+    negative_feedback: number;
   };
   users: {
     new_users: number;

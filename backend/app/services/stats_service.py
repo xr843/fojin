@@ -353,6 +353,20 @@ async def get_platform_activity(db: AsyncSession, redis=None, days: int = 7) -> 
         )
     ).scalar() or 0
 
+    # negative_feedback lets the dashboard split two distinct things the old
+    # single 好评率 conflated: feedback rate ((up+down)/messages — how many
+    # answers got any rating) vs positive rate (up/(up+down) — of those rated,
+    # how many were liked). up/total_messages alone reads as ~0% even when every
+    # rating is positive, because almost nobody clicks the buttons.
+    negative_feedback = (
+        await db.execute(
+            select(func.count(ChatMessage.id)).where(
+                ChatMessage.created_at >= cutoff,
+                ChatMessage.feedback == "down",
+            )
+        )
+    ).scalar() or 0
+
     # --- Users ---
     new_users = (
         await db.execute(
@@ -392,6 +406,7 @@ async def get_platform_activity(db: AsyncSession, redis=None, days: int = 7) -> 
             "total_messages": total_messages,
             "total_sessions": total_sessions,
             "positive_feedback": positive_feedback,
+            "negative_feedback": negative_feedback,
         },
         "users": {
             "new_users": new_users,

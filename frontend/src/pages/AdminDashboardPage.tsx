@@ -423,10 +423,16 @@ function PlatformActivityCard() {
     );
   }
 
-  const fbRate =
+  // Two distinct metrics (was conflated into one misleading "好评率 = 赞/总消息"):
+  //   反馈率 = (赞+踩)/消息  — how many answers users bothered to rate
+  //   好评率 = 赞/(赞+踩)     — of those rated, how many were liked
+  const ratedCount = data.chat.positive_feedback + data.chat.negative_feedback;
+  const feedbackRate =
     data.chat.total_messages > 0
-      ? `${((data.chat.positive_feedback / data.chat.total_messages) * 100).toFixed(1)}%`
+      ? `${((ratedCount / data.chat.total_messages) * 100).toFixed(1)}%`
       : "—";
+  const positiveRate =
+    ratedCount > 0 ? `${((data.chat.positive_feedback / ratedCount) * 100).toFixed(1)}%` : "—";
 
   return (
     <Card
@@ -463,12 +469,16 @@ function PlatformActivityCard() {
           <Statistic title="新增消息" value={data.chat.total_messages} prefix={<MessageOutlined />} />
         </Col>
         <Col xs={12} sm={6}>
-          <Tooltip title={`${data.chat.positive_feedback} 条 👍 / ${data.chat.total_messages} 条消息`}>
+          <Tooltip title={`${ratedCount} 条已评价（👍${data.chat.positive_feedback} / 👎${data.chat.negative_feedback}）/ ${data.chat.total_messages} 条消息`}>
+            <Statistic title="反馈率" value={feedbackRate} prefix={<LikeOutlined />} />
+          </Tooltip>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Tooltip title={`👍${data.chat.positive_feedback} / 👎${data.chat.negative_feedback}（共 ${ratedCount} 条评价）`}>
             <Statistic
               title="好评率"
-              value={fbRate}
-              prefix={<LikeOutlined />}
-              valueStyle={{ color: data.chat.positive_feedback > 0 ? "#52c41a" : undefined }}
+              value={positiveRate}
+              valueStyle={{ color: ratedCount > 0 && data.chat.positive_feedback >= data.chat.negative_feedback ? "#52c41a" : undefined }}
             />
           </Tooltip>
         </Col>
