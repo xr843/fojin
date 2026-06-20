@@ -4,7 +4,7 @@ anyio_backend = "asyncio"
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.0",
+    "pytest>=9.1.1",
     "anyio>=4.0",
     "pytest-anyio==0.0.0",
 ]
