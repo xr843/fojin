@@ -20,7 +20,7 @@ import {
 import { Helmet } from "react-helmet-async";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { Line } from "@ant-design/charts";
+import { DualAxes } from "@ant-design/charts";
 import {
   getAdminOverview,
   getAdminTrends,
@@ -196,10 +196,12 @@ export default function AdminDashboardPage() {
   const overview = overviewQuery.data!;
   const trends = trendsQuery.data!;
 
-  // 新注册线已移除：日注册量只有个位数，和消息数(数十~数百)共用一个 Y 轴会被
-  // 压成贴底直线读不出；新增用户已在顶部统计卡 + 日环比呈现。
-  const chartData = [
-    ...trends.messages.map((d) => ({ ...d, type: "消息数" })),
+  // Dual Y-axis: 消息数 (tens~hundreds) on the left, 新增用户 + 活跃用户
+  // (single digits ~ teens) on the right. On a shared axis the two
+  // small-magnitude series flatten to the baseline and can't be read.
+  const messagesData = trends.messages.map((d) => ({ ...d, type: "消息数" }));
+  const usersData = [
+    ...trends.registrations.map((d) => ({ ...d, type: "新增用户" })),
     ...trends.active_users.map((d) => ({ ...d, type: "活跃用户" })),
   ];
 
@@ -208,16 +210,30 @@ export default function AdminDashboardPage() {
     ? trends.active_users[trends.active_users.length - 1].date
     : null;
 
-  const lineConfig = {
-    data: chartData,
+  const chartConfig = {
     xField: "date",
-    yField: "count",
-    colorField: "type",
-    smooth: true,
     height: 360,
-    axis: {
-      x: { labelAutoRotate: false },
-    },
+    legend: { color: { itemMarker: "round" } },
+    axis: { x: { labelAutoRotate: false } },
+    children: [
+      {
+        data: messagesData,
+        type: "line",
+        yField: "count",
+        colorField: "type",
+        smooth: true,
+        scale: { color: { range: ["#1677ff"] } },
+      },
+      {
+        data: usersData,
+        type: "line",
+        yField: "count",
+        colorField: "type",
+        smooth: true,
+        axis: { y: { position: "right" } },
+        scale: { color: { range: ["#fa8c16", "#52c41a"] } },
+      },
+    ],
     // Click any point to drill the active-users table to that day.
     onReady: ({ chart }: { chart: { on: (ev: string, cb: (e: { data?: { data?: { date?: string } } }) => void) => void } }) => {
       chart.on("element:click", (e) => {
@@ -293,7 +309,7 @@ export default function AdminDashboardPage() {
           style={{ marginTop: 16 }}
           extra={<Text type="secondary" style={{ fontSize: 12 }}>更新于 {lastUpdated}</Text>}
         >
-          <Line {...lineConfig} />
+          <DualAxes {...chartConfig} />
         </Card>
 
         <ActiveUsersCard
