@@ -126,7 +126,23 @@ class KeywordItem(BaseModel):
     count: int
 
 
+class AnswerQuality(BaseModel):
+    """Behavioural answer-quality proxies, sourced from Umami events.
+
+    Rates are percentages against ``chat_questions`` (questions asked); they are
+    ``None`` when there is no chat volume in the window.
+    """
+    chat_questions: int
+    citation_click: int
+    chat_copy: int
+    chat_retry: int
+    citation_click_rate: float | None = None
+    copy_rate: float | None = None
+    retry_rate: float | None = None
+
+
 class AdminModuleUsage(BaseModel):
     days: int
     events: list[ModuleEventItem]
     top_search_keywords: list[KeywordItem]
+    answer_quality: AnswerQuality

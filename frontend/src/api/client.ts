@@ -1222,10 +1222,21 @@ export interface KeywordItem {
   count: number;
 }
 
+export interface AnswerQuality {
+  chat_questions: number;
+  citation_click: number;
+  chat_copy: number;
+  chat_retry: number;
+  citation_click_rate: number | null;
+  copy_rate: number | null;
+  retry_rate: number | null;
+}
+
 export interface AdminModuleUsage {
   days: number;
   events: ModuleEventItem[];
   top_search_keywords: KeywordItem[];
+  answer_quality: AnswerQuality;
 }
 
 export async function getAdminModuleUsage(days: number = 7): Promise<AdminModuleUsage> {

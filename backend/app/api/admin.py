@@ -84,6 +84,7 @@ async def stats_module_usage(
         days=days,
         events=result["events"],
         top_search_keywords=result["top_search_keywords"],
+        answer_quality=result["answer_quality"],
     )
 
 

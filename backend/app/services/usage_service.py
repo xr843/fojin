@@ -36,6 +36,13 @@ _EVENT_LABELS: dict[str, str] = {
     "cbeta-shortcut": "CBETA直跳",
 }
 
+# Behavioural answer-quality signals. Tracked as Umami events on every chat
+# answer (not just the ~0% that get an explicit 👍/👎), so they give a quality
+# proxy with real volume. Pulled OUT of the module-usage `events` list so they
+# don't clutter the "板块使用情况" board, and reported as rates against the
+# number of questions asked (the `chat` event).
+_QUALITY_EVENTS: tuple[str, ...] = ("citation_click", "chat_copy", "chat_retry")
+
 
 def _build_umami_url() -> str:
     """Derive the Umami async DB URL from the fojin app DB URL.
@@ -92,7 +99,19 @@ async def get_module_usage(days: int = 7) -> dict[str, Any]:
 
 
 def _empty_usage() -> dict[str, Any]:
-    return {"events": [], "top_search_keywords": []}
+    return {
+        "events": [],
+        "top_search_keywords": [],
+        "answer_quality": {
+            "chat_questions": 0,
+            "citation_click": 0,
+            "chat_copy": 0,
+            "chat_retry": 0,
+            "citation_click_rate": None,
+            "copy_rate": None,
+            "retry_rate": None,
+        },
+    }
 
 
 async def _query_module_usage(days: int) -> dict[str, Any]:
@@ -127,14 +146,39 @@ async def _query_module_usage(days: int) -> dict[str, Any]:
         event_rows = (await session.execute(event_sql, {"days": days})).all()
         keyword_rows = (await session.execute(keyword_sql, {"days": days})).all()
 
+    counts = {row[0]: int(row[1]) for row in event_rows}
+
+    # Module-usage board: every tracked event EXCEPT the quality signals.
     events = [
         {
-            "event_name": row[0],
-            "label": _EVENT_LABELS.get(row[0], row[0]),
-            "count": int(row[1]),
+            "event_name": name,
+            "label": _EVENT_LABELS.get(name, name),
+            "count": cnt,
         }
-        for row in event_rows
+        for name, cnt in counts.items()
+        if name not in _QUALITY_EVENTS
     ]
+
+    # Answer-quality proxies, as rates against questions asked. Denominator is
+    # the `chat` event (one per question). `None` when there is no chat volume
+    # yet so the UI can show "—" instead of a misleading 0%.
+    chat_n = counts.get("chat", 0)
+
+    def _rate(n: int) -> float | None:
+        return round(n / chat_n * 100, 1) if chat_n else None
+
+    citation_click = counts.get("citation_click", 0)
+    chat_copy = counts.get("chat_copy", 0)
+    chat_retry = counts.get("chat_retry", 0)
+    answer_quality = {
+        "chat_questions": chat_n,
+        "citation_click": citation_click,
+        "chat_copy": chat_copy,
+        "chat_retry": chat_retry,
+        "citation_click_rate": _rate(citation_click),
+        "copy_rate": _rate(chat_copy),
+        "retry_rate": _rate(chat_retry),
+    }
 
     top_search_keywords = [
         {"keyword": row[0], "count": int(row[1])}
@@ -142,4 +186,8 @@ async def _query_module_usage(days: int) -> dict[str, Any]:
         if row[0]  # skip null/empty keywords
     ]
 
-    return {"events": events, "top_search_keywords": top_search_keywords}
+    return {
+        "events": events,
+        "top_search_keywords": top_search_keywords,
+        "answer_quality": answer_quality,
+    }

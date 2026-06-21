@@ -156,6 +156,15 @@ async def test_module_usage_returns_data(client):
         "top_search_keywords": [
             {"keyword": "心经", "count": 8},
         ],
+        "answer_quality": {
+            "chat_questions": 10,
+            "citation_click": 3,
+            "chat_copy": 2,
+            "chat_retry": 1,
+            "citation_click_rate": 30.0,
+            "copy_rate": 20.0,
+            "retry_rate": 10.0,
+        },
     }
 
     app.dependency_overrides[get_current_user] = lambda: fake_admin
@@ -174,6 +183,8 @@ async def test_module_usage_returns_data(client):
             assert body["events"][0]["label"] == "检索"
             assert body["events"][0]["count"] == 42
             assert body["top_search_keywords"][0]["keyword"] == "心经"
+            assert body["answer_quality"]["citation_click_rate"] == 30.0
+            assert body["answer_quality"]["chat_questions"] == 10
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 
