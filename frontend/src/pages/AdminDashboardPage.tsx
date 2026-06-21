@@ -210,6 +210,15 @@ export default function AdminDashboardPage() {
     ? trends.active_users[trends.active_users.length - 1].date
     : null;
 
+  // Both children map colorField "type" to ONE shared G2 color scale (keyed by
+  // field name). If each declares only its own range, the merged scale picks up
+  // the 2-color range and cycles it across the 3 series, so 消息数 and 活跃用户
+  // both land on orange. Declaring the SAME full domain→range on both children
+  // pins every series to a distinct color: 消息数 蓝 / 新增用户 橙 / 活跃用户 绿.
+  const seriesColor = {
+    domain: ["消息数", "新增用户", "活跃用户"],
+    range: ["#1677ff", "#fa8c16", "#52c41a"],
+  };
   const chartConfig = {
     xField: "date",
     height: 360,
@@ -222,7 +231,7 @@ export default function AdminDashboardPage() {
         yField: "count",
         colorField: "type",
         smooth: true,
-        scale: { color: { range: ["#1677ff"] } },
+        scale: { color: seriesColor },
       },
       {
         data: usersData,
@@ -231,7 +240,7 @@ export default function AdminDashboardPage() {
         colorField: "type",
         smooth: true,
         axis: { y: { position: "right" } },
-        scale: { color: { range: ["#fa8c16", "#52c41a"] } },
+        scale: { color: seriesColor },
       },
     ],
     // Click any point to drill the active-users table to that day.
