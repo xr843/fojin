@@ -199,10 +199,16 @@ export default function AdminDashboardPage() {
   // Dual Y-axis: 消息数 (tens~hundreds) on the left, 新增用户 + 活跃用户
   // (single digits ~ teens) on the right. On a shared axis the two
   // small-magnitude series flatten to the baseline and can't be read.
-  const messagesData = trends.messages.map((d) => ({ ...d, type: "消息数" }));
+  // Series labels: defined once so the chart data, the legend and the shared
+  // color domain below all reference the exact same strings (a mismatch would
+  // silently drop a series back to a default color).
+  const S_MESSAGES = "消息数";
+  const S_NEW_USERS = "新增用户";
+  const S_ACTIVE_USERS = "活跃用户";
+  const messagesData = trends.messages.map((d) => ({ ...d, type: S_MESSAGES }));
   const usersData = [
-    ...trends.registrations.map((d) => ({ ...d, type: "新增用户" })),
-    ...trends.active_users.map((d) => ({ ...d, type: "活跃用户" })),
+    ...trends.registrations.map((d) => ({ ...d, type: S_NEW_USERS })),
+    ...trends.active_users.map((d) => ({ ...d, type: S_ACTIVE_USERS })),
   ];
 
   // Latest day in the trend = default selection for the active-users table.
@@ -210,6 +216,15 @@ export default function AdminDashboardPage() {
     ? trends.active_users[trends.active_users.length - 1].date
     : null;
 
+  // Both children map colorField "type" to ONE shared G2 color scale (keyed by
+  // field name). If each declares only its own range, the merged scale picks up
+  // the 2-color range and cycles it across the 3 series, so 消息数 and 活跃用户
+  // both land on orange. Declaring the SAME full domain→range on both children
+  // pins every series to a distinct color: 消息数 蓝 / 新增用户 橙 / 活跃用户 绿.
+  const seriesColor = {
+    domain: [S_MESSAGES, S_NEW_USERS, S_ACTIVE_USERS],
+    range: ["#1677ff", "#fa8c16", "#52c41a"],
+  };
   const chartConfig = {
     xField: "date",
     height: 360,
@@ -222,7 +237,7 @@ export default function AdminDashboardPage() {
         yField: "count",
         colorField: "type",
         smooth: true,
-        scale: { color: { range: ["#1677ff"] } },
+        scale: { color: seriesColor },
       },
       {
         data: usersData,
@@ -231,7 +246,7 @@ export default function AdminDashboardPage() {
         colorField: "type",
         smooth: true,
         axis: { y: { position: "right" } },
-        scale: { color: { range: ["#fa8c16", "#52c41a"] } },
+        scale: { color: seriesColor },
       },
     ],
     // Click any point to drill the active-users table to that day.
