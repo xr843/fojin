@@ -396,6 +396,44 @@ function ModuleUsageCard() {
             ))}
           </Row>
 
+          {data.answer_quality && (
+            <div style={{ marginTop: 8, marginBottom: 16 }}>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                答案质量（行为信号，相对问答次数；显式 👍👎 见上方「平台活跃度」反馈率。本批信号自部署起累计）
+              </Text>
+              <Row gutter={[16, 16]} style={{ marginTop: 4 }}>
+                <Col xs={12} sm={8}>
+                  <Tooltip title={`点开引文查看原文的次数 / 问答次数 = ${data.answer_quality.citation_click} / ${data.answer_quality.chat_questions}（越高越说明用户在验证、信任来源）`}>
+                    <Statistic
+                      title="引文点击率"
+                      value={data.answer_quality.citation_click_rate ?? "—"}
+                      suffix={data.answer_quality.citation_click_rate == null ? "" : "%"}
+                    />
+                  </Tooltip>
+                </Col>
+                <Col xs={12} sm={8}>
+                  <Tooltip title={`复制答案的次数 / 问答次数 = ${data.answer_quality.chat_copy} / ${data.answer_quality.chat_questions}（越高越说明答案被当作有用结果带走）`}>
+                    <Statistic
+                      title="复制率"
+                      value={data.answer_quality.copy_rate ?? "—"}
+                      suffix={data.answer_quality.copy_rate == null ? "" : "%"}
+                    />
+                  </Tooltip>
+                </Col>
+                <Col xs={12} sm={8}>
+                  <Tooltip title={`失败后重试的次数 / 问答次数 = ${data.answer_quality.chat_retry} / ${data.answer_quality.chat_questions}（衡量可靠性，越低越好）`}>
+                    <Statistic
+                      title="失败重试率"
+                      value={data.answer_quality.retry_rate ?? "—"}
+                      suffix={data.answer_quality.retry_rate == null ? "" : "%"}
+                      valueStyle={{ color: (data.answer_quality.retry_rate ?? 0) > 5 ? "#e74c3c" : undefined }}
+                    />
+                  </Tooltip>
+                </Col>
+              </Row>
+            </div>
+          )}
+
           {data.top_search_keywords.length > 0 && (
             <div style={{ marginTop: 8 }}>
               <Text type="secondary" style={{ fontSize: 12 }}>

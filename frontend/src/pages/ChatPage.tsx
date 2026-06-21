@@ -393,6 +393,10 @@ function MessageBubbleInner({
                   const textToCopy = m.role === "assistant" ? parseFollowUps(m.content).cleanContent : m.content;
                   navigator.clipboard.writeText(textToCopy);
                   message.success(t("chat.copied"));
+                  // Behavioural quality signal: copying an answer = found it useful.
+                  if (m.role === "assistant" && typeof umami !== "undefined") {
+                    umami.track("chat_copy");
+                  }
                 }}
               />
             </Tooltip>
@@ -657,6 +661,11 @@ export default function ChatPage() {
               type="button"
               onClick={(e) => {
                 e.preventDefault();
+                // Behavioural quality signal: clicking a citation = engaging
+                // with / trusting the cited source.
+                if (typeof umami !== "undefined") {
+                  umami.track("citation_click", { text_id: parsed.textId });
+                }
                 if (parsed.chunkIndex < 0) {
                   // Legacy history message without chunk_index — fall back
                   // to navigating to the reader page as before.
@@ -972,6 +981,11 @@ export default function ChatPage() {
     const idx = messages.findIndex((x) => x.id === m.id);
     const userMsg = idx > 0 ? messages[idx - 1] : null;
     if (userMsg && userMsg.role === "user") {
+      // Behavioural signal: the retry button only appears on a failed answer,
+      // so this measures failure-retries (reliability), not regenerate-on-dislike.
+      if (typeof umami !== "undefined") {
+        umami.track("chat_retry");
+      }
       setMessages((prev) => prev.filter((x) => x.id !== m.id && x.id !== userMsg.id));
       handleSendMessage(userMsg.content);
     }
