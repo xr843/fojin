@@ -7,7 +7,6 @@ Two scoring modes:
 
 import json
 import logging
-import re
 
 import httpx
 
