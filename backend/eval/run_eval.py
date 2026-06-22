@@ -7,6 +7,11 @@ Usage:
     python -m eval.run_eval --limit 5
     python -m eval.run_eval --no-llm
     python -m eval.run_eval --tag baseline-v1
+
+    # Regression gate (run where the corpus DB is reachable, e.g. prod/cron):
+    python -m eval.run_eval --no-llm --baseline eval/reports/<prev>.json \
+        --fail-on-regression --regression-tolerance 0.02
+    python -m eval.run_eval --no-llm --min-recall5 0.70
 """
 
 import argparse
@@ -22,9 +27,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.config import settings
 from app.database import async_session
-from app.services.chat import _build_llm_messages, SYSTEM_PROMPT
+from app.services.chat import _build_llm_messages
 from app.services.rag_retrieval import retrieve_rag_context
-
+from eval.retrieval_metrics import (
+    aggregate,
+    compute_metrics,
+    detect_regressions,
+    gold_entries,
+    sources_to_pairs,
+)
 from eval.scorer import score_out_of_scope, score_with_llm_judge
 
 logging.basicConfig(level=logging.WARNING)
@@ -61,6 +72,11 @@ async def run_single_question(question_data: dict, skip_llm: bool = False) -> di
     result["num_sources"] = len(sources)
     result["source_titles"] = [s.title_zh for s in sources if s.title_zh]
     result["context_length"] = len(context_text)
+    # Deterministic retrieval metrics (Recall@K/Hit@K/MRR/Precision@K). Needs no
+    # LLM, so this is populated even in --no-llm mode.
+    result["retrieval_metrics"] = compute_metrics(
+        sources_to_pairs(sources), gold_entries(question_data)
+    )
     retrieval_time = time.monotonic() - t0
 
     if skip_llm:
@@ -75,6 +91,7 @@ async def run_single_question(question_data: dict, skip_llm: bool = False) -> di
 
     # Step 2: LLM generation
     import httpx
+
     from app.services.chat import _resolve_llm_config
 
     api_url, api_key, model, _, _ = _resolve_llm_config(None)
@@ -153,6 +170,13 @@ def generate_report(results: list[dict], tag: str = "") -> str:
     )
     overall_pct = round(overall / 12 * 100, 1)
 
+    # Deterministic retrieval metrics (no LLM judge involved).
+    retr_agg = aggregate([r["retrieval_metrics"] for r in results if r.get("retrieval_metrics")])
+    graded = sum(
+        1 for r in results
+        if r.get("retrieval_metrics", {}).get("num_gold", 0) > 0
+    )
+
     cat_names = {
         "term_explanation": "名相解释", "source_lookup": "经文出处",
         "historical": "人物历史", "comparative": "义理比较",
@@ -170,6 +194,15 @@ def generate_report(results: list[dict], tag: str = "") -> str:
         f"| 引用准确性 | {avg(all_scores['citation_accuracy'])} | 3 |",
         f"| 回答完整性 | {avg(all_scores['answer_completeness'])} | 3 |",
         f"| 无编造 | {avg(all_scores['no_hallucination'])} | 1 |",
+        "", "## 检索指标（确定性，对照黄金来源）", "",
+        f"*基于 {graded}/{total} 道有黄金来源标注的题目*", "",
+        "| 指标 | 值 |", "|------|-----|",
+        f"| Recall@1 | {round(retr_agg.get('recall@1', 0), 3)} |",
+        f"| Recall@3 | {round(retr_agg.get('recall@3', 0), 3)} |",
+        f"| Recall@5 | {round(retr_agg.get('recall@5', 0), 3)} |",
+        f"| Hit@5 | {round(retr_agg.get('hit@5', 0), 3)} |",
+        f"| MRR | {round(retr_agg.get('mrr', 0), 3)} |",
+        f"| Precision@5 | {round(retr_agg.get('precision@5', 0), 3)} |",
         "", "## 分类得分", "",
         "| 分类 | 题数 | 检索 | 引用 | 完整 | 无编造 |",
         "|------|------|------|------|------|--------|",
@@ -217,6 +250,13 @@ async def main():
     parser.add_argument("--limit", type=int, help="Limit number of questions")
     parser.add_argument("--no-llm", action="store_true", help="Skip LLM, only test RAG retrieval")
     parser.add_argument("--tag", type=str, default="", help="Tag for the report")
+    parser.add_argument("--baseline", type=str, help="Prior raw eval JSON to compare retrieval metrics against")
+    parser.add_argument("--fail-on-regression", action="store_true",
+                        help="Exit non-zero if retrieval metrics regress vs --baseline")
+    parser.add_argument("--regression-tolerance", type=float, default=0.02,
+                        help="Allowed drop before a metric counts as a regression (default 0.02)")
+    parser.add_argument("--min-recall5", type=float,
+                        help="Exit non-zero if mean Recall@5 falls below this absolute floor")
     args = parser.parse_args()
 
     test_set = load_test_set()
@@ -277,6 +317,37 @@ async def main():
     print(f"\n{'='*60}")
     print(report)
     print(saved)
+
+    # Regression gate: usable wherever the corpus DB is reachable (e.g. prod cron).
+    current_agg = aggregate([r["retrieval_metrics"] for r in results if r.get("retrieval_metrics")])
+    gate_failed = False
+
+    if args.baseline:
+        try:
+            baseline_results = json.loads(Path(args.baseline).read_text(encoding="utf-8"))
+            baseline_agg = aggregate(
+                [r["retrieval_metrics"] for r in baseline_results if r.get("retrieval_metrics")]
+            )
+            regressions = detect_regressions(current_agg, baseline_agg, args.regression_tolerance)
+            print(f"\n{'='*60}\n回归检查（对照 {args.baseline}）：")
+            if regressions:
+                for reg in regressions:
+                    print(f"  ⚠️  {reg}")
+                if args.fail_on_regression:
+                    gate_failed = True
+            else:
+                print("  ✓ 检索指标无回归")
+        except (OSError, ValueError, KeyError) as exc:
+            print(f"\n[baseline 对照失败] {exc}")
+
+    if args.min_recall5 is not None:
+        recall5 = current_agg.get("recall@5")
+        if recall5 is None or recall5 < args.min_recall5:
+            print(f"\n  ⚠️  Recall@5 {recall5} 低于下限 {args.min_recall5}")
+            gate_failed = True
+
+    if gate_failed:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
