@@ -152,7 +152,7 @@ def aggregate(rows: list[dict]) -> dict:
                 keys.append(key)
     agg: dict = {}
     for key in keys:
-        vals = [row[key] for row in rows if isinstance(row.get(key), (int, float))]
+        vals = [row[key] for row in rows if isinstance(row.get(key), int | float)]
         if vals:
             agg[key] = sum(vals) / len(vals)
     return agg
@@ -167,7 +167,7 @@ def detect_regressions(
         if not key.startswith(_METRIC_PREFIXES):
             continue
         cur_val = current.get(key)
-        if not isinstance(cur_val, (int, float)) or not isinstance(base_val, (int, float)):
+        if not isinstance(cur_val, int | float) or not isinstance(base_val, int | float):
             continue
         if base_val - cur_val > tolerance:
             regressions.append(
