@@ -29,7 +29,8 @@ from urllib.parse import unquote
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from opencc import OpenCC
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -50,6 +51,11 @@ router = APIRouter(tags=["seo"])
 _DEFINITION_PREVIEW_CHARS = 220
 _REVERSE_INDEX_LIMIT = 8
 _MAX_HEADWORD_LEN = 200
+_MIN_HEADWORD_LEN = 2  # single-char terms match ~everything + defeat the trgm index
+# Cap how long the best-effort reverse-index lookup may hold a pool connection.
+# Terms the trgm index can't serve seq-scan the 406MB content table; bounding
+# this (vs the global ~60s) is what stops crawler load from exhausting the pool.
+_REVERSE_INDEX_TIMEOUT_MS = 3000
 
 
 def _build_dict_jsonld(headword: str, entries: list[DictionaryEntry], canonical: str) -> dict:
@@ -92,12 +98,17 @@ async def _fetch_reverse_index(
 ) -> list[dict]:
     """Return up to N sutras containing this headword in their content.
 
-    Uses a vanilla ILIKE — text_contents.content has a GIN trigram index
-    (ix_text_contents_content_trgm, migration 0157) so a single-term substring
-    match is sub-second. Without that index this seq-scans the 406MB table and,
-    under crawler load, piles up and exhausts the connection pool.
+    text_contents.content has a GIN trigram index (ix_text_contents_content_trgm,
+    migration 0157) that serves most ILIKE substring matches sub-second. But
+    short/uncommon CJK terms the index can't serve seq-scan the 406MB table for
+    tens of seconds; under crawler load those pile up and exhaust the connection
+    pool (prod outage 2026-06-23). This block is a best-effort SEO nicety, so:
+      - skip single-char headwords (match ~everything, worst case for trgm), and
+      - cap the per-query statement_timeout so a slow lookup fails fast and
+        releases its pool connection instead of holding it ~60s; on timeout we
+        drop the "appears in N sutras" block rather than starve the pool.
     """
-    if len(headword) > _MAX_HEADWORD_LEN:
+    if not (_MIN_HEADWORD_LEN <= len(headword) <= _MAX_HEADWORD_LEN):
         return []
     stmt = (
         select(BuddhistText.id, BuddhistText.title_zh, BuddhistText.cbeta_id)
@@ -107,11 +118,21 @@ async def _fetch_reverse_index(
         .order_by(BuddhistText.id.asc())
         .limit(_REVERSE_INDEX_LIMIT)
     )
-    rows = await db.execute(stmt)
-    return [
-        {"id": r[0], "title_zh": (r[1] or "").strip(), "cbeta_id": (r[2] or "").strip()}
-        for r in rows.all()
-    ]
+    try:
+        # SET LOCAL applies to the request's already-open transaction (the
+        # caller fetched entries first), bounding just this lookup.
+        await db.execute(text(f"SET LOCAL statement_timeout = '{_REVERSE_INDEX_TIMEOUT_MS}ms'"))
+        rows = await db.execute(stmt)
+        return [
+            {"id": r[0], "title_zh": (r[1] or "").strip(), "cbeta_id": (r[2] or "").strip()}
+            for r in rows.all()
+        ]
+    except SQLAlchemyError as exc:
+        # Timeout / cancellation: abort the txn so the session is reusable, drop
+        # the block. This is the last DB op of the request, so rollback is safe.
+        logger.warning("reverse-index lookup gave up for %r (best-effort): %s", headword, exc)
+        await db.rollback()
+        return []
 
 
 def _render_dict_html(
