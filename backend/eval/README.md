@@ -29,17 +29,28 @@ python -m eval.run_eval --category source_lookup --limit 5
 
 ## 回归门（用在 cron）
 
-把上次的原始 `.json` 当基线，本次检索指标若跌超过容差就非零退出：
+门逻辑版本化在 **`eval/run_regression.sh`**（别再把它只写在 VPS crontab 里——
+改 `run_eval` 的 flag/签名时，review 里就能看到这个依赖）。它对照基线、检索指标
+跌超过容差就**非零退出**：
 
 ```bash
-python -m eval.run_eval --no-llm \
-  --baseline eval/reports/eval-<上次>-baseline.json \
-  --fail-on-regression --regression-tolerance 0.02
-# 或设绝对下限：
-python -m eval.run_eval --no-llm --min-recall5 0.70
+# 在 backend 容器内（cwd /app），对照 eval/reports/baseline.json：
+eval/run_regression.sh
+# 自定义基线 / 绝对下限 / 容差：
+BASELINE=eval/reports/baseline-v2.json MIN_RECALL5=0.30 TOLERANCE=0.03 eval/run_regression.sh
 ```
 
-退出码非零即"质量退化"，cron 里可据此告警（接现有 Telegram bot）。
+prod cron 调用方式（薄包装，Telegram 凭据留在 VPS 不进 repo）：
+
+```bash
+cd /home/admin/fojin && docker compose exec -T backend eval/run_regression.sh \
+  || curl -s "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" --data-urlencode chat_id="${TG_CHAT}" \
+       --data-urlencode text="FoJin 答案质量回归门告警"
+```
+
+> 全量 eval 需要 678K 向量的语料库 DB，**CI 跑不了**；门只在能连 prod DB 处跑，
+> 而门用到的**指标逻辑**由 CI 单测护住（`test_retrieval_metrics.py` / `test_rag_rerank_merge.py`）。
+> 有意提升质量后，用 `python -m eval.run_eval --no-llm --tag baseline` 重新生成基线并存为新 `BASELINE`。
 
 ## 黄金来源 schema（`test_set.json`）
 
