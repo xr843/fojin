@@ -42,9 +42,25 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+from opencc import OpenCC
+
 from app.schemas.chat import ChatSource
 
 logger = logging.getLogger(__name__)
+
+# 繁简 fold for title matching. The LLM frequently emits a simplified 经名
+# (e.g. 《地藏菩萨本愿经》) while the CBETA source title_zh is traditional
+# (地藏菩薩本願經). Without folding, the whitelist check misses and a CORRECT
+# citation gets stripped of its clickable 【】. quote_verifier already folds
+# quotes the same way; keep the two guards symmetric.
+_t2s = OpenCC("t2s")
+
+
+def _norm_title(title: str) -> str:
+    """Whitelist key: 繁→简 folded, stripped. Comparison-only — the answer
+    keeps the LLM's original title text (the frontend's injectCitationLinks
+    folds the same way, so the rendered citation still resolves)."""
+    return _t2s.convert(title).strip()
 
 
 # Matches 【《<title>》第<fascicle>卷】 or 【《<title>》】. The fascicle group
@@ -93,11 +109,11 @@ def _build_whitelist(sources: Iterable[ChatSource]) -> dict[str, set[int]]:
     for s in sources:
         if s.text_id <= 0 or not s.title_zh:
             continue
-        wl.setdefault(s.title_zh, set()).add(s.juan_num)
+        wl.setdefault(_norm_title(s.title_zh), set()).add(s.juan_num)
         for p in s.parallel_chunks:
             if p.text_id <= 0 or not p.title:
                 continue
-            wl.setdefault(p.title, set()).add(p.juan_num)
+            wl.setdefault(_norm_title(p.title), set()).add(p.juan_num)
     return wl
 
 
@@ -146,7 +162,8 @@ def enforce_citation_whitelist(
         title = match.group(1)
         original_juan, juan_is_placeholder = _parse_juan(match.group(2))
 
-        if title not in whitelist:
+        norm_title = _norm_title(title)
+        if norm_title not in whitelist:
             replacement = f"《{title}》"
             mutations.append(
                 CitationMutation(
@@ -160,7 +177,7 @@ def enforce_citation_whitelist(
             )
             return replacement
 
-        valid_juans = whitelist[title]
+        valid_juans = whitelist[norm_title]
         # Title-only citation (【《X》】 with no fascicle at all) is always
         # allowed when the title is real — it points at the text as a whole.
         if original_juan is None and not juan_is_placeholder:
