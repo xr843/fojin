@@ -270,6 +270,62 @@ async def test_quota_increment_uses_explicit_update():
     assert user.daily_chat_count == 6
 
 
+class _HandleCapturingSessionmaker:
+    """Like _CountingSessionmaker but keeps each db handle so a test can
+    assert what was called on the prep/save sessions."""
+
+    def __init__(self):
+        self.handles: list = []
+
+    def __call__(self):
+        outer = self
+
+        class _CM:
+            async def __aenter__(self_inner):
+                h = AsyncMock()
+                outer.handles.append(h)
+                return h
+
+            async def __aexit__(self_inner, *_):
+                return False
+
+        return _CM()
+
+
+@pytest.mark.anyio
+async def test_streaming_prep_commits_so_quota_persists():
+    """The streaming prep session must COMMIT before it closes.
+
+    _check_daily_quota issues UPDATE + flush() but no commit, and the prep
+    block deliberately relies on close()->rollback to expire detached ORM
+    instances — which ALSO discards the uncommitted quota UPDATE. So on the
+    /chat/stream path the logged-in daily limit (FREE_DAILY_LIMIT_USER)
+    silently never persists, leaving the free tier effectively unbounded and
+    burning the platform key. Pin that the prep session commits. Regression
+    for the streaming quota-leak audit finding (2026-06-23)."""
+    sources = _make_fake_sources()
+    prepare_return = _make_prepare_chat_return(sources)
+    sm = _HandleCapturingSessionmaker()
+    mock_client_cls = _make_mock_httpx_client(["般", "若"])
+
+    with patch("app.services.chat._prepare_chat", new_callable=AsyncMock, return_value=prepare_return), \
+         patch("app.services.chat._save_messages", new_callable=AsyncMock, return_value=99), \
+         patch("app.services.chat._mark_attachments_consumed", new_callable=AsyncMock), \
+         patch("app.services.chat.httpx.AsyncClient", mock_client_cls):
+        from app.services.chat import send_message_stream
+
+        async for _ in send_message_stream(user_id=1, message="测试", sessionmaker=sm):
+            pass
+
+    assert sm.handles, "no session opened"
+    prep_handle = sm.handles[0]
+    assert prep_handle.commit.await_count >= 1, (
+        "streaming prep session must commit so _check_daily_quota's UPDATE "
+        "survives close()->rollback; otherwise logged-in daily quota is a "
+        "no-op on /chat/stream"
+    )
+
+
 @pytest.mark.anyio
 async def test_attachments_consumed_uses_explicit_update():
     """``_mark_attachments_consumed`` must persist via UPDATE statement on

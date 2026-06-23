@@ -116,6 +116,32 @@ def _convert_messages_for_anthropic(messages: list[dict]) -> tuple[str, list[dic
     return system, user_messages
 
 
+# Reasoning models (deepseek-v4*, deepseek-reasoner, *-thinking, o1/o3) emit
+# hidden reasoning_content that shares the max_tokens budget with the visible
+# answer. A tight cap — notably the 30 used for session titles — gets fully
+# consumed by the reasoning trace, leaving content empty / answers truncated.
+# bare "reasoner"/"thinking" are intentional broad substring matches (catch any
+# provider's *-reasoner / *-thinking variant); "deepseek-v4" is explicit since
+# its reasoning isn't reflected in the name.
+_REASONING_MODEL_MARKERS = (
+    "deepseek-v4", "reasoner", "thinking", "-o1", "-o3", "/o1", "/o3",
+)
+
+
+def _is_reasoning_model(model: str | None) -> bool:
+    m = (model or "").lower()
+    return any(k in m for k in _REASONING_MODEL_MARKERS)
+
+
+def _with_reasoning_headroom(model: str | None, max_tokens: int) -> int:
+    """Add budget for hidden reasoning_content on reasoning models so the
+    visible answer isn't starved. max_tokens is a ceiling, not a target, so
+    this is ~free for responses that don't hit the old cap — it only prevents
+    reasoning from eating the entire short cap (empty titles) or truncating
+    long answers."""
+    return max_tokens + 4000 if _is_reasoning_model(model) else max_tokens
+
+
 def _build_anthropic_body(model: str, messages: list[dict], *, temperature: float = 0.7,
                           max_tokens: int = 2000, stream: bool = False) -> dict:
     system, user_messages = _convert_messages_for_anthropic(messages)
@@ -833,7 +859,7 @@ async def _generate_session_title(
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             if _is_anthropic(api_url, provider):
-                body = _build_anthropic_body(model, messages, temperature=0.3, max_tokens=30)
+                body = _build_anthropic_body(model, messages, temperature=0.3, max_tokens=_with_reasoning_headroom(model, 64))
                 resp = await client.post(f"{api_url}/messages", headers=_build_anthropic_headers(api_key), json=body)
                 resp.raise_for_status()
                 title = resp.json()["content"][0]["text"].strip().strip("\"'《》")
@@ -841,7 +867,7 @@ async def _generate_session_title(
                 resp = await client.post(
                     f"{api_url}/chat/completions",
                     headers={"Authorization": f"Bearer {api_key}"},
-                    json={"model": model, "messages": messages, "temperature": 0.3, "max_tokens": 30},
+                    json={"model": model, "messages": messages, "temperature": 0.3, "max_tokens": _with_reasoning_headroom(model, 64)},
                 )
                 resp.raise_for_status()
                 title = resp.json()["choices"][0]["message"]["content"].strip().strip("\"'《》")
@@ -1104,14 +1130,14 @@ async def send_message(
     async def _call_once(u: str, k: str, m: str, p: str) -> str:
         async with httpx.AsyncClient(timeout=60) as client:
             if _is_anthropic(u, p):
-                body = _build_anthropic_body(m, llm_messages, max_tokens=8000 if page_content else 2000)
+                body = _build_anthropic_body(m, llm_messages, max_tokens=_with_reasoning_headroom(m, 8000 if page_content else 2000))
                 resp = await client.post(f"{u}/messages", headers=_build_anthropic_headers(k), json=body)
                 resp.raise_for_status()
                 return resp.json()["content"][0]["text"]
             resp = await client.post(
                 f"{u}/chat/completions",
                 headers={"Authorization": f"Bearer {k}"},
-                json={"model": m, "messages": llm_messages, "temperature": 0.7, "max_tokens": 8000 if page_content else 2000},
+                json={"model": m, "messages": llm_messages, "temperature": 0.7, "max_tokens": _with_reasoning_headroom(m, 8000 if page_content else 2000)},
             )
             resp.raise_for_status()
             return resp.json()["choices"][0]["message"]["content"]
@@ -1355,6 +1381,16 @@ async def send_message_stream(
             pending_attachment_ids = [
                 a.id for a in prep_result[-1] if a.consumed_at is None
             ]
+            # Persist prep-phase writes (the _check_daily_quota UPDATE) BEFORE
+            # the block exits. Without this, close() rolls back the still-open
+            # prep transaction (see the snapshot note above) and discards the
+            # quota increment — making FREE_DAILY_LIMIT_USER a no-op on the
+            # streaming path while the non-stream path persists it via
+            # _save_messages. Scalars are already captured above, so the
+            # commit's instance-expiry is harmless. Quota is the only pending
+            # write here (create_session already committed; everything else in
+            # _prepare_chat is SELECT-only).
+            await db_prep.commit()
         except (ValidationError, QuotaExceededError, AccessDeniedError, ServiceError) as exc:
             prep_error = exc
     # db_prep is closed here — connection returned to the pool before any
@@ -1390,7 +1426,7 @@ async def send_message_stream(
     async def _stream_llm_once(u: str, k: str, m: str, p: str):
         """Inner generator that yields content chunks. Raises httpx errors on failure."""
         if _is_anthropic(u, p):
-            body = _build_anthropic_body(m, llm_messages, stream=True, max_tokens=8000 if page_content else 2000)
+            body = _build_anthropic_body(m, llm_messages, stream=True, max_tokens=_with_reasoning_headroom(m, 8000 if page_content else 2000))
             async with httpx.AsyncClient(timeout=120 if page_content else 60) as client, client.stream(
                 "POST", f"{u}/messages", headers=_build_anthropic_headers(k), json=body,
             ) as resp:
@@ -1415,7 +1451,7 @@ async def send_message_stream(
                 "POST", f"{u}/chat/completions",
                 headers={"Authorization": f"Bearer {k}"},
                 json={"model": m, "messages": llm_messages, "temperature": 0.7,
-                      "max_tokens": 8000 if page_content else 2000, "stream": True},
+                      "max_tokens": _with_reasoning_headroom(m, 8000 if page_content else 2000), "stream": True},
             ) as resp:
                 resp.raise_for_status()
                 async for line in resp.aiter_lines():
