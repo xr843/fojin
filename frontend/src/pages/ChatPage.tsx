@@ -1379,6 +1379,12 @@ export default function ChatPage() {
                 options={[
                   { value: "", label: `🟢 ${t("chat.general_assistant")}` },
                   {
+                    label: t("chat.tradition_india"),
+                    options: [
+                      { value: "nagarjuna", label: t("chat.master_nagarjuna") },
+                    ],
+                  },
+                  {
                     label: t("chat.tradition_han"),
                     options: [
                       { value: "zhiyi", label: t("chat.master_zhiyi") },
