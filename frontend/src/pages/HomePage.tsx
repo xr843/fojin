@@ -85,12 +85,7 @@ export default function HomePage() {
         </h1>
         <div className="home-subtitle">{t("app.tagline")}</div>
 
-        {/* 问答主入口：问答是核心，搜索是其下的支撑入口 */}
-        <button className="home-ask-cta" onClick={() => navigate("/chat")}>
-          <RobotOutlined /> {t("home.ask_cta")}
-        </button>
-
-        {/* 合并搜索栏（按数据源检索原文全文） */}
+        {/* 合并搜索栏 */}
         <div className="search-combo">
           <div className="search-combo-bar">
             <button
@@ -190,15 +185,15 @@ export default function HomePage() {
         </div>
 
         <div className="home-features">
-          <div className="home-feature-card" onClick={() => navigate("/chat")}>
-            <RobotOutlined className="home-feature-icon" />
-            <div className="home-feature-title">{t("home.feature_chat_title")}</div>
-            <div className="home-feature-desc">{t("home.feature_chat_desc")}</div>
-          </div>
           <div className="home-feature-card" onClick={() => navigate("/sources")}>
             <DatabaseOutlined className="home-feature-icon" />
             <div className="home-feature-title">{t("home.feature_sources_title")}</div>
             <div className="home-feature-desc">{t("home.feature_sources_desc")}</div>
+          </div>
+          <div className="home-feature-card" onClick={() => navigate("/chat")}>
+            <RobotOutlined className="home-feature-icon" />
+            <div className="home-feature-title">{t("home.feature_chat_title")}</div>
+            <div className="home-feature-desc">{t("home.feature_chat_desc")}</div>
           </div>
           <div className="home-feature-card" onClick={() => navigate("/dictionary")}>
             <FileTextOutlined className="home-feature-icon" />

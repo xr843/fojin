@@ -94,32 +94,6 @@
   letter-spacing: 2px;
 }
 
-/* ---------- 问答主入口 CTA ---------- */
-.home-ask-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 18px;
-  padding: 11px 30px;
-  background: var(--fj-accent);
-  color: #fff;
-  border: none;
-  border-radius: 26px;
-  cursor: pointer;
-  font-family: "Noto Serif SC", serif;
-  font-size: 16px;
-  font-weight: 400;
-  letter-spacing: 2px;
-  box-shadow: 0 2px 14px rgba(160, 48, 0, 0.18);
-  transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
-}
-
-.home-ask-cta:hover {
-  background: #a03000;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 18px rgba(160, 48, 0, 0.26);
-}
-
 /* ---------- 合并搜索栏 ---------- */
 .search-combo {
   width: 100%;
