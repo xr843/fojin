@@ -6,12 +6,13 @@ The block is a best-effort SEO nicety — cap its statement_timeout and drop it 
 timeout rather than starve the pool.
 """
 
-from unittest.mock import AsyncMock, MagicMock
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.api.seo_dict import _fetch_reverse_index
+from app.api.seo_dict import _fetch_reverse_index, dict_seo_html
 
 
 @pytest.mark.anyio
@@ -58,3 +59,73 @@ async def test_best_effort_empty_and_rollback_on_db_error():
     out = await _fetch_reverse_index(db, "般若")
     assert out == []
     db.rollback.assert_awaited()  # aborted txn cleaned so the session is reusable
+
+
+@pytest.mark.anyio
+async def test_dict_page_survives_reverse_index_rollback():
+    """Live /dict/般若 and /dict/菩提 returned 500 (2026-06-24): those two common
+    terms make the reverse-index ILIKE time out, which rolls back the session
+    (the #801 best-effort guard) — and the rollback EXPIRES the joinedload'd
+    entries loaded earlier. Rendering then touched ``e.source.name_zh`` /
+    ``e.definition`` on the now-expired async ORM rows, triggering a lazy reload
+    → MissingGreenlet → 500. This is the #654/#763 detached-row trap, 3rd time.
+
+    The page MUST render from a primitive snapshot taken BEFORE the reverse-index
+    lookup, so a mid-request rollback can never 500 the page.
+    """
+
+    class _ExpiringEntry:
+        """An ORM row that raises on attribute access once the session is rolled
+        back — exactly how async SQLAlchemy behaves on an expired attribute."""
+
+        def __init__(self):
+            self.expired = False
+
+        def _guard(self):
+            if self.expired:
+                raise RuntimeError(
+                    "greenlet_spawn has not been called; can't reload expired "
+                    "attribute (MissingGreenlet after rollback)"
+                )
+
+        @property
+        def definition(self):
+            self._guard()
+            return "般若：智慧；超越世俗分别的洞见。"
+
+        @property
+        def reading(self):
+            self._guard()
+            return None
+
+        @property
+        def source(self):
+            self._guard()
+            return SimpleNamespace(name_zh="佛光大辞典")
+
+    entry = _ExpiringEntry()
+
+    db = AsyncMock()
+    entries_result = MagicMock()
+    entries_result.unique.return_value.scalars.return_value.all.return_value = [entry]
+    db.execute.return_value = entries_result
+
+    async def _fake_reverse(_db, _headword):
+        # Simulate the timeout path: the session was rolled back, so every
+        # previously-loaded ORM row is now expired.
+        entry.expired = True
+        return []
+
+    request = MagicMock()
+    request.base_url = "http://test/"
+
+    # 般若 is identical in simplified/traditional, so the variant probe is
+    # skipped and the only pre-render DB call is the entries SELECT (mocked).
+    with patch("app.api.seo_dict._fetch_reverse_index", _fake_reverse):
+        resp = await dict_seo_html("般若", request, db)
+
+    assert resp.status_code == 200
+    body = resp.body.decode()
+    assert "般若" in body
+    # The source name was snapshotted before the rollback, so it still renders.
+    assert "佛光大辞典" in body
