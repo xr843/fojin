@@ -1,24 +1,22 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────
-# PROVENANCE / 来源说明(本副本为版本控制 bus-factor,非从 repo 运行):
-#   生产 VPS(sg-vps)上 *实际运行* 的"答案质量回归门"主机侧 cron 包装的忠实副本。
-#   - 部署位置:host:/home/admin/fojin-eval-regression.sh(repo 目录之外,手动管理;
-#     被 fojin-backup.sh 的 /home/admin/*.sh 通配自动纳入每日备份)
-#   - 调度:admin crontab,建议每日(语料库只在 prod,门跑不进 GitHub CI)
-#   - Telegram 凭据:走 host 环境(crontab 行内或 /home/admin/.env),**不在本脚本/repo 内**
-#   - 修改逻辑须先改 host 再同步此副本(与 fojin-backup.sh 同约定)
+# PROVENANCE / 部署拓扑(本文件即源头:版本化 + CI 受测,非 VPS 副本):
+#   "答案质量回归门"的主机侧包装。门跑不进 GitHub CI(检索召回要打 2.84 亿字 +
+#   67.8 万向量的 pgvector,只 prod 有),所以跑在 sg-vps cron。实际拓扑(2026-06-25 起):
+#   - 本脚本随 repo 部署到 host:/home/admin/fojin/fojin-eval-regression.sh(deploy.sh 同步)
+#   - cron(admin,每日 04:45)调 VPS-only 瘦 shim /home/admin/fojin-eval-gate.sh,该 shim
+#     仅 source Telegram 凭据(导出 TELEGRAM_BOT_TOKEN/CHAT_ID,**凭据不在 repo 内**)后
+#     exec 本脚本 —— 凭据留 host、逻辑留 repo。日志 /home/admin/fojin-eval-gate.log
+#   - 改逻辑改本文件即可(随 deploy 生效);改 shim/凭据才需登 host
 #
 # 职责(刻意做窄):跑容器内的回归门 → 仅失败时 Telegram 告警 → 透传退出码。
 # 门的判定逻辑在 backend/eval/run_regression.sh(版本化)+ run_eval.py;
 # metric 逻辑由 CI 单测(tests/test_retrieval_metrics.py 等)守。本包装的控制流
 # 由 tests/test_eval_regression_wrapper.py 守(注入假 gate/假 curl,CI 跑)。
 #
-# 推荐 crontab 行(每日 04:10,设绝对下限 + 容器内对照 baseline):
-#   10 4 * * * TELEGRAM_BOT_TOKEN=xxx TELEGRAM_CHAT_ID=yyy \
-#     EVAL_GATE_CMD='docker compose exec -T -e MIN_RECALL5=0.30 backend eval/run_regression.sh' \
-#     /home/admin/fojin-eval-regression.sh >> /home/admin/logs/eval-regression.log 2>&1
-#
-# 生成/更新 baseline(仅在 prod,有意的质量变更后):
+# 设绝对下限(可选,默认只对照 baseline 抓回归):令 shim 或 crontab 注入
+#   EVAL_GATE_CMD='docker compose exec -T -e MIN_RECALL5=0.30 backend eval/run_regression.sh'
+# 生成/更新 baseline(仅 prod,有意的质量变更后;eval/ 是 bind mount,host repo 可见):
 #   docker compose exec -T backend python -m eval.run_eval --no-llm --tag baseline
 #   # 然后把产出的 raw json 存为容器内 eval/reports/baseline.json
 # ─────────────────────────────────────────────────────────────────────────
