@@ -6,7 +6,7 @@
 
 **AI Q&A grounded in the world's largest open aggregation of Buddhist texts: 600+ sources, 30+ languages, trilingual cross-canon retrieval — every answer linked back to its source passage.**
 
-Ask a question in plain language and FoJin's assistant **"XiaoJin"** answers from the canon itself — Retrieval-Augmented Generation over 680K+ embedded passages, optional cross-encoder reranking and root-sutra recall, **clickable 【《sutra》juan N】 citations** that open the exact source text, anti-hallucination guards, and a citation drawer with **side-by-side 汉 / 巴利 / 藏文 cross-canon parallels**. You can also ask in the voice of **14 historical Buddhist masters**, each scoped to their own tradition's scriptures.
+Ask a question in plain language and FoJin's assistant **"XiaoJin"** answers from the canon itself — Retrieval-Augmented Generation over 680K+ embedded passages, optional cross-encoder reranking and root-sutra recall, **clickable 【《sutra》juan N】 citations** that open the exact source text, anti-hallucination guards, and a citation drawer with **side-by-side 汉 / 巴利 / 藏文 cross-canon parallels**. You can also ask in the voice of **15 historical Buddhist masters**, each scoped to their own tradition's scriptures.
 
 What makes those answers trustworthy is the corpus underneath. FoJin aggregates **613 data sources** into one searchable platform — 10,500+ texts with 23,500+ volumes of full content in Classical Chinese, Pali, Tibetan and Sanskrit, **the first LLM-driven trilingual cross-canon parallel reading platform** (CBETA × SuttaCentral × 84000) with LLM-verified chunk-level alignment, a 110K+ entity knowledge graph on a Deck.GL geo map, and 32 dictionaries with 748K entries. Every feature exists to make the answers more grounded — and to let you go deeper once you have one.
 
@@ -32,7 +32,7 @@ Buddhist texts are scattered across hundreds of databases worldwide — CBETA, S
 | What you need | How FoJin helps |
 |---|---|
 | **Ask a question, get a sourced answer** | **AI Q&A ("XiaoJin")** — RAG over 680K+ passages, reranking, root-sutra recall, clickable 【《sutra》juan N】 citations, cross-canon citation drawer, anti-hallucination guards |
-| Ask in a master's voice | **Master Persona Mode** — 14 historical masters, each with tradition-scoped RAG |
+| Ask in a master's voice | **Master Persona Mode** — 15 historical masters, each with tradition-scoped RAG |
 | Find a sutra across databases | **Multi-dimensional search** across 10,500+ texts from 613 sources |
 | Read the full text online | **8,900+ texts** with 23,500+ volumes of full content, CBETA-style layout |
 | Compare translations | **Parallel reading** in 30+ languages side by side |
@@ -207,10 +207,11 @@ RAG layer automatically includes parallel_chunks in the LLM context when a retri
 
 ### Master Persona Mode (法师模式)
 
-Select a specific Buddhist master to receive answers in their teaching style, grounded in their tradition's core scriptures. 14 historical masters available:
+Select a specific Buddhist master to receive answers in their teaching style, grounded in their tradition's core scriptures. 15 historical masters available:
 
 | Master | Tradition | Core Teachings |
 |--------|-----------|----------------|
+| 龙树 Nāgārjuna | 印度·中观 | 八不中道、缘起性空、二谛中道、戏论寂灭 |
 | 智顗 Zhiyi | 天台宗 | 一念三千、三谛圆融、五时八教、止观双修 |
 | 慧能 Huineng | 禅宗 | 直指人心、见性成佛、无念无相无住 |
 | 玄奘 Xuanzang | 法相唯识宗 | 八识、三性、五位百法、转识成智 |
