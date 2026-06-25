@@ -21,7 +21,7 @@
   "dependencies": {
     "@ant-design/charts": "^2.6.7",
     "@deck.gl/core": "^9.2.11",
-    "@deck.gl/geo-layers": "^9.2.11",
+    "@deck.gl/geo-layers": "^9.3.4",
     "@deck.gl/layers": "^9.2.11",
     "@deck.gl/react": "^9.2.11",
     "@tanstack/react-query": "^5.62.0",
