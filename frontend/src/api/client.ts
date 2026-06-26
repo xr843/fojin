@@ -927,6 +927,38 @@ export async function searchDictionaryGrouped(params: {
   return data;
 }
 
+// Cross-lingual term concept (multilingual concept card)
+export interface DictConcept {
+  sanskrit: string | null;
+  devanagari: string | null;
+  pali: string | null;
+  tibetan: string | null;
+  chinese: string | null;
+  english: string | null;
+}
+
+export interface DictConceptEntry {
+  id: DictEntryId;
+  headword: string;
+  source_name: string | null;
+  definition_preview: string;
+}
+
+export interface DictConceptLangGroup {
+  lang: string;
+  entries: DictConceptEntry[];
+}
+
+export interface DictConceptResponse {
+  concept: DictConcept | null;
+  entries_by_lang: DictConceptLangGroup[];
+}
+
+export async function getDictConcept(q: string): Promise<DictConceptResponse> {
+  const { data } = await api.get<DictConceptResponse>("/dictionary/concept", { params: { q } });
+  return data;
+}
+
 // Dictionary hot terms
 export async function getDictionaryHot(): Promise<string[]> {
   const { data } = await api.get<{ terms: string[] }>("/dictionary/hot");

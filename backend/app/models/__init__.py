@@ -10,6 +10,7 @@ from app.models.iiif import IIIFManifest
 from app.models.knowledge_graph import KGEntity, KGRelation
 from app.models.relation import TextRelation
 from app.models.source import DataSource, SourceDistribution, TextIdentifier
+from app.models.term_concept import TermConcept, TermConceptEntry
 from app.models.text import (
     ApparatusReading,
     BuddhistText,
@@ -42,6 +43,8 @@ __all__ = [
     "ReadingHistory",
     "SourceDistribution",
     "SourceUpdate",
+    "TermConcept",
+    "TermConceptEntry",
     "TextApparatus",
     "TextContent",
     "TextEmbedding",

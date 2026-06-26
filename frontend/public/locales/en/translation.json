@@ -500,6 +500,8 @@
   "dict.total_n": "{{n}} total",
   "dict.no_results": "No entries found for \"{{query}}\"",
   "dict.ask_ai": "Ask AI",
+  "dict.concept.title": "Across languages",
+  "dict.concept.search_form": "Search this form",
   "lang.ja": "Japanese",
   "lang.ko": "Korean",
   "lang.mn": "Mongolian",

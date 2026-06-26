@@ -500,6 +500,8 @@
   "dict.total_n": "共 {{n}} 条",
   "dict.no_results": "未找到\"{{query}}\"的相关词条",
   "dict.ask_ai": "问小津",
+  "dict.concept.title": "跨语种对照",
+  "dict.concept.search_form": "搜索此词形",
   "lang.ja": "日文",
   "lang.ko": "韩文",
   "lang.mn": "蒙古文",
