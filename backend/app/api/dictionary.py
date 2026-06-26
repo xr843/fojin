@@ -11,6 +11,7 @@ from app.core.exceptions import DictionaryEntryNotFoundError
 from app.database import get_db
 from app.models.dictionary import DictionaryEntry
 from app.models.source import DataSource
+from app.services.term_concept_service import resolve_concept
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/dictionary", tags=["dictionary"])
@@ -314,6 +315,21 @@ async def search_dictionary(
         "size": size,
         "results": [_entry_to_dict(e) for e in entries],
     }
+
+
+@router.get("/concept")
+async def get_concept(
+    response: Response,
+    q: str = Query(..., min_length=1, description="term in any language (中/梵/巴/藏)"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Resolve a term to its cross-lingual concept + linked entries grouped by
+    language. Returns ``concept: null`` (200) when nothing matches, so the
+    frontend simply renders no card and falls back to normal search.
+
+    跨语种术语概念卡数据。"""
+    response.headers["Cache-Control"] = PUBLIC_CACHE_HEADER
+    return await resolve_concept(db, q)
 
 
 @router.get("/{entry_id}")
