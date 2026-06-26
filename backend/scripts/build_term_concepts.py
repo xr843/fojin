@@ -47,6 +47,26 @@ logger = logging.getLogger(__name__)
 MVP_CODE = "dila-mvp"
 SIYI_CODE = "siyi-hebi"
 
+# A concept is a *term*. Mahāvyutpatti also contains whole sentences/passages
+# (e.g. doctrinal phrases) whose normalized key runs to hundreds of chars; those
+# are not lexical terms and would overflow the varchar columns. Skip any entry
+# whose key exceeds this — real Sanskrit terms (incl. long compounds like
+# anuttarasamyaksambodhi ~22) stay well under it.
+MAX_KEY_LEN = 64
+
+# Per-column display caps (must match the term_concepts schema).
+_DISPLAY_CAPS = {"sanskrit": 200, "devanagari": 200, "pali": 200, "tibetan": 300, "chinese": 200}
+
+
+def _cap(value: str | None, field: str) -> str | None:
+    """Return ``value`` only if it fits the column, else None — drop an
+    over-long display form rather than truncate it (a truncated term is wrong)
+    or blow up the whole insert."""
+    if value and len(value) <= _DISPLAY_CAPS[field]:
+        return value
+    return None
+
+
 # ─────────────────────────── pure functions (unit-tested) ───────────────────
 
 
@@ -143,7 +163,9 @@ async def build(session) -> dict:
     links: set[tuple[int, int]] = set()  # (concept_id, dict_entry_id) guard
 
     def get_or_make(key: str) -> TermConcept | None:
-        if not key:
+        # Skip empty keys and sentence-length keys (non-term Mahāvyutpatti
+        # entries) — the latter would also overflow the varchar(200) key column.
+        if not key or len(key) > MAX_KEY_LEN:
             return None
         c = concepts.get(key)
         if c is None:
@@ -180,11 +202,11 @@ async def build(session) -> dict:
             c = get_or_make(key)
             if c is None:
                 continue
-            c.sanskrit = c.sanskrit or p["sanskrit"]
-            c.devanagari = c.devanagari or p["devanagari"]
-            c.tibetan = c.tibetan or p["tibetan"]
+            c.sanskrit = c.sanskrit or _cap(p["sanskrit"], "sanskrit")
+            c.devanagari = c.devanagari or _cap(p["devanagari"], "devanagari")
+            c.tibetan = c.tibetan or _cap(p["tibetan"], "tibetan")
             if not c.chinese and p["chinese"]:
-                c.chinese = p["chinese"][0]
+                c.chinese = _cap(p["chinese"][0], "chinese")
             if await link(c, e.id, e.lang or "sa", "mvp"):
                 stats["links_mvp"] += 1
 
@@ -201,10 +223,10 @@ async def build(session) -> dict:
             c = get_or_make(key)
             if c is None:
                 continue
-            c.sanskrit = c.sanskrit or p.get("sanskrit")
-            c.chinese = c.chinese or p.get("chinese")
-            c.tibetan = c.tibetan or p.get("tibetan")
-            c.pali = c.pali or p.get("pali")
+            c.sanskrit = c.sanskrit or _cap(p.get("sanskrit"), "sanskrit")
+            c.chinese = c.chinese or _cap(p.get("chinese"), "chinese")
+            c.tibetan = c.tibetan or _cap(p.get("tibetan"), "tibetan")
+            c.pali = c.pali or _cap(p.get("pali"), "pali")
             if await link(c, e.id, "sa", "siyi_tag"):
                 stats["links_siyi"] += 1
 
@@ -228,13 +250,13 @@ async def build(session) -> dict:
             continue
         lemma = (headword or "").split("\n")[0].strip()
         if lang == "pi":
-            c.pali = c.pali or lemma
+            c.pali = c.pali or _cap(lemma, "pali")
         # Prefer a dictionary lemma over Mahāvyutpatti's inflected citation form
         # (e.g. "nirvāṇa" over "nirvāṇam") when it's the same word.
         elif lang == "sa" and (
             not c.sanskrit or (lemma and c.sanskrit.startswith(lemma) and lemma != c.sanskrit)
         ):
-            c.sanskrit = lemma
+            c.sanskrit = _cap(lemma, "sanskrit") or c.sanskrit
         if await link(c, eid, lang, "romanized_join"):
             stats["links_roman"] += 1
 

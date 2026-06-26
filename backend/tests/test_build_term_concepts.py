@@ -54,6 +54,16 @@ async def _seed(s):
             DictionaryEntry(headword="nirvāṇa", definition="extinction; liberation.", source_id=sources["mw"].id, lang="sa", external_id="mw-1"),
             DictionaryEntry(headword="nibbāna", definition="the unbinding.", source_id=sources["dpd"].id, lang="pi", external_id="dpd-1"),
             DictionaryEntry(headword="涅槃", definition="梵語 nirvāṇa 之音譯。", source_id=sources["fg"].id, lang="zh", external_id="fg-1"),
+            # A sentence-length Mahāvyutpatti entry (real corpus has these) — its
+            # key far exceeds MAX_KEY_LEN, must be skipped, not crash the build.
+            DictionaryEntry(
+                headword=(
+                    "idaṃ punar agram asaṅga jñānam utsṛjya viśiṣṭaparinirvāṇatām "
+                    "sattvā hīnayānaṃ prārthayante yad idam śrāvakapratyekabuddhayānaṃ"
+                ),
+                definition="idaṃ punar agram asaṅga jñānam …\n  一切有情不貪妙智外捨涅槃",
+                source_id=sources["dila-mvp"].id, lang="sa", external_id="mvp-sentence",
+            ),
         ]
     )
     await s.commit()
@@ -100,6 +110,16 @@ async def test_build_respects_pali_boundary(session):
         .where(TermConceptEntry.dict_entry_id == entry_id)
     )
     assert linked == 0
+
+
+async def test_build_skips_sentence_length_entries(session):
+    # The fixture includes a sentence-length Mahāvyutpatti entry; it must be
+    # skipped (not a lexical term) without crashing or creating a giant concept
+    # that would overflow the varchar columns.
+    await build(session)
+    concepts = await _concepts(session)
+    assert len(concepts) == 1  # only the nirvāṇa term; the sentence is dropped
+    assert all(len(c.key) <= 64 for c in concepts)
 
 
 async def test_build_is_idempotent(session):
