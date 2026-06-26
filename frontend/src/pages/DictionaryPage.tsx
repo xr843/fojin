@@ -8,8 +8,10 @@ import { useTranslation } from "react-i18next";
 import {
   getDictionarySources,
   searchDictionaryGrouped,
+  getDictConcept,
 } from "../api/client";
 import type { DictEntry, DictGroupedResult } from "../api/client";
+import ConceptCard from "../components/ConceptCard";
 import { localizedSourceName } from "../utils/sourceName";
 import "../styles/dictionary.css";
 
@@ -160,6 +162,15 @@ export default function DictionaryPage() {
         page,
       }),
     enabled: query.length > 0,
+  });
+
+  // Cross-lingual concept lookup — skipped for whole-source browse (q="*").
+  const conceptQuery = query && query !== "*" ? query : "";
+  const { data: conceptResult } = useQuery({
+    queryKey: ["dict-concept", conceptQuery],
+    queryFn: () => getDictConcept(conceptQuery),
+    enabled: conceptQuery.length > 0,
+    staleTime: 300_000,
   });
 
   const handleSearch = (value: string) => {
@@ -332,6 +343,14 @@ export default function DictionaryPage() {
               ]}
             />
           </div>
+
+          <ConceptCard
+            data={conceptResult}
+            onPick={(term) => {
+              setInputValue(term);
+              handleSearch(term);
+            }}
+          />
 
           {searching ? (
             <div style={{ textAlign: "center", padding: 60 }}>
