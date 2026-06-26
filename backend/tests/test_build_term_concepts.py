@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.models.dictionary import DictionaryEntry
 from app.models.source import DataSource
 from app.models.term_concept import TermConcept, TermConceptEntry
+from app.services.term_concept_service import resolve_concept
 
 MVP_HEADWORD = "nirvāṇam\n            निर्वाणम्"
 MVP_DEF = (
@@ -70,7 +71,9 @@ async def test_build_assembles_single_cross_lingual_concept(session):
     c = concepts[0]
     assert c.key == "nirvana"
     assert c.chinese == "涅槃"  # first Chinese form from the Mahāvyutpatti entry
-    assert c.sanskrit == "nirvāṇam"
+    # Phase 3 prefers the MW lemma "nirvāṇa" over the Mahāvyutpatti citation
+    # form "nirvāṇam" for display (same word, lemma is a prefix).
+    assert c.sanskrit == "nirvāṇa"
     assert c.tibetan == "མྱ་ངན་ལས་འདས་པ་"  # Tibetan script, not the Wylie line
     assert stats["concepts"] == 1
 
@@ -104,3 +107,29 @@ async def test_build_is_idempotent(session):
     second = await build(session)
     assert first == second
     assert len(await _concepts(session)) == 1
+
+
+# --- resolve_concept (the request-path) ------------------------------------
+
+
+async def test_resolve_by_chinese_sanskrit_and_normalized_key(session):
+    await build(session)
+    # Chinese form, exact Sanskrit display form, and a romanized key variant
+    # (no diacritics, accusative -m) must all resolve to the same concept.
+    for term in ("涅槃", "nirvāṇa", "nirvanam"):
+        res = await resolve_concept(session, term)
+        assert res["concept"] is not None, term
+        assert res["concept"]["chinese"] == "涅槃", term
+        langs = {g["lang"] for g in res["entries_by_lang"]}
+        assert {"zh", "sa"} <= langs, term  # grouped linked entries present
+
+
+async def test_resolve_unknown_term_returns_empty(session):
+    await build(session)
+    res = await resolve_concept(session, "no-such-term-xyz")
+    assert res == {"concept": None, "entries_by_lang": []}
+
+
+async def test_resolve_blank_query_short_circuits(session):
+    await build(session)
+    assert await resolve_concept(session, "   ") == {"concept": None, "entries_by_lang": []}

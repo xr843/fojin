@@ -320,7 +320,7 @@ async def search_dictionary(
 @router.get("/concept")
 async def get_concept(
     response: Response,
-    q: str = Query(..., min_length=1, description="term in any language (中/梵/巴/藏)"),
+    q: str = Query(..., min_length=1, max_length=200, description="term in any language (中/梵/巴/藏)"),
     db: AsyncSession = Depends(get_db),
 ):
     """Resolve a term to its cross-lingual concept + linked entries grouped by

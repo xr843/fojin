@@ -29,6 +29,7 @@ Run inside the backend container where the corpus DB is reachable:
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 import sys
 
@@ -39,6 +40,8 @@ from sqlalchemy.pool import NullPool
 from app.config import settings
 from app.models import DataSource, DictionaryEntry, TermConcept, TermConceptEntry
 from app.services.term_concept_service import normalize_iast
+
+logger = logging.getLogger(__name__)
 
 # Source codes whose entries pack all languages into one row.
 MVP_CODE = "dila-mvp"
@@ -131,6 +134,10 @@ async def build(session) -> dict:
 
     mvp_id = await _source_id(session, MVP_CODE)
     siyi_id = await _source_id(session, SIYI_CODE)
+    if mvp_id is None:
+        logger.warning("source %r not found — concept backbone will be empty", MVP_CODE)
+    if siyi_id is None:
+        logger.warning("source %r not found — skipping 四譯合璧 enrichment", SIYI_CODE)
 
     concepts: dict[str, TermConcept] = {}  # key -> concept
     links: set[tuple[int, int]] = set()  # (concept_id, dict_entry_id) guard
@@ -206,21 +213,29 @@ async def build(session) -> dict:
 
     # Phase 3 — romanized-headword join: link Sanskrit/Pali entries to existing
     # concepts; fill display forms. Never creates new concepts.
-    rows = (
-        await session.execute(
-            select(DictionaryEntry).where(DictionaryEntry.lang.in_(["sa", "pi"]))
-        )
-    ).scalars()
-    for e in rows:
-        key = normalize_iast(e.headword)
-        c = concepts.get(key)
+    # Select only the 3 needed columns (NOT the definition Text) and stream in
+    # batches — the sa/pi corpus is large (MW alone is ~32k rows); loading full
+    # ORM entities with their definitions would balloon the session and risk OOM
+    # on the prod container.
+    result = await session.stream(
+        select(DictionaryEntry.id, DictionaryEntry.headword, DictionaryEntry.lang)
+        .where(DictionaryEntry.lang.in_(["sa", "pi"]))
+        .execution_options(yield_per=2000)
+    )
+    async for eid, headword, lang in result:
+        c = concepts.get(normalize_iast(headword))
         if c is None:
             continue
-        if e.lang == "pi":
-            c.pali = c.pali or (e.headword or "").split("\n")[0].strip()
-        elif e.lang == "sa":
-            c.sanskrit = c.sanskrit or (e.headword or "").split("\n")[0].strip()
-        if await link(c, e.id, e.lang, "romanized_join"):
+        lemma = (headword or "").split("\n")[0].strip()
+        if lang == "pi":
+            c.pali = c.pali or lemma
+        # Prefer a dictionary lemma over Mahāvyutpatti's inflected citation form
+        # (e.g. "nirvāṇa" over "nirvāṇam") when it's the same word.
+        elif lang == "sa" and (
+            not c.sanskrit or (lemma and c.sanskrit.startswith(lemma) and lemma != c.sanskrit)
+        ):
+            c.sanskrit = lemma
+        if await link(c, eid, lang, "romanized_join"):
             stats["links_roman"] += 1
 
     # Phase 4 — Chinese back-link: concepts with a Chinese anchor pull in the
@@ -230,18 +245,27 @@ async def build(session) -> dict:
         if c.chinese:
             chinese_index.setdefault(c.chinese, []).append(c)
     if chinese_index:
-        rows = (
-            await session.execute(
-                select(DictionaryEntry).where(
-                    DictionaryEntry.lang == "zh",
-                    DictionaryEntry.headword.in_(list(chinese_index.keys())),
-                )
+        rows = await session.execute(
+            select(DictionaryEntry.id, DictionaryEntry.headword)
+            .where(
+                DictionaryEntry.lang == "zh",
+                DictionaryEntry.headword.in_(list(chinese_index.keys())),
             )
-        ).scalars()
-        for e in rows:
-            for c in chinese_index.get(e.headword, []):
-                if await link(c, e.id, "zh", "romanized_join", conf="medium"):
+        )
+        for eid, headword in rows:
+            for c in chinese_index.get(headword, []):
+                if await link(c, eid, "zh", "romanized_join", conf="medium"):
                     stats["links_zh"] += 1
+
+    # Surface silent-no-op failure modes (wrong source codes / lang values in
+    # prod data) instead of returning a clean-looking all-zero stats line.
+    for phase, n in (
+        ("links_mvp", stats["links_mvp"]),
+        ("links_roman", stats["links_roman"]),
+        ("links_zh", stats["links_zh"]),
+    ):
+        if n == 0:
+            logger.warning("build_term_concepts: %s produced 0 links — check source codes / lang values", phase)
 
     await session.commit()
     return stats
