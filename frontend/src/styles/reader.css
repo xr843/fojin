@@ -334,6 +334,38 @@
   box-shadow: 0 6px 16px rgba(139, 105, 20, 0.4);
 }
 
+/* ── Back-to-top FAB ── */
+.reader-backtop-fab {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 100;
+  width: 48px !important;
+  height: 48px !important;
+  background: #fff !important;
+  border-color: var(--fj-accent, #8b6914) !important;
+  color: var(--fj-accent, #8b6914) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: reader-backtop-in 0.2s ease;
+}
+
+/* AI 面板关闭时 AI FAB 在 bottom:24，回到顶部上移一档避免重叠 */
+.reader-backtop-fab-stacked {
+  bottom: 84px;
+}
+
+.reader-backtop-fab:hover {
+  background: var(--fj-accent, #8b6914) !important;
+  border-color: var(--fj-accent, #8b6914) !important;
+  color: #fff !important;
+  box-shadow: 0 6px 16px rgba(139, 105, 20, 0.4);
+}
+
+@keyframes reader-backtop-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* ── AI inline sidebar panel ── */
 .reader-ai-sidebar {
   flex-shrink: 0;

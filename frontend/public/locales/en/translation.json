@@ -717,5 +717,6 @@
   "reader.lineref.citation": "{{title}} (CBETA {{id}}, fasc. {{juan}}, {{ref}})",
   "reader.kabc.link": "Goryeo {{k}}",
   "reader.kabc.button": "Goryeo",
-  "reader.kabc.tooltip": "View this sutra's Goryeo (Tripitaka Koreana, {{k}}) edition on KABC (Dongguk Univ.)"
+  "reader.kabc.tooltip": "View this sutra's Goryeo (Tripitaka Koreana, {{k}}) edition on KABC (Dongguk Univ.)",
+  "reader.backtop": "Back to top"
 }
