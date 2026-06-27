@@ -433,8 +433,9 @@ export default function TextReaderPage() {
 
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
   const [compareLang, setCompareLang] = useState<string | null>(null);
-  // 回到顶部按钮：滚过一屏后浮现
+  // 回到顶部按钮：滚过一屏后浮现；落点跟随"阅读列"右下角
   const [showBackTop, setShowBackTop] = useState(false);
+  const [backTopStyle, setBackTopStyle] = useState<{ right: number; bottom: number }>({ right: 24, bottom: 84 });
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const readerContentRef = useRef<HTMLDivElement>(null);
@@ -723,6 +724,24 @@ export default function TextReaderPage() {
     return () => window.removeEventListener("scroll", update, { capture: true });
     // aiPanelOpen/parallelPanelOpen 都会切换真实 scroller（reader-ai-active），需重评
   }, [content, aiPanelOpen, parallelPanelOpen]);
+
+  // 按钮落点跟随"阅读列"右下角：实测 .reader-container 右缘，让按钮右缘落在其内侧 16px。
+  // 直接量 DOM 而非按面板宽度推算 —— 面板未必贴视口右缘（滚动条/留白），且移动端面板纵向
+  // 堆叠、阅读列占满宽度，量 DOM 对桌面并排 / 移动堆叠 / 居中三种布局都成立。
+  // AI 面板关闭时右下角被 AI FAB 占据（bottom:24），按钮上移一档避免重叠。
+  useEffect(() => {
+    const compute = () => {
+      const rc = readerContentRef.current?.closest(".reader-container");
+      const viewportRight = document.documentElement.clientWidth;
+      const right = rc
+        ? Math.max(24, Math.round(viewportRight - rc.getBoundingClientRect().right + 16))
+        : 24;
+      setBackTopStyle({ right, bottom: aiPanelOpen ? 24 : 84 });
+    };
+    compute();
+    window.addEventListener("resize", compute);
+    return () => window.removeEventListener("resize", compute);
+  }, [content, aiPanelOpen, parallelPanelOpen, aiPanelWidth, parallelPanelWidth]);
 
   const scrollToTop = useCallback(() => {
     const el = readerContentRef.current;
@@ -1214,11 +1233,12 @@ export default function TextReaderPage() {
       </Tooltip>
     )}
 
-    {/* 回到顶部：AI 面板关闭时 AI FAB 占据右下角，故上移以免重叠 */}
+    {/* 回到顶部：落点由 backTopStyle 动态计算（让开 AI 面板与 AI FAB） */}
     {showBackTop && (
       <Tooltip title={t("reader.backtop")} placement="left">
         <Button
-          className={`reader-backtop-fab${aiPanelOpen ? "" : " reader-backtop-fab-stacked"}`}
+          className="reader-backtop-fab"
+          style={backTopStyle}
           shape="circle"
           size="large"
           icon={<VerticalAlignTopOutlined />}

@@ -349,11 +349,6 @@
   animation: reader-backtop-in 0.2s ease;
 }
 
-/* AI 面板关闭时 AI FAB 在 bottom:24，回到顶部上移一档避免重叠 */
-.reader-backtop-fab-stacked {
-  bottom: 84px;
-}
-
 .reader-backtop-fab:hover {
   background: var(--fj-accent, #8b6914) !important;
   border-color: var(--fj-accent, #8b6914) !important;
