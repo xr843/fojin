@@ -17,6 +17,7 @@ import {
   RobotOutlined,
   GlobalOutlined,
   DiffOutlined,
+  VerticalAlignTopOutlined,
 } from "@ant-design/icons";
 import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBookmark, addBookmark, removeBookmark, searchDictionaryGrouped, getJuanApparatus, getJuanLineAnchors, type ApparatusEntryItem } from "../api/client";
 import { useAuthStore } from "../stores/authStore";
@@ -432,6 +433,8 @@ export default function TextReaderPage() {
 
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
   const [compareLang, setCompareLang] = useState<string | null>(null);
+  // 回到顶部按钮：滚过一屏后浮现
+  const [showBackTop, setShowBackTop] = useState(false);
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const readerContentRef = useRef<HTMLDivElement>(null);
@@ -704,6 +707,29 @@ export default function TextReaderPage() {
       }
     };
   }, [content, textId, juanNum]);
+
+  // 回到顶部：滚过 ~一屏后浮现按钮。和续读同理，AI 面板打开时滚动发生在
+  // .reader-container（不冒泡），只能在 window 捕获阶段收到 scroll 事件；
+  // 偏移量按真实 scroller 取值，document 滚动时回退 window.scrollY。
+  useEffect(() => {
+    const update = () => {
+      const el = readerContentRef.current;
+      const scroller = el ? findScrollContainer(el) : null;
+      const offset = scroller ? scroller.scrollTop : window.scrollY;
+      setShowBackTop(offset > 400);
+    };
+    update();
+    window.addEventListener("scroll", update, { passive: true, capture: true });
+    return () => window.removeEventListener("scroll", update, { capture: true });
+    // aiPanelOpen/parallelPanelOpen 都会切换真实 scroller（reader-ai-active），需重评
+  }, [content, aiPanelOpen, parallelPanelOpen]);
+
+  const scrollToTop = useCallback(() => {
+    const el = readerContentRef.current;
+    const scroller = el ? findScrollContainer(el) : null;
+    if (scroller) scroller.scrollTo({ top: 0, behavior: "smooth" });
+    else window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
 
   // Deep-link from the chat citation drawer: ?highlight_chunk=N
   // Chunks are 500 chars wide with 50-char overlap (see scripts/archive/misc/generate_embeddings.py),
@@ -1184,6 +1210,20 @@ export default function TextReaderPage() {
           icon={<RobotOutlined />}
           onClick={() => setAiPanelOpen(true)}
           aria-label="AI 解读"
+        />
+      </Tooltip>
+    )}
+
+    {/* 回到顶部：AI 面板关闭时 AI FAB 占据右下角，故上移以免重叠 */}
+    {showBackTop && (
+      <Tooltip title={t("reader.backtop")} placement="left">
+        <Button
+          className={`reader-backtop-fab${aiPanelOpen ? "" : " reader-backtop-fab-stacked"}`}
+          shape="circle"
+          size="large"
+          icon={<VerticalAlignTopOutlined />}
+          onClick={scrollToTop}
+          aria-label={t("reader.backtop")}
         />
       </Tooltip>
     )}

@@ -717,5 +717,6 @@
   "reader.lineref.citation": "《{{title}}》卷{{juan}}（CBETA {{id}}, {{ref}}）",
   "reader.kabc.link": "高丽藏 {{k}}",
   "reader.kabc.button": "高丽藏",
-  "reader.kabc.tooltip": "在 KABC（东国大学）查看本经的高丽再雕藏版（{{k}}）"
+  "reader.kabc.tooltip": "在 KABC（东国大学）查看本经的高丽再雕藏版（{{k}}）",
+  "reader.backtop": "回到顶部"
 }
