@@ -129,7 +129,7 @@ def upgrade() -> None:
             """
             UPDATE data_sources
                SET is_active = true,
-                   base_url = 'https://femc.huma-num.fr',
+                   base_url = 'https://femc.huma-num.fr/',
                    health_status = 'ok',
                    health_checked_at = NULL,
                    unreachable_since = NULL
@@ -181,13 +181,15 @@ def downgrade() -> None:
     op.execute(
         sa_text("UPDATE data_sources SET is_active = true WHERE code = 'fodocs-list'")
     )
-    # Reverse FIX-URL.
+    # Reverse FIX-URL. Only base_url is restored — health_status is the
+    # cron-owned reachability signal (it self-heals on the next probe) and
+    # this migration's upgrade only cleared the stale badge transiently, so
+    # the downgrade deliberately leaves health_status to the health checker.
     op.execute(
         sa_text(
             """
             UPDATE data_sources
-               SET base_url = 'https://budsir.mahidol.ac.th/',
-                   health_status = 'cert_invalid'
+               SET base_url = 'https://budsir.mahidol.ac.th/'
              WHERE code = 'mahidol-tipitaka'
             """
         )
@@ -196,8 +198,7 @@ def downgrade() -> None:
         sa_text(
             """
             UPDATE data_sources
-               SET base_url = 'https://www.indica-et-buddhica.com/repositorium',
-                   health_status = 'unreachable'
+               SET base_url = 'https://www.indica-et-buddhica.com/repositorium'
              WHERE code = 'indica-buddhica-repo'
             """
         )
@@ -208,7 +209,7 @@ def downgrade() -> None:
             """
             UPDATE data_sources
                SET is_active = false,
-                   base_url = 'https://femc.huma-num.fr'
+                   base_url = 'https://femc.huma-num.fr/'
              WHERE code = 'femc-khmer'
             """
         )
