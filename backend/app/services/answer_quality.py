@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
@@ -184,7 +184,9 @@ async def build_bad_answer_queue(
     return {
         "total_unreviewed": total,
         "score_distribution": _percentiles(score_samples),
-        "items": page,
+        # Plain dicts (not QueueItem dataclasses) so the AnswerQueueResponse
+        # response_model validates cleanly without from_attributes coercion.
+        "items": [asdict(it) for it in page],
     }
 
 

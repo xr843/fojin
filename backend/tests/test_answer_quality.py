@@ -1,6 +1,8 @@
 """Answer-quality queue — pure classifier unit tests + API tests."""
 
+from unittest.mock import MagicMock
 
+import pytest
 
 from app.services.answer_quality import (
     WEAK_EVIDENCE_THRESHOLD,
@@ -75,3 +77,44 @@ def test_percentiles_empty_returns_nulls():
 def test_percentiles_basic():
     p = _percentiles([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0])
     assert p["p10"] <= p["p50"] <= p["p90"]
+
+
+# --- API auth tests ---
+
+
+@pytest.mark.anyio
+async def test_queue_requires_admin(client):
+    resp = await client.get("/api/admin/answer-quality/queue")
+    assert resp.status_code in (401, 403)
+
+
+@pytest.mark.anyio
+async def test_queue_non_admin_forbidden(client):
+    from app.core.deps import get_current_user
+    from app.main import app
+
+    fake = MagicMock()
+    fake.id = 2
+    fake.role = "user"
+    fake.is_active = True
+    app.dependency_overrides[get_current_user] = lambda: fake
+    try:
+        resp = await client.get("/api/admin/answer-quality/queue")
+        assert resp.status_code == 403
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+@pytest.mark.anyio
+async def test_review_submit_requires_admin(client):
+    resp = await client.post(
+        "/api/admin/answer-quality/reviews",
+        json={"message_id": 1, "verdict": "good"},
+    )
+    assert resp.status_code in (401, 403)
+
+
+@pytest.mark.anyio
+async def test_review_stats_requires_admin(client):
+    resp = await client.get("/api/admin/answer-quality/reviews/stats")
+    assert resp.status_code in (401, 403)
