@@ -42,6 +42,19 @@ def _max_source_score(sources) -> float | None:
     return max(scores) if scores else None
 
 
+def _clean_sources(sources) -> list[dict]:
+    """Defensive view of an answer's ``sources`` for the response model: always
+    a list of dicts that carry a ``text_id`` (the only required schema field).
+    A null / non-list / malformed persisted ``sources`` yields ``[]`` so a
+    no-citation or odd-JSON item never raises during serialization — the same
+    "never raise" contract the detection side already honors."""
+    if not isinstance(sources, list):
+        return []
+    return [
+        s for s in sources if isinstance(s, dict) and s.get("text_id") is not None
+    ]
+
+
 def classify_answer(
     content: str | None, sources, feedback: str | None
 ) -> tuple[list[str], float]:
@@ -121,8 +134,13 @@ async def _attach_questions(db: AsyncSession, items: list[QueueItem]) -> None:
     for sid, content, created in rows:
         by_session.setdefault(sid, []).append((created, content))
     for it in items:
+        # ``<=`` not ``<``: the user question and its assistant answer are saved
+        # in one transaction and share an identical created_at (server-side
+        # transaction_timestamp), so a strict ``<`` would drop the very question
+        # that produced the answer. The answer itself is role='assistant' and was
+        # already excluded by the role=='user' query above, so ``<=`` is safe.
         prior = [
-            c for (ts, c) in by_session.get(it.session_id, []) if ts < it.created_at
+            c for (ts, c) in by_session.get(it.session_id, []) if ts <= it.created_at
         ]
         it.question = prior[-1] if prior else ""
 
@@ -168,7 +186,7 @@ async def build_bad_answer_queue(
                 message_id=m.id,
                 session_id=m.session_id,
                 answer=m.content,
-                sources=m.sources,
+                sources=_clean_sources(m.sources),
                 reason_tags=tags,
                 suspicion_score=score,
                 feedback=m.feedback,

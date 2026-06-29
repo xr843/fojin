@@ -1,14 +1,22 @@
 """Answer-quality queue — pure classifier unit tests + API tests."""
 
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 import pytest
+import pytest_asyncio
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from app.models.answer_review import AnswerReview
+from app.models.chat import ChatMessage, ChatSession
 from app.services.answer_quality import (
     WEAK_EVIDENCE_THRESHOLD,
     _max_source_score,
     _percentiles,
+    build_bad_answer_queue,
     classify_answer,
+    upsert_review,
 )
 
 
@@ -118,3 +126,104 @@ async def test_review_submit_requires_admin(client):
 async def test_review_stats_requires_admin(client):
     resp = await client.get("/api/admin/answer-quality/reviews/stats")
     assert resp.status_code in (401, 403)
+
+
+# --- DB-backed queue/review tests (in-memory SQLite) ---
+
+
+@pytest_asyncio.fixture
+async def aq_session():
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as conn:
+        for model in (ChatSession, ChatMessage, AnswerReview):
+            await conn.run_sync(model.__table__.create)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    async with factory() as s:
+        yield s
+    await engine.dispose()
+
+
+async def _seed_turn(s, *, question, answer, sources, feedback=None):
+    """Insert a user question + assistant answer that share one created_at, the
+    way the chat save path does (single transaction, equal server-side now())."""
+    ts = datetime.now(UTC)
+    session = ChatSession(user_id=None)
+    s.add(session)
+    await s.flush()
+    s.add(
+        ChatMessage(
+            session_id=session.id, role="user", content=question, created_at=ts
+        )
+    )
+    assistant = ChatMessage(
+        session_id=session.id,
+        role="assistant",
+        content=answer,
+        sources=sources,
+        feedback=feedback,
+        created_at=ts,
+    )
+    s.add(assistant)
+    await s.commit()
+    return assistant.id
+
+
+@pytest.mark.anyio
+async def test_queue_pairs_question_on_equal_timestamp(aq_session):
+    # C1 regression: question must be paired even though user+assistant share
+    # an identical created_at (single-turn session).
+    await _seed_turn(
+        aq_session,
+        question="什么是五蕴？",
+        answer="正常长度的回答内容" * 5,
+        sources=[{"text_id": 1, "juan_num": 1, "chunk_text": "x", "score": 0.2}],
+    )
+    res = await build_bad_answer_queue(aq_session)
+    assert res["total_unreviewed"] == 1
+    item = res["items"][0]
+    assert item["question"] == "什么是五蕴？"
+    assert "weak_evidence" in item["reason_tags"]
+
+
+@pytest.mark.anyio
+async def test_no_citation_item_serializes_without_sources(aq_session):
+    # I3 regression: a None-sources answer must not break the queue.
+    await _seed_turn(
+        aq_session, question="问", answer="正常长度的回答内容" * 5, sources=None
+    )
+    res = await build_bad_answer_queue(aq_session)
+    assert res["total_unreviewed"] == 1
+    assert res["items"][0]["sources"] == []
+    assert "no_citation" in res["items"][0]["reason_tags"]
+
+
+@pytest.mark.anyio
+async def test_review_removes_item_and_snapshots(aq_session):
+    mid = await _seed_turn(
+        aq_session, question="问", answer="短", sources=None, feedback="down"
+    )
+    before = await build_bad_answer_queue(aq_session)
+    assert before["total_unreviewed"] == 1
+
+    remaining = await upsert_review(
+        aq_session,
+        message_id=mid,
+        verdict="bad",
+        failure_category="recall",
+        note="n",
+        reviewed_by=None,
+    )
+    assert remaining == 0
+
+    after = await build_bad_answer_queue(aq_session)
+    assert after["total_unreviewed"] == 0
+
+    row = (
+        await aq_session.execute(
+            select(AnswerReview).where(AnswerReview.message_id == mid)
+        )
+    ).scalar_one()
+    assert row.verdict == "bad"
+    assert row.failure_category == "recall"
+    assert row.suspicion_score > 0
+    assert set(row.detection_reasons) >= {"downvoted", "abnormal", "no_citation"}
