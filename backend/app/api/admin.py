@@ -17,6 +17,10 @@ from app.schemas.admin import (
     AdminUserItem,
     AdminUserListResponse,
     AdminUserUpdate,
+    AnswerQueueResponse,
+    AnswerReviewCreate,
+    AnswerReviewResult,
+    AnswerReviewStats,
 )
 from app.services.admin_service import (
     daily_active_user_detail,
@@ -26,6 +30,11 @@ from app.services.admin_service import (
     list_audit_log,
     list_users,
     record_audit,
+)
+from app.services.answer_quality import (
+    build_bad_answer_queue,
+    review_stats,
+    upsert_review,
 )
 from app.services.usage_service import get_module_usage
 
@@ -164,3 +173,59 @@ async def audit_log_list(
 ):
     total, items = await list_audit_log(db, page, size, action)
     return {"total": total, "page": page, "size": size, "items": items}
+
+
+@router.get("/answer-quality/queue", response_model=AnswerQueueResponse)
+async def answer_quality_queue(
+    window: int = Query(90, ge=1, le=365),
+    min_suspicion: float = Query(0.0, ge=0.0),
+    category: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    _user=Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Live-ranked queue of suspect low-quality assistant answers.
+
+    Detection is read-only over chat_messages; messages already in
+    answer_reviews are excluded. ``score_distribution`` helps calibrate the
+    weak-evidence threshold."""
+    return await build_bad_answer_queue(
+        db,
+        window_days=window,
+        min_suspicion=min_suspicion,
+        category=category,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.post("/answer-quality/reviews", response_model=AnswerReviewResult)
+async def answer_quality_review(
+    payload: AnswerReviewCreate,
+    current_user: User = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Upsert the admin verdict for one assistant message (idempotent by
+    message_id). Snapshots the detection reasons + score at review time."""
+    try:
+        remaining = await upsert_review(
+            db,
+            message_id=payload.message_id,
+            verdict=payload.verdict,
+            failure_category=payload.failure_category,
+            note=payload.note,
+            reviewed_by=current_user.id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return AnswerReviewResult(ok=True, remaining_unreviewed=remaining)
+
+
+@router.get("/answer-quality/reviews/stats", response_model=AnswerReviewStats)
+async def answer_quality_review_stats(
+    _user=Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Labeled-dataset overview: reviewed totals + failure-category breakdown."""
+    return await review_stats(db)

@@ -12,6 +12,7 @@
   "nav.chat": "AI 問答",
   "nav.admin": "管理",
   "nav.admin_overview": "資料概覽",
+  "nav.admin_answer_quality": "差答案佇列",
   "nav.admin_users": "使用者管理",
   "nav.admin_suggestions": "源建議",
   "nav.admin_annotations": "標註稽核",

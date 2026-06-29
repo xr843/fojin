@@ -1,5 +1,6 @@
 from app.models.ai_diff_cache import AiDiffCache
 from app.models.annotation import Annotation, AnnotationReview
+from app.models.answer_review import AnswerReview
 from app.models.audit import AdminAuditLog
 from app.models.chat import ChatAttachment, ChatMessage, ChatSession, TextEmbedding
 from app.models.dictionary import DictionaryEntry
@@ -27,6 +28,7 @@ __all__ = [
     "AiDiffCache",
     "Annotation",
     "AnnotationReview",
+    "AnswerReview",
     "ApparatusReading",
     "Bookmark",
     "BuddhistText",

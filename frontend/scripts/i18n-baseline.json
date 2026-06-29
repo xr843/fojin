@@ -8,6 +8,7 @@
   "src/utils/sourceUrls.ts": 52,
   "src/data/dynasty_years.ts": 46,
   "src/pages/TextReaderPage.tsx": 39,
+  "src/pages/AdminAnswerQualityPage.tsx": 38,
   "src/components/ReaderParallelPanel.tsx": 36,
   "src/pages/AdminFeedbacksPage.tsx": 34,
   "src/pages/AdminAnnotationsPage.tsx": 27,
