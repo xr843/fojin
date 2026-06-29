@@ -1278,6 +1278,82 @@ export async function getAdminModuleUsage(days: number = 7): Promise<AdminModule
   return data;
 }
 
+// --- Admin: Answer-Quality Queue ---
+
+export interface AnswerQueueSource {
+  text_id: number;
+  juan_num: number;
+  chunk_index: number;
+  chunk_text: string;
+  score: number | null;
+  title_zh: string;
+  lang: string;
+}
+
+export interface AnswerQueueItem {
+  message_id: number;
+  session_id: number;
+  question: string;
+  answer: string;
+  sources: AnswerQueueSource[];
+  reason_tags: string[];
+  suspicion_score: number;
+  feedback: string | null;
+  created_at: string;
+}
+
+export interface ScoreDistribution {
+  p10: number | null;
+  p25: number | null;
+  p50: number | null;
+  p90: number | null;
+}
+
+export interface AnswerQueueResponse {
+  total_unreviewed: number;
+  score_distribution: ScoreDistribution;
+  items: AnswerQueueItem[];
+}
+
+export interface AnswerReviewStats {
+  reviewed_total: number;
+  good: number;
+  bad: number;
+  by_category: Record<string, number>;
+  last_reviewed_at: string | null;
+}
+
+export async function getAnswerQualityQueue(params: {
+  window?: number;
+  min_suspicion?: number;
+  category?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<AnswerQueueResponse> {
+  const { data } = await api.get<AnswerQueueResponse>(
+    "/admin/answer-quality/queue",
+    { params },
+  );
+  return data;
+}
+
+export async function submitAnswerReview(payload: {
+  message_id: number;
+  verdict: "good" | "bad";
+  failure_category?: string;
+  note?: string;
+}): Promise<{ ok: boolean; remaining_unreviewed: number }> {
+  const { data } = await api.post("/admin/answer-quality/reviews", payload);
+  return data;
+}
+
+export async function getAnswerReviewStats(): Promise<AnswerReviewStats> {
+  const { data } = await api.get<AnswerReviewStats>(
+    "/admin/answer-quality/reviews/stats",
+  );
+  return data;
+}
+
 // --- Similar Passages ---
 
 export interface SimilarPassageItem {

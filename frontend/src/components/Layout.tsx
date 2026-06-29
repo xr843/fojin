@@ -94,6 +94,7 @@ export default function Layout() {
             path: "/admin",
             children: [
               { label: t("nav.admin_overview"), path: "/admin" },
+              { label: t("nav.admin_answer_quality"), path: "/admin/answer-quality" },
               { label: t("nav.admin_users"), path: "/admin/users" },
               { label: t("nav.admin_suggestions"), path: "/admin/suggestions" },
               { label: t("nav.admin_annotations"), path: "/admin/annotations" },
