@@ -823,6 +823,24 @@ def _strip_followup_suggestions(text: str) -> str:
     return "\n".join(cleaned).rstrip()
 
 
+# Prefixes of the failure replies produced by the LLM error branches in
+# _prepare_chat / _stream_chat and _byok_error_message. A reply that starts
+# with one of these (or is empty) is a failed generation, not a real answer:
+# the user already saw the error live, so persisting it only pollutes chat
+# history, the answer-quality queue, and the quality metrics.
+_FAILED_ANSWER_PREFIXES = (
+    "抱歉，AI 服务",  # 暂时不可用 / 响应超时 / 返回错误（HTTP …）
+    "AI 服务返回",  # _byok_error_message 401/404/429/balance/model-not-found
+    "您的 API Key 无效",
+)
+
+
+def _is_failed_answer(content: str | None) -> bool:
+    """True for an empty answer or one of the known LLM-failure replies."""
+    text = (content or "").strip()
+    return not text or text.startswith(_FAILED_ANSWER_PREFIXES)
+
+
 async def _save_messages(
     db: AsyncSession, session_id: int, message: str, answer: str, sources: list[ChatSource]
 ) -> int | None:
@@ -833,6 +851,11 @@ async def _save_messages(
     chat_messages row instead of the local `Date.now()` placeholder it
     used while streaming. Returns None when the message cannot be
     persisted (defensive — current callers always supply a session)."""
+    # Don't persist failed/empty generations — neither the user turn nor the
+    # error reply. The user saw the error live via the stream/response; saving
+    # it would leave a junk turn in history and poison the answer-quality data.
+    if _is_failed_answer(answer):
+        return None
     user_msg = ChatMessage(session_id=session_id, role="user", content=message)
     assistant_msg = ChatMessage(
         session_id=session_id,

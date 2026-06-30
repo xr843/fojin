@@ -20,17 +20,19 @@ import {
 
 const REASON_LABELS: Record<string, string> = {
   downvoted: "被踩",
-  abnormal: "答案异常",
   no_citation: "未引经",
   weak_evidence: "召回证据弱",
 };
 
 const REASON_COLORS: Record<string, string> = {
   downvoted: "red",
-  abnormal: "volcano",
   no_citation: "orange",
   weak_evidence: "gold",
 };
+
+// Mirrors backend WEAK_EVIDENCE_THRESHOLD (answer_quality.py) — keep in sync if
+// the backend threshold is recalibrated. Display-only (reds weak sources).
+const WEAK_SCORE = 0.37;
 
 const CATEGORY_OPTIONS = [
   { value: "recall", label: "召回弱/不全" },
@@ -188,7 +190,7 @@ export default function AdminAnswerQualityPage() {
                   {item.sources.map((s, i) => (
                     <li
                       key={i}
-                      style={{ color: (s.score ?? 1) < 0.5 ? "#cf1322" : undefined }}
+                      style={{ color: (s.score ?? 1) < WEAK_SCORE ? "#cf1322" : undefined }}
                     >
                       {s.title_zh}（卷{s.juan_num}，score {s.score ?? "—"}）：
                       {s.chunk_text.slice(0, 80)}

@@ -12,6 +12,7 @@ from app.models.answer_review import AnswerReview
 from app.models.chat import ChatMessage, ChatSession
 from app.services.answer_quality import (
     WEAK_EVIDENCE_THRESHOLD,
+    _is_failed_answer,
     _max_source_score,
     _percentiles,
     build_bad_answer_queue,
@@ -55,20 +56,19 @@ def test_weak_evidence_is_flagged_and_graded():
     assert score_far > score_near  # deeper below threshold => more suspect
 
 
-def test_abnormal_short_answer_is_flagged():
-    tags, _ = classify_answer("太短了", _sources(0.9), None)
-    assert "abnormal" in tags
-
-
-def test_abnormal_error_marker_is_flagged():
-    tags, _ = classify_answer("发送失败，请稍后重试" + "x" * 50, _sources(0.9), None)
-    assert "abnormal" in tags
-
-
 def test_multiple_detectors_stack():
-    tags, score = classify_answer("短", None, "down")
-    assert {"downvoted", "abnormal", "no_citation"} <= set(tags)
-    assert score > 5  # all three weights add up
+    tags, score = classify_answer("一段正常的回答" * 3, None, "down")
+    assert {"downvoted", "no_citation"} <= set(tags)
+    assert score > 5  # downvoted(5) + no_citation(2)
+
+
+def test_is_failed_answer():
+    assert _is_failed_answer("")
+    assert _is_failed_answer("   ")
+    assert _is_failed_answer(None)
+    assert _is_failed_answer("抱歉，AI 服务暂时不可用，请稍后重试。")
+    assert _is_failed_answer("AI 服务返回 429：触发限流，请稍后重试。")
+    assert not _is_failed_answer("一段正常的佛学回答内容，解释五蕴。")
 
 
 def test_max_source_score_handles_bad_json():
@@ -198,9 +198,27 @@ async def test_no_citation_item_serializes_without_sources(aq_session):
 
 
 @pytest.mark.anyio
+async def test_failed_answers_excluded_from_queue(aq_session):
+    # Error-string and empty answers are bugs, not reviewable — never queued.
+    await _seed_turn(
+        aq_session,
+        question="问一",
+        answer="抱歉，AI 服务暂时不可用，请稍后重试。",
+        sources=None,
+    )
+    await _seed_turn(aq_session, question="问二", answer="", sources=None)
+    res = await build_bad_answer_queue(aq_session)
+    assert res["total_unreviewed"] == 0
+
+
+@pytest.mark.anyio
 async def test_review_removes_item_and_snapshots(aq_session):
     mid = await _seed_turn(
-        aq_session, question="问", answer="短", sources=None, feedback="down"
+        aq_session,
+        question="问",
+        answer="一段正常但无引经的回答" * 2,
+        sources=None,
+        feedback="down",
     )
     before = await build_bad_answer_queue(aq_session)
     assert before["total_unreviewed"] == 1
@@ -226,4 +244,4 @@ async def test_review_removes_item_and_snapshots(aq_session):
     assert row.verdict == "bad"
     assert row.failure_category == "recall"
     assert row.suspicion_score > 0
-    assert set(row.detection_reasons) >= {"downvoted", "abnormal", "no_citation"}
+    assert set(row.detection_reasons) >= {"downvoted", "no_citation"}
