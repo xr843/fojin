@@ -69,9 +69,11 @@ def _clean_sources(sources) -> list[dict]:
 def classify_answer(
     content: str | None, sources, feedback: str | None
 ) -> tuple[list[str], float]:
-    """Pure detector. Given an assistant message's own columns, return the
-    reason tags it trips and a suspicion score (0.0 = not suspect). Every
-    detector reads the answer itself — the question is not needed here."""
+    """Pure detector. Given an assistant message's columns, return the reason
+    tags it trips and a suspicion score (0.0 = not suspect). Detectors read
+    ``feedback`` (downvoted) and ``sources`` (no_citation / weak_evidence);
+    ``content`` is unused today (kept for the signature + future content-based
+    detectors) — failed/empty answers are filtered upstream, not scored here."""
     tags: list[str] = []
     score = 0.0
 

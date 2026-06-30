@@ -245,3 +245,39 @@ async def test_review_removes_item_and_snapshots(aq_session):
     assert row.failure_category == "recall"
     assert row.suspicion_score > 0
     assert set(row.detection_reasons) >= {"downvoted", "no_citation"}
+
+
+@pytest.mark.anyio
+async def test_chat_save_guard_skips_failed_answers(aq_session):
+    # The chat-side guard in _save_messages must not persist failed/empty
+    # generations (neither the user nor the assistant turn).
+    from app.services.chat import _save_messages
+
+    session = ChatSession(user_id=None)
+    aq_session.add(session)
+    await aq_session.flush()
+
+    assert (
+        await _save_messages(
+            aq_session, session.id, "问", "抱歉，AI 服务暂时不可用，请稍后重试。", []
+        )
+        is None
+    )
+    assert await _save_messages(aq_session, session.id, "问", "", []) is None
+    mid = await _save_messages(
+        aq_session, session.id, "问", "一段正常的佛学回答内容，解释五蕴。", []
+    )
+    assert mid is not None
+
+    # only the one real turn persisted (user + assistant = 2 rows)
+    rows = (await aq_session.execute(select(ChatMessage))).scalars().all()
+    assert len(rows) == 2
+
+
+def test_failed_answer_prefixes_match_chat():
+    # The prefix set is duplicated in chat.py (save guard) and answer_quality.py
+    # (queue filter); they must stay identical or legacy-junk filtering drifts.
+    from app.services import answer_quality as aq
+    from app.services import chat
+
+    assert chat._FAILED_ANSWER_PREFIXES == aq._FAILED_ANSWER_PREFIXES
