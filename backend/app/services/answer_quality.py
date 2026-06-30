@@ -10,20 +10,31 @@ from app.models.answer_review import AnswerReview
 from app.models.chat import ChatMessage
 
 # --- Detection config -------------------------------------------------------
-# Calibrate WEAK_EVIDENCE_THRESHOLD post-deploy from the score_distribution
-# the queue endpoint returns (default = roughly the 10th percentile of
-# max(source.score)). ChatSource.score is the blended vector+rerank score.
-WEAK_EVIDENCE_THRESHOLD = 0.50
-MIN_CONTENT_LEN = 40  # answers shorter than this (chars) are abnormal
-ERROR_MARKERS = ("发送失败", "请求超时", "网络错误", "请求失败", "服务暂时不可用")
+# Calibrated 2026-06-30 to ~p10 of the live max(source.score) distribution
+# (p10≈0.366), so weak_evidence flags only the bottom decile of retrieval
+# strength rather than ~the bottom quartile. ChatSource.score is the blended
+# vector+rerank score. Re-read score_distribution from the queue endpoint and
+# adjust if the corpus/reranker changes.
+WEAK_EVIDENCE_THRESHOLD = 0.37
+
+# Prefixes of LLM-failure replies (see chat._FAILED_ANSWER_PREFIXES). Failed /
+# empty generations are bugs, not reviewable answers — they are excluded from
+# the queue entirely (the chat save-guard stops new ones; this defends against
+# legacy junk rows already in the table).
+_FAILED_ANSWER_PREFIXES = ("抱歉，AI 服务", "AI 服务返回", "您的 API Key 无效")
 
 # reason tag -> base weight in the suspicion score
 WEIGHTS = {
     "downvoted": 5.0,
-    "abnormal": 4.0,
     "no_citation": 2.0,
     "weak_evidence": 1.0,  # plus a graded bonus, see classify_answer
 }
+
+
+def _is_failed_answer(content: str | None) -> bool:
+    """Empty answer or a known LLM-failure reply — excluded from the queue."""
+    text = (content or "").strip()
+    return not text or text.startswith(_FAILED_ANSWER_PREFIXES)
 
 
 def _max_source_score(sources) -> float | None:
@@ -58,20 +69,17 @@ def _clean_sources(sources) -> list[dict]:
 def classify_answer(
     content: str | None, sources, feedback: str | None
 ) -> tuple[list[str], float]:
-    """Pure detector. Given an assistant message's own columns, return the
-    reason tags it trips and a suspicion score (0.0 = not suspect). Every
-    detector reads the answer itself — the question is not needed here."""
+    """Pure detector. Given an assistant message's columns, return the reason
+    tags it trips and a suspicion score (0.0 = not suspect). Detectors read
+    ``feedback`` (downvoted) and ``sources`` (no_citation / weak_evidence);
+    ``content`` is unused today (kept for the signature + future content-based
+    detectors) — failed/empty answers are filtered upstream, not scored here."""
     tags: list[str] = []
     score = 0.0
 
     if feedback == "down":
         tags.append("downvoted")
         score += WEIGHTS["downvoted"]
-
-    text = (content or "").strip()
-    if len(text) < MIN_CONTENT_LEN or any(m in text for m in ERROR_MARKERS):
-        tags.append("abnormal")
-        score += WEIGHTS["abnormal"]
 
     max_score = _max_source_score(sources)
     if max_score is None:
@@ -173,6 +181,11 @@ async def build_bad_answer_queue(
     items: list[QueueItem] = []
     score_samples: list[float] = []
     for m in rows:
+        # Failed/empty generations are bugs, not reviewable answers — never
+        # surface them in the quality queue (nor let them skew the score
+        # distribution used for calibration).
+        if _is_failed_answer(m.content):
+            continue
         ms = _max_source_score(m.sources)
         if ms is not None:
             score_samples.append(ms)
