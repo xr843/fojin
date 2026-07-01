@@ -10,6 +10,7 @@ from app.schemas.chat import ChatSource, ParallelChunk
 from app.services.citation_guard import (
     CitationMutation,
     enforce_citation_whitelist,
+    log_mutations,
 )
 
 
@@ -224,3 +225,23 @@ def test_mutation_is_dataclass_with_full_audit_fields():
     assert m.original_juan == 1
     assert m.corrected_juan is None
     assert m.replacement == "《伪经》"
+
+
+def test_log_mutations_emits_clean_warning(caplog):
+    m = CitationMutation(
+        kind="fascicle_corrected",
+        original="【《心经》第99卷】",
+        replacement="【《心经》第1卷】",
+        title="心经",
+        original_juan=99,
+        corrected_juan=1,
+    )
+
+    log_mutations(123, [m])
+
+    assert len(caplog.records) == 1
+    assert caplog.records[0].message == (
+        "citation_guard fascicle_corrected msg_id=123 title='心经' "
+        "orig='【《心经》第99卷】' repl='【《心经》第1卷】' "
+        "orig_juan=99 corrected_juan=1"
+    )

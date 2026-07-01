@@ -50,6 +50,7 @@ import {
   type ChatMessageItem,
   type ChatSource,
   type ChatSessionItem,
+  type ChatTrustStatus,
   type HotQuestionCard,
   type HotQuestionCategory,
 } from "../api/client";
@@ -126,6 +127,24 @@ const chatUrlTransform = (url: string): string => {
   if (url.startsWith(`${CITATION_URL_SCHEME}:`)) return url;
   return defaultUrlTransform(url);
 };
+
+function trustStatusLabelKey(status?: ChatTrustStatus | null): string | null {
+  if (!status) return null;
+  return `chat.trust.${status.state}`;
+}
+
+function trustStatusColor(status?: ChatTrustStatus | null): string {
+  switch (status?.state) {
+    case "verified":
+      return "#3f7d20";
+    case "quote_unverified":
+      return "#a66300";
+    case "no_sources":
+      return "var(--fj-ink-muted)";
+    default:
+      return "var(--fj-accent)";
+  }
+}
 
 /**
  * Turn sutra references inside an AI answer into citation-drawer buttons.
@@ -323,6 +342,7 @@ function MessageBubbleInner({
     () => (isAssistantText ? tightenLists(injectCitationLinks(cleanContent, m.sources)) + (isStreaming ? " ▌" : "") : ""),
     [isAssistantText, cleanContent, m.sources, isStreaming],
   );
+  const trustLabelKey = trustStatusLabelKey(m.trust_status);
 
   return (
     <div style={{
@@ -357,6 +377,20 @@ function MessageBubbleInner({
                 <div className="chat-markdown">
                   <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[[rehypeSanitize, CHAT_SANITIZE_SCHEMA]]} urlTransform={chatUrlTransform} components={markdownComponents}>{rendered}</Markdown>
                 </div>
+                {trustLabelKey && (
+                  <div
+                    style={{
+                      marginTop: 8,
+                      paddingTop: 6,
+                      borderTop: "1px solid rgba(217,208,193,0.45)",
+                      color: trustStatusColor(m.trust_status),
+                      fontSize: 12,
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {t(trustLabelKey)}
+                  </div>
+                )}
                 {suggestions.length > 0 && !sending && (
                   <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>
                     {suggestions.map((q, i) => (
@@ -899,6 +933,13 @@ export default function ChatPage() {
             staleTime: 15 * 60 * 1000,
           });
         }
+      },
+      onTrustStatus: (trustStatus: ChatTrustStatus) => {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId ? { ...m, trust_status: trustStatus } : m,
+          ),
+        );
       },
       onSearching: (_searchMsg: string) => {
         // 搜索状态由初始占位符 "正在检索经文并生成回答..." 显示，不覆盖 content

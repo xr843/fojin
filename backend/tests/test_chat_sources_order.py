@@ -1,7 +1,7 @@
 """测试 chat SSE 事件流中事件的顺序。
 
 验证 send_message_stream 生成器输出的 SSE 事件满足前端预期的顺序：
-  padding → searching → session_id → token(s) → sources → done
+  padding → searching → session_id → token(s) → trust_status → sources → done
 """
 
 import json
@@ -141,6 +141,42 @@ async def test_sources_after_tokens():
     # 验证 searching 事件内容
     searching_event = events[0]
     assert "检索" in searching_event["message"]
+
+
+@pytest.mark.anyio
+async def test_trust_status_after_tokens_before_sources():
+    """可信度事件应在完整答案校正后、来源列表展示前发出。"""
+    sources = _make_fake_sources()
+    prepare_return = _make_prepare_chat_return(sources)
+    mock_client_cls = _make_mock_httpx_client(["经云：", "【《心经》第1卷】"])
+
+    with patch("app.services.chat._prepare_chat", new_callable=AsyncMock, return_value=prepare_return), \
+         patch("app.services.chat._save_messages", new_callable=AsyncMock, return_value=99), \
+         patch("app.services.chat.httpx.AsyncClient", mock_client_cls):
+
+        from app.services.chat import send_message_stream
+
+        chunks = []
+        async for chunk in send_message_stream(user_id=1, message="什么是心经"):
+            chunks.append(chunk)
+
+    events = _parse_sse_events(chunks)
+    event_types = [e["type"] for e in events]
+
+    trust_idx = event_types.index("trust_status")
+    sources_idx = event_types.index("sources")
+    last_token_idx = len(event_types) - 1 - event_types[::-1].index("token")
+
+    assert last_token_idx < trust_idx < sources_idx
+    assert events[trust_idx]["trust_status"] == {
+        "state": "verified",
+        "citation_count": 1,
+        "source_count": 2,
+        "citation_mutation_count": 0,
+        "quote_mutation_count": 0,
+        "max_source_score": 0.9,
+        "min_source_score": 0.8,
+    }
 
 
 @pytest.mark.anyio

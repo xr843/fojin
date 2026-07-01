@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -42,6 +42,31 @@ class ChatMessage(Base):
     feedback: Mapped[str | None] = mapped_column(String(10), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class ChatAnswerDiagnostic(Base):
+    __tablename__ = "chat_answer_diagnostics"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    # The unique constraint and secondary indexes are owned by migration 0165.
+    message_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("chat_messages.id", ondelete="CASCADE"), nullable=False
+    )
+    trust_state: Mapped[str] = mapped_column(String(30))
+    citation_count: Mapped[int] = mapped_column(Integer, default=0)
+    source_count: Mapped[int] = mapped_column(Integer, default=0)
+    citation_mutation_count: Mapped[int] = mapped_column(Integer, default=0)
+    quote_mutation_count: Mapped[int] = mapped_column(Integer, default=0)
+    max_source_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    min_source_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    citation_mutations: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    quote_mutations: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
 
