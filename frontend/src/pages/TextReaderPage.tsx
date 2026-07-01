@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Helmet } from "react-helmet-async";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Typography, Spin, Button, Select, Breadcrumb, Row, Col, message, Tooltip, Tag, Popover } from "antd";
+import { Typography, Spin, Button, Select, Breadcrumb, Row, Col, message, Tooltip, Tag, Popover, Dropdown } from "antd";
 import { getLastPosition, recordReading } from "../utils/readingHistory";
 import {
   HomeOutlined,
@@ -18,6 +18,7 @@ import {
   GlobalOutlined,
   DiffOutlined,
   VerticalAlignTopOutlined,
+  DownloadOutlined,
 } from "@ant-design/icons";
 import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBookmark, addBookmark, removeBookmark, searchDictionaryGrouped, getJuanApparatus, getJuanLineAnchors, type ApparatusEntryItem } from "../api/client";
 import { useAuthStore } from "../stores/authStore";
@@ -516,6 +517,18 @@ export default function TextReaderPage() {
     setLineLocator(null);
   }, []);
 
+  const downloadExport = useCallback((format: "txt" | "html" | "docx" | "epub", juan: number | null) => {
+    const params = new URLSearchParams({ format });
+    if (juan != null) params.set("juan", String(juan));
+    // A plain anchor navigation lets the browser handle the Content-Disposition
+    // download; no auth header is needed (export is a public read endpoint).
+    const a = document.createElement("a");
+    a.href = `/api/texts/${textId}/export?${params.toString()}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }, [textId]);
+
   const handleTextSelect = useCallback(async () => {
     const sel = window.getSelection();
     const text = sel?.toString().trim() || "";
@@ -987,6 +1000,27 @@ export default function TextReaderPage() {
           >
             引用
           </Button>
+          <Dropdown
+            trigger={["click"]}
+            menu={{
+              items: (["txt", "html", "docx", "epub"] as const).flatMap((fmt) => [
+                {
+                  key: `${fmt}-juan`,
+                  label: `${t(`reader.export.${fmt}`)} · ${t("reader.export.this_juan")}`,
+                  onClick: () => downloadExport(fmt, juanNum),
+                },
+                {
+                  key: `${fmt}-all`,
+                  label: `${t(`reader.export.${fmt}`)} · ${t("reader.export.whole_text")}`,
+                  onClick: () => downloadExport(fmt, null),
+                },
+              ]),
+            }}
+          >
+            <Button size="small" icon={<DownloadOutlined />}>
+              {t("reader.export.button")}
+            </Button>
+          </Dropdown>
           <Tooltip title={t("reader.apparatus.tooltip")}>
             <Button
               size="small"

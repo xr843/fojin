@@ -2,6 +2,7 @@ import re
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +22,8 @@ from app.services.content import (
     get_juan_list,
 )
 from app.services.text import get_text_by_id, get_text_count, get_text_id_by_cbeta
+from app.services.text_export import FORMATS as EXPORT_FORMATS
+from app.services.text_export import build_export_doc, render
 
 router = APIRouter(tags=["texts"])
 
@@ -237,6 +240,33 @@ async def read_juan_line_anchors(
     Loaded lazily by the reader; a juan can carry several hundred anchors."""
     anchors = await get_juan_line_anchors(db, text_id, juan_num)
     return JuanLineAnchorsResponse(text_id=text_id, juan_num=juan_num, anchors=anchors)
+
+
+@router.get("/texts/{text_id}/export", tags=["exports"])
+async def export_text(
+    text_id: int,
+    format: str = Query("txt", description="导出格式：txt / html / docx / epub"),
+    juan: int | None = Query(None, description="仅导出该卷；省略则导出全经"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Export one sutra as a downloadable document (TXT / HTML / DOCX / EPUB).
+
+    将单部经典导出为可下载文档（纯文本 / 网页 / Word / EPUB 电子书）。
+    ``juan`` 省略时导出全经，否则仅导出该卷。"""
+    if format not in EXPORT_FORMATS:
+        raise HTTPException(status_code=400, detail=f"unsupported format: {format}")
+    doc = await build_export_doc(db, text_id, juan)
+    if doc is None:
+        raise TextNotFoundError(text_id=text_id)
+    payload, media_type = render(doc, format)
+    ext, _ = EXPORT_FORMATS[format]
+    suffix = f"_juan{juan}" if juan is not None else ""
+    filename = f"{doc.cbeta_id}{suffix}{ext}"
+    return Response(
+        content=payload,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/stats")
