@@ -716,6 +716,8 @@
   "reader.lineref.copy_link": "Copy link",
   "reader.lineref.copied": "Copied",
   "reader.lineref.citation": "{{title}} (CBETA {{id}}, fasc. {{juan}}, {{ref}})",
+  "reader.lineref.toggle": "Line refs",
+  "reader.lineref.tooltip": "Show CBETA page-column-line refs (e.g. 0001a09) for precise citation",
   "reader.export.button": "Export",
   "reader.export.this_juan": "This fascicle",
   "reader.export.whole_text": "Whole text",

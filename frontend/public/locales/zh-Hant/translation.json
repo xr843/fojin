@@ -716,6 +716,8 @@
   "reader.lineref.copy_link": "複製連結",
   "reader.lineref.copied": "已複製",
   "reader.lineref.citation": "《{{title}}》卷{{juan}}（CBETA {{id}}, {{ref}}）",
+  "reader.lineref.toggle": "行首",
+  "reader.lineref.tooltip": "顯示 CBETA 頁·欄·行號（如 0001a09），便於精確引用與核對",
   "reader.export.button": "匯出",
   "reader.export.this_juan": "本卷",
   "reader.export.whole_text": "全經",
