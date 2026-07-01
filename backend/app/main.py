@@ -240,7 +240,8 @@ _OPENAPI_TAGS = [
     },
     {
         "name": "exports",
-        "description": "Export texts in PDF, EPUB, and other formats / 导出经文为 PDF、EPUB 等格式",
+        "description": "Export sutra texts (TXT/HTML/DOCX/EPUB) and open datasets "
+        "(metadata CSV, knowledge graph JSON) / 导出经文（TXT/HTML/DOCX/EPUB）与开放数据集",
     },
     {
         "name": "iiif",
