@@ -21,6 +21,13 @@ from app.services.text_export import (
     render_html,
     render_txt,
 )
+from app.services.text_reflow import reflow
+
+
+def _juan(juan_num: int, lines: list[str]) -> ExportJuan:
+    """Build a juan the way build_export_doc does: raw lines + reflow segments."""
+    raw = "\n".join(lines)
+    return ExportJuan(juan_num=juan_num, lines=lines, segments=reflow(raw))
 
 
 def _doc(**kw) -> ExportDoc:
@@ -32,8 +39,8 @@ def _doc(**kw) -> ExportDoc:
         juans=kw.get(
             "juans",
             [
-                ExportJuan(juan_num=1, lines=["如是我聞。", "一時佛在。"]),
-                ExportJuan(juan_num=2, lines=["爾時世尊。"]),
+                _juan(1, ["爾時世尊，處於此座，成最正覺。", "智入三世，悉皆平等。"]),
+                _juan(2, ["其身充滿一切世間，其音普順十方國土。"]),
             ],
         ),
     )
@@ -45,8 +52,8 @@ def test_render_txt_includes_title_metadata_and_all_lines():
     out = render_txt(_doc())
     assert "佛說長阿含經" in out
     assert "佛陀耶舍共竺佛念譯" in out
-    assert "如是我聞。" in out
-    assert "爾時世尊。" in out
+    assert "爾時世尊，處於此座，成最正覺。" in out
+    assert "其身充滿一切世間，其音普順十方國土。" in out
     # both juans are marked
     assert out.count("卷") >= 2
 
@@ -59,7 +66,7 @@ def test_render_txt_omits_missing_metadata():
 # --- HTML --------------------------------------------------------------------
 
 def test_render_html_is_wellformed_and_escapes():
-    doc = _doc(juans=[ExportJuan(juan_num=1, lines=["善男子<惡>&未來。"])])
+    doc = _doc(juans=[_juan(1, ["善男子，<惡>&未來，皆悉明見。"])])
     out = render_html(doc)
     assert out.startswith("<!DOCTYPE html>")
     assert '<meta charset="utf-8"' in out
@@ -68,6 +75,15 @@ def test_render_html_is_wellformed_and_escapes():
     assert "<惡>" not in out
     assert "&lt;惡&gt;" in out
     assert "&amp;" in out
+
+
+def test_render_html_uses_web_layout_classes():
+    # HTML must carry the reader.css-matching segment classes, not bare <p>.
+    doc = _doc(juans=[_juan(1, ["諸一切種諸冥滅，", "拔眾生出生死泥，"])])
+    out = render_html(doc)
+    assert 'class="verse"' in out          # opening equal-clause lines → verse
+    assert 'class="juan"' in out           # juan heading
+    assert ".prose{text-indent:2em" in out  # prose paragraph style present
 
 
 # --- DOCX --------------------------------------------------------------------
@@ -80,8 +96,8 @@ def test_render_docx_roundtrips_content():
     parsed = Document(BytesIO(data))
     all_text = "\n".join(p.text for p in parsed.paragraphs)
     assert "佛說長阿含經" in all_text
-    assert "如是我聞。" in all_text
-    assert "爾時世尊。" in all_text
+    assert "爾時世尊，處於此座，成最正覺。" in all_text
+    assert "其身充滿一切世間，其音普順十方國土。" in all_text
 
 
 # --- EPUB --------------------------------------------------------------------
@@ -102,7 +118,7 @@ def test_render_epub_is_valid_container():
     juan_docs = [n for n in names if n.endswith(".xhtml")]
     assert juan_docs
     body = "\n".join(zf.read(n).decode("utf-8") for n in juan_docs)
-    assert "如是我聞。" in body
+    assert "爾時世尊，處於此座，成最正覺。" in body
 
 
 def test_render_epub_has_dcterms_modified():
@@ -118,7 +134,7 @@ def test_render_epub_has_dcterms_modified():
 
 
 def test_render_epub_escapes_xml():
-    doc = _doc(juans=[ExportJuan(juan_num=1, lines=["a<b>&c"])])
+    doc = _doc(juans=[_juan(1, ["善哉，a<b>&c，如是我說。"])])
     zf = zipfile.ZipFile(BytesIO(render_epub(doc)))
     body = "\n".join(zf.read(n).decode("utf-8") for n in zf.namelist() if n.endswith(".xhtml"))
     assert "<b>" not in body
@@ -202,7 +218,7 @@ async def test_export_endpoint_sets_download_headers(client):
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("text/plain")
     assert 'filename="T0001.txt"' in resp.headers["content-disposition"]
-    assert "如是我聞。" in resp.text
+    assert "爾時世尊，處於此座，成最正覺。" in resp.text
 
 
 async def test_export_endpoint_single_juan_filename(client):
