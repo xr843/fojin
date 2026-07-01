@@ -1572,6 +1572,7 @@ export interface ChatResponse {
   session_id: ChatSessionId;
   message: string;
   sources: ChatSource[];
+  trust_status?: ChatTrustStatus | null;
 }
 
 export interface ChatSessionItem {
@@ -1580,11 +1581,29 @@ export interface ChatSessionItem {
   created_at: string;
 }
 
+export type ChatTrustState =
+  | "verified"
+  | "citation_corrected"
+  | "quote_unverified"
+  | "sources_available"
+  | "no_sources";
+
+export interface ChatTrustStatus {
+  state: ChatTrustState;
+  citation_count: number;
+  source_count: number;
+  citation_mutation_count: number;
+  quote_mutation_count: number;
+  max_source_score?: number | null;
+  min_source_score?: number | null;
+}
+
 export interface ChatMessageItem {
   id: number;
   role: string;
   content: string;
   sources: ChatSource[] | null;
+  trust_status?: ChatTrustStatus | null;
   feedback?: string | null;
   created_at: string;
 }
@@ -1716,6 +1735,7 @@ export async function getRandomHotQuestions(
 export interface StreamCallbacks {
   onToken: (content: string) => void;
   onSources: (sources: ChatSource[]) => void;
+  onTrustStatus?: (trustStatus: ChatTrustStatus) => void;
   onSessionId: (sessionId: number) => void;
   onSearching?: (message: string) => void;
   /**
@@ -1803,6 +1823,9 @@ export function sendChatMessageStream(
               break;
             case "sources":
               callbacks.onSources(event.sources);
+              break;
+            case "trust_status":
+              callbacks?.onTrustStatus?.(event.trust_status);
               break;
             case "session_id":
               callbacks.onSessionId(event.session_id);

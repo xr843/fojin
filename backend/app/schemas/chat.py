@@ -92,10 +92,30 @@ class ChatSource(BaseModel):
     parallel_chunks: list[ParallelChunk] = []
 
 
+ChatTrustState = Literal[
+    "verified",
+    "citation_corrected",
+    "quote_unverified",
+    "sources_available",
+    "no_sources",
+]
+
+
+class ChatTrustStatus(BaseModel):
+    state: ChatTrustState
+    citation_count: int = 0
+    source_count: int = 0
+    citation_mutation_count: int = 0
+    quote_mutation_count: int = 0
+    max_source_score: float | None = None
+    min_source_score: float | None = None
+
+
 class ChatResponse(BaseModel):
     session_id: int
     message: str
     sources: list[ChatSource]
+    trust_status: ChatTrustStatus | None = None
 
 
 class ChatMessageResponse(BaseModel):
@@ -103,6 +123,7 @@ class ChatMessageResponse(BaseModel):
     role: str
     content: str
     sources: list[ChatSource] | None
+    trust_status: ChatTrustStatus | None = None
     feedback: str | None = None
     created_at: datetime
 

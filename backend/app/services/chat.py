@@ -23,6 +23,7 @@ from app.models.chat import ChatAttachment, ChatMessage, ChatSession
 from app.models.hot_question import HotQuestion
 from app.models.user import User
 from app.schemas.chat import ChatResponse, ChatSource
+from app.services.chat_trust import build_trust_status, persist_answer_diagnostic
 from app.services.citation_guard import enforce_citation_whitelist, log_mutations
 from app.services.master_profiles import get_master
 from app.services.quote_verifier import log_quote_mutations, verify_quoted_content
@@ -1213,11 +1214,32 @@ async def send_message(
     # to citations the guard already stripped don't get double-flagged.
     # See app/services/quote_verifier for the substring-match contract.
     answer, _quote_mutations = verify_quoted_content(answer, sources)
+    trust_status = build_trust_status(
+        answer,
+        sources,
+        citation_mutations=_citation_mutations,
+        quote_mutations=_quote_mutations,
+    )
 
     if chat_session:
-        await _save_messages(db, chat_session.id, message, answer, sources)
-        log_mutations(chat_session.id, _citation_mutations)
-        log_quote_mutations(chat_session.id, _quote_mutations)
+        assistant_msg_id = await _save_messages(db, chat_session.id, message, answer, sources)
+        if assistant_msg_id is not None:
+            log_mutations(assistant_msg_id, _citation_mutations)
+            log_quote_mutations(assistant_msg_id, _quote_mutations)
+            try:
+                await persist_answer_diagnostic(
+                    db,
+                    message_id=assistant_msg_id,
+                    trust_status=trust_status,
+                    citation_mutations=_citation_mutations,
+                    quote_mutations=_quote_mutations,
+                )
+            except Exception:
+                await db.rollback()
+                logger.exception(
+                    "Failed to persist chat answer diagnostics (message_id=%s)",
+                    assistant_msg_id,
+                )
         # Rows are still bound to this request session here, so reading
         # .id/.consumed_at is safe (unlike the streaming save phase).
         await _mark_attachments_consumed(
@@ -1235,6 +1257,7 @@ async def send_message(
         session_id=chat_session.id if chat_session else 0,
         message=answer,
         sources=sources,
+        trust_status=trust_status,
     )
 
 
@@ -1593,6 +1616,12 @@ async def send_message_stream(
     # Quote verifier runs after citation_guard so flagged-and-stripped
     # citations don't carry their quotes into a second annotation.
     corrected_answer, _quote_mutations = verify_quoted_content(corrected_answer, sources)
+    trust_status = build_trust_status(
+        corrected_answer,
+        sources,
+        citation_mutations=_citation_mutations,
+        quote_mutations=_quote_mutations,
+    )
     logger.info(
         "chat/stream phase-cg %.2fs (citations=%d, quotes=%d)",
         _time.monotonic() - cg_start,
@@ -1611,6 +1640,15 @@ async def send_message_stream(
             )
             + "\n\n"
         )
+
+    yield (
+        "data: "
+        + json.dumps(
+            {"type": "trust_status", "trust_status": trust_status.model_dump()},
+            ensure_ascii=False,
+        )
+        + "\n\n"
+    )
 
     # 回答完成后显示引用来源——先论点后论据，自然阅读顺序
     if sources:
@@ -1637,9 +1675,25 @@ async def send_message_stream(
                 assistant_msg_id = await _save_messages(
                     db_save, chat_session_id, message, corrected_answer, sources
                 )
-                log_mutations(chat_session_id, _citation_mutations)
-                log_quote_mutations(chat_session_id, _quote_mutations)
+                if assistant_msg_id is not None:
+                    log_mutations(assistant_msg_id, _citation_mutations)
+                    log_quote_mutations(assistant_msg_id, _quote_mutations)
                 await _mark_attachments_consumed(db_save, pending_attachment_ids)
+                if assistant_msg_id is not None:
+                    try:
+                        await persist_answer_diagnostic(
+                            db_save,
+                            message_id=assistant_msg_id,
+                            trust_status=trust_status,
+                            citation_mutations=_citation_mutations,
+                            quote_mutations=_quote_mutations,
+                        )
+                    except Exception:
+                        await db_save.rollback()
+                        logger.exception(
+                            "chat/stream diagnostic persist failed (message_id=%s)",
+                            assistant_msg_id,
+                        )
         except Exception:
             logger.exception(
                 "chat/stream phase-3 save failed; user got the reply but it is "

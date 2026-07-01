@@ -82,6 +82,24 @@ describe("MessageBubble", () => {
     expect(onSuggestionClick).toHaveBeenCalledWith("什么是阿赖耶识");
   });
 
+  it("renders a concise verified citation trust hint", () => {
+    renderBubble({
+      m: msg({
+        trust_status: {
+          state: "verified",
+          citation_count: 1,
+          source_count: 1,
+          citation_mutation_count: 0,
+          quote_mutation_count: 0,
+          max_source_score: 0.91,
+          min_source_score: 0.91,
+        },
+      } as Partial<ChatMessageItem>),
+    });
+
+    expect(screen.getByText("引用已校验")).toBeInTheDocument();
+  });
+
   it("wires the share button to onShare with the message", () => {
     const m = msg({ id: 7, content: "可分享的回答" });
     // assistant, not failed, no user → action row is [copy, share]
