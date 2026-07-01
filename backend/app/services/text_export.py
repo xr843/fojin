@@ -23,6 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.text import BuddhistText, TextContent
+from app.services.text_reflow import Segment, reflow
 
 # format → (file extension, media type)
 FORMATS: dict[str, tuple[str, str]] = {
@@ -41,7 +42,10 @@ _EPUB_MODIFIED = "2026-01-01T00:00:00Z"
 @dataclass
 class ExportJuan:
     juan_num: int
+    # Raw stripped source lines — used by TXT (no layout) and as the reflow input.
     lines: list[str] = field(default_factory=list)
+    # Reflowed layout segments — used by HTML/EPUB/DOCX to match the web reader.
+    segments: list[Segment] = field(default_factory=list)
 
 
 @dataclass
@@ -80,6 +84,30 @@ def render_txt(doc: ExportDoc) -> str:
 
 # --- HTML --------------------------------------------------------------------
 
+# Mirrors the web reader's reader.css typography (.text-prose/.text-verse/…) so
+# the exported page reads like fojin.app: flowing prose paragraphs (2em indent),
+# indented verse, centred juan/section headings, right-aligned byline.
+_HTML_STYLE = (
+    "body{font-family:'Noto Serif SC','Source Han Serif SC',serif;max-width:42em;"
+    "margin:2em auto;padding:0 1.2em;line-height:1.8;color:#1a1a1a;"
+    "line-break:strict}"
+    "h1{font-size:1.5em;margin:0 0 .2em}"
+    ".byline-doc{color:#666;margin:0 0 .1em}.src{color:#999;font-size:.85em;margin:0 0 1.5em}"
+    ".juan{font-size:1.1em;color:#8b6914;text-align:center;margin:1.5em 0 1em}"
+    ".head{font-size:1.2em;color:#8b6914;text-align:center;margin:.5em 0 1em}"
+    ".byline{color:#408080;text-align:right;margin:0 0 1.2em;font-size:.95em}"
+    ".section{text-align:center;margin:1.5em 0 1em;font-size:1.05em}"
+    ".prose{text-indent:2em;margin:0 0 1em}"
+    ".verse{margin:0;padding-left:4em;text-indent:0}"
+)
+
+
+def _seg_html(seg: Segment) -> str:
+    if seg.type == "break":
+        return ""
+    return f'<p class="{seg.type}">{escape(seg.text)}</p>'
+
+
 def render_html(doc: ExportDoc) -> str:
     parts: list[str] = [
         "<!DOCTYPE html>",
@@ -88,20 +116,18 @@ def render_html(doc: ExportDoc) -> str:
         '<meta charset="utf-8">',
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
         f"<title>{escape(doc.title)}</title>",
-        "<style>body{font-family:serif;max-width:42em;margin:2em auto;line-height:1.9;padding:0 1em}"
-        "h1{font-size:1.5em}.byline{color:#666}.src{color:#999;font-size:.85em}"
-        "h2{font-size:1.1em;margin-top:2em;border-top:1px solid #eee;padding-top:1em}p{margin:.3em 0}</style>",
+        f"<style>{_HTML_STYLE}</style>",
         "</head>",
         "<body>",
         f"<h1>{escape(doc.title)}</h1>",
     ]
     byline = _byline(doc)
     if byline:
-        parts.append(f'<p class="byline">{escape(byline)}</p>')
+        parts.append(f'<p class="byline-doc">{escape(byline)}</p>')
     parts.append(f'<p class="src">CBETA {escape(doc.cbeta_id)}</p>')
     for j in doc.juans:
-        parts.append(f"<h2>{escape(_juan_label(j.juan_num))}</h2>")
-        parts.extend(f"<p>{escape(line)}</p>" for line in j.lines)
+        parts.append(f'<h2 class="juan">{escape(_juan_label(j.juan_num))}</h2>')
+        parts.extend(html for html in (_seg_html(s) for s in j.segments) if html)
     parts.append("</body>")
     parts.append("</html>")
     return "\n".join(parts) + "\n"
@@ -111,6 +137,8 @@ def render_html(doc: ExportDoc) -> str:
 
 def render_docx(doc: ExportDoc) -> bytes:
     from docx import Document
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.shared import Pt
 
     d = Document()
     d.add_heading(doc.title, level=0)
@@ -120,8 +148,22 @@ def render_docx(doc: ExportDoc) -> bytes:
     d.add_paragraph(f"CBETA {doc.cbeta_id}")
     for j in doc.juans:
         d.add_heading(_juan_label(j.juan_num), level=1)
-        for line in j.lines:
-            d.add_paragraph(line)
+        for seg in j.segments:
+            if seg.type == "break":
+                continue
+            if seg.type in ("head", "juan"):
+                h = d.add_heading(seg.text, level=2)
+                h.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                continue
+            p = d.add_paragraph(seg.text)
+            if seg.type == "section":
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            elif seg.type == "byline":
+                p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            elif seg.type == "prose":
+                p.paragraph_format.first_line_indent = Pt(24)
+            elif seg.type == "verse":
+                p.paragraph_format.left_indent = Pt(48)
     buf = BytesIO()
     d.save(buf)
     return buf.getvalue()
@@ -129,15 +171,34 @@ def render_docx(doc: ExportDoc) -> bytes:
 
 # --- EPUB --------------------------------------------------------------------
 
+# Inline CSS shared by every juan document — same typography as the HTML export.
+_EPUB_CSS = (
+    "body{font-family:'Noto Serif SC',serif;line-height:1.8}"
+    ".juan{font-size:1.1em;text-align:center;margin:1.5em 0 1em}"
+    ".head{font-size:1.2em;text-align:center;margin:.5em 0 1em}"
+    ".byline{text-align:right;margin:0 0 1.2em;font-size:.95em}"
+    ".section{text-align:center;margin:1.5em 0 1em}"
+    ".prose{text-indent:2em;margin:0 0 1em}"
+    ".verse{margin:0;padding-left:4em}"
+)
+
+
+def _seg_xhtml(seg: Segment) -> str:
+    if seg.type == "break":
+        return ""
+    return f'    <p class="{seg.type}">{xml_escape(seg.text)}</p>'
+
+
 def _epub_juan_xhtml(title: str, j: ExportJuan) -> str:
-    body = "\n".join(f"    <p>{xml_escape(line)}</p>" for line in j.lines)
+    body = "\n".join(x for x in (_seg_xhtml(s) for s in j.segments) if x)
     return (
         '<?xml version="1.0" encoding="utf-8"?>\n'
         '<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="zh-Hant">\n'
         f"  <head><title>{xml_escape(title)} {_juan_label(j.juan_num)}</title>\n"
-        '  <meta charset="utf-8"/></head>\n'
+        '  <meta charset="utf-8"/>\n'
+        f"  <style>{_EPUB_CSS}</style></head>\n"
         "  <body>\n"
-        f"    <h2>{xml_escape(_juan_label(j.juan_num))}</h2>\n"
+        f'    <h2 class="juan">{xml_escape(_juan_label(j.juan_num))}</h2>\n'
         f"{body}\n"
         "  </body>\n"
         "</html>\n"
@@ -262,7 +323,14 @@ async def build_export_doc(
     if not rows:
         return None
 
-    juans = [ExportJuan(juan_num=r.juan_num, lines=_split_lines(r.content or "")) for r in rows]
+    juans = [
+        ExportJuan(
+            juan_num=r.juan_num,
+            lines=_split_lines(r.content or ""),
+            segments=reflow(r.content or ""),
+        )
+        for r in rows
+    ]
     return ExportDoc(
         title=bt.title_zh,
         cbeta_id=bt.cbeta_id,
