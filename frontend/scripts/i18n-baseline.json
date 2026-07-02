@@ -12,7 +12,6 @@
   "src/pages/AdminSuggestionsPage.tsx": 27,
   "src/pages/TextDetailPage.tsx": 27,
   "src/components/ShareCard.tsx": 26,
-  "src/components/AnnotationPanel.tsx": 25,
   "src/pages/AdminAuditLogPage.tsx": 24,
   "src/pages/AdminUsersPage.tsx": 22,
   "src/pages/ParallelReaderPage.tsx": 20,

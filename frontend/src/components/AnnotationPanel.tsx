@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Typography,
@@ -38,10 +39,17 @@ interface AnnotationPanelProps {
   onClose: () => void;
 }
 
-const typeLabels: Record<string, string> = {
-  note: "笔记",
-  correction: "校正",
-  tag: "标签",
+const typeLabelKeys: Record<string, string> = {
+  note: "reader.annotation.type.note",
+  correction: "reader.annotation.type.correction",
+  tag: "reader.annotation.type.tag",
+};
+
+const statusLabelKeys: Record<string, string> = {
+  draft: "reader.annotation.status.draft",
+  pending: "reader.annotation.status.pending",
+  approved: "reader.annotation.status.approved",
+  rejected: "reader.annotation.status.rejected",
 };
 
 const statusColors: Record<string, string> = {
@@ -57,6 +65,7 @@ export default function AnnotationPanel({
   visible,
   onClose,
 }: AnnotationPanelProps) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
@@ -84,7 +93,7 @@ export default function AnnotationPanel({
       queryClient.invalidateQueries({ queryKey: ["annotations", textId, juanNum] });
       setShowForm(false);
       setForm({ start_pos: 0, end_pos: 0, annotation_type: "note", content: "" });
-      message.success("标注已创建");
+      message.success(t("reader.annotation.created"));
     },
   });
 
@@ -92,7 +101,7 @@ export default function AnnotationPanel({
     mutationFn: (id: number) => api.post(`/annotations/${id}/submit`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["annotations", textId, juanNum] });
-      message.success("已提交审核");
+      message.success(t("reader.annotation.submitted"));
     },
   });
 
@@ -100,13 +109,13 @@ export default function AnnotationPanel({
     mutationFn: (id: number) => api.delete(`/annotations/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["annotations", textId, juanNum] });
-      message.success("已删除");
+      message.success(t("reader.annotation.deleted"));
     },
   });
 
   return (
     <Drawer
-      title="标注面板"
+      title={t("reader.annotation.title")}
       placement="right"
       width={400}
       open={visible}
@@ -119,7 +128,7 @@ export default function AnnotationPanel({
         onClick={() => setShowForm(!showForm)}
         style={{ marginBottom: 16 }}
       >
-        {showForm ? "取消" : "新增标注"}
+        {showForm ? t("chat.cancel") : t("reader.annotation.add")}
       </Button>
 
       {showForm && (
@@ -127,16 +136,16 @@ export default function AnnotationPanel({
           <Space direction="vertical" style={{ width: "100%" }}>
             <Space>
               <Input
-                placeholder="起始位置"
-                aria-label="起始位置"
+                placeholder={t("reader.annotation.start_pos")}
+                aria-label={t("reader.annotation.start_pos")}
                 type="number"
                 value={form.start_pos}
                 onChange={(e) => setForm({ ...form, start_pos: Number(e.target.value) })}
                 style={{ width: 100 }}
               />
               <Input
-                placeholder="结束位置"
-                aria-label="结束位置"
+                placeholder={t("reader.annotation.end_pos")}
+                aria-label={t("reader.annotation.end_pos")}
                 type="number"
                 value={form.end_pos}
                 onChange={(e) => setForm({ ...form, end_pos: Number(e.target.value) })}
@@ -147,15 +156,15 @@ export default function AnnotationPanel({
                 onChange={(v) => setForm({ ...form, annotation_type: v })}
                 style={{ width: 100 }}
               >
-                <Select.Option value="note">笔记</Select.Option>
-                <Select.Option value="correction">校正</Select.Option>
-                <Select.Option value="tag">标签</Select.Option>
+                <Select.Option value="note">{t("reader.annotation.type.note")}</Select.Option>
+                <Select.Option value="correction">{t("reader.annotation.type.correction")}</Select.Option>
+                <Select.Option value="tag">{t("reader.annotation.type.tag")}</Select.Option>
               </Select>
             </Space>
             <Input.TextArea
               rows={3}
-              placeholder="标注内容"
-              aria-label="标注内容"
+              placeholder={t("reader.annotation.content")}
+              aria-label={t("reader.annotation.content")}
               value={form.content}
               onChange={(e) => setForm({ ...form, content: e.target.value })}
             />
@@ -166,14 +175,14 @@ export default function AnnotationPanel({
               loading={createMutation.isPending}
               disabled={!form.content.trim()}
             >
-              保存
+              {t("reader.annotation.save")}
             </Button>
           </Space>
         </div>
       )}
 
       {!annotations || annotations.length === 0 ? (
-        <Empty description="暂无标注" />
+        <Empty description={t("reader.annotation.empty")} />
       ) : (
         <List
           size="small"
@@ -188,16 +197,16 @@ export default function AnnotationPanel({
                     icon={<SendOutlined />}
                     onClick={() => submitMutation.mutate(ann.id)}
                   >
-                    提交
+                    {t("reader.annotation.submit")}
                   </Button>
                 ),
                 <Popconfirm
                   key="delete"
-                  title="确认删除"
-                  description="确定要删除这条标注吗？"
+                  title={t("reader.annotation.confirm_delete")}
+                  description={t("reader.annotation.confirm_delete_desc")}
                   onConfirm={() => deleteMutation.mutate(ann.id)}
-                  okText="删除"
-                  cancelText="取消"
+                  okText={t("chat.delete")}
+                  cancelText={t("chat.cancel")}
                 >
                   <Button
                     size="small"
@@ -210,8 +219,10 @@ export default function AnnotationPanel({
               <List.Item.Meta
                 title={
                   <Space>
-                    <Tag>{typeLabels[ann.annotation_type] || ann.annotation_type}</Tag>
-                    <Tag color={statusColors[ann.status]}>{ann.status}</Tag>
+                    <Tag>{typeLabelKeys[ann.annotation_type] ? t(typeLabelKeys[ann.annotation_type]) : ann.annotation_type}</Tag>
+                    <Tag color={statusColors[ann.status]}>
+                      {statusLabelKeys[ann.status] ? t(statusLabelKeys[ann.status]) : ann.status}
+                    </Tag>
                     <Text type="secondary" style={{ fontSize: 11 }}>
                       [{ann.start_pos}-{ann.end_pos}]
                     </Text>
