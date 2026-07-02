@@ -2,14 +2,5 @@
   "src/data/collections.ts": 1166,
   "src/data/popularSutras.ts": 157,
   "src/data/topics.ts": 74,
-  "src/pages/AdminDashboardPage.tsx": 72,
-  "src/data/dynasty_years.ts": 46,
-  "src/pages/ParallelReaderPage.tsx": 20,
-  "src/pages/SutraLandingPage.tsx": 17,
-  "src/pages/AdminAnswerQualityPage.tsx": 13,
-  "src/pages/SearchPage.tsx": 13,
-  "src/pages/TopicsPage.tsx": 11,
-  "src/pages/ManuscriptViewerPage.tsx": 6,
-  "src/pages/HomePage.tsx": 3,
-  "src/utils/citationFormats.ts": 1
+  "src/data/dynasty_years.ts": 46
 }

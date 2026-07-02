@@ -4,10 +4,12 @@ import { Typography, Spin, Card, List, Empty, Button, Space, Tag } from "antd";
 import { ArrowLeftOutlined, FileImageOutlined, EyeOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import IIIFViewer from "../components/IIIFViewer";
 import { getTextManifests, getTextDetail } from "../api/client";
 
 export default function ManuscriptViewerPage() {
+  const { t } = useTranslation();
   const { textId } = useParams<{ textId: string }>();
   const navigate = useNavigate();
   const [selectedManifestUrl, setSelectedManifestUrl] = useState<string | null>(null);
@@ -27,11 +29,16 @@ export default function ManuscriptViewerPage() {
   return (
     <div style={{ maxWidth: 1200, margin: "24px auto", padding: "0 16px" }}>
       <Space style={{ marginBottom: 16 }}>
-        <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)}>
-          返回
+        <Button
+          type="text"
+          aria-label={t("manuscript.back")}
+          icon={<ArrowLeftOutlined />}
+          onClick={() => navigate(-1)}
+        >
+          {t("manuscript.back")}
         </Button>
         <Typography.Title level={3} style={{ margin: 0 }}>
-          <FileImageOutlined /> 手稿影像
+          <FileImageOutlined /> {t("manuscript.title")}
           {text && <span style={{ fontWeight: "normal", fontSize: 16, marginLeft: 8 }}>{text.title_zh}</span>}
         </Typography.Title>
       </Space>
@@ -42,11 +49,11 @@ export default function ManuscriptViewerPage() {
         </div>
       ) : !manifests?.length ? (
         <Card>
-          <Empty description="暂无手稿影像" />
+          <Empty description={t("manuscript.empty")} />
         </Card>
       ) : (
         <Space direction="vertical" size="large" style={{ width: "100%" }}>
-          <Card title="可用影像" size="small">
+          <Card title={t("manuscript.available_images")} size="small">
             <List
               dataSource={manifests}
               renderItem={(item) => (
@@ -55,10 +62,11 @@ export default function ManuscriptViewerPage() {
                     <Button
                       type="primary"
                       size="small"
+                      aria-label={t("manuscript.view")}
                       icon={<EyeOutlined />}
                       onClick={() => setSelectedManifestUrl(item.manifest_url)}
                     >
-                      查看
+                      {t("manuscript.view")}
                     </Button>,
                   ]}
                 >
@@ -77,7 +85,7 @@ export default function ManuscriptViewerPage() {
           </Card>
 
           {selectedManifestUrl && (
-            <Card title="影像查看器" size="small">
+            <Card title={t("manuscript.viewer")} size="small">
               <IIIFViewer manifestUrl={selectedManifestUrl} height="650px" />
             </Card>
           )}

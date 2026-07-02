@@ -16,6 +16,12 @@ export interface CitationMeta {
   url?: string;
 }
 
+export interface CitationOptions {
+  apaLocale?: string;
+  siteName?: string;
+  accessedLabel?: string;
+}
+
 /** Sanitise a string for use as a BibTeX key (ASCII only, no spaces). */
 function bibKey(meta: CitationMeta): string {
   return meta.cbetaId.replace(/[^a-zA-Z0-9]/g, "_");
@@ -87,14 +93,16 @@ export function toRIS(meta: CitationMeta): string {
 // APA (7th edition style)
 // ---------------------------------------------------------------------------
 
-export function toAPA(meta: CitationMeta): string {
+export function toAPA(meta: CitationMeta, options: CitationOptions = {}): string {
   const author = authorField(meta);
   const url = canonicalUrl(meta);
-  const accessDate = new Date().toLocaleDateString("zh-CN", {
+  const accessDate = new Date().toLocaleDateString(options.apaLocale ?? "en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
   });
+  const siteName = options.siteName ?? "FoJin";
+  const accessedLabel = options.accessedLabel ?? "accessed";
 
   // Author. (Dynasty/n.d.). Title (CBETA ID). Source. URL
   const datePart = meta.dynasty ?? "n.d.";
@@ -102,7 +110,7 @@ export function toAPA(meta: CitationMeta): string {
     ? `${meta.titleZh} [${meta.titleEn}]`
     : meta.titleZh;
 
-  return `${author}. (${datePart}). ${titlePart} (CBETA ${meta.cbetaId}). 佛津 FoJin. ${url} (${accessDate} 访问)`;
+  return `${author}. (${datePart}). ${titlePart} (CBETA ${meta.cbetaId}). ${siteName}. ${url} (${accessDate} ${accessedLabel})`;
 }
 
 // ---------------------------------------------------------------------------
@@ -114,6 +122,7 @@ export type CitationFormat = "bibtex" | "ris" | "apa";
 export function generateCitation(
   format: CitationFormat,
   meta: CitationMeta,
+  options: CitationOptions = {},
 ): string {
   switch (format) {
     case "bibtex":
@@ -121,7 +130,7 @@ export function generateCitation(
     case "ris":
       return toRIS(meta);
     case "apa":
-      return toAPA(meta);
+      return toAPA(meta, options);
   }
 }
 
@@ -141,8 +150,9 @@ const MIME_TYPE: Record<CitationFormat, string> = {
 export function downloadCitation(
   format: CitationFormat,
   meta: CitationMeta,
+  options: CitationOptions = {},
 ): void {
-  const text = generateCitation(format, meta);
+  const text = generateCitation(format, meta, options);
   const blob = new Blob([text], { type: MIME_TYPE[format] });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
