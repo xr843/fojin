@@ -16,13 +16,13 @@ function seoPages(): Plugin {
       title: "搜索 | 佛津 FoJin",
       desc: "搜索全球佛教古籍数字资源 — 支持按经名、编号、译者检索",
       noscript:
-        '<h1>佛津 — 典籍搜索</h1><p>跨 613 个数据源检索佛教古籍，支持按经名、编号、译者查询。</p><a href="/">返回首页</a>',
+        '<h1>佛津 — 典籍搜索</h1><p>跨多个数据源检索佛教古籍，支持按经名、编号、译者查询。</p><a href="/">返回首页</a>',
     },
     sources: {
       title: "数据源导航 | 佛津 FoJin",
-      desc: "聚合全球 613 个佛教数字资源，覆盖图书馆、大学、研究机构、数字项目等。",
+      desc: "聚合全球佛教数字资源，覆盖图书馆、大学、研究机构、数字项目等。",
       noscript:
-        '<h1>佛津 — 数据源导航</h1><p>聚合 CBETA、BDRC、SAT、SuttaCentral 等全球 613 个佛教数字资源。</p><a href="/">返回首页</a>',
+        '<h1>佛津 — 数据源导航</h1><p>聚合 CBETA、BDRC、SAT、SuttaCentral 等全球佛教数字资源。</p><a href="/">返回首页</a>',
     },
     kg: {
       title: "知识图谱 | 佛津 FoJin",
@@ -149,6 +149,17 @@ function seoPages(): Plugin {
         html = html.replace(
           /<meta property="og:description" content="[^"]*"/,
           `<meta property="og:description" content="${meta.desc}"`,
+        );
+
+        // Replace Twitter metadata as well; otherwise route pages inherit the
+        // generic SPA shell description.
+        html = html.replace(
+          /<meta name="twitter:title" content="[^"]*"/,
+          `<meta name="twitter:title" content="${meta.title}"`,
+        );
+        html = html.replace(
+          /<meta name="twitter:description" content="[^"]*"/,
+          `<meta name="twitter:description" content="${meta.desc}"`,
         );
 
         // Replace noscript content

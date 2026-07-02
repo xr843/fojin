@@ -22,10 +22,19 @@ URL = "https://src.example.org/"
 
 
 class FakeResp:
-    def __init__(self, status_code: int, location: str | None = None):
+    def __init__(
+        self,
+        status_code: int,
+        location: str | None = None,
+        headers: dict[str, str] | None = None,
+        text: str = "",
+    ):
         self.status_code = status_code
-        self.headers = {"location": location} if location else {}
+        self.headers = headers or {}
+        if location:
+            self.headers["location"] = location
         self.is_redirect = location is not None
+        self.text = text
 
 
 class FakeClient:
@@ -117,6 +126,13 @@ async def test_5xx_then_200_on_retry_is_ok():
     v = await hc.probe(client, FakeClient(), "src", URL)
     assert v["status"] == "ok"
     assert client.calls == 2
+
+
+async def test_cloudflare_challenge_503_is_ok_without_retry():
+    client = FakeClient(FakeResp(503, headers={"cf-mitigated": "challenge"}))
+    v = await hc.probe(client, FakeClient(), "src", URL)
+    assert v["status"] == "ok"
+    assert client.calls == 1
 
 
 async def test_stable_404_is_degraded_and_not_retried():

@@ -24,6 +24,19 @@ interface GraphLink {
   evidence?: string | null;
 }
 
+interface SimNode extends GraphNode, d3.SimulationNodeDatum {
+  _clickTimer?: number | null;
+}
+
+type SimLinkEndpoint = string | number | SimNode;
+
+interface SimLink
+  extends Omit<GraphLink, "source" | "target">,
+    d3.SimulationLinkDatum<SimNode> {
+  source: SimLinkEndpoint;
+  target: SimLinkEndpoint;
+}
+
 interface ForceGraphProps {
   nodes: GraphNode[];
   links: GraphLink[];
@@ -180,8 +193,19 @@ export default function ForceGraph({
     svg.call(zoom);
 
     // Clone data to avoid mutation
-    const simNodes = nodes.map((n) => ({ ...n }));
-    const simLinks = links.map((l) => ({ ...l }));
+    const simNodes: SimNode[] = nodes.map((n) => ({ ...n }));
+    const simNodeById = new Map(simNodes.map((n) => [n.id, n]));
+    const endpointKey = (endpoint: number | GraphNode) =>
+      typeof endpoint === "object" ? String(endpoint.id) : String(endpoint);
+    const endpointId = (endpoint: SimLinkEndpoint) =>
+      typeof endpoint === "object" ? endpoint.id : Number(endpoint);
+    const endpointNode = (endpoint: SimLinkEndpoint): SimNode | undefined =>
+      typeof endpoint === "object" ? endpoint : simNodeById.get(Number(endpoint));
+    const simLinks: SimLink[] = links.map((l) => ({
+      ...l,
+      source: endpointKey(l.source),
+      target: endpointKey(l.target),
+    }));
 
     // ── Node degree → radius ──
     // A node's degree (how many relations touch it) is its visual
@@ -190,9 +214,9 @@ export default function ForceGraph({
     // every node looking equally (un)important. Square-root scale so a
     // 16× busier node isn't 16× wider.
     const degree = new Map<number, number>();
-    simLinks.forEach((l: any) => {
-      const sid = typeof l.source === "object" ? l.source.id : l.source;
-      const tid = typeof l.target === "object" ? l.target.id : l.target;
+    simLinks.forEach((l) => {
+      const sid = endpointId(l.source);
+      const tid = endpointId(l.target);
       degree.set(sid, (degree.get(sid) || 0) + 1);
       degree.set(tid, (degree.get(tid) || 0) + 1);
     });
@@ -202,7 +226,7 @@ export default function ForceGraph({
       .domain([0, maxDegree])
       .range([12, 30])
       .clamp(true);
-    const nodeRadius = (d: any) => radiusScale(degree.get(d.id) || 0);
+    const nodeRadius = (d: SimNode) => radiusScale(degree.get(d.id) || 0);
 
     // Adaptive forces based on node count
     const nodeCount = simNodes.length;
@@ -210,40 +234,40 @@ export default function ForceGraph({
     const linkDist = nodeCount > 100 ? 90 : nodeCount > 50 ? 110 : 140;
 
     const simulation = d3
-      .forceSimulation(simNodes as any)
+      .forceSimulation<SimNode>(simNodes)
       .force(
         "link",
         d3
-          .forceLink(simLinks as any)
-          .id((d: any) => d.id)
+          .forceLink<SimNode, SimLink>(simLinks)
+          .id((d) => String(d.id))
           .distance(linkDist)
       )
-      .force("charge", d3.forceManyBody().strength(chargeStrength))
+      .force("charge", d3.forceManyBody<SimNode>().strength(chargeStrength))
       .force("center", d3.forceCenter(width / 2, height / 2))
-      .force("collision", d3.forceCollide().radius((d: any) => nodeRadius(d) + 8))
-      .force("x", d3.forceX(width / 2).strength(0.03))
-      .force("y", d3.forceY(height / 2).strength(0.03));
+      .force("collision", d3.forceCollide<SimNode>().radius((d) => nodeRadius(d) + 8))
+      .force("x", d3.forceX<SimNode>(width / 2).strength(0.03))
+      .force("y", d3.forceY<SimNode>(height / 2).strength(0.03));
 
     // ── Links ──
     const linkGroup = g.append("g").attr("class", "links");
     const link = linkGroup
-      .selectAll("line")
+      .selectAll<SVGLineElement, SimLink>("line")
       .data(simLinks)
       .join("line")
-      .attr("stroke", (d: any) => PREDICATE_COLORS[d.predicate] || "#bbb5a6")
+      .attr("stroke", (d) => PREDICATE_COLORS[d.predicate] || "#bbb5a6")
       .attr("stroke-opacity", 0.35)
-      .attr("stroke-width", (d: any) => {
+      .attr("stroke-width", (d) => {
         // cites edges thinner to reduce visual noise
         if (d.predicate === "cites") return 0.8;
         return Math.max(1, Math.min(d.confidence * 2, 2.5));
       })
-      .attr("marker-end", (d: any) =>
+      .attr("marker-end", (d) =>
         d.predicate !== "cites" ? `url(#arrow-${d.predicate})` : null
       );
 
     // Edge hover: show tooltip
     link
-      .on("mouseover", function (event: any, d: any) {
+      .on("mouseover", function (this: SVGLineElement, event: MouseEvent, d) {
         d3.select(this)
           .attr("stroke-opacity", 0.9)
           .attr("stroke-width", 3);
@@ -259,7 +283,7 @@ export default function ForceGraph({
           parts.push(`<span style="color:#b08d57">${escapeHtml(t("kg.tooltip_confidence"))}: ${d.confidence}</span>`);
         showTooltip(parts.join("<br>"), event.offsetX, event.offsetY);
       })
-      .on("mouseout", function (_event: any, d: any) {
+      .on("mouseout", function (this: SVGLineElement, _event: MouseEvent, d) {
         d3.select(this)
           .attr("stroke-opacity", 0.35)
           .attr("stroke-width", d.predicate === "cites" ? 0.8 : Math.max(1, Math.min(d.confidence * 2, 2.5)));
@@ -269,27 +293,27 @@ export default function ForceGraph({
     // ── Nodes ──
     const nodeGroup = g.append("g").attr("class", "nodes");
     const node = nodeGroup
-      .selectAll("g")
+      .selectAll<SVGGElement, SimNode>("g")
       .data(simNodes)
       .join("g")
       .style("cursor", "pointer")
       .call(
         d3
-          .drag<any, any>()
-          .on("start", (event, d: any) => {
+          .drag<SVGGElement, SimNode>()
+          .on("start", (event, d) => {
             if (!event.active) simulation.alphaTarget(0.3).restart();
             d.fx = d.x;
             d.fy = d.y;
           })
-          .on("drag", (event, d: any) => {
+          .on("drag", (event, d) => {
             d.fx = event.x;
             d.fy = event.y;
           })
-          .on("end", (event, d: any) => {
+          .on("end", (event, d) => {
             if (!event.active) simulation.alphaTarget(0);
             d.fx = null;
             d.fy = null;
-          }) as any
+          })
       );
 
     // ── Expand ring: a faint outer circle on nodes that haven't yet been
@@ -298,13 +322,13 @@ export default function ForceGraph({
     node
       .append("circle")
       .attr("class", "expand-ring")
-      .attr("r", (d: any) => nodeRadius(d) + 5)
+      .attr("r", (d) => nodeRadius(d) + 5)
       .attr("fill", "none")
-      .attr("stroke", (d: any) =>
+      .attr("stroke", (d) =>
         expandedNodeIds?.has(d.id) ? "none" : (TYPE_COLORS[d.entity_type] || "#888")
       )
       .attr("stroke-width", 1.5)
-      .attr("stroke-opacity", (d: any) => (expandedNodeIds?.has(d.id) ? 0 : 0.35))
+      .attr("stroke-opacity", (d) => (expandedNodeIds?.has(d.id) ? 0 : 0.35))
       .attr("stroke-dasharray", "3 3")
       .attr("pointer-events", "none");
 
@@ -312,7 +336,7 @@ export default function ForceGraph({
     node
       .append("circle")
       .attr("r", nodeRadius)
-      .attr("fill", (d: any) => TYPE_COLORS[d.entity_type] || "#888")
+      .attr("fill", (d) => TYPE_COLORS[d.entity_type] || "#888")
       .attr("stroke", "#fff")
       .attr("stroke-width", 2)
       .attr("filter", "drop-shadow(0 1px 2px rgba(0,0,0,0.12))");
@@ -320,13 +344,13 @@ export default function ForceGraph({
     // Short label inside node (1-2 chars), font scaled with radius
     node
       .append("text")
-      .text((d: any) => {
+      .text((d) => {
         const n = d.name;
         return n.length <= 2 ? n : n.slice(0, 1);
       })
       .attr("text-anchor", "middle")
       .attr("dy", "0.35em")
-      .attr("font-size", (d: any) => Math.max(10, nodeRadius(d) * 0.62))
+      .attr("font-size", (d) => Math.max(10, nodeRadius(d) * 0.62))
       .attr("font-weight", 600)
       .attr("fill", "#fff")
       .attr("pointer-events", "none");
@@ -334,11 +358,11 @@ export default function ForceGraph({
     // Full name label below node — offset by the node's own radius
     node
       .append("text")
-      .text((d: any) =>
+      .text((d) =>
         d.name.length > 6 ? d.name.slice(0, 6) + "…" : d.name
       )
       .attr("text-anchor", "middle")
-      .attr("dy", (d: any) => nodeRadius(d) + 14)
+      .attr("dy", (d) => nodeRadius(d) + 14)
       .attr("font-size", 11)
       .attr("font-family", '"Noto Serif SC", serif')
       .attr("fill", "#2b2318")
@@ -346,30 +370,30 @@ export default function ForceGraph({
 
     // ── Hover highlight: dim everything except neighbors ──
     node
-      .on("mouseover", function (event: any, d: any) {
+      .on("mouseover", function (_event: MouseEvent, d) {
         const connectedIds = new Set<number>();
         connectedIds.add(d.id);
-        simLinks.forEach((l: any) => {
-          const sid = typeof l.source === "object" ? l.source.id : l.source;
-          const tid = typeof l.target === "object" ? l.target.id : l.target;
+        simLinks.forEach((l) => {
+          const sid = endpointId(l.source);
+          const tid = endpointId(l.target);
           if (sid === d.id) connectedIds.add(tid);
           if (tid === d.id) connectedIds.add(sid);
         });
 
         // Dim non-connected nodes
-        node.transition().duration(150).style("opacity", (n: any) =>
+        node.transition().duration(150).style("opacity", (n) =>
           connectedIds.has(n.id) ? 1 : 0.15
         );
         // Highlight connected edges, dim others
         link.transition().duration(150)
-          .attr("stroke-opacity", (l: any) => {
-            const sid = typeof l.source === "object" ? l.source.id : l.source;
-            const tid = typeof l.target === "object" ? l.target.id : l.target;
+          .attr("stroke-opacity", (l) => {
+            const sid = endpointId(l.source);
+            const tid = endpointId(l.target);
             return sid === d.id || tid === d.id ? 0.8 : 0.05;
           })
-          .attr("stroke-width", (l: any) => {
-            const sid = typeof l.source === "object" ? l.source.id : l.source;
-            const tid = typeof l.target === "object" ? l.target.id : l.target;
+          .attr("stroke-width", (l) => {
+            const sid = endpointId(l.source);
+            const tid = endpointId(l.target);
             return sid === d.id || tid === d.id ? 2.5 : 0.5;
           });
 
@@ -382,18 +406,18 @@ export default function ForceGraph({
         if (onNodeExpand && !expandedNodeIds?.has(d.id)) {
           html += `<br><span style="color:#b08d57;font-size:10px">${escapeHtml(t("kg.dblclick_expand"))}</span>`;
         }
-        showTooltip(html, event.offsetX, event.offsetY);
+        showTooltip(html, _event.offsetX, _event.offsetY);
       })
       .on("mouseout", function () {
         node.transition().duration(200).style("opacity", 1);
         link.transition().duration(200)
           .attr("stroke-opacity", 0.35)
-          .attr("stroke-width", (l: any) =>
+          .attr("stroke-width", (l) =>
             l.predicate === "cites" ? 0.8 : Math.max(1, Math.min(l.confidence * 2, 2.5))
           );
         hideTooltip();
       })
-      .on("click", (_event: any, d: any) => {
+      .on("click", (_event: MouseEvent, d) => {
         // Debounce: wait 250 ms so a double-click can cancel before we
         // treat this as a single-click re-root.  The timer is stored on
         // the node datum itself so each node has its own pending timer.
@@ -403,7 +427,7 @@ export default function ForceGraph({
           if (onNodeClick) onNodeClick(d);
         }, 250);
       })
-      .on("dblclick", (event: any, d: any) => {
+      .on("dblclick", (event: MouseEvent, d) => {
         // Cancel the pending single-click timer so onNodeClick is NOT called.
         if (d._clickTimer != null) {
           clearTimeout(d._clickTimer);
@@ -417,13 +441,16 @@ export default function ForceGraph({
     // Trim a link to the node boundaries so it starts/ends at the
     // circle edge rather than the centre — with degree-scaled radii a
     // fixed offset would leave arrows floating or buried.
-    const trimLink = (d: any) => {
-      const sx = d.source.x, sy = d.source.y;
-      const tx = d.target.x, ty = d.target.y;
+    const trimLink = (d: SimLink) => {
+      const source = endpointNode(d.source);
+      const target = endpointNode(d.target);
+      if (!source || !target) return null;
+      const sx = source.x ?? width / 2, sy = source.y ?? height / 2;
+      const tx = target.x ?? width / 2, ty = target.y ?? height / 2;
       const dx = tx - sx, dy = ty - sy;
       const dist = Math.hypot(dx, dy) || 1;
-      const sr = nodeRadius(d.source) + 2;
-      const tr = nodeRadius(d.target) + 5; // extra gap for the arrowhead
+      const sr = nodeRadius(source) + 2;
+      const tr = nodeRadius(target) + 5; // extra gap for the arrowhead
       return {
         x1: sx + (dx / dist) * sr,
         y1: sy + (dy / dist) * sr,
@@ -434,15 +461,16 @@ export default function ForceGraph({
 
     // ── Tick ──
     simulation.on("tick", () => {
-      link.each(function (d: any) {
+      link.each(function (this: SVGLineElement, d) {
         const e = trimLink(d);
+        if (!e) return;
         d3.select(this)
           .attr("x1", e.x1)
           .attr("y1", e.y1)
           .attr("x2", e.x2)
           .attr("y2", e.y2);
       });
-      node.attr("transform", (d: any) => `translate(${d.x},${d.y})`);
+      node.attr("transform", (d) => `translate(${d.x ?? width / 2},${d.y ?? height / 2})`);
     });
 
     // ── Fit-to-view (manual, on-demand) ──
@@ -458,7 +486,7 @@ export default function ForceGraph({
       // layout isn't clipped after the fit.
       const pad = 24;
       let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-      for (const n of simNodes as any[]) {
+      for (const n of simNodes) {
         const ext = nodeRadius(n) + 40;
         const x = n.x ?? width / 2, y = n.y ?? height / 2;
         minX = Math.min(minX, x - ext);

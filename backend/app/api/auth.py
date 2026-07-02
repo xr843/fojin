@@ -11,6 +11,7 @@ from app.config import settings
 from app.core.client_ip import get_real_client_ip
 from app.core.crypto import decrypt_api_key, encrypt_api_key
 from app.core.deps import get_current_user
+from app.core.url_security import normalize_public_https_url
 from app.database import get_db
 from app.models.user import User
 from app.schemas.user import (
@@ -132,12 +133,19 @@ async def save_api_key(
     db: AsyncSession = Depends(get_db),
 ):
     """保存用户自己的 API Key（加密存储）。"""
+    custom_url = None
+    if data.provider == "custom":
+        try:
+            custom_url = normalize_public_https_url(data.custom_url, label="自定义 API 地址")
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from None
+
     cipher, kdf_ver = encrypt_api_key(data.api_key)
     user.encrypted_api_key = cipher
     user.api_key_kdf_version = kdf_ver
     user.api_provider = data.provider
     user.api_model = data.model
-    user.api_custom_url = data.custom_url if data.provider == "custom" else None
+    user.api_custom_url = custom_url
     await db.commit()
     key = data.api_key
     return ApiKeyStatus(
