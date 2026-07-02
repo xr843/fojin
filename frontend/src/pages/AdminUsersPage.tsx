@@ -2,12 +2,14 @@ import { useEffect, useState, useCallback } from "react";
 import { Table, Tag, Input, Select, Space, Typography, message, Popconfirm, Switch } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import { Helmet } from "react-helmet-async";
+import { useTranslation } from "react-i18next";
 import {
   getAdminUsers,
   updateAdminUser,
   type AdminUserItem,
 } from "../api/client";
 import { useAuthStore } from "../stores/authStore";
+import { formatAdminDate } from "./adminI18n";
 
 const roleColorMap: Record<string, string> = {
   admin: "red",
@@ -16,6 +18,7 @@ const roleColorMap: Record<string, string> = {
 };
 
 export default function AdminUsersPage() {
+  const { t, i18n } = useTranslation();
   const currentUser = useAuthStore((s) => s.user);
   const [items, setItems] = useState<AdminUserItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -38,11 +41,11 @@ export default function AdminUsersPage() {
       setItems(res.items);
       setTotal(res.total);
     } catch {
-      message.error("加载用户列表失败");
+      message.error(t("admin_crud.users.load_error"));
     } finally {
       setLoading(false);
     }
-  }, [page, search, sortBy, sortOrder]);
+  }, [page, search, sortBy, sortOrder, t]);
 
   useEffect(() => {
     fetchData();
@@ -51,42 +54,42 @@ export default function AdminUsersPage() {
   const handleToggleActive = async (record: AdminUserItem) => {
     try {
       await updateAdminUser(record.id, { is_active: !record.is_active });
-      message.success(record.is_active ? "已禁用" : "已启用");
+      message.success(record.is_active ? t("admin_crud.users.disabled") : t("admin_crud.users.enabled"));
       fetchData();
     } catch {
-      message.error("操作失败");
+      message.error(t("admin_crud.common.action_failed"));
     }
   };
 
   const handleRoleChange = async (record: AdminUserItem, role: string) => {
     try {
       await updateAdminUser(record.id, { role });
-      message.success("角色已更新");
+      message.success(t("admin_crud.users.role_updated"));
       fetchData();
     } catch {
-      message.error("操作失败");
+      message.error(t("admin_crud.common.action_failed"));
     }
   };
 
   const columns = [
     {
-      title: "用户名",
+      title: t("admin_crud.column.username"),
       dataIndex: "username",
       width: 120,
     },
     {
-      title: "显示名",
+      title: t("admin_crud.column.display_name"),
       dataIndex: "display_name",
       width: 120,
       render: (v: string | null) => v || "-",
     },
     {
-      title: "邮箱",
+      title: t("admin_crud.column.email"),
       dataIndex: "email",
       ellipsis: true,
     },
     {
-      title: "角色",
+      title: t("admin_crud.column.role"),
       dataIndex: "role",
       width: 120,
       render: (role: string, record: AdminUserItem) => {
@@ -109,19 +112,19 @@ export default function AdminUsersPage() {
       },
     },
     {
-      title: "状态",
+      title: t("admin_crud.column.status"),
       dataIndex: "is_active",
       width: 80,
       render: (active: boolean, record: AdminUserItem) => {
         if (record.id === currentUser?.id) {
-          return <Tag color="green">正常</Tag>;
+          return <Tag color="green">{t("admin_crud.users.active")}</Tag>;
         }
         return (
           <Popconfirm
-            title={active ? "确定禁用此用户？" : "确定启用此用户？"}
+            title={active ? t("admin_crud.users.confirm_disable") : t("admin_crud.users.confirm_enable")}
             onConfirm={() => handleToggleActive(record)}
-            okText="确定"
-            cancelText="取消"
+            okText={t("admin_crud.common.confirm")}
+            cancelText={t("admin_crud.common.cancel")}
           >
             <Switch checked={active} size="small" />
           </Popconfirm>
@@ -129,33 +132,33 @@ export default function AdminUsersPage() {
       },
     },
     {
-      title: "注册时间",
+      title: t("admin_crud.column.registered_at"),
       dataIndex: "created_at",
       width: 170,
       sorter: true,
-      render: (t: string) => new Date(t).toLocaleString("zh-CN"),
+      render: (value: string) => formatAdminDate(value, i18n.language),
     },
     {
-      title: "最后活跃",
+      title: t("admin_crud.column.last_active"),
       dataIndex: "last_active_at",
       width: 170,
       sorter: true,
-      render: (t: string | null) => (t ? new Date(t).toLocaleString("zh-CN") : "-"),
+      render: (value: string | null) => formatAdminDate(value, i18n.language),
     },
   ];
 
   return (
     <>
       <Helmet>
-        <title>用户管理 - 佛津</title>
+        <title>{t("admin_crud.users.page_title")}</title>
       </Helmet>
       <div style={{ maxWidth: 1200, margin: "0 auto" }}>
         <Space style={{ marginBottom: 16, justifyContent: "space-between", width: "100%" }}>
           <Typography.Title level={4} style={{ margin: 0 }}>
-            用户管理
+            {t("admin_crud.users.heading")}
           </Typography.Title>
           <Input.Search
-            placeholder="搜索用户名或邮箱"
+            placeholder={t("admin_crud.users.search_placeholder")}
             allowClear
             prefix={<SearchOutlined />}
             style={{ width: 280 }}
@@ -181,7 +184,7 @@ export default function AdminUsersPage() {
             total,
             pageSize: 20,
             onChange: setPage,
-            showTotal: (t) => `共 ${t} 个用户`,
+            showTotal: (count) => t("admin_crud.users.total_users", { count }),
           }}
           size="middle"
         />

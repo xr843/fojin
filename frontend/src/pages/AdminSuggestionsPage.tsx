@@ -2,12 +2,14 @@ import { useEffect, useState, useCallback } from "react";
 import { Table, Tag, Button, Space, Select, message, Typography, Popconfirm } from "antd";
 import { CheckOutlined, CloseOutlined, DeleteOutlined } from "@ant-design/icons";
 import { Helmet } from "react-helmet-async";
+import { useTranslation } from "react-i18next";
 import {
   getSourceSuggestions,
   updateSuggestionStatus,
   deleteSourceSuggestion,
   type SourceSuggestionItem,
 } from "../api/client";
+import { adminLabel, formatAdminDate } from "./adminI18n";
 
 const statusColorMap: Record<string, string> = {
   pending: "orange",
@@ -15,13 +17,14 @@ const statusColorMap: Record<string, string> = {
   rejected: "red",
 };
 
-const statusLabelMap: Record<string, string> = {
-  pending: "待审核",
-  accepted: "已采纳",
-  rejected: "已拒绝",
+const statusLabelKeyMap: Record<string, string> = {
+  pending: "admin_crud.suggestion.status.pending",
+  accepted: "admin_crud.suggestion.status.accepted",
+  rejected: "admin_crud.suggestion.status.rejected",
 };
 
 export default function AdminSuggestionsPage() {
+  const { t, i18n } = useTranslation();
   const [items, setItems] = useState<SourceSuggestionItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -35,11 +38,11 @@ export default function AdminSuggestionsPage() {
       setItems(res.items);
       setTotal(res.total);
     } catch {
-      message.error("加载推荐列表失败");
+      message.error(t("admin_crud.suggestion.load_error"));
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter]);
+  }, [page, statusFilter, t]);
 
   useEffect(() => {
     fetchData();
@@ -48,26 +51,26 @@ export default function AdminSuggestionsPage() {
   const handleStatusChange = async (id: number, status: string) => {
     try {
       await updateSuggestionStatus(id, status);
-      message.success(status === "accepted" ? "已采纳" : "已拒绝");
+      message.success(status === "accepted" ? t("admin_crud.suggestion.accepted") : t("admin_crud.suggestion.rejected"));
       fetchData();
     } catch {
-      message.error("操作失败");
+      message.error(t("admin_crud.common.action_failed"));
     }
   };
 
   const handleDelete = async (id: number) => {
     try {
       await deleteSourceSuggestion(id);
-      message.success("已删除");
+      message.success(t("admin_crud.suggestion.deleted"));
       fetchData();
     } catch {
-      message.error("删除失败");
+      message.error(t("admin_crud.suggestion.delete_failed"));
     }
   };
 
   const columns = [
     {
-      title: "名称",
+      title: t("admin_crud.column.name"),
       dataIndex: "name",
       width: 200,
     },
@@ -82,27 +85,27 @@ export default function AdminSuggestionsPage() {
       ),
     },
     {
-      title: "描述",
+      title: t("admin_crud.column.description"),
       dataIndex: "description",
       ellipsis: true,
       width: 300,
     },
     {
-      title: "状态",
+      title: t("admin_crud.column.status"),
       dataIndex: "status",
       width: 100,
       render: (status: string) => (
-        <Tag color={statusColorMap[status]}>{statusLabelMap[status] || status}</Tag>
+        <Tag color={statusColorMap[status]}>{adminLabel(t, statusLabelKeyMap[status], status)}</Tag>
       ),
     },
     {
-      title: "提交时间",
+      title: t("admin_crud.column.submitted_at"),
       dataIndex: "submitted_at",
       width: 180,
-      render: (t: string | null) => (t ? new Date(t).toLocaleString("zh-CN") : "-"),
+      render: (value: string | null) => formatAdminDate(value, i18n.language),
     },
     {
-      title: "操作",
+      title: t("admin_crud.column.actions"),
       width: 220,
       render: (_: unknown, record: SourceSuggestionItem) => (
         <Space>
@@ -114,7 +117,7 @@ export default function AdminSuggestionsPage() {
                 icon={<CheckOutlined />}
                 onClick={() => handleStatusChange(record.id, "accepted")}
               >
-                采纳
+                {t("admin_crud.suggestion.accept")}
               </Button>
               <Button
                 danger
@@ -122,18 +125,18 @@ export default function AdminSuggestionsPage() {
                 icon={<CloseOutlined />}
                 onClick={() => handleStatusChange(record.id, "rejected")}
               >
-                拒绝
+                {t("admin_crud.suggestion.reject")}
               </Button>
             </>
           )}
           <Popconfirm
-            title="确定删除这条推荐记录吗？"
+            title={t("admin_crud.suggestion.confirm_delete")}
             onConfirm={() => handleDelete(record.id)}
-            okText="删除"
-            cancelText="取消"
+            okText={t("admin_crud.common.delete")}
+            cancelText={t("admin_crud.common.cancel")}
           >
             <Button size="small" danger icon={<DeleteOutlined />}>
-              删除
+              {t("admin_crud.common.delete")}
             </Button>
           </Popconfirm>
         </Space>
@@ -144,18 +147,18 @@ export default function AdminSuggestionsPage() {
   return (
     <>
       <Helmet>
-        <title>推荐数据源管理 - 佛津</title>
+        <title>{t("admin_crud.suggestion.page_title")}</title>
       </Helmet>
       <div style={{ maxWidth: 1200, margin: "0 auto" }}>
         <Space
           style={{ marginBottom: 16, justifyContent: "space-between", width: "100%" }}
         >
           <Typography.Title level={4} style={{ margin: 0 }}>
-            推荐数据源管理
+            {t("admin_crud.suggestion.heading")}
           </Typography.Title>
           <Select
             style={{ width: 140 }}
-            placeholder="筛选状态"
+            placeholder={t("admin_crud.common.filter_status")}
             allowClear
             value={statusFilter}
             onChange={(v) => {
@@ -163,9 +166,9 @@ export default function AdminSuggestionsPage() {
               setPage(1);
             }}
             options={[
-              { value: "pending", label: "待审核" },
-              { value: "accepted", label: "已采纳" },
-              { value: "rejected", label: "已拒绝" },
+              { value: "pending", label: t("admin_crud.suggestion.status.pending") },
+              { value: "accepted", label: t("admin_crud.suggestion.status.accepted") },
+              { value: "rejected", label: t("admin_crud.suggestion.status.rejected") },
             ]}
           />
         </Space>
@@ -179,7 +182,7 @@ export default function AdminSuggestionsPage() {
             total,
             pageSize: 20,
             onChange: setPage,
-            showTotal: (t) => `共 ${t} 条`,
+            showTotal: (count) => t("admin_crud.common.total_rows", { count }),
           }}
           size="middle"
         />

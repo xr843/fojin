@@ -1,12 +1,15 @@
 import { useEffect, useState, useCallback } from "react";
 import { Table, Tag, Select, Typography, message } from "antd";
 import { Helmet } from "react-helmet-async";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { getAdminAuditLog, type AdminAuditLogItem } from "../api/client";
+import { adminLabel, formatAdminDate } from "./adminI18n";
 
-const actionLabel: Record<string, string> = {
-  update_user: "用户变更",
-  update_suggestion: "建议审核",
-  delete_suggestion: "删除建议",
+const actionLabelKeyMap: Record<string, string> = {
+  update_user: "admin_crud.audit.action.update_user",
+  update_suggestion: "admin_crud.audit.action.update_suggestion",
+  delete_suggestion: "admin_crud.audit.action.delete_suggestion",
 };
 
 const actionColor: Record<string, string> = {
@@ -15,40 +18,38 @@ const actionColor: Record<string, string> = {
   delete_suggestion: "red",
 };
 
-const fieldLabel: Record<string, string> = {
-  role: "角色",
-  is_active: "账号状态",
-  status: "状态",
-  name: "名称",
-  url: "链接",
+const fieldLabelKeyMap: Record<string, string> = {
+  role: "admin_crud.audit.field.role",
+  is_active: "admin_crud.audit.field.is_active",
+  status: "admin_crud.audit.field.status",
+  name: "admin_crud.audit.field.name",
+  url: "admin_crud.audit.field.url",
 };
 
-function renderValue(v: unknown): string {
-  if (v === true) return "启用";
-  if (v === false) return "停用";
+function renderValue(t: TFunction, v: unknown): string {
+  if (v === true) return t("admin_crud.audit.value.enabled");
+  if (v === false) return t("admin_crud.audit.value.disabled");
   if (v === null || v === undefined) return "—";
   return String(v);
 }
 
-function renderDetail(detail: Record<string, unknown> | null) {
+function renderDetail(t: TFunction, detail: Record<string, unknown> | null) {
   if (!detail || Object.keys(detail).length === 0) return <span style={{ color: "#999" }}>—</span>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       {Object.entries(detail).map(([key, value]) => {
-        const label = fieldLabel[key] || key;
+        const label = adminLabel(t, fieldLabelKeyMap[key], key);
         if (value && typeof value === "object" && "from" in value && "to" in value) {
           const diff = value as { from: unknown; to: unknown };
           return (
             <span key={key} style={{ fontSize: 13 }}>
-              {label}：<span style={{ color: "#999" }}>{renderValue(diff.from)}</span>
-              {" → "}
-              <span style={{ color: "#1677ff" }}>{renderValue(diff.to)}</span>
+              {t("admin_crud.audit.detail_diff", { label, from: renderValue(t, diff.from), to: renderValue(t, diff.to) })}
             </span>
           );
         }
         return (
           <span key={key} style={{ fontSize: 13 }}>
-            {label}：{renderValue(value)}
+            {t("admin_crud.audit.detail_value", { label, value: renderValue(t, value) })}
           </span>
         );
       })}
@@ -57,6 +58,7 @@ function renderDetail(detail: Record<string, unknown> | null) {
 }
 
 export default function AdminAuditLogPage() {
+  const { t, i18n } = useTranslation();
   const [items, setItems] = useState<AdminAuditLogItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -70,11 +72,11 @@ export default function AdminAuditLogPage() {
       setItems(res.items);
       setTotal(res.total);
     } catch {
-      message.error("加载审计日志失败");
+      message.error(t("admin_crud.audit.load_error"));
     } finally {
       setLoading(false);
     }
-  }, [page, actionFilter]);
+  }, [page, actionFilter, t]);
 
   useEffect(() => {
     fetchData();
@@ -82,40 +84,40 @@ export default function AdminAuditLogPage() {
 
   const columns = [
     {
-      title: "时间",
+      title: t("admin_crud.column.time"),
       dataIndex: "created_at",
       width: 170,
-      render: (t: string) => new Date(t).toLocaleString("zh-CN", { hour12: false }),
+      render: (value: string) => formatAdminDate(value, i18n.language),
     },
     {
-      title: "操作人",
+      title: t("admin_crud.column.actor"),
       dataIndex: "actor_username",
       width: 130,
-      render: (name: string | null) => name || <span style={{ color: "#999" }}>已删除用户</span>,
+      render: (name: string | null) => name || <span style={{ color: "#999" }}>{t("admin_crud.audit.deleted_user")}</span>,
     },
     {
-      title: "动作",
+      title: t("admin_crud.column.action"),
       dataIndex: "action",
       width: 110,
-      render: (a: string) => <Tag color={actionColor[a]}>{actionLabel[a] || a}</Tag>,
+      render: (a: string) => <Tag color={actionColor[a]}>{adminLabel(t, actionLabelKeyMap[a], a)}</Tag>,
     },
     {
-      title: "对象",
+      title: t("admin_crud.column.target"),
       width: 150,
       render: (_: unknown, record: AdminAuditLogItem) =>
         record.target_id != null ? `${record.target_type} #${record.target_id}` : record.target_type,
     },
     {
-      title: "变更详情",
+      title: t("admin_crud.column.detail"),
       dataIndex: "detail",
-      render: (detail: Record<string, unknown> | null) => renderDetail(detail),
+      render: (detail: Record<string, unknown> | null) => renderDetail(t, detail),
     },
   ];
 
   return (
     <>
       <Helmet>
-        <title>审计日志 - 佛津</title>
+        <title>{t("admin_crud.audit.page_title")}</title>
       </Helmet>
       <div style={{ maxWidth: 1200, margin: "0 auto" }}>
         <div
@@ -127,11 +129,11 @@ export default function AdminAuditLogPage() {
           }}
         >
           <Typography.Title level={4} style={{ margin: 0 }}>
-            审计日志
+            {t("admin_crud.audit.heading")}
           </Typography.Title>
           <Select
             style={{ width: 160 }}
-            placeholder="筛选动作"
+            placeholder={t("admin_crud.common.filter_action")}
             allowClear
             value={actionFilter}
             onChange={(v) => {
@@ -139,9 +141,9 @@ export default function AdminAuditLogPage() {
               setPage(1);
             }}
             options={[
-              { value: "update_user", label: "用户变更" },
-              { value: "update_suggestion", label: "建议审核" },
-              { value: "delete_suggestion", label: "删除建议" },
+              { value: "update_user", label: t("admin_crud.audit.action.update_user") },
+              { value: "update_suggestion", label: t("admin_crud.audit.action.update_suggestion") },
+              { value: "delete_suggestion", label: t("admin_crud.audit.action.delete_suggestion") },
             ]}
           />
         </div>
@@ -155,7 +157,7 @@ export default function AdminAuditLogPage() {
             total,
             pageSize: 20,
             onChange: setPage,
-            showTotal: (t) => `共 ${t} 条`,
+            showTotal: (count) => t("admin_crud.common.total_rows", { count }),
           }}
           size="middle"
         />

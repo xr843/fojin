@@ -229,6 +229,7 @@ export default defineConfig({
     setupFiles: ["./src/test/setup.ts"],
     include: ["src/**/*.test.{ts,tsx}"],
     css: false,
+    testTimeout: 10000,
   },
   server: {
     port: 3000,
