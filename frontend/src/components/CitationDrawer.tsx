@@ -1,5 +1,6 @@
 import { useMemo, useState, useRef, useEffect } from "react";
 import { Button, Spin, Alert, Tabs } from "antd";
+import { useTranslation } from "react-i18next";
 import { BookOutlined, ArrowRightOutlined, CloseOutlined, GlobalOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -19,12 +20,12 @@ export interface CitationTarget {
 // Map ISO language codes from alignment_pairs to display labels + font classes.
 // The CSS lang attribute styles (see global.css) pick font families based on
 // lang="pi" / lang="bo" etc so Devanagari and Tibetan render correctly.
-const LANG_CONFIG: Record<string, { label: string; tab: string }> = {
-  lzh: { label: "汉", tab: "汉文" },
-  pi: { label: "巴", tab: "巴利" },
-  sa: { label: "梵", tab: "梵文" },
-  bo: { label: "藏", tab: "藏文" },
-  en: { label: "英", tab: "English" },
+const LANG_TAB_KEY: Record<string, string> = {
+  lzh: "reader.citation.lang_tab.lzh",
+  pi: "reader.citation.lang_tab.pi",
+  sa: "reader.citation.lang_tab.sa",
+  bo: "reader.citation.lang_tab.bo",
+  en: "reader.citation.lang_tab.en",
 };
 
 interface Props {
@@ -187,6 +188,7 @@ function CitationBlocks({ chunks, quote }: { chunks: ChunkContextItem[]; quote?:
  * with the chat on the left while verifying the cited passage.
  */
 export default function CitationDrawer({ target, onClose }: Props) {
+  const { t } = useTranslation();
   const [activeLang, setActiveLang] = useState<string>("lzh");
 
   const { data, isLoading, error } = useQuery({
@@ -248,8 +250,11 @@ export default function CitationDrawer({ target, onClose }: Props) {
     : "#";
 
   const titleText = target
-    ? `《${target.titleZh || data?.title_zh || ""}》· 第 ${target.juanNum} 卷`
-    : "原文对照";
+    ? t("reader.citation.title_with_juan", {
+        title: target.titleZh || data?.title_zh || "",
+        n: target.juanNum,
+      })
+    : t("reader.citation.title");
 
   return (
     <>
@@ -263,7 +268,7 @@ export default function CitationDrawer({ target, onClose }: Props) {
           size="small"
           icon={<CloseOutlined />}
           onClick={onClose}
-          aria-label="关闭原文对照"
+          aria-label={t("reader.citation.close")}
         />
       </div>
 
@@ -272,7 +277,7 @@ export default function CitationDrawer({ target, onClose }: Props) {
           <div style={{ textAlign: "center", padding: "40px 0" }}>
             <Spin />
             <div style={{ marginTop: 12, color: "var(--fj-ink-muted)", fontSize: 13 }}>
-              正在加载原文…
+              {t("reader.citation.loading")}
             </div>
           </div>
         )}
@@ -281,8 +286,8 @@ export default function CitationDrawer({ target, onClose }: Props) {
           <Alert
             type="error"
             showIcon
-            message="无法加载原文"
-            description="可能是该段暂未入库，请尝试在完整阅读器中打开。"
+            message={t("reader.citation.load_failed")}
+            description={t("reader.citation.load_failed_desc")}
           />
         )}
 
@@ -297,7 +302,7 @@ export default function CitationDrawer({ target, onClose }: Props) {
                   key: lang,
                   label: (
                     <span>
-                      {lang === "lzh" ? <BookOutlined /> : <GlobalOutlined />} {LANG_CONFIG[lang]?.tab || lang}
+                      {lang === "lzh" ? <BookOutlined /> : <GlobalOutlined />} {LANG_TAB_KEY[lang] ? t(LANG_TAB_KEY[lang]) : lang}
                       {lang !== "lzh" && parallelsByLang[lang] && ` (${parallelsByLang[lang].length})`}
                     </span>
                   ),
@@ -305,13 +310,15 @@ export default function CitationDrawer({ target, onClose }: Props) {
                     <div lang="zh-Hans">
                       {data.has_more_before && (
                         <div className="chat-citation-boundary-hint">
-                          … 前文（本卷第 {data.chunks[0]?.chunk_index ?? 0} 段之前）
+                          {t("reader.citation.before_context", { n: data.chunks[0]?.chunk_index ?? 0 })}
                         </div>
                       )}
                       <CitationBlocks chunks={dedupedChunks} quote={target?.quote} />
                       {data.has_more_after && (
                         <div className="chat-citation-boundary-hint">
-                          … 后文（本卷第 {data.chunks[data.chunks.length - 1]?.chunk_index ?? 0} 段之后）
+                          {t("reader.citation.after_context", {
+                            n: data.chunks[data.chunks.length - 1]?.chunk_index ?? 0,
+                          })}
                         </div>
                       )}
                     </div>
@@ -336,7 +343,11 @@ export default function CitationDrawer({ target, onClose }: Props) {
                                 fontStyle: "italic",
                               }}
                             >
-                              《{p.title}》 第 {p.juan_num} 卷 · 置信度 {(p.confidence * 100).toFixed(0)}%
+                              {t("reader.citation.parallel_title", {
+                                title: p.title,
+                                n: p.juan_num,
+                                confidence: (p.confidence * 100).toFixed(0),
+                              })}
                             </div>
                           )}
                           {p.chunk_text}
@@ -350,13 +361,15 @@ export default function CitationDrawer({ target, onClose }: Props) {
               <div lang="zh-Hans">
                 {data.has_more_before && (
                   <div className="chat-citation-boundary-hint">
-                    … 前文（本卷第 {data.chunks[0]?.chunk_index ?? 0} 段之前）
+                    {t("reader.citation.before_context", { n: data.chunks[0]?.chunk_index ?? 0 })}
                   </div>
                 )}
                 <CitationBlocks chunks={dedupedChunks} quote={target?.quote} />
                 {data.has_more_after && (
                   <div className="chat-citation-boundary-hint">
-                    … 后文（本卷第 {data.chunks[data.chunks.length - 1]?.chunk_index ?? 0} 段之后）
+                    {t("reader.citation.after_context", {
+                      n: data.chunks[data.chunks.length - 1]?.chunk_index ?? 0,
+                    })}
                   </div>
                 )}
               </div>
@@ -373,7 +386,7 @@ export default function CitationDrawer({ target, onClose }: Props) {
             icon={<ArrowRightOutlined />}
             style={{ background: "var(--fj-accent)", borderColor: "var(--fj-accent)" }}
           >
-            在阅读器中打开
+            {t("reader.citation.open_reader")}
           </Button>
         </Link>
       </div>
