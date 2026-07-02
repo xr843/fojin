@@ -1,5 +1,6 @@
 import axios from "axios";
 import { useAuthStore } from "../stores/authStore";
+import i18n from "../i18n";
 import type {
   TextId,
   SourceId,
@@ -1704,10 +1705,10 @@ export async function getHotQuestions(): Promise<HotQuestionsResponse> {
 }
 
 export type HotQuestionCategory =
-  | "白话翻译"
-  | "经文解读"
-  | "对比辨析"
-  | "佛教史话";
+  | "白话翻译" // i18n-exempt — backend enum contract
+  | "经文解读" // i18n-exempt — backend enum contract
+  | "对比辨析" // i18n-exempt — backend enum contract
+  | "佛教史话"; // i18n-exempt — backend enum contract
 
 export interface HotQuestionCard {
   id: number;
@@ -1869,7 +1870,7 @@ export function sendChatMessageStream(
           return;
         }
         if (xhr.status !== 200) {
-          let detail = "发送失败，请稍后重试";
+          let detail = i18n.t("chat.stream.sendFailed");
           try { detail = JSON.parse(xhr.responseText).detail || detail; } catch { /* ignore */ }
           callbacks.onError(detail);
         }
@@ -1880,7 +1881,7 @@ export function sendChatMessageStream(
 
     xhr.onerror = function () {
       if (!done) {
-        callbacks.onError("网络错误，请稍后重试");
+        callbacks.onError(i18n.t("chat.stream.networkError"));
         callbacks.onDone();
         resolve();
       }
@@ -1888,7 +1889,7 @@ export function sendChatMessageStream(
 
     xhr.ontimeout = function () {
       if (!done) {
-        callbacks.onError("请求超时，请稍后重试");
+        callbacks.onError(i18n.t("chat.stream.timeout"));
         callbacks.onDone();
         resolve();
       }
@@ -1906,7 +1907,7 @@ export function sendChatMessageStream(
       signal.addEventListener("abort", () => {
         xhr.abort();
         if (!done) {
-          callbacks.onError("请求已取消");
+          callbacks.onError(i18n.t("chat.stream.cancelled"));
           callbacks.onDone();
           resolve();
         }

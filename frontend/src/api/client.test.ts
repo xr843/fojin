@@ -1,7 +1,9 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { afterEach, describe, it, expect, beforeEach, vi } from "vitest";
 import axios from "axios";
 import type { AxiosError, InternalAxiosRequestConfig, AxiosResponse } from "axios";
 import { useAuthStore } from "../stores/authStore";
+import i18n from "../i18n";
+import enTranslation from "../../public/locales/en/translation.json";
 
 /**
  * 测试 API client 的拦截器逻辑。
@@ -197,5 +199,60 @@ describe("getWorkByText", () => {
     const spy = vi.spyOn(api, "get").mockRejectedValueOnce(err);
     await expect(getWorkByText(123)).rejects.toBe(err);
     spy.mockRestore();
+  });
+});
+
+class MockStreamXHR {
+  static instances: MockStreamXHR[] = [];
+
+  onprogress: (() => void) | null = null;
+  onload: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  ontimeout: (() => void) | null = null;
+  responseText = "";
+  status = 0;
+  timeout = 0;
+
+  open = vi.fn();
+  setRequestHeader = vi.fn();
+  send = vi.fn();
+  abort = vi.fn();
+
+  constructor() {
+    MockStreamXHR.instances.push(this);
+  }
+}
+
+describe("sendChatMessageStream", () => {
+  beforeEach(async () => {
+    MockStreamXHR.instances = [];
+    vi.stubGlobal("XMLHttpRequest", MockStreamXHR);
+    i18n.addResourceBundle("en", "translation", enTranslation, true, true);
+    await i18n.changeLanguage("en");
+  });
+
+  afterEach(async () => {
+    vi.unstubAllGlobals();
+    await i18n.changeLanguage("zh");
+  });
+
+  it("uses the active UI language for client-side network errors", async () => {
+    const { sendChatMessageStream } = await import("./client");
+    const callbacks = {
+      onToken: vi.fn(),
+      onSources: vi.fn(),
+      onSessionId: vi.fn(),
+      onError: vi.fn(),
+      onDone: vi.fn(),
+    };
+
+    const promise = sendChatMessageStream("hello", undefined, null, callbacks);
+    expect(MockStreamXHR.instances).toHaveLength(1);
+
+    MockStreamXHR.instances[0].onerror?.();
+    await promise;
+
+    expect(callbacks.onError).toHaveBeenCalledWith("Network error. Please try again later.");
+    expect(callbacks.onDone).toHaveBeenCalledTimes(1);
   });
 });
