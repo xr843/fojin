@@ -20,7 +20,7 @@ import {
 import { Helmet } from "react-helmet-async";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { Line } from "@ant-design/charts";
+import { DualAxes } from "@ant-design/charts";
 import {
   getAdminOverview,
   getAdminTrends,
@@ -196,10 +196,19 @@ export default function AdminDashboardPage() {
   const overview = overviewQuery.data!;
   const trends = trendsQuery.data!;
 
-  const chartData = [
-    ...trends.registrations.map((d) => ({ ...d, type: "新注册" })),
-    ...trends.messages.map((d) => ({ ...d, type: "消息数" })),
-    ...trends.active_users.map((d) => ({ ...d, type: "活跃用户" })),
+  // Dual Y-axis: 消息数 (tens~hundreds) on the left, 新增用户 + 活跃用户
+  // (single digits ~ teens) on the right. On a shared axis the two
+  // small-magnitude series flatten to the baseline and can't be read.
+  // Series labels: defined once so the chart data, the legend and the shared
+  // color domain below all reference the exact same strings (a mismatch would
+  // silently drop a series back to a default color).
+  const S_MESSAGES = "消息数";
+  const S_NEW_USERS = "新增用户";
+  const S_ACTIVE_USERS = "活跃用户";
+  const messagesData = trends.messages.map((d) => ({ ...d, type: S_MESSAGES }));
+  const usersData = [
+    ...trends.registrations.map((d) => ({ ...d, type: S_NEW_USERS })),
+    ...trends.active_users.map((d) => ({ ...d, type: S_ACTIVE_USERS })),
   ];
 
   // Latest day in the trend = default selection for the active-users table.
@@ -207,16 +216,39 @@ export default function AdminDashboardPage() {
     ? trends.active_users[trends.active_users.length - 1].date
     : null;
 
-  const lineConfig = {
-    data: chartData,
+  // Both children map colorField "type" to ONE shared G2 color scale (keyed by
+  // field name). If each declares only its own range, the merged scale picks up
+  // the 2-color range and cycles it across the 3 series, so 消息数 and 活跃用户
+  // both land on orange. Declaring the SAME full domain→range on both children
+  // pins every series to a distinct color: 消息数 蓝 / 新增用户 橙 / 活跃用户 绿.
+  const seriesColor = {
+    domain: [S_MESSAGES, S_NEW_USERS, S_ACTIVE_USERS],
+    range: ["#1677ff", "#fa8c16", "#52c41a"],
+  };
+  const chartConfig = {
     xField: "date",
-    yField: "count",
-    colorField: "type",
-    smooth: true,
     height: 360,
-    axis: {
-      x: { labelAutoRotate: false },
-    },
+    legend: { color: { itemMarker: "round" } },
+    axis: { x: { labelAutoRotate: false } },
+    children: [
+      {
+        data: messagesData,
+        type: "line",
+        yField: "count",
+        colorField: "type",
+        smooth: true,
+        scale: { color: seriesColor },
+      },
+      {
+        data: usersData,
+        type: "line",
+        yField: "count",
+        colorField: "type",
+        smooth: true,
+        axis: { y: { position: "right" } },
+        scale: { color: seriesColor },
+      },
+    ],
     // Click any point to drill the active-users table to that day.
     onReady: ({ chart }: { chart: { on: (ev: string, cb: (e: { data?: { data?: { date?: string } } }) => void) => void } }) => {
       chart.on("element:click", (e) => {
@@ -292,7 +324,7 @@ export default function AdminDashboardPage() {
           style={{ marginTop: 16 }}
           extra={<Text type="secondary" style={{ fontSize: 12 }}>更新于 {lastUpdated}</Text>}
         >
-          <Line {...lineConfig} />
+          <DualAxes {...chartConfig} />
         </Card>
 
         <ActiveUsersCard
@@ -364,6 +396,44 @@ function ModuleUsageCard() {
             ))}
           </Row>
 
+          {data.answer_quality && (
+            <div style={{ marginTop: 8, marginBottom: 16 }}>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                答案质量（行为信号，相对问答次数；显式 👍👎 见上方「平台活跃度」反馈率。本批信号自部署起累计）
+              </Text>
+              <Row gutter={[16, 16]} style={{ marginTop: 4 }}>
+                <Col xs={12} sm={8}>
+                  <Tooltip title={`点开引文查看原文的次数 / 问答次数 = ${data.answer_quality.citation_click} / ${data.answer_quality.chat_questions}（越高越说明用户在验证、信任来源）`}>
+                    <Statistic
+                      title="引文点击率"
+                      value={data.answer_quality.citation_click_rate ?? "—"}
+                      suffix={data.answer_quality.citation_click_rate == null ? "" : "%"}
+                    />
+                  </Tooltip>
+                </Col>
+                <Col xs={12} sm={8}>
+                  <Tooltip title={`复制答案的次数 / 问答次数 = ${data.answer_quality.chat_copy} / ${data.answer_quality.chat_questions}（越高越说明答案被当作有用结果带走）`}>
+                    <Statistic
+                      title="复制率"
+                      value={data.answer_quality.copy_rate ?? "—"}
+                      suffix={data.answer_quality.copy_rate == null ? "" : "%"}
+                    />
+                  </Tooltip>
+                </Col>
+                <Col xs={12} sm={8}>
+                  <Tooltip title={`失败后重试的次数 / 问答次数 = ${data.answer_quality.chat_retry} / ${data.answer_quality.chat_questions}（衡量可靠性，越低越好）`}>
+                    <Statistic
+                      title="失败重试率"
+                      value={data.answer_quality.retry_rate ?? "—"}
+                      suffix={data.answer_quality.retry_rate == null ? "" : "%"}
+                      valueStyle={{ color: (data.answer_quality.retry_rate ?? 0) > 5 ? "#e74c3c" : undefined }}
+                    />
+                  </Tooltip>
+                </Col>
+              </Row>
+            </div>
+          )}
+
           {data.top_search_keywords.length > 0 && (
             <div style={{ marginTop: 8 }}>
               <Text type="secondary" style={{ fontSize: 12 }}>
@@ -434,6 +504,18 @@ function PlatformActivityCard() {
   const positiveRate =
     ratedCount > 0 ? `${((data.chat.positive_feedback / ratedCount) * 100).toFixed(1)}%` : "—";
 
+  // 未引经率 = 无来源的 AI 回答 / AI 回答总数。粗略质量信号：含真·RAG 召回缺口，
+  // 但也含寒暄/身份类提问(本就无需引经)和 AI 出错回答,故不等于纯检索失败率。
+  const failRate =
+    data.chat.assistant_messages > 0
+      ? `${((data.chat.assistant_no_source / data.chat.assistant_messages) * 100).toFixed(1)}%`
+      : "—";
+  // 自带 Key 占活跃用户比例（其余跑平台 key = 你补贴的成本）
+  const byokRate =
+    data.users.active_users > 0
+      ? `${((data.users.byok_active_users / data.users.active_users) * 100).toFixed(0)}%`
+      : "—";
+
   return (
     <Card
       title="平台活跃度"
@@ -457,6 +539,20 @@ function PlatformActivityCard() {
         </Col>
         <Col xs={12} sm={6}>
           <Statistic title="活跃用户" value={data.users.active_users} />
+        </Col>
+        <Col xs={12} sm={6}>
+          <Tooltip title="本期活跃且在本期之前就注册的老用户（留存信号）">
+            <Statistic
+              title="回访用户"
+              value={data.users.returning_users}
+              valueStyle={{ color: data.users.returning_users > data.users.new_users ? "#52c41a" : undefined }}
+            />
+          </Tooltip>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Tooltip title={`${data.users.byok_active_users} 个活跃用户自带 API Key（占活跃 ${byokRate}），其余跑平台 Key`}>
+            <Statistic title="自带Key" value={`${data.users.byok_active_users}（${byokRate}）`} />
+          </Tooltip>
         </Col>
       </Row>
 
@@ -482,26 +578,23 @@ function PlatformActivityCard() {
             />
           </Tooltip>
         </Col>
+        <Col xs={12} sm={6}>
+          <Tooltip title={`${data.chat.assistant_no_source} / ${data.chat.assistant_messages} 条 AI 回答未引用经文来源。含三类：RAG 没召回到经文（真·检索缺口）、寒暄/身份类提问（本就无需引经）、AI 服务出错。越低越好，用作粗略质量信号`}>
+            <Statistic
+              title="未引经率"
+              value={failRate}
+              valueStyle={{ color: data.chat.assistant_messages > 0 && data.chat.assistant_no_source / data.chat.assistant_messages > 0.3 ? "#cf1322" : undefined }}
+            />
+          </Tooltip>
+        </Col>
       </Row>
 
-      {/* 口径：reading_history 仅记录登录用户；全站(含匿名)阅读量见
-          「板块使用情况」面板的「在线阅读」。 */}
+      {/* 阅读次数仅记录登录用户；全站(含匿名)阅读量见「板块使用情况」的「在线阅读」。
+          已移除「阅读经文数(unique)」「本期新增经文」(批量灌入、平时恒为0,信号低)。 */}
       <Text type="secondary" style={{ fontSize: 12 }}>阅读（仅登录用户）</Text>
       <Row gutter={[16, 16]} style={{ marginTop: 4, marginBottom: 16 }}>
         <Col xs={12} sm={6}>
           <Statistic title="阅读次数" value={data.reading.total_reads} prefix={<BookOutlined />} />
-        </Col>
-        <Col xs={12} sm={6}>
-          <Statistic title="阅读经文数" value={data.reading.unique_texts_read} />
-        </Col>
-      </Row>
-
-      {/* 静态总量(经文总数/数据源)已移出 — 本面板只放随时间范围变化的
-          周期指标；总量见首页。 */}
-      <Text type="secondary" style={{ fontSize: 12 }}>内容</Text>
-      <Row gutter={[16, 16]} style={{ marginTop: 4, marginBottom: 16 }}>
-        <Col xs={12} sm={6}>
-          <Statistic title="本期新增经文" value={data.content.new_texts} prefix={<DatabaseOutlined />} />
         </Col>
       </Row>
 

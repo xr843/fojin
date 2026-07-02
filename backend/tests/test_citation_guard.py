@@ -10,6 +10,7 @@ from app.schemas.chat import ChatSource, ParallelChunk
 from app.services.citation_guard import (
     CitationMutation,
     enforce_citation_whitelist,
+    log_mutations,
 )
 
 
@@ -191,6 +192,25 @@ def test_fascicle_correction_falls_back_to_title_only_when_juan_set_empty():
     assert muts[0].corrected_juan == 0
 
 
+def test_simplified_citation_matches_traditional_source():
+    """LLM often writes simplified 经名 while CBETA source title_zh is
+    traditional. Without 繁简 normalisation the whitelist check misses and a
+    CORRECT citation gets stripped of its clickable 【】. Regression for the
+    2026-06-23 audit (citation_guard lacked the t2s that quote_verifier has)."""
+    answer = "见【《地藏菩萨本愿经》第1卷】所说。"  # simplified citation
+    out, muts = enforce_citation_whitelist(answer, [_src(7, "地藏菩薩本願經", 1)])  # traditional source
+    assert out == answer, "simplified citation of a traditional source must stay clickable"
+    assert not any(m.kind == "unverified_title" for m in muts)
+
+
+def test_traditional_citation_matches_simplified_source():
+    """Symmetric: traditional citation, simplified source title — t2s folds both."""
+    answer = "見【《地藏菩薩本願經》第1卷】。"  # traditional citation
+    out, muts = enforce_citation_whitelist(answer, [_src(7, "地藏菩萨本愿经", 1)])  # simplified source
+    assert out == answer
+    assert not any(m.kind == "unverified_title" for m in muts)
+
+
 def test_mutation_is_dataclass_with_full_audit_fields():
     """Locks the audit shape so a future migration that persists these
     rows has a stable schema to bind to."""
@@ -205,3 +225,23 @@ def test_mutation_is_dataclass_with_full_audit_fields():
     assert m.original_juan == 1
     assert m.corrected_juan is None
     assert m.replacement == "《伪经》"
+
+
+def test_log_mutations_emits_clean_warning(caplog):
+    m = CitationMutation(
+        kind="fascicle_corrected",
+        original="【《心经》第99卷】",
+        replacement="【《心经》第1卷】",
+        title="心经",
+        original_juan=99,
+        corrected_juan=1,
+    )
+
+    log_mutations(123, [m])
+
+    assert len(caplog.records) == 1
+    assert caplog.records[0].message == (
+        "citation_guard fascicle_corrected msg_id=123 title='心经' "
+        "orig='【《心经》第99卷】' repl='【《心经》第1卷】' "
+        "orig_juan=99 corrected_juan=1"
+    )

@@ -50,6 +50,7 @@ import {
   type ChatMessageItem,
   type ChatSource,
   type ChatSessionItem,
+  type ChatTrustStatus,
   type HotQuestionCard,
   type HotQuestionCategory,
 } from "../api/client";
@@ -126,6 +127,24 @@ const chatUrlTransform = (url: string): string => {
   if (url.startsWith(`${CITATION_URL_SCHEME}:`)) return url;
   return defaultUrlTransform(url);
 };
+
+function trustStatusLabelKey(status?: ChatTrustStatus | null): string | null {
+  if (!status) return null;
+  return `chat.trust.${status.state}`;
+}
+
+function trustStatusColor(status?: ChatTrustStatus | null): string {
+  switch (status?.state) {
+    case "verified":
+      return "#3f7d20";
+    case "quote_unverified":
+      return "#a66300";
+    case "no_sources":
+      return "var(--fj-ink-muted)";
+    default:
+      return "var(--fj-accent)";
+  }
+}
 
 /**
  * Turn sutra references inside an AI answer into citation-drawer buttons.
@@ -323,6 +342,7 @@ function MessageBubbleInner({
     () => (isAssistantText ? tightenLists(injectCitationLinks(cleanContent, m.sources)) + (isStreaming ? " ▌" : "") : ""),
     [isAssistantText, cleanContent, m.sources, isStreaming],
   );
+  const trustLabelKey = trustStatusLabelKey(m.trust_status);
 
   return (
     <div style={{
@@ -357,6 +377,20 @@ function MessageBubbleInner({
                 <div className="chat-markdown">
                   <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[[rehypeSanitize, CHAT_SANITIZE_SCHEMA]]} urlTransform={chatUrlTransform} components={markdownComponents}>{rendered}</Markdown>
                 </div>
+                {trustLabelKey && (
+                  <div
+                    style={{
+                      marginTop: 8,
+                      paddingTop: 6,
+                      borderTop: "1px solid rgba(217,208,193,0.45)",
+                      color: trustStatusColor(m.trust_status),
+                      fontSize: 12,
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {t(trustLabelKey)}
+                  </div>
+                )}
                 {suggestions.length > 0 && !sending && (
                   <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>
                     {suggestions.map((q, i) => (
@@ -393,6 +427,10 @@ function MessageBubbleInner({
                   const textToCopy = m.role === "assistant" ? parseFollowUps(m.content).cleanContent : m.content;
                   navigator.clipboard.writeText(textToCopy);
                   message.success(t("chat.copied"));
+                  // Behavioural quality signal: copying an answer = found it useful.
+                  if (m.role === "assistant" && typeof umami !== "undefined") {
+                    umami.track("chat_copy");
+                  }
                 }}
               />
             </Tooltip>
@@ -505,7 +543,6 @@ export default function ChatPage() {
         setMessages((prev) => (prev.length === 0 ? parsed : prev));
       }
     } catch { /* ignore */ }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [attachments, setAttachments] = useState<ChatAttachmentMeta[]>([]);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
@@ -657,6 +694,11 @@ export default function ChatPage() {
               type="button"
               onClick={(e) => {
                 e.preventDefault();
+                // Behavioural quality signal: clicking a citation = engaging
+                // with / trusting the cited source.
+                if (typeof umami !== "undefined") {
+                  umami.track("citation_click", { text_id: parsed.textId });
+                }
                 if (parsed.chunkIndex < 0) {
                   // Legacy history message without chunk_index — fall back
                   // to navigating to the reader page as before.
@@ -891,6 +933,13 @@ export default function ChatPage() {
           });
         }
       },
+      onTrustStatus: (trustStatus: ChatTrustStatus) => {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId ? { ...m, trust_status: trustStatus } : m,
+          ),
+        );
+      },
       onSearching: (_searchMsg: string) => {
         // 搜索状态由初始占位符 "正在检索经文并生成回答..." 显示，不覆盖 content
       },
@@ -972,6 +1021,11 @@ export default function ChatPage() {
     const idx = messages.findIndex((x) => x.id === m.id);
     const userMsg = idx > 0 ? messages[idx - 1] : null;
     if (userMsg && userMsg.role === "user") {
+      // Behavioural signal: the retry button only appears on a failed answer,
+      // so this measures failure-retries (reliability), not regenerate-on-dislike.
+      if (typeof umami !== "undefined") {
+        umami.track("chat_retry");
+      }
       setMessages((prev) => prev.filter((x) => x.id !== m.id && x.id !== userMsg.id));
       handleSendMessage(userMsg.content);
     }
@@ -1375,6 +1429,12 @@ export default function ChatPage() {
                       { value: "yinguang", label: t("chat.master_yinguang") },
                       { value: "ouyi", label: t("chat.master_ouyi") },
                       { value: "xuyun", label: t("chat.master_xuyun") },
+                    ],
+                  },
+                  {
+                    label: t("chat.tradition_india"),
+                    options: [
+                      { value: "nagarjuna", label: t("chat.master_nagarjuna") },
                     ],
                   },
                   {

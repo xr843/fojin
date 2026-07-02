@@ -10,6 +10,7 @@ from app.services import rag_retrieval
 from app.services.rag_retrieval import (
     _detect_doctrine_root,
     _detect_named_root,
+    _detect_phrase_root,
     _inject_root_sutra_slot,
 )
 
@@ -166,6 +167,55 @@ def test_named_sutra_query_not_hijacked_by_doctrine_term():
     assert _detect_doctrine_root(q2) == "T1564"
 
 
+# --- Case 3: canonical phrase → root sutra (出自哪部经 attribution) ----------
+
+
+@pytest.mark.parametrize(
+    "query,expected",
+    [
+        # 心经 distinctive phrases
+        ("「色不异空，空不异色」出自哪部经？", "T0251"),
+        ("照见五蕴皆空，度一切苦厄 是哪部经", "T0251"),
+        ("「不生不灭，不垢不净，不增不减」出自哪部经？", "T0251"),
+        ("「是诸法空相」后面的经文内容是什么？", "T0251"),
+        ("色即是空 空即是色", "T0251"),
+        # 金刚经 distinctive phrases
+        ("「应无所住而生其心」出自哪部经？", "T0235"),
+        ("「一切有为法，如梦幻泡影」的完整偈颂是什么？出自哪里？", "T0235"),
+        ("若以色见我，以音声求我，是人行邪道", "T0235"),
+        ("凡所有相皆是虚妄 出处", "T0235"),
+        # 坛经 distinctive phrases (note: 坛经 is also named-detectable, but the
+        # phrase must resolve on its own too)
+        ("菩提本无树，明镜亦非台 完整偈颂", "T2008"),
+        ("本来无一物，何处惹尘埃", "T2008"),
+    ],
+)
+def test_canonical_phrase_maps_to_root(query, expected):
+    assert _detect_phrase_root(query) == expected
+
+
+def test_phrase_traditional_form_also_matches():
+    assert _detect_phrase_root("「應無所住而生其心」出自哪部經？") == "T0235"
+    assert _detect_phrase_root("色不異空，空不異色") == "T0251"
+
+
+def test_phrase_no_false_positive():
+    assert _detect_phrase_root("禅修怎么入门") is None
+    assert _detect_phrase_root("今天天气怎么样") is None
+    assert _detect_phrase_root("介绍一下佛教历史") is None
+    assert _detect_phrase_root("") is None
+
+
+def test_non_distinctive_dharma_terms_not_mapped():
+    # 五蕴皆空 / 一切有为法 are 法数 that recur across canons + 注疏 and read as
+    # doctrine, not attribution — they must NOT fire (would wrongly grab slot #1).
+    # The genuinely-distinctive lines of the same sutras still carry attribution.
+    assert _detect_phrase_root("什么是五蕴皆空") is None
+    assert _detect_phrase_root("有为法和无为法的区别") is None
+    assert _detect_phrase_root("照见五蕴皆空，度一切苦厄出自哪部经") == "T0251"
+    assert _detect_phrase_root("「一切有为法，如梦幻泡影」出自哪里") == "T0235"
+
+
 # --- Injector: slot placement, cap, precedence ------------------------------
 
 
@@ -235,3 +285,13 @@ async def test_no_detection_is_noop(_patched_injector_deps):
     out = await _inject_root_sutra_slot(None, "今天天气怎么样", [0.0], results)
     assert out == results
     assert "cbeta_id" not in _patched_injector_deps
+
+
+@pytest.mark.anyio
+async def test_phrase_attribution_takes_slot_one(_patched_injector_deps):
+    # "「色不异空」出自哪部经" names no sutra, but the quote IS the answer's source,
+    # so the root takes slot #1 (named tier), not the doctrine last slot.
+    out = await _inject_root_sutra_slot(None, "「色不异空」出自哪部经", [0.0], _fake_results(5))
+    assert len(out) == 5
+    assert out[0]["text_id"] == 999
+    assert _patched_injector_deps["cbeta_id"] == "T0251"

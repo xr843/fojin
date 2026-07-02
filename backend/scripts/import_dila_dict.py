@@ -118,6 +118,14 @@ class DilaBaseImporter(BaseImporter):
                     skipped += 1
                     continue
 
+                # Skip catalog/TOC/production-note metadata rows that some source
+                # dicts embed as entries (e.g. "00000製作說明【…】", "001-01 教義類〈…〉",
+                # "00 總目錄"). Buddhist headwords use Chinese numerals (一二三), never
+                # a leading ASCII digit, so this is a safe junk filter.
+                if headword[0] in "0123456789":
+                    skipped += 1
+                    continue
+
                 external_id = parsed.get("external_id", f"{self.SOURCE_CODE}-{i}")
                 entry_data = parsed.get("entry_data")
                 entry_data_json = (

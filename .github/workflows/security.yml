@@ -6,12 +6,15 @@ on:
   pull_request:
     branches: [main, master]
 
+permissions:
+  contents: read
+
 jobs:
   secrets-scan:
     name: Check for leaked secrets
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -51,7 +54,7 @@ jobs:
     name: Python SAST (bandit)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v6
         with:
@@ -77,12 +80,11 @@ jobs:
   pip-audit:
     name: Python dependency audit
     runs-on: ubuntu-latest
-    continue-on-error: true
     defaults:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v6
         with:
@@ -123,12 +125,11 @@ jobs:
   npm-audit:
     name: Frontend dependency audit
     runs-on: ubuntu-latest
-    continue-on-error: true
     defaults:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v6
         with:
@@ -140,7 +141,7 @@ jobs:
         run: npm ci
 
       - name: Run npm audit
-        run: npm audit --omit=dev || true
+        run: npm audit --omit=dev
 
       - name: Run npm audit (JSON report)
         if: always()

@@ -2,11 +2,13 @@
 
 # FoJin 佛津
 
-### The World's Encyclopedic Buddhist Digital Text Platform
+### Ask the Buddhist canon — get cited, verifiable answers.
 
-**503 sources. 30 languages. 30 countries. 23,500+ full-text volumes. One search.**
+**AI Q&A grounded in the world's largest open aggregation of Buddhist texts: 600+ sources, 30+ languages, trilingual cross-canon retrieval — every answer linked back to its source passage.**
 
-Aggregating the world's Buddhist digital heritage — 10,500+ texts with 23,500+ volumes of full content in Pali, Classical Chinese, Tibetan, and Sanskrit from 503 data sources. **The first LLM-driven trilingual cross-canon parallel reading platform** (CBETA × SuttaCentral × 84000), with chunk-level alignment verified by LLM, plus CBETA-style reading, AI-powered Q&A with 14 Buddhist master personas (RAG + tradition-scoped retrieval + citations), knowledge graph with 31K+ entities and 28K+ relations visualized on a 50K-entity Deck.GL geo map, 32 dictionaries with 748K entries across 6 languages, timeline visualization, activity feed, collections, citations, annotations, bookmarks, and multi-language parallel reading.
+Ask a question in plain language and FoJin's assistant **"XiaoJin"** answers from the canon itself — Retrieval-Augmented Generation over 680K+ embedded passages, optional cross-encoder reranking and root-sutra recall, **clickable 【《sutra》juan N】 citations** that open the exact source text, anti-hallucination guards, and a citation drawer with **side-by-side 汉 / 巴利 / 藏文 cross-canon parallels**. You can also ask in the voice of **15 historical Buddhist masters**, each scoped to their own tradition's scriptures.
+
+What makes those answers trustworthy is the corpus underneath. FoJin aggregates **613 data sources** into one searchable platform — 10,500+ texts with 23,500+ volumes of full content in Classical Chinese, Pali, Tibetan and Sanskrit, **the first LLM-driven trilingual cross-canon parallel reading platform** (CBETA × SuttaCentral × 84000) with LLM-verified chunk-level alignment, a 110K+ entity knowledge graph on a Deck.GL geo map, and 32 dictionaries with 748K entries. Every feature exists to make the answers more grounded — and to let you go deeper once you have one.
 
 [Live Demo](https://fojin.app) &nbsp;&middot;&nbsp; [API Docs](https://fojin.app/docs) &nbsp;&middot;&nbsp; [中文文档](./docs/README_zh.md) &nbsp;&middot;&nbsp; [Discussions](https://github.com/xr843/fojin/discussions) &nbsp;&middot;&nbsp; [Discord](https://discord.gg/76SZeuJekq) &nbsp;&middot;&nbsp; [Report Bug](https://github.com/xr843/fojin/issues)
 
@@ -23,23 +25,23 @@ Aggregating the world's Buddhist digital heritage — 10,500+ texts with 23,500+
 
 ## Why FoJin?
 
-Buddhist texts are scattered across hundreds of databases worldwide — CBETA, SuttaCentral, BDRC, SAT, 84000, GRETIL, and many more. Each has different interfaces, languages, and data formats. Researchers spend more time *finding* texts than *reading* them.
+Buddhist texts are scattered across hundreds of databases worldwide — CBETA, SuttaCentral, BDRC, SAT, 84000, GRETIL, and many more. Each has its own interface, language, and data format. When you have a *question* — "what does the Heart Sutra mean by 'form is emptiness'?", "how do the Pali and Chinese versions of this passage differ?" — you spend more time hunting for the right passage than understanding it.
 
-**FoJin solves this.** It aggregates 503 sources into a single, searchable platform with features no other tool provides:
+**FoJin answers the question for you.** Ask in plain language; XiaoJin retrieves the relevant passages from 613 sources and answers with clickable citations you can verify. Everything else FoJin does — full-text reading, cross-canon alignment, the knowledge graph, 32 dictionaries — exists to make those answers more grounded, and to let you go deeper once you have one:
 
 | What you need | How FoJin helps |
 |---|---|
-| Find a sutra across databases | **Multi-dimensional search** across 10,500+ texts from 503 sources |
+| **Ask a question, get a sourced answer** | **AI Q&A ("XiaoJin")** — RAG over 680K+ passages, reranking, root-sutra recall, clickable 【《sutra》juan N】 citations, cross-canon citation drawer, anti-hallucination guards |
+| Ask in a master's voice | **Master Persona Mode** — 15 historical masters, each with tradition-scoped RAG |
+| Find a sutra across databases | **Multi-dimensional search** across 10,500+ texts from 613 sources |
 | Read the full text online | **8,900+ texts** with 23,500+ volumes of full content, CBETA-style layout |
-| Compare translations | **Parallel reading** in 30 languages side by side |
-| Compare sutras across Buddhist canons | **Trilingual cross-canon parallel reading** — 3,500+ LLM-verified chunk alignments across Chinese / Pali / Tibetan covering Heart Sutra, Vimalakīrti, **Lotus Sutra (法华 ↔ Toh 113, 259 pairs)**, **8,000-verse Prajñāpāramitā (小品般若 ↔ Toh 11, 127 pairs)**, Satipaṭṭhāna + the full Āgama ↔ Nikāya corpus (MN/DN/SN/AN), Dhammapada |
+| Compare translations | **Parallel reading** in 30+ languages side by side |
+| Compare sutras across Buddhist canons | **Trilingual cross-canon parallel reading** — 3,000+ LLM-verified chunk alignments across Chinese / Pali / Tibetan covering Heart Sutra, Vimalakīrti, **Lotus Sutra (法华 ↔ Toh 113, 259 pairs)**, **8,000-verse Prajñāpāramitā (小品般若 ↔ Toh 11, 127 pairs)**, Satipaṭṭhāna + the full Āgama ↔ Nikāya corpus (MN/DN/SN/AN), Dhammapada |
 | Look up Buddhist terms | **32 dictionaries**, 748K entries (Chinese/Sanskrit/Pali/Tibetan/English) |
-| Explore relationships | **Knowledge graph** with 31K+ entities and 28K+ relations (23K lineage chains) |
-| Discover similar texts | **Semantic similarity** powered by 678K+ embedding vectors (pgvector + HNSW) |
-| Ask questions about texts | **AI Q&A** ("XiaoJin") with RAG, reranking, clickable citations, multi-language citation drawer, and follow-up suggestions |
-| Learn from a specific master | **Master Persona Mode** — 14 historical Buddhist masters, each with tradition-specific RAG scope |
-| Explore Buddhist geography | **Knowledge Graph Map** — 50K+ geo entities, monastery locations, lineage arcs on Deck.GL |
-| Track source updates | **Activity Feed** — real-time updates from 503 data sources |
+| Explore relationships | **Knowledge graph** with 110K+ entities and 28K+ relations (22K+ lineage chains) |
+| Discover similar texts | **Semantic similarity** powered by 680K+ embedding vectors (pgvector + HNSW) |
+| Explore Buddhist geography | **Knowledge Graph Map** — geo-enabled entities, monastery locations, lineage arcs on Deck.GL |
+| Track source updates | **Activity Feed** — real-time updates from 613 data sources |
 | Explore history visually | **Timeline & Dashboard** — dynasty charts, translation trends, category analytics |
 | Save and organize | **Collections, bookmarks, annotations** for personal study |
 | Cite in research | **Citation export** (BibTeX, RIS, APA) for academic use |
@@ -144,13 +146,13 @@ Compare translations side by side — Classical Chinese, Sanskrit, Pali, Tibetan
 
 ### Knowledge Graph
 
-31,000+ entities (persons, monasteries, texts, schools, concepts) and 28,000+ relationships — including 23,000 teacher-student lineage chains from the DILA Authority Database — visualized as an interactive force-directed graph. Click any node to explore connections.
+110,000+ entities (monasteries, persons, texts, schools, concepts) and 28,000+ relationships — including 22,000+ teacher-student lineage chains from the DILA Authority Database — visualized as an interactive force-directed graph. Click any node to explore connections.
 
 ### Trilingual Cross-Canon Parallel Reading (三语对读)
 
 **The first LLM-driven cross-canon parallel reading system for Buddhist texts.** No other platform provides this: CBETA (汉文), SuttaCentral (Pali), and 84000 (Tibetan) each operate in their own language silo. FoJin bridges them via LLM-verified chunk-level alignment.
 
-**Current coverage (3,500+ chunk-level alignments across 11 pair definitions):**
+**Current coverage (3,000+ chunk-level alignments across 11 pair definitions):**
 
 | Sutra / Corpus | Source | Target | Pairs | Type |
 |---|---|---|---:|---|
@@ -186,14 +188,14 @@ RAG layer automatically includes parallel_chunks in the LLM context when a retri
 
 ### AI Q&A — "XiaoJin"
 
-Ask questions in natural language. XiaoJin answers based on canonical Buddhist texts using RAG (Retrieval-Augmented Generation) with 678K+ embedding vectors and HNSW index for fast semantic search. Features include:
+**This is FoJin's core.** Ask questions in natural language; XiaoJin answers from canonical Buddhist texts using RAG (Retrieval-Augmented Generation) over 680K+ embedding vectors with an HNSW index for fast semantic search. Answers stay grounded because retrieval combines vector similarity, keyword reranking, and **root-sutra recall** (the sutra you asked about is always pulled into context), and every quoted passage is checked against the retrieved sources before it can become a clickable citation. Features include:
 
 - Multi-turn conversation with context awareness
 - Keyword + optional API cross-encoder **reranking** for higher answer quality
 - **Clickable citations** in 【《经名》第N卷】 format — click to open a side drawer with surrounding context, plus **multi-language tabs for cross-canon parallels** when available (see Trilingual section above)
 - **GFM markdown tables** — comparative answers (e.g., "Madhyamaka vs Yogācāra") render as proper tables instead of raw pipe syntax
 - **Progressive follow-up suggestions** (concept → related texts → practice)
-- **Smart data source recommendations** — when users ask about finding databases, AI automatically recommends relevant sources from 503 data sources via semantic similarity
+- **Smart data source recommendations** — when users ask about finding databases, AI automatically recommends relevant sources from 613 data sources via semantic similarity
 - **Meta-question handling** — detects self-introduction queries ("who are you" / "what can you do") and skips RAG to give a clean functional overview, instead of randomly citing scriptures
 - **Anti-hallucination citation rules** — the system prompt strictly forbids wrapping a text name in 【…】 unless that exact source appeared in the retrieved context, preventing broken citation links
 - **Inline split-view in reader** — AI panel opens by default beside the text with a draggable divider; independent scrolling on each side, resizable width persisted to localStorage
@@ -205,10 +207,11 @@ Ask questions in natural language. XiaoJin answers based on canonical Buddhist t
 
 ### Master Persona Mode (法师模式)
 
-Select a specific Buddhist master to receive answers in their teaching style, grounded in their tradition's core scriptures. 14 historical masters available:
+Select a specific Buddhist master to receive answers in their teaching style, grounded in their tradition's core scriptures. 15 historical masters available:
 
 | Master | Tradition | Core Teachings |
 |--------|-----------|----------------|
+| 龙树 Nāgārjuna | 印度·中观 | 八不中道、缘起性空、二谛中道、戏论寂灭 |
 | 智顗 Zhiyi | 天台宗 | 一念三千、三谛圆融、五时八教、止观双修 |
 | 慧能 Huineng | 禅宗 | 直指人心、见性成佛、无念无相无住 |
 | 玄奘 Xuanzang | 法相唯识宗 | 八识、三性、五位百法、转识成智 |
@@ -240,7 +243,7 @@ Visualize 50,000+ geo-enabled Buddhist entities on an interactive world map — 
 
 ### Activity Feed (佛学动态)
 
-Track real-time updates from 503 data sources — new texts added, translation releases, manuscript scans, and schema changes. Includes academic content aggregation and platform-wide activity summary.
+Track real-time updates from 613 data sources — new texts added, translation releases, manuscript scans, and schema changes. Includes academic content aggregation and platform-wide activity summary.
 
 ### Similar Passages Discovery
 
@@ -264,7 +267,7 @@ Available in 9 languages: Simplified Chinese, Traditional Chinese, English, Japa
 
 ## Data Sources
 
-<p align="center"><img src="./docs/screenshots/sources.png" alt="503 data sources from 30 countries" width="800"></p>
+<p align="center"><img src="./docs/screenshots/sources.png" alt="613 data sources from 30 countries" width="800"></p>
 
 FoJin aggregates data from major Buddhist digital projects worldwide. Sources are categorized by research field (Han, Theravada, Tibetan, Sanskrit, Dunhuang, Art, Dictionary, Digital Humanities) and filterable by region, language, and type:
 
@@ -281,7 +284,7 @@ FoJin aggregates data from major Buddhist digital projects worldwide. Sources ar
 | [Gandhari.org](https://gandhari.org) | Gandhari manuscripts | Gandhari |
 | [VRI Tipitaka](https://tipitaka.org) | Pali Canon (Chattha Sangayana) | Pali |
 | [Korean Tripitaka](http://kb.sutra.re.kr) | Goryeo Tripitaka | Chinese, Korean |
-| + 492 more... | | |
+| + 602 more... | | |
 
 ## Tech Stack
 
@@ -292,7 +295,7 @@ FoJin aggregates data from major Buddhist digital projects worldwide. Sources ar
 | Database | PostgreSQL 15 + pgvector (HNSW index) + pg_trgm |
 | Search | Elasticsearch 8 (ICU tokenizer) |
 | Cache | Redis 7 |
-| AI | RAG (678K+ vectors, BGE-M3, HNSW) + 14 master personas + multi-provider LLM (OpenAI/Anthropic/DeepSeek/DashScope/Gemini/+10 more) |
+| AI | RAG (680K+ vectors, BGE-M3, HNSW) + 14 master personas + multi-provider LLM (OpenAI/Anthropic/DeepSeek/DashScope/Gemini/+10 more) |
 | Deploy | Docker Compose, Nginx (gzip, security headers), Cloudflare CDN |
 | CI | GitHub Actions (lint, test, security scan) |
 
@@ -380,7 +383,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 - [x] User annotations
 - [x] Community-contributed data sources
 - [x] Internationalization (i18n) — 9 UI languages
-- [x] Embedding-based semantic search (678K+ vectors, HNSW index)
+- [x] Embedding-based semantic search (680K+ vectors, HNSW index)
 - [x] AI Q&A with RAG, multi-turn context, and streaming
 - [x] Similar passages discovery (cross-text semantic matching)
 - [x] Timeline visualization and statistics dashboard
@@ -398,7 +401,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 - [x] Research field filtering for data sources (8 categories)
 - [x] Admin feedback reply with notification system
 - [x] AI-powered data source recommendations in chat (semantic similarity)
-- [x] DILA Authority lineage import (23K teacher-student relations)
+- [x] DILA Authority lineage import (22K+ teacher-student relations)
 - [x] DILA catalog associations (contributors, places for 2,300+ texts)
 - [x] Nanshan Vinaya Dictionary (3,200+ Buddhist precept terms)
 - [x] CBETA full-text import — Taishō (T) + Xuzangjing (X): 3,600+ texts, 143M characters, 432K embedding vectors
@@ -409,7 +412,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 - [x] Inline split-view AI reader panel with draggable divider and independent scrolling
 - [x] AI panel auto-open in reader for one-click access to interpretation
 - [x] Meta-question detection in chat — recognizes "who are you / what can you do" and skips RAG
-- [x] **Trilingual cross-canon parallel reading** — 11 pair definitions, 3,500+ LLM-verified chunk alignments across CBETA / SuttaCentral / 84000 (incl. Lotus Sutra 法华 ↔ Toh 113, 8,000-verse Prajñāpāramitā 小品般若 ↔ Toh 11, the full Āgama ↔ Nikāya corpus, and the original 5 MVP classics)
+- [x] **Trilingual cross-canon parallel reading** — 11 pair definitions, 3,000+ LLM-verified chunk alignments across CBETA / SuttaCentral / 84000 (incl. Lotus Sutra 法华 ↔ Toh 113, 8,000-verse Prajñāpāramitā 小品般若 ↔ Toh 11, the full Āgama ↔ Nikāya corpus, and the original 5 MVP classics)
 - [x] Chat citation drawer with multi-language tabs (汉 / 巴 / 藏 side-by-side)
 - [x] Reader "多语对读" inline sidebar — dual tabs: sutta-level SC-authoritative parallels + legacy chunk-level RAG alignment; coexists with AI panel, independent drag-resize
 - [x] GFM markdown tables in AI answers (remark-gfm) — comparative responses render as proper tables

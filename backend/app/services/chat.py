@@ -18,11 +18,17 @@ from app.core.exceptions import (
     ServiceError,
     ValidationError,
 )
+from app.core.url_security import (
+    create_pinned_https_transport,
+    ensure_public_https_url_resolves,
+    normalize_public_https_url,
+)
 from app.database import async_session
 from app.models.chat import ChatAttachment, ChatMessage, ChatSession
 from app.models.hot_question import HotQuestion
 from app.models.user import User
 from app.schemas.chat import ChatResponse, ChatSource
+from app.services.chat_trust import build_trust_status, persist_answer_diagnostic
 from app.services.citation_guard import enforce_citation_whitelist, log_mutations
 from app.services.master_profiles import get_master
 from app.services.quote_verifier import log_quote_mutations, verify_quoted_content
@@ -116,6 +122,32 @@ def _convert_messages_for_anthropic(messages: list[dict]) -> tuple[str, list[dic
     return system, user_messages
 
 
+# Reasoning models (deepseek-v4*, deepseek-reasoner, *-thinking, o1/o3) emit
+# hidden reasoning_content that shares the max_tokens budget with the visible
+# answer. A tight cap — notably the 30 used for session titles — gets fully
+# consumed by the reasoning trace, leaving content empty / answers truncated.
+# bare "reasoner"/"thinking" are intentional broad substring matches (catch any
+# provider's *-reasoner / *-thinking variant); "deepseek-v4" is explicit since
+# its reasoning isn't reflected in the name.
+_REASONING_MODEL_MARKERS = (
+    "deepseek-v4", "reasoner", "thinking", "-o1", "-o3", "/o1", "/o3",
+)
+
+
+def _is_reasoning_model(model: str | None) -> bool:
+    m = (model or "").lower()
+    return any(k in m for k in _REASONING_MODEL_MARKERS)
+
+
+def _with_reasoning_headroom(model: str | None, max_tokens: int) -> int:
+    """Add budget for hidden reasoning_content on reasoning models so the
+    visible answer isn't starved. max_tokens is a ceiling, not a target, so
+    this is ~free for responses that don't hit the old cap — it only prevents
+    reasoning from eating the entire short cap (empty titles) or truncating
+    long answers."""
+    return max_tokens + 4000 if _is_reasoning_model(model) else max_tokens
+
+
 def _build_anthropic_body(model: str, messages: list[dict], *, temperature: float = 0.7,
                           max_tokens: int = 2000, stream: bool = False) -> dict:
     system, user_messages = _convert_messages_for_anthropic(messages)
@@ -125,6 +157,20 @@ def _build_anthropic_body(model: str, messages: list[dict], *, temperature: floa
     if stream:
         body["stream"] = True
     return body
+
+
+async def _build_llm_http_client(
+    api_url: str,
+    provider: str,
+    timeout: float,
+) -> httpx.AsyncClient:
+    if provider == "custom":
+        transport = await create_pinned_https_transport(
+            api_url,
+            label="自定义 API 地址",
+        )
+        return httpx.AsyncClient(timeout=timeout, transport=transport)
+    return httpx.AsyncClient(timeout=timeout)
 
 SYSTEM_PROMPT = (
     "你是小津（XiaoJin）——佛津（FoJin）平台内置的佛教古籍研习 AI 助手。\n\n"
@@ -501,17 +547,21 @@ def _resolve_llm_config(user: User | None) -> tuple[str, str, str, bool, str]:
     if user and user.encrypted_api_key:
         try:
             key = decrypt_api_key(user.encrypted_api_key, user.api_key_kdf_version)
-            provider = user.api_provider or "openai"
-            if provider == "custom":
-                url = user.api_custom_url or settings.llm_api_url
-                model = user.api_model or "gpt-4o-mini"
-            else:
-                url = PROVIDER_URLS.get(provider, settings.llm_api_url)
-                model = user.api_model or PROVIDER_DEFAULT_MODELS.get(provider, settings.llm_model)
-            return url, key, model, True, provider
         except Exception as exc:
             logger.warning("Failed to decrypt user %s API key: %s", user.id, exc)
             raise ServiceError("您的 API Key 解密失败，请在个人中心重新配置。") from None
+
+        provider = user.api_provider or "openai"
+        if provider == "custom":
+            try:
+                url = normalize_public_https_url(user.api_custom_url, label="自定义 API 地址")
+            except ValueError as exc:
+                raise ServiceError(f"自定义 API 地址不安全：{exc}") from None
+            model = user.api_model or "gpt-4o-mini"
+        else:
+            url = PROVIDER_URLS.get(provider, settings.llm_api_url)
+            model = user.api_model or PROVIDER_DEFAULT_MODELS.get(provider, settings.llm_model)
+        return url, key, model, True, provider
     url = settings.llm_api_url or "https://api.openai.com/v1"
     model = settings.llm_model or _detect_model_from_url(url)
     return url, settings.llm_api_key, model, False, "openai"
@@ -797,6 +847,24 @@ def _strip_followup_suggestions(text: str) -> str:
     return "\n".join(cleaned).rstrip()
 
 
+# Prefixes of the failure replies produced by the LLM error branches in
+# _prepare_chat / _stream_chat and _byok_error_message. A reply that starts
+# with one of these (or is empty) is a failed generation, not a real answer:
+# the user already saw the error live, so persisting it only pollutes chat
+# history, the answer-quality queue, and the quality metrics.
+_FAILED_ANSWER_PREFIXES = (
+    "抱歉，AI 服务",  # 暂时不可用 / 响应超时 / 返回错误（HTTP …）
+    "AI 服务返回",  # _byok_error_message 401/404/429/balance/model-not-found
+    "您的 API Key 无效",
+)
+
+
+def _is_failed_answer(content: str | None) -> bool:
+    """True for an empty answer or one of the known LLM-failure replies."""
+    text = (content or "").strip()
+    return not text or text.startswith(_FAILED_ANSWER_PREFIXES)
+
+
 async def _save_messages(
     db: AsyncSession, session_id: int, message: str, answer: str, sources: list[ChatSource]
 ) -> int | None:
@@ -807,6 +875,11 @@ async def _save_messages(
     chat_messages row instead of the local `Date.now()` placeholder it
     used while streaming. Returns None when the message cannot be
     persisted (defensive — current callers always supply a session)."""
+    # Don't persist failed/empty generations — neither the user turn nor the
+    # error reply. The user saw the error live via the stream/response; saving
+    # it would leave a junk turn in history and poison the answer-quality data.
+    if _is_failed_answer(answer):
+        return None
     user_msg = ChatMessage(session_id=session_id, role="user", content=message)
     assistant_msg = ChatMessage(
         session_id=session_id,
@@ -833,7 +906,7 @@ async def _generate_session_title(
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             if _is_anthropic(api_url, provider):
-                body = _build_anthropic_body(model, messages, temperature=0.3, max_tokens=30)
+                body = _build_anthropic_body(model, messages, temperature=0.3, max_tokens=_with_reasoning_headroom(model, 64))
                 resp = await client.post(f"{api_url}/messages", headers=_build_anthropic_headers(api_key), json=body)
                 resp.raise_for_status()
                 title = resp.json()["content"][0]["text"].strip().strip("\"'《》")
@@ -841,7 +914,7 @@ async def _generate_session_title(
                 resp = await client.post(
                     f"{api_url}/chat/completions",
                     headers={"Authorization": f"Bearer {api_key}"},
-                    json={"model": model, "messages": messages, "temperature": 0.3, "max_tokens": 30},
+                    json={"model": model, "messages": messages, "temperature": 0.3, "max_tokens": _with_reasoning_headroom(model, 64)},
                 )
                 resp.raise_for_status()
                 title = resp.json()["choices"][0]["message"]["content"].strip().strip("\"'《》")
@@ -1003,6 +1076,12 @@ async def _prepare_chat(
     if not is_byok and not api_key:
         raise ServiceError("平台 AI 服务暂未配置。请在个人中心配置自己的 API Key 使用 AI 问答功能。")
 
+    if is_byok and provider == "custom":
+        try:
+            api_url = await ensure_public_https_url_resolves(api_url, label="自定义 API 地址")
+        except ValueError as exc:
+            raise ServiceError(f"自定义 API 地址不安全：{exc}") from None
+
     if user_id is not None:
         if not is_byok:
             await _check_daily_quota(db, user)
@@ -1102,16 +1181,17 @@ async def send_message(
 
     # Call LLM (with fallback for platform users only)
     async def _call_once(u: str, k: str, m: str, p: str) -> str:
-        async with httpx.AsyncClient(timeout=60) as client:
+        client_cm = await _build_llm_http_client(u, p, 60)
+        async with client_cm as client:
             if _is_anthropic(u, p):
-                body = _build_anthropic_body(m, llm_messages, max_tokens=8000 if page_content else 2000)
+                body = _build_anthropic_body(m, llm_messages, max_tokens=_with_reasoning_headroom(m, 8000 if page_content else 2000))
                 resp = await client.post(f"{u}/messages", headers=_build_anthropic_headers(k), json=body)
                 resp.raise_for_status()
                 return resp.json()["content"][0]["text"]
             resp = await client.post(
                 f"{u}/chat/completions",
                 headers={"Authorization": f"Bearer {k}"},
-                json={"model": m, "messages": llm_messages, "temperature": 0.7, "max_tokens": 8000 if page_content else 2000},
+                json={"model": m, "messages": llm_messages, "temperature": 0.7, "max_tokens": _with_reasoning_headroom(m, 8000 if page_content else 2000)},
             )
             resp.raise_for_status()
             return resp.json()["choices"][0]["message"]["content"]
@@ -1164,11 +1244,32 @@ async def send_message(
     # to citations the guard already stripped don't get double-flagged.
     # See app/services/quote_verifier for the substring-match contract.
     answer, _quote_mutations = verify_quoted_content(answer, sources)
+    trust_status = build_trust_status(
+        answer,
+        sources,
+        citation_mutations=_citation_mutations,
+        quote_mutations=_quote_mutations,
+    )
 
     if chat_session:
-        await _save_messages(db, chat_session.id, message, answer, sources)
-        log_mutations(chat_session.id, _citation_mutations)
-        log_quote_mutations(chat_session.id, _quote_mutations)
+        assistant_msg_id = await _save_messages(db, chat_session.id, message, answer, sources)
+        if assistant_msg_id is not None:
+            log_mutations(assistant_msg_id, _citation_mutations)
+            log_quote_mutations(assistant_msg_id, _quote_mutations)
+            try:
+                await persist_answer_diagnostic(
+                    db,
+                    message_id=assistant_msg_id,
+                    trust_status=trust_status,
+                    citation_mutations=_citation_mutations,
+                    quote_mutations=_quote_mutations,
+                )
+            except Exception:
+                await db.rollback()
+                logger.exception(
+                    "Failed to persist chat answer diagnostics (message_id=%s)",
+                    assistant_msg_id,
+                )
         # Rows are still bound to this request session here, so reading
         # .id/.consumed_at is safe (unlike the streaming save phase).
         await _mark_attachments_consumed(
@@ -1186,6 +1287,7 @@ async def send_message(
         session_id=chat_session.id if chat_session else 0,
         message=answer,
         sources=sources,
+        trust_status=trust_status,
     )
 
 
@@ -1355,6 +1457,16 @@ async def send_message_stream(
             pending_attachment_ids = [
                 a.id for a in prep_result[-1] if a.consumed_at is None
             ]
+            # Persist prep-phase writes (the _check_daily_quota UPDATE) BEFORE
+            # the block exits. Without this, close() rolls back the still-open
+            # prep transaction (see the snapshot note above) and discards the
+            # quota increment — making FREE_DAILY_LIMIT_USER a no-op on the
+            # streaming path while the non-stream path persists it via
+            # _save_messages. Scalars are already captured above, so the
+            # commit's instance-expiry is harmless. Quota is the only pending
+            # write here (create_session already committed; everything else in
+            # _prepare_chat is SELECT-only).
+            await db_prep.commit()
         except (ValidationError, QuotaExceededError, AccessDeniedError, ServiceError) as exc:
             prep_error = exc
     # db_prep is closed here — connection returned to the pool before any
@@ -1389,9 +1501,11 @@ async def send_message_stream(
     # --- Phase 3: stream LLM (with fallback on connect-before-first-token failures) ---
     async def _stream_llm_once(u: str, k: str, m: str, p: str):
         """Inner generator that yields content chunks. Raises httpx errors on failure."""
+        timeout = 120 if page_content else 60
+        client_cm = await _build_llm_http_client(u, p, timeout)
         if _is_anthropic(u, p):
-            body = _build_anthropic_body(m, llm_messages, stream=True, max_tokens=8000 if page_content else 2000)
-            async with httpx.AsyncClient(timeout=120 if page_content else 60) as client, client.stream(
+            body = _build_anthropic_body(m, llm_messages, stream=True, max_tokens=_with_reasoning_headroom(m, 8000 if page_content else 2000))
+            async with client_cm as client, client.stream(
                 "POST", f"{u}/messages", headers=_build_anthropic_headers(k), json=body,
             ) as resp:
                 resp.raise_for_status()
@@ -1411,11 +1525,11 @@ async def send_message_stream(
                     except (json.JSONDecodeError, KeyError):
                         continue
         else:
-            async with httpx.AsyncClient(timeout=120 if page_content else 60) as client, client.stream(
+            async with client_cm as client, client.stream(
                 "POST", f"{u}/chat/completions",
                 headers={"Authorization": f"Bearer {k}"},
                 json={"model": m, "messages": llm_messages, "temperature": 0.7,
-                      "max_tokens": 8000 if page_content else 2000, "stream": True},
+                      "max_tokens": _with_reasoning_headroom(m, 8000 if page_content else 2000), "stream": True},
             ) as resp:
                 resp.raise_for_status()
                 async for line in resp.aiter_lines():
@@ -1534,6 +1648,12 @@ async def send_message_stream(
     # Quote verifier runs after citation_guard so flagged-and-stripped
     # citations don't carry their quotes into a second annotation.
     corrected_answer, _quote_mutations = verify_quoted_content(corrected_answer, sources)
+    trust_status = build_trust_status(
+        corrected_answer,
+        sources,
+        citation_mutations=_citation_mutations,
+        quote_mutations=_quote_mutations,
+    )
     logger.info(
         "chat/stream phase-cg %.2fs (citations=%d, quotes=%d)",
         _time.monotonic() - cg_start,
@@ -1552,6 +1672,15 @@ async def send_message_stream(
             )
             + "\n\n"
         )
+
+    yield (
+        "data: "
+        + json.dumps(
+            {"type": "trust_status", "trust_status": trust_status.model_dump()},
+            ensure_ascii=False,
+        )
+        + "\n\n"
+    )
 
     # 回答完成后显示引用来源——先论点后论据，自然阅读顺序
     if sources:
@@ -1578,9 +1707,25 @@ async def send_message_stream(
                 assistant_msg_id = await _save_messages(
                     db_save, chat_session_id, message, corrected_answer, sources
                 )
-                log_mutations(chat_session_id, _citation_mutations)
-                log_quote_mutations(chat_session_id, _quote_mutations)
+                if assistant_msg_id is not None:
+                    log_mutations(assistant_msg_id, _citation_mutations)
+                    log_quote_mutations(assistant_msg_id, _quote_mutations)
                 await _mark_attachments_consumed(db_save, pending_attachment_ids)
+                if assistant_msg_id is not None:
+                    try:
+                        await persist_answer_diagnostic(
+                            db_save,
+                            message_id=assistant_msg_id,
+                            trust_status=trust_status,
+                            citation_mutations=_citation_mutations,
+                            quote_mutations=_quote_mutations,
+                        )
+                    except Exception:
+                        await db_save.rollback()
+                        logger.exception(
+                            "chat/stream diagnostic persist failed (message_id=%s)",
+                            assistant_msg_id,
+                        )
         except Exception:
             logger.exception(
                 "chat/stream phase-3 save failed; user got the reply but it is "

@@ -326,7 +326,7 @@ export interface KGEntity {
   name_bo: string | null;
   name_en: string | null;
   description: string | null;
-  properties: Record<string, any> | null;
+  properties: Record<string, unknown> | null;
   text_id: TextId | null;
   external_ids: Record<string, string> | null;
   /** KG relation count — populated by search results, used for the degree badge. */
@@ -927,6 +927,38 @@ export async function searchDictionaryGrouped(params: {
   return data;
 }
 
+// Cross-lingual term concept (multilingual concept card)
+export interface DictConcept {
+  sanskrit: string | null;
+  devanagari: string | null;
+  pali: string | null;
+  tibetan: string | null;
+  chinese: string | null;
+  english: string | null;
+}
+
+export interface DictConceptEntry {
+  id: DictEntryId;
+  headword: string;
+  source_name: string | null;
+  definition_preview: string;
+}
+
+export interface DictConceptLangGroup {
+  lang: string;
+  entries: DictConceptEntry[];
+}
+
+export interface DictConceptResponse {
+  concept: DictConcept | null;
+  entries_by_lang: DictConceptLangGroup[];
+}
+
+export async function getDictConcept(q: string): Promise<DictConceptResponse> {
+  const { data } = await api.get<DictConceptResponse>("/dictionary/concept", { params: { q } });
+  return data;
+}
+
 // Dictionary hot terms
 export async function getDictionaryHot(): Promise<string[]> {
   const { data } = await api.get<{ terms: string[] }>("/dictionary/hot");
@@ -1222,16 +1254,103 @@ export interface KeywordItem {
   count: number;
 }
 
+export interface AnswerQuality {
+  chat_questions: number;
+  citation_click: number;
+  chat_copy: number;
+  chat_retry: number;
+  citation_click_rate: number | null;
+  copy_rate: number | null;
+  retry_rate: number | null;
+}
+
 export interface AdminModuleUsage {
   days: number;
   events: ModuleEventItem[];
   top_search_keywords: KeywordItem[];
+  answer_quality: AnswerQuality;
 }
 
 export async function getAdminModuleUsage(days: number = 7): Promise<AdminModuleUsage> {
   const { data } = await api.get<AdminModuleUsage>("/admin/stats/module-usage", {
     params: { days },
   });
+  return data;
+}
+
+// --- Admin: Answer-Quality Queue ---
+
+export interface AnswerQueueSource {
+  text_id: number;
+  juan_num: number;
+  chunk_index: number;
+  chunk_text: string;
+  score: number | null;
+  title_zh: string;
+  lang: string;
+}
+
+export interface AnswerQueueItem {
+  message_id: number;
+  session_id: number;
+  question: string;
+  answer: string;
+  sources: AnswerQueueSource[];
+  reason_tags: string[];
+  suspicion_score: number;
+  feedback: string | null;
+  created_at: string;
+}
+
+export interface ScoreDistribution {
+  p10: number | null;
+  p25: number | null;
+  p50: number | null;
+  p90: number | null;
+}
+
+export interface AnswerQueueResponse {
+  total_unreviewed: number;
+  score_distribution: ScoreDistribution;
+  items: AnswerQueueItem[];
+}
+
+export interface AnswerReviewStats {
+  reviewed_total: number;
+  good: number;
+  bad: number;
+  by_category: Record<string, number>;
+  last_reviewed_at: string | null;
+}
+
+export async function getAnswerQualityQueue(params: {
+  window?: number;
+  min_suspicion?: number;
+  category?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<AnswerQueueResponse> {
+  const { data } = await api.get<AnswerQueueResponse>(
+    "/admin/answer-quality/queue",
+    { params },
+  );
+  return data;
+}
+
+export async function submitAnswerReview(payload: {
+  message_id: number;
+  verdict: "good" | "bad";
+  failure_category?: string;
+  note?: string;
+}): Promise<{ ok: boolean; remaining_unreviewed: number }> {
+  const { data } = await api.post("/admin/answer-quality/reviews", payload);
+  return data;
+}
+
+export async function getAnswerReviewStats(): Promise<AnswerReviewStats> {
+  const { data } = await api.get<AnswerReviewStats>(
+    "/admin/answer-quality/reviews/stats",
+  );
   return data;
 }
 
@@ -1453,6 +1572,7 @@ export interface ChatResponse {
   session_id: ChatSessionId;
   message: string;
   sources: ChatSource[];
+  trust_status?: ChatTrustStatus | null;
 }
 
 export interface ChatSessionItem {
@@ -1461,11 +1581,29 @@ export interface ChatSessionItem {
   created_at: string;
 }
 
+export type ChatTrustState =
+  | "verified"
+  | "citation_corrected"
+  | "quote_unverified"
+  | "sources_available"
+  | "no_sources";
+
+export interface ChatTrustStatus {
+  state: ChatTrustState;
+  citation_count: number;
+  source_count: number;
+  citation_mutation_count: number;
+  quote_mutation_count: number;
+  max_source_score?: number | null;
+  min_source_score?: number | null;
+}
+
 export interface ChatMessageItem {
   id: number;
   role: string;
   content: string;
   sources: ChatSource[] | null;
+  trust_status?: ChatTrustStatus | null;
   feedback?: string | null;
   created_at: string;
 }
@@ -1597,6 +1735,7 @@ export async function getRandomHotQuestions(
 export interface StreamCallbacks {
   onToken: (content: string) => void;
   onSources: (sources: ChatSource[]) => void;
+  onTrustStatus?: (trustStatus: ChatTrustStatus) => void;
   onSessionId: (sessionId: number) => void;
   onSearching?: (message: string) => void;
   /**
@@ -1684,6 +1823,9 @@ export function sendChatMessageStream(
               break;
             case "sources":
               callbacks.onSources(event.sources);
+              break;
+            case "trust_status":
+              callbacks?.onTrustStatus?.(event.trust_status);
               break;
             case "session_id":
               callbacks.onSessionId(event.session_id);

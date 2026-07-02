@@ -35,6 +35,7 @@ const CrossCanonPage = lazy(() => import("./pages/CrossCanonPage"));
 const TopicsPage = lazy(() => import("./pages/TopicsPage"));
 const AdminSuggestionsPage = lazy(() => import("./pages/AdminSuggestionsPage"));
 const AdminDashboardPage = lazy(() => import("./pages/AdminDashboardPage"));
+const AdminAnswerQualityPage = lazy(() => import("./pages/AdminAnswerQualityPage"));
 const AdminUsersPage = lazy(() => import("./pages/AdminUsersPage"));
 const AdminAnnotationsPage = lazy(() => import("./pages/AdminAnnotationsPage"));
 const AdminFeedbacksPage = lazy(() => import("./pages/AdminFeedbacksPage"));
@@ -90,6 +91,7 @@ function App() {
             </Route>
             <Route element={<ProtectedRoute requiredRole="admin" />}>
               <Route path="/admin" element={<AdminDashboardPage />} />
+              <Route path="/admin/answer-quality" element={<AdminAnswerQualityPage />} />
               <Route path="/admin/users" element={<AdminUsersPage />} />
               <Route path="/admin/suggestions" element={<AdminSuggestionsPage />} />
               <Route path="/admin/annotations" element={<AdminAnnotationsPage />} />

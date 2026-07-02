@@ -56,10 +56,14 @@ export interface PlatformActivity {
     total_sessions: number;
     positive_feedback: number;
     negative_feedback: number;
+    assistant_messages: number;
+    assistant_no_source: number;
   };
   users: {
     new_users: number;
     active_users: number;
+    returning_users: number;
+    byok_active_users: number;
   };
   content: {
     new_texts: number;

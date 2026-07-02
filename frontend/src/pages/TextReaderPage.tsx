@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Helmet } from "react-helmet-async";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Typography, Spin, Button, Select, Breadcrumb, Row, Col, message, Tooltip, Tag, Popover } from "antd";
+import { Typography, Spin, Button, Select, Breadcrumb, Row, Col, message, Tooltip, Tag, Popover, Dropdown } from "antd";
 import { getLastPosition, recordReading } from "../utils/readingHistory";
 import {
   HomeOutlined,
@@ -17,6 +17,9 @@ import {
   RobotOutlined,
   GlobalOutlined,
   DiffOutlined,
+  VerticalAlignTopOutlined,
+  DownloadOutlined,
+  NumberOutlined,
 } from "@ant-design/icons";
 import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBookmark, addBookmark, removeBookmark, searchDictionaryGrouped, getJuanApparatus, getJuanLineAnchors, type ApparatusEntryItem } from "../api/client";
 import { useAuthStore } from "../stores/authStore";
@@ -428,10 +431,14 @@ export default function TextReaderPage() {
   const [citationOpen, setCitationOpen] = useState(false);
   const [annotationOpen, setAnnotationOpen] = useState(false);
   const [apparatusOn, setApparatusOn] = useState(false);
+  const [showLineRef, setShowLineRef] = useState(false);
   const [parallelPanelOpen, setParallelPanelOpen] = useState(false);
 
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
   const [compareLang, setCompareLang] = useState<string | null>(null);
+  // 回到顶部按钮：滚过一屏后浮现；落点跟随"阅读列"右下角
+  const [showBackTop, setShowBackTop] = useState(false);
+  const [backTopStyle, setBackTopStyle] = useState<{ right: number; bottom: number }>({ right: 24, bottom: 84 });
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const readerContentRef = useRef<HTMLDivElement>(null);
@@ -511,6 +518,18 @@ export default function TextReaderPage() {
     setDictPopover(DICT_POPOVER_INIT);
     setLineLocator(null);
   }, []);
+
+  const downloadExport = useCallback((format: "txt" | "html" | "docx" | "epub", juan: number | null) => {
+    const params = new URLSearchParams({ format });
+    if (juan != null) params.set("juan", String(juan));
+    // A plain anchor navigation lets the browser handle the Content-Disposition
+    // download; no auth header is needed (export is a public read endpoint).
+    const a = document.createElement("a");
+    a.href = `/api/texts/${textId}/export?${params.toString()}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }, [textId]);
 
   const handleTextSelect = useCallback(async () => {
     const sel = window.getSelection();
@@ -704,6 +723,47 @@ export default function TextReaderPage() {
       }
     };
   }, [content, textId, juanNum]);
+
+  // 回到顶部：滚过 ~一屏后浮现按钮。和续读同理，AI 面板打开时滚动发生在
+  // .reader-container（不冒泡），只能在 window 捕获阶段收到 scroll 事件；
+  // 偏移量按真实 scroller 取值，document 滚动时回退 window.scrollY。
+  useEffect(() => {
+    const update = () => {
+      const el = readerContentRef.current;
+      const scroller = el ? findScrollContainer(el) : null;
+      const offset = scroller ? scroller.scrollTop : window.scrollY;
+      setShowBackTop(offset > 400);
+    };
+    update();
+    window.addEventListener("scroll", update, { passive: true, capture: true });
+    return () => window.removeEventListener("scroll", update, { capture: true });
+    // aiPanelOpen/parallelPanelOpen 都会切换真实 scroller（reader-ai-active），需重评
+  }, [content, aiPanelOpen, parallelPanelOpen]);
+
+  // 按钮落点跟随"阅读列"右下角：实测 .reader-container 右缘，让按钮右缘落在其内侧 16px。
+  // 直接量 DOM 而非按面板宽度推算 —— 面板未必贴视口右缘（滚动条/留白），且移动端面板纵向
+  // 堆叠、阅读列占满宽度，量 DOM 对桌面并排 / 移动堆叠 / 居中三种布局都成立。
+  // AI 面板关闭时右下角被 AI FAB 占据（bottom:24），按钮上移一档避免重叠。
+  useEffect(() => {
+    const compute = () => {
+      const rc = readerContentRef.current?.closest(".reader-container");
+      const viewportRight = document.documentElement.clientWidth;
+      const right = rc
+        ? Math.max(24, Math.round(viewportRight - rc.getBoundingClientRect().right + 16))
+        : 24;
+      setBackTopStyle({ right, bottom: aiPanelOpen ? 24 : 84 });
+    };
+    compute();
+    window.addEventListener("resize", compute);
+    return () => window.removeEventListener("resize", compute);
+  }, [content, aiPanelOpen, parallelPanelOpen, aiPanelWidth, parallelPanelWidth]);
+
+  const scrollToTop = useCallback(() => {
+    const el = readerContentRef.current;
+    const scroller = el ? findScrollContainer(el) : null;
+    if (scroller) scroller.scrollTo({ top: 0, behavior: "smooth" });
+    else window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
 
   // Deep-link from the chat citation drawer: ?highlight_chunk=N
   // Chunks are 500 chars wide with 50-char overlap (see scripts/archive/misc/generate_embeddings.py),
@@ -942,6 +1002,27 @@ export default function TextReaderPage() {
           >
             引用
           </Button>
+          <Dropdown
+            trigger={["click"]}
+            menu={{
+              items: (["txt", "html", "docx", "epub"] as const).flatMap((fmt) => [
+                {
+                  key: `${fmt}-juan`,
+                  label: `${t(`reader.export.${fmt}`)} · ${t("reader.export.this_juan")}`,
+                  onClick: () => downloadExport(fmt, juanNum),
+                },
+                {
+                  key: `${fmt}-all`,
+                  label: `${t(`reader.export.${fmt}`)} · ${t("reader.export.whole_text")}`,
+                  onClick: () => downloadExport(fmt, null),
+                },
+              ]),
+            }}
+          >
+            <Button size="small" icon={<DownloadOutlined />}>
+              {t("reader.export.button")}
+            </Button>
+          </Dropdown>
           <Tooltip title={t("reader.apparatus.tooltip")}>
             <Button
               size="small"
@@ -950,6 +1031,16 @@ export default function TextReaderPage() {
               onClick={() => setApparatusOn((v) => !v)}
             >
               {t("reader.apparatus.toggle")}
+            </Button>
+          </Tooltip>
+          <Tooltip title={t("reader.lineref.tooltip")}>
+            <Button
+              size="small"
+              type={showLineRef ? "primary" : "default"}
+              icon={<NumberOutlined />}
+              onClick={() => setShowLineRef((v) => !v)}
+            >
+              {t("reader.lineref.toggle")}
             </Button>
           </Tooltip>
           <Tooltip title="跨藏对照（其他版本 · 经级/段级对读）">
@@ -1032,7 +1123,7 @@ export default function TextReaderPage() {
               <div className="bilingual-column">
                 <div className="bilingual-label">{LANG_LABELS[langData?.default_lang || ""] || "原文"}</div>
                 <div
-                  className="reader-body"
+                  className={`reader-body${showLineRef ? " show-lineref" : ""}`}
                   style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
                 >
                   {reflowedContent.map((seg, i) => renderSegment(seg, i, readerCtx))}
@@ -1059,7 +1150,7 @@ export default function TextReaderPage() {
           </Row>
         ) : (
           <div
-            className="reader-body"
+            className={`reader-body${showLineRef ? " show-lineref" : ""}`}
             style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
           >
             {reflowedContent.map((seg, i) => renderSegment(seg, i, readerCtx))}
@@ -1184,6 +1275,21 @@ export default function TextReaderPage() {
           icon={<RobotOutlined />}
           onClick={() => setAiPanelOpen(true)}
           aria-label="AI 解读"
+        />
+      </Tooltip>
+    )}
+
+    {/* 回到顶部：落点由 backTopStyle 动态计算（让开 AI 面板与 AI FAB） */}
+    {showBackTop && (
+      <Tooltip title={t("reader.backtop")} placement="left">
+        <Button
+          className="reader-backtop-fab"
+          style={backTopStyle}
+          shape="circle"
+          size="large"
+          icon={<VerticalAlignTopOutlined />}
+          onClick={scrollToTop}
+          aria-label={t("reader.backtop")}
         />
       </Tooltip>
     )}

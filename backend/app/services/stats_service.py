@@ -367,6 +367,31 @@ async def get_platform_activity(db: AsyncSession, redis=None, days: int = 7) -> 
         )
     ).scalar() or 0
 
+    # "未引经率" proxy: assistant replies with no sources. sources is stored
+    # NULL when empty (chat.py: "[...] if sources else None"). A passive quality
+    # signal that doesn't need 👍/👎 (which nobody clicks). NOTE it is NOT a pure
+    # retrieval-failure rate: meta-questions (你好/你是谁) and error replies also
+    # persist NULL sources, so the numerator mixes real RAG gaps with those. The
+    # honest split needs a per-message RAG/non-RAG marker — left as a follow-up;
+    # the UI label ("未引经率") and tooltip state this caveat.
+    assistant_messages = (
+        await db.execute(
+            select(func.count(ChatMessage.id)).where(
+                ChatMessage.created_at >= cutoff,
+                ChatMessage.role == "assistant",
+            )
+        )
+    ).scalar() or 0
+    assistant_no_source = (
+        await db.execute(
+            select(func.count(ChatMessage.id)).where(
+                ChatMessage.created_at >= cutoff,
+                ChatMessage.role == "assistant",
+                ChatMessage.sources.is_(None),
+            )
+        )
+    ).scalar() or 0
+
     # --- Users ---
     new_users = (
         await db.execute(
@@ -377,6 +402,29 @@ async def get_platform_activity(db: AsyncSession, redis=None, days: int = 7) -> 
     active_users = (
         await db.execute(
             select(func.count(User.id)).where(User.last_active_at >= cutoff)
+        )
+    ).scalar() or 0
+
+    # Returning = active in this period AND registered before it started. Splits
+    # active_users into returning vs new, the core retention signal the dashboard
+    # was missing (everything else was "new" or "total active", never "came back").
+    returning_users = (
+        await db.execute(
+            select(func.count(User.id)).where(
+                User.last_active_at >= cutoff,
+                User.created_at < cutoff,
+            )
+        )
+    ).scalar() or 0
+
+    # BYOK = active users who brought their own API key (api_provider set). The
+    # rest run on the platform key = cost you subsidise.
+    byok_active_users = (
+        await db.execute(
+            select(func.count(User.id)).where(
+                User.last_active_at >= cutoff,
+                User.api_provider.is_not(None),
+            )
         )
     ).scalar() or 0
 
@@ -407,10 +455,14 @@ async def get_platform_activity(db: AsyncSession, redis=None, days: int = 7) -> 
             "total_sessions": total_sessions,
             "positive_feedback": positive_feedback,
             "negative_feedback": negative_feedback,
+            "assistant_messages": assistant_messages,
+            "assistant_no_source": assistant_no_source,
         },
         "users": {
             "new_users": new_users,
             "active_users": active_users,
+            "returning_users": returning_users,
+            "byok_active_users": byok_active_users,
         },
         "content": {
             "new_texts": new_texts,

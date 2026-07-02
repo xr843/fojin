@@ -17,7 +17,7 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v6
         with:
@@ -29,7 +29,7 @@ jobs:
         run: pip install -r requirements-dev.txt
 
       - name: Lint (ruff)
-        run: pip install ruff==0.9.7 && ruff check app/
+        run: pip install ruff==0.9.7 && ruff check app/ eval/
 
       - name: Run tests
         run: python -m pytest -q tests/
@@ -41,7 +41,7 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v6
         with:
@@ -53,7 +53,7 @@ jobs:
         run: npm ci
 
       - name: Lint (ESLint)
-        run: npx eslint src/ --max-warnings 50
+        run: npx eslint src/ --max-warnings 0
 
       - name: i18n ratchet (no new hardcoded Chinese)
         run: npm run i18n:check

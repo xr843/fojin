@@ -5,9 +5,10 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.chat import ChatAttachment
+from app.models.chat import ChatAnswerDiagnostic, ChatAttachment, ChatMessage
 from app.services.attachment_parser import (
     ALLOWED_EXTENSIONS,
     MAX_FILE_BYTES,
@@ -27,6 +28,7 @@ from app.schemas.chat import (
     ChatResponse,
     ChatSessionResponse,
     ChatSource,
+    ChatTrustStatus,
     FeedbackRequest,
     HotQuestionCard,
     HotQuestionCardsResponse,
@@ -47,9 +49,26 @@ from app.services.chat import (
     send_message_stream,
     update_message_feedback,
 )
+from app.services.chat_trust import trust_status_from_diagnostic
 from app.services.master_profiles import list_masters
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+
+
+async def _trust_statuses_for_messages(
+    db: AsyncSession,
+    messages: list[ChatMessage],
+) -> dict[int, ChatTrustStatus | None]:
+    ids = [m.id for m in messages if m.role == "assistant"]
+    if not ids:
+        return {}
+    result = await db.execute(
+        select(ChatAnswerDiagnostic).where(ChatAnswerDiagnostic.message_id.in_(ids))
+    )
+    return {
+        row.message_id: trust_status_from_diagnostic(row)
+        for row in result.scalars().all()
+    }
 
 
 def _get_client_ip(request: Request) -> str:
@@ -370,6 +389,7 @@ async def get_chat_session(
     获取会话详情及消息历史。"""
     cs = await get_session_for_user(db, session_id, user.id)
     msgs = await get_history(db, session_id)
+    trust_by_message = await _trust_statuses_for_messages(db, msgs)
     return ChatSessionResponse(
         id=cs.id,
         title=cs.title,
@@ -380,6 +400,7 @@ async def get_chat_session(
                 role=m.role,
                 content=m.content,
                 sources=[ChatSource(**s) for s in m.sources] if m.sources else None,
+                trust_status=trust_by_message.get(m.id),
                 feedback=m.feedback,
                 created_at=m.created_at,
             )
@@ -401,6 +422,7 @@ async def get_session_messages(
     分页获取会话消息（page=1 为最新消息）。"""
     await get_session_for_user(db, session_id, user.id)
     msgs, total = await get_history_paginated(db, session_id, page, min(size, 100))
+    trust_by_message = await _trust_statuses_for_messages(db, msgs)
     return {
         "total": total,
         "page": page,
@@ -411,6 +433,7 @@ async def get_session_messages(
                 role=m.role,
                 content=m.content,
                 sources=[ChatSource(**s) for s in m.sources] if m.sources else None,
+                trust_status=trust_by_message.get(m.id),
                 feedback=m.feedback,
                 created_at=m.created_at,
             )
@@ -430,11 +453,13 @@ async def set_message_feedback(
 
     对 AI 回答进行评价（点赞/点踩/取消）。"""
     msg = await update_message_feedback(db, message_id, user.id, data.feedback)
+    trust_by_message = await _trust_statuses_for_messages(db, [msg])
     return ChatMessageResponse(
         id=msg.id,
         role=msg.role,
         content=msg.content,
         sources=[ChatSource(**s) for s in msg.sources] if msg.sources else None,
+        trust_status=trust_by_message.get(msg.id),
         feedback=msg.feedback,
         created_at=msg.created_at,
     )

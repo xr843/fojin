@@ -160,6 +160,39 @@ _AMBIGUOUS_DOCTRINE_TAILS: dict[str, set[str]] = {
     "空性": set("质質能格"),
 }
 
+# --- 规范名句→本经 (canonical-phrase root slot, Case 3 of 本经召回缺口) --------
+# Attribution questions quote a famous line without naming the sutra
+# ("「色不异空」出自哪部经?"), so neither _detect_named_root nor
+# _detect_doctrine_root fires, and the terse root loses the cosine race to its
+# verbose 注疏 (prod-measured 2026-06-22: root recall@5 ≈ 0 on these). Same
+# curated-map + reserved-slot fix as Cases 1-2. Keys are deliberately limited to
+# sutra-DISTINCTIVE lines (a unique fingerprint of one root, both 简/繁 listed) so
+# no ambiguity guard is needed. Non-distinctive法数 like 五蕴皆空 / 一切有为法 are
+# excluded on purpose: they recur across canons + 注疏 and read as doctrine, not
+# attribution, so they would mis-fire on 义理 questions and wrongly grab slot #1.
+# Attribution → the user wants THE source, so a match joins the named tier (slot #1).
+_CANONICAL_PHRASE_ROOTS: dict[str, str] = {
+    # 般若波罗蜜多心经 T0251
+    "色不异空": "T0251", "色不異空": "T0251", "空不异色": "T0251", "空不異色": "T0251",
+    "色即是空": "T0251", "空即是色": "T0251",
+    "照见五蕴皆空": "T0251", "照見五蘊皆空": "T0251", "度一切苦厄": "T0251",
+    "不垢不净": "T0251", "不垢不淨": "T0251", "不增不减": "T0251", "不增不減": "T0251",
+    "是诸法空相": "T0251", "是諸法空相": "T0251",
+    "心无罣碍": "T0251", "心無罣礙": "T0251", "心无挂碍": "T0251", "心無掛礙": "T0251",
+    "远离颠倒梦想": "T0251", "遠離顛倒夢想": "T0251",
+    "揭谛揭谛": "T0251", "揭諦揭諦": "T0251",
+    # 金刚般若波罗蜜经 T0235
+    "应无所住而生其心": "T0235", "應無所住而生其心": "T0235",
+    "如梦幻泡影": "T0235", "如夢幻泡影": "T0235", "如露亦如电": "T0235", "如露亦如電": "T0235",
+    "若以色见我": "T0235", "若以色見我": "T0235", "以音声求我": "T0235", "以音聲求我": "T0235",
+    "是人行邪道": "T0235", "凡所有相皆是虚妄": "T0235", "凡所有相皆是虛妄": "T0235",
+    "过去心不可得": "T0235", "過去心不可得": "T0235", "应作如是观": "T0235", "應作如是觀": "T0235",
+    # 六祖大师法宝坛经 T2008
+    "菩提本无树": "T2008", "菩提本無樹": "T2008", "明镜亦非台": "T2008", "明鏡亦非臺": "T2008",
+    "本来无一物": "T2008", "本來無一物": "T2008", "何处惹尘埃": "T2008", "何處惹塵埃": "T2008",
+}
+_PHRASE_KEYS_BY_LEN = sorted(_CANONICAL_PHRASE_ROOTS, key=len, reverse=True)
+
 
 def _detect_doctrine_root(query: str) -> str | None:
     """Return the root cbeta_id for the longest curated doctrine term present in
@@ -207,6 +240,17 @@ def _detect_named_root(query: str) -> str | None:
     return None
 
 
+def _detect_phrase_root(query: str) -> str | None:
+    """Return the root cbeta_id for a curated canonical phrase quoted in the query,
+    or None. Targets attribution questions ("「色不异空」出自哪部经?") where the user
+    quotes a distinctive sutra line without naming the sutra. Phrases are ≥4 chars
+    and sutra-specific, so a plain longest-first substring match suffices."""
+    for phrase in _PHRASE_KEYS_BY_LEN:
+        if phrase in query:
+            return _CANONICAL_PHRASE_ROOTS[phrase]
+    return None
+
+
 async def _resolve_root_text_id(db: AsyncSession, cbeta_id: str) -> int | None:
     """Resolve a root cbeta_id → buddhist_texts.id (lzh), cached per process."""
     if cbeta_id in _root_text_id_cache:
@@ -234,8 +278,11 @@ async def _inject_root_sutra_slot(
          curated doctrine term (空性, 唯识, …) → the foundational treatise's
          best chunk takes the LAST slot. It belongs in context, but the user
          didn't name it, so it must not displace the reranked top hits.
-    No-op when neither fires or the root is already present."""
-    named = _detect_named_root(query)
+    No-op when neither fires or the root is already present.
+
+    Attribution by canonical phrase ("「色不异空」出自哪部经?") joins tier 1: the
+    quoted line IS the answer's source, so its root takes slot #1 like a named one."""
+    named = _detect_named_root(query) or _detect_phrase_root(query)
     cbeta_id = named or _detect_doctrine_root(query)
     if not cbeta_id:
         return search_results
