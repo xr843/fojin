@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { Typography, Card, Tabs, List, Tag, Empty, Spin, Descriptions, Button, Space, Pagination, Input, Select, message, Alert, Form } from "antd";
 import { BookOutlined, HistoryOutlined, UserOutlined, ReadOutlined, KeyOutlined, DeleteOutlined, CheckCircleOutlined, LockOutlined } from "@ant-design/icons";
+import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../stores/authStore";
 import { getBookmarks, getHistory, getApiKeyStatus, saveApiKey, deleteApiKey, changePassword } from "../api/client";
 
@@ -12,81 +13,85 @@ const { Title } = Typography;
 // Recommended model presets per provider — clicking a chip fills the model field.
 // Users can still type any custom model ID. Hints describe role (cheap/flagship/vision)
 // instead of exact prices to avoid drift; check provider docs for current pricing.
-const PROVIDER_MODELS: Record<string, Array<{ value: string; label: string; hint: string }>> = {
+const PROVIDER_MODELS: Record<string, Array<{ value: string; label: string; hintKey: string }>> = {
   deepseek: [
-    { value: "deepseek-v4-flash", label: "V4 Flash", hint: "经济日常 · $0.28/1M output" },
-    { value: "deepseek-v4-pro", label: "V4 Pro", hint: "旗舰 · $0.87/1M @ 促销至 2026-05-31" },
+    { value: "deepseek-v4-flash", label: "V4 Flash", hintKey: "profile.modelHint.economy_daily" },
+    { value: "deepseek-v4-pro", label: "V4 Pro", hintKey: "profile.modelHint.flagship" },
   ],
   dashscope: [
-    { value: "qwen-plus", label: "Qwen Plus", hint: "稳定通用（旧 ID，强烈推荐）" },
-    { value: "qwen-turbo", label: "Qwen Turbo", hint: "经济快速" },
-    { value: "qwen-max", label: "Qwen Max", hint: "旗舰" },
-    { value: "qwen3.6-flash", label: "Qwen 3.6 Flash", hint: "新一代经济档" },
-    { value: "qwen3.6-plus", label: "Qwen 3.6 Plus", hint: "新一代主力" },
+    { value: "qwen-plus", label: "Qwen Plus", hintKey: "profile.modelHint.stable_general" },
+    { value: "qwen-turbo", label: "Qwen Turbo", hintKey: "profile.modelHint.economy_fast" },
+    { value: "qwen-max", label: "Qwen Max", hintKey: "profile.modelHint.flagship" },
+    { value: "qwen3.6-flash", label: "Qwen 3.6 Flash", hintKey: "profile.modelHint.next_gen_economy" },
+    { value: "qwen3.6-plus", label: "Qwen 3.6 Plus", hintKey: "profile.modelHint.next_gen_main" },
   ],
   moonshot: [
-    { value: "moonshot-v1-8k", label: "v1-8k", hint: "8K 上下文 · 经济" },
-    { value: "moonshot-v1-32k", label: "v1-32k", hint: "32K 上下文" },
-    { value: "moonshot-v1-128k", label: "v1-128k", hint: "128K 长文" },
+    { value: "moonshot-v1-8k", label: "v1-8k", hintKey: "profile.modelHint.context_8k_economy" },
+    { value: "moonshot-v1-32k", label: "v1-32k", hintKey: "profile.modelHint.context_32k" },
+    { value: "moonshot-v1-128k", label: "v1-128k", hintKey: "profile.modelHint.context_128k" },
   ],
   zhipu: [
-    { value: "glm-4-flash", label: "GLM-4 Flash", hint: "免费/极低价" },
-    { value: "glm-4-air", label: "GLM-4 Air", hint: "中档" },
-    { value: "glm-4-plus", label: "GLM-4 Plus", hint: "旗舰" },
+    { value: "glm-4-flash", label: "GLM-4 Flash", hintKey: "profile.modelHint.free_low_cost" },
+    { value: "glm-4-air", label: "GLM-4 Air", hintKey: "profile.modelHint.midrange" },
+    { value: "glm-4-plus", label: "GLM-4 Plus", hintKey: "profile.modelHint.flagship" },
   ],
   anthropic: [
-    { value: "claude-haiku-4-5", label: "Haiku 4.5", hint: "快速经济" },
-    { value: "claude-sonnet-4-6", label: "Sonnet 4.6", hint: "主力推荐" },
-    { value: "claude-opus-4-7", label: "Opus 4.7", hint: "旗舰" },
+    { value: "claude-haiku-4-5", label: "Haiku 4.5", hintKey: "profile.modelHint.fast_economy" },
+    { value: "claude-sonnet-4-6", label: "Sonnet 4.6", hintKey: "profile.modelHint.main_recommended" },
+    { value: "claude-opus-4-7", label: "Opus 4.7", hintKey: "profile.modelHint.flagship" },
   ],
   openai: [
-    { value: "gpt-4o-mini", label: "GPT-4o mini", hint: "经济日常" },
-    { value: "gpt-4o", label: "GPT-4o", hint: "主力" },
+    { value: "gpt-4o-mini", label: "GPT-4o mini", hintKey: "profile.modelHint.economy_daily" },
+    { value: "gpt-4o", label: "GPT-4o", hintKey: "profile.modelHint.main" },
   ],
   gemini: [
-    { value: "gemini-2.0-flash", label: "2.0 Flash", hint: "快速经济" },
-    { value: "gemini-2.5-pro", label: "2.5 Pro", hint: "旗舰" },
+    { value: "gemini-2.0-flash", label: "2.0 Flash", hintKey: "profile.modelHint.fast_economy" },
+    { value: "gemini-2.5-pro", label: "2.5 Pro", hintKey: "profile.modelHint.flagship" },
   ],
   doubao: [
-    { value: "doubao-1.5-lite-32k", label: "1.5 Lite", hint: "经济" },
-    { value: "doubao-1.5-pro-32k", label: "1.5 Pro", hint: "主力" },
+    { value: "doubao-1.5-lite-32k", label: "1.5 Lite", hintKey: "profile.modelHint.economy" },
+    { value: "doubao-1.5-pro-32k", label: "1.5 Pro", hintKey: "profile.modelHint.main" },
   ],
   siliconflow: [
-    { value: "deepseek-ai/DeepSeek-V3", label: "DeepSeek V3", hint: "DeepSeek 镜像" },
-    { value: "Qwen/Qwen2.5-72B-Instruct", label: "Qwen 2.5 72B", hint: "Qwen 大模型" },
-    { value: "Pro/moonshotai/Kimi-K2-Instruct", label: "Kimi K2", hint: "Moonshot 镜像（Pro）" },
+    { value: "deepseek-ai/DeepSeek-V3", label: "DeepSeek V3", hintKey: "profile.modelHint.deepseek_mirror" },
+    { value: "Qwen/Qwen2.5-72B-Instruct", label: "Qwen 2.5 72B", hintKey: "profile.modelHint.qwen_large" },
+    { value: "Pro/moonshotai/Kimi-K2-Instruct", label: "Kimi K2", hintKey: "profile.modelHint.moonshot_mirror_pro" },
   ],
   xai: [
-    { value: "grok-2-latest", label: "Grok 2", hint: "稳定版" },
+    { value: "grok-2-latest", label: "Grok 2", hintKey: "profile.modelHint.stable" },
   ],
 };
 
 const PROVIDERS = [
-  // 国内
-  { value: "deepseek", label: "DeepSeek" },
-  { value: "dashscope", label: "通义千问 (DashScope)" },
-  { value: "zhipu", label: "智谱 AI (GLM)" },
-  { value: "moonshot", label: "月之暗面 (Kimi)" },
-  { value: "doubao", label: "字节豆包 (Doubao)" },
-  { value: "minimax", label: "MiniMax" },
-  { value: "stepfun", label: "阶跃星辰 (StepFun)" },
-  { value: "baichuan", label: "百川智能 (Baichuan)" },
-  { value: "yi", label: "零一万物 (Yi)" },
-  { value: "siliconflow", label: "SiliconFlow" },
-  // 国际
-  { value: "openai", label: "OpenAI" },
-  { value: "anthropic", label: "Anthropic (Claude)" },
-  { value: "gemini", label: "Google Gemini" },
-  { value: "groq", label: "Groq" },
-  { value: "mistral", label: "Mistral" },
-  { value: "xai", label: "xAI (Grok)" },
-  { value: "openrouter", label: "OpenRouter" },
-  // 自定义
-  { value: "custom", label: "自定义 (Custom)" },
+  { value: "deepseek", labelKey: "profile.provider.deepseek" },
+  { value: "dashscope", labelKey: "profile.provider.dashscope" },
+  { value: "zhipu", labelKey: "profile.provider.zhipu" },
+  { value: "moonshot", labelKey: "profile.provider.moonshot" },
+  { value: "doubao", labelKey: "profile.provider.doubao" },
+  { value: "minimax", labelKey: "profile.provider.minimax" },
+  { value: "stepfun", labelKey: "profile.provider.stepfun" },
+  { value: "baichuan", labelKey: "profile.provider.baichuan" },
+  { value: "yi", labelKey: "profile.provider.yi" },
+  { value: "siliconflow", labelKey: "profile.provider.siliconflow" },
+  { value: "openai", labelKey: "profile.provider.openai" },
+  { value: "anthropic", labelKey: "profile.provider.anthropic" },
+  { value: "gemini", labelKey: "profile.provider.gemini" },
+  { value: "groq", labelKey: "profile.provider.groq" },
+  { value: "mistral", labelKey: "profile.provider.mistral" },
+  { value: "xai", labelKey: "profile.provider.xai" },
+  { value: "openrouter", labelKey: "profile.provider.openrouter" },
+  { value: "custom", labelKey: "profile.provider.custom" },
 ];
+
+function uiDateLocale(language: string): string {
+  if (language.startsWith("zh-Hant")) return "zh-Hant";
+  if (language.startsWith("en")) return "en-US";
+  return "zh-CN";
+}
 
 export default function ProfilePage() {
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation();
   const [searchParams] = useSearchParams();
   const { user, token, setAuth } = useAuthStore();
   const queryClient = useQueryClient();
@@ -101,6 +106,11 @@ export default function ProfilePage() {
   const [changingPw, setChangingPw] = useState(false);
 
   const defaultTab = searchParams.get("tab") || "profile";
+  const dateLocale = uiDateLocale(i18n.language);
+  const providerOptions = PROVIDERS.map((p) => ({
+    value: p.value,
+    label: t(p.labelKey),
+  }));
 
   const { data: keyStatus, refetch: refetchKey } = useQuery({
     queryKey: ["apiKeyStatus"],
@@ -109,7 +119,7 @@ export default function ProfilePage() {
   });
 
   const handleSaveKey = async () => {
-    if (!apiKey.trim()) { message.warning("请输入 API Key"); return; }
+    if (!apiKey.trim()) { message.warning(t("profile.api_key_required")); return; }
     setSaving(true);
     try {
       await saveApiKey({
@@ -118,7 +128,7 @@ export default function ProfilePage() {
         model: apiModel || undefined,
         custom_url: provider === "custom" ? apiCustomUrl.trim() || undefined : undefined,
       });
-      message.success("API Key 已保存");
+      message.success(t("profile.api_key_saved"));
       setApiKey("");
       refetchKey();
       queryClient.invalidateQueries({ queryKey: ["apiKeyStatus"] });
@@ -126,7 +136,7 @@ export default function ProfilePage() {
       const detail =
         axios.isAxiosError(err) && typeof err.response?.data?.detail === "string"
           ? err.response.data.detail
-          : "保存失败";
+          : t("profile.save_failed");
       message.error(detail);
     } finally {
       setSaving(false);
@@ -136,11 +146,11 @@ export default function ProfilePage() {
   const handleDeleteKey = async () => {
     try {
       await deleteApiKey();
-      message.success("API Key 已删除");
+      message.success(t("profile.api_key_deleted"));
       refetchKey();
       queryClient.invalidateQueries({ queryKey: ["apiKeyStatus"] });
     } catch {
-      message.error("删除失败");
+      message.error(t("profile.delete_failed"));
     }
   };
 
@@ -158,12 +168,12 @@ export default function ProfilePage() {
       });
       setAuth(access_token, user);
       pwForm.resetFields();
-      message.success("密码已修改，其他设备上的登录已失效");
+      message.success(t("profile.password_changed"));
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 429) {
-        message.error("操作过于频繁，请稍后再试");
+        message.error(t("profile.password_too_frequent"));
       } else {
-        message.error("当前密码不正确或新密码不合要求");
+        message.error(t("profile.password_change_failed"));
       }
     } finally {
       setChangingPw(false);
@@ -185,10 +195,10 @@ export default function ProfilePage() {
   if (!user) {
     return (
       <div style={{ textAlign: "center", padding: 80 }}>
-        <Typography.Text type="secondary">请先登录</Typography.Text>
+        <Typography.Text type="secondary">{t("profile.login_required")}</Typography.Text>
         <br />
         <Button type="primary" style={{ marginTop: 16 }} onClick={() => navigate("/login")}>
-          去登录
+          {t("profile.go_login")}
         </Button>
       </div>
     );
@@ -197,7 +207,7 @@ export default function ProfilePage() {
   return (
     <div style={{ maxWidth: 800, margin: "24px auto" }}>
       <Space direction="vertical" size="large" style={{ width: "100%" }}>
-        <Title level={3}>个人中心</Title>
+        <Title level={3}>{t("auth.profile")}</Title>
 
         <Tabs
           defaultActiveKey={defaultTab}
@@ -206,17 +216,17 @@ export default function ProfilePage() {
               key: "profile",
               label: (
                 <span>
-                  <UserOutlined /> 个人资料
+                  <UserOutlined /> {t("profile.tab_profile")}
                 </span>
               ),
               children: (
                 <Card>
                   <Descriptions column={1} bordered size="small">
-                    <Descriptions.Item label="用户名">{user.username}</Descriptions.Item>
-                    <Descriptions.Item label="显示名称">{user.display_name || "-"}</Descriptions.Item>
-                    <Descriptions.Item label="邮箱">{user.email}</Descriptions.Item>
-                    <Descriptions.Item label="注册时间">
-                      {new Date(user.created_at).toLocaleDateString("zh-CN")}
+                    <Descriptions.Item label={t("profile.username")}>{user.username}</Descriptions.Item>
+                    <Descriptions.Item label={t("profile.display_name")}>{user.display_name || "-"}</Descriptions.Item>
+                    <Descriptions.Item label={t("profile.email")}>{user.email}</Descriptions.Item>
+                    <Descriptions.Item label={t("profile.joined")}>
+                      {new Date(user.created_at).toLocaleDateString(dateLocale)}
                     </Descriptions.Item>
                   </Descriptions>
                 </Card>
@@ -226,7 +236,7 @@ export default function ProfilePage() {
               key: "bookmarks",
               label: (
                 <span>
-                  <BookOutlined /> 我的收藏 {bookmarksData ? `(${bookmarksData.total})` : ""}
+                  <BookOutlined /> {t("profile.tab_bookmarks")} {bookmarksData ? `(${bookmarksData.total})` : ""}
                 </span>
               ),
               children: bmLoading ? (
@@ -234,7 +244,7 @@ export default function ProfilePage() {
                   <Spin />
                 </div>
               ) : !bookmarksData?.items?.length ? (
-                <Empty description="暂无收藏" />
+                <Empty description={t("profile.no_bookmarks")} />
               ) : (
                 <>
                   <List
@@ -251,7 +261,9 @@ export default function ProfilePage() {
                           title={item.title_zh}
                           description={
                             item.note ||
-                            `收藏于 ${new Date(item.created_at).toLocaleDateString("zh-CN")}`
+                            t("profile.bookmarked_at", {
+                              date: new Date(item.created_at).toLocaleDateString(dateLocale),
+                            })
                           }
                         />
                       </List.Item>
@@ -270,7 +282,7 @@ export default function ProfilePage() {
               key: "history",
               label: (
                 <span>
-                  <HistoryOutlined /> 阅读历史 {historyData ? `(${historyData.total})` : ""}
+                  <HistoryOutlined /> {t("profile.tab_history")} {historyData ? `(${historyData.total})` : ""}
                 </span>
               ),
               children: histLoading ? (
@@ -278,7 +290,7 @@ export default function ProfilePage() {
                   <Spin />
                 </div>
               ) : !historyData?.items?.length ? (
-                <Empty description="暂无阅读记录" />
+                <Empty description={t("profile.no_history")} />
               ) : (
                 <>
                   <List
@@ -289,13 +301,17 @@ export default function ProfilePage() {
                         onClick={() => navigate(`/texts/${item.text_id}`)}
                         actions={[
                           <Button type="link" icon={<ReadOutlined />}>
-                            查看详情
+                            {t("profile.view_details")}
                           </Button>,
                         ]}
                       >
                         <List.Item.Meta
                           title={item.title_zh}
-                          description={`${item.cbeta_id} · 第${item.juan_num}卷 · ${new Date(item.last_read_at).toLocaleDateString("zh-CN")}`}
+                          description={t("profile.history_description", {
+                            cbetaId: item.cbeta_id,
+                            n: item.juan_num,
+                            date: new Date(item.last_read_at).toLocaleDateString(dateLocale),
+                          })}
                         />
                       </List.Item>
                     )}
@@ -321,7 +337,7 @@ export default function ProfilePage() {
                   <Space direction="vertical" size="middle" style={{ width: "100%" }}>
                     <Alert
                       message="Bring Your Own Key (BYOK)"
-                      description="配置自己的 AI API Key，即可无限使用 AI 佛典问答功能。不配置则使用平台免费额度（每日 10 次）。Key 经 AES 加密存储，仅用于调用 AI 接口。"
+                      description={t("profile.byok_description")}
                       type="info"
                       showIcon
                     />
@@ -330,24 +346,27 @@ export default function ProfilePage() {
                         message={
                           <Space>
                             <CheckCircleOutlined style={{ color: "#52c41a" }} />
-                            已配置: {keyStatus.provider} · {keyStatus.key_preview}
+                            {t("profile.api_key_configured", {
+                              provider: keyStatus.provider,
+                              preview: keyStatus.key_preview,
+                            })}
                             {keyStatus.model && ` · ${keyStatus.model}`}
                           </Space>
                         }
                         type="success"
                         action={
                           <Button danger size="small" icon={<DeleteOutlined />} onClick={handleDeleteKey}>
-                            删除
+                            {t("profile.delete")}
                           </Button>
                         }
                       />
                     )}
                     <div>
-                      <Typography.Text strong>服务商</Typography.Text>
+                      <Typography.Text strong>{t("profile.provider")}</Typography.Text>
                       <Select
                         value={provider}
                         onChange={setProvider}
-                        options={PROVIDERS}
+                        options={providerOptions}
                         showSearch
                         optionFilterProp="label"
                         style={{ width: "100%", marginTop: 4 }}
@@ -369,22 +388,22 @@ export default function ProfilePage() {
                       <Input.Password
                         value={apiKey}
                         onChange={(e) => setApiKey(e.target.value)}
-                        placeholder="输入你的 API Key"
+                        placeholder={t("profile.api_key_placeholder")}
                         style={{ marginTop: 4 }}
                       />
                     </div>
                     <div>
-                      <Typography.Text strong>模型（可选）</Typography.Text>
+                      <Typography.Text strong>{t("profile.model_optional")}</Typography.Text>
                       <Input
                         value={apiModel}
                         onChange={(e) => setApiModel(e.target.value)}
-                        placeholder="留空使用默认模型"
+                        placeholder={t("profile.model_placeholder")}
                         style={{ marginTop: 4 }}
                       />
                       {PROVIDER_MODELS[provider] && (
                         <Space wrap size={[6, 6]} style={{ marginTop: 8 }}>
                           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                            推荐：
+                            {t("profile.recommended")}
                           </Typography.Text>
                           {PROVIDER_MODELS[provider].map((m) => (
                             <Tag.CheckableTag
@@ -395,7 +414,7 @@ export default function ProfilePage() {
                             >
                               <span style={{ fontWeight: 500 }}>{m.label}</span>
                               <span style={{ marginLeft: 6, color: "#8c8c8c", fontSize: 11 }}>
-                                {m.hint}
+                                {t(m.hintKey)}
                               </span>
                             </Tag.CheckableTag>
                           ))}
@@ -403,7 +422,7 @@ export default function ProfilePage() {
                       )}
                     </div>
                     <Button type="primary" loading={saving} onClick={handleSaveKey}>
-                      保存 API Key
+                      {t("profile.save_api_key")}
                     </Button>
                   </Space>
                 </Card>
@@ -413,23 +432,21 @@ export default function ProfilePage() {
               key: "security",
               label: (
                 <span>
-                  <LockOutlined /> 账户安全
+                  <LockOutlined /> {t("profile.tab_security")}
                 </span>
               ),
               children: (
                 <Card>
                   <Space direction="vertical" size="middle" style={{ width: "100%" }}>
                     <Alert
-                      message="修改登录密码"
+                      message={t("profile.password_title")}
                       description={
                         <div>
                           <div style={{ marginBottom: 8 }}>
-                            修改成功后，其他设备（浏览器 / 手机）上的登录会立刻失效，需要用新密码重新登录。
+                            {t("profile.password_description_1")}
                           </div>
                           <div style={{ color: "#8c6e3e" }}>
-                            只有使用 <strong>用户名 + 密码</strong> 注册的账号可以在这里修改密码。如果你当初是通过
-                            <strong> GitHub 登录</strong> 或 <strong>Google 登录</strong> 进入 fojin 的，你的账号没有独立密码——
-                            下次登录时，请继续在登录页点击对应的 GitHub / Google 按钮即可。
+                            {t("profile.password_description_2")}
                           </div>
                         </div>
                       }
@@ -443,36 +460,36 @@ export default function ProfilePage() {
                       autoComplete="off"
                     >
                       <Form.Item
-                        label="当前密码"
+                        label={t("profile.current_password")}
                         name="old_password"
-                        rules={[{ required: true, message: "请输入当前密码" }]}
+                        rules={[{ required: true, message: t("profile.current_password_required") }]}
                       >
                         <Input.Password autoComplete="current-password" size="large" />
                       </Form.Item>
                       <Form.Item
-                        label="新密码"
+                        label={t("profile.new_password")}
                         name="new_password"
                         rules={[
-                          { required: true, message: "请输入新密码" },
-                          { min: 8, message: "密码至少 8 位" },
-                          { pattern: /[a-zA-Z]/, message: "密码必须包含字母" },
-                          { pattern: /\d/, message: "密码必须包含数字" },
+                          { required: true, message: t("profile.new_password_required") },
+                          { min: 8, message: t("auth.password_min") },
+                          { pattern: /[a-zA-Z]/, message: t("auth.password_letter") },
+                          { pattern: /\d/, message: t("auth.password_digit") },
                         ]}
                       >
                         <Input.Password autoComplete="new-password" size="large" />
                       </Form.Item>
                       <Form.Item
-                        label="确认新密码"
+                        label={t("profile.confirm_password")}
                         name="confirm_password"
                         dependencies={["new_password"]}
                         rules={[
-                          { required: true, message: "请再次输入新密码" },
+                          { required: true, message: t("profile.confirm_password_required") },
                           ({ getFieldValue }) => ({
                             validator(_, value) {
                               if (!value || getFieldValue("new_password") === value) {
                                 return Promise.resolve();
                               }
-                              return Promise.reject(new Error("两次输入的新密码不一致"));
+                              return Promise.reject(new Error(t("profile.password_mismatch")));
                             },
                           }),
                         ]}
@@ -481,7 +498,7 @@ export default function ProfilePage() {
                       </Form.Item>
                       <Form.Item>
                         <Button type="primary" htmlType="submit" loading={changingPw}>
-                          修改密码
+                          {t("profile.change_password")}
                         </Button>
                       </Form.Item>
                     </Form>

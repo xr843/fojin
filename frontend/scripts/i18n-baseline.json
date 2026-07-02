@@ -1,7 +1,6 @@
 {
   "src/data/collections.ts": 1166,
   "src/data/popularSutras.ts": 157,
-  "src/pages/ProfilePage.tsx": 87,
   "src/data/topics.ts": 74,
   "src/pages/AdminDashboardPage.tsx": 72,
   "src/pages/ExportsPage.tsx": 64,
@@ -21,7 +20,6 @@
   "src/pages/AdminAnswerQualityPage.tsx": 13,
   "src/pages/SearchPage.tsx": 13,
   "src/pages/TopicsPage.tsx": 11,
-  "src/pages/LoginPage.tsx": 8,
   "src/pages/ManuscriptViewerPage.tsx": 6,
   "src/pages/HomePage.tsx": 3,
   "src/utils/citationFormats.ts": 1
