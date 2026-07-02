@@ -1,35 +1,38 @@
 import type { WorkWitnessInfo } from "../api/client";
+import type { TFunction } from "i18next";
 
-/** 见证本语言 code → 中文标签 */
-export const WORK_LANG_LABELS: Record<string, string> = {
-  lzh: "中文",
-  zh: "中文",
-  pi: "巴利",
-  pli: "巴利",
-  sa: "梵文",
-  san: "梵文",
-  bo: "藏文",
-  tib: "藏文",
-  en: "英文",
+/** Witness language code → i18n key. */
+export const WORK_LANG_LABEL_KEYS: Record<string, string> = {
+  lzh: "work.lang.zh",
+  zh: "work.lang.zh",
+  pi: "work.lang.pi",
+  pli: "work.lang.pi",
+  sa: "work.lang.sa",
+  san: "work.lang.sa",
+  bo: "work.lang.bo",
+  tib: "work.lang.bo",
+  en: "work.lang.en",
 };
 
-/** 见证本藏经 code → 中文藏经名（仅常见者，未知返回 null 不展示） */
-export const WORK_CANON_LABELS: Record<string, string> = {
-  taisho: "大正藏",
-  xuzangjing: "卍續藏",
-  xuzang: "卍續藏",
-  pali: "巴利",
-  kangyur: "甘珠爾",
-  gretil: "GRETIL",
+/** Witness canon code → i18n key for common collections; unknown values hide. */
+export const WORK_CANON_LABEL_KEYS: Record<string, string> = {
+  taisho: "work.canon.taisho",
+  xuzangjing: "work.canon.xuzang",
+  xuzang: "work.canon.xuzang",
+  pali: "work.canon.pali",
+  kangyur: "work.canon.kangyur",
+  gretil: "work.canon.gretil",
 };
 
-export function workLangLabel(lang: string): string {
-  return WORK_LANG_LABELS[lang] || lang;
+export function workLangLabel(lang: string, t?: TFunction): string {
+  const key = WORK_LANG_LABEL_KEYS[lang];
+  return key && t ? t(key) : key || lang;
 }
 
-export function workCanonLabel(canon: string | null | undefined): string | null {
+export function workCanonLabel(canon: string | null | undefined, t?: TFunction): string | null {
   if (!canon) return null;
-  return WORK_CANON_LABELS[canon] || null;
+  const key = WORK_CANON_LABEL_KEYS[canon];
+  return key && t ? t(key) : key || null;
 }
 
 /** 见证本的阅读链接：有正文进阅读器，否则进详情页。 */

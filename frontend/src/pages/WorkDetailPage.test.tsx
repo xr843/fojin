@@ -1,8 +1,10 @@
-import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
+import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import i18n from "../i18n";
+import enTranslation from "../../public/locales/en/translation.json";
 import WorkDetailPage from "./WorkDetailPage";
 import {
   getWork,
@@ -26,6 +28,7 @@ beforeAll(() => {
         dispatchEvent: () => false,
       }) as unknown as MediaQueryList;
   }
+  i18n.addResourceBundle("en", "translation", enTranslation, true, true);
 });
 
 vi.mock("../api/client", () => ({
@@ -86,6 +89,11 @@ function renderPage(slug = "lotus-sutra") {
 describe("WorkDetailPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    i18n.changeLanguage("zh");
+  });
+
+  afterEach(() => {
+    i18n.changeLanguage("zh");
   });
 
   it("渲染作品标题、梵文别名、见证本列表与阅读链接", async () => {
@@ -131,5 +139,37 @@ describe("WorkDetailPage", () => {
     await waitFor(() =>
       expect(screen.getByText("NOT FOUND")).toBeInTheDocument(),
     );
+  });
+
+  it("renders work-detail chrome in the active UI language", async () => {
+    await i18n.changeLanguage("en");
+    mockGetWork.mockResolvedValue(work());
+    mockGetWorkWitnesses.mockResolvedValue([
+      witness({ text_id: 10, lang: "sa", role: "root", has_content: true }),
+      witness({
+        text_id: 30,
+        cbeta_id: "T0263",
+        title: "正法華經",
+        lang: "lzh",
+        canon: "taisho",
+        role: "translation",
+        has_content: false,
+      }),
+    ]);
+
+    renderPage();
+
+    await waitFor(() =>
+      expect(screen.getAllByText("妙法蓮華經").length).toBeGreaterThan(0),
+    );
+    expect(screen.getByText("Home")).toBeInTheDocument();
+    expect(screen.getByText("Works")).toBeInTheDocument();
+    expect(screen.getByText("2 witnesses")).toBeInTheDocument();
+    expect(screen.getByText("All versions")).toBeInTheDocument();
+    expect(screen.getByText("Root text")).toBeInTheDocument();
+    expect(screen.getByText("Sanskrit")).toBeInTheDocument();
+    expect(screen.getByText("Chinese")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Read/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Details/ })).toBeInTheDocument();
   });
 });

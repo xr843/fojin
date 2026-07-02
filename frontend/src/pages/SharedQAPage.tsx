@@ -6,16 +6,27 @@ import { RobotOutlined, MessageOutlined, ShareAltOutlined } from "@ant-design/ic
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize from "rehype-sanitize";
+import { useTranslation } from "react-i18next";
 import { getSharedQA, type SharedQA } from "../api/client";
 
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+function dateLocale(language: string): string {
+  if (language.startsWith("zh-Hant")) return "zh-Hant";
+  if (language.startsWith("en")) return "en-US";
+  return "zh-CN";
+}
+
+function formatDate(iso: string, language: string): string {
+  return new Intl.DateTimeFormat(dateLocale(language), {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(new Date(iso));
 }
 
 export default function SharedQAPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation();
   const [data, setData] = useState<SharedQA | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,11 +55,11 @@ export default function SharedQAPage() {
     return (
       <Result
         status="404"
-        title="未找到此分享"
-        subTitle="链接可能已失效或被删除"
+        title={t("sharedQA.notFoundTitle")}
+        subTitle={t("sharedQA.notFoundSubtitle")}
         extra={
           <Button type="primary" onClick={() => navigate("/chat")}>
-            去 AI 问答
+            {t("sharedQA.goToChat")}
           </Button>
         }
       />
@@ -56,7 +67,7 @@ export default function SharedQAPage() {
   }
 
   const previewText = data.answer.slice(0, 140).replace(/\n/g, " ");
-  const ogTitle = `${data.question.slice(0, 60)} — 佛津 AI 佛典问答`;
+  const ogTitle = t("sharedQA.ogTitle", { question: data.question.slice(0, 60) });
 
   return (
     <div style={{ maxWidth: 780, margin: "0 auto", padding: "32px 20px 80px" }}>
@@ -84,10 +95,10 @@ export default function SharedQAPage() {
             fontFamily: '"Noto Serif SC", serif',
           }}
         >
-          佛津 · FoJin
+          {t("shareCard.brand")}
         </Link>
         <div style={{ fontSize: 12, color: "var(--fj-ink-muted, #9a8e7a)", marginTop: 4 }}>
-          AI 佛典问答 · 引据原典 · {formatDate(data.created_at)}
+          {t("shareCard.subtitle")} · {formatDate(data.created_at, i18n.language)}
         </div>
       </div>
 
@@ -103,7 +114,7 @@ export default function SharedQAPage() {
             letterSpacing: 2,
           }}
         >
-          问
+          {t("shareCard.questionLabel")}
         </div>
         <h1
           style={{
@@ -134,7 +145,7 @@ export default function SharedQAPage() {
             letterSpacing: 2,
           }}
         >
-          <RobotOutlined /> 答
+          <RobotOutlined /> {t("shareCard.answerLabel")}
         </div>
         <div
           className="chat-markdown"
@@ -166,7 +177,7 @@ export default function SharedQAPage() {
               letterSpacing: 2,
             }}
           >
-            引据原典
+            {t("shareCard.sourcesTitle")}
           </div>
           {data.sources
             .filter((s) => s.title_zh)
@@ -187,11 +198,11 @@ export default function SharedQAPage() {
                     to={`/texts/${s.text_id}/read?juan=${s.juan_num}`}
                     style={{ color: "var(--fj-ink-light, #5c4f3d)" }}
                   >
-                    《{s.title_zh}》{s.juan_num > 0 ? `第${s.juan_num}卷` : ""}
+                    《{s.title_zh}》{s.juan_num > 0 ? t("shareCard.fascicle", { n: s.juan_num }) : ""}
                   </Link>
                 ) : (
                   <span>
-                    《{s.title_zh}》{s.juan_num > 0 ? `第${s.juan_num}卷` : ""}
+                    《{s.title_zh}》{s.juan_num > 0 ? t("shareCard.fascicle", { n: s.juan_num }) : ""}
                   </span>
                 )}
               </div>
@@ -216,10 +227,10 @@ export default function SharedQAPage() {
             fontWeight: 600,
           }}
         >
-          想问自己的佛学问题？
+          {t("sharedQA.askOwnQuestion")}
         </div>
         <div style={{ fontSize: 13, color: "var(--fj-ink-muted, #9a8e7a)", marginBottom: 18 }}>
-          佛津 AI 佛典问答 — 每一个回答都引据原典,汇聚 CBETA · SuttaCentral 等 600+ 数据源
+          {t("sharedQA.ctaDescription")}
         </div>
         <Button
           type="primary"
@@ -231,7 +242,7 @@ export default function SharedQAPage() {
             borderColor: "var(--fj-accent, #8b2500)",
           }}
         >
-          打开 AI 问答
+          {t("sharedQA.openChat")}
         </Button>
       </div>
 
@@ -243,7 +254,7 @@ export default function SharedQAPage() {
           color: "var(--fj-ink-muted, #9a8e7a)",
         }}
       >
-        <ShareAltOutlined /> 已被浏览 {data.view_count} 次
+        <ShareAltOutlined /> {t("sharedQA.viewed", { count: data.view_count })}
       </div>
     </div>
   );

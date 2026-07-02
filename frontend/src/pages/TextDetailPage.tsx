@@ -19,6 +19,7 @@ import {
   ExportOutlined,
 } from "@ant-design/icons";
 import { getTextDetail } from "../api/client";
+import { useTranslation } from "react-i18next";
 import { buildCbetaReadUrl } from "../utils/sourceUrls";
 import { getLastPosition } from "../utils/readingHistory";
 import BookmarkButton from "../components/BookmarkButton";
@@ -33,6 +34,7 @@ const { Title } = Typography;
 export default function TextDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [citationOpen, setCitationOpen] = useState(false);
   // 续读：有本地阅读记录时，主按钮变为"继续阅读·第N卷"。
   // useMemo 按 id 重算：相关经典跳转复用同一路由实例，useState 初始化会 stale。
@@ -61,30 +63,42 @@ export default function TextDetailPage() {
   if (!text) {
     return (
       <div style={{ textAlign: "center", padding: 80 }}>
-        <Typography.Text type="secondary">经典未找到</Typography.Text>
+        <Typography.Text type="secondary">{t("textDetail.notFound")}</Typography.Text>
       </div>
     );
   }
 
   const cbetaUrl = text.cbeta_url || buildCbetaReadUrl(text.cbeta_id);
+  const seoParts = [
+    text.title_zh,
+    text.translator ? t("textDetail.metaTranslator", { translator: text.translator }) : null,
+    text.dynasty,
+    text.category,
+  ].filter(Boolean).join(" · ");
+  const seoDescription = t("textDetail.seoDescription", { details: seoParts });
+  const shortDescription = [
+    text.title_zh,
+    text.translator ? t("textDetail.metaTranslator", { translator: text.translator }) : null,
+    text.category,
+  ].filter(Boolean).join(" · ");
 
   return (
     <div className="text-detail-page">
       <Helmet>
-        <title>{text.title_zh} — 佛津</title>
-        <meta name="description" content={`${text.title_zh}${text.translator ? ` · ${text.translator}译` : ""}${text.dynasty ? ` · ${text.dynasty}` : ""}${text.category ? ` · ${text.category}` : ""} — 佛津佛教古籍数字资源平台`} />
+        <title>{t("textDetail.pageTitle", { title: text.title_zh })}</title>
+        <meta name="description" content={seoDescription} />
         <link rel="canonical" href={`https://fojin.app/texts/${id}`} />
         <link rel="alternate" hrefLang="x-default" href={`https://fojin.app/texts/${id}`} />
         <link rel="alternate" hrefLang="zh" href={`https://fojin.app/texts/${id}`} />
         <meta property="og:type" content="book" />
-        <meta property="og:title" content={`${text.title_zh} — 佛津`} />
-        <meta property="og:description" content={`${text.title_zh}${text.translator ? ` · ${text.translator}译` : ""}${text.category ? ` · ${text.category}` : ""}`} />
+        <meta property="og:title" content={t("textDetail.pageTitle", { title: text.title_zh })} />
+        <meta property="og:description" content={shortDescription} />
         <meta property="og:url" content={`https://fojin.app/texts/${id}`} />
-        <meta property="og:site_name" content="佛津 FoJin" />
+        <meta property="og:site_name" content={t("app.name")} />
         <meta property="og:locale" content="zh_CN" />
         <meta name="twitter:card" content="summary" />
-        <meta name="twitter:title" content={`${text.title_zh} — 佛津`} />
-        <meta name="twitter:description" content={`${text.title_zh}${text.translator ? ` · ${text.translator}译` : ""}${text.category ? ` · ${text.category}` : ""}`} />
+        <meta name="twitter:title" content={t("textDetail.pageTitle", { title: text.title_zh })} />
+        <meta name="twitter:description" content={shortDescription} />
         <script type="application/ld+json">
           {JSON.stringify({
             "@context": "https://schema.org",
@@ -100,12 +114,12 @@ export default function TextDetailPage() {
             ...(text.category && { "genre": text.category }),
             "isPartOf": {
               "@type": "Collection",
-              "name": "佛津 FoJin 佛教古籍数字资源",
+              "name": t("textDetail.schemaCollectionName"),
               "url": "https://fojin.app/"
             },
             "provider": {
               "@type": "WebSite",
-              "name": "佛津 FoJin",
+              "name": t("app.name"),
               "url": "https://fojin.app/"
             }
           })}
@@ -114,9 +128,9 @@ export default function TextDetailPage() {
       <Space direction="vertical" size="large" style={{ width: "100%" }}>
         <Breadcrumb
           items={[
-            { title: <span style={{ cursor: "pointer" }} onClick={() => navigate("/")}><HomeOutlined /> 首页</span> },
-            { title: <span style={{ cursor: "pointer" }} onClick={() => navigate("/search")}>搜索</span> },
-            { title: "经典详情" },
+            { title: <span style={{ cursor: "pointer" }} onClick={() => navigate("/")}><HomeOutlined /> {t("nav.home", "首页")}</span> },
+            { title: <span style={{ cursor: "pointer" }} onClick={() => navigate("/search")}>{t("nav.search", "搜索")}</span> },
+            { title: t("textDetail.breadcrumbDetails") },
           ]}
         />
 
@@ -134,42 +148,42 @@ export default function TextDetailPage() {
 
           <Descriptions column={1} bordered size="small">
             {text.translator && (
-              <Descriptions.Item label="译者">
+              <Descriptions.Item label={t("textDetail.translator")}>
                 {text.dynasty ? `${text.dynasty} ` : ""}
                 {text.translator}
               </Descriptions.Item>
             )}
             {text.dynasty && (
-              <Descriptions.Item label="朝代">
+              <Descriptions.Item label={t("textDetail.dynasty")}>
                 {text.dynasty}
               </Descriptions.Item>
             )}
             {text.fascicle_count && (
-              <Descriptions.Item label="卷数">
-                {text.fascicle_count} 卷
+              <Descriptions.Item label={t("textDetail.fascicles")}>
+                {t("textDetail.fascicleCount", { count: text.fascicle_count })}
               </Descriptions.Item>
             )}
             {text.subcategory && (
-              <Descriptions.Item label="典藏">
+              <Descriptions.Item label={t("textDetail.collection")}>
                 {text.subcategory}
               </Descriptions.Item>
             )}
             {text.title_sa && (
-              <Descriptions.Item label="梵文名">
+              <Descriptions.Item label={t("textDetail.sanskritTitle")}>
                 {text.title_sa}
               </Descriptions.Item>
             )}
             {text.title_pi && (
-              <Descriptions.Item label="巴利文名">
+              <Descriptions.Item label={t("textDetail.paliTitle")}>
                 {text.title_pi}
               </Descriptions.Item>
             )}
             {text.title_bo && (
-              <Descriptions.Item label="藏文名">
+              <Descriptions.Item label={t("textDetail.tibetanTitle")}>
                 {text.title_bo}
               </Descriptions.Item>
             )}
-            <Descriptions.Item label="CBETA 编号">
+            <Descriptions.Item label={t("textDetail.cbetaId")}>
               {text.cbeta_id}
             </Descriptions.Item>
           </Descriptions>
@@ -189,7 +203,7 @@ export default function TextDetailPage() {
                 )
               }
             >
-              {lastRead ? `继续阅读 · 第${lastRead.juan}卷` : "在线阅读"}
+              {lastRead ? t("textDetail.continueReading", { n: lastRead.juan }) : t("textDetail.readOnline")}
             </Button>
           )}
           {cbetaUrl && (
@@ -201,7 +215,7 @@ export default function TextDetailPage() {
               rel="noopener noreferrer"
               style={{ background: "var(--fj-accent)", borderColor: "var(--fj-accent)", color: "#fff" }}
             >
-              CBETA 阅读
+              {t("textDetail.readOnCbeta")}
             </Button>
           )}
           <BookmarkButton textId={text.id} />
@@ -210,7 +224,7 @@ export default function TextDetailPage() {
             icon={<ExportOutlined />}
             onClick={() => setCitationOpen(true)}
           >
-            导出引用
+            {t("textDetail.exportCitation")}
           </Button>
         </Space>
 
