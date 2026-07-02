@@ -18,6 +18,7 @@ from app.core.exceptions import (
     ServiceError,
     ValidationError,
 )
+from app.core.url_security import ensure_public_https_url_resolves, normalize_public_https_url
 from app.database import async_session
 from app.models.chat import ChatAttachment, ChatMessage, ChatSession
 from app.models.hot_question import HotQuestion
@@ -528,17 +529,21 @@ def _resolve_llm_config(user: User | None) -> tuple[str, str, str, bool, str]:
     if user and user.encrypted_api_key:
         try:
             key = decrypt_api_key(user.encrypted_api_key, user.api_key_kdf_version)
-            provider = user.api_provider or "openai"
-            if provider == "custom":
-                url = user.api_custom_url or settings.llm_api_url
-                model = user.api_model or "gpt-4o-mini"
-            else:
-                url = PROVIDER_URLS.get(provider, settings.llm_api_url)
-                model = user.api_model or PROVIDER_DEFAULT_MODELS.get(provider, settings.llm_model)
-            return url, key, model, True, provider
         except Exception as exc:
             logger.warning("Failed to decrypt user %s API key: %s", user.id, exc)
             raise ServiceError("您的 API Key 解密失败，请在个人中心重新配置。") from None
+
+        provider = user.api_provider or "openai"
+        if provider == "custom":
+            try:
+                url = normalize_public_https_url(user.api_custom_url, label="自定义 API 地址")
+            except ValueError as exc:
+                raise ServiceError(f"自定义 API 地址不安全：{exc}") from None
+            model = user.api_model or "gpt-4o-mini"
+        else:
+            url = PROVIDER_URLS.get(provider, settings.llm_api_url)
+            model = user.api_model or PROVIDER_DEFAULT_MODELS.get(provider, settings.llm_model)
+        return url, key, model, True, provider
     url = settings.llm_api_url or "https://api.openai.com/v1"
     model = settings.llm_model or _detect_model_from_url(url)
     return url, settings.llm_api_key, model, False, "openai"
@@ -1052,6 +1057,12 @@ async def _prepare_chat(
 
     if not is_byok and not api_key:
         raise ServiceError("平台 AI 服务暂未配置。请在个人中心配置自己的 API Key 使用 AI 问答功能。")
+
+    if is_byok and provider == "custom":
+        try:
+            api_url = await ensure_public_https_url_resolves(api_url, label="自定义 API 地址")
+        except ValueError as exc:
+            raise ServiceError(f"自定义 API 地址不安全：{exc}") from None
 
     if user_id is not None:
         if not is_byok:
