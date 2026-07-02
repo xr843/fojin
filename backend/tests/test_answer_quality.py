@@ -5,11 +5,13 @@ from unittest.mock import MagicMock
 
 import pytest
 import pytest_asyncio
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.models.answer_review import AnswerReview
 from app.models.chat import ChatMessage, ChatSession
+from app.schemas.admin import AnswerReviewCreate
 from app.services.answer_quality import (
     WEAK_EVIDENCE_THRESHOLD,
     _is_failed_answer,
@@ -42,6 +44,12 @@ def test_downvoted_is_flagged():
     assert score > 0
 
 
+def test_short_answer_is_flagged_as_abnormal():
+    tags, score = classify_answer("不知道", _sources(0.9), None)
+    assert tags == ["abnormal"]
+    assert score > 0
+
+
 def test_no_citation_is_flagged():
     tags, _ = classify_answer("一段足够长的正常回答内容" * 3, None, None)
     assert "no_citation" in tags
@@ -57,9 +65,19 @@ def test_weak_evidence_is_flagged_and_graded():
 
 
 def test_multiple_detectors_stack():
-    tags, score = classify_answer("一段正常的回答" * 3, None, "down")
-    assert {"downvoted", "no_citation"} <= set(tags)
-    assert score > 5  # downvoted(5) + no_citation(2)
+    tags, score = classify_answer("短答", None, "down")
+    assert {"downvoted", "abnormal", "no_citation"} <= set(tags)
+    assert score > 7  # downvoted(5) + abnormal + no_citation(2)
+
+
+def test_answer_review_create_requires_bad_failure_category():
+    with pytest.raises(ValidationError):
+        AnswerReviewCreate(message_id=1, verdict="bad")
+
+
+def test_answer_review_create_rejects_good_failure_category():
+    with pytest.raises(ValidationError):
+        AnswerReviewCreate(message_id=1, verdict="good", failure_category="recall")
 
 
 def test_is_failed_answer():
@@ -195,6 +213,33 @@ async def test_no_citation_item_serializes_without_sources(aq_session):
     assert res["total_unreviewed"] == 1
     assert res["items"][0]["sources"] == []
     assert "no_citation" in res["items"][0]["reason_tags"]
+
+
+@pytest.mark.anyio
+async def test_queue_can_filter_by_multiple_reason_tags(aq_session):
+    await _seed_turn(
+        aq_session,
+        question="问一",
+        answer="短答",
+        sources=[{"text_id": 1, "juan_num": 1, "chunk_text": "x", "score": 0.9}],
+    )
+    await _seed_turn(
+        aq_session,
+        question="问二",
+        answer="正常长度的回答内容" * 5,
+        sources=None,
+    )
+    await _seed_turn(
+        aq_session,
+        question="问三",
+        answer="正常长度的回答内容" * 5,
+        sources=[{"text_id": 1, "juan_num": 1, "chunk_text": "x", "score": 0.9}],
+    )
+
+    res = await build_bad_answer_queue(aq_session, category="abnormal,no_citation")
+
+    assert res["total_unreviewed"] == 2
+    assert {item["question"] for item in res["items"]} == {"问一", "问二"}
 
 
 @pytest.mark.anyio

@@ -16,6 +16,7 @@ from app.models.chat import ChatMessage
 # vector+rerank score. Re-read score_distribution from the queue endpoint and
 # adjust if the corpus/reranker changes.
 WEAK_EVIDENCE_THRESHOLD = 0.37
+ABNORMAL_MIN_CHARS = 20
 
 # Prefixes of LLM-failure replies (see chat._FAILED_ANSWER_PREFIXES). Failed /
 # empty generations are bugs, not reviewable answers — they are excluded from
@@ -26,6 +27,7 @@ _FAILED_ANSWER_PREFIXES = ("抱歉，AI 服务", "AI 服务返回", "您的 API 
 # reason tag -> base weight in the suspicion score
 WEIGHTS = {
     "downvoted": 5.0,
+    "abnormal": 3.0,
     "no_citation": 2.0,
     "weak_evidence": 1.0,  # plus a graded bonus, see classify_answer
 }
@@ -66,20 +68,30 @@ def _clean_sources(sources) -> list[dict]:
     ]
 
 
+def _requested_categories(category: str | None) -> set[str]:
+    if not category:
+        return set()
+    return {c.strip() for c in category.split(",") if c.strip()}
+
+
 def classify_answer(
     content: str | None, sources, feedback: str | None
 ) -> tuple[list[str], float]:
     """Pure detector. Given an assistant message's columns, return the reason
     tags it trips and a suspicion score (0.0 = not suspect). Detectors read
-    ``feedback`` (downvoted) and ``sources`` (no_citation / weak_evidence);
-    ``content`` is unused today (kept for the signature + future content-based
-    detectors) — failed/empty answers are filtered upstream, not scored here."""
+    ``feedback`` (downvoted), ``content`` (abnormal short answers), and
+    ``sources`` (no_citation / weak_evidence). Failed/empty answers are filtered
+    upstream, not scored here."""
     tags: list[str] = []
     score = 0.0
 
     if feedback == "down":
         tags.append("downvoted")
         score += WEIGHTS["downvoted"]
+
+    if len((content or "").strip()) < ABNORMAL_MIN_CHARS:
+        tags.append("abnormal")
+        score += WEIGHTS["abnormal"]
 
     max_score = _max_source_score(sources)
     if max_score is None:
@@ -165,6 +177,7 @@ async def build_bad_answer_queue(
     """Live-compute the ranked queue of suspect assistant answers, excluding
     any message already reviewed."""
     since = datetime.now(UTC) - timedelta(days=window_days)
+    requested_categories = _requested_categories(category)
     reviewed = select(AnswerReview.message_id)
     rows = (
         await db.execute(
@@ -192,7 +205,7 @@ async def build_bad_answer_queue(
         tags, score = classify_answer(m.content, m.sources, m.feedback)
         if not tags or score < min_suspicion:
             continue
-        if category and category not in tags:
+        if requested_categories and not requested_categories.intersection(tags):
             continue
         items.append(
             QueueItem(

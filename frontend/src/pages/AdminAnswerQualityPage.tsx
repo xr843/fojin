@@ -3,6 +3,7 @@ import {
   Button,
   Card,
   Input,
+  InputNumber,
   Select,
   Space,
   Table,
@@ -12,20 +13,24 @@ import {
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
+  getAnswerReviewStats,
   getAnswerQualityQueue,
   submitAnswerReview,
   type AnswerQueueItem,
+  type AnswerReviewStats,
   type ScoreDistribution,
 } from "../api/client";
 
 const REASON_LABELS: Record<string, string> = {
   downvoted: "被踩",
+  abnormal: "异常短答",
   no_citation: "未引经",
   weak_evidence: "召回证据弱",
 };
 
 const REASON_COLORS: Record<string, string> = {
   downvoted: "red",
+  abnormal: "purple",
   no_citation: "orange",
   weak_evidence: "gold",
 };
@@ -46,8 +51,11 @@ export default function AdminAnswerQualityPage() {
   const [items, setItems] = useState<AnswerQueueItem[]>([]);
   const [total, setTotal] = useState(0);
   const [dist, setDist] = useState<ScoreDistribution | null>(null);
+  const [reviewStats, setReviewStats] = useState<AnswerReviewStats | null>(null);
   const [loading, setLoading] = useState(false);
-  const [categoryFilter, setCategoryFilter] = useState<string | undefined>();
+  const [windowDays, setWindowDays] = useState(90);
+  const [minSuspicion, setMinSuspicion] = useState(0);
+  const [reasonFilters, setReasonFilters] = useState<string[]>([]);
   const [verdicts, setVerdicts] = useState<
     Record<number, { category?: string; note?: string }>
   >({});
@@ -55,19 +63,25 @@ export default function AdminAnswerQualityPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getAnswerQualityQueue({
-        category: categoryFilter,
-        limit: 50,
-      });
+      const [res, stats] = await Promise.all([
+        getAnswerQualityQueue({
+          window: windowDays,
+          min_suspicion: minSuspicion,
+          category: reasonFilters.length ? reasonFilters.join(",") : undefined,
+          limit: 50,
+        }),
+        getAnswerReviewStats(),
+      ]);
       setItems(res.items);
       setTotal(res.total_unreviewed);
       setDist(res.score_distribution);
+      setReviewStats(stats);
     } catch {
       message.error("加载差答案队列失败");
     } finally {
       setLoading(false);
     }
-  }, [categoryFilter]);
+  }, [minSuspicion, reasonFilters, windowDays]);
 
   useEffect(() => {
     void load();
@@ -81,14 +95,17 @@ export default function AdminAnswerQualityPage() {
         return;
       }
       try {
-        await submitAnswerReview({
+        const res = await submitAnswerReview({
           message_id: item.message_id,
           verdict,
           failure_category: verdict === "bad" ? extra.category : undefined,
           note: extra.note,
         });
         setItems((prev) => prev.filter((i) => i.message_id !== item.message_id));
-        setTotal((t) => Math.max(0, t - 1));
+        setTotal(res.remaining_unreviewed);
+        void getAnswerReviewStats()
+          .then(setReviewStats)
+          .catch(() => undefined);
         message.success(verdict === "good" ? "已标记 good" : "已标记 bad");
       } catch {
         message.error("提交失败");
@@ -140,18 +157,54 @@ export default function AdminAnswerQualityPage() {
       <Typography.Title level={3}>差答案队列</Typography.Title>
       <Space style={{ marginBottom: 16 }} wrap>
         <Typography.Text strong>未复核 {total} 条</Typography.Text>
+        {reviewStats && (
+          <>
+            <Typography.Text type="secondary">
+              已复核 {reviewStats.reviewed_total} 条
+            </Typography.Text>
+            <Typography.Text type="secondary">good {reviewStats.good}</Typography.Text>
+            <Typography.Text type="secondary">bad {reviewStats.bad}</Typography.Text>
+          </>
+        )}
         {dist && (
           <Typography.Text type="secondary">
             召回分布 p10 {dist.p10 ?? "—"} / p50 {dist.p50 ?? "—"} / p90{" "}
             {dist.p90 ?? "—"}
           </Typography.Text>
         )}
+        <Space size={6}>
+          <Typography.Text type="secondary">时间窗口</Typography.Text>
+          <Select
+            style={{ width: 96 }}
+            value={windowDays}
+            onChange={setWindowDays}
+            options={[
+              { value: 30, label: "30 天" },
+              { value: 90, label: "90 天" },
+              { value: 180, label: "180 天" },
+              { value: 365, label: "365 天" },
+            ]}
+          />
+        </Space>
+        <Space size={6}>
+          <Typography.Text type="secondary">最低可疑度</Typography.Text>
+          <InputNumber
+            min={0}
+            max={20}
+            step={0.5}
+            precision={1}
+            style={{ width: 88 }}
+            value={minSuspicion}
+            onChange={(v) => setMinSuspicion(typeof v === "number" ? v : 0)}
+          />
+        </Space>
         <Select
+          mode="multiple"
           allowClear
           placeholder="按原因筛选"
-          style={{ width: 160 }}
-          value={categoryFilter}
-          onChange={(v) => setCategoryFilter(v)}
+          style={{ minWidth: 220 }}
+          value={reasonFilters}
+          onChange={(v: string[]) => setReasonFilters(v)}
           options={Object.entries(REASON_LABELS).map(([value, label]) => ({
             value,
             label,
@@ -165,7 +218,7 @@ export default function AdminAnswerQualityPage() {
         loading={loading}
         columns={columns}
         dataSource={items}
-        locale={{ emptyText: "队列已清空 🎉" }}
+        locale={{ emptyText: "队列已清空" }}
         expandable={{
           expandedRowRender: (item) => (
             <Card size="small" bordered={false}>
