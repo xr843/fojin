@@ -7,8 +7,10 @@ import { TOPICS, type Topic } from "../data/topics";
 import "../styles/sources.css";
 import "../styles/topics.css";
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 
 function TopicCard({ topic }: { topic: Topic }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
 
@@ -18,11 +20,11 @@ function TopicCard({ topic }: { topic: Topic }) {
         <div className="topic-card-title-row">
           <span className="topic-card-icon">{topic.icon}</span>
           <h3 className="topic-card-name">{topic.name}</h3>
-          <span className="topic-card-count">{topic.texts.length} 部经典</span>
+          <span className="topic-card-count">{t("topics.card.text_count", { count: topic.texts.length })}</span>
         </div>
         <p className="topic-card-desc">{topic.description}</p>
         <span className="topic-card-toggle">
-          {expanded ? "收起 \u25B2" : "展开查看 \u25BC"}
+          {expanded ? t("topics.card.collapse") : t("topics.card.expand")}
         </span>
       </div>
 
@@ -45,7 +47,7 @@ function TopicCard({ topic }: { topic: Topic }) {
               className="source-btn source-btn-search"
               onClick={() => navigate(`/search?q=${encodeURIComponent(topic.name.replace(/系经典|经论|典籍|精选/g, ""))}`)}
             >
-              <SearchOutlined /> 在佛津搜索相关经典
+              <SearchOutlined /> {t("topics.card.search_related")}
             </button>
           </div>
         </div>
@@ -55,6 +57,7 @@ function TopicCard({ topic }: { topic: Topic }) {
 }
 
 export default function TopicsPage() {
+  const { t } = useTranslation();
   const [showTop, setShowTop] = useState(false);
 
   useEffect(() => {
@@ -68,22 +71,22 @@ export default function TopicsPage() {
   return (
     <div className="sources-page">
       <Helmet>
-        <title>经典专题 — 佛津 FoJin</title>
+        <title>{t("topics.page.title")}</title>
         <meta
           name="description"
-          content="按主题浏览佛教经典：般若系、净土五经、法华系、禅宗典籍、律藏、阿含经、唯识经论、华严系。"
+          content={t("topics.page.description")}
         />
       </Helmet>
 
       <div className="sources-header">
-        <h1 className="sources-title">经典专题</h1>
+        <h1 className="sources-title">{t("topics.page.heading")}</h1>
         <p className="sources-desc">
-          {TOPICS.length} 个专题 · {totalTexts} 部经典 · 按主题浏览佛教核心典籍
+          {t("topics.page.summary", { topics: TOPICS.length, texts: totalTexts })}
         </p>
       </div>
 
       {TOPICS.length === 0 ? (
-        <Empty description="暂无专题" style={{ marginTop: 60 }} />
+        <Empty description={t("topics.page.empty")} style={{ marginTop: 60 }} />
       ) : (
         <div className="topic-grid">
           {TOPICS.map((topic) => (
@@ -96,7 +99,7 @@ export default function TopicsPage() {
         <button
           className="sources-back-top"
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          aria-label="回到顶部"
+          aria-label={t("topics.page.back_to_top")}
         >
           <VerticalAlignTopOutlined />
           <span>Top</span>

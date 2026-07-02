@@ -21,6 +21,7 @@ import {
   type ScoreDistribution,
 } from "../api/client";
 import { useTranslation } from "react-i18next";
+import { formatAdminDate } from "./adminI18n";
 
 const REASON_LABEL_KEYS: Record<string, string> = {
   downvoted: "admin_aq.reason.downvoted",
@@ -51,7 +52,7 @@ const CATEGORY_OPTION_KEYS = [
 const WINDOW_DAY_OPTIONS = [30, 90, 180, 365];
 
 export default function AdminAnswerQualityPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [items, setItems] = useState<AnswerQueueItem[]>([]);
   const [total, setTotal] = useState(0);
   const [dist, setDist] = useState<ScoreDistribution | null>(null);
@@ -129,7 +130,7 @@ export default function AdminAnswerQualityPage() {
       title: t("admin_aq.column.time"),
       dataIndex: "created_at",
       width: 160,
-      render: (v: string) => new Date(v).toLocaleString("zh-CN"),
+      render: (v: string) => formatAdminDate(v, i18n.language),
     },
     {
       title: t("admin_aq.column.question"),
@@ -186,8 +187,11 @@ export default function AdminAnswerQualityPage() {
         )}
         {dist && (
           <Typography.Text type="secondary">
-            召回分布 p10 {dist.p10 ?? "—"} / p50 {dist.p50 ?? "—"} / p90{" "}
-            {dist.p90 ?? "—"}
+            {t("admin_aq.score_distribution", {
+              p10: dist.p10 ?? "—",
+              p50: dist.p50 ?? "—",
+              p90: dist.p90 ?? "—",
+            })}
           </Typography.Text>
         )}
         <Space size={6}>
@@ -243,20 +247,22 @@ export default function AdminAnswerQualityPage() {
           expandedRowRender: (item) => (
             <Card size="small" bordered={false}>
               <Typography.Paragraph>
-                <Typography.Text strong>问：</Typography.Text>
-                {item.question || "（无）"}
+                <Typography.Text strong>{t("admin_aq.detail.question_label")}</Typography.Text>
+                {item.question || t("admin_aq.empty_value")}
               </Typography.Paragraph>
               <Typography.Paragraph>
-                <Typography.Text strong>答：</Typography.Text>
+                <Typography.Text strong>{t("admin_aq.detail.answer_label")}</Typography.Text>
                 <span style={{ whiteSpace: "pre-wrap" }}>{item.answer}</span>
               </Typography.Paragraph>
               <Typography.Paragraph type="secondary">
-                当前反馈：{item.feedback ?? "无"}
+                {t("admin_aq.detail.current_feedback", {
+                  feedback: item.feedback ?? t("admin_aq.empty_value"),
+                })}
               </Typography.Paragraph>
-              <Typography.Text strong>召回片段：</Typography.Text>
+              <Typography.Text strong>{t("admin_aq.detail.sources_label")}</Typography.Text>
               {item.sources.length === 0 ? (
                 <Typography.Paragraph type="secondary">
-                  （未引经）
+                  {t("admin_aq.detail.no_sources")}
                 </Typography.Paragraph>
               ) : (
                 <ul>
@@ -265,7 +271,11 @@ export default function AdminAnswerQualityPage() {
                       key={i}
                       style={{ color: (s.score ?? 1) < WEAK_SCORE ? "#cf1322" : undefined }}
                     >
-                      {s.title_zh}（卷{s.juan_num}，score {s.score ?? "—"}）：
+                      {t("admin_aq.detail.source_meta", {
+                        title: s.title_zh,
+                        juan: s.juan_num,
+                        score: s.score ?? "—",
+                      })}
                       {s.chunk_text.slice(0, 80)}
                     </li>
                   ))}
@@ -274,7 +284,7 @@ export default function AdminAnswerQualityPage() {
               <Space direction="vertical" style={{ width: "100%", marginTop: 12 }}>
                 <Space wrap>
                   <Select
-                    placeholder="失败类型（bad 必填）"
+                    placeholder={t("admin_aq.failure_category_placeholder")}
                     style={{ width: 180 }}
                     options={CATEGORY_OPTION_KEYS.map(({ value, labelKey }) => ({
                       value,
@@ -288,13 +298,15 @@ export default function AdminAnswerQualityPage() {
                       }))
                     }
                   />
-                  <Button onClick={() => void review(item, "good")}>标 good</Button>
+                  <Button onClick={() => void review(item, "good")}>
+                    {t("admin_aq.action.mark_good")}
+                  </Button>
                   <Button danger onClick={() => void review(item, "bad")}>
-                    标 bad
+                    {t("admin_aq.action.mark_bad")}
                   </Button>
                 </Space>
                 <Input.TextArea
-                  placeholder="笔记（可选）"
+                  placeholder={t("admin_aq.note_placeholder")}
                   rows={2}
                   value={verdicts[item.message_id]?.note}
                   onChange={(e) =>

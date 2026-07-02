@@ -22,6 +22,11 @@ import "../styles/sources.css";
 // CBETA-style identifier: prefix letter (T/X/J/B/P/C) + 1-4 digits + optional lowercase suffix.
 // 例：T0278、X0235a、J1510b。命中即直跳 /texts/{id}，跳过结果列表。
 const CBETA_ID_RE = /^[TXJBPC]\d{1,4}[a-z]?$/i;
+const REGION_CHINA = "中国"; // i18n-exempt
+const REGION_TAIWAN = "台湾"; // i18n-exempt
+const REGION_MAINLAND_CHINA = "中国大陆"; // i18n-exempt
+const REGION_TAIWAN_CHINA = "中国台湾"; // i18n-exempt
+const REGION_OTHER = "其他"; // i18n-exempt
 
 export default function SearchPage() {
   const { t } = useTranslation();
@@ -199,9 +204,9 @@ export default function SearchPage() {
   /* 地区 & 馆藏统计 */
   /* 地区：中国→中国大陆，台湾→中国台湾，其余保持原国家名 */
   const normalizeRegion = (r: string): string => {
-    if (r === "中国") return "中国大陆";
-    if (r === "台湾") return "中国台湾";
-    return r || "其他";
+    if (r === REGION_CHINA) return REGION_MAINLAND_CHINA;
+    if (r === REGION_TAIWAN) return REGION_TAIWAN_CHINA;
+    return r || REGION_OTHER;
   };
 
   /* 只保留有真实搜索入口的外部数据源（左侧筛选只针对外部源） */
@@ -220,7 +225,7 @@ export default function SearchPage() {
       result = result.filter((s) => codes.has(s.code));
     }
     if (regionFilter.size > 0) {
-      result = result.filter((s) => regionFilter.has(normalizeRegion(s.region || "其他")));
+      result = result.filter((s) => regionFilter.has(normalizeRegion(s.region || REGION_OTHER)));
     }
     if (institutionFilter.size > 0) {
       result = result.filter((s) => institutionFilter.has(s.name_zh));
@@ -232,7 +237,7 @@ export default function SearchPage() {
   const regionCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     extSearchable.forEach((s) => {
-      const r = normalizeRegion(s.region || "其他");
+      const r = normalizeRegion(s.region || REGION_OTHER);
       counts[r] = (counts[r] || 0) + 1;
     });
     return counts;
@@ -282,12 +287,12 @@ export default function SearchPage() {
   const sortedRegions = useMemo(() => {
     return Object.keys(regionCounts).sort((a, b) => {
       // 中国大陆第一，中国台湾第二，其他最后，其余按数量降序
-      if (a === "中国大陆") return -1;
-      if (b === "中国大陆") return 1;
-      if (a === "中国台湾") return -1;
-      if (b === "中国台湾") return 1;
-      if (a === "其他") return 1;
-      if (b === "其他") return -1;
+      if (a === REGION_MAINLAND_CHINA) return -1;
+      if (b === REGION_MAINLAND_CHINA) return 1;
+      if (a === REGION_TAIWAN_CHINA) return -1;
+      if (b === REGION_TAIWAN_CHINA) return 1;
+      if (a === REGION_OTHER) return 1;
+      if (b === REGION_OTHER) return -1;
       return (regionCounts[b] || 0) - (regionCounts[a] || 0);
     });
   }, [regionCounts]);

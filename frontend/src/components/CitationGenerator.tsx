@@ -46,7 +46,7 @@ export default function CitationGenerator({
   open,
   onClose,
 }: CitationGeneratorProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [format, setFormat] = useState<CitationFormat>("bibtex");
 
   // Only fetch if the parent didn't pass textData
@@ -58,7 +58,16 @@ export default function CitationGenerator({
 
   const text = textData ?? fetched;
   const meta = text ? buildMeta(text) : null;
-  const citation = meta ? generateCitation(format, meta) : "";
+  const citationOptions = {
+    apaLocale: i18n.language.startsWith("en")
+      ? "en-US"
+      : i18n.language.startsWith("zh-Hant")
+      ? "zh-Hant"
+      : "zh-CN",
+    siteName: t("reader.citation_generator.site_name"),
+    accessedLabel: t("reader.citation_generator.accessed"),
+  };
+  const citation = meta ? generateCitation(format, meta, citationOptions) : "";
 
   const handleCopy = async () => {
     if (!citation) return;
@@ -72,7 +81,7 @@ export default function CitationGenerator({
 
   const handleDownload = () => {
     if (!meta) return;
-    downloadCitation(format, meta);
+    downloadCitation(format, meta, citationOptions);
     message.success(t("reader.citation_generator.downloaded"));
   };
 

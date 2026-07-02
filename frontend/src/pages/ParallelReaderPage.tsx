@@ -13,6 +13,7 @@ import {
   Typography,
 } from "antd";
 import { ArrowLeftOutlined, RobotOutlined, SwapOutlined } from "@ant-design/icons";
+import { useTranslation } from "react-i18next";
 import {
   getJuanAlignment,
   getParallelRead,
@@ -31,6 +32,7 @@ import "../styles/parallel.css";
 const { Title } = Typography;
 
 export default function ParallelReaderPage() {
+  const { t } = useTranslation();
   const { textId } = useParams<{ textId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -160,46 +162,51 @@ export default function ParallelReaderPage() {
   const relationOptions =
     relations?.relations.map((r) => ({
       value: r.text_id,
-      label: `${r.title_zh} (${r.translator || "佚名"} · ${r.dynasty || ""}) [${r.relation_type}]`,
+      label: `${r.title_zh} (${r.translator || t("parallel.option.anonymous")} · ${r.dynasty || ""}) [${r.relation_type}]`,
     })) ?? [];
 
   return (
     <div className="parallel-container">
       <div className="parallel-header">
-        <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)}>
-          返回
+        <Button
+          type="text"
+          aria-label={t("parallel.page.back")}
+          icon={<ArrowLeftOutlined />}
+          onClick={() => navigate(-1)}
+        >
+          {t("parallel.page.back")}
         </Button>
         <Title level={3} style={{ margin: 0 }}>
-          <SwapOutlined /> 跨藏并排对照
+          <SwapOutlined /> {t("parallel.page.title")}
         </Title>
       </div>
 
       <Card size="small" style={{ marginBottom: 16 }} className="parallel-controls">
         <Space wrap>
-          <span>对照版本：</span>
+          <span>{t("parallel.controls.compare_version")}</span>
           <Select
             style={{ minWidth: 260 }}
-            placeholder="选择对照文本"
+            placeholder={t("parallel.controls.choose_compare")}
             value={compareId ?? undefined}
             onChange={handleCompareChange}
             options={relationOptions}
           />
-          <span>+ 第三列：</span>
+          <span>{t("parallel.controls.third_column")}</span>
           <Select
             allowClear
             style={{ minWidth: 260 }}
-            placeholder="可选"
+            placeholder={t("parallel.controls.optional")}
             value={compare2Id ?? undefined}
             onChange={(v) => handleCompare2Change(v ?? null)}
             options={relationOptions.filter((o) => o.value !== compareId)}
           />
-          <span>卷：</span>
+          <span>{t("parallel.controls.juan")}</span>
           <InputNumber min={1} value={juan} onChange={handleJuanChange} />
         </Space>
       </Card>
 
       {!compareId ? (
-        <Empty description="请选择对照文本" />
+        <Empty description={t("parallel.status.choose_compare")} />
       ) : anyLoading ? (
         <div style={{ textAlign: "center", padding: 80 }}>
           <Spin size="large" />
@@ -207,16 +214,16 @@ export default function ParallelReaderPage() {
       ) : anyError ? (
         <Result
           status="error"
-          title="加载失败"
-          subTitle="对照内容加载出错，请稍后重试。"
+          title={t("parallel.status.load_failed")}
+          subTitle={t("parallel.status.load_failed_desc")}
           extra={
             <Button type="primary" onClick={() => parallelQueries.forEach((q) => q.refetch())}>
-              重试
+              {t("parallel.status.retry")}
             </Button>
           }
         />
       ) : columns.length === 0 ? (
-        <Empty description="对照内容未找到" />
+        <Empty description={t("parallel.status.not_found")} />
       ) : (
         <>
           <AlignmentCoverageBanner alignments={alignmentQueries.map((q) => q.data ?? null)} />
@@ -243,7 +250,7 @@ export default function ParallelReaderPage() {
               className="ai-diff-trigger"
               onClick={() => setShowDiff(true)}
             >
-              AI 差异分析（{selected.length} 段）
+              {t("parallel.page.ai_diff_button", { count: selected.length })}
             </Button>
           )}
           {showDiff && selected.length >= 2 && (
@@ -266,6 +273,7 @@ interface CoverageBannerProps {
 }
 
 function AlignmentCoverageBanner({ alignments }: CoverageBannerProps) {
+  const { t } = useTranslation();
   // Use the base column (first alignment) for the coverage stat — that's the driver
   const base = alignments[0];
   if (!base || base.total_chunks === 0) return null;
@@ -273,16 +281,20 @@ function AlignmentCoverageBanner({ alignments }: CoverageBannerProps) {
   const tone = pct >= 60 ? "#5b8c6b" : pct >= 30 ? "#d48806" : "#999";
   return (
     <div className="parallel-coverage-banner" style={{ borderLeftColor: tone }}>
-      <span>本卷对齐覆盖</span>
+      <span>{t("parallel.coverage.title")}</span>
       <strong style={{ color: tone }}>
-        {base.chunks_with_parallels} / {base.total_chunks} 段 ({pct}%)
+        {t("parallel.coverage.count", {
+          matched: base.chunks_with_parallels,
+          total: base.total_chunks,
+          pct,
+        })}
       </strong>
       <span className="parallel-coverage-hint">
         {pct >= 60
-          ? "锚点对齐为主，滚动精准"
+          ? t("parallel.coverage.high")
           : pct >= 30
-            ? "部分锚点对齐，无对齐处比例滚动"
-            : "无段级对齐，按比例同步滚动"}
+            ? t("parallel.coverage.medium")
+            : t("parallel.coverage.low")}
       </span>
     </div>
   );

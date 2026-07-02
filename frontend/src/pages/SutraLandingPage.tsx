@@ -22,10 +22,12 @@ import {
   getRelatedSutras,
   popularSutras,
 } from "../data/popularSutras";
+import { useTranslation } from "react-i18next";
 
 const { Title, Paragraph, Text } = Typography;
 
 export default function SutraLandingPage() {
+  const { t } = useTranslation();
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
 
@@ -52,12 +54,12 @@ export default function SutraLandingPage() {
     genre: "Buddhist Scripture",
     isPartOf: {
       "@type": "Collection",
-      name: "CBETA 中华电子佛典",
+      name: t("sutra_landing.cbeta_name"),
       url: "https://www.cbeta.org/",
     },
     provider: {
       "@type": "WebSite",
-      name: "佛津 FoJin",
+      name: t("sutra_landing.site_name"),
       url: "https://fojin.app/",
     },
   };
@@ -69,7 +71,7 @@ export default function SutraLandingPage() {
       {
         "@type": "ListItem",
         position: 1,
-        name: "首页",
+        name: t("sutra_landing.home"),
         item: "https://fojin.app/",
       },
       {
@@ -97,7 +99,7 @@ export default function SutraLandingPage() {
         <meta property="og:title" content={sutra.meta_title} />
         <meta property="og:description" content={sutra.meta_description} />
         <meta property="og:url" content={canonicalUrl} />
-        <meta property="og:site_name" content="佛津 FoJin" />
+        <meta property="og:site_name" content={t("sutra_landing.site_name")} />
         <meta property="og:locale" content="zh_CN" />
         <meta name="twitter:card" content="summary" />
         <meta name="twitter:title" content={sutra.meta_title} />
@@ -123,11 +125,11 @@ export default function SutraLandingPage() {
                   style={{ cursor: "pointer" }}
                   onClick={() => navigate("/")}
                 >
-                  <HomeOutlined /> 首页
+                  <HomeOutlined /> {t("sutra_landing.home")}
                 </span>
               ),
             },
-            { title: "热门经典" },
+            { title: t("sutra_landing.popular_sutras") },
             { title: sutra.title_zh.length > 10
                 ? sutra.title_zh.slice(0, 10) + "..."
                 : sutra.title_zh },
@@ -162,16 +164,16 @@ export default function SutraLandingPage() {
               <Tag color="gold">{sutra.dynasty}</Tag>
             )}
             {sutra.translator && (
-              <Tag color="geekblue">{sutra.translator} 译</Tag>
+              <Tag color="geekblue">{t("sutra_landing.translator_tag", { translator: sutra.translator })}</Tag>
             )}
             {sutra.fascicle_count > 0 && (
-              <Tag>{sutra.fascicle_count} 卷</Tag>
+              <Tag>{t("sutra_landing.fascicle_count", { count: sutra.fascicle_count })}</Tag>
             )}
           </Space>
         </Card>
 
         {/* Introduction */}
-        <Card title="经典简介">
+        <Card title={t("sutra_landing.introduction_title")}>
           <Typography>
             {sutra.introduction.map((para, i) => (
               <Paragraph key={i} style={{ fontSize: 15, lineHeight: 1.8 }}>
@@ -192,7 +194,7 @@ export default function SutraLandingPage() {
                 block
                 onClick={() => navigate(`/texts/${sutra.text_id}/read`)}
               >
-                开始阅读
+                {t("sutra_landing.start_reading")}
               </Button>
             </Col>
             <Col xs={24} sm={8}>
@@ -202,7 +204,7 @@ export default function SutraLandingPage() {
                 block
                 onClick={() => navigate(`/texts/${sutra.text_id}`)}
               >
-                经典详情
+                {t("sutra_landing.text_details")}
               </Button>
             </Col>
             <Col xs={24} sm={8}>
@@ -212,11 +214,11 @@ export default function SutraLandingPage() {
                 block
                 onClick={() =>
                   navigate(
-                    `/chat?q=${encodeURIComponent(`请介绍${sutra.title_zh}的核心思想`)}`
+                    `/chat?q=${encodeURIComponent(t("sutra_landing.chat_prompt", { title: sutra.title_zh }))}`
                   )
                 }
               >
-                AI 问答
+                {t("sutra_landing.ai_qa")}
               </Button>
             </Col>
           </Row>
@@ -226,7 +228,7 @@ export default function SutraLandingPage() {
         <div>
           <Divider>
             <Text strong style={{ fontSize: 16 }}>
-              更多热门经典
+              {t("sutra_landing.more_popular_sutras")}
             </Text>
           </Divider>
           <Row gutter={[16, 16]}>
@@ -283,16 +285,16 @@ export default function SutraLandingPage() {
             fontSize: 13,
           }}
         >
-          经文数据由{" "}
+          {t("sutra_landing.data_provided_by")}{" "}
           <a
             href="https://www.cbeta.org/"
             target="_blank"
             rel="noopener noreferrer"
             style={{ color: "var(--fj-accent, #8b2500)" }}
           >
-            CBETA 中华电子佛典协会
+            {t("sutra_landing.cbeta_association")}
           </a>{" "}
-          提供
+          {t("sutra_landing.provided")}
         </div>
       </Space>
     </div>
