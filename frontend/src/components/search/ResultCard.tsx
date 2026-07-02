@@ -32,7 +32,7 @@ export default function ResultCard({ hit, rank }: { hit: SearchHit; rank: number
   const navigate = useNavigate();
   const { t } = useTranslation();
   const titleHtml = hit.highlight?.title_zh?.[0] ?? hit.title_zh;
-  const sourceName = hit.source_code ? getSourceLabel(hit.source_code) : null;
+  const sourceName = hit.source_code ? getSourceLabel(hit.source_code, t) : null;
   const relatedTranslations = hit.related_translations || [];
   const langLabel = (lang: string) => (LANG_KEYS[lang] ? t(LANG_KEYS[lang]) : lang);
 
