@@ -16,11 +16,14 @@ import {
   VerticalAlignTopOutlined,
 } from "@ant-design/icons";
 import { api } from "../api/client";
-import collections, {
-  RESOURCE_CATEGORIES,
+import {
+  getLocalizedCollections,
+  getLocalizedResourceCategories,
+  RESOURCE_CATEGORY_KEYS,
   type Collection,
   type CollectionText,
   type CollectionLink,
+  type ResourceCategoryLabels,
   type ResourceCategory,
 } from "../data/collections";
 import { getAlignmentCatalog } from "../api/client";
@@ -72,8 +75,8 @@ function TextItem({ text, navigate, cbetaMap }: { text: CollectionText; navigate
   );
 }
 
-function ResourceTabs({ resources }: { resources: Collection["resources"] }) {
-  const availableTabs = (Object.keys(RESOURCE_CATEGORIES) as ResourceCategory[]).filter(
+function ResourceTabs({ resources, resourceCategories }: { resources: Collection["resources"]; resourceCategories: ResourceCategoryLabels }) {
+  const availableTabs = RESOURCE_CATEGORY_KEYS.filter(
     (k) => resources[k] && resources[k]!.length > 0,
   );
   const [activeTab, setActiveTab] = useState<ResourceCategory>(availableTabs[0]);
@@ -92,7 +95,7 @@ function ResourceTabs({ resources }: { resources: Collection["resources"] }) {
             onClick={() => setActiveTab(key)}
           >
             {RESOURCE_ICONS[key]}
-            <span>{RESOURCE_CATEGORIES[key]}</span>
+            <span>{resourceCategories[key]}</span>
             <span className="coll-res-tab-count">{resources[key]!.length}</span>
           </button>
         ))}
@@ -100,7 +103,7 @@ function ResourceTabs({ resources }: { resources: Collection["resources"] }) {
       <div className="coll-res-content">
         {links.map((link) => (
           <a
-            key={link.url}
+            key={link.key}
             href={link.url}
             target="_blank"
             rel="noopener noreferrer"
@@ -115,18 +118,17 @@ function ResourceTabs({ resources }: { resources: Collection["resources"] }) {
   );
 }
 
-function CollectionCard({ coll, cbetaMap }: { coll: Collection; cbetaMap: Record<string, number> }) {
+function CollectionCard({ coll, cbetaMap, resourceCategories }: { coll: Collection; cbetaMap: Record<string, number>; resourceCategories: ResourceCategoryLabels }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
 
-  const totalResources = (Object.keys(RESOURCE_CATEGORIES) as ResourceCategory[]).reduce(
+  const totalResources = RESOURCE_CATEGORY_KEYS.reduce(
     (sum, k) => sum + (coll.resources[k]?.length || 0),
     0,
   );
 
-  // Strip the data-layer suffix to build the on-site search query term.
-  const searchName = coll.name.replace("系列", ""); // i18n-exempt
+  const searchName = coll.searchQuery;
 
   return (
     <div className="coll-card">
@@ -154,7 +156,7 @@ function CollectionCard({ coll, cbetaMap }: { coll: Collection; cbetaMap: Record
             </div>
             <div className="coll-text-list">
               {coll.mainTexts.map((tx) => (
-                <TextItem key={tx.cbeta_id || tx.title} text={tx} navigate={navigate} cbetaMap={cbetaMap} />
+                <TextItem key={tx.key} text={tx} navigate={navigate} cbetaMap={cbetaMap} />
               ))}
             </div>
           </div>
@@ -167,7 +169,7 @@ function CollectionCard({ coll, cbetaMap }: { coll: Collection; cbetaMap: Record
               </div>
               <div className="coll-text-list">
                 {coll.commentaries.map((tx) => (
-                  <TextItem key={tx.cbeta_id || tx.title} text={tx} navigate={navigate} cbetaMap={cbetaMap} />
+                  <TextItem key={tx.key} text={tx} navigate={navigate} cbetaMap={cbetaMap} />
                 ))}
               </div>
             </div>
@@ -178,7 +180,7 @@ function CollectionCard({ coll, cbetaMap }: { coll: Collection; cbetaMap: Record
             <div className="coll-section-title">
               <LinkOutlined /> {t("collections.resources", { n: totalResources })}
             </div>
-            <ResourceTabs resources={coll.resources} />
+            <ResourceTabs resources={coll.resources} resourceCategories={resourceCategories} />
           </div>
 
           {/* 站内搜索 */}
@@ -333,11 +335,13 @@ function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useN
 }
 
 export default function CollectionsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [showTop, setShowTop] = useState(false);
   const [cbetaMap, setCbetaMap] = useState<Record<string, number>>({});
+  const collections = useMemo(() => getLocalizedCollections(i18n.language), [i18n.language]);
+  const resourceCategories = useMemo(() => getLocalizedResourceCategories(i18n.language), [i18n.language]);
 
   useEffect(() => {
     const onScroll = () => setShowTop(window.scrollY > 400);
@@ -361,7 +365,7 @@ export default function CollectionsPage() {
       .catch((err) => {
         console.warn("CBETA id 映射加载失败，相关外链将不可用", err);
       });
-  }, []);
+  }, [collections]);
 
   const filtered = useMemo(() => {
     if (!search) return collections;
@@ -370,16 +374,17 @@ export default function CollectionsPage() {
       c.name.toLowerCase().includes(q) ||
       c.tradition.toLowerCase().includes(q) ||
       c.description.toLowerCase().includes(q) ||
+      c.searchQuery.toLowerCase().includes(q) ||
       c.mainTexts.some((t) => t.title.toLowerCase().includes(q) || t.author?.toLowerCase().includes(q)) ||
       c.commentaries.some((t) => t.title.toLowerCase().includes(q) || t.author?.toLowerCase().includes(q))
     );
-  }, [search]);
+  }, [collections, search]);
 
   const totalTexts = collections.reduce((sum, c) => sum + c.mainTexts.length + c.commentaries.length, 0);
   const totalResources = collections.reduce(
     (sum, c) =>
       sum +
-      (Object.keys(RESOURCE_CATEGORIES) as ResourceCategory[]).reduce(
+      RESOURCE_CATEGORY_KEYS.reduce(
         (s, k) => s + (c.resources[k]?.length || 0),
         0,
       ),
@@ -422,7 +427,7 @@ export default function CollectionsPage() {
       ) : (
         <div className="coll-list">
           {filtered.map((c) => (
-            <CollectionCard key={c.id} coll={c} cbetaMap={cbetaMap} />
+            <CollectionCard key={c.id} coll={c} cbetaMap={cbetaMap} resourceCategories={resourceCategories} />
           ))}
         </div>
       )}
