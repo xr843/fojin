@@ -44,21 +44,32 @@ jobs:
           cache: npm
           cache-dependency-path: e2e/package-lock.json
 
-      # Conservative belt-and-suspenders: after a deploy-success dispatch the
-      # containers should already be up, but the webhook CD can still be
-      # mid-rebuild. We can't poll a commit hash (no version endpoint yet), but
-      # the en locale key count is a deterministic deploy signal whenever
-      # locales changed; when they didn't, any moment is equally valid to test.
-      # Wait until served == repo, give up after 12 min and test anyway (the
-      # functional specs are mostly version-independent). Harmless under
-      # schedule/workflow_dispatch since this step is gated to the dispatch.
-      - name: Wait for CD rollout
+      - name: Wait for deployed backend commit
+        if: github.event_name == 'repository_dispatch'
+        env:
+          BASE_URL: ${{ github.event.inputs.base_url || 'https://fojin.app' }}
+          EXPECTED_SHA: ${{ github.event.client_payload.commit || github.sha }}
+        run: |
+          echo "expected backend commit: $EXPECTED_SHA"
+          for i in $(seq 1 24); do
+            SERVED=$(curl -sf --max-time 10 "$BASE_URL/api/version" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).commit || ''))" 2>/dev/null || echo "")
+            if [ "$SERVED" = "$EXPECTED_SHA" ]; then
+              echo "backend commit in sync after $((i*30))s ($SERVED)"
+              exit 0
+            fi
+            echo "waiting for backend commit... served=${SERVED:-unavailable} ($((i*30))s)"
+            sleep 30
+          done
+          echo "::error::Production backend did not report expected commit $EXPECTED_SHA"
+          exit 1
+
+      - name: Wait for frontend locale
         if: github.event_name == 'repository_dispatch'
         run: |
           REPO_KEYS=$(node -e "console.log(Object.keys(require('../frontend/public/locales/en/translation.json')).length)")
           echo "repo en keys: $REPO_KEYS"
           for i in $(seq 1 24); do
-            SERVED=$(curl -sf --max-time 10 https://fojin.app/locales/en/translation.json | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(Object.keys(JSON.parse(d)).length))" 2>/dev/null || echo -1)
+            SERVED=$(curl -sf -A 'Mozilla/5.0' --max-time 10 https://fojin.app/locales/en/translation.json | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(Object.keys(JSON.parse(d)).length))" 2>/dev/null || echo -1)
             if [ "$SERVED" = "$REPO_KEYS" ]; then
               echo "locale in sync after $((i*30))s (served=$SERVED)"
               exit 0

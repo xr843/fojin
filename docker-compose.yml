@@ -101,6 +101,8 @@ services:
       API_KEY_ENCRYPTION_KEY: ${API_KEY_ENCRYPTION_KEY:?Set API_KEY_ENCRYPTION_KEY in .env (Fernet.generate_key() output)}
       # Drives the production fail-fast block in app/config.py.
       FOJIN_ENV: ${FOJIN_ENV:-production}
+      APP_VERSION: ${APP_VERSION:-}
+      FOJIN_COMMIT_SHA: ${FOJIN_COMMIT_SHA:-}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173,http://localhost:5174}
       LLM_API_URL: ${LLM_API_URL:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
