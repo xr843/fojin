@@ -1,7 +1,8 @@
 import { useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import * as d3 from "d3";
 import type { TopTranslator } from "../../api/stats";
-import { resolveDynasty } from "../../data/dynasty_years";
+import { getDynastyLabel, resolveDynasty } from "../../data/dynasty_years";
 
 interface TopTranslatorsChartProps {
   data: TopTranslator[];
@@ -9,6 +10,7 @@ interface TopTranslatorsChartProps {
 }
 
 export default function TopTranslatorsChart({ data, scholarlyMode }: TopTranslatorsChartProps) {
+  const { i18n } = useTranslation();
   const svgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
@@ -35,7 +37,10 @@ export default function TopTranslatorsChart({ data, scholarlyMode }: TopTranslat
 
     // Build label: name + dynasty
     const label = (d: TopTranslator) => {
-      if (d.dynasty) return `${d.name}（${d.dynasty}）`;
+      if (d.dynasty) {
+        const dynastyLabel = getDynastyLabel(d.dynasty, i18n.language);
+        return i18n.language.startsWith("en") ? `${d.name} (${dynastyLabel})` : `${d.name}（${dynastyLabel}）`;
+      }
       return d.name;
     };
 
@@ -92,7 +97,7 @@ export default function TopTranslatorsChart({ data, scholarlyMode }: TopTranslat
         .style("fill", "var(--fj-ink, #2b2318)")
         .text((d) => d.count.toLocaleString());
     }
-  }, [data, scholarlyMode]);
+  }, [data, i18n.language, scholarlyMode]);
 
   return <svg ref={svgRef} style={{ width: "100%", height: "auto" }} />;
 }
