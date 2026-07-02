@@ -134,6 +134,86 @@ async def test_runtime_dns_guard_rejects_hostname_resolving_to_private_ip(monkey
 
 
 @pytest.mark.anyio
+async def test_public_https_resolution_returns_pinned_ip(monkeypatch):
+    from app.core.url_security import resolve_public_https_url
+
+    def fake_getaddrinfo(host, port, *args, **kwargs):
+        assert host == "llm.example.com"
+        assert port == 443
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", port))]
+
+    monkeypatch.setattr(socket, "getaddrinfo", fake_getaddrinfo)
+
+    resolution = await resolve_public_https_url(
+        "https://llm.example.com/v1/", label="自定义 API 地址"
+    )
+
+    assert resolution.url == "https://llm.example.com/v1"
+    assert resolution.host == "llm.example.com"
+    assert resolution.port == 443
+    assert resolution.pinned_ip == "93.184.216.34"
+
+
+@pytest.mark.anyio
+async def test_pinned_network_backend_connects_validated_host_to_pinned_ip():
+    import httpcore
+
+    from app.core.url_security import PinnedHTTPSNetworkBackend, PublicHttpsResolution
+
+    class RecordingBackend(httpcore.AsyncNetworkBackend):
+        def __init__(self):
+            self.calls = []
+
+        async def connect_tcp(self, host, port, timeout=None, local_address=None, socket_options=None):
+            self.calls.append((host, port))
+            return MagicMock()
+
+        async def connect_unix_socket(self, path, timeout=None, socket_options=None):
+            raise AssertionError("unix sockets should not be used")
+
+        async def sleep(self, seconds):
+            return None
+
+    delegate = RecordingBackend()
+    backend = PinnedHTTPSNetworkBackend(
+        PublicHttpsResolution(
+            url="https://llm.example.com/v1",
+            host="llm.example.com",
+            port=443,
+            resolved_ips=("93.184.216.34",),
+        ),
+        delegate=delegate,
+    )
+
+    await backend.connect_tcp("llm.example.com", 443)
+    await backend.connect_tcp("other.example.com", 443)
+
+    assert delegate.calls == [
+        ("93.184.216.34", 443),
+        ("other.example.com", 443),
+    ]
+
+
+@pytest.mark.anyio
+async def test_custom_byok_http_client_uses_pinned_transport(monkeypatch):
+    from app.services import chat
+
+    transport = object()
+    pin = AsyncMock(return_value=transport)
+    client_cls = MagicMock(return_value="client")
+    monkeypatch.setattr(chat, "create_pinned_https_transport", pin)
+    monkeypatch.setattr(chat.httpx, "AsyncClient", client_cls)
+
+    client = await chat._build_llm_http_client(
+        "https://llm.example.com/v1", "custom", 60
+    )
+
+    assert client == "client"
+    pin.assert_awaited_once_with("https://llm.example.com/v1", label="自定义 API 地址")
+    client_cls.assert_called_once_with(timeout=60, transport=transport)
+
+
+@pytest.mark.anyio
 async def test_prepare_chat_rejects_custom_byok_when_runtime_dns_guard_fails(monkeypatch):
     from app.services import chat
 

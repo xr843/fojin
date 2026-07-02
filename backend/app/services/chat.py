@@ -18,7 +18,11 @@ from app.core.exceptions import (
     ServiceError,
     ValidationError,
 )
-from app.core.url_security import ensure_public_https_url_resolves, normalize_public_https_url
+from app.core.url_security import (
+    create_pinned_https_transport,
+    ensure_public_https_url_resolves,
+    normalize_public_https_url,
+)
 from app.database import async_session
 from app.models.chat import ChatAttachment, ChatMessage, ChatSession
 from app.models.hot_question import HotQuestion
@@ -153,6 +157,20 @@ def _build_anthropic_body(model: str, messages: list[dict], *, temperature: floa
     if stream:
         body["stream"] = True
     return body
+
+
+async def _build_llm_http_client(
+    api_url: str,
+    provider: str,
+    timeout: float,
+) -> httpx.AsyncClient:
+    if provider == "custom":
+        transport = await create_pinned_https_transport(
+            api_url,
+            label="自定义 API 地址",
+        )
+        return httpx.AsyncClient(timeout=timeout, transport=transport)
+    return httpx.AsyncClient(timeout=timeout)
 
 SYSTEM_PROMPT = (
     "你是小津（XiaoJin）——佛津（FoJin）平台内置的佛教古籍研习 AI 助手。\n\n"
@@ -1163,7 +1181,8 @@ async def send_message(
 
     # Call LLM (with fallback for platform users only)
     async def _call_once(u: str, k: str, m: str, p: str) -> str:
-        async with httpx.AsyncClient(timeout=60) as client:
+        client_cm = await _build_llm_http_client(u, p, 60)
+        async with client_cm as client:
             if _is_anthropic(u, p):
                 body = _build_anthropic_body(m, llm_messages, max_tokens=_with_reasoning_headroom(m, 8000 if page_content else 2000))
                 resp = await client.post(f"{u}/messages", headers=_build_anthropic_headers(k), json=body)
@@ -1482,9 +1501,11 @@ async def send_message_stream(
     # --- Phase 3: stream LLM (with fallback on connect-before-first-token failures) ---
     async def _stream_llm_once(u: str, k: str, m: str, p: str):
         """Inner generator that yields content chunks. Raises httpx errors on failure."""
+        timeout = 120 if page_content else 60
+        client_cm = await _build_llm_http_client(u, p, timeout)
         if _is_anthropic(u, p):
             body = _build_anthropic_body(m, llm_messages, stream=True, max_tokens=_with_reasoning_headroom(m, 8000 if page_content else 2000))
-            async with httpx.AsyncClient(timeout=120 if page_content else 60) as client, client.stream(
+            async with client_cm as client, client.stream(
                 "POST", f"{u}/messages", headers=_build_anthropic_headers(k), json=body,
             ) as resp:
                 resp.raise_for_status()
@@ -1504,7 +1525,7 @@ async def send_message_stream(
                     except (json.JSONDecodeError, KeyError):
                         continue
         else:
-            async with httpx.AsyncClient(timeout=120 if page_content else 60) as client, client.stream(
+            async with client_cm as client, client.stream(
                 "POST", f"{u}/chat/completions",
                 headers={"Authorization": f"Bearer {k}"},
                 json={"model": m, "messages": llm_messages, "temperature": 0.7,
