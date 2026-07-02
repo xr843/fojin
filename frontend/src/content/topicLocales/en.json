@@ -1,0 +1,174 @@
+{
+  "prajna": {
+    "name": "Prajna Classics",
+    "description": "A family of texts centered on emptiness wisdom, from the concise Heart Sutra to the vast Great Prajnaparamita collection.",
+    "searchQuery": "般若",
+    "texts": [
+      {
+        "title": "Heart Sutra",
+        "description": "The shortest and most distilled Prajnaparamita text, summarizing the heart of prajna thought in 260 Chinese characters."
+      },
+      {
+        "title": "Diamond Sutra",
+        "description": "Uses the diamond as an image for prajna wisdom and became a major scriptural basis for Chan Buddhism."
+      },
+      {
+        "title": "Large Prajnaparamita Sutra",
+        "description": "An important Prajnaparamita translation by Kumarajiva."
+      },
+      {
+        "title": "Great Prajnaparamita Sutra",
+        "description": "Xuanzang's 600-fascicle collection, the most comprehensive Chinese Prajnaparamita corpus."
+      }
+    ]
+  },
+  "pureland": {
+    "name": "Pure Land Five Scriptures",
+    "description": "Core Pure Land texts describing Sukhavati and the path of rebirth through Amitabha practice.",
+    "searchQuery": "净土",
+    "texts": [
+      {
+        "title": "Amitabha Sutra",
+        "description": "One of the Three Pure Land Sutras and the most widely recited Pure Land scripture."
+      },
+      {
+        "title": "Infinite Life Sutra",
+        "description": "Presents Amitabha Buddha's Forty-eight Vows in detail."
+      },
+      {
+        "title": "Contemplation Sutra",
+        "description": "Teaches the sixteen contemplations and the nine grades of rebirth."
+      },
+      {
+        "title": "Dashizhi Bodhisattva's Perfect Penetration Through Buddha Recitation",
+        "description": "A concise teaching on Buddha-recitation practice from the Shurangama Sutra."
+      },
+      {
+        "title": "Samantabhadra's Aspiration Chapter",
+        "description": "From the Avatamsaka Sutra, directing the ten great vows toward rebirth in Sukhavati."
+      }
+    ]
+  },
+  "lotus": {
+    "name": "Lotus Classics",
+    "description": "Foundational Tiantai texts centered on revealing the real through the provisional and unifying the three vehicles.",
+    "searchQuery": "法华",
+    "texts": [
+      {
+        "title": "Lotus Sutra",
+        "description": "Kumarajiva's translation and the foundational scripture of Tiantai Buddhism."
+      },
+      {
+        "title": "Zhengfa Hua Sutra",
+        "description": "Dharmaraksha's translation, the earliest Chinese translation of the Lotus Sutra."
+      },
+      {
+        "title": "Sutra on the Practice of Contemplating Samantabhadra",
+        "description": "One of the three Lotus scriptures, focused on repentance and purification."
+      }
+    ]
+  },
+  "chan": {
+    "name": "Chan Texts",
+    "description": "Core scriptures, recorded sayings, lamp records, and koan collections for direct pointing and seeing one's nature.",
+    "searchQuery": "禅宗",
+    "texts": [
+      {
+        "title": "Platform Sutra of the Sixth Patriarch",
+        "description": "Teachings of Huineng, the Sixth Patriarch of Chan, and the only Chinese Buddhist patriarchal work called a sutra."
+      },
+      {
+        "title": "Jingde Record of the Transmission of the Lamp",
+        "description": "A representative lamp-record text preserving Chan lineage accounts."
+      },
+      {
+        "title": "Blue Cliff Record",
+        "description": "Yuanwu Keqin's annotated collection, often called the foremost Chan koan book."
+      },
+      {
+        "title": "Compendium of the Five Lamps",
+        "description": "A comprehensive compilation of five lamp records and Chan encounter dialogues."
+      }
+    ]
+  },
+  "vinaya": {
+    "name": "Vinaya Selections",
+    "description": "Buddhist disciplinary texts on monastic life, communal order, and practice norms.",
+    "searchQuery": "律藏",
+    "texts": [
+      {
+        "title": "Four-Part Vinaya",
+        "description": "Dharmaguptaka Vinaya, the most widely used vinaya tradition in Chinese Buddhism."
+      },
+      {
+        "title": "Brahma Net Sutra",
+        "description": "A foundational Mahayana bodhisattva precepts text."
+      },
+      {
+        "title": "Mahasamghika Vinaya",
+        "description": "The vinaya text of the Mahasamghika school."
+      }
+    ]
+  },
+  "agama": {
+    "name": "Agama / Nikaya",
+    "description": "Early scriptures shared across northern and southern traditions, preserving direct records of the Buddha's early teachings.",
+    "searchQuery": "阿含",
+    "texts": [
+      {
+        "title": "Dirgha Agama",
+        "description": "A 22-fascicle collection corresponding to the Pali Digha Nikaya, including texts such as the Mahaparinirvana Sutra."
+      },
+      {
+        "title": "Madhyama Agama",
+        "description": "A 60-fascicle collection corresponding to the Pali Majjhima Nikaya."
+      },
+      {
+        "title": "Samyukta Agama",
+        "description": "A 50-fascicle collection corresponding to the Pali Samyutta Nikaya and close to early Buddhist teaching strata."
+      },
+      {
+        "title": "Ekottarika Agama",
+        "description": "A 51-fascicle collection corresponding to the Pali Anguttara Nikaya."
+      }
+    ]
+  },
+  "yogacara": {
+    "name": "Yogacara Texts",
+    "description": "Core Yogacara scriptures and treatises analyzing the structure and transformation of consciousness.",
+    "searchQuery": "唯识",
+    "texts": [
+      {
+        "title": "Samdhinirmocana Sutra",
+        "description": "A foundational Yogacara scripture and classic statement of the three-turnings teaching."
+      },
+      {
+        "title": "Cheng Weishi Lun",
+        "description": "Xuanzang's synthetic translation and a defining work of East Asian Yogacara."
+      },
+      {
+        "title": "Yogacarabhumi",
+        "description": "A 100-fascicle Yogacara encyclopedia attributed to Maitreya and transmitted by Asanga."
+      },
+      {
+        "title": "Mahayanasamgraha",
+        "description": "Asanga's concise outline of Yogacara thought."
+      }
+    ]
+  },
+  "avatamsaka": {
+    "name": "Avatamsaka Classics",
+    "description": "Foundational Huayan texts presenting dharmadhatu dependent arising and the unobstructed interpenetration of all phenomena.",
+    "searchQuery": "华严",
+    "texts": [
+      {
+        "title": "Avatamsaka Sutra",
+        "description": "The 80-fascicle translation by Shikshananda and the central scripture of Huayan Buddhism."
+      },
+      {
+        "title": "Avatamsaka Sutra (Sixty-Fascicle Version)",
+        "description": "The 60-fascicle translation by Buddhabhadra."
+      }
+    ]
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "prajna": {
+    "name": "般若系經典",
+    "description": "以空性智慧為核心的經典群，從《心經》260字的精要到《大般若經》600卷的浩瀚。",
+    "searchQuery": "般若",
+    "texts": [
+      { "title": "般若波羅蜜多心經", "description": "最簡短的般若經典，260字概括般若思想精髓" },
+      { "title": "金剛般若波羅蜜經", "description": "以金剛喻般若智慧，禪宗重要依據經典" },
+      { "title": "摩訶般若波羅蜜經", "description": "鳩摩羅什譯，般若系重要經典" },
+      { "title": "大般若波羅蜜多經", "description": "玄奘譯，600卷，般若類經典集大成" }
+    ]
+  },
+  "pureland": {
+    "name": "淨土五經",
+    "description": "淨土宗核心經典，描述西方極樂世界及往生法門。",
+    "searchQuery": "淨土",
+    "texts": [
+      { "title": "佛說阿彌陀經", "description": "淨土三經之一，最廣為流傳的淨土經典" },
+      { "title": "佛說無量壽經", "description": "詳述阿彌陀佛四十八願" },
+      { "title": "佛說觀無量壽佛經", "description": "十六觀法與九品往生" },
+      { "title": "大勢至菩薩念佛圓通章", "description": "出自《楞嚴經》，念佛法門精要" },
+      { "title": "普賢菩薩行願品", "description": "出自《華嚴經》，十大願王導歸極樂" }
+    ]
+  },
+  "lotus": {
+    "name": "法華系經典",
+    "description": "天台宗根本經典，開權顯實，會三歸一。",
+    "searchQuery": "法華",
+    "texts": [
+      { "title": "妙法蓮華經", "description": "鳩摩羅什譯，天台宗根本經典" },
+      { "title": "正法華經", "description": "竺法護譯，法華經最早漢譯本" },
+      { "title": "觀普賢菩薩行法經", "description": "法華三部之一，懺悔滅罪" }
+    ]
+  },
+  "chan": {
+    "name": "禪宗典籍",
+    "description": "直指人心、見性成佛，禪宗的核心經典與語錄。",
+    "searchQuery": "禪宗",
+    "texts": [
+      { "title": "六祖大師法寶壇經", "description": "禪宗六祖惠能說法，中國佛教唯一稱「經」的祖師著作" },
+      { "title": "景德傳燈錄", "description": "禪宗燈錄體代表作，記錄歷代禪師傳承" },
+      { "title": "碧巖錄", "description": "圓悟克勤評唱，禪門第一書" },
+      { "title": "五燈會元", "description": "五部燈錄彙編，禪宗公案大全" }
+    ]
+  },
+  "vinaya": {
+    "name": "律藏精選",
+    "description": "佛教戒律典籍，僧團生活與修行規範。",
+    "searchQuery": "律藏",
+    "texts": [
+      { "title": "四分律", "description": "法藏部律典，漢傳佛教最通行的律典" },
+      { "title": "梵網經", "description": "大乘菩薩戒經典" },
+      { "title": "摩訶僧祇律", "description": "大眾部律典" }
+    ]
+  },
+  "agama": {
+    "name": "阿含/尼柯耶",
+    "description": "佛陀原始教法的直接記錄，南北傳共有的早期經典。",
+    "searchQuery": "阿含",
+    "texts": [
+      { "title": "長阿含經", "description": "22卷，對應巴利長部，含大般涅槃經等" },
+      { "title": "中阿含經", "description": "60卷，對應巴利中部" },
+      { "title": "雜阿含經", "description": "50卷，對應巴利相應部，最接近原始佛法" },
+      { "title": "增壹阿含經", "description": "51卷，對應巴利增支部" }
+    ]
+  },
+  "yogacara": {
+    "name": "唯識經論",
+    "description": "瑜伽行派（唯識宗）核心經論，深入分析心識結構。",
+    "searchQuery": "唯識",
+    "texts": [
+      { "title": "解深密經", "description": "唯識學根本經典，三轉法輪" },
+      { "title": "成唯識論", "description": "玄奘糅譯，唯識學集大成之作" },
+      { "title": "瑜伽師地論", "description": "彌勒說、無著記，100卷瑜伽行派百科全書" },
+      { "title": "攝大乘論", "description": "無著造，唯識學綱要" }
+    ]
+  },
+  "avatamsaka": {
+    "name": "華嚴系經典",
+    "description": "華嚴宗根本經典，法界緣起、事事無礙的圓融世界觀。",
+    "searchQuery": "華嚴",
+    "texts": [
+      { "title": "大方廣佛華嚴經", "description": "實叉難陀譯80卷本，華嚴宗根本經典" },
+      { "title": "大方廣佛華嚴經（六十華嚴）", "description": "佛馱跋陀羅譯60卷本" }
+    ]
+  }
+}
