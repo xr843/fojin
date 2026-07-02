@@ -1,4 +1,5 @@
 import { Card, Tag, Spin, Alert, Button } from "antd";
+import { useTranslation } from "react-i18next";
 import { CloseOutlined, RobotOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { postAiDiff, type AiDiffChunkInput, type AiDiffResponse } from "../../api/client";
@@ -18,6 +19,7 @@ function chunksKey(chunks: AiDiffChunkInput[]): string {
 }
 
 export default function AIDiffPopover({ chunks, onClose, fetchAiDiff = postAiDiff }: Props) {
+  const { t } = useTranslation();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["ai-diff", chunksKey(chunks)],
     queryFn: () => fetchAiDiff(chunks),
@@ -32,14 +34,14 @@ export default function AIDiffPopover({ chunks, onClose, fetchAiDiff = postAiDif
       size="small"
       title={
         <div className="ai-diff-popover-header">
-          <RobotOutlined /> <span>AI 差异分析</span>
-          {data?.cached && <Tag color="default">缓存</Tag>}
+          <RobotOutlined /> <span>{t("parallel.diff.title")}</span>
+          {data?.cached && <Tag color="default">{t("parallel.diff.cached")}</Tag>}
           <Button
             type="text"
             size="small"
             icon={<CloseOutlined />}
             onClick={onClose}
-            aria-label="关闭"
+            aria-label={t("reader.dict.close")}
             style={{ marginLeft: "auto" }}
           />
         </div>
@@ -48,15 +50,15 @@ export default function AIDiffPopover({ chunks, onClose, fetchAiDiff = postAiDif
       {isLoading && (
         <div style={{ textAlign: "center", padding: 24 }}>
           <Spin />
-          <div style={{ marginTop: 8, color: "#888", fontSize: 13 }}>正在生成差异分析…</div>
+          <div style={{ marginTop: 8, color: "#888", fontSize: 13 }}>{t("parallel.diff.loading")}</div>
         </div>
       )}
       {isError && (
         <Alert
           type="error"
           showIcon
-          message="分析失败"
-          description="请稍后重试。"
+          message={t("parallel.diff.failed")}
+          description={t("parallel.diff.retry_later")}
           style={{ margin: "8px 0" }}
         />
       )}
@@ -67,7 +69,7 @@ export default function AIDiffPopover({ chunks, onClose, fetchAiDiff = postAiDif
           )}
           {data.analysis.differences && data.analysis.differences.length > 0 && (
             <>
-              <div className="ai-diff-section-label">差异</div>
+              <div className="ai-diff-section-label">{t("parallel.diff.differences")}</div>
               <ul className="ai-diff-differences">
                 {data.analysis.differences.map((d, i) => (
                   <li key={i}>{d}</li>
@@ -77,7 +79,7 @@ export default function AIDiffPopover({ chunks, onClose, fetchAiDiff = postAiDif
           )}
           {data.analysis.doctrinal_notes && (
             <>
-              <div className="ai-diff-section-label">教义注</div>
+              <div className="ai-diff-section-label">{t("parallel.diff.doctrinal_notes")}</div>
               <p className="ai-diff-doctrinal">{data.analysis.doctrinal_notes}</p>
             </>
           )}

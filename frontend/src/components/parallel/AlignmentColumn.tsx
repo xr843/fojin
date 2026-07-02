@@ -1,13 +1,14 @@
 import type { Ref } from "react";
 import { Card, Tag } from "antd";
+import { useTranslation } from "react-i18next";
 import type { ParallelTextContent, JuanAlignmentResponse } from "../../api/client";
 
-const LANG_LABEL: Record<string, string> = {
-  lzh: "汉",
-  pi: "Pāli",
-  sa: "Sanskrit",
-  bo: "བོ་",
-  en: "English",
+const LANG_LABEL_KEY: Record<string, string> = {
+  lzh: "parallel.column.lang.lzh",
+  pi: "parallel.column.lang.pi",
+  sa: "parallel.column.lang.sa",
+  bo: "parallel.column.lang.bo",
+  en: "parallel.column.lang.en",
 };
 
 const LANG_COLOR: Record<string, string> = {
@@ -69,6 +70,7 @@ export default function AlignmentColumn({
   selectedKeys,
   onChunkClick,
 }: Props) {
+  const { t } = useTranslation();
   const paragraphs = splitParagraphs(text.content);
   const chunkIndex = buildChunkIndex(alignment);
 
@@ -81,7 +83,7 @@ export default function AlignmentColumn({
           <span className="parallel-column-title">{text.title_zh}</span>
           {text.translator && <span className="parallel-column-translator">{text.translator}</span>}
           <Tag color={LANG_COLOR[text.lang] || "default"} className="parallel-column-lang">
-            {LANG_LABEL[text.lang] || text.lang}
+            {LANG_LABEL_KEY[text.lang] ? t(LANG_LABEL_KEY[text.lang]) : text.lang}
           </Tag>
         </div>
       }
