@@ -33,13 +33,13 @@ import ReaderParallelPanel from "../components/ReaderParallelPanel";
 import "../styles/versions-panel.css";
 import "../styles/reader.css";
 
-const LANG_LABELS: Record<string, string> = {
-  lzh: "中文",
-  pi: "巴利文",
-  en: "English",
-  sa: "梵文",
-  bo: "藏文",
-  ja: "日本語",
+const LANG_LABEL_KEYS: Record<string, string> = {
+  lzh: "reader.lang.lzh",
+  pi: "reader.lang.pi",
+  en: "reader.lang.en",
+  sa: "reader.lang.sa",
+  bo: "reader.lang.bo",
+  ja: "reader.lang.ja",
 };
 
 const FONT_SIZE_MIN = 14;
@@ -428,6 +428,10 @@ export default function TextReaderPage() {
   });
   const [fontSize, setFontSize] = useState(getInitialFontSize);
   const { t } = useTranslation();
+  const getLangLabel = useCallback((lang: string) => {
+    const key = LANG_LABEL_KEYS[lang];
+    return key ? t(key) : lang;
+  }, [t]);
   const [citationOpen, setCitationOpen] = useState(false);
   const [annotationOpen, setAnnotationOpen] = useState(false);
   const [apparatusOn, setApparatusOn] = useState(false);
@@ -612,21 +616,21 @@ export default function TextReaderPage() {
 
   const toggleBookmark = async () => {
     if (!user) {
-      message.info("请登录后收藏");
+      message.info(t("reader.bookmark.login_required"));
       return;
     }
     setBookmarkLoading(true);
     try {
       if (bookmarked) {
         await removeBookmark(textId);
-        message.success("已取消收藏");
+        message.success(t("reader.bookmark.removed"));
       } else {
         await addBookmark(textId);
-        message.success("已收藏");
+        message.success(t("reader.bookmark.added"));
       }
       queryClient.invalidateQueries({ queryKey: ["bookmark", textId] });
     } catch {
-      message.error("操作失败");
+      message.error(t("reader.bookmark.failed"));
     } finally {
       setBookmarkLoading(false);
     }
@@ -685,10 +689,10 @@ export default function TextReaderPage() {
         if (scroller) scroller.scrollTop += delta;
         else window.scrollBy({ top: delta });
       }
-      message.info(`已定位到上次阅读位置 · 第${resume.juan}卷`, 2.5);
+      message.info(t("reader.resume.positioned", { n: resume.juan }), 2.5);
     });
     return () => cancelAnimationFrame(raf);
-  }, [content, juanNum]);
+  }, [content, juanNum, t]);
 
   // 续读 · 记录阅读位置。trailing-throttle 1.5s；进卷时也记录一次；卸载时
   // flush 未落盘的最后位置。capture: true 是关键 —— AI 面板打开时滚动发生在
@@ -704,7 +708,7 @@ export default function TextReaderPage() {
       if (rect.height <= 0) return;
       recordReading({
         textId,
-        title: content.title_zh || `文本 ${textId}`,
+        title: content.title_zh || t("reader.text_fallback", { id: textId }),
         juan: juanNum,
         ratio: (window.innerHeight / 3 - rect.top) / rect.height,
       });
@@ -722,7 +726,7 @@ export default function TextReaderPage() {
         record(); // flush：离开页面/换卷前把最后 1.5s 内的滚动落盘
       }
     };
-  }, [content, textId, juanNum]);
+  }, [content, textId, juanNum, t]);
 
   // 回到顶部：滚过 ~一屏后浮现按钮。和续读同理，AI 面板打开时滚动发生在
   // .reader-container（不冒泡），只能在 window 捕获阶段收到 scroll 事件；
@@ -895,9 +899,8 @@ export default function TextReaderPage() {
       <Helmet>
         <title>
           {content?.title_zh
-            ? `${content.title_zh} 第${juanNum}卷`
-            : "在线阅读"}{" "}
-          — 佛津
+            ? t("reader.seo.title", { title: content.title_zh, n: juanNum })
+            : t("reader.seo.online_reading")}
         </title>
       </Helmet>
 
@@ -907,7 +910,7 @@ export default function TextReaderPage() {
           {
             title: (
               <span style={{ cursor: "pointer" }} onClick={() => navigate("/")}>
-                <HomeOutlined /> 首页
+                <HomeOutlined /> {t("reader.breadcrumb.home")}
               </span>
             ),
           },
@@ -917,21 +920,21 @@ export default function TextReaderPage() {
                 style={{ cursor: "pointer" }}
                 onClick={() => navigate(`/texts/${textId}`)}
               >
-                经典详情
+                {t("reader.breadcrumb.detail")}
               </span>
             ),
           },
-          { title: "在线阅读" },
+          { title: t("reader.breadcrumb.online_reading") },
         ]}
       />
 
       {/* Header */}
       <div className="reader-header">
         <Typography.Title level={3} style={{ marginBottom: 4 }}>
-          {content?.title_zh || juanList?.title_zh || "加载中..."}
+          {content?.title_zh || juanList?.title_zh || t("reader.loading")}
           {content?.canon_label && (
             <Tooltip
-              title="本经所属藏经（底本）— 据 CBETA 编号推导"
+              title={t("reader.canon.tooltip")}
               placement="right"
             >
               <Tag
@@ -957,8 +960,11 @@ export default function TextReaderPage() {
             options={
               juanList?.juans.map((j) => ({
                 value: j.juan_num,
-                label: `第 ${j.juan_num} 卷 (${j.char_count.toLocaleString()}字)`,
-              })) || [{ value: 1, label: "第 1 卷" }]
+                label: t("reader.juan.option", {
+                  n: j.juan_num,
+                  chars: j.char_count.toLocaleString(),
+                }),
+              })) || [{ value: 1, label: t("reader.juan.first") }]
             }
           />
           <div className="nav-btn-group">
@@ -969,7 +975,7 @@ export default function TextReaderPage() {
                 content?.prev_juan && setJuanNum(content.prev_juan)
               }
             >
-              上一卷
+              {t("reader.nav.prev")}
             </Button>
             <Button
               disabled={!content?.next_juan}
@@ -977,7 +983,7 @@ export default function TextReaderPage() {
                 content?.next_juan && setJuanNum(content.next_juan)
               }
             >
-              下一卷 <RightOutlined />
+              {t("reader.nav.next")} <RightOutlined />
             </Button>
           </div>
           <Button
@@ -986,21 +992,21 @@ export default function TextReaderPage() {
             loading={bookmarkLoading}
             onClick={toggleBookmark}
           >
-            {bookmarked ? "已收藏" : "收藏"}
+            {bookmarked ? t("reader.bookmark.added") : t("reader.bookmark.add")}
           </Button>
           <Button
             size="small"
             icon={<EditOutlined />}
             onClick={() => setAnnotationOpen(true)}
           >
-            标注
+            {t("reader.annotation.button")}
           </Button>
           <Button
             size="small"
             icon={<BookOutlined />}
             onClick={() => setCitationOpen(true)}
           >
-            引用
+            {t("reader.citation.button")}
           </Button>
           <Dropdown
             trigger={["click"]}
@@ -1043,14 +1049,14 @@ export default function TextReaderPage() {
               {t("reader.lineref.toggle")}
             </Button>
           </Tooltip>
-          <Tooltip title="跨藏对照（其他版本 · 经级/段级对读）">
+          <Tooltip title={t("reader.parallel.tooltip")}>
             <Button
               size="small"
               type={parallelPanelOpen ? "primary" : "default"}
               icon={<GlobalOutlined />}
               onClick={() => setParallelPanelOpen((v) => !v)}
             >
-              跨藏对照
+              {t("reader.parallel.button")}
             </Button>
           </Tooltip>
           {textDetail?.kabc_url && (
@@ -1095,14 +1101,14 @@ export default function TextReaderPage() {
             <Select
               value={compareLang}
               onChange={(val) => setCompareLang(val || null)}
-              placeholder="对照语言"
+              placeholder={t("reader.compare.placeholder")}
               allowClear
               style={{ width: 120 }}
             >
               {langData.languages
                 .filter((l) => l !== langData.default_lang)
                 .map((l) => (
-                  <Select.Option key={l} value={l}>{LANG_LABELS[l] || l}</Select.Option>
+                  <Select.Option key={l} value={l}>{getLangLabel(l)}</Select.Option>
                 ))
               }
             </Select>
@@ -1121,7 +1127,9 @@ export default function TextReaderPage() {
           <Row gutter={24}>
             <Col xs={24} lg={12}>
               <div className="bilingual-column">
-                <div className="bilingual-label">{LANG_LABELS[langData?.default_lang || ""] || "原文"}</div>
+                <div className="bilingual-label">
+                  {langData?.default_lang ? getLangLabel(langData.default_lang) : t("reader.compare.original")}
+                </div>
                 <div
                   className={`reader-body${showLineRef ? " show-lineref" : ""}`}
                   style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
@@ -1132,7 +1140,7 @@ export default function TextReaderPage() {
             </Col>
             <Col xs={24} lg={12}>
               <div className="bilingual-column">
-                <div className="bilingual-label">{LANG_LABELS[compareLang] || compareLang}</div>
+                <div className="bilingual-label">{getLangLabel(compareLang)}</div>
                 {compareLoading ? (
                   <div style={{ textAlign: "center", padding: 80 }}><Spin /></div>
                 ) : (
@@ -1142,7 +1150,7 @@ export default function TextReaderPage() {
                   >
                     {compareContent?.content
                       ? reflowedCompare.map((seg, i) => renderSegment(seg, i))
-                      : "暂无内容"}
+                      : t("reader.empty")}
                   </div>
                 )}
               </div>
@@ -1157,7 +1165,7 @@ export default function TextReaderPage() {
           </div>
         )
       ) : (
-        <Typography.Text type="secondary">暂无内容</Typography.Text>
+        <Typography.Text type="secondary">{t("reader.empty")}</Typography.Text>
       )}
       <ReaderDictPopover
         state={dictPopover}
@@ -1203,7 +1211,7 @@ export default function TextReaderPage() {
               content.prev_juan && setJuanNum(content.prev_juan)
             }
           >
-            <LeftOutlined /> 上一卷
+            <LeftOutlined /> {t("reader.nav.prev")}
           </Button>
           <Button
             disabled={!content.next_juan}
@@ -1211,7 +1219,7 @@ export default function TextReaderPage() {
               content.next_juan && setJuanNum(content.next_juan)
             }
           >
-            下一卷 <RightOutlined />
+            {t("reader.nav.next")} <RightOutlined />
           </Button>
         </div>
       )}
@@ -1238,7 +1246,7 @@ export default function TextReaderPage() {
         <div className="reader-ai-divider" onMouseDown={handleParallelDragStart} />
         <div className="reader-ai-sidebar" style={{ width: parallelPanelWidth }}>
           <div className="reader-ai-sidebar-header">
-            <span className="reader-ai-sidebar-title"><GlobalOutlined /> 跨藏对照</span>
+            <span className="reader-ai-sidebar-title"><GlobalOutlined /> {t("reader.parallel.button")}</span>
             <Button type="text" size="small" onClick={() => setParallelPanelOpen(false)}>✕</Button>
           </div>
           <ReaderParallelPanel textId={textId} juanNum={juanNum} />
@@ -1252,7 +1260,7 @@ export default function TextReaderPage() {
         <div className="reader-ai-divider" onMouseDown={handleDragStart} />
         <div className="reader-ai-sidebar" style={{ width: aiPanelWidth }}>
           <div className="reader-ai-sidebar-header">
-            <span className="reader-ai-sidebar-title"><RobotOutlined /> AI 解读</span>
+            <span className="reader-ai-sidebar-title"><RobotOutlined /> {t("reader.ai.title")}</span>
             <Button type="text" size="small" onClick={() => setAiPanelOpen(false)}>✕</Button>
           </div>
           <ReaderAIPanel
@@ -1266,7 +1274,7 @@ export default function TextReaderPage() {
         </div>
       </>
     ) : (
-      <Tooltip title="AI 解读" placement="left">
+      <Tooltip title={t("reader.ai.title")} placement="left">
         <Button
           className="reader-ai-fab"
           type="primary"
@@ -1274,7 +1282,7 @@ export default function TextReaderPage() {
           size="large"
           icon={<RobotOutlined />}
           onClick={() => setAiPanelOpen(true)}
-          aria-label="AI 解读"
+          aria-label={t("reader.ai.title")}
         />
       </Tooltip>
     )}
