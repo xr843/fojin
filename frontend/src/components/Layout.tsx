@@ -171,7 +171,7 @@ export default function Layout() {
             }}
             onClick={() => navigate("/")}
           >
-            佛津
+            {t("app.name")}
           </Typography.Title>
           <div className="nav-desktop">
             {navItems.map((item) =>
@@ -231,8 +231,8 @@ export default function Layout() {
           <Dropdown
             menu={{
               items: [
-                { key: "zh", label: "中文简体" },
-                { key: "zh-Hant", label: "中文繁體" },
+                { key: "zh", label: t("language.zh") },
+                { key: "zh-Hant", label: t("language.zh-Hant") },
                 { key: "en", label: "English" },
               ],
               onClick: ({ key }) => i18n.changeLanguage(key),

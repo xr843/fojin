@@ -68,12 +68,12 @@ export default function NotificationBell() {
       {unreadCount > 0 && (
         <div style={{ textAlign: "right", marginBottom: 8 }}>
           <Button type="link" size="small" onClick={handleMarkAllRead}>
-            全部已读
+            {t("notifications.mark_all_read")}
           </Button>
         </div>
       )}
       {items.length === 0 ? (
-        <Empty description="暂无通知" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+        <Empty description={t("notifications.empty")} image={Empty.PRESENTED_IMAGE_SIMPLE} />
       ) : (
         <List
           loading={loading}
@@ -118,7 +118,7 @@ export default function NotificationBell() {
   return (
     <Popover
       content={content}
-      title="通知"
+      title={t("notifications.title")}
       trigger="click"
       open={open}
       onOpenChange={handleOpenChange}
