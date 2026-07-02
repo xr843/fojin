@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { List, Typography, Tag, Button, Spin, Empty } from "antd";
 import { ReadOutlined } from "@ant-design/icons";
@@ -12,6 +13,7 @@ function SimilarPassagesInner({
   textId: number;
   juanNum: number;
 }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   const { data, isLoading } = useQuery({
@@ -26,7 +28,7 @@ function SimilarPassagesInner({
       <div style={{ textAlign: "center", padding: 24 }}>
         <Spin size="small" />
         <div style={{ marginTop: 8, fontSize: 12, color: "var(--fj-ink-muted)" }}>
-          正在查找相似段落…
+          {t("reader.similar.loading")}
         </div>
       </div>
     );
@@ -36,7 +38,7 @@ function SimilarPassagesInner({
     return (
       <Empty
         image={Empty.PRESENTED_IMAGE_SIMPLE}
-        description="暂无相似段落"
+        description={t("reader.similar.empty")}
         style={{ padding: "16px 0" }}
       />
     );
@@ -56,7 +58,7 @@ function SimilarPassagesInner({
               icon={<ReadOutlined />}
               onClick={() => navigate(`/texts/${item.text_id}/read`)}
             >
-              阅读
+              {t("reader.similar.read")}
             </Button>,
           ]}
         >
@@ -79,8 +81,8 @@ function SimilarPassagesInner({
             </div>
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
               {item.dynasty && `${item.dynasty} · `}
-              {item.translator || "佚名"}
-              {` · 第${item.juan_num}卷`}
+              {item.translator || t("reader.common.anonymous")}
+              {` · ${t("reader.similar.juan", { n: item.juan_num })}`}
             </Typography.Text>
             <Typography.Paragraph
               type="secondary"

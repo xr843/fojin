@@ -1,18 +1,20 @@
 import { useState, useMemo, memo } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Card, List, Tag, Typography, Button, Spin, Empty } from "antd";
 import { SwapOutlined, ReadOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { getTextRelations } from "../api/client";
 
-const RELATION_LABELS: Record<string, { label: string; color: string }> = {
-  alt_translation: { label: "异译", color: "orange" },
-  parallel: { label: "平行文本", color: "blue" },
-  commentary: { label: "注疏", color: "green" },
-  cites: { label: "引用", color: "red" },
+const RELATION_LABELS: Record<string, { labelKey: string; color: string }> = {
+  alt_translation: { labelKey: "reader.related.relation.alt_translation", color: "orange" },
+  parallel: { labelKey: "reader.related.relation.parallel", color: "blue" },
+  commentary: { labelKey: "reader.related.relation.commentary", color: "green" },
+  cites: { labelKey: "reader.related.relation.cites", color: "red" },
 };
 
 function RelatedTextsContent({ textId }: { textId: number }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [activeTypes, setActiveTypes] = useState<Set<string>>(new Set());
 
@@ -51,7 +53,7 @@ function RelatedTextsContent({ textId }: { textId: number }) {
     return (
       <Empty
         image={Empty.PRESENTED_IMAGE_SIMPLE}
-        description="暂无关联经典"
+        description={t("reader.related.empty")}
         style={{ padding: "16px 0" }}
       />
     );
@@ -74,7 +76,7 @@ function RelatedTextsContent({ textId }: { textId: number }) {
                   color: isActive ? undefined : meta.color,
                 }}
               >
-                {meta.label}
+                {t(meta.labelKey)}
               </Tag.CheckableTag>
             );
           })}
@@ -85,7 +87,7 @@ function RelatedTextsContent({ textId }: { textId: number }) {
         dataSource={filtered}
         renderItem={(item) => {
           const meta = RELATION_LABELS[item.relation_type] || {
-            label: item.relation_type,
+            labelKey: item.relation_type,
             color: "default",
           };
           return (
@@ -99,7 +101,7 @@ function RelatedTextsContent({ textId }: { textId: number }) {
                     navigate(`/parallel/${textId}?compare=${item.text_id}`)
                   }
                 >
-                  对照
+                  {t("reader.related.compare")}
                 </Button>,
               ]}
             >
@@ -112,14 +114,14 @@ function RelatedTextsContent({ textId }: { textId: number }) {
                   >
                     {item.title_zh}
                     <Tag color={meta.color} style={{ marginLeft: 8 }}>
-                      {meta.label}
+                      {RELATION_LABELS[item.relation_type] ? t(meta.labelKey) : item.relation_type}
                     </Tag>
                   </Button>
                 }
                 description={
                   <Typography.Text type="secondary">
                     {item.dynasty && `${item.dynasty} · `}
-                    {item.translator || "佚名"}
+                    {item.translator || t("reader.common.anonymous")}
                     {item.lang !== "lzh" && ` · ${item.lang}`}
                   </Typography.Text>
                 }
@@ -134,6 +136,7 @@ function RelatedTextsContent({ textId }: { textId: number }) {
 
 /** Standalone card version (used in TextDetailPage) */
 function RelatedTextsCard({ textId }: { textId: number }) {
+  const { t } = useTranslation();
   const { data } = useQuery({
     queryKey: ["relations", textId],
     queryFn: () => getTextRelations(textId),
@@ -146,7 +149,7 @@ function RelatedTextsCard({ textId }: { textId: number }) {
     <Card
       title={
         <span>
-          <SwapOutlined /> 关联文本
+          <SwapOutlined /> {t("reader.related.title")}
         </span>
       }
       size="small"

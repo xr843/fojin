@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Spin } from "antd";
+import { useTranslation } from "react-i18next";
 import { MessageOutlined } from "@ant-design/icons";
 import type { DictGroupedSearchResponse, DictEntry } from "../api/client";
 import { MAX_WORD_LEN, type DictPopoverState } from "./ReaderDictPopover.types";
@@ -35,6 +36,7 @@ export function ReaderDictPopover({
   onClose: () => void;
   onAsk: (text: string) => void;
 }) {
+  const { t } = useTranslation();
   if (!state.visible) return null;
 
   const isWord = state.text.length > 0 && state.text.length <= MAX_WORD_LEN;
@@ -76,7 +78,7 @@ export function ReaderDictPopover({
           {state.text}
           {reading && <span className="reader-dict-popover-reading">{reading}</span>}
         </span>
-        <button className="reader-dict-popover-close" onClick={onClose} aria-label="关闭">
+        <button className="reader-dict-popover-close" onClick={onClose} aria-label={t("reader.dict.close")}>
           ✕
         </button>
       </div>
@@ -101,7 +103,7 @@ export function ReaderDictPopover({
               ))}
             </div>
           ) : (
-            <div className="reader-dict-popover-empty">辞典未收录，可问小津</div>
+            <div className="reader-dict-popover-empty">{t("reader.dict.empty")}</div>
           )}
         </div>
       )}
@@ -109,11 +111,11 @@ export function ReaderDictPopover({
       <div className="reader-dict-popover-footer">
         <button className="reader-dict-popover-ask" onClick={handleAsk}>
           <MessageOutlined style={{ fontSize: 12, marginRight: 3 }} />
-          问小津
+          {t("dict.ask_ai")}
         </button>
         {isWord && (
           <Link to={`/dictionary?q=${encodeURIComponent(state.text)}`} onClick={onClose}>
-            查看全部释义 →
+            {t("reader.dict.view_all")}
           </Link>
         )}
       </div>

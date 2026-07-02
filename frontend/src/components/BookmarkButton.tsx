@@ -1,5 +1,6 @@
 import { Button, message } from "antd";
 import { HeartOutlined, HeartFilled } from "@ant-design/icons";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { useAuthStore } from "../stores/authStore";
@@ -21,6 +22,7 @@ function getErrorDetail(err: unknown): string | undefined {
 }
 
 export default function BookmarkButton({ textId, size }: BookmarkButtonProps) {
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
 
@@ -35,10 +37,10 @@ export default function BookmarkButton({ textId, size }: BookmarkButtonProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bookmark", textId] });
       queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
-      message.success(bookmarked ? "已取消收藏" : "已收藏");
+      message.success(bookmarked ? t("reader.bookmark.removed") : t("reader.bookmark.added"));
     },
     onError: (err: unknown) => {
-      message.error(getErrorDetail(err) || "操作失败");
+      message.error(getErrorDetail(err) || t("reader.bookmark.failed"));
     },
   });
 
@@ -52,7 +54,7 @@ export default function BookmarkButton({ textId, size }: BookmarkButtonProps) {
       loading={mutation.isPending}
       onClick={() => mutation.mutate()}
     >
-      {bookmarked ? "已收藏" : "收藏"}
+      {bookmarked ? t("reader.bookmark.added") : t("reader.bookmark.add")}
     </Button>
   );
 }

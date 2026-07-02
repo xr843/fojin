@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, List, Tag, Typography } from "antd";
+import { useTranslation } from "react-i18next";
 import { SwapOutlined } from "@ant-design/icons";
 import { Link } from "react-router-dom";
 import { getWorkByText } from "../api/client";
@@ -14,6 +15,7 @@ const { Text } = Typography;
  * 不渲染的情况：加载中 / 无数据 / 接口 404（null）/ 仅有自身一个见证本。
  */
 export default function OtherVersions({ textId }: { textId: number }) {
+  const { t } = useTranslation();
   const { data, isLoading } = useQuery({
     queryKey: ["work-by-text", textId],
     queryFn: () => getWorkByText(textId),
@@ -30,7 +32,7 @@ export default function OtherVersions({ textId }: { textId: number }) {
     <Card
       title={
         <span>
-          <SwapOutlined /> 其他版本 · {data.witness_count} 个见证本
+          <SwapOutlined /> {t("reader.versions.title", { n: data.witness_count })}
         </span>
       }
       size="small"
@@ -51,7 +53,7 @@ export default function OtherVersions({ textId }: { textId: number }) {
                     {w.title || w.cbeta_id}
                     {w.role === "root" && (
                       <Tag color="gold" style={{ marginLeft: 8 }}>
-                        底本
+                        {t("reader.versions.root")}
                       </Tag>
                     )}
                   </Link>
@@ -70,7 +72,7 @@ export default function OtherVersions({ textId }: { textId: number }) {
       />
       <div style={{ textAlign: "right", marginTop: 4 }}>
         <Link to={`/works/${data.slug}`} style={{ fontSize: 12 }}>
-          查看作品全部 {data.witness_count} 个版本 →
+          {t("reader.versions.view_all", { n: data.witness_count })}
         </Link>
       </div>
     </Card>
