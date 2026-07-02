@@ -3,6 +3,7 @@ import { Modal, Button, message, Spin } from "antd";
 import { DownloadOutlined, CopyOutlined, PictureOutlined } from "@ant-design/icons";
 import html2canvas from "html2canvas-pro";
 import QRCode from "qrcode";
+import { useTranslation } from "react-i18next";
 import { createSharedQA, type ChatSource } from "../api/client";
 
 interface ShareCardProps {
@@ -28,11 +29,11 @@ function sanitizeFilenameSegment(text: string): string {
   return out.replace(/\s+/g, "").slice(0, 18);
 }
 
-function buildFilename(question: string): string {
+function buildFilename(question: string, fallbackTitle: string): string {
   const d = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
   const datePart = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  const titlePart = sanitizeFilenameSegment(question || "佛典问答") || "佛典问答";
+  const titlePart = sanitizeFilenameSegment(question || fallbackTitle) || fallbackTitle;
   return `fojin-${datePart}-${titlePart}.png`;
 }
 
@@ -63,12 +64,22 @@ function truncate(text: string, max: number): { text: string; truncated: boolean
   return { text: base.trimEnd() + "……", truncated: true };
 }
 
-function formatDate(): string {
-  const d = new Date();
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+function dateLocale(language: string): string {
+  if (language.startsWith("zh-Hant")) return "zh-Hant";
+  if (language.startsWith("en")) return "en-US";
+  return "zh-CN";
+}
+
+function formatDate(language: string): string {
+  return new Intl.DateTimeFormat(dateLocale(language), {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(new Date());
 }
 
 export default function ShareCard({ open, onClose, question, answer, sources }: ShareCardProps) {
+  const { t, i18n } = useTranslation();
   const cardRef = useRef<HTMLDivElement>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
   const [generating, setGenerating] = useState(false);
@@ -130,13 +141,13 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
       if (!canvas) return;
       const dataUrl = canvas.toDataURL("image/png");
       const link = document.createElement("a");
-      link.download = buildFilename(question);
+      link.download = buildFilename(question, t("shareCard.filenameFallback"));
       link.href = dataUrl;
       link.click();
-      message.success("图片已保存");
+      message.success(t("shareCard.imageSaved"));
     } catch (e) {
       console.error("share card render failed", e);
-      message.error("生成图片失败，请重试");
+      message.error(t("shareCard.imageFailed"));
     } finally {
       setGenerating(false);
     }
@@ -144,7 +155,7 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
 
   const handleCopyImage = async () => {
     if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
-      message.warning("此浏览器不支持复制图片，请改用「下载图片」");
+      message.warning(t("shareCard.copyImageUnsupported"));
       return;
     }
     setGenerating(true);
@@ -155,14 +166,14 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
         canvas.toBlob((b) => resolve(b), "image/png"),
       );
       if (!blob) {
-        message.error("生成图片失败，请重试");
+        message.error(t("shareCard.imageFailed"));
         return;
       }
       await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-      message.success("图片已复制");
+      message.success(t("shareCard.imageCopied"));
     } catch (e) {
       console.error("copy image failed", e);
-      message.error("复制图片失败，请改用「下载图片」");
+      message.error(t("shareCard.copyImageFailed"));
     } finally {
       setGenerating(false);
     }
@@ -170,7 +181,7 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(shareUrl).then(() => {
-      message.success("链接已复制");
+      message.success(t("shareCard.linkCopied"));
     });
   };
 
@@ -181,8 +192,8 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
       footer={null}
       width={Math.min(CARD_WIDTH + 60, 800)}
       centered
-      destroyOnClose
-      title="分享这段佛典问答"
+      destroyOnHidden
+      title={t("shareCard.title")}
       styles={{ body: { background: "#e8e2d4", padding: 20 } }}
     >
       <div style={{ overflowX: "auto", display: "flex", justifyContent: "center" }}>
@@ -212,13 +223,13 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 28 }}>
             <div>
               <div style={{ fontSize: 30, fontWeight: 700, letterSpacing: 4, color: "#8b2500" }}>
-                佛津 · FoJin
+                {t("shareCard.brand")}
               </div>
               <div style={{ fontSize: 13, color: "#9a8e7a", marginTop: 4, letterSpacing: 1 }}>
-                AI 佛典问答 · 引据原典
+                {t("shareCard.subtitle")}
               </div>
             </div>
-            <div style={{ fontSize: 12, color: "#9a8e7a" }}>{formatDate()}</div>
+            <div style={{ fontSize: 12, color: "#9a8e7a" }}>{formatDate(i18n.language)}</div>
           </div>
 
           {/* Question */}
@@ -234,7 +245,7 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
                 letterSpacing: 2,
               }}
             >
-              问
+              {t("shareCard.questionLabel")}
             </div>
             <div
               style={{
@@ -263,7 +274,7 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
                 letterSpacing: 2,
               }}
             >
-              答
+              {t("shareCard.answerLabel")}
             </div>
             <div
               style={{
@@ -278,7 +289,7 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
             </div>
             {truncated && (
               <div style={{ fontSize: 12, color: "#9a8e7a", marginTop: 10, fontStyle: "italic" }}>
-                — 完整回答请访问 fojin.app/chat
+                {t("shareCard.fullAnswerHint")}
               </div>
             )}
           </div>
@@ -294,7 +305,7 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
               }}
             >
               <div style={{ fontSize: 12, color: "#9a8e7a", marginBottom: 8, letterSpacing: 2 }}>
-                引据原典
+                {t("shareCard.sourcesTitle")}
               </div>
               {topSources.map((s, i) => (
                 <div
@@ -307,7 +318,7 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
                   }}
                 >
                   <span style={{ color: "#b08d57", marginRight: 6 }}>▸</span>
-                  《{s.title_zh}》{s.juan_num > 0 ? `第${s.juan_num}卷` : ""}
+                  《{s.title_zh}》{s.juan_num > 0 ? t("shareCard.fascicle", { n: s.juan_num }) : ""}
                 </div>
               ))}
             </div>
@@ -329,9 +340,9 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
                 fojin.app
               </div>
               <div style={{ fontSize: 11, color: "#9a8e7a", marginTop: 3, lineHeight: 1.6 }}>
-                全球佛典数字资源平台
+                {t("shareCard.platformLine1")}
                 <br />
-                汇聚 CBETA · SuttaCentral 等 600+ 数据源
+                {t("shareCard.platformLine2")}
               </div>
             </div>
             {qrDataUrl && (
@@ -342,7 +353,7 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
                   style={{ width: 70, height: 70, display: "block" }}
                 />
                 <div style={{ fontSize: 10, color: "#9a8e7a", marginTop: 4 }}>
-                  扫码体验
+                  {t("shareCard.scanToOpen")}
                 </div>
               </div>
             )}
@@ -359,7 +370,7 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
           size="large"
           style={{ background: "#8b2500", borderColor: "#8b2500" }}
         >
-          下载图片
+          {t("shareCard.downloadImage")}
         </Button>
         <Button
           icon={<PictureOutlined />}
@@ -372,7 +383,7 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
             color: "#4a2d6e",
           }}
         >
-          复制图片
+          {t("shareCard.copyImage")}
         </Button>
         <Button
           icon={<CopyOutlined />}
@@ -386,12 +397,12 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
             color: "#2d2920",
           }}
         >
-          {creatingShare ? "生成链接中…" : "复制链接"}
+          {creatingShare ? t("shareCard.creatingLink") : t("shareCard.copyLink")}
         </Button>
       </div>
       {generating && (
         <div style={{ textAlign: "center", marginTop: 10, color: "#9a8e7a", fontSize: 12 }}>
-          <Spin size="small" /> 正在生成图片…
+          <Spin size="small" /> {t("shareCard.generatingImage")}
         </div>
       )}
     </Modal>
