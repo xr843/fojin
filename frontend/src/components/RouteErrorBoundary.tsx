@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Result, Button } from "antd";
+import i18n from "../i18n";
 
 interface Props {
   children: ReactNode;
@@ -33,14 +34,14 @@ export default class RouteErrorBoundary extends Component<Props, State> {
       return (
         <Result
           status="warning"
-          title="此页面加载出错"
-          subTitle="其他页面不受影响，您可以尝试重新加载此页面。"
+          title={i18n.t("error.route.title")}
+          subTitle={i18n.t("error.route.subtitle")}
           extra={
             <Button
               type="primary"
               onClick={() => this.setState({ hasError: false })}
             >
-              重试
+              {i18n.t("error.route.retry")}
             </Button>
           }
         />

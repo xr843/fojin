@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Result, Button, Space } from "antd";
+import i18n from "../i18n";
 
 interface Props {
   children: ReactNode;
@@ -28,8 +29,8 @@ export default class ErrorBoundary extends Component<Props, State> {
       return (
         <Result
           status="error"
-          title="页面渲染出错"
-          subTitle="抱歉，页面遇到了意外错误。请尝试刷新页面。"
+          title={i18n.t("error.boundary.title")}
+          subTitle={i18n.t("error.boundary.subtitle")}
           extra={
             <Space>
               <Button
@@ -39,7 +40,7 @@ export default class ErrorBoundary extends Component<Props, State> {
                   window.location.reload();
                 }}
               >
-                刷新页面
+                {i18n.t("error.boundary.reload")}
               </Button>
               <Button
                 onClick={() => {
@@ -47,7 +48,7 @@ export default class ErrorBoundary extends Component<Props, State> {
                   window.location.href = "/";
                 }}
               >
-                返回首页
+                {i18n.t("error.boundary.home")}
               </Button>
             </Space>
           }

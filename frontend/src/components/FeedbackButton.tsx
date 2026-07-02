@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { FloatButton, Modal, Input, message, Form } from "antd";
 import { CommentOutlined } from "@ant-design/icons";
 import { useAuthStore } from "../stores/authStore";
@@ -7,6 +8,7 @@ import { submitFeedback } from "../api/client";
 const { TextArea } = Input;
 
 export default function FeedbackButton() {
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -22,7 +24,7 @@ export default function FeedbackButton() {
         content: values.content,
         contact: values.contact || undefined,
       });
-      message.success("反馈已提交，感谢您的意见！");
+      message.success(t("feedback.submitted"));
       form.resetFields();
       setOpen(false);
     } catch {
@@ -36,37 +38,37 @@ export default function FeedbackButton() {
     <>
       <FloatButton
         icon={<CommentOutlined style={{ color: "#8b4513" }} />}
-        tooltip="意见反馈"
+        tooltip={t("feedback.title")}
         onClick={() => setOpen(true)}
         style={{ right: 24, bottom: 24 }}
       />
       <Modal
-        title="意见反馈"
+        title={t("feedback.title")}
         open={open}
         onCancel={() => setOpen(false)}
         onOk={handleSubmit}
         confirmLoading={loading}
-        okText="提交"
-        cancelText="取消"
+        okText={t("feedback.submit")}
+        cancelText={t("chat.cancel")}
       >
         <Form form={form} layout="vertical">
           <Form.Item
             name="content"
-            label="反馈内容"
-            rules={[{ required: true, message: "请输入反馈内容" }]}
+            label={t("feedback.content_label")}
+            rules={[{ required: true, message: t("feedback.content_required") }]}
           >
             <TextArea
               rows={4}
               maxLength={2000}
               showCount
-              placeholder="请描述您的建议、问题或意见..."
+              placeholder={t("feedback.content_placeholder")}
             />
           </Form.Item>
           <Form.Item
             name="contact"
-            label="联系方式（选填）"
+            label={t("feedback.contact_label")}
           >
-            <Input placeholder="邮箱或其他联系方式，方便我们回复您" maxLength={200} />
+            <Input placeholder={t("feedback.contact_placeholder")} maxLength={200} />
           </Form.Item>
         </Form>
       </Modal>
