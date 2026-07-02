@@ -326,7 +326,7 @@ export interface KGEntity {
   name_bo: string | null;
   name_en: string | null;
   description: string | null;
-  properties: Record<string, any> | null;
+  properties: Record<string, unknown> | null;
   text_id: TextId | null;
   external_ids: Record<string, string> | null;
   /** KG relation count — populated by search results, used for the degree badge. */

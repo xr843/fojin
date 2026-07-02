@@ -1,12 +1,23 @@
 import { Button, message } from "antd";
 import { HeartOutlined, HeartFilled } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
 import { useAuthStore } from "../stores/authStore";
 import { addBookmark, removeBookmark, checkBookmark } from "../api/client";
 
 interface BookmarkButtonProps {
   textId: number;
   size?: "small" | "middle" | "large";
+}
+
+interface ErrorResponse {
+  detail?: unknown;
+}
+
+function getErrorDetail(err: unknown): string | undefined {
+  if (!axios.isAxiosError<ErrorResponse>(err)) return undefined;
+  const detail = err.response?.data?.detail;
+  return typeof detail === "string" ? detail : undefined;
 }
 
 export default function BookmarkButton({ textId, size }: BookmarkButtonProps) {
@@ -26,8 +37,8 @@ export default function BookmarkButton({ textId, size }: BookmarkButtonProps) {
       queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
       message.success(bookmarked ? "已取消收藏" : "已收藏");
     },
-    onError: (err: any) => {
-      message.error(err.response?.data?.detail || "操作失败");
+    onError: (err: unknown) => {
+      message.error(getErrorDetail(err) || "操作失败");
     },
   });
 

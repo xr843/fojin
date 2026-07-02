@@ -543,7 +543,6 @@ export default function ChatPage() {
         setMessages((prev) => (prev.length === 0 ? parsed : prev));
       }
     } catch { /* ignore */ }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [attachments, setAttachments] = useState<ChatAttachmentMeta[]>([]);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);

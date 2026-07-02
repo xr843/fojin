@@ -3,10 +3,15 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, Form, Input, Button, Typography, Tabs, Divider, message, Space } from "antd";
 import { UserOutlined, LockOutlined, MailOutlined, GithubOutlined, GoogleOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
+import axios from "axios";
 import { useAuthStore } from "../stores/authStore";
 import api from "../api/client";
 
 const { Title, Text } = Typography;
+
+interface ApiErrorData {
+  detail?: string | Array<{ msg?: string }>;
+}
 
 /**
  * 登录成功后的回跳目标。用 sessionStorage 而非 location.state：OAuth 流程
@@ -20,6 +25,11 @@ function consumeReturnTo(): string {
     if (v && v.startsWith("/") && !v.startsWith("//")) return v;
   } catch { /* ignore */ }
   return "/";
+}
+
+function getApiErrorDetail(err: unknown): ApiErrorData["detail"] | undefined {
+  if (!axios.isAxiosError<ApiErrorData>(err)) return undefined;
+  return err.response?.data?.detail;
 }
 
 export default function LoginPage() {
@@ -72,8 +82,9 @@ export default function LoginPage() {
       setAuth(tokenData.access_token, user);
       message.success(t("auth.login_success"));
       navigate(consumeReturnTo());
-    } catch (err: any) {
-      message.error(err.response?.data?.detail || t("auth.login_fail"));
+    } catch (err: unknown) {
+      const detail = getApiErrorDetail(err);
+      message.error(typeof detail === "string" ? detail : t("auth.login_fail"));
     } finally {
       setLoading(false);
     }
@@ -90,9 +101,14 @@ export default function LoginPage() {
       await api.post("/auth/register", values);
       message.success(t("auth.register_success"));
       setActiveTab("login");
-    } catch (err: any) {
-      const detail = err.response?.data?.detail;
-      const msg = Array.isArray(detail) ? detail.map((d: any) => d.msg).join("; ") : detail || t("auth.register_fail");
+    } catch (err: unknown) {
+      const detail = getApiErrorDetail(err);
+      const msg = Array.isArray(detail)
+        ? detail
+            .map((d) => d.msg)
+            .filter((value): value is string => Boolean(value))
+            .join("; ") || t("auth.register_fail")
+        : detail || t("auth.register_fail");
       message.error(msg);
     } finally {
       setLoading(false);
@@ -214,5 +230,4 @@ function SocialLoginButtons() {
     </>
   );
 }
-
 

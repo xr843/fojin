@@ -12,6 +12,7 @@ Valid statuses: ok | degraded | cert_invalid | unreachable | moved
 
 import ipaddress
 import socket
+from collections.abc import Mapping
 from datetime import datetime
 from urllib.parse import urlsplit
 
@@ -131,12 +132,45 @@ def _is_moved(requested_url: str, final_url: str | None) -> bool:
     return not _same_site(src, dst)
 
 
+def _header_value(headers: Mapping[str, str] | None, name: str) -> str:
+    if not headers:
+        return ""
+    wanted = name.lower()
+    for key, value in headers.items():
+        if key.lower() == wanted:
+            return value.strip().lower()
+    return ""
+
+
+def _is_challenge_response(
+    status_code: int | None,
+    response_headers: Mapping[str, str] | None,
+    response_text: str | None,
+) -> bool:
+    """True when a reachable site returned an anti-bot challenge page."""
+    if status_code is None:
+        return False
+    if _header_value(response_headers, "cf-mitigated") == "challenge":
+        return True
+
+    if status_code not in (403, 429, 503):
+        return False
+    body = (response_text or "").lower()
+    if not body:
+        return False
+    if "/cdn-cgi/challenge-platform" in body or "cf-browser-verification" in body:
+        return True
+    return "just a moment" in body and "cloudflare" in body
+
+
 def classify_health(
     *,
     error: str | None,
     status_code: int | None,
     requested_url: str,
     final_url: str | None,
+    response_headers: Mapping[str, str] | None = None,
+    response_text: str | None = None,
 ) -> str:
     """Map a single probe outcome to a ``health_status`` value.
 
@@ -148,6 +182,9 @@ def classify_health(
         status_code: final HTTP status, or ``None`` when ``error`` is set.
         requested_url: the URL the probe started from.
         final_url: the URL after following redirects, or ``None``.
+        response_headers: final response headers, when a response exists.
+        response_text: bounded final response text, used only to recognise
+            anti-bot challenge pages that do not expose a dedicated header.
 
     Returns:
         One of :data:`VALID_STATUSES`.
@@ -168,6 +205,8 @@ def classify_health(
 
     if status_code is None:
         return "unreachable"
+    if _is_challenge_response(status_code, response_headers, response_text):
+        return "ok"
     if status_code >= 500:
         return "unreachable"
     # Only 404/410 mean the page is genuinely gone — that is a degraded source.

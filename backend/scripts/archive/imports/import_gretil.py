@@ -15,20 +15,96 @@ import asyncio
 import os
 import re
 import sys
+from html import unescape
+from urllib.parse import urljoin, urlparse
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from elasticsearch.helpers import async_bulk
 from scripts.base_importer import BaseImporter
+from sqlalchemy import text
+
+from app.core.elasticsearch import CONTENT_INDEX_NAME, INDEX_NAME
 from app.core.gretil_parser import parse_gretil_file
 
-from sqlalchemy import text
-from elasticsearch.helpers import async_bulk
-
-from app.core.elasticsearch import INDEX_NAME, CONTENT_INDEX_NAME
-
 # GRETIL Buddhism section index URL
-GRETIL_BASE = "https://gretil.sub.uni-goettingen.de/gretil"
-GRETIL_BUDDHISM_INDEX = f"{GRETIL_BASE}/corpusx.htm"
+GRETIL_SITE_BASE = "https://gretil.sub.uni-goettingen.de"
+GRETIL_BASE = f"{GRETIL_SITE_BASE}/gretil"
+GRETIL_BUDDHISM_INDEX = f"{GRETIL_SITE_BASE}/gretil.html"
+
+
+def _strip_tags(value: str) -> str:
+    return re.sub(r"<[^>]+>", "", value).strip()
+
+
+def _buddhist_sections(html: str) -> list[str]:
+    """Return sections headed by a Buddhist heading in the single-page index."""
+    headings = list(re.finditer(r"<h([1-6])\b[^>]*>(.*?)</h\1>", html, re.IGNORECASE | re.DOTALL))
+    sections = []
+
+    for index, heading in enumerate(headings):
+        title = unescape(_strip_tags(heading.group(2)))
+        if title.lower() != "buddhist":
+            continue
+
+        level = int(heading.group(1))
+        end = len(html)
+        for next_heading in headings[index + 1:]:
+            if int(next_heading.group(1)) <= level:
+                end = next_heading.start()
+                break
+
+        sections.append(html[heading.end():end])
+
+    return sections
+
+
+def _is_gretil_text_href(href: str) -> bool:
+    parsed_path = urlparse(href).path.lower()
+    if "/corpustei/" not in parsed_path:
+        return False
+    return parsed_path.endswith(".xml") or (
+        "/transformations/plaintext/" in parsed_path and parsed_path.endswith(".txt")
+    )
+
+
+def _gretil_text_key(url: str) -> str:
+    return os.path.splitext(os.path.basename(urlparse(url).path))[0]
+
+
+def _gretil_href_priority(url: str) -> int:
+    parsed_path = urlparse(url).path.lower()
+    if "/transformations/plaintext/" in parsed_path and parsed_path.endswith(".txt"):
+        return 0
+    return 1
+
+
+def _discover_links_from_gretil_html(html: str) -> list[dict]:
+    texts_by_key: dict[str, tuple[int, dict]] = {}
+
+    for section in _buddhist_sections(html):
+        for match in re.finditer(r"""href\s*=\s*["']([^"']+)["']""", section, re.IGNORECASE):
+            href = unescape(match.group(1))
+            if not _is_gretil_text_href(href):
+                continue
+
+            url = urljoin(GRETIL_BUDDHISM_INDEX, href)
+            key = _gretil_text_key(url)
+            priority = _gretil_href_priority(url)
+            existing = texts_by_key.get(key)
+            if existing is not None and existing[0] <= priority:
+                continue
+
+            texts_by_key[key] = (
+                priority,
+                {
+                    "url": url,
+                    "filename": os.path.basename(urlparse(url).path),
+                    "category": "Buddhism",
+                },
+            )
+
+    return [item for _, item in texts_by_key.values()]
 
 
 class GRETILImporter(BaseImporter):
@@ -73,20 +149,7 @@ class GRETILImporter(BaseImporter):
             print("  Trying alternative structure...")
             return await self._discover_from_directory()
 
-        # Parse links to .txt or .htm files under Buddhism section
-        texts = []
-        # Match href links to text files
-        pattern = r'href="([^"]*(?:sa_|sanskrit)[^"]*\.(?:txt|htm))"'
-        for match in re.finditer(pattern, html, re.IGNORECASE):
-            url = match.group(1)
-            if not url.startswith("http"):
-                url = f"{GRETIL_BASE}/{url.lstrip('/')}"
-            filename = url.split("/")[-1]
-            texts.append({
-                "url": url,
-                "filename": filename,
-                "category": "Buddhism",
-            })
+        texts = _discover_links_from_gretil_html(html)
 
         print(f"  Discovered {len(texts)} Buddhist Sanskrit texts from index.")
         return texts
@@ -143,7 +206,7 @@ class GRETILImporter(BaseImporter):
                 try:
                     # Get content
                     if info.get("local_path"):
-                        with open(info["local_path"], "r", encoding="utf-8", errors="replace") as f:
+                        with open(info["local_path"], encoding="utf-8", errors="replace") as f:
                             raw = f.read()
                     else:
                         resp = await self.rate_limited_get(info["url"])

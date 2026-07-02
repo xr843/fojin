@@ -87,7 +87,7 @@ interface Entity {
   name_bo?: string | null;
   name_en?: string | null;
   description?: string | null;
-  properties?: Record<string, any> | null;
+  properties?: Record<string, unknown> | null;
   text_id?: number | null;
   external_ids?: Record<string, string> | null;
   relations?: EntityRelationItem[];

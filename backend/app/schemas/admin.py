@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class AdminOverview(BaseModel):
@@ -192,6 +192,14 @@ class AnswerReviewCreate(BaseModel):
         None, pattern="^(recall|hallucination|prompt|data|other)$"
     )
     note: str | None = None
+
+    @model_validator(mode="after")
+    def validate_failure_category(self) -> "AnswerReviewCreate":
+        if self.verdict == "bad" and not self.failure_category:
+            raise ValueError("failure_category is required when verdict is bad")
+        if self.verdict == "good" and self.failure_category is not None:
+            raise ValueError("failure_category must be omitted when verdict is good")
+        return self
 
 
 class AnswerReviewResult(BaseModel):
