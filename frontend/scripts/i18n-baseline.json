@@ -16,7 +16,6 @@
   "src/components/AnnotationPanel.tsx": 25,
   "src/pages/AdminAuditLogPage.tsx": 24,
   "src/pages/AdminUsersPage.tsx": 22,
-  "src/components/ReaderAIPanel.tsx": 20,
   "src/pages/ParallelReaderPage.tsx": 20,
   "src/pages/SharedQAPage.tsx": 17,
   "src/pages/SutraLandingPage.tsx": 17,

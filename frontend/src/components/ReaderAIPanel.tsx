@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Input, Button, message, Spin, Tooltip } from "antd";
 import {
   SendOutlined,
@@ -20,6 +21,8 @@ import rehypeSanitize from "rehype-sanitize";
 import { sendChatMessageStream, updateChatMessageFeedback } from "../api/client";
 import type { ChatSource, ChatMessageItem, ReadingContext } from "../api/client";
 import type { ReactNode } from "react";
+
+type TFn = (key: string, opts?: Record<string, unknown>) => string;
 
 interface ReaderAIPanelProps {
   textId: number;
@@ -63,8 +66,7 @@ function injectCitationLinks(content: string, sources: ChatSource[] | null): str
     if (!source) return _match;
     const juan = juanStr ? parseInt(juanStr, 10) : source.juan_num;
     const url = `/texts/${source.text_id}/read?juan=${juan}`;
-    const label = juanStr ? `【《${title}》第${juanStr}卷】` : `【《${title}》】`;
-    return `[${label}](${url})`;
+    return `[${_match}](${url})`;
   });
 }
 
@@ -72,10 +74,20 @@ function tightenLists(md: string): string {
   return md.replace(/^(\d+\.)\s*\n\n+/gm, "$1 ").replace(/\n\n+(?=\d+\.\s)/g, "\n");
 }
 
-function getQuickActions(textTitle: string, juanNum: number) {
+function getQuickActions(textTitle: string, juanNum: number, t: TFn) {
   return [
-    { key: "explain", icon: <ReadOutlined />, label: "全文解读", prompt: `请对《${textTitle}》第${juanNum}卷进行逐段解读，提供白话翻译和重点术语解释。` },
-    { key: "summary", icon: <FileTextOutlined />, label: "全文概要", prompt: `请概括《${textTitle}》第${juanNum}卷的主要内容和核心思想。` },
+    {
+      key: "explain",
+      icon: <ReadOutlined />,
+      label: t("reader.ai.quick.explain"),
+      prompt: t("reader.ai.prompt.explain", { title: textTitle, n: juanNum }),
+    },
+    {
+      key: "summary",
+      icon: <FileTextOutlined />,
+      label: t("reader.ai.quick.summary"),
+      prompt: t("reader.ai.prompt.summary", { title: textTitle, n: juanNum }),
+    },
   ];
 }
 
@@ -87,6 +99,7 @@ export default function ReaderAIPanel({
   selectedText,
   onSelectedTextConsumed,
 }: ReaderAIPanelProps) {
+  const { t } = useTranslation();
   const [messages, setMessages] = useState<ChatMessageItem[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -135,7 +148,7 @@ export default function ReaderAIPanel({
     const assistantMsg: ChatMessageItem = {
       id: assistantId,
       role: "assistant",
-      content: "正在检索经文并生成回答...",
+      content: t("reader.ai.thinking"),
       sources: null,
       created_at: new Date().toISOString(),
     };
@@ -158,7 +171,7 @@ export default function ReaderAIPanel({
         setMessages((prev) =>
           prev.map((m) => {
             if (m.id !== assistantId) return m;
-            const current = m.content === "正在检索经文并生成回答..." ? "" : m.content;
+            const current = m.content === t("reader.ai.thinking") ? "" : m.content;
             return { ...m, content: current + content };
           }),
         );
@@ -195,8 +208,8 @@ export default function ReaderAIPanel({
         message.error(errMsg);
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === assistantId && m.content === "正在检索经文并生成回答..."
-              ? { ...m, content: "请求失败，请重试" }
+            m.id === assistantId && m.content === t("reader.ai.thinking")
+              ? { ...m, content: t("chat.request_failed") }
               : m,
           ),
         );
@@ -208,7 +221,7 @@ export default function ReaderAIPanel({
         setSending(false);
       },
     }, { signal: abortController.signal, readingContext });
-  }, [sending, sessionId, selectedText, onSelectedTextConsumed, scrollToBottom, readingContext]);
+  }, [sending, sessionId, selectedText, onSelectedTextConsumed, scrollToBottom, readingContext, t]);
 
   const handleClearChat = useCallback(() => {
     if (sending) {
@@ -238,7 +251,7 @@ export default function ReaderAIPanel({
       {/* Selected text context indicator */}
       {selectedText && messages.length === 0 && (
         <div className="reader-ai-context">
-          <div className="reader-ai-context-label">选中的经文：</div>
+          <div className="reader-ai-context-label">{t("reader.ai.selected_label")}</div>
           <div className="reader-ai-context-text">
             「{selectedText.length > 100 ? selectedText.slice(0, 100) + "…" : selectedText}」
           </div>
@@ -248,7 +261,7 @@ export default function ReaderAIPanel({
       {/* Quick actions */}
       {messages.length === 0 && (
         <div className="reader-ai-quick-actions">
-          {getQuickActions(textTitle, juanNum).map((action) => (
+          {getQuickActions(textTitle, juanNum, t).map((action) => (
             <Button
               key={action.key}
               size="small"
@@ -268,7 +281,7 @@ export default function ReaderAIPanel({
           <div className="reader-ai-empty">
             <RobotOutlined style={{ fontSize: 28, color: "#c4b89a", marginBottom: 8 }} />
             <div style={{ color: "#8b7355", fontSize: 13 }}>
-              选中经文或输入问题，AI 为你解读《{textTitle}》
+              {t("reader.ai.empty", { title: textTitle })}
             </div>
           </div>
         )}
@@ -286,9 +299,9 @@ export default function ReaderAIPanel({
               </div>
               <div className="reader-ai-msg-content">
                 {isAssistant ? (
-                  m.content === "正在检索经文并生成回答..." ? (
+                  m.content === t("reader.ai.thinking") ? (
                     <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#8b7355" }}>
-                      <Spin size="small" /> 正在检索经文并生成回答...
+                      <Spin size="small" /> {t("reader.ai.thinking")}
                     </div>
                   ) : (
                     <>
@@ -316,7 +329,7 @@ export default function ReaderAIPanel({
                           collect feedback uniformly. */}
                       {!isStreaming && m.id < 1e12 && (
                         <div style={{ marginTop: 8, display: "flex", gap: 4 }}>
-                          <Tooltip title="有帮助">
+                          <Tooltip title={t("chat.feedback_helpful")}>
                             <Button
                               type="text"
                               size="small"
@@ -339,7 +352,7 @@ export default function ReaderAIPanel({
                               }}
                             />
                           </Tooltip>
-                          <Tooltip title="没帮助">
+                          <Tooltip title={t("chat.feedback_not_helpful")}>
                             <Button
                               type="text"
                               size="small"
@@ -382,7 +395,7 @@ export default function ReaderAIPanel({
           <Input.TextArea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={selectedText ? "针对选中经文提问..." : "输入问题..."}
+            placeholder={selectedText ? t("reader.ai.placeholder_selected") : t("reader.ai.placeholder")}
             autoSize={{ minRows: 1, maxRows: 3 }}
             onPressEnter={(e) => {
               if (!e.shiftKey) {
@@ -409,7 +422,7 @@ export default function ReaderAIPanel({
                 icon={<ClearOutlined />}
                 onClick={handleClearChat}
               >
-                清空
+                {t("reader.ai.clear")}
               </Button>
               <Button
                 size="small"
@@ -420,11 +433,11 @@ export default function ReaderAIPanel({
                   if (lastAssistant) {
                     const { cleanContent } = parseFollowUps(lastAssistant.content);
                     navigator.clipboard.writeText(cleanContent);
-                    message.success("已复制");
+                    message.success(t("chat.copied"));
                   }
                 }}
               >
-                复制
+                {t("chat.copy")}
               </Button>
             </>
           )}
