@@ -43,8 +43,8 @@ export default function OtherVersions({ textId }: { textId: number }) {
         dataSource={siblings}
         rowKey={(w) => String(w.text_id)}
         renderItem={(w) => {
-          const lang = workLangLabel(w.lang);
-          const canon = workCanonLabel(w.canon);
+          const lang = workLangLabel(w.lang, t);
+          const canon = workCanonLabel(w.canon, t);
           return (
             <List.Item>
               <List.Item.Meta
