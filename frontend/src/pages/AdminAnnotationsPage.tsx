@@ -2,11 +2,13 @@ import { useEffect, useState, useCallback } from "react";
 import { Table, Tag, Button, Space, Select, Typography, message } from "antd";
 import { CheckOutlined, CloseOutlined } from "@ant-design/icons";
 import { Helmet } from "react-helmet-async";
+import { useTranslation } from "react-i18next";
 import {
   getAdminAnnotations,
   reviewAnnotation,
   type AdminAnnotationItem,
 } from "../api/client";
+import { adminLabel, formatAdminDate } from "./adminI18n";
 
 const statusColorMap: Record<string, string> = {
   draft: "default",
@@ -15,20 +17,21 @@ const statusColorMap: Record<string, string> = {
   rejected: "red",
 };
 
-const statusLabelMap: Record<string, string> = {
-  draft: "草稿",
-  pending: "待审核",
-  approved: "已通过",
-  rejected: "已拒绝",
+const statusLabelKeyMap: Record<string, string> = {
+  draft: "admin_crud.annotation.status.draft",
+  pending: "admin_crud.annotation.status.pending",
+  approved: "admin_crud.annotation.status.approved",
+  rejected: "admin_crud.annotation.status.rejected",
 };
 
-const typeLabel: Record<string, string> = {
-  note: "笔记",
-  correction: "勘误",
-  tag: "标签",
+const typeLabelKeyMap: Record<string, string> = {
+  note: "admin_crud.annotation.type.note",
+  correction: "admin_crud.annotation.type.correction",
+  tag: "admin_crud.annotation.type.tag",
 };
 
 export default function AdminAnnotationsPage() {
+  const { t, i18n } = useTranslation();
   const [items, setItems] = useState<AdminAnnotationItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -46,11 +49,11 @@ export default function AdminAnnotationsPage() {
       setItems(res.items);
       setTotal(res.total);
     } catch {
-      message.error("加载标注列表失败");
+      message.error(t("admin_crud.annotation.load_error"));
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter]);
+  }, [page, statusFilter, t]);
 
   useEffect(() => {
     fetchData();
@@ -59,44 +62,46 @@ export default function AdminAnnotationsPage() {
   const handleReview = async (id: number, action: string) => {
     try {
       await reviewAnnotation(id, { action });
-      message.success(action === "approve" ? "已通过" : "已拒绝");
+      message.success(action === "approve" ? t("admin_crud.annotation.approved") : t("admin_crud.annotation.rejected"));
       fetchData();
     } catch {
-      message.error("操作失败");
+      message.error(t("admin_crud.common.action_failed"));
     }
   };
 
   const columns = [
     {
-      title: "类型",
+      title: t("admin_crud.column.type"),
       dataIndex: "annotation_type",
       width: 80,
-      render: (t: string) => typeLabel[t] || t,
+      render: (value: string) => adminLabel(t, typeLabelKeyMap[value], value),
     },
     {
-      title: "内容",
+      title: t("admin_crud.column.content"),
       dataIndex: "content",
       ellipsis: true,
     },
     {
-      title: "用户",
+      title: t("admin_crud.column.user"),
       dataIndex: "username",
       width: 120,
     },
     {
-      title: "状态",
+      title: t("admin_crud.column.status"),
       dataIndex: "status",
       width: 100,
-      render: (s: string) => <Tag color={statusColorMap[s]}>{statusLabelMap[s] || s}</Tag>,
+      render: (s: string) => (
+        <Tag color={statusColorMap[s]}>{adminLabel(t, statusLabelKeyMap[s], s)}</Tag>
+      ),
     },
     {
-      title: "提交时间",
+      title: t("admin_crud.column.submitted_at"),
       dataIndex: "created_at",
       width: 170,
-      render: (t: string) => new Date(t).toLocaleString("zh-CN"),
+      render: (value: string) => formatAdminDate(value, i18n.language),
     },
     {
-      title: "操作",
+      title: t("admin_crud.column.actions"),
       width: 180,
       render: (_: unknown, record: AdminAnnotationItem) =>
         record.status === "pending" ? (
@@ -107,7 +112,7 @@ export default function AdminAnnotationsPage() {
               icon={<CheckOutlined />}
               onClick={() => handleReview(record.id, "approve")}
             >
-              通过
+              {t("admin_crud.annotation.approve")}
             </Button>
             <Button
               danger
@@ -115,7 +120,7 @@ export default function AdminAnnotationsPage() {
               icon={<CloseOutlined />}
               onClick={() => handleReview(record.id, "reject")}
             >
-              拒绝
+              {t("admin_crud.annotation.reject")}
             </Button>
           </Space>
         ) : null,
@@ -125,16 +130,16 @@ export default function AdminAnnotationsPage() {
   return (
     <>
       <Helmet>
-        <title>标注审核 - 佛津</title>
+        <title>{t("admin_crud.annotation.page_title")}</title>
       </Helmet>
       <div style={{ maxWidth: 1200, margin: "0 auto" }}>
         <Space style={{ marginBottom: 16, justifyContent: "space-between", width: "100%" }}>
           <Typography.Title level={4} style={{ margin: 0 }}>
-            标注审核
+            {t("admin_crud.annotation.heading")}
           </Typography.Title>
           <Select
             style={{ width: 140 }}
-            placeholder="筛选状态"
+            placeholder={t("admin_crud.common.filter_status")}
             allowClear
             value={statusFilter}
             onChange={(v) => {
@@ -142,10 +147,10 @@ export default function AdminAnnotationsPage() {
               setPage(1);
             }}
             options={[
-              { value: "pending", label: "待审核" },
-              { value: "approved", label: "已通过" },
-              { value: "rejected", label: "已拒绝" },
-              { value: "draft", label: "草稿" },
+              { value: "pending", label: t("admin_crud.annotation.status.pending") },
+              { value: "approved", label: t("admin_crud.annotation.status.approved") },
+              { value: "rejected", label: t("admin_crud.annotation.status.rejected") },
+              { value: "draft", label: t("admin_crud.annotation.status.draft") },
             ]}
           />
         </Space>
@@ -159,7 +164,7 @@ export default function AdminAnnotationsPage() {
             total,
             pageSize: 20,
             onChange: setPage,
-            showTotal: (t) => `共 ${t} 条`,
+            showTotal: (count) => t("admin_crud.common.total_rows", { count }),
           }}
           size="middle"
         />
