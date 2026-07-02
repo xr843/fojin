@@ -47,3 +47,5 @@
 ### 诊断工具（可重复运行）
 
 - `audit_*.py`、`check_*.py`、`validate_*.py`、`show_data_sources.py`
+- `audit_source_governance.py` — 汇总数据源健康、license 元数据、主导入渠道、
+  catalog-only 覆盖缺口；支持 `--json` 供后续治理批次使用。
