@@ -7,6 +7,7 @@ import {
   ApartmentOutlined,
   ShareAltOutlined,
 } from "@ant-design/icons";
+import { useTranslation } from "react-i18next";
 import api from "../api/client";
 
 const { Title, Paragraph, Text } = Typography;
@@ -18,14 +19,37 @@ interface ExportStats {
 }
 
 const ENTITY_TYPE_OPTIONS = [
-  { value: "", label: "全部类型" },
-  { value: "person", label: "人物" },
-  { value: "text", label: "典籍" },
-  { value: "monastery", label: "寺院" },
-  { value: "school", label: "宗派" },
-  { value: "place", label: "地点" },
-  { value: "concept", label: "概念" },
-  { value: "dynasty", label: "朝代" },
+  { value: "person", labelKey: "geo.type_person" },
+  { value: "text", labelKey: "geo.type_text" },
+  { value: "monastery", labelKey: "geo.type_temple" },
+  { value: "school", labelKey: "geo.type_school" },
+  { value: "place", labelKey: "geo.type_place" },
+  { value: "concept", labelKey: "geo.type_concept" },
+  { value: "dynasty", labelKey: "geo.type_dynasty" },
+];
+
+const DYNASTY_FILTER_OPTIONS = [
+  { value: "东汉", labelKey: "exports.dynasty.easternHan" }, // i18n-exempt
+  { value: "三国", labelKey: "exports.dynasty.threeKingdoms" }, // i18n-exempt
+  { value: "西晋", labelKey: "exports.dynasty.westernJin" }, // i18n-exempt
+  { value: "东晋", labelKey: "exports.dynasty.easternJin" }, // i18n-exempt
+  { value: "南北朝", labelKey: "exports.dynasty.northernSouthern" }, // i18n-exempt
+  { value: "隋", labelKey: "exports.dynasty.sui" }, // i18n-exempt
+  { value: "唐", labelKey: "exports.dynasty.tang" }, // i18n-exempt
+  { value: "宋", labelKey: "exports.dynasty.song" }, // i18n-exempt
+  { value: "元", labelKey: "exports.dynasty.yuan" }, // i18n-exempt
+  { value: "明", labelKey: "exports.dynasty.ming" }, // i18n-exempt
+  { value: "清", labelKey: "exports.dynasty.qing" }, // i18n-exempt
+];
+
+const CATEGORY_FILTER_OPTIONS = [
+  { value: "阿含部", labelKey: "exports.category.agama" }, // i18n-exempt
+  { value: "般若部", labelKey: "exports.category.prajna" }, // i18n-exempt
+  { value: "华严部", labelKey: "exports.category.huayan" }, // i18n-exempt
+  { value: "法华部", labelKey: "exports.category.lotus" }, // i18n-exempt
+  { value: "密教部", labelKey: "exports.category.esoteric" }, // i18n-exempt
+  { value: "律部", labelKey: "exports.category.vinaya" }, // i18n-exempt
+  { value: "论集部", labelKey: "exports.category.treatises" }, // i18n-exempt
 ];
 
 function buildUrl(base: string, params: Record<string, string>) {
@@ -37,6 +61,7 @@ function buildUrl(base: string, params: Record<string, string>) {
 }
 
 export default function ExportsPage() {
+  const { t } = useTranslation();
   const [dynasty, setDynasty] = useState("");
   const [category, setCategory] = useState("");
   const [entityType, setEntityType] = useState("");
@@ -53,11 +78,10 @@ export default function ExportsPage() {
   return (
     <div style={{ maxWidth: 800, margin: "24px auto" }}>
       <Title level={3}>
-        <DownloadOutlined /> 开放数据下载
+        <DownloadOutlined /> {t("exports.title")}
       </Title>
       <Paragraph type="secondary">
-        佛津平台数据以开放协议提供，欢迎学术研究和开发者使用。
-        数据采用分批流式导出，适合大规模数据集。
+        {t("exports.description")}
       </Paragraph>
 
       {isLoading ? (
@@ -66,13 +90,13 @@ export default function ExportsPage() {
         <Card size="small" style={{ marginBottom: 24 }}>
           <Space size="large">
             <span>
-              经典元数据 <Tag color="blue">{stats.texts.toLocaleString()} 条</Tag>
+              {t("exports.stats.texts")} <Tag color="blue">{t("exports.count.records", { n: stats.texts.toLocaleString() })}</Tag>
             </span>
             <span>
-              知识图谱实体 <Tag color="green">{stats.kg_entities.toLocaleString()} 个</Tag>
+              {t("exports.stats.entities")} <Tag color="green">{t("exports.count.items", { n: stats.kg_entities.toLocaleString() })}</Tag>
             </span>
             <span>
-              知识图谱关系 <Tag color="orange">{stats.kg_relations.toLocaleString()} 条</Tag>
+              {t("exports.stats.relations")} <Tag color="orange">{t("exports.count.records", { n: stats.kg_relations.toLocaleString() })}</Tag>
             </span>
           </Space>
         </Card>
@@ -86,47 +110,27 @@ export default function ExportsPage() {
           </div>
           <div style={{ flex: 1 }}>
             <Text strong style={{ fontSize: 16 }}>
-              佛典元数据 (CSV)
+              {t("exports.csvTitle")}
             </Text>
             <Paragraph type="secondary" style={{ margin: "4px 0 8px" }}>
-              包含所有经典的编号、标题、译者、朝代、分类等元数据。可选按朝代/分类筛选。
+              {t("exports.csvDescription")}
             </Paragraph>
             <Space wrap style={{ marginBottom: 8 }}>
               <Select
                 style={{ width: 120 }}
-                placeholder="朝代"
+                placeholder={t("exports.dynastyPlaceholder")}
                 allowClear
                 value={dynasty || undefined}
                 onChange={(v) => setDynasty(v || "")}
-                options={[
-                  { value: "东汉", label: "东汉" },
-                  { value: "三国", label: "三国" },
-                  { value: "西晋", label: "西晋" },
-                  { value: "东晋", label: "东晋" },
-                  { value: "南北朝", label: "南北朝" },
-                  { value: "隋", label: "隋" },
-                  { value: "唐", label: "唐" },
-                  { value: "宋", label: "宋" },
-                  { value: "元", label: "元" },
-                  { value: "明", label: "明" },
-                  { value: "清", label: "清" },
-                ]}
+                options={DYNASTY_FILTER_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
               />
               <Select
                 style={{ width: 120 }}
-                placeholder="分类"
+                placeholder={t("exports.categoryPlaceholder")}
                 allowClear
                 value={category || undefined}
                 onChange={(v) => setCategory(v || "")}
-                options={[
-                  { value: "阿含部", label: "阿含部" },
-                  { value: "般若部", label: "般若部" },
-                  { value: "华严部", label: "华严部" },
-                  { value: "法华部", label: "法华部" },
-                  { value: "密教部", label: "密教部" },
-                  { value: "律部", label: "律部" },
-                  { value: "论集部", label: "论集部" },
-                ]}
+                options={CATEGORY_FILTER_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
               />
             </Space>
             <br />
@@ -136,7 +140,7 @@ export default function ExportsPage() {
               href={csvUrl}
               download="fojin_metadata.csv"
             >
-              下载 CSV
+              {t("exports.downloadCsv")}
             </Button>
           </div>
         </Space>
@@ -150,19 +154,19 @@ export default function ExportsPage() {
           </div>
           <div style={{ flex: 1 }}>
             <Text strong style={{ fontSize: 16 }}>
-              知识图谱 (JSON)
+              {t("exports.kgJsonTitle")}
             </Text>
             <Paragraph type="secondary" style={{ margin: "4px 0 8px" }}>
-              包含实体（人物、地点、概念等）和关系的完整知识图谱数据，含属性和外部标识符。
+              {t("exports.kgJsonDescription")}
             </Paragraph>
             <Space style={{ marginBottom: 8 }}>
               <Select
                 style={{ width: 140 }}
-                placeholder="实体类型"
+                placeholder={t("exports.entityTypePlaceholder")}
                 allowClear
                 value={entityType || undefined}
                 onChange={(v) => setEntityType(v || "")}
-                options={ENTITY_TYPE_OPTIONS.filter((o) => o.value)}
+                options={ENTITY_TYPE_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
               />
             </Space>
             <br />
@@ -172,7 +176,7 @@ export default function ExportsPage() {
               href={kgJsonUrl}
               download="fojin_kg.json"
             >
-              下载 JSON
+              {t("exports.downloadJson")}
             </Button>
           </div>
         </Space>
@@ -186,11 +190,10 @@ export default function ExportsPage() {
           </div>
           <div style={{ flex: 1 }}>
             <Text strong style={{ fontSize: 16 }}>
-              知识图谱 (JSON-LD)
+              {t("exports.kgJsonLdTitle")}
             </Text>
             <Paragraph type="secondary" style={{ margin: "4px 0 8px" }}>
-              语义化链接数据格式，使用 SKOS/Dublin Core/Schema.org 标准词汇，
-              支持多语言标签（@language 标注）。可用于与其他 LOD 数据集互操作。
+              {t("exports.kgJsonLdDescription")}
             </Paragraph>
             <Button
               type="primary"
@@ -198,7 +201,7 @@ export default function ExportsPage() {
               href={kgJsonLdUrl}
               download="fojin_kg.jsonld"
             >
-              下载 JSON-LD
+              {t("exports.downloadJsonLd")}
             </Button>
           </div>
         </Space>

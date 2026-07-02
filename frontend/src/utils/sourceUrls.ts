@@ -40,36 +40,36 @@ export function buildCbetaReadUrl(cbetaId: string): string | null {
   return null;
 }
 
-/** 数据源 code → 中文显示名称 */
-const SOURCE_LABELS: Record<string, string> = {
-  cbeta: "CBETA",
-  "cbeta-org": "CBETA",
-  suttacentral: "SuttaCentral",
-  "suttacentral-org": "SuttaCentral",
-  gretil: "GRETIL",
-  "84000": "84000",
-  bdrc: "BDRC",
-  "tbrc-bdrc": "BDRC",
-  ctext: "中國哲學書電子化計劃",
-  sat: "SAT 大正藏",
-  "sat-utokyo": "SAT 大正藏",
-  shidianguji: "识典古籍",
-  dianjin: "典津",
-  "kanseki-repo": "汉籍全文资料库",
-  "lotsawa-house": "Lotsawa House",
-  buddhanexus: "Dharmamitra (原BuddhaNexus)",
-  dharmanexus: "DharmaNexus",
-  accesstoinsight: "Access to Insight",
-  dhammatalks: "Dhammatalks",
-  dharmacloud: "Dharma Cloud",
-  ddb: "DDB 電子佛教辭典",
+const SOURCE_LABEL_KEYS: Record<string, string> = {
+  cbeta: "sourceLabel.cbeta",
+  "cbeta-org": "sourceLabel.cbeta",
+  suttacentral: "sourceLabel.suttacentral",
+  "suttacentral-org": "sourceLabel.suttacentral",
+  gretil: "sourceLabel.gretil",
+  "84000": "sourceLabel.84000",
+  bdrc: "sourceLabel.bdrc",
+  "tbrc-bdrc": "sourceLabel.bdrc",
+  ctext: "sourceLabel.ctext",
+  sat: "sourceLabel.sat",
+  "sat-utokyo": "sourceLabel.sat",
+  shidianguji: "sourceLabel.shidianguji",
+  dianjin: "sourceLabel.dianjin",
+  "kanseki-repo": "sourceLabel.kanseki",
+  "lotsawa-house": "sourceLabel.lotsawaHouse",
+  buddhanexus: "sourceLabel.buddhanexus",
+  dharmanexus: "sourceLabel.dharmanexus",
+  accesstoinsight: "sourceLabel.accessToInsight",
+  dhammatalks: "sourceLabel.dhammatalks",
+  dharmacloud: "sourceLabel.dharmaCloud",
+  ddb: "sourceLabel.ddb",
 };
 
 /**
- * 获取数据源的中文显示名称
+ * 获取数据源的显示名称。Pass t from useTranslation for locale-aware UI.
  */
-export function getSourceLabel(code: string): string {
-  return SOURCE_LABELS[code] || code.toUpperCase();
+export function getSourceLabel(code: string, t?: TFunction): string {
+  const key = SOURCE_LABEL_KEYS[code];
+  return key && t ? t(key, { defaultValue: code.toUpperCase() }) : code.toUpperCase();
 }
 
 /** 阅读 URL 模板（非搜索，而是具体文本阅读） */
@@ -97,42 +97,42 @@ export function buildSourceReadUrl(sourceCode: string, identifier: string): stri
 
 /** 语言代码 → 中文名称映射 */
 export const LANG_NAMES: Record<string, string> = {
-  lzh: "古典汉文",
-  sa: "梵文",
-  pi: "巴利文",
-  bo: "藏文",
-  pgd: "犍陀罗语",
-  kho: "和阗语",
-  sog: "粟特语",
-  xto: "吐火罗语",
-  txb: "吐火罗语",
-  oui: "古维吾尔语",
-  txg: "西夏文",
-  cmg: "蒙文",
-  mnc: "满文",
-  th: "泰文",
-  my: "缅文",
-  si: "僧伽罗文",
-  km: "高棉文",
-  ja: "日文",
-  ko: "韩文",
-  vi: "越南文",
-  en: "英文",
-  de: "德文",
-  fr: "法文",
-  lo: "老挝文",
-  zh: "中文",
-  ru: "俄文",
-  nl: "荷兰文",
-  pt: "葡萄牙文",
-  ne: "尼泊尔文",
-  hi: "印地文",
-  jv: "爪哇文",
-  es: "西班牙文",
-  mn: "蒙古文",
-  bn: "孟加拉文",
-  cs: "捷克文",
-  mul: "多语种",
+  lzh: "古典汉文", // i18n-exempt
+  sa: "梵文", // i18n-exempt
+  pi: "巴利文", // i18n-exempt
+  bo: "藏文", // i18n-exempt
+  pgd: "犍陀罗语", // i18n-exempt
+  kho: "和阗语", // i18n-exempt
+  sog: "粟特语", // i18n-exempt
+  xto: "吐火罗语", // i18n-exempt
+  txb: "吐火罗语", // i18n-exempt
+  oui: "古维吾尔语", // i18n-exempt
+  txg: "西夏文", // i18n-exempt
+  cmg: "蒙文", // i18n-exempt
+  mnc: "满文", // i18n-exempt
+  th: "泰文", // i18n-exempt
+  my: "缅文", // i18n-exempt
+  si: "僧伽罗文", // i18n-exempt
+  km: "高棉文", // i18n-exempt
+  ja: "日文", // i18n-exempt
+  ko: "韩文", // i18n-exempt
+  vi: "越南文", // i18n-exempt
+  en: "英文", // i18n-exempt
+  de: "德文", // i18n-exempt
+  fr: "法文", // i18n-exempt
+  lo: "老挝文", // i18n-exempt
+  zh: "中文", // i18n-exempt
+  ru: "俄文", // i18n-exempt
+  nl: "荷兰文", // i18n-exempt
+  pt: "葡萄牙文", // i18n-exempt
+  ne: "尼泊尔文", // i18n-exempt
+  hi: "印地文", // i18n-exempt
+  jv: "爪哇文", // i18n-exempt
+  es: "西班牙文", // i18n-exempt
+  mn: "蒙古文", // i18n-exempt
+  bn: "孟加拉文", // i18n-exempt
+  cs: "捷克文", // i18n-exempt
+  mul: "多语种", // i18n-exempt
 };
 
 export function getLangName(code: string): string {
@@ -154,14 +154,14 @@ const NAME_TO_CODE: Record<string, string> = Object.fromEntries(
   Object.entries(LANG_NAMES).map(([k, v]) => [v, k]),
 );
 // 额外别名
-NAME_TO_CODE["日语"] = "ja";
-NAME_TO_CODE["韩语"] = "ko";
-NAME_TO_CODE["英语"] = "en";
-NAME_TO_CODE["德语"] = "de";
-NAME_TO_CODE["法语"] = "fr";
-NAME_TO_CODE["荷兰语"] = "nl";
-NAME_TO_CODE["西班牙语"] = "es";
-NAME_TO_CODE["繁体中文"] = "zh";
+NAME_TO_CODE["日语"] = "ja"; // i18n-exempt
+NAME_TO_CODE["韩语"] = "ko"; // i18n-exempt
+NAME_TO_CODE["英语"] = "en"; // i18n-exempt
+NAME_TO_CODE["德语"] = "de"; // i18n-exempt
+NAME_TO_CODE["法语"] = "fr"; // i18n-exempt
+NAME_TO_CODE["荷兰语"] = "nl"; // i18n-exempt
+NAME_TO_CODE["西班牙语"] = "es"; // i18n-exempt
+NAME_TO_CODE["繁体中文"] = "zh"; // i18n-exempt
 
 /** 将可能的中文语言名规范化为 ISO 代码 */
 export function normalizeLangCode(raw: string): string {

@@ -3,8 +3,6 @@
   "src/data/popularSutras.ts": 157,
   "src/data/topics.ts": 74,
   "src/pages/AdminDashboardPage.tsx": 72,
-  "src/pages/ExportsPage.tsx": 64,
-  "src/utils/sourceUrls.ts": 52,
   "src/data/dynasty_years.ts": 46,
   "src/pages/AdminFeedbacksPage.tsx": 34,
   "src/pages/AdminAnnotationsPage.tsx": 27,
