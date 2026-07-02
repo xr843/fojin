@@ -14,6 +14,7 @@ from app.config import settings
 from app.core.elasticsearch import close_es, get_es, init_es
 from app.core.exceptions import FoJinError, fojin_error_to_http
 from app.core.rate_limit import RateLimitMiddleware
+from app.core.version import get_deploy_identity
 from app.database import engine as async_engine
 
 try:
@@ -561,4 +562,9 @@ async def health(request: Request):
 
     all_ok = all(v == "ok" for v in components.values())
     status = "ok" if all_ok else "degraded"
-    return {"status": status, **components}
+    return {"status": status, **components, "version": get_deploy_identity()}
+
+
+@app.get("/api/version")
+async def version():
+    return get_deploy_identity()

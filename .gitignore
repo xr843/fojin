@@ -3,6 +3,7 @@
 
 # Deploy state (per-host markers used by deploy.sh)
 .deploy-state/
+backend/.deploy-version.json
 
 # Python
 __pycache__/

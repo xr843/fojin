@@ -50,6 +50,7 @@ BRANCH="${BRANCH:-master}"
 STATE_DIR="$REPO_DIR/.deploy-state"
 FRONTEND_BUILD_MARKER="$STATE_DIR/last-frontend-build"
 BACKEND_RESTART_MARKER="$STATE_DIR/last-backend-restart"
+DEPLOY_VERSION_FILE="$REPO_DIR/backend/.deploy-version.json"
 mkdir -p "$STATE_DIR"
 
 log()  { printf '\n\033[1;36m>>> %s\033[0m\n' "$*"; }
@@ -74,6 +75,52 @@ marker_commit() {
 # True iff $1 is a known git commit in this repo.
 is_known_commit() {
   git rev-parse --verify --quiet "$1^{commit}" >/dev/null 2>&1
+}
+
+write_deploy_version_file() {
+  local commit="$1"
+  local version="${APP_VERSION:-3.0.0}"
+  command -v python3 >/dev/null || fail "python3 不在 PATH — 无法写入部署版本文件。"
+  python3 - "$DEPLOY_VERSION_FILE" "$commit" "$version" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+commit = sys.argv[2]
+version = sys.argv[3]
+path.write_text(
+    json.dumps(
+        {
+            "app": "fojin",
+            "version": version,
+            "commit": commit,
+            "commit_short": commit[:7],
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    + "\n",
+    encoding="utf-8",
+)
+PY
+  log "Wrote deploy identity $(git rev-parse HEAD) -> backend/.deploy-version.json"
+}
+
+dispatch_deploy_success() {
+  local commit="$1"
+  local repo="${GITHUB_REPOSITORY:-xr843/fojin}"
+  if ! command -v gh >/dev/null 2>&1; then
+    warn "gh 不在 PATH — 跳过 deploy-success dispatch。"
+    return 0
+  fi
+  gh api --method POST "repos/${repo}/dispatches" \
+    -f event_type=deploy-success \
+    -f "client_payload[branch]=${BRANCH}" \
+    -f "client_payload[commit]=${commit}" \
+    >/dev/null \
+    || { warn "deploy-success dispatch 失败 — 部署已完成，但生产 smoke 未触发。"; return 0; }
+  log "Triggered deploy-success smoke for ${repo}@${commit:0:7}."
 }
 
 # --- 0. 并发锁 ---------------------------------------------------------------
@@ -200,6 +247,8 @@ if ! $frontend_changed && ! $backend_changed; then
   exit 0
 fi
 
+write_deploy_version_file "$NEW_REV"
+
 # --- 3. 前端: 改了就重建镜像 + 重建容器 --------------------------------------
 if $frontend_changed; then
   log "Frontend changed — building image + recreating container ..."
@@ -284,5 +333,7 @@ docker compose ps
 log "Pruning build cache + dangling images ..."
 docker builder prune -f >/dev/null
 docker image prune -f   >/dev/null
+
+dispatch_deploy_success "$NEW_REV"
 
 log "Done. Deployed $(git rev-parse --short HEAD) on $BRANCH."
