@@ -9,16 +9,16 @@ Saves XML files to data/84000_download/
 
 import asyncio
 import os
-import sys
 import time
 
 import httpx
 
 GITHUB_API = "https://api.github.com"
 REPO = "84000/data-tei"
+DEFAULT_BRANCH = "master"
 TRANSLATIONS_PATH = "translations/kangyur/translations"
 TENGYUR_PATH = "translations/tengyur/translations"
-RAW_BASE = f"https://raw.githubusercontent.com/{REPO}/main"
+RAW_BASE = f"https://raw.githubusercontent.com/{REPO}/{DEFAULT_BRANCH}"
 
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "84000_download")
 RATE_LIMIT = 0.3  # GitHub API is generous
@@ -71,7 +71,7 @@ async def main():
             return
 
         # Download
-        print(f"\n[2/2] Downloading XML files...")
+        print("\n[2/2] Downloading XML files...")
         downloaded = 0
         skipped = 0
         errors = 0
@@ -113,7 +113,7 @@ async def main():
 
         elapsed = time.time() - start
         print(f"\n{'='*50}")
-        print(f"84000 download complete:")
+        print("84000 download complete:")
         print(f"  Downloaded: {downloaded}")
         print(f"  Skipped (existing): {skipped}")
         print(f"  Errors: {errors}")

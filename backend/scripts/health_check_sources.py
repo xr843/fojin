@@ -196,6 +196,10 @@ async def _probe_once(
                 status_code=resp.status_code,
                 requested_url=url,
                 final_url=current,
+                response_headers=resp.headers,
+                response_text=getattr(resp, "text", "")[:4096]
+                if resp.status_code >= 400
+                else None,
             )
             if status == "ok":
                 detail = None
@@ -209,7 +213,7 @@ async def _probe_once(
                 detail = f"HTTP {resp.status_code}"
             # A 5xx is the one HTTP outcome worth retrying; ok / moved / degraded
             # and the 4xx the classifier already reads as reachable are stable.
-            return _verdict(code, status, detail), resp.status_code >= 500
+            return _verdict(code, status, detail), status == "unreachable" and resp.status_code >= 500
 
         # Redirect budget exhausted.
         status = classify_health(
