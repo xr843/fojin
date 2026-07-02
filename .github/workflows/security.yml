@@ -153,3 +153,35 @@ jobs:
         with:
           name: npm-audit-report
           path: frontend/npm-audit-report.json
+
+  worker-prerender-npm-audit:
+    name: Worker prerender dependency audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: workers/prerender
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: workers/prerender/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: npm audit
+
+      - name: Run npm audit (JSON report)
+        if: always()
+        run: npm audit --json > npm-audit-report.json || true
+
+      - name: Upload npm audit report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: worker-prerender-npm-audit-report
+          path: workers/prerender/npm-audit-report.json
