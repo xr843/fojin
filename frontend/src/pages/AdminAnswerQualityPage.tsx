@@ -3,6 +3,7 @@ import {
   Button,
   Card,
   Input,
+  InputNumber,
   Select,
   Space,
   Table,
@@ -12,20 +13,25 @@ import {
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
+  getAnswerReviewStats,
   getAnswerQualityQueue,
   submitAnswerReview,
   type AnswerQueueItem,
+  type AnswerReviewStats,
   type ScoreDistribution,
 } from "../api/client";
+import { useTranslation } from "react-i18next";
 
-const REASON_LABELS: Record<string, string> = {
-  downvoted: "被踩",
-  no_citation: "未引经",
-  weak_evidence: "召回证据弱",
+const REASON_LABEL_KEYS: Record<string, string> = {
+  downvoted: "admin_aq.reason.downvoted",
+  abnormal: "admin_aq.reason.abnormal",
+  no_citation: "admin_aq.reason.no_citation",
+  weak_evidence: "admin_aq.reason.weak_evidence",
 };
 
 const REASON_COLORS: Record<string, string> = {
   downvoted: "red",
+  abnormal: "purple",
   no_citation: "orange",
   weak_evidence: "gold",
 };
@@ -34,20 +40,26 @@ const REASON_COLORS: Record<string, string> = {
 // the backend threshold is recalibrated. Display-only (reds weak sources).
 const WEAK_SCORE = 0.37;
 
-const CATEGORY_OPTIONS = [
-  { value: "recall", label: "召回弱/不全" },
-  { value: "hallucination", label: "幻觉" },
-  { value: "prompt", label: "表达/提示词" },
-  { value: "data", label: "语料缺失" },
-  { value: "other", label: "其他" },
+const CATEGORY_OPTION_KEYS = [
+  { value: "recall", labelKey: "admin_aq.category.recall" },
+  { value: "hallucination", labelKey: "admin_aq.category.hallucination" },
+  { value: "prompt", labelKey: "admin_aq.category.prompt" },
+  { value: "data", labelKey: "admin_aq.category.data" },
+  { value: "other", labelKey: "admin_aq.category.other" },
 ];
 
+const WINDOW_DAY_OPTIONS = [30, 90, 180, 365];
+
 export default function AdminAnswerQualityPage() {
+  const { t } = useTranslation();
   const [items, setItems] = useState<AnswerQueueItem[]>([]);
   const [total, setTotal] = useState(0);
   const [dist, setDist] = useState<ScoreDistribution | null>(null);
+  const [reviewStats, setReviewStats] = useState<AnswerReviewStats | null>(null);
   const [loading, setLoading] = useState(false);
-  const [categoryFilter, setCategoryFilter] = useState<string | undefined>();
+  const [windowDays, setWindowDays] = useState(90);
+  const [minSuspicion, setMinSuspicion] = useState(0);
+  const [reasonFilters, setReasonFilters] = useState<string[]>([]);
   const [verdicts, setVerdicts] = useState<
     Record<number, { category?: string; note?: string }>
   >({});
@@ -55,19 +67,25 @@ export default function AdminAnswerQualityPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getAnswerQualityQueue({
-        category: categoryFilter,
-        limit: 50,
-      });
+      const [res, stats] = await Promise.all([
+        getAnswerQualityQueue({
+          window: windowDays,
+          min_suspicion: minSuspicion,
+          category: reasonFilters.length ? reasonFilters.join(",") : undefined,
+          limit: 50,
+        }),
+        getAnswerReviewStats(),
+      ]);
       setItems(res.items);
       setTotal(res.total_unreviewed);
       setDist(res.score_distribution);
+      setReviewStats(stats);
     } catch {
-      message.error("加载差答案队列失败");
+      message.error(t("admin_aq.load_error"));
     } finally {
       setLoading(false);
     }
-  }, [categoryFilter]);
+  }, [minSuspicion, reasonFilters, t, windowDays]);
 
   useEffect(() => {
     void load();
@@ -77,56 +95,69 @@ export default function AdminAnswerQualityPage() {
     async (item: AnswerQueueItem, verdict: "good" | "bad") => {
       const extra = verdicts[item.message_id] || {};
       if (verdict === "bad" && !extra.category) {
-        message.warning("标为 bad 时请先选择失败类型");
+        message.warning(t("admin_aq.bad_requires_category"));
         return;
       }
       try {
-        await submitAnswerReview({
+        const res = await submitAnswerReview({
           message_id: item.message_id,
           verdict,
           failure_category: verdict === "bad" ? extra.category : undefined,
           note: extra.note,
         });
         setItems((prev) => prev.filter((i) => i.message_id !== item.message_id));
-        setTotal((t) => Math.max(0, t - 1));
-        message.success(verdict === "good" ? "已标记 good" : "已标记 bad");
+        setTotal(res.remaining_unreviewed);
+        void getAnswerReviewStats()
+          .then(setReviewStats)
+          .catch(() => undefined);
+        message.success(
+          t(
+            verdict === "good"
+              ? "admin_aq.review_good_success"
+              : "admin_aq.review_bad_success",
+          ),
+        );
       } catch {
-        message.error("提交失败");
+        message.error(t("admin_aq.submit_error"));
       }
     },
-    [verdicts],
+    [t, verdicts],
   );
 
   const columns: ColumnsType<AnswerQueueItem> = [
     {
-      title: "时间",
+      title: t("admin_aq.column.time"),
       dataIndex: "created_at",
       width: 160,
       render: (v: string) => new Date(v).toLocaleString("zh-CN"),
     },
     {
-      title: "问题",
+      title: t("admin_aq.column.question"),
       dataIndex: "question",
       ellipsis: true,
       render: (q: string) =>
-        q || <Typography.Text type="secondary">（无）</Typography.Text>,
+        q || (
+          <Typography.Text type="secondary">
+            {t("admin_aq.empty_value")}
+          </Typography.Text>
+        ),
     },
     {
-      title: "原因",
+      title: t("admin_aq.column.reason"),
       dataIndex: "reason_tags",
       width: 220,
       render: (tags: string[]) => (
         <Space size={[0, 4]} wrap>
-          {tags.map((t) => (
-            <Tag key={t} color={REASON_COLORS[t] || "default"}>
-              {REASON_LABELS[t] || t}
+          {tags.map((tag) => (
+            <Tag key={tag} color={REASON_COLORS[tag] || "default"}>
+              {REASON_LABEL_KEYS[tag] ? t(REASON_LABEL_KEYS[tag]) : tag}
             </Tag>
           ))}
         </Space>
       ),
     },
     {
-      title: "可疑度",
+      title: t("admin_aq.column.suspicion"),
       dataIndex: "suspicion_score",
       width: 90,
       sorter: (a, b) => a.suspicion_score - b.suspicion_score,
@@ -137,27 +168,69 @@ export default function AdminAnswerQualityPage() {
 
   return (
     <div style={{ padding: 24 }}>
-      <Typography.Title level={3}>差答案队列</Typography.Title>
+      <Typography.Title level={3}>{t("nav.admin_answer_quality")}</Typography.Title>
       <Space style={{ marginBottom: 16 }} wrap>
-        <Typography.Text strong>未复核 {total} 条</Typography.Text>
+        <Typography.Text strong>
+          {t("admin_aq.unreviewed_total", { count: total })}
+        </Typography.Text>
+        {reviewStats && (
+          <>
+            <Typography.Text type="secondary">
+              {t("admin_aq.reviewed_total", {
+                count: reviewStats.reviewed_total,
+              })}
+            </Typography.Text>
+            <Typography.Text type="secondary">good {reviewStats.good}</Typography.Text>
+            <Typography.Text type="secondary">bad {reviewStats.bad}</Typography.Text>
+          </>
+        )}
         {dist && (
           <Typography.Text type="secondary">
             召回分布 p10 {dist.p10 ?? "—"} / p50 {dist.p50 ?? "—"} / p90{" "}
             {dist.p90 ?? "—"}
           </Typography.Text>
         )}
+        <Space size={6}>
+          <Typography.Text type="secondary">
+            {t("admin_aq.window_label")}
+          </Typography.Text>
+          <Select
+            style={{ width: 96 }}
+            value={windowDays}
+            onChange={setWindowDays}
+            options={WINDOW_DAY_OPTIONS.map((value) => ({
+              value,
+              label: t("admin_aq.days", { count: value }),
+            }))}
+          />
+        </Space>
+        <Space size={6}>
+          <Typography.Text type="secondary">
+            {t("admin_aq.min_suspicion_label")}
+          </Typography.Text>
+          <InputNumber
+            min={0}
+            max={20}
+            step={0.5}
+            precision={1}
+            style={{ width: 88 }}
+            value={minSuspicion}
+            onChange={(v) => setMinSuspicion(typeof v === "number" ? v : 0)}
+          />
+        </Space>
         <Select
+          mode="multiple"
           allowClear
-          placeholder="按原因筛选"
-          style={{ width: 160 }}
-          value={categoryFilter}
-          onChange={(v) => setCategoryFilter(v)}
-          options={Object.entries(REASON_LABELS).map(([value, label]) => ({
+          placeholder={t("admin_aq.reason_filter_placeholder")}
+          style={{ minWidth: 220 }}
+          value={reasonFilters}
+          onChange={(v: string[]) => setReasonFilters(v)}
+          options={Object.entries(REASON_LABEL_KEYS).map(([value, labelKey]) => ({
             value,
-            label,
+            label: t(labelKey),
           }))}
         />
-        <Button onClick={() => void load()}>刷新</Button>
+        <Button onClick={() => void load()}>{t("admin_aq.refresh")}</Button>
       </Space>
 
       <Table<AnswerQueueItem>
@@ -165,7 +238,7 @@ export default function AdminAnswerQualityPage() {
         loading={loading}
         columns={columns}
         dataSource={items}
-        locale={{ emptyText: "队列已清空 🎉" }}
+        locale={{ emptyText: t("admin_aq.queue_empty") }}
         expandable={{
           expandedRowRender: (item) => (
             <Card size="small" bordered={false}>
@@ -203,7 +276,10 @@ export default function AdminAnswerQualityPage() {
                   <Select
                     placeholder="失败类型（bad 必填）"
                     style={{ width: 180 }}
-                    options={CATEGORY_OPTIONS}
+                    options={CATEGORY_OPTION_KEYS.map(({ value, labelKey }) => ({
+                      value,
+                      label: t(labelKey),
+                    }))}
                     value={verdicts[item.message_id]?.category}
                     onChange={(v) =>
                       setVerdicts((p) => ({

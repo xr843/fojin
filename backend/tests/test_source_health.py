@@ -2,7 +2,9 @@
 
 数据源健康状态分类的单元测试。Pure logic, no DB / network."""
 
+import importlib.util
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 
@@ -99,6 +101,21 @@ def test_5xx_is_unreachable():
             classify_health(error=None, status_code=code, requested_url=HOME, final_url=HOME)
             == "unreachable"
         )
+
+
+def test_cloudflare_challenge_response_is_ok():
+    # A Cloudflare challenge means the site is reachable but the bot probe is
+    # blocked; it should not start an unreachable streak.
+    assert (
+        classify_health(
+            error=None,
+            status_code=503,
+            requested_url=HOME,
+            final_url=HOME,
+            response_headers={"Cf-Mitigated": "challenge"},
+        )
+        == "ok"
+    )
 
 
 def test_ssl_error_is_cert_invalid():
@@ -254,3 +271,36 @@ def test_non_unreachable_with_no_prior_streak_stays_none():
 def test_streak_start_is_timezone_aware():
     # The value lands in a TIMESTAMPTZ column — a naive datetime would shift.
     assert resolve_unreachable_since("unreachable", None, NOW).tzinfo is not None
+
+
+# --- migration 0166 sanity -------------------------------------------------
+
+
+def _load_migration(path: Path):
+    spec = importlib.util.spec_from_file_location("migration_0166", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_0166_migration_keeps_source_health_update_narrow():
+    migration_path = (
+        Path(__file__).resolve().parents[1]
+        / "alembic"
+        / "versions"
+        / "0166_fix_source_urls_and_health_false_positives.py"
+    )
+    assert migration_path.exists()
+    migration = _load_migration(migration_path)
+
+    assert migration.revision == "0166"
+    assert migration.down_revision == "0165"
+    assert migration.INDICA_BUDDHICA_URL == "https://indica-et-buddhica.com/"
+    assert migration.CLEAR_HEALTH_CODES == ("indica-buddhica-repo",)
+    assert migration.GRETIL_DISTRIBUTION_UPDATE["url"] == (
+        "https://gretil.sub.uni-goettingen.de/gretil.html"
+    )
+    assert "not a hard dependency for scripts/archive/imports/import_gretil.py" in (
+        migration.GRETIL_DISTRIBUTION_UPDATE["license_note"]
+    )

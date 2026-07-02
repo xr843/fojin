@@ -33,7 +33,12 @@ except ImportError:
 # logs with INFO from third-party libraries (sqlalchemy, httpx, etc.).
 _app_logger = logging.getLogger("app")
 _app_logger.setLevel(logging.INFO)
-if not _app_logger.handlers:
+_root_has_handlers = bool(logging.getLogger().handlers)
+if _root_has_handlers:
+    # Pytest/caplog and any embedding runtime that already configured root
+    # logging should receive app.* records through normal propagation.
+    _app_logger.propagate = True
+elif not _app_logger.handlers:
     _h = logging.StreamHandler()
     _h.setFormatter(logging.Formatter(
         "%(asctime)s %(levelname)s %(name)s: %(message)s",
@@ -43,6 +48,8 @@ if not _app_logger.handlers:
     # Don't propagate to root — uvicorn doesn't install a handler there
     # and the lastResort filter would re-drop INFO anyway, but it also
     # avoids duplicate lines if a future change adds a root handler.
+    _app_logger.propagate = False
+else:
     _app_logger.propagate = False
 
 logger = logging.getLogger(__name__)
