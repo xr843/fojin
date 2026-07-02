@@ -49,7 +49,7 @@ export default function LoginPage() {
     const error = searchParams.get("error");
 
     if (error) {
-      message.error(`第三方登录失败: ${error}`);
+      message.error(t("auth.oauth_fail_with_error", { error }));
       return;
     }
 
@@ -62,15 +62,17 @@ export default function LoginPage() {
             headers: { Authorization: `Bearer ${token}` },
           });
           setAuth(token, user);
-          message.success(`${provider === "github" ? "GitHub" : "Google"} 登录成功`);
+          message.success(t("auth.oauth_success", {
+            provider: provider === "github" ? "GitHub" : "Google",
+          }));
           navigate(consumeReturnTo(), { replace: true });
         } catch {
-          message.error("第三方登录失败，请重试");
+          message.error(t("auth.oauth_fail_retry"));
           navigate("/login", { replace: true });
         }
       })();
     }
-  }, [searchParams, setAuth, navigate]);
+  }, [searchParams, setAuth, navigate, t]);
 
   const handleLogin = async (values: { username: string; password: string }) => {
     setLoading(true);
@@ -204,30 +206,31 @@ export default function LoginPage() {
 
 
 function SocialLoginButtons() {
+  const { t } = useTranslation();
+
   return (
     <>
       <Divider plain>
-        <Text type="secondary" style={{ fontSize: 12 }}>或使用第三方账号登录</Text>
+        <Text type="secondary" style={{ fontSize: 12 }}>{t("auth.social_login_divider")}</Text>
       </Divider>
       <Space direction="vertical" style={{ width: "100%" }} size="middle">
         <Button
           icon={<GithubOutlined />}
           block
           size="large"
-          onClick={async () => { try { const { data } = await api.get("/auth/github/login"); window.location.href = data.url; } catch { message.error("GitHub 登录失败"); } }}
+          onClick={async () => { try { const { data } = await api.get("/auth/github/login"); window.location.href = data.url; } catch { message.error(t("auth.github_login_fail")); } }}
         >
-          GitHub 登录
+          {t("auth.github_login")}
         </Button>
         <Button
           icon={<GoogleOutlined />}
           block
           size="large"
-          onClick={async () => { try { const { data } = await api.get("/auth/google/login"); window.location.href = data.url; } catch { message.error("Google 登录失败"); } }}
+          onClick={async () => { try { const { data } = await api.get("/auth/google/login"); window.location.href = data.url; } catch { message.error(t("auth.google_login_fail")); } }}
         >
-          Google 登录
+          {t("auth.google_login")}
         </Button>
       </Space>
     </>
   );
 }
-
