@@ -350,6 +350,21 @@ describe("remaining page i18n", () => {
     expect(screen.getByText(/Scripture data provided by/)).toBeInTheDocument();
   });
 
+  it("renders sutra landing content from locale data", async () => {
+    renderWithProviders(
+      <Routes>
+        <Route path="/sutras/:slug" element={<SutraLandingPage />} />
+      </Routes>,
+      ["/sutras/heart-sutra"],
+    );
+
+    expect(screen.getByRole("heading", { name: "Heart Sutra" })).toBeInTheDocument();
+    expect(screen.getByText("Tang dynasty")).toBeInTheDocument();
+    expect(screen.getByText("Xuanzang translation")).toBeInTheDocument();
+    expect(screen.getByText(/concise Prajnaparamita text/)).toBeInTheDocument();
+    expect(screen.queryByText(/全经仅二百六十字/)).not.toBeInTheDocument();
+  });
+
   it("renders topics page chrome in the active UI language", async () => {
     renderWithProviders(<TopicsPage />);
 
