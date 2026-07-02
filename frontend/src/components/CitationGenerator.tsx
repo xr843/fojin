@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Typography, Button, Space, message, Modal, Segmented } from "antd";
 import { CopyOutlined, DownloadOutlined, BookOutlined } from "@ant-design/icons";
@@ -45,6 +46,7 @@ export default function CitationGenerator({
   open,
   onClose,
 }: CitationGeneratorProps) {
+  const { t } = useTranslation();
   const [format, setFormat] = useState<CitationFormat>("bibtex");
 
   // Only fetch if the parent didn't pass textData
@@ -62,23 +64,23 @@ export default function CitationGenerator({
     if (!citation) return;
     try {
       await navigator.clipboard.writeText(citation);
-      message.success("引用已复制到剪贴板");
+      message.success(t("reader.citation_generator.copied"));
     } catch {
-      message.error("复制失败，请手动选择文本复制");
+      message.error(t("reader.citation_generator.copy_failed"));
     }
   };
 
   const handleDownload = () => {
     if (!meta) return;
     downloadCitation(format, meta);
-    message.success("文件已下载");
+    message.success(t("reader.citation_generator.downloaded"));
   };
 
   return (
     <Modal
       title={
         <Space>
-          <BookOutlined /> 导出引用
+          <BookOutlined /> {t("reader.citation_generator.title")}
         </Space>
       }
       open={open}
@@ -88,7 +90,7 @@ export default function CitationGenerator({
     >
       <Space direction="vertical" style={{ width: "100%" }} size="middle">
         <div>
-          <Text style={{ marginRight: 8 }}>引用格式:</Text>
+          <Text style={{ marginRight: 8 }}>{t("reader.citation_generator.format_label")}</Text>
           <Segmented
             value={format}
             onChange={(v) => setFormat(v as CitationFormat)}
@@ -129,14 +131,14 @@ export default function CitationGenerator({
             onClick={handleCopy}
             disabled={!citation}
           >
-            复制
+            {t("chat.copy")}
           </Button>
           <Button
             icon={<DownloadOutlined />}
             onClick={handleDownload}
             disabled={!meta}
           >
-            下载文件
+            {t("reader.citation_generator.download")}
           </Button>
         </Space>
       </Space>

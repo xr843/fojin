@@ -1,5 +1,6 @@
 import { useState, memo } from "react";
 import { Tabs, Drawer, Button, Badge } from "antd";
+import { useTranslation } from "react-i18next";
 import {
   SwapOutlined,
   SearchOutlined,
@@ -18,6 +19,7 @@ function ReaderSidebarInner({
   textId: number;
   juanNum: number;
 }) {
+  const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -48,7 +50,7 @@ function ReaderSidebarInner({
       key: "related",
       label: (
         <span>
-          <SwapOutlined /> 相关经典
+          <SwapOutlined /> {t("reader.sidebar.related")}
           {relCount > 0 && (
             <Badge
               count={relCount}
@@ -64,7 +66,7 @@ function ReaderSidebarInner({
       key: "similar",
       label: (
         <span>
-          <SearchOutlined /> 相似段落
+          <SearchOutlined /> {t("reader.sidebar.similar")}
           {simCount > 0 && (
             <Badge
               count={simCount}
@@ -97,7 +99,7 @@ function ReaderSidebarInner({
             icon={<MenuUnfoldOutlined />}
             onClick={() => setCollapsed(false)}
             className="reader-sidebar-toggle"
-            title="展开侧边栏"
+            title={t("reader.sidebar.expand")}
           />
         ) : (
           <div className="reader-sidebar-panel">
@@ -133,7 +135,7 @@ function ReaderSidebarInner({
           )}
         </Button>
         <Drawer
-          title="相关内容"
+          title={t("reader.sidebar.title")}
           placement="bottom"
           height="70vh"
           open={mobileOpen}
