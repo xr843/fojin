@@ -176,6 +176,31 @@ function seoPages(): Plugin {
   };
 }
 
+function manualChunks(id: string): string | undefined {
+  if (
+    [
+      "/node_modules/react/",
+      "/node_modules/react-dom/",
+      "/node_modules/react-router-dom/",
+    ].some((pkg) => id.includes(pkg))
+  ) {
+    return "vendor-react";
+  }
+  if (id.includes("/node_modules/antd/")) {
+    return "vendor-antd";
+  }
+  if (id.includes("/node_modules/@tanstack/react-query/")) {
+    return "vendor-query";
+  }
+  if (id.includes("/node_modules/d3/")) {
+    return "vendor-d3";
+  }
+  if (id.includes("/src/utils/sourceUrls")) {
+    return "source-urls";
+  }
+  return undefined;
+}
+
 export default defineConfig({
   plugins: [
     react(),
@@ -194,13 +219,7 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          "vendor-react": ["react", "react-dom", "react-router-dom"],
-          "vendor-antd": ["antd"],
-          "vendor-query": ["@tanstack/react-query"],
-          "vendor-d3": ["d3"],
-          "source-urls": ["./src/utils/sourceUrls"],
-        },
+        manualChunks,
       },
     },
   },
