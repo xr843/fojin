@@ -264,11 +264,16 @@ if $backend_changed; then
   if $backend_image_changed; then
     log "Backend deps/Dockerfile changed — rebuilding image ..."
     docker compose build backend
-    docker compose up -d backend
-  else
-    log "Backend code/env changed — restarting container (bind-mount reload) ..."
-    docker compose restart backend
   fi
+  # Zero-downtime rolling restart across BOTH replicas (backend + backend2,
+  # behind nginx upstream fojin_backend = 8000+8001). Recreate one at a time,
+  # --wait for healthy, so the other keeps serving → no 502 window. --no-deps
+  # avoids touching pg/es/redis. backend first so it runs alembic before
+  # backend2 (never two concurrent `alembic upgrade head`). force-recreate
+  # also reloads bind-mounted code, covering the code-only-change case.
+  log "Rolling-restart backend replicas (zero-downtime) ..."
+  docker compose up -d --no-deps --force-recreate --wait backend
+  docker compose up -d --no-deps --force-recreate --wait backend2
   echo "$NEW_REV" > "$BACKEND_RESTART_MARKER"
 else
   log "Backend unchanged — skip."
