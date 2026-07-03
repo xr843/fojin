@@ -245,9 +245,13 @@ async def search_texts(
 
     sort_clause = []
     if sort == "title":
-        sort_clause = [{"title_zh.keyword": "asc"}, "_score"]
+        # title_zh is analyzed text; its keyword sub-field is mapped as "raw",
+        # not "keyword" (see INDEX_SETTINGS in app/core/elasticsearch.py).
+        sort_clause = [{"title_zh.raw": "asc"}, "_score"]
     elif sort == "dynasty":
-        sort_clause = [{"dynasty.keyword": "asc"}, "_score"]
+        # dynasty is mapped directly as `keyword` (no analyzed variant), so it
+        # has no ".keyword" sub-field — sort on the field itself.
+        sort_clause = [{"dynasty": "asc"}, "_score"]
     elif sort != "relevance":
         # Default: relevance (use ES default _score sorting)
         pass
