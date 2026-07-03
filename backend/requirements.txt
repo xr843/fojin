@@ -14,7 +14,7 @@ bcrypt==4.1.1
 defusedxml==0.7.1
 lxml==6.1.0
 pgvector==0.3.6
-openai==1.58.0
+openai==2.44.0
 tiktoken==0.8.0
 opencc-python-reimplemented==0.1.7
 Pillow==12.3.0
