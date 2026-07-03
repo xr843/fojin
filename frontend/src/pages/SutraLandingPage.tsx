@@ -20,31 +20,46 @@ import {
 import {
   getSutraBySlug,
   getRelatedSutras,
-  popularSutras,
+  getLocalizedPopularSutras,
 } from "../data/popularSutras";
 import { useTranslation } from "react-i18next";
 
 const { Title, Paragraph, Text } = Typography;
 
+function compactTitle(title: string) {
+  const maxLength = /[\u3400-\u9fff]/.test(title) ? 10 : 18;
+  if (title.length <= maxLength) return title;
+  return `${title.slice(0, maxLength)}...`;
+}
+
+function ogLocale(language: string) {
+  if (language.startsWith("en")) return "en_US";
+  if (language.startsWith("zh-Hant") || language.startsWith("zh-TW") || language.startsWith("zh-HK")) {
+    return "zh_TW";
+  }
+  return "zh_CN";
+}
+
 export default function SutraLandingPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
 
-  const sutra = slug ? getSutraBySlug(slug) : undefined;
+  const sutra = slug ? getSutraBySlug(slug, i18n.language) : undefined;
 
   if (!sutra) {
     return <Navigate to="/404" replace />;
   }
 
-  const related = getRelatedSutras(sutra.slug, 4);
+  const related = getRelatedSutras(sutra.slug, 4, i18n.language);
+  const sutras = getLocalizedPopularSutras(i18n.language);
   const canonicalUrl = `https://fojin.app/sutras/${sutra.slug}`;
 
   const schemaBook = {
     "@context": "https://schema.org",
     "@type": "Book",
-    name: sutra.title_zh,
-    alternateName: [sutra.title_en, sutra.title_sa].filter(Boolean),
+    name: sutra.title,
+    alternateName: [sutra.alternateTitle, sutra.sanskritTitle].filter(Boolean),
     url: canonicalUrl,
     inLanguage: "lzh",
     ...(sutra.translator && {
@@ -77,7 +92,7 @@ export default function SutraLandingPage() {
       {
         "@type": "ListItem",
         position: 2,
-        name: sutra.title_zh,
+        name: sutra.title,
         item: canonicalUrl,
       },
     ],
@@ -89,23 +104,23 @@ export default function SutraLandingPage() {
       style={{ maxWidth: 960, margin: "0 auto", padding: "24px 16px" }}
     >
       <Helmet>
-        <title>{sutra.meta_title}</title>
-        <meta name="description" content={sutra.meta_description} />
+        <title>{sutra.metaTitle}</title>
+        <meta name="description" content={sutra.metaDescription} />
         <meta name="keywords" content={sutra.keywords.join(",")} />
         <link rel="canonical" href={canonicalUrl} />
         <link rel="alternate" hrefLang="x-default" href={canonicalUrl} />
         <link rel="alternate" hrefLang="zh" href={canonicalUrl} />
         <meta property="og:type" content="book" />
-        <meta property="og:title" content={sutra.meta_title} />
-        <meta property="og:description" content={sutra.meta_description} />
+        <meta property="og:title" content={sutra.metaTitle} />
+        <meta property="og:description" content={sutra.metaDescription} />
         <meta property="og:url" content={canonicalUrl} />
         <meta property="og:site_name" content={t("sutra_landing.site_name")} />
-        <meta property="og:locale" content="zh_CN" />
+        <meta property="og:locale" content={ogLocale(i18n.language)} />
         <meta name="twitter:card" content="summary" />
-        <meta name="twitter:title" content={sutra.meta_title} />
+        <meta name="twitter:title" content={sutra.metaTitle} />
         <meta
           name="twitter:description"
-          content={sutra.meta_description}
+          content={sutra.metaDescription}
         />
         <script type="application/ld+json">
           {JSON.stringify(schemaBook)}
@@ -130,32 +145,30 @@ export default function SutraLandingPage() {
               ),
             },
             { title: t("sutra_landing.popular_sutras") },
-            { title: sutra.title_zh.length > 10
-                ? sutra.title_zh.slice(0, 10) + "..."
-                : sutra.title_zh },
+            { title: compactTitle(sutra.title) },
           ]}
         />
 
         {/* Title Block */}
         <Card>
           <Title level={2} style={{ marginBottom: 4 }}>
-            {sutra.title_zh}
+            {sutra.title}
           </Title>
-          {sutra.title_en && (
+          {sutra.alternateTitle && (
             <Text
               type="secondary"
               style={{ fontSize: 16, display: "block", marginBottom: 4 }}
             >
-              {sutra.title_en}
+              {sutra.alternateTitle}
             </Text>
           )}
-          {sutra.title_sa && (
+          {sutra.sanskritTitle && (
             <Text
               type="secondary"
               italic
               style={{ fontSize: 14, display: "block", marginBottom: 12 }}
             >
-              {sutra.title_sa}
+              {sutra.sanskritTitle}
             </Text>
           )}
           <Space wrap style={{ marginBottom: 12 }}>
@@ -214,7 +227,7 @@ export default function SutraLandingPage() {
                 block
                 onClick={() =>
                   navigate(
-                    `/chat?q=${encodeURIComponent(t("sutra_landing.chat_prompt", { title: sutra.title_zh }))}`
+                    `/chat?q=${encodeURIComponent(t("sutra_landing.chat_prompt", { title: sutra.title }))}`
                   )
                 }
               >
@@ -241,16 +254,10 @@ export default function SutraLandingPage() {
                   style={{ textAlign: "center", height: "100%" }}
                 >
                   <Text strong style={{ display: "block", marginBottom: 4 }}>
-                    {r.title_zh.length > 8
-                      ? r.title_zh.replace(
-                          /^(.*?)(经|论)$/,
-                          (_, p1, p2) =>
-                            p1.length > 6 ? p1.slice(0, 6) + "..." + p2 : p1 + p2
-                        )
-                      : r.title_zh}
+                    {compactTitle(r.title)}
                   </Text>
                   <Text type="secondary" style={{ fontSize: 12 }}>
-                    {r.title_en}
+                    {compactTitle(r.alternateTitle)}
                   </Text>
                 </Card>
               </Col>
@@ -260,7 +267,7 @@ export default function SutraLandingPage() {
           {/* Full list link */}
           <div style={{ textAlign: "center", marginTop: 16 }}>
             <Space wrap>
-              {popularSutras
+              {sutras
                 .filter((s) => s.slug !== sutra.slug)
                 .slice(4)
                 .map((s) => (
@@ -269,7 +276,7 @@ export default function SutraLandingPage() {
                     style={{ cursor: "pointer" }}
                     onClick={() => navigate(`/sutras/${s.slug}`)}
                   >
-                    {s.title_en}
+                    {s.title}
                   </Tag>
                 ))}
             </Space>
