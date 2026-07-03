@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { Empty } from "antd";
 import { SearchOutlined, VerticalAlignTopOutlined } from "@ant-design/icons";
-import { TOPICS, type Topic } from "../data/topics";
+import { getLocalizedTopics, type Topic } from "../data/topics";
 import "../styles/sources.css";
 import "../styles/topics.css";
 import { useEffect } from "react";
@@ -45,7 +45,7 @@ function TopicCard({ topic }: { topic: Topic }) {
           <div className="topic-card-actions">
             <button
               className="source-btn source-btn-search"
-              onClick={() => navigate(`/search?q=${encodeURIComponent(topic.name.replace(/系经典|经论|典籍|精选/g, ""))}`)}
+              onClick={() => navigate(`/search?q=${encodeURIComponent(topic.searchQuery)}`)}
             >
               <SearchOutlined /> {t("topics.card.search_related")}
             </button>
@@ -57,8 +57,9 @@ function TopicCard({ topic }: { topic: Topic }) {
 }
 
 export default function TopicsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [showTop, setShowTop] = useState(false);
+  const topics = getLocalizedTopics(i18n.language);
 
   useEffect(() => {
     const onScroll = () => setShowTop(window.scrollY > 400);
@@ -66,7 +67,7 @@ export default function TopicsPage() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const totalTexts = TOPICS.reduce((sum, t) => sum + t.texts.length, 0);
+  const totalTexts = topics.reduce((sum, t) => sum + t.texts.length, 0);
 
   return (
     <div className="sources-page">
@@ -81,15 +82,15 @@ export default function TopicsPage() {
       <div className="sources-header">
         <h1 className="sources-title">{t("topics.page.heading")}</h1>
         <p className="sources-desc">
-          {t("topics.page.summary", { topics: TOPICS.length, texts: totalTexts })}
+          {t("topics.page.summary", { topics: topics.length, texts: totalTexts })}
         </p>
       </div>
 
-      {TOPICS.length === 0 ? (
+      {topics.length === 0 ? (
         <Empty description={t("topics.page.empty")} style={{ marginTop: 60 }} />
       ) : (
         <div className="topic-grid">
-          {TOPICS.map((topic) => (
+          {topics.map((topic) => (
             <TopicCard key={topic.id} topic={topic} />
           ))}
         </div>
