@@ -2,7 +2,7 @@ import { useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import * as d3 from "d3";
 import type { DynastyDistribution } from "../../api/stats";
-import { DYNASTIES, resolveDynasty } from "../../data/dynasty_years";
+import { getDynastyLabel, getLocalizedDynasties, resolveDynasty } from "../../data/dynasty_years";
 
 interface DynastyBarChartProps {
   data: DynastyDistribution[];
@@ -10,14 +10,14 @@ interface DynastyBarChartProps {
 }
 
 export default function DynastyBarChart({ data, scholarlyMode }: DynastyBarChartProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const svgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
     if (!svgRef.current || data.length === 0) return;
 
     // Sort data chronologically using DYNASTIES config order
-    const dynastyOrder = new Map(DYNASTIES.map((d, i) => [d.name_zh, i]));
+    const dynastyOrder = new Map(getLocalizedDynasties(i18n.language).map((d, i) => [d.name_zh, i]));
     const sorted = [...data].sort((a, b) => {
       const ai = dynastyOrder.get(a.dynasty) ?? 999;
       const bi = dynastyOrder.get(b.dynasty) ?? 999;
@@ -55,7 +55,12 @@ export default function DynastyBarChart({ data, scholarlyMode }: DynastyBarChart
 
     // Y axis
     g.append("g")
-      .call(d3.axisLeft(yScale).tickSize(0))
+      .call(
+        d3
+          .axisLeft(yScale)
+          .tickSize(0)
+          .tickFormat((value) => getDynastyLabel(String(value), i18n.language)),
+      )
       .call((axis) => axis.select(".domain").remove())
       .selectAll("text")
       .style("font-size", "11px")
@@ -94,7 +99,7 @@ export default function DynastyBarChart({ data, scholarlyMode }: DynastyBarChart
         .style("fill", "var(--fj-ink, #2b2318)")
         .text((d) => d.count.toLocaleString());
     }
-  }, [data, scholarlyMode]);
+  }, [data, i18n.language, scholarlyMode]);
 
   return (
     <div className="dashboard-card">

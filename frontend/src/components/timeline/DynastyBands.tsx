@@ -1,5 +1,6 @@
 import type { ScaleLinear } from "d3";
-import { DYNASTIES } from "../../data/dynasty_years";
+import { useTranslation } from "react-i18next";
+import { getLocalizedDynasties } from "../../data/dynasty_years";
 
 const NON_CHINESE_KEYS = new Set(["india", "japan", "korea", "tibet"]);
 
@@ -9,9 +10,11 @@ interface DynastyBandsProps {
 }
 
 export default function DynastyBands({ xScale, height }: DynastyBandsProps) {
+  const { i18n } = useTranslation();
   const [domainStart, domainEnd] = xScale.domain() as [number, number];
+  const dynasties = getLocalizedDynasties(i18n.language);
 
-  const visible = DYNASTIES.filter(
+  const visible = dynasties.filter(
     (d) => d.end > domainStart && d.start < domainEnd,
   );
 
@@ -47,7 +50,7 @@ export default function DynastyBands({ xScale, height }: DynastyBandsProps) {
                 fill={d.color}
                 opacity={0.6}
               >
-                {d.name_zh}
+                {d.name}
               </text>
             )}
           </g>
