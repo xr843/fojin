@@ -13,7 +13,7 @@ services:
     # 1g chronically OOM-killed backends (155 cgroup OOMs in the dmesg
     # buffer, all task=postgres) → full crash-recovery cycles dropping
     # every connection. Raised to 3g; host has the headroom.
-    mem_limit: 3g
+    mem_limit: 4g
     cpus: 1.0
     # Docker's default /dev/shm is 64MB. Postgres puts parallel-worker shared
     # memory there, so a parallel VACUUM / VACUUM ANALYZE on a large table
@@ -149,12 +149,79 @@ services:
       redis:
         condition: service_healthy
 
+  # Second backend replica for zero-downtime rolling deploys. nginx upstream
+  # balances host 8000 + 8001; deploys recreate ONE replica at a time so the
+  # other keeps serving (no 502 window). Reuses the fojin-backend image — the
+  # app code is bind-mounted (./backend:/app), so both replicas run identical
+  # code. Start order matters: bring backend up (runs alembic) before backend2
+  # so the two never run `alembic upgrade head` concurrently.
+  backend2:
+    image: fojin-backend
+    container_name: fojin-backend2
+    restart: always
+    logging: *default-logging
+    mem_limit: 1g
+    cpus: 1.0
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-fojin}
+      POSTGRES_USER: ${POSTGRES_USER:-fojin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      ES_HOST: http://elasticsearch:9200
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env (32+ chars)}
+      API_KEY_ENCRYPTION_KEY: ${API_KEY_ENCRYPTION_KEY:?Set API_KEY_ENCRYPTION_KEY in .env (Fernet.generate_key() output)}
+      FOJIN_ENV: ${FOJIN_ENV:-production}
+      APP_VERSION: ${APP_VERSION:-}
+      FOJIN_COMMIT_SHA: ${FOJIN_COMMIT_SHA:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173,http://localhost:5174}
+      LLM_API_URL: ${LLM_API_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      EMBEDDING_API_URL: ${EMBEDDING_API_URL:-}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-m3}
+      RERANKER_API_URL: ${RERANKER_API_URL:-}
+      RERANKER_API_KEY: ${RERANKER_API_KEY:-}
+      RERANKER_MODEL: ${RERANKER_MODEL:-BAAI/bge-reranker-v2-m3}
+      DIANJIN_API_KEY: ${DIANJIN_API_KEY:-}
+      AMAP_KEY: ${AMAP_KEY:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      OAUTH_REDIRECT_BASE: ${OAUTH_REDIRECT_BASE:-http://localhost:3000}
+      ALIYUN_SMS_ACCESS_KEY_ID: ${ALIYUN_SMS_ACCESS_KEY_ID:-}
+      ALIYUN_SMS_ACCESS_KEY_SECRET: ${ALIYUN_SMS_ACCESS_KEY_SECRET:-}
+      ALIYUN_SMS_SIGN_NAME: ${ALIYUN_SMS_SIGN_NAME:-佛津}
+      ALIYUN_SMS_TEMPLATE_CODE: ${ALIYUN_SMS_TEMPLATE_CODE:-}
+    ports:
+      - "127.0.0.1:8001:8000"
+    volumes:
+      - ./backend:/app
+      - ./data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   umami:
     image: ghcr.io/umami-software/umami:postgresql-latest
     container_name: fojin-umami
     restart: always
     logging: *default-logging
-    mem_limit: 256m
+    mem_limit: 384m
     cpus: 0.5
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-fojin}:${POSTGRES_PASSWORD}@postgres:5432/umami
