@@ -57,7 +57,7 @@ export default function AdminAnswerQualityPage() {
   const [total, setTotal] = useState(0);
   const [dist, setDist] = useState<ScoreDistribution | null>(null);
   const [reviewStats, setReviewStats] = useState<AnswerReviewStats | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [windowDays, setWindowDays] = useState(90);
   const [minSuspicion, setMinSuspicion] = useState(0);
   const [reasonFilters, setReasonFilters] = useState<string[]>([]);
@@ -65,30 +65,45 @@ export default function AdminAnswerQualityPage() {
     Record<number, { category?: string; note?: string }>
   >({});
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [res, stats] = await Promise.all([
-        getAnswerQualityQueue({
-          window: windowDays,
-          min_suspicion: minSuspicion,
-          category: reasonFilters.length ? reasonFilters.join(",") : undefined,
-          limit: 50,
-        }),
-        getAnswerReviewStats(),
-      ]);
-      setItems(res.items);
-      setTotal(res.total_unreviewed);
-      setDist(res.score_distribution);
-      setReviewStats(stats);
-    } catch {
-      message.error(t("admin_aq.load_error"));
-    } finally {
-      setLoading(false);
-    }
+  const load = useCallback(() => {
+    return Promise.all([
+      getAnswerQualityQueue({
+        window: windowDays,
+        min_suspicion: minSuspicion,
+        category: reasonFilters.length ? reasonFilters.join(",") : undefined,
+        limit: 50,
+      }),
+      getAnswerReviewStats(),
+    ])
+      .then(([res, stats]) => {
+        setItems(res.items);
+        setTotal(res.total_unreviewed);
+        setDist(res.score_distribution);
+        setReviewStats(stats);
+      })
+      .catch(() => {
+        message.error(t("admin_aq.load_error"));
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, [minSuspicion, reasonFilters, t, windowDays]);
 
+  // Spinner state for param changes is adjusted during render; the fetch
+  // effect below only sets state from promise callbacks.
+  const queryKey = `${windowDays}|${minSuspicion}|${reasonFilters.join(",")}`;
+  const [prevQueryKey, setPrevQueryKey] = useState(queryKey);
+  if (prevQueryKey !== queryKey) {
+    setPrevQueryKey(queryKey);
+    setLoading(true);
+  }
+
   useEffect(() => {
+    void load();
+  }, [load]);
+
+  const refresh = useCallback(() => {
+    setLoading(true);
     void load();
   }, [load]);
 
@@ -234,7 +249,7 @@ export default function AdminAnswerQualityPage() {
             label: t(labelKey),
           }))}
         />
-        <Button onClick={() => void load()}>{t("admin_aq.refresh")}</Button>
+        <Button onClick={() => refresh()}>{t("admin_aq.refresh")}</Button>
       </Space>
 
       <Table<AnswerQueueItem>

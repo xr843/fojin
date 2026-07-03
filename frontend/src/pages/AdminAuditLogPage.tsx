@@ -62,24 +62,34 @@ export default function AdminAuditLogPage() {
   const [items, setItems] = useState<AdminAuditLogItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [actionFilter, setActionFilter] = useState<string | undefined>(undefined);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await getAdminAuditLog({ page, size: 20, action: actionFilter });
-      setItems(res.items);
-      setTotal(res.total);
-    } catch {
-      message.error(t("admin_crud.audit.load_error"));
-    } finally {
-      setLoading(false);
-    }
+  const fetchData = useCallback(() => {
+    return getAdminAuditLog({ page, size: 20, action: actionFilter })
+      .then((res) => {
+        setItems(res.items);
+        setTotal(res.total);
+      })
+      .catch(() => {
+        message.error(t("admin_crud.audit.load_error"));
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, [page, actionFilter, t]);
 
+  // Spinner state for param changes is adjusted during render; the fetch
+  // effect below only sets state from promise callbacks.
+  const queryKey = `${page}|${actionFilter}`;
+  const [prevQueryKey, setPrevQueryKey] = useState(queryKey);
+  if (prevQueryKey !== queryKey) {
+    setPrevQueryKey(queryKey);
+    setLoading(true);
+  }
+
   useEffect(() => {
-    fetchData();
+    void fetchData();
   }, [fetchData]);
 
   const columns = [

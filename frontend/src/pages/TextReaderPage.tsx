@@ -409,23 +409,24 @@ export default function TextReaderPage() {
   const highlightChunkParam = searchParams.get("highlight_chunk");
   const highlightChunkIndex = highlightChunkParam ? parseInt(highlightChunkParam, 10) : null;
   // 续读：URL 显式指定卷或深链高亮时尊重 URL；否则恢复上次阅读位置。
-  // resumeRef 在首次渲染时一次性决定，供后续滚动恢复 effect 消费。
-  const resumeRef = useRef<{ juan: number; ratio: number } | null>(null);
-  const [juanNum, setJuanNum] = useState(() => {
+  // 首次渲染时一次性决定（惰性 state），resumeRef 用它做初值，供滚动恢复
+  // effect 消费后置空。
+  const [initialReading] = useState<{ juan: number; resume: { juan: number; ratio: number } | null }>(() => {
     const last = highlightChunkParam ? null : getLastPosition(Number(id));
     if (initialJuanParam && Number.isFinite(initialJuan) && initialJuan > 0) {
       // URL 显式指定卷：尊重 URL；若与记录同卷（如详情页"继续阅读"），仍恢复滚动。
-      if (last && last.juan === initialJuan && last.ratio > 0.03) {
-        resumeRef.current = { juan: initialJuan, ratio: last.ratio };
-      }
-      return initialJuan;
+      const resume = last && last.juan === initialJuan && last.ratio > 0.03
+        ? { juan: initialJuan, ratio: last.ratio }
+        : null;
+      return { juan: initialJuan, resume };
     }
     if (last && last.juan > 0 && (last.juan > 1 || last.ratio > 0.03)) {
-      resumeRef.current = { juan: last.juan, ratio: last.ratio };
-      return last.juan;
+      return { juan: last.juan, resume: { juan: last.juan, ratio: last.ratio } };
     }
-    return 1;
+    return { juan: 1, resume: null };
   });
+  const resumeRef = useRef<{ juan: number; ratio: number } | null>(initialReading.resume);
+  const [juanNum, setJuanNum] = useState(initialReading.juan);
   const [fontSize, setFontSize] = useState(getInitialFontSize);
   const { t } = useTranslation();
   const getLangLabel = useCallback((lang: string) => {
@@ -815,13 +816,15 @@ export default function TextReaderPage() {
   // dict-popover opens, and AI-panel resize-drags don't re-parse the whole text
   // on every render. Keyed on content only — render-time concerns (font size) are
   // CSS, not part of the parse.
+  const contentText = content?.content ?? null;
+  const compareText = compareContent?.content ?? null;
   const reflowedContent = useMemo(
-    () => (content?.content ? reflowText(content.content) : []),
-    [content?.content],
+    () => (contentText ? reflowText(contentText) : []),
+    [contentText],
   );
   const reflowedCompare = useMemo(
-    () => (compareContent?.content ? reflowText(compareContent.content) : []),
-    [compareContent?.content],
+    () => (compareText ? reflowText(compareText) : []),
+    [compareText],
   );
 
   // Critical apparatus (校勘异文): fetched lazily only when the 校勘 toggle is on.

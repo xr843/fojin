@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import {
@@ -106,12 +106,13 @@ export default function ParallelReaderPage() {
     [alignmentKey],
   );
 
-  // Refs to each column's scroll container — kept as a stable array
+  // Refs to each column's scroll container. Entries are (re)written by the
+  // inline ref callbacks in the JSX below on every commit; here we only trim
+  // stale tail entries when columns shrink (ref writes in effects are fine).
   const scrollRefs = useRef<ColumnRef[]>([]);
-  scrollRefs.current = columns.map((col, i) => ({
-    textId: col.text.text_id,
-    el: scrollRefs.current[i]?.el ?? null,
-  }));
+  useEffect(() => {
+    scrollRefs.current.length = columns.length;
+  }, [columns.length]);
 
   useSyncScroll(scrollRefs, alignmentMap);
 

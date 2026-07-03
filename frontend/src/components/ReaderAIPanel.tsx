@@ -106,7 +106,7 @@ export default function ReaderAIPanel({
   const [sessionId, setSessionId] = useState<number | undefined>();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const streamingIdRef = useRef(0);
+  const [streamingId, setStreamingId] = useState(0);
   const consumedRef = useRef(false);
 
   // When selectedText changes, auto-fill it as a question
@@ -144,7 +144,7 @@ export default function ReaderAIPanel({
     };
 
     const assistantId = Date.now() + 1;
-    streamingIdRef.current = assistantId;
+    setStreamingId(assistantId);
     const assistantMsg: ChatMessageItem = {
       id: assistantId,
       role: "assistant",
@@ -217,7 +217,7 @@ export default function ReaderAIPanel({
       onDone: () => {
         clearTimeout(timeoutId);
         abortRef.current = null;
-        streamingIdRef.current = 0;
+        setStreamingId(0);
         setSending(false);
       },
     }, { signal: abortController.signal, readingContext });
@@ -287,7 +287,7 @@ export default function ReaderAIPanel({
         )}
         {messages.map((m) => {
           const isAssistant = m.role === "assistant";
-          const isStreaming = isAssistant && m.id === streamingIdRef.current && sending;
+          const isStreaming = isAssistant && m.id === streamingId && sending;
           const { cleanContent, suggestions } = isAssistant
             ? parseFollowUps(m.content)
             : { cleanContent: m.content, suggestions: [] };

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Empty, Spin, Alert, Collapse, Tag, Progress, Tabs, Button } from "antd";
 import { LinkOutlined, BookOutlined, ExpandAltOutlined } from "@ant-design/icons";
@@ -395,7 +395,11 @@ export default function ReaderParallelPanel({ textId, juanNum }: Props) {
   // shares CanonicalView's cache key (deduped). activeKey=undefined means
   // "auto"; a user click pins it. Reset on textId change so auto re-applies.
   const [activeKey, setActiveKey] = useState<string | undefined>(undefined);
-  useEffect(() => setActiveKey(undefined), [textId]);
+  const [prevTextId, setPrevTextId] = useState(textId);
+  if (prevTextId !== textId) {
+    setPrevTextId(textId);
+    setActiveKey(undefined);
+  }
   const { data: canonical, isSuccess, isError } = useQuery({
     queryKey: ["canonical-parallels", textId],
     queryFn: () => getCanonicalParallels(textId),

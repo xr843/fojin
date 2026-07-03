@@ -28,31 +28,46 @@ export default function AdminSuggestionsPage() {
   const [items, setItems] = useState<SourceSuggestionItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await getSourceSuggestions(page, 20, statusFilter);
-      setItems(res.items);
-      setTotal(res.total);
-    } catch {
-      message.error(t("admin_crud.suggestion.load_error"));
-    } finally {
-      setLoading(false);
-    }
+  const fetchData = useCallback(() => {
+    return getSourceSuggestions(page, 20, statusFilter)
+      .then((res) => {
+        setItems(res.items);
+        setTotal(res.total);
+      })
+      .catch(() => {
+        message.error(t("admin_crud.suggestion.load_error"));
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, [page, statusFilter, t]);
 
+  // Spinner state for param changes is adjusted during render; the fetch
+  // effect below only sets state from promise callbacks.
+  const queryKey = `${page}|${statusFilter}`;
+  const [prevQueryKey, setPrevQueryKey] = useState(queryKey);
+  if (prevQueryKey !== queryKey) {
+    setPrevQueryKey(queryKey);
+    setLoading(true);
+  }
+
   useEffect(() => {
-    fetchData();
+    void fetchData();
+  }, [fetchData]);
+
+  const refresh = useCallback(() => {
+    setLoading(true);
+    void fetchData();
   }, [fetchData]);
 
   const handleStatusChange = async (id: number, status: string) => {
     try {
       await updateSuggestionStatus(id, status);
       message.success(status === "accepted" ? t("admin_crud.suggestion.accepted") : t("admin_crud.suggestion.rejected"));
-      fetchData();
+      refresh();
     } catch {
       message.error(t("admin_crud.common.action_failed"));
     }
@@ -62,7 +77,7 @@ export default function AdminSuggestionsPage() {
     try {
       await deleteSourceSuggestion(id);
       message.success(t("admin_crud.suggestion.deleted"));
-      fetchData();
+      refresh();
     } catch {
       message.error(t("admin_crud.suggestion.delete_failed"));
     }

@@ -70,17 +70,21 @@ export default function DeckGLMap({
   const [viewState, setViewState] = useState<typeof INITIAL_VIEW_STATE & { transitionDuration?: number }>(INITIAL_VIEW_STATE);
   const mapRef = useRef<MapRef>(null);
 
-  // Fly to focused entity when it changes
-  useEffect(() => {
-    if (!focusEntity || focusEntity.longitude == null || focusEntity.latitude == null) return;
-    setViewState((prev) => ({
-      ...prev,
-      longitude: focusEntity.longitude,
-      latitude: focusEntity.latitude,
-      zoom: Math.max(prev.zoom, 9),
-      transitionDuration: 1200,
-    }));
-  }, [focusEntity]);
+  // Fly to focused entity when it changes (state adjusted during render so the
+  // transition starts on the same commit, without an effect-driven extra pass)
+  const [prevFocusEntity, setPrevFocusEntity] = useState(focusEntity);
+  if (prevFocusEntity !== focusEntity) {
+    setPrevFocusEntity(focusEntity);
+    if (focusEntity && focusEntity.longitude != null && focusEntity.latitude != null) {
+      setViewState((prev) => ({
+        ...prev,
+        longitude: focusEntity.longitude,
+        latitude: focusEntity.latitude,
+        zoom: Math.max(prev.zoom, 9),
+        transitionDuration: 1200,
+      }));
+    }
+  }
 
   // Pulse animation for highlight ring
   const [pulseScale, setPulseScale] = useState(1.0);

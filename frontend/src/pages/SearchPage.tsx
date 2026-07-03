@@ -72,10 +72,13 @@ export default function SearchPage() {
     }, 300);
   }, []);
 
-  // Sync acInput when URL query changes (e.g. clicking "did you mean" link)
-  useEffect(() => {
+  // Sync acInput when the URL query changes (e.g. clicking a "did you mean"
+  // link). Adjusted during render — no effect pass.
+  const [prevQuery, setPrevQuery] = useState(query);
+  if (prevQuery !== query) {
+    setPrevQuery(query);
     setAcInput(query);
-  }, [query]);
+  }
 
   // CBETA ID 直跳：用户输入 T0278 / X0235a 等时，命中即跳 /texts/{id}，
   // 跳过结果列表。404/非 CBETA 静默 fallback 到常规搜索。
@@ -171,17 +174,18 @@ export default function SearchPage() {
 
   // Dictionary knowledge card (parallel, non-blocking)
   const [dictCardDismissed, setDictCardDismissed] = useState(false);
+  // Reset dismissal when the query changes — adjusted during render.
+  const [prevDictQuery, setPrevDictQuery] = useState(query);
+  if (prevDictQuery !== query) {
+    setPrevDictQuery(query);
+    setDictCardDismissed(false);
+  }
   const { data: dictKnowledge } = useQuery<DictGroupedSearchResponse>({
     queryKey: ["dictKnowledge", query],
     queryFn: () => searchDictionaryGrouped({ q: query }),
     enabled: query.length > 0 && tab !== "dictionary",
     staleTime: 5 * 60 * 1000,
   });
-
-  // Reset dismissed state when query changes
-  useEffect(() => {
-    setDictCardDismissed(false);
-  }, [query]);
 
   const { data: sources } = useQuery({ queryKey: ["sources"], queryFn: getSources });
 

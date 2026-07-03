@@ -23,39 +23,54 @@ export default function AdminUsersPage() {
   const [items, setItems] = useState<AdminUserItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("created_at");
   const [sortOrder, setSortOrder] = useState("desc");
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await getAdminUsers({
-        page,
-        size: 20,
-        q: search || undefined,
-        sort_by: sortBy,
-        sort_order: sortOrder,
+  const fetchData = useCallback(() => {
+    return getAdminUsers({
+      page,
+      size: 20,
+      q: search || undefined,
+      sort_by: sortBy,
+      sort_order: sortOrder,
+    })
+      .then((res) => {
+        setItems(res.items);
+        setTotal(res.total);
+      })
+      .catch(() => {
+        message.error(t("admin_crud.users.load_error"));
+      })
+      .finally(() => {
+        setLoading(false);
       });
-      setItems(res.items);
-      setTotal(res.total);
-    } catch {
-      message.error(t("admin_crud.users.load_error"));
-    } finally {
-      setLoading(false);
-    }
   }, [page, search, sortBy, sortOrder, t]);
 
+  // Spinner state for param changes is adjusted during render; the fetch
+  // effect below only sets state from promise callbacks.
+  const queryKey = `${page}|${search}|${sortBy}|${sortOrder}`;
+  const [prevQueryKey, setPrevQueryKey] = useState(queryKey);
+  if (prevQueryKey !== queryKey) {
+    setPrevQueryKey(queryKey);
+    setLoading(true);
+  }
+
   useEffect(() => {
-    fetchData();
+    void fetchData();
+  }, [fetchData]);
+
+  const refresh = useCallback(() => {
+    setLoading(true);
+    void fetchData();
   }, [fetchData]);
 
   const handleToggleActive = async (record: AdminUserItem) => {
     try {
       await updateAdminUser(record.id, { is_active: !record.is_active });
       message.success(record.is_active ? t("admin_crud.users.disabled") : t("admin_crud.users.enabled"));
-      fetchData();
+      refresh();
     } catch {
       message.error(t("admin_crud.common.action_failed"));
     }
@@ -65,7 +80,7 @@ export default function AdminUsersPage() {
     try {
       await updateAdminUser(record.id, { role });
       message.success(t("admin_crud.users.role_updated"));
-      fetchData();
+      refresh();
     } catch {
       message.error(t("admin_crud.common.action_failed"));
     }
