@@ -129,12 +129,25 @@ dispatch_deploy_success() {
 # 注意: 仓外的 webhook CD 若不经由 deploy.sh, 必须自己也取这把同一文件锁
 # ($STATE_DIR/deploy.lock) 才能完全堵住与它的竞争 — 否则只挡住 deploy.sh 自身。
 # 非阻塞获取: 抢不到锁就干净退出 (另一个 deploy 已在处理同一份代码)。
+# 但"干净退出"不能是无限期的: 若持锁者僵死 (卡住的 build、挂起的 docker),
+# 每次 webhook 都会静默让出, CD 就无声停摆 (2026-07 事故的失败模式之一)。
+# 持锁者把 "PID 时间戳" 写进 holder 文件; 竞争失败时检查锁龄, 超过 45min
+# (正常 build ≤ ~20min) 就以非零退出报僵死, 让 deploy.log / webhook 侧变红。
+# 锁文件本身的 mtime 不可用: 每个竞争者的 `exec 200>` 都会 touch 它。
 DEPLOY_LOCK="$STATE_DIR/deploy.lock"
+LOCK_HOLDER="$STATE_DIR/deploy.holder"
 exec 200>"$DEPLOY_LOCK"
 if ! flock -n 200; then
-  warn "另一个 deploy 正在运行 (lock: $DEPLOY_LOCK) — 退出，避免并发 build 触发 OOM。"
+  holder="$(cat "$LOCK_HOLDER" 2>/dev/null || true)"
+  holder_pid="${holder%% *}"
+  holder_ts="${holder##* }"
+  if [[ "$holder_ts" =~ ^[0-9]+$ ]] && (( $(date +%s) - holder_ts > 2700 )); then
+    fail "deploy.lock 已被 PID ${holder_pid:-?} 持有超过 45min — 疑似僵死。请人工检查该进程 (kill 后重跑 deploy.sh)。"
+  fi
+  warn "另一个 deploy 正在运行 (PID ${holder_pid:-?}, lock: $DEPLOY_LOCK) — 退出，避免并发 build 触发 OOM。"
   exit 0
 fi
+echo "$$ $(date +%s)" > "$LOCK_HOLDER"
 
 # --- 1. 取最新代码 -----------------------------------------------------------
 log "Fetching origin/$BRANCH ..."
