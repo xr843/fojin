@@ -44,6 +44,40 @@ jobs:
           cache: npm
           cache-dependency-path: e2e/package-lock.json
 
+      # Drift watchdog for scheduled runs. The dispatch path below asserts the
+      # deploy that just finished; this asserts CD is alive AT ALL. The 2026-07
+      # incident: dirty VPS worktree made every ff-merge abort, prod silently
+      # froze for 1.5 days while webhooks returned 200 — the only red signal
+      # was an indirect locale-count assertion. Compare what prod actually
+      # runs (/api/version) against master; allow a grace window so a deploy
+      # racing a fresh merge doesn't false-alarm.
+      - name: Assert production tracks master (drift watchdog)
+        if: github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SERVED=$(curl -sf --max-time 15 -A 'fojin-smoke' https://fojin.app/api/version \
+            | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).commit||''))" 2>/dev/null || echo "")
+          if [ -z "$SERVED" ]; then
+            echo "::error::/api/version unreachable or missing commit — backend down or running pre-versioning code."
+            exit 1
+          fi
+          echo "prod: $SERVED / master: $GITHUB_SHA"
+          [ "$SERVED" = "$GITHUB_SHA" ] && { echo "in sync"; exit 0; }
+          CMP=$(gh api "repos/${GITHUB_REPOSITORY}/compare/${SERVED}...${GITHUB_SHA}" 2>/dev/null) || {
+            echo "::error::prod commit $SERVED is unknown to this repo — investigate what is deployed."
+            exit 1
+          }
+          BEHIND=$(echo "$CMP" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).ahead_by))")
+          HEAD_DATE=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}" --jq '.commit.committer.date')
+          AGE_MIN=$(( ($(date +%s) - $(date -d "$HEAD_DATE" +%s)) / 60 ))
+          echo "prod is $BEHIND commit(s) behind; master head is ${AGE_MIN}min old"
+          if [ "$BEHIND" -gt 0 ] && [ "$AGE_MIN" -gt 120 ]; then
+            echo "::error::Production is $BEHIND commit(s) behind a master that has been quiet for ${AGE_MIN}min — CD looks stalled (check VPS deploy.log / worktree cleanliness)."
+            exit 1
+          fi
+          echo "lag within grace window (master head <120min old) — CD may still be rolling out"
+
       - name: Wait for deployed backend commit
         if: github.event_name == 'repository_dispatch'
         env:
