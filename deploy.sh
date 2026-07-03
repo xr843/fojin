@@ -205,11 +205,12 @@ elif [ "$BE_BASE" != "$NEW_REV" ]; then
   # Live API path: backend/ minus dirs that don't ride the uvicorn process.
   # - backend/scripts/   : CLI tools (build_alignments, build_works, audits, …)
   # - backend/tests/     : pytest fixtures / unit tests
+  # - backend/tests_integration/ : real-ES integration tests (CI-only lane)
   # - backend/eval/      : RAG eval harness
   # - backend/alembic/   : migration files (apply via `alembic upgrade`, not restart)
   # Changing any of these MUST NOT bounce a running uvicorn — and, more importantly,
   # MUST NOT kill long-running scripts a developer has launched via `docker exec`.
-  BE_LIVE_DIFF="$(echo "$BE_DIFF" | grep -E '^backend/' | grep -vE '^backend/(scripts|tests|eval|alembic)/' || true)"
+  BE_LIVE_DIFF="$(echo "$BE_DIFF" | grep -E '^backend/' | grep -vE '^backend/(scripts|tests|tests_integration|eval|alembic)/' || true)"
   if [ -n "$BE_LIVE_DIFF" ]; then
     log "backend/ live-API 路径自 ${BE_BASE:0:7} 起有变更 — 触发 restart。"
     echo "$BE_LIVE_DIFF" | sed 's/^/    /'
