@@ -2,7 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HelmetProvider } from "react-helmet-async";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import type { ReactElement } from "react";
 import i18n from "../i18n";
 import enTranslation from "../../public/locales/en/translation.json";
@@ -82,6 +82,11 @@ function renderWithProviders(ui: ReactElement, initialEntries = ["/"]) {
       </QueryClientProvider>
     </HelmetProvider>,
   );
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
 }
 
 const overview: AdminOverview = {
@@ -345,6 +350,21 @@ describe("remaining page i18n", () => {
     expect(screen.getByText(/Scripture data provided by/)).toBeInTheDocument();
   });
 
+  it("renders sutra landing content from locale data", async () => {
+    renderWithProviders(
+      <Routes>
+        <Route path="/sutras/:slug" element={<SutraLandingPage />} />
+      </Routes>,
+      ["/sutras/heart-sutra"],
+    );
+
+    expect(screen.getByRole("heading", { name: "Heart Sutra" })).toBeInTheDocument();
+    expect(screen.getByText("Tang dynasty")).toBeInTheDocument();
+    expect(screen.getByText("Xuanzang translation")).toBeInTheDocument();
+    expect(screen.getByText(/concise Prajnaparamita text/)).toBeInTheDocument();
+    expect(screen.queryByText(/全经仅二百六十字/)).not.toBeInTheDocument();
+  });
+
   it("renders topics page chrome in the active UI language", async () => {
     renderWithProviders(<TopicsPage />);
 
@@ -352,6 +372,34 @@ describe("remaining page i18n", () => {
     expect(screen.getByText(/topics/)).toBeInTheDocument();
     fireEvent.click(document.querySelector(".topic-card-header")!);
     expect(screen.getByRole("button", { name: /Search related texts on FoJin/ })).toBeInTheDocument();
+  });
+
+  it("renders topic content from locale data while keeping canonical search queries", async () => {
+    renderWithProviders(
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <>
+              <TopicsPage />
+              <LocationProbe />
+            </>
+          }
+        />
+        <Route path="/search" element={<LocationProbe />} />
+      </Routes>,
+    );
+
+    expect(screen.getByText("Prajna Classics")).toBeInTheDocument();
+    expect(screen.getByText(/emptiness wisdom/)).toBeInTheDocument();
+    expect(screen.queryByText("般若系经典")).not.toBeInTheDocument();
+
+    fireEvent.click(document.querySelector(".topic-card-header")!);
+    expect(screen.getByText("Heart Sutra")).toBeInTheDocument();
+    expect(screen.queryByText("般若波罗蜜多心经")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Search related texts on FoJin/ }));
+    expect(screen.getByTestId("location")).toHaveTextContent("/search?q=%E8%88%AC%E8%8B%A5");
   });
 
   it("renders home visitor tip in the active UI language", async () => {

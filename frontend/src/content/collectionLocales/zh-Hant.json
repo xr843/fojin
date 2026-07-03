@@ -1,0 +1,3092 @@
+{
+  "resourceCategories": {
+    "reading": "在線閱讀",
+    "translation": "翻譯項目",
+    "manuscript": "寫本善本",
+    "research": "學術研究",
+    "temple": "寺院道場"
+  },
+  "collections": [
+    {
+      "id": "huayan",
+      "name": "華嚴經系列",
+      "tradition": "華嚴宗",
+      "description": "《大方廣佛華嚴經》是大乘佛教最重要的經典之一，闡述法界緣起、事事無礙的圓融思想。歷代有多種漢譯本及大量註疏，華嚴宗五祖（杜順、智儼、法藏、澄觀、宗密）均留下豐富著作。",
+      "mainTexts": [
+        {
+          "key": "huayan-main-t0278",
+          "title": "大方廣佛華嚴經（六十卷）",
+          "cbeta_id": "T0278",
+          "author": "佛馱跋陀羅",
+          "dynasty": "東晉",
+          "note": "舊譯/晉譯本"
+        },
+        {
+          "key": "huayan-main-t0279",
+          "title": "大方廣佛華嚴經（八十卷）",
+          "cbeta_id": "T0279",
+          "author": "實叉難陀",
+          "dynasty": "唐",
+          "note": "新譯/唐譯本，最通行的版本"
+        },
+        {
+          "key": "huayan-main-t0293",
+          "title": "大方廣佛華嚴經（四十卷·入不思議解脫境界普賢行願品）",
+          "cbeta_id": "T0293",
+          "author": "般若",
+          "dynasty": "唐",
+          "note": "又稱《四十華嚴》"
+        },
+        {
+          "key": "huayan-main-t0285",
+          "title": "漸備一切智德經",
+          "cbeta_id": "T0285",
+          "author": "竺法護",
+          "dynasty": "西晉",
+          "note": "十地品早期重要別譯"
+        },
+        {
+          "key": "huayan-main-t0286",
+          "title": "十住經",
+          "cbeta_id": "T0286",
+          "author": "鳩摩羅什",
+          "dynasty": "姚秦",
+          "note": "十地品別譯"
+        },
+        {
+          "key": "huayan-main-t0287",
+          "title": "佛說十地經",
+          "cbeta_id": "T0287",
+          "author": "屍羅達摩",
+          "dynasty": "唐",
+          "note": "十地品，梵文 Daśabhūmika 直譯"
+        },
+        {
+          "key": "huayan-main-t0280",
+          "title": "佛說兜沙經",
+          "cbeta_id": "T0280",
+          "author": "支婁迦讖",
+          "dynasty": "後漢",
+          "note": "華嚴經最早單品別譯"
+        },
+        {
+          "key": "huayan-main-t0291",
+          "title": "佛說如來興顯經",
+          "cbeta_id": "T0291",
+          "author": "竺法護",
+          "dynasty": "西晉",
+          "note": "如來出現品別譯"
+        }
+      ],
+      "commentaries": [
+        {
+          "key": "huayan-commentary-t1867",
+          "title": "華嚴五教止觀",
+          "cbeta_id": "T1867",
+          "author": "杜順",
+          "dynasty": "隋",
+          "note": "華嚴宗開山之作，初祖杜順"
+        },
+        {
+          "key": "huayan-commentary-t1732",
+          "title": "華嚴經搜玄分齊通智方軌（搜玄記）",
+          "cbeta_id": "T1732",
+          "author": "智儼",
+          "dynasty": "唐",
+          "note": "華嚴經最早疏釋，二祖智儼"
+        },
+        {
+          "key": "huayan-commentary-t1868",
+          "title": "華嚴一乘十玄門",
+          "cbeta_id": "T1868",
+          "author": "智儼",
+          "dynasty": "唐",
+          "note": "華嚴十玄門核心教義"
+        },
+        {
+          "key": "huayan-commentary-t1870",
+          "title": "華嚴經內章門等雜孔目章",
+          "cbeta_id": "T1870",
+          "author": "智儼",
+          "dynasty": "唐",
+          "note": "華嚴教義綱要"
+        },
+        {
+          "key": "huayan-commentary-t1733",
+          "title": "華嚴經探玄記",
+          "cbeta_id": "T1733",
+          "author": "法藏",
+          "dynasty": "唐",
+          "note": "三祖法藏代表作"
+        },
+        {
+          "key": "huayan-commentary-t1866",
+          "title": "華嚴一乘教義分齊章",
+          "cbeta_id": "T1866",
+          "author": "法藏",
+          "dynasty": "唐",
+          "note": "又稱《華嚴五教章》，判教核心"
+        },
+        {
+          "key": "huayan-commentary-t1871",
+          "title": "華嚴經旨歸",
+          "cbeta_id": "T1871",
+          "author": "法藏",
+          "dynasty": "唐",
+          "note": "華嚴經總綱"
+        },
+        {
+          "key": "huayan-commentary-t1876",
+          "title": "修華嚴奧旨妄盡還源觀",
+          "cbeta_id": "T1876",
+          "author": "法藏",
+          "dynasty": "唐",
+          "note": "修行觀法核心著作"
+        },
+        {
+          "key": "huayan-commentary-t1875",
+          "title": "華嚴經義海百門",
+          "cbeta_id": "T1875",
+          "author": "法藏",
+          "dynasty": "唐"
+        },
+        {
+          "key": "huayan-commentary-t1880",
+          "title": "華嚴金師子章",
+          "cbeta_id": "T1880",
+          "author": "法藏",
+          "dynasty": "唐"
+        },
+        {
+          "key": "huayan-commentary-t1735",
+          "title": "華嚴經疏",
+          "cbeta_id": "T1735",
+          "author": "澄觀",
+          "dynasty": "唐",
+          "note": "四祖澄觀所撰"
+        },
+        {
+          "key": "huayan-commentary-t1736",
+          "title": "華嚴經隨疏演義鈔",
+          "cbeta_id": "T1736",
+          "author": "澄觀",
+          "dynasty": "唐"
+        },
+        {
+          "key": "huayan-commentary-t1883",
+          "title": "華嚴法界玄鏡",
+          "cbeta_id": "T1883",
+          "author": "澄觀",
+          "dynasty": "唐",
+          "note": "法界觀門註釋"
+        },
+        {
+          "key": "huayan-commentary-t1884",
+          "title": "注華嚴法界觀門",
+          "cbeta_id": "T1884",
+          "author": "宗密注杜順原作",
+          "dynasty": "唐",
+          "note": "法界三觀"
+        },
+        {
+          "key": "huayan-commentary-t1886",
+          "title": "原人論",
+          "cbeta_id": "T1886",
+          "author": "宗密",
+          "dynasty": "唐",
+          "note": "五祖宗密代表作，判攝儒釋道"
+        },
+        {
+          "key": "huayan-commentary-t1739",
+          "title": "新華嚴經論",
+          "cbeta_id": "T1739",
+          "author": "李通玄",
+          "dynasty": "唐",
+          "note": "居士解華嚴的鉅著，40卷"
+        },
+        {
+          "key": "huayan-commentary-t1522",
+          "title": "十地經論",
+          "cbeta_id": "T1522",
+          "author": "世親造，菩提流支譯",
+          "dynasty": "元魏",
+          "note": "世親注十地經，地論宗根本"
+        }
+      ],
+      "resources": {
+        "reading": [
+          {
+            "key": "huayan-reading-cbetaonline-dila-edu-tw-1",
+            "name": "CBETA 華嚴部",
+            "url": "https://cbetaonline.dila.edu.tw/zh/T0279",
+            "desc": "大正藏華嚴經全文，支持全文檢索"
+          },
+          {
+            "key": "huayan-reading-21dzk-l-u-tokyo-ac-jp-2",
+            "name": "SAT 大正藏數據庫",
+            "url": "https://21dzk.l.u-tokyo.ac.jp/SAT/",
+            "desc": "東京大學，含原版影像對照"
+          },
+          {
+            "key": "huayan-reading-ntireader-org-3",
+            "name": "NTI Reader",
+            "url": "https://ntireader.org/taisho/t0279.html",
+            "desc": "中英佛典閱讀器，即時詞彙查詢"
+          },
+          {
+            "key": "huayan-reading-ctext-org-4",
+            "name": "CText 中國哲學書電子化",
+            "url": "https://ctext.org/datawiki.pl?if=en&res=725377",
+            "desc": "華嚴經全文與影像"
+          },
+          {
+            "key": "huayan-reading-deerpark-app-5",
+            "name": "Deerpark 佛經閱讀器",
+            "url": "https://deerpark.app/",
+            "desc": "優雅排版，支持 PDF 下載"
+          }
+        ],
+        "translation": [
+          {
+            "key": "huayan-translation-84000-co-1",
+            "name": "84000 入法界品英譯",
+            "url": "https://84000.co/translation/toh44-45",
+            "desc": "The Stem Array (Gandavyuha)，藏譯英"
+          },
+          {
+            "key": "huayan-translation-kalavinka-org-2",
+            "name": "Kalavinka Press 完整英譯",
+            "url": "http://kalavinka.org/",
+            "desc": "Bhikshu Dharmamitra 英譯全三卷，目前唯一完整英譯"
+          },
+          {
+            "key": "huayan-translation-www-buddhisttexts-org-3",
+            "name": "DRBA 華嚴英譯項目",
+            "url": "https://www.buddhisttexts.org/pages/the-avatamsaka-sutra-english-translation-project",
+            "desc": "法界佛教總會華嚴經英譯"
+          },
+          {
+            "key": "huayan-translation-www-dsbcproject-org-4",
+            "name": "DSBC 梵文佛典",
+            "url": "https://www.dsbcproject.org/",
+            "desc": "入法界品、十地經等梵文殘存部分"
+          },
+          {
+            "key": "huayan-translation-www-bdkamerica-org-5",
+            "name": "BDK 英譯大藏經",
+            "url": "https://www.bdkamerica.org/the-translation-project/",
+            "desc": "Numata 基金會英譯項目"
+          }
+        ],
+        "manuscript": [
+          {
+            "key": "huayan-manuscript-knmdb-kyohaku-go-jp-1",
+            "name": "京都國立博物館 金字寫本",
+            "url": "https://knmdb.kyohaku.go.jp/eng/2922.html",
+            "desc": "華嚴經金字寫本高清數字影像"
+          },
+          {
+            "key": "huayan-manuscript-www-metmuseum-org-2",
+            "name": "大都會博物館 佛教寫本",
+            "url": "https://www.metmuseum.org/art/collection/search?q=gandavyuha",
+            "desc": "尼泊爾 Gandavyuha 相關館藏"
+          },
+          {
+            "key": "huayan-manuscript-www-clevelandart-org-3",
+            "name": "克利夫蘭美術館 高麗金字寫本",
+            "url": "https://www.clevelandart.org/art/1994.25",
+            "desc": "高麗時代華嚴經金字寫本"
+          },
+          {
+            "key": "huayan-manuscript-idp-bl-uk-4",
+            "name": "IDP 國際敦煌項目",
+            "url": "https://idp.bl.uk/",
+            "desc": "敦煌華嚴經寫卷數字影像"
+          },
+          {
+            "key": "huayan-manuscript-www-digitalcollections-manchester-ac-uk-5",
+            "name": "曼徹斯特大學 華嚴經寫卷",
+            "url": "https://www.digitalcollections.manchester.ac.uk/view/PR-CHCR-00459",
+            "desc": "館藏華嚴經寫卷數字影像"
+          }
+        ],
+        "research": [
+          {
+            "key": "huayan-research-www-huayencollege-org-1",
+            "name": "華嚴專宗學院",
+            "url": "https://www.huayencollege.org/",
+            "desc": "臺灣，專門研究華嚴宗的佛學院"
+          },
+          {
+            "key": "huayan-research-indra-huayen-org-tw-2",
+            "name": "華嚴學術論文庫 (Indra)",
+            "url": "https://indra.huayen.org.tw/",
+            "desc": "華嚴研究所論文電子全文"
+          },
+          {
+            "key": "huayan-research-plato-stanford-edu-3",
+            "name": "斯坦福哲學百科 · 華嚴佛學",
+            "url": "https://plato.stanford.edu/entries/buddhism-huayan/",
+            "desc": "華嚴思想權威學術條目"
+          },
+          {
+            "key": "huayan-research-buddhanexus2-kc-tbts-uni-hamburg-de-4",
+            "name": "BuddhaNexus 跨語種對照",
+            "url": "https://buddhanexus2.kc-tbts.uni-hamburg.de/db/skt",
+            "desc": "漢堡大學，AI 驅動跨語種佛典文本比對"
+          },
+          {
+            "key": "huayan-research-buddhism-lib-ntu-edu-tw-5",
+            "name": "臺大佛學數位圖書館",
+            "url": "https://buddhism.lib.ntu.edu.tw/",
+            "desc": "大量華嚴研究論文全文"
+          }
+        ],
+        "temple": [
+          {
+            "key": "huayan-temple-www-todaiji-or-jp-1",
+            "name": "東大寺（華嚴宗總本山）",
+            "url": "https://www.todaiji.or.jp/en/",
+            "desc": "日本奈良，毗盧遮那大佛，世界遺產"
+          },
+          {
+            "key": "huayan-temple-www-huayenworld-org-2",
+            "name": "大華嚴寺",
+            "url": "https://www.huayenworld.org/",
+            "desc": "臺灣，華嚴宗道場"
+          },
+          {
+            "key": "huayan-temple-www-cttbusa-org-3",
+            "name": "萬佛聖城 華嚴講堂",
+            "url": "https://www.cttbusa.org/avatamsaka/avatamsaka_contents.asp.html",
+            "desc": "美國，宣化上人華嚴經講解全文"
+          }
+        ]
+      },
+      "searchQuery": "华严经"
+    },
+    {
+      "id": "prajna",
+      "name": "般若經系列",
+      "tradition": "般若/中觀",
+      "description": "般若經類是大乘佛教最早期的經典群，以「空」為核心思想。包括《大般若經》《心經》《金剛經》等，以及龍樹菩薩的《大智度論》《中論》《十二門論》等重要註釋，是三論宗的根本經論。",
+      "mainTexts": [
+        {
+          "key": "prajna-main-t0220",
+          "title": "大般若波羅蜜多經（六百卷）",
+          "cbeta_id": "T0220",
+          "author": "玄奘",
+          "dynasty": "唐",
+          "note": "般若經總集，玄奘法師翻譯的最大部頭經典"
+        },
+        {
+          "key": "prajna-main-t0223",
+          "title": "摩訶般若波羅蜜經",
+          "cbeta_id": "T0223",
+          "author": "鳩摩羅什",
+          "dynasty": "姚秦",
+          "note": "又稱《大品般若》"
+        },
+        {
+          "key": "prajna-main-t0227",
+          "title": "小品般若波羅蜜經",
+          "cbeta_id": "T0227",
+          "author": "鳩摩羅什",
+          "dynasty": "姚秦"
+        },
+        {
+          "key": "prajna-main-t0224",
+          "title": "道行般若經",
+          "cbeta_id": "T0224",
+          "author": "支婁迦讖",
+          "dynasty": "後漢",
+          "note": "中國般若學之始，最早的般若漢譯"
+        },
+        {
+          "key": "prajna-main-t0221",
+          "title": "放光般若經",
+          "cbeta_id": "T0221",
+          "author": "無羅叉",
+          "dynasty": "西晉",
+          "note": "二萬五千頌般若重要譯本"
+        },
+        {
+          "key": "prajna-main-t0222",
+          "title": "光贊經",
+          "cbeta_id": "T0222",
+          "author": "竺法護",
+          "dynasty": "西晉",
+          "note": "二萬五千頌般若異譯"
+        },
+        {
+          "key": "prajna-main-t0235",
+          "title": "金剛般若波羅蜜經",
+          "cbeta_id": "T0235",
+          "author": "鳩摩羅什",
+          "dynasty": "姚秦",
+          "note": "最流行的般若經典之一"
+        },
+        {
+          "key": "prajna-main-t0251",
+          "title": "般若波羅蜜多心經",
+          "cbeta_id": "T0251",
+          "author": "玄奘",
+          "dynasty": "唐",
+          "note": "最短最精要的般若經"
+        },
+        {
+          "key": "prajna-main-t0232",
+          "title": "文殊師利所說摩訶般若波羅蜜經",
+          "cbeta_id": "T0232",
+          "author": "曼陀羅仙",
+          "dynasty": "梁",
+          "note": "重要別部般若"
+        },
+        {
+          "key": "prajna-main-t0245",
+          "title": "佛說仁王般若波羅蜜經",
+          "cbeta_id": "T0245",
+          "author": "鳩摩羅什",
+          "dynasty": "姚秦",
+          "note": "護國般若"
+        }
+      ],
+      "commentaries": [
+        {
+          "key": "prajna-commentary-t1509",
+          "title": "大智度論",
+          "cbeta_id": "T1509",
+          "author": "龍樹菩薩造，鳩摩羅什譯",
+          "dynasty": "姚秦",
+          "note": "般若經最重要的釋論，百卷鉅著"
+        },
+        {
+          "key": "prajna-commentary-t1564",
+          "title": "中論",
+          "cbeta_id": "T1564",
+          "author": "龍樹菩薩造，鳩摩羅什譯",
+          "dynasty": "姚秦",
+          "note": "中觀學派根本論典，三論之一"
+        },
+        {
+          "key": "prajna-commentary-t1568",
+          "title": "十二門論",
+          "cbeta_id": "T1568",
+          "author": "龍樹",
+          "dynasty": "姚秦",
+          "note": "三論宗三論之一"
+        },
+        {
+          "key": "prajna-commentary-t1569",
+          "title": "百論",
+          "cbeta_id": "T1569",
+          "author": "提婆造，鳩摩羅什譯",
+          "dynasty": "姚秦",
+          "note": "三論宗三論之一"
+        },
+        {
+          "key": "prajna-commentary-t1570",
+          "title": "廣百論本",
+          "cbeta_id": "T1570",
+          "author": "聖天造，玄奘譯",
+          "dynasty": "唐",
+          "note": "百論擴充版"
+        },
+        {
+          "key": "prajna-commentary-t1578",
+          "title": "大乘掌珍論",
+          "cbeta_id": "T1578",
+          "author": "清辯造，玄奘譯",
+          "dynasty": "唐",
+          "note": "中觀自續派代表論著"
+        },
+        {
+          "key": "prajna-commentary-t1631",
+          "title": "回諍論",
+          "cbeta_id": "T1631",
+          "author": "龍樹造，毗目智仙譯",
+          "dynasty": "元魏",
+          "note": "龍樹反駁空義質疑"
+        },
+        {
+          "key": "prajna-commentary-t1521",
+          "title": "十住毗婆沙論",
+          "cbeta_id": "T1521",
+          "author": "龍樹造，鳩摩羅什譯",
+          "dynasty": "姚秦",
+          "note": "含「易行品」，淨土宗亦重視"
+        },
+        {
+          "key": "prajna-commentary-t1710",
+          "title": "般若波羅蜜多心經幽贊",
+          "cbeta_id": "T1710",
+          "author": "窺基",
+          "dynasty": "唐",
+          "note": "最重要的心經註疏之一"
+        },
+        {
+          "key": "prajna-commentary-t1712",
+          "title": "般若心經略疏",
+          "cbeta_id": "T1712",
+          "author": "法藏",
+          "dynasty": "唐",
+          "note": "華嚴宗三祖注心經"
+        },
+        {
+          "key": "prajna-commentary-t1698",
+          "title": "金剛般若經疏",
+          "cbeta_id": "T1698",
+          "author": "智顗",
+          "dynasty": "隋",
+          "note": "天台宗祖師注金剛經"
+        },
+        {
+          "key": "prajna-commentary-t1699",
+          "title": "金剛般若疏",
+          "cbeta_id": "T1699",
+          "author": "吉藏",
+          "dynasty": "隋",
+          "note": "三論宗祖師注金剛經"
+        },
+        {
+          "key": "prajna-commentary-t1702",
+          "title": "金剛經纂要刊定記",
+          "cbeta_id": "T1702",
+          "author": "宗密",
+          "dynasty": "唐"
+        }
+      ],
+      "resources": {
+        "reading": [
+          {
+            "key": "prajna-reading-cbetaonline-dila-edu-tw-1",
+            "name": "CBETA 般若部",
+            "url": "https://cbetaonline.dila.edu.tw/zh/T0220",
+            "desc": "大般若經全文"
+          },
+          {
+            "key": "prajna-reading-cbetaonline-dila-edu-tw-2",
+            "name": "CBETA 大智度論",
+            "url": "https://cbetaonline.dila.edu.tw/zh/T1509",
+            "desc": "大智度論全 100 卷"
+          },
+          {
+            "key": "prajna-reading-21dzk-l-u-tokyo-ac-jp-3",
+            "name": "SAT 大正藏數據庫",
+            "url": "https://21dzk.l.u-tokyo.ac.jp/SAT/",
+            "desc": "東京大學，含大正藏原版影像"
+          },
+          {
+            "key": "prajna-reading-deerpark-app-4",
+            "name": "Deerpark 佛經閱讀器",
+            "url": "https://deerpark.app/reader/T1509/1",
+            "desc": "優雅閱讀界面，支持 PDF 下載"
+          },
+          {
+            "key": "prajna-reading-www-wisdomlib-org-5",
+            "name": "WisdomLib 大智度論英譯全文",
+            "url": "https://www.wisdomlib.org/buddhism/book/maha-prajnaparamita-sastra",
+            "desc": "Lamotte 法譯轉英譯，免費在線"
+          }
+        ],
+        "translation": [
+          {
+            "key": "prajna-translation-archive-org-1",
+            "name": "Lamotte 法譯本（Internet Archive）",
+            "url": "https://archive.org/details/EtienneLamotteLeTraiteDeLaGrandeVertuDeSagesseDeNagarjunaVol.I1944",
+            "desc": "比利時魯汶大學，法文經典譯本，免費 PDF"
+          },
+          {
+            "key": "prajna-translation-84000-co-2",
+            "name": "84000 般若經英譯",
+            "url": "https://84000.co/canon-sections/perfection-of-wisdom",
+            "desc": "般若部藏譯英全部索引"
+          },
+          {
+            "key": "prajna-translation-www-kalavinka-org-3",
+            "name": "Kalavinka 大智度論選譯",
+            "url": "https://www.kalavinka.org/",
+            "desc": "六度品英譯 + 130 則故事選譯"
+          },
+          {
+            "key": "prajna-translation-www-lotsawahouse-org-4",
+            "name": "Lotsawa House 龍樹著作英譯",
+            "url": "https://www.lotsawahouse.org/indian-masters/nagarjuna/",
+            "desc": "龍樹菩薩著作藏譯英，免費下載"
+          },
+          {
+            "key": "prajna-translation-www-bdkamerica-org-5",
+            "name": "BDK 英譯大藏經",
+            "url": "https://www.bdkamerica.org/the-translation-project/",
+            "desc": "Numata 基金會英譯項目"
+          }
+        ],
+        "manuscript": [
+          {
+            "key": "prajna-manuscript-rmda-kulib-kyoto-u-ac-jp-1",
+            "name": "京都大學 石山寺本大智度論",
+            "url": "https://rmda.kulib.kyoto-u.ac.jp/en/item/rb00012918/explanation/manabinosekai",
+            "desc": "100 卷存 41 卷，高清 IIIF 影像"
+          },
+          {
+            "key": "prajna-manuscript-www-dpm-org-cn-2",
+            "name": "故宮博物院 大智度論寫本",
+            "url": "https://www.dpm.org.cn/",
+            "desc": "中唐楷書，首尾完整"
+          },
+          {
+            "key": "prajna-manuscript-idp-bl-uk-3",
+            "name": "IDP 國際敦煌項目",
+            "url": "https://idp.bl.uk/",
+            "desc": "敦煌般若經/大智度論殘卷影像"
+          },
+          {
+            "key": "prajna-manuscript-cudl-lib-cam-ac-uk-4",
+            "name": "劍橋大學 八千頌般若梵文寫本",
+            "url": "https://cudl.lib.cam.ac.uk/view/MS-ADD-01643/1",
+            "desc": "Prajnaparamita 梵文貝葉寫本數字化"
+          },
+          {
+            "key": "prajna-manuscript-collections-vam-ac-uk-5",
+            "name": "V&A 般若經彩繪寫本",
+            "url": "https://collections.vam.ac.uk/item/O18839/",
+            "desc": "Astasahasrika Prajnaparamita 彩繪貝葉"
+          }
+        ],
+        "research": [
+          {
+            "key": "prajna-research-yinshun-edu-org-tw-1",
+            "name": "印順法師佛學著作集",
+            "url": "https://yinshun-edu.org.tw/Master_yinshun/books",
+            "desc": "大量大智度論研究，全文在線"
+          },
+          {
+            "key": "prajna-research-www-uclouvain-be-2",
+            "name": "魯汶大學 (UCLouvain)",
+            "url": "https://www.uclouvain.be/en",
+            "desc": "Lamotte 母校，東方學研究所"
+          },
+          {
+            "key": "prajna-research-buddhanexus2-kc-tbts-uni-hamburg-de-3",
+            "name": "BuddhaNexus 文本比對",
+            "url": "https://buddhanexus2.kc-tbts.uni-hamburg.de/",
+            "desc": "AI 驅動跨語種佛典平行對照"
+          },
+          {
+            "key": "prajna-research-poj-peeters-leuven-be-4",
+            "name": "JIABS 國際佛學研究期刊",
+            "url": "https://poj.peeters-leuven.be/content.php?url=journal&journal_code=JIABS",
+            "desc": "般若/中觀研究權威期刊"
+          },
+          {
+            "key": "prajna-research-dazangthings-nz-5",
+            "name": "CBC@ 佛典歸屬數據庫",
+            "url": "https://dazangthings.nz/cbc/",
+            "desc": "T1509 大智度論作者歸屬專條"
+          }
+        ],
+        "temple": [
+          {
+            "key": "prajna-temple-www-nagarjunainstitute-com-1",
+            "name": "龍樹菩薩研究所",
+            "url": "https://www.nagarjunainstitute.com/",
+            "desc": "尼泊爾加德滿都，梵文佛典研究"
+          },
+          {
+            "key": "prajna-temple-www-dila-edu-tw-2",
+            "name": "法鼓文理學院 (DILA)",
+            "url": "https://www.dila.edu.tw/",
+            "desc": "臺灣，CBETA 核心支持機構"
+          },
+          {
+            "key": "prajna-temple-maitripa-org-3",
+            "name": "Maitripa College 中觀專題",
+            "url": "https://maitripa.org/library/subject-guides/madhyamaka/",
+            "desc": "美國波特蘭，中觀學資源指南"
+          }
+        ]
+      },
+      "searchQuery": "般若经"
+    },
+    {
+      "id": "lotus",
+      "name": "法華經系列",
+      "tradition": "天台宗",
+      "description": "《妙法蓮華經》被譽為「經中之王」，提出「開權顯實」「會三歸一」的思想，是天台宗的根本經典。天台三大部（玄義、文句、止觀）以法華經義理為基礎構建了完整的教觀體系。",
+      "mainTexts": [
+        {
+          "key": "lotus-main-t0262",
+          "title": "妙法蓮華經",
+          "cbeta_id": "T0262",
+          "author": "鳩摩羅什",
+          "dynasty": "姚秦",
+          "note": "最通行的譯本"
+        },
+        {
+          "key": "lotus-main-t0263",
+          "title": "正法華經",
+          "cbeta_id": "T0263",
+          "author": "竺法護",
+          "dynasty": "西晉",
+          "note": "最早的漢譯本"
+        },
+        {
+          "key": "lotus-main-t0264",
+          "title": "添品妙法蓮華經",
+          "cbeta_id": "T0264",
+          "author": "闍那崛多、達摩笈多",
+          "dynasty": "隋"
+        }
+      ],
+      "commentaries": [
+        {
+          "key": "lotus-commentary-t1716",
+          "title": "妙法蓮華經玄義",
+          "cbeta_id": "T1716",
+          "author": "智顗說，灌頂記",
+          "dynasty": "隋",
+          "note": "天台三大部之一，十重玄義"
+        },
+        {
+          "key": "lotus-commentary-t1718",
+          "title": "妙法蓮華經文句",
+          "cbeta_id": "T1718",
+          "author": "智顗說，灌頂記",
+          "dynasty": "隋",
+          "note": "天台三大部之一，逐句解釋"
+        },
+        {
+          "key": "lotus-commentary-t1911",
+          "title": "摩訶止觀",
+          "cbeta_id": "T1911",
+          "author": "智顗說，灌頂記",
+          "dynasty": "隋",
+          "note": "天台三大部之一，止觀修行體系"
+        },
+        {
+          "key": "lotus-commentary-t1717",
+          "title": "法華玄義釋籤",
+          "cbeta_id": "T1717",
+          "author": "湛然",
+          "dynasty": "唐",
+          "note": "天台中興祖師疏記"
+        },
+        {
+          "key": "lotus-commentary-t1719",
+          "title": "法華文句記",
+          "cbeta_id": "T1719",
+          "author": "湛然",
+          "dynasty": "唐"
+        },
+        {
+          "key": "lotus-commentary-t1912",
+          "title": "止觀輔行傳弘決",
+          "cbeta_id": "T1912",
+          "author": "湛然",
+          "dynasty": "唐",
+          "note": "摩訶止觀疏記"
+        },
+        {
+          "key": "lotus-commentary-t1721",
+          "title": "法華義疏",
+          "cbeta_id": "T1721",
+          "author": "吉藏",
+          "dynasty": "隋",
+          "note": "三論宗立場的法華註疏，12卷"
+        },
+        {
+          "key": "lotus-commentary-t1720",
+          "title": "法華玄論",
+          "cbeta_id": "T1720",
+          "author": "吉藏",
+          "dynasty": "隋",
+          "note": "三論宗法華宗旨概論"
+        },
+        {
+          "key": "lotus-commentary-t1723",
+          "title": "妙法蓮華經玄贊",
+          "cbeta_id": "T1723",
+          "author": "窺基",
+          "dynasty": "唐",
+          "note": "唯識宗角度的法華註疏"
+        },
+        {
+          "key": "lotus-commentary-t1726",
+          "title": "觀音玄義",
+          "cbeta_id": "T1726",
+          "author": "智顗",
+          "dynasty": "隋",
+          "note": "釋普門品玄義"
+        },
+        {
+          "key": "lotus-commentary-t1728",
+          "title": "觀音義疏",
+          "cbeta_id": "T1728",
+          "author": "智顗",
+          "dynasty": "隋",
+          "note": "釋普門品經文"
+        }
+      ],
+      "resources": {
+        "reading": [
+          {
+            "key": "lotus-reading-cbetaonline-dila-edu-tw-1",
+            "name": "CBETA 法華部",
+            "url": "https://cbetaonline.dila.edu.tw/zh/T0262",
+            "desc": "法華經全文在線閱讀"
+          },
+          {
+            "key": "lotus-reading-21dzk-l-u-tokyo-ac-jp-2",
+            "name": "SAT 大正藏",
+            "url": "https://21dzk.l.u-tokyo.ac.jp/SAT/",
+            "desc": "東京大學大正藏數據庫"
+          },
+          {
+            "key": "lotus-reading-deerpark-app-3",
+            "name": "Deerpark 佛經閱讀器",
+            "url": "https://deerpark.app/",
+            "desc": "優雅排版，支持PDF下載"
+          },
+          {
+            "key": "lotus-reading-zh-wikisource-org-4",
+            "name": "維基文庫 妙法蓮華經",
+            "url": "https://zh.wikisource.org/zh-hans/妙法蓮華經",
+            "desc": "公有領域全文"
+          }
+        ],
+        "translation": [
+          {
+            "key": "lotus-translation-84000-co-1",
+            "name": "84000 妙法蓮華經",
+            "url": "https://84000.co/translation/toh113",
+            "desc": "The White Lotus of the Good Dharma，藏譯英"
+          },
+          {
+            "key": "lotus-translation-www-bdk-or-jp-2",
+            "name": "BDK 法華經英譯 PDF",
+            "url": "https://www.bdk.or.jp/document/dgtl-dl/dBET_T0262_LotusSutra_2007.pdf",
+            "desc": "Kubo & Yuyama 英譯，免費 PDF"
+          },
+          {
+            "key": "lotus-translation-www-buddhisttexts-org-3",
+            "name": "BTTS 法華經中英版",
+            "url": "https://www.buddhisttexts.org/products/the-wonderful-dharma-lotus-sutra",
+            "desc": "宣化上人講解中英雙語"
+          },
+          {
+            "key": "lotus-translation-www-nichirenlibrary-org-4",
+            "name": "Nichiren Buddhism Library",
+            "url": "https://www.nichirenlibrary.org/en/lsoc/toc",
+            "desc": "Burton Watson 英譯全文在線"
+          },
+          {
+            "key": "lotus-translation-www-dsbcproject-org-5",
+            "name": "DSBC 梵文法華經",
+            "url": "https://www.dsbcproject.org/",
+            "desc": "法華經梵文校本 (Vaidya 版)"
+          }
+        ],
+        "manuscript": [
+          {
+            "key": "lotus-manuscript-idp-bl-uk-1",
+            "name": "IDP 法華經寫本數字化項目",
+            "url": "https://idp.bl.uk/blog/the-lotus-sutra-project/",
+            "desc": "793件敦煌法華經寫本，5-11世紀"
+          },
+          {
+            "key": "lotus-manuscript-www-e-dunhuang-com-2",
+            "name": "數字敦煌",
+            "url": "https://www.e-dunhuang.com/",
+            "desc": "法華經變壁畫全景漫遊"
+          },
+          {
+            "key": "lotus-manuscript-en-unesco-org-3",
+            "name": "吉爾吉特寫本 (UNESCO)",
+            "url": "https://en.unesco.org/memoryoftheworld/registry/303",
+            "desc": "5-6世紀梵文法華經，現存最古"
+          },
+          {
+            "key": "lotus-manuscript-www-shuge-org-4",
+            "name": "書格 宋刊妙法蓮華經",
+            "url": "https://www.shuge.org/view/miao_fa_lian_hua_jing/",
+            "desc": "宋刊經摺裝本高清 PDF"
+          }
+        ],
+        "research": [
+          {
+            "key": "lotus-research-www-totetu-org-1",
+            "name": "東洋哲學研究所 (IOP)",
+            "url": "https://www.totetu.org/en/",
+            "desc": "每年舉辦國際法華經學術研討會"
+          },
+          {
+            "key": "lotus-research-www-wisdomlib-org-2",
+            "name": "WisdomLib 法華經梵文",
+            "url": "https://www.wisdomlib.org/buddhism/book/lotus-sutra-sanskrit",
+            "desc": "Kern 英譯本及梵文原文"
+          },
+          {
+            "key": "lotus-research-buddhism-lib-ntu-edu-tw-3",
+            "name": "臺大佛學數位圖書館",
+            "url": "https://buddhism.lib.ntu.edu.tw/",
+            "desc": "法華經研究論文全文"
+          }
+        ],
+        "temple": [
+          {
+            "key": "lotus-temple-www-tendai-or-jp-1",
+            "name": "日本天台宗（延歷寺）",
+            "url": "https://www.tendai.or.jp/",
+            "desc": "比叡山，天台宗總本山"
+          },
+          {
+            "key": "lotus-temple-rk-world-org-2",
+            "name": "立正佼成會",
+            "url": "https://rk-world.org/lotus-sutra/",
+            "desc": "全球 300+ 道場，法華經修行"
+          },
+          {
+            "key": "lotus-temple-www-500yojanas-org-3",
+            "name": "500 Yojanas",
+            "url": "https://www.500yojanas.org/",
+            "desc": "法華經 28 品全文在線，修行指南"
+          }
+        ]
+      },
+      "searchQuery": "法华经"
+    },
+    {
+      "id": "shurangama",
+      "name": "楞嚴經系列",
+      "tradition": "禪宗/教下通用",
+      "description": "《楞嚴經》全稱《大佛頂如來密因修證了義諸菩薩萬行首楞嚴經》，涵蓋禪修、破魔、二十五圓通等。歷代註疏極為豐富，明代一朝即達六十餘種，是漢傳佛教中註疏最多的經典之一。",
+      "mainTexts": [
+        {
+          "key": "shurangama-main-t0945",
+          "title": "大佛頂如來密因修證了義諸菩薩萬行首楞嚴經",
+          "cbeta_id": "T0945",
+          "author": "般剌蜜帝",
+          "dynasty": "唐",
+          "note": "唯一漢譯本，10卷"
+        }
+      ],
+      "commentaries": [
+        {
+          "key": "shurangama-commentary-t1799",
+          "title": "首楞嚴義疏注經",
+          "cbeta_id": "T1799",
+          "author": "子璇（長水）",
+          "dynasty": "宋",
+          "note": "20卷，講楞嚴三十餘遍，賜號「楞嚴大師」"
+        },
+        {
+          "key": "shurangama-commentary-x0275",
+          "title": "楞嚴經正脈疏",
+          "cbeta_id": "X0275",
+          "author": "交光真鑑",
+          "dynasty": "明",
+          "note": "干支標科法分析經文，明代最重要註疏"
+        },
+        {
+          "key": "shurangama-commentary-x0276",
+          "title": "楞嚴經通議",
+          "cbeta_id": "X0276",
+          "author": "憨山德清",
+          "dynasty": "明",
+          "note": "四大高僧之一，以一心三觀貫穿全經"
+        },
+        {
+          "key": "shurangama-commentary-x0278",
+          "title": "楞嚴經玄義",
+          "cbeta_id": "X0278",
+          "author": "蕅益智旭",
+          "dynasty": "明",
+          "note": "仿天台體例，玄義 2 卷"
+        },
+        {
+          "key": "shurangama-commentary-x0279",
+          "title": "楞嚴經文句",
+          "cbeta_id": "X0279",
+          "author": "蕅益智旭",
+          "dynasty": "明",
+          "note": "仿天台體例，文句 10 卷"
+        },
+        {
+          "key": "shurangama-commentary-x0283",
+          "title": "楞嚴經寶鏡疏",
+          "cbeta_id": "X0283",
+          "author": "溥畹",
+          "dynasty": "清",
+          "note": "集前人註疏之大成"
+        },
+        {
+          "key": "shurangama-commentary-x0268",
+          "title": "楞嚴經義疏",
+          "cbeta_id": "X0268",
+          "author": "子璿",
+          "dynasty": "宋"
+        }
+      ],
+      "resources": {
+        "reading": [
+          {
+            "key": "shurangama-reading-cbetaonline-dila-edu-tw-1",
+            "name": "CBETA 楞嚴經",
+            "url": "https://cbetaonline.dila.edu.tw/zh/T0945",
+            "desc": "楞嚴經全文在線閱讀"
+          },
+          {
+            "key": "shurangama-reading-www-wisdomlib-org-2",
+            "name": "WisdomLib 楞嚴經英文講解",
+            "url": "https://www.wisdomlib.org/buddhism/book/shurangama-sutra-with-commentary",
+            "desc": "宣化上人講解英文全文"
+          },
+          {
+            "key": "shurangama-reading-ctext-org-3",
+            "name": "CText 楞嚴經",
+            "url": "https://ctext.org/datawiki.pl?if=en&res=453706",
+            "desc": "原文在線，支持繁簡切換"
+          },
+          {
+            "key": "shurangama-reading-www-buddhanet-net-4",
+            "name": "BuddhaNet 楞嚴經 PDF",
+            "url": "https://www.buddhanet.net/pdf_file/surangama.pdf",
+            "desc": "陸寬昱經典英譯本 PDF"
+          }
+        ],
+        "translation": [
+          {
+            "key": "shurangama-translation-www-buddhisttexts-org-1",
+            "name": "BTTS 楞嚴經新譯",
+            "url": "https://www.buddhisttexts.org/",
+            "desc": "David Rounds 新英譯，含宣化上人註釋"
+          },
+          {
+            "key": "shurangama-translation-www-cttbusa-org-2",
+            "name": "萬佛聖城 楞嚴講解",
+            "url": "https://www.cttbusa.org/shurangama1/shurangama_contents.asp.html",
+            "desc": "宣化上人楞嚴經 10 卷講解全文"
+          },
+          {
+            "key": "shurangama-translation-archive-org-3",
+            "name": "Internet Archive 楞嚴經",
+            "url": "https://archive.org/details/ShurangamaSutra_201407",
+            "desc": "陸寬昱譯本免費下載"
+          }
+        ],
+        "manuscript": [
+          {
+            "key": "shurangama-manuscript-cbetaonline-dila-edu-tw-1",
+            "name": "CBETA 楞嚴經全文",
+            "url": "https://cbetaonline.dila.edu.tw/zh/T0945",
+            "desc": "CBETA 在線楞嚴經校勘全文"
+          },
+          {
+            "key": "shurangama-manuscript-www-shuge-org-2",
+            "name": "書格 古籍善本",
+            "url": "https://www.shuge.org/",
+            "desc": "楞嚴經宋元明刻本影像"
+          }
+        ],
+        "research": [
+          {
+            "key": "shurangama-research-web-archive-org-1",
+            "name": "DRBU 楞嚴經學術資源",
+            "url": "https://web.archive.org/web/2024/https://repstein.faculty.drbu.edu/Buddhism/Shurangama/Shurangama.htm",
+            "desc": "Ron Epstein 編輯，含註疏列表、真偽考證（存檔）"
+          },
+          {
+            "key": "shurangama-research-buddhism-lib-ntu-edu-tw-2",
+            "name": "臺大佛學數位圖書館",
+            "url": "https://buddhism.lib.ntu.edu.tw/",
+            "desc": "楞嚴經研究論文"
+          }
+        ],
+        "temple": [
+          {
+            "key": "shurangama-temple-www-cttbusa-org-1",
+            "name": "萬佛聖城",
+            "url": "https://www.cttbusa.org/",
+            "desc": "美國，每日早課誦楞嚴咒"
+          },
+          {
+            "key": "shurangama-temple-www-lingyinsi-com-2",
+            "name": "杭州靈隱寺",
+            "url": "https://www.lingyinsi.com/",
+            "desc": "定期開講楞嚴經法義"
+          }
+        ]
+      },
+      "searchQuery": "楞严经"
+    },
+    {
+      "id": "pureland",
+      "name": "淨土經系列",
+      "tradition": "淨土宗",
+      "description": "淨土三經（《無量壽經》《觀無量壽佛經》《阿彌陀經》）加上《往生論》，構成淨土宗核心經典。善導、曇鸞、道綽三位祖師的著作奠定了淨土宗的教義基礎，蓮池、蕅益、印光三位大師則在明清時期將淨土思想推向新高峰。",
+      "mainTexts": [
+        {
+          "key": "pureland-main-t0360",
+          "title": "佛說無量壽經",
+          "cbeta_id": "T0360",
+          "author": "康僧鎧",
+          "dynasty": "曹魏",
+          "note": "淨土三經之一，又稱《大經》"
+        },
+        {
+          "key": "pureland-main-t0365",
+          "title": "佛說觀無量壽佛經",
+          "cbeta_id": "T0365",
+          "author": "畺良耶舍",
+          "dynasty": "劉宋",
+          "note": "淨土三經之一"
+        },
+        {
+          "key": "pureland-main-t0366",
+          "title": "佛說阿彌陀經",
+          "cbeta_id": "T0366",
+          "author": "鳩摩羅什",
+          "dynasty": "姚秦",
+          "note": "淨土三經之一，又稱《小經》"
+        },
+        {
+          "key": "pureland-main-t1524",
+          "title": "無量壽經優波提舍願生偈",
+          "cbeta_id": "T1524",
+          "author": "天親菩薩造，菩提流支譯",
+          "dynasty": "北魏",
+          "note": "又稱《往生論》"
+        }
+      ],
+      "commentaries": [
+        {
+          "key": "pureland-commentary-t1753",
+          "title": "觀無量壽佛經疏（觀經四帖疏）",
+          "cbeta_id": "T1753",
+          "author": "善導",
+          "dynasty": "唐",
+          "note": "淨土宗開宗判教之典籍"
+        },
+        {
+          "key": "pureland-commentary-t1959",
+          "title": "觀念法門",
+          "cbeta_id": "T1959",
+          "author": "善導",
+          "dynasty": "唐",
+          "note": "觀佛唸佛實修指南"
+        },
+        {
+          "key": "pureland-commentary-t1979",
+          "title": "法事贊",
+          "cbeta_id": "T1979",
+          "author": "善導",
+          "dynasty": "唐",
+          "note": "淨土法會贊偈儀軌"
+        },
+        {
+          "key": "pureland-commentary-t1980",
+          "title": "往生禮讚",
+          "cbeta_id": "T1980",
+          "author": "善導",
+          "dynasty": "唐",
+          "note": "日課禮拜贊偈"
+        },
+        {
+          "key": "pureland-commentary-t1981",
+          "title": "般舟贊",
+          "cbeta_id": "T1981",
+          "author": "善導",
+          "dynasty": "唐",
+          "note": "般舟三昧唸佛贊偈"
+        },
+        {
+          "key": "pureland-commentary-t1819",
+          "title": "往生論注",
+          "cbeta_id": "T1819",
+          "author": "曇鸞",
+          "dynasty": "北魏",
+          "note": "註釋世親《往生論》，他力信仰理論基石"
+        },
+        {
+          "key": "pureland-commentary-t1958",
+          "title": "安樂集",
+          "cbeta_id": "T1958",
+          "author": "道綽",
+          "dynasty": "唐",
+          "note": "建立聖道門/淨土門二門判教"
+        },
+        {
+          "key": "pureland-commentary-t1745",
+          "title": "無量壽經義疏",
+          "cbeta_id": "T1745",
+          "author": "慧遠",
+          "dynasty": "隋"
+        },
+        {
+          "key": "pureland-commentary-x0424",
+          "title": "阿彌陀經疏鈔",
+          "cbeta_id": "X0424",
+          "author": "蓮池",
+          "dynasty": "明",
+          "note": "蓮池大師，融合天台華嚴"
+        },
+        {
+          "key": "pureland-commentary-t1762",
+          "title": "阿彌陀經要解",
+          "cbeta_id": "T1762",
+          "author": "智旭",
+          "dynasty": "明",
+          "note": "蕅益大師，印光贊為「最精最妙」"
+        }
+      ],
+      "resources": {
+        "reading": [
+          {
+            "key": "pureland-reading-cbetaonline-dila-edu-tw-1",
+            "name": "CBETA 淨土部",
+            "url": "https://cbetaonline.dila.edu.tw/zh/T0360",
+            "desc": "淨土三經及全部註疏"
+          },
+          {
+            "key": "pureland-reading-21dzk-l-u-tokyo-ac-jp-2",
+            "name": "SAT 大正藏",
+            "url": "https://21dzk.l.u-tokyo.ac.jp/SAT/",
+            "desc": "東京大學大正藏數據庫"
+          },
+          {
+            "key": "pureland-reading-deerpark-app-3",
+            "name": "Deerpark 佛經閱讀器",
+            "url": "https://deerpark.app/",
+            "desc": "優雅閱讀界面"
+          }
+        ],
+        "translation": [
+          {
+            "key": "pureland-translation-www-bdk-or-jp-1",
+            "name": "BDK 三淨土經英譯",
+            "url": "https://www.bdk.or.jp/document/dgtl-dl/dBET_ThreePureLandSutras_2003.pdf",
+            "desc": "稻垣久雄英譯，免費 PDF"
+          },
+          {
+            "key": "pureland-translation-84000-co-2",
+            "name": "84000 無量壽經",
+            "url": "https://84000.co/translation/toh115",
+            "desc": "藏文 Sukhavativyuha 首個英譯"
+          },
+          {
+            "key": "pureland-translation-sites-google-com-3",
+            "name": "Shingan's Portal 淨土祖師英譯",
+            "url": "https://sites.google.com/view/shingans-portal/pure-land-text-translations",
+            "desc": "善導等淨土祖師著作英譯"
+          },
+          {
+            "key": "pureland-translation-www-fgsitc-org-4",
+            "name": "佛光山國際翻譯中心",
+            "url": "https://www.fgsitc.org/",
+            "desc": "阿彌陀經英文著作"
+          }
+        ],
+        "manuscript": [
+          {
+            "key": "pureland-manuscript-idp-bl-uk-1",
+            "name": "IDP 國際敦煌項目",
+            "url": "https://idp.bl.uk/",
+            "desc": "敦煌淨土經寫本數字化"
+          },
+          {
+            "key": "pureland-manuscript-cudl-lib-cam-ac-uk-2",
+            "name": "劍橋大學 梵文無量壽經寫本",
+            "url": "https://cudl.lib.cam.ac.uk/view/MS-ADD-01368",
+            "desc": "尼泊爾 Sukhavativyuha 寫本"
+          },
+          {
+            "key": "pureland-manuscript-www-e-dunhuang-com-3",
+            "name": "數字敦煌",
+            "url": "https://www.e-dunhuang.com/",
+            "desc": "淨土變相壁畫全景"
+          }
+        ],
+        "research": [
+          {
+            "key": "pureland-research-jsri-jodo-or-jp-1",
+            "name": "浄土宗総合研究所",
+            "url": "https://jsri.jodo.or.jp/",
+            "desc": "日本淨土宗官方學術機構"
+          },
+          {
+            "key": "pureland-research-j-soken-jp-2",
+            "name": "浄土真宗聖典検索",
+            "url": "https://j-soken.jp/",
+            "desc": "淨土真宗全部聖典電子化"
+          },
+          {
+            "key": "pureland-research-buddhism-lib-ntu-edu-tw-3",
+            "name": "臺大佛學數位圖書館",
+            "url": "https://buddhism.lib.ntu.edu.tw/",
+            "desc": "善導、曇鸞、道綽研究論文"
+          }
+        ],
+        "temple": [
+          {
+            "key": "pureland-temple-www-chion-in-or-jp-1",
+            "name": "知恩院（浄土宗総本山）",
+            "url": "https://www.chion-in.or.jp/en/",
+            "desc": "日本京都，法然上人創淨土宗之地"
+          },
+          {
+            "key": "pureland-temple-www-hongwanji-or-jp-2",
+            "name": "西本願寺",
+            "url": "https://www.hongwanji.or.jp/",
+            "desc": "日本京都，淨土真宗本山"
+          },
+          {
+            "key": "pureland-temple-www-plb-tw-3",
+            "name": "淨土宗文教基金會",
+            "url": "https://www.plb.tw/",
+            "desc": "臺灣淨土宗資源"
+          },
+          {
+            "key": "pureland-temple-www-plb-sea-org-4",
+            "name": "PLB 全球淨土道場",
+            "url": "https://www.plb-sea.org/world",
+            "desc": "全球淨土宗道場網絡"
+          }
+        ]
+      },
+      "searchQuery": "净土经"
+    },
+    {
+      "id": "yogacara",
+      "name": "唯識系列",
+      "tradition": "唯識宗",
+      "description": "唯識學以「萬法唯識」為核心，由彌勒、無著、世親創立，玄奘法師在中國大力弘揚，窺基繼承發展。核心論典包括「一本十支」體系，以《瑜伽師地論》為本，十部支論闡發其義。",
+      "mainTexts": [
+        {
+          "key": "yogacara-main-t0676",
+          "title": "解深密經",
+          "cbeta_id": "T0676",
+          "author": "玄奘",
+          "dynasty": "唐",
+          "note": "唯識學的根本經典，三時判教"
+        },
+        {
+          "key": "yogacara-main-t1579",
+          "title": "瑜伽師地論",
+          "cbeta_id": "T1579",
+          "author": "彌勒菩薩說，玄奘譯",
+          "dynasty": "唐",
+          "note": "唯識學最重要的論典，百卷鉅著"
+        },
+        {
+          "key": "yogacara-main-t1585",
+          "title": "成唯識論",
+          "cbeta_id": "T1585",
+          "author": "護法等菩薩造，玄奘譯",
+          "dynasty": "唐",
+          "note": "糅合十大論師註釋，法相宗根本論"
+        },
+        {
+          "key": "yogacara-main-t1593",
+          "title": "攝大乘論",
+          "cbeta_id": "T1593",
+          "author": "無著菩薩造，玄奘譯",
+          "dynasty": "唐",
+          "note": "阿賴耶識緣起綱要"
+        },
+        {
+          "key": "yogacara-main-t1586",
+          "title": "唯識三十論頌",
+          "cbeta_id": "T1586",
+          "author": "世親菩薩造，玄奘譯",
+          "dynasty": "唐",
+          "note": "唯識學最精練綱要"
+        },
+        {
+          "key": "yogacara-main-t1590",
+          "title": "唯識二十論",
+          "cbeta_id": "T1590",
+          "author": "世親菩薩造，玄奘譯",
+          "dynasty": "唐",
+          "note": "破外境實有論"
+        },
+        {
+          "key": "yogacara-main-t1614",
+          "title": "大乘百法明門論",
+          "cbeta_id": "T1614",
+          "author": "世親造，玄奘譯",
+          "dynasty": "唐",
+          "note": "唯識入門基礎，五位百法"
+        },
+        {
+          "key": "yogacara-main-t1600",
+          "title": "辨中邊論",
+          "cbeta_id": "T1600",
+          "author": "彌勒造，玄奘譯",
+          "dynasty": "唐",
+          "note": "辨中道與邊見，三性說經典表述"
+        },
+        {
+          "key": "yogacara-main-t1604",
+          "title": "大乘莊嚴經論",
+          "cbeta_id": "T1604",
+          "author": "無著造，波羅頗蜜多羅譯",
+          "dynasty": "唐",
+          "note": "大乘修行階位"
+        },
+        {
+          "key": "yogacara-main-t1605",
+          "title": "大乘阿毘達磨集論",
+          "cbeta_id": "T1605",
+          "author": "無著造，玄奘譯",
+          "dynasty": "唐",
+          "note": "大乘阿毗達磨體系"
+        }
+      ],
+      "commentaries": [
+        {
+          "key": "yogacara-commentary-t1830",
+          "title": "成唯識論述記",
+          "cbeta_id": "T1830",
+          "author": "窺基",
+          "dynasty": "唐",
+          "note": "窺基最權威註釋，20卷"
+        },
+        {
+          "key": "yogacara-commentary-t1829",
+          "title": "瑜伽師地論略纂",
+          "cbeta_id": "T1829",
+          "author": "窺基",
+          "dynasty": "唐",
+          "note": "瑜伽論前66卷註釋"
+        },
+        {
+          "key": "yogacara-commentary-t1828",
+          "title": "瑜伽論記",
+          "cbeta_id": "T1828",
+          "author": "遁倫",
+          "dynasty": "唐",
+          "note": "集錄玄奘弟子眾家注說"
+        },
+        {
+          "key": "yogacara-commentary-t1597",
+          "title": "攝大乘論釋",
+          "cbeta_id": "T1597",
+          "author": "世親菩薩造，玄奘譯",
+          "dynasty": "唐"
+        },
+        {
+          "key": "yogacara-commentary-x0818",
+          "title": "唯識三十論直解",
+          "cbeta_id": "X0818",
+          "author": "智旭",
+          "dynasty": "明",
+          "note": "蕅益大師以天台融通唯識"
+        }
+      ],
+      "resources": {
+        "reading": [
+          {
+            "key": "yogacara-reading-cbetaonline-dila-edu-tw-1",
+            "name": "CBETA 瑜伽部",
+            "url": "https://cbetaonline.dila.edu.tw/zh/T1579",
+            "desc": "瑜伽師地論全文"
+          },
+          {
+            "key": "yogacara-reading-cbetaonline-dila-edu-tw-2",
+            "name": "CBETA 成唯識論",
+            "url": "https://cbetaonline.dila.edu.tw/zh/T1585",
+            "desc": "成唯識論全文"
+          },
+          {
+            "key": "yogacara-reading-www-acmuller-net-3",
+            "name": "A.C. Muller 唯識學資源",
+            "url": "http://www.acmuller.net/yogacara/thinkers/xuanzang-works.html",
+            "desc": "玄奘譯著完整列表與 DDB 術語"
+          },
+          {
+            "key": "yogacara-reading-ctext-org-4",
+            "name": "CText 成唯識論",
+            "url": "https://ctext.org/wiki.pl?if=en&res=255278",
+            "desc": "全文在線，逐段閱讀"
+          }
+        ],
+        "translation": [
+          {
+            "key": "yogacara-translation-www-bdkamerica-org-1",
+            "name": "BDK 唯識三論英譯",
+            "url": "https://www.bdkamerica.org/product/three-texts-on-consciousness-only/",
+            "desc": "唯識二十論/三十頌/成唯識論英譯"
+          },
+          {
+            "key": "yogacara-translation-84000-co-2",
+            "name": "84000 解深密經英譯",
+            "url": "https://84000.co/translation/toh106",
+            "desc": "Samdhinirmocana 藏譯英"
+          },
+          {
+            "key": "yogacara-translation-buddhanature-tsadra-org-3",
+            "name": "Tsadra 唯識資源",
+            "url": "https://buddhanature.tsadra.org/index.php/Key_Terms/Yogācāra",
+            "desc": "唯識核心術語與文本"
+          },
+          {
+            "key": "yogacara-translation-plato-stanford-edu-4",
+            "name": "斯坦福哲學百科 Yogacara",
+            "url": "https://plato.stanford.edu/entries/yogacara/",
+            "desc": "學術級唯識哲學導論"
+          }
+        ],
+        "manuscript": [
+          {
+            "key": "yogacara-manuscript-www-dsbcproject-org-1",
+            "name": "DSBC 梵文佛典",
+            "url": "https://www.dsbcproject.org/",
+            "desc": "唯識系梵文原典數字化"
+          },
+          {
+            "key": "yogacara-manuscript-gretil-sub-uni-goettingen-de-2",
+            "name": "GRETIL 梵文文本庫",
+            "url": "https://gretil.sub.uni-goettingen.de/",
+            "desc": "唯識論典梵文電子文本"
+          },
+          {
+            "key": "yogacara-manuscript-cudl-lib-cam-ac-uk-3",
+            "name": "劍橋大學 菩薩地寫本",
+            "url": "https://cudl.lib.cam.ac.uk/view/MS-ADD-01702/1",
+            "desc": "Bodhisattvabhumi 梵文貝葉寫本"
+          },
+          {
+            "key": "yogacara-manuscript-library-bdrc-io-4",
+            "name": "BDRC 藏文文獻",
+            "url": "https://library.bdrc.io/",
+            "desc": "唯識學藏文傳本"
+          }
+        ],
+        "research": [
+          {
+            "key": "yogacara-research-www-buddhismuskunde-uni-hamburg-de-1",
+            "name": "漢堡大學 Numata 佛教研究中心",
+            "url": "https://www.buddhismuskunde.uni-hamburg.de/en.html",
+            "desc": "瑜伽師地論英譯工程"
+          },
+          {
+            "key": "yogacara-research-www-hzfxy-net-2",
+            "name": "杭州佛學院《唯識研究》",
+            "url": "https://www.hzfxy.net/",
+            "desc": "中國唯一唯識學專業期刊"
+          },
+          {
+            "key": "yogacara-research-ocbs-org-3",
+            "name": "牛津佛教研究中心",
+            "url": "https://ocbs.org/",
+            "desc": "瑜伽行派與中觀比較研究"
+          },
+          {
+            "key": "yogacara-research-buddhism-lib-ntu-edu-tw-4",
+            "name": "臺大佛學數位圖書館",
+            "url": "https://buddhism.lib.ntu.edu.tw/",
+            "desc": "唯識研究論文全文"
+          }
+        ],
+        "temple": [
+          {
+            "key": "yogacara-temple-www-kohfukuji-com-1",
+            "name": "興福寺（法相宗大本山）",
+            "url": "https://www.kohfukuji.com/",
+            "desc": "日本奈良，南都七大寺之一"
+          },
+          {
+            "key": "yogacara-temple-yakushiji-or-jp-2",
+            "name": "藥師寺（法相宗大本山）",
+            "url": "https://yakushiji.or.jp/",
+            "desc": "日本奈良，設玄奘三蔵院"
+          }
+        ]
+      },
+      "searchQuery": "唯识"
+    },
+    {
+      "id": "chan",
+      "name": "禪宗經典系列",
+      "tradition": "禪宗",
+      "description": "禪宗雖然強調「不立文字」，但歷代留下了豐富的燈錄、語錄和公案集。這些典籍記載了禪宗的傳承和修行方法，從初祖達摩到唐宋五家七宗的開展，形成了獨特的禪宗文獻體系。",
+      "mainTexts": [
+        {
+          "key": "chan-main-t2008",
+          "title": "六祖大師法寶壇經",
+          "cbeta_id": "T2008",
+          "author": "惠能",
+          "dynasty": "唐",
+          "note": "禪宗最核心的典籍，唯一被稱為「經」的祖師著作"
+        },
+        {
+          "key": "chan-main-t2003",
+          "title": "碧巖錄",
+          "cbeta_id": "T2003",
+          "author": "圓悟克勤",
+          "dynasty": "宋",
+          "note": "禪門第一書，百則公案"
+        },
+        {
+          "key": "chan-main-t2004",
+          "title": "從容錄",
+          "cbeta_id": "T2004",
+          "author": "萬松行秀評唱",
+          "dynasty": "宋/金",
+          "note": "曹洞宗百則公案，與碧巖錄並稱「禪門雙璧」"
+        },
+        {
+          "key": "chan-main-t2005",
+          "title": "無門關",
+          "cbeta_id": "T2005",
+          "author": "無門慧開",
+          "dynasty": "宋",
+          "note": "四十八則公案"
+        },
+        {
+          "key": "chan-main-t1985",
+          "title": "臨濟錄",
+          "cbeta_id": "T1985",
+          "author": "慧然集",
+          "dynasty": "唐",
+          "note": "臨濟宗祖師義玄語錄，「喝」法代表"
+        },
+        {
+          "key": "chan-main-t2076",
+          "title": "景德傳燈錄",
+          "cbeta_id": "T2076",
+          "author": "道原",
+          "dynasty": "宋",
+          "note": "禪宗第一部燈錄，30卷錄1701位祖師"
+        },
+        {
+          "key": "chan-main-x1565",
+          "title": "五燈會元",
+          "cbeta_id": "X1565",
+          "author": "普濟",
+          "dynasty": "宋",
+          "note": "綜合五部燈錄"
+        },
+        {
+          "key": "chan-main-t2012a",
+          "title": "黃檗傳心法要",
+          "cbeta_id": "T2012A",
+          "author": "裴休集",
+          "dynasty": "唐",
+          "note": "黃檗希運禪師心法"
+        }
+      ],
+      "commentaries": [
+        {
+          "key": "chan-commentary-t2010",
+          "title": "信心銘",
+          "cbeta_id": "T2010",
+          "author": "僧璨",
+          "dynasty": "隋",
+          "note": "禪宗三祖，「至道無難，唯嫌揀擇」"
+        },
+        {
+          "key": "chan-commentary-t2014",
+          "title": "永嘉證道歌",
+          "cbeta_id": "T2014",
+          "author": "玄覺",
+          "dynasty": "唐",
+          "note": "六祖法嗣，禪宗最著名偈頌"
+        },
+        {
+          "key": "chan-commentary-t2015",
+          "title": "禪源諸詮集都序",
+          "cbeta_id": "T2015",
+          "author": "宗密",
+          "dynasty": "唐",
+          "note": "禪教一致的代表作"
+        },
+        {
+          "key": "chan-commentary-t2025",
+          "title": "敕修百丈清規",
+          "cbeta_id": "T2025",
+          "author": "德輝重編",
+          "dynasty": "元",
+          "note": "禪宗僧團制度根本典籍"
+        },
+        {
+          "key": "chan-commentary-x1245",
+          "title": "禪苑清規",
+          "cbeta_id": "X1245",
+          "author": "宗賾",
+          "dynasty": "宋",
+          "note": "現存最早的完整禪宗清規 (1103)"
+        }
+      ],
+      "resources": {
+        "reading": [
+          {
+            "key": "chan-reading-cbetaonline-dila-edu-tw-1",
+            "name": "CBETA 禪宗部",
+            "url": "https://cbetaonline.dila.edu.tw/zh/T2008",
+            "desc": "壇經及全部禪宗典籍原文"
+          },
+          {
+            "key": "chan-reading-terebess-hu-2",
+            "name": "Terebess Asia Online",
+            "url": "https://terebess.hu/zen/textindex.html",
+            "desc": "最全面的禪宗英譯在線圖書館，73+ 部"
+          },
+          {
+            "key": "chan-reading-www-thezensite-com-3",
+            "name": "TheZenSite",
+            "url": "http://www.thezensite.com/MainPages/translation_sutras.html",
+            "desc": "免費禪宗翻譯集合"
+          },
+          {
+            "key": "chan-reading-21dzk-l-u-tokyo-ac-jp-4",
+            "name": "SAT 大正藏",
+            "url": "https://21dzk.l.u-tokyo.ac.jp/SAT/",
+            "desc": "東京大學大正藏數據庫"
+          }
+        ],
+        "translation": [
+          {
+            "key": "chan-translation-www-bdkamerica-org-1",
+            "name": "BDK 禪宗經典英譯",
+            "url": "https://www.bdkamerica.org/",
+            "desc": "含黃檗傳心法要、壇經等英譯"
+          },
+          {
+            "key": "chan-translation-zenlibrary-org-2",
+            "name": "Zen Library 經典目錄",
+            "url": "https://zenlibrary.org/comprehensive-canon-of-classical-zen-texts/",
+            "desc": "禪宗經典綜合目錄，標註英譯可得性"
+          },
+          {
+            "key": "chan-translation-84000-co-3",
+            "name": "84000 禪宗文獻",
+            "url": "https://84000.co/",
+            "desc": "部分禪宗經典藏譯英"
+          }
+        ],
+        "manuscript": [
+          {
+            "key": "chan-manuscript-dev-dila-edu-tw-1",
+            "name": "DILA 敦煌禪宗寫本",
+            "url": "http://dev.dila.edu.tw/Dunhuang_Manuscripts/",
+            "desc": "早期禪宗敦煌寫本 TEI 數字化"
+          },
+          {
+            "key": "chan-manuscript-idp-bl-uk-2",
+            "name": "IDP 國際敦煌項目",
+            "url": "https://idp.bl.uk/",
+            "desc": "壇經敦煌本等大量禪宗寫本"
+          },
+          {
+            "key": "chan-manuscript-www-shuge-org-3",
+            "name": "書格 禪宗古籍",
+            "url": "https://www.shuge.org/",
+            "desc": "百丈清規、傳燈錄等善本影像"
+          }
+        ],
+        "research": [
+          {
+            "key": "chan-research-iriz-hanazono-ac-jp-1",
+            "name": "花園大學國際禪學研究所 (IRIZ)",
+            "url": "http://iriz.hanazono.ac.jp/",
+            "desc": "禪籍數據庫、電子達磨系統"
+          },
+          {
+            "key": "chan-research-www-zenbunka-or-jp-2",
+            "name": "禪文化研究所",
+            "url": "https://www.zenbunka.or.jp/",
+            "desc": "京都，60年曆史，黑豆數據庫"
+          },
+          {
+            "key": "chan-research-zen-rinnou-net-3",
+            "name": "臨濟宗黃檗宗聯合官網",
+            "url": "https://zen.rinnou.net/",
+            "desc": "臨濟宗 14 派與黃檗宗"
+          }
+        ],
+        "temple": [
+          {
+            "key": "chan-temple-www-bailinsi-net-1",
+            "name": "柏林禪寺（趙州祖庭）",
+            "url": "https://www.bailinsi.net/",
+            "desc": "河北，設禪學研究所"
+          },
+          {
+            "key": "chan-temple-www-myoshinji-or-jp-2",
+            "name": "妙心寺",
+            "url": "https://www.myoshinji.or.jp/",
+            "desc": "日本最大臨濟宗禪寺"
+          },
+          {
+            "key": "chan-temple-www-sfzc-org-3",
+            "name": "San Francisco Zen Center",
+            "url": "https://www.sfzc.org/",
+            "desc": "美國最大禪修中心之一"
+          },
+          {
+            "key": "chan-temple-zmm-org-4",
+            "name": "Zen Mountain Monastery",
+            "url": "https://zmm.org/",
+            "desc": "美國紐約，法話與禪修直播"
+          }
+        ]
+      },
+      "searchQuery": "禅宗经典"
+    },
+    {
+      "id": "vinaya",
+      "name": "律典系列",
+      "tradition": "律宗",
+      "description": "佛教戒律是僧團生活的根本規範。漢傳佛教中有四部廣律的完整翻譯，道宣律師創立的南山律宗以「南山三大部」為核心。菩薩戒則以《梵網經》和《瑜伽菩薩戒》兩大系統為主。",
+      "mainTexts": [
+        {
+          "key": "vinaya-main-t1428",
+          "title": "四分律",
+          "cbeta_id": "T1428",
+          "author": "佛陀耶舍、竺佛念",
+          "dynasty": "姚秦",
+          "note": "法藏部律，漢傳最通行"
+        },
+        {
+          "key": "vinaya-main-t1425",
+          "title": "摩訶僧祇律",
+          "cbeta_id": "T1425",
+          "author": "佛陀跋陀羅、法顯",
+          "dynasty": "東晉",
+          "note": "大眾部律，法顯從印度帶回"
+        },
+        {
+          "key": "vinaya-main-t1435",
+          "title": "十誦律",
+          "cbeta_id": "T1435",
+          "author": "弗若多羅、鳩摩羅什",
+          "dynasty": "姚秦",
+          "note": "說一切有部律"
+        },
+        {
+          "key": "vinaya-main-t1421",
+          "title": "五分律",
+          "cbeta_id": "T1421",
+          "author": "佛陀什、竺道生",
+          "dynasty": "劉宋",
+          "note": "化地部律"
+        },
+        {
+          "key": "vinaya-main-t1442",
+          "title": "根本說一切有部毗奈耶",
+          "cbeta_id": "T1442",
+          "author": "義淨",
+          "dynasty": "唐",
+          "note": "50卷，義淨從印度帶回"
+        },
+        {
+          "key": "vinaya-main-t1484",
+          "title": "梵網經",
+          "cbeta_id": "T1484",
+          "author": "鳩摩羅什",
+          "dynasty": "姚秦",
+          "note": "十重四十八輕戒，東亞菩薩戒最通行本"
+        },
+        {
+          "key": "vinaya-main-t1501",
+          "title": "菩薩戒本（瑜伽菩薩戒）",
+          "cbeta_id": "T1501",
+          "author": "玄奘",
+          "dynasty": "唐",
+          "note": "出自瑜伽師地論·菩薩地"
+        },
+        {
+          "key": "vinaya-main-t1488",
+          "title": "優婆塞戒經",
+          "cbeta_id": "T1488",
+          "author": "曇無讖",
+          "dynasty": "北涼",
+          "note": "在家菩薩戒根本經典"
+        }
+      ],
+      "commentaries": [
+        {
+          "key": "vinaya-commentary-t1804",
+          "title": "四分律刪繁補闕行事鈔",
+          "cbeta_id": "T1804",
+          "author": "道宣",
+          "dynasty": "唐",
+          "note": "南山三大部之一，指導僧團行事"
+        },
+        {
+          "key": "vinaya-commentary-t1805",
+          "title": "四分律含注戒本疏",
+          "cbeta_id": "T1805",
+          "author": "道宣",
+          "dynasty": "唐",
+          "note": "南山三大部之一，逐條解釋250戒"
+        },
+        {
+          "key": "vinaya-commentary-t1808",
+          "title": "四分律刪補隨機羯磨疏",
+          "cbeta_id": "T1808",
+          "author": "道宣",
+          "dynasty": "唐",
+          "note": "南山三大部之一，僧團法律程序"
+        },
+        {
+          "key": "vinaya-commentary-t1813",
+          "title": "梵網經菩薩戒本疏",
+          "cbeta_id": "T1813",
+          "author": "法藏",
+          "dynasty": "唐"
+        },
+        {
+          "key": "vinaya-commentary-t1462",
+          "title": "善見律毗婆沙",
+          "cbeta_id": "T1462",
+          "author": "僧伽跋陀羅",
+          "dynasty": "南齊",
+          "note": "巴利律藏註釋書漢譯"
+        }
+      ],
+      "resources": {
+        "reading": [
+          {
+            "key": "vinaya-reading-cbetaonline-dila-edu-tw-1",
+            "name": "CBETA 律部",
+            "url": "https://cbetaonline.dila.edu.tw/zh/T1428",
+            "desc": "四分律及全部律典原文"
+          },
+          {
+            "key": "vinaya-reading-suttacentral-net-2",
+            "name": "SuttaCentral 律藏",
+            "url": "https://suttacentral.net/vinaya-guide-brahmali",
+            "desc": "巴利律藏首個完整英譯（六卷）"
+          },
+          {
+            "key": "vinaya-reading-www-dhammatalks-org-3",
+            "name": "DhammaTalks 佛教僧伽法典",
+            "url": "https://www.dhammatalks.org/vinaya/bmc/",
+            "desc": "Thanissaro Bhikkhu 逐條解釋 227 條比丘戒"
+          },
+          {
+            "key": "vinaya-reading-www-accesstoinsight-org-4",
+            "name": "Access to Insight 律藏",
+            "url": "https://www.accesstoinsight.org/tipitaka/vin/index.html",
+            "desc": "巴利律藏部分資料"
+          }
+        ],
+        "translation": [
+          {
+            "key": "vinaya-translation-dharmaguptakavinaya-wordpress-com-1",
+            "name": "四分律英譯項目",
+            "url": "https://dharmaguptakavinaya.wordpress.com/",
+            "desc": "Dharmaguptaka Vinaya 犍度部英譯"
+          },
+          {
+            "key": "vinaya-translation-www-bdkamerica-org-2",
+            "name": "BDK 百丈清規英譯",
+            "url": "https://www.bdkamerica.org/",
+            "desc": "含百丈清規等英譯"
+          },
+          {
+            "key": "vinaya-translation-www-sutrasmantras-info-3",
+            "name": "梵網經中英對照",
+            "url": "https://www.sutrasmantras.info/sutra32.html",
+            "desc": "菩薩心地戒品在線"
+          },
+          {
+            "key": "vinaya-translation-palitextsociety-org-4",
+            "name": "Pali Text Society 律藏",
+            "url": "https://palitextsociety.org/",
+            "desc": "I.B. Horner 經典英譯六卷"
+          }
+        ],
+        "manuscript": [
+          {
+            "key": "vinaya-manuscript-en-unesco-org-1",
+            "name": "吉爾吉特寫本 (UNESCO)",
+            "url": "https://en.unesco.org/memoryoftheworld/registry/303",
+            "desc": "5-6世紀，含有部律梵文原典"
+          },
+          {
+            "key": "vinaya-manuscript-idp-bl-uk-2",
+            "name": "IDP 國際敦煌項目",
+            "url": "https://idp.bl.uk/",
+            "desc": "敦煌律藏抄本、戒律文獻寫本"
+          }
+        ],
+        "research": [
+          {
+            "key": "vinaya-research-buddhistuniversity-net-1",
+            "name": "Open Buddhist University 律學",
+            "url": "https://buddhistuniversity.net/tags/vinaya-studies",
+            "desc": "免費在線律學課程與文獻"
+          },
+          {
+            "key": "vinaya-research-sravastiabbey-org-2",
+            "name": "Sravasti Abbey 律學資源",
+            "url": "https://sravastiabbey.org/discover-monastic-life/living-in-vinaya/vinaya-resources/",
+            "desc": "比丘尼戒律研究中心"
+          },
+          {
+            "key": "vinaya-research-buddhism-lib-ntu-edu-tw-3",
+            "name": "臺大佛學數位圖書館",
+            "url": "https://buddhism.lib.ntu.edu.tw/",
+            "desc": "南山律宗研究論文"
+          }
+        ],
+        "temple": [
+          {
+            "key": "vinaya-temple-www-jcedu-org-1",
+            "name": "西園戒幢律寺",
+            "url": "https://www.jcedu.org/",
+            "desc": "蘇州，律宗重要道場，設佛學研究所"
+          },
+          {
+            "key": "vinaya-temple-www-lingyinsi-com-2",
+            "name": "靈隱寺 律宗專題",
+            "url": "https://www.lingyinsi.com/",
+            "desc": "定期舉辦傳戒法會"
+          }
+        ]
+      },
+      "searchQuery": "律典"
+    },
+    {
+      "id": "agama",
+      "name": "阿含經/尼柯耶系列",
+      "tradition": "原始佛教",
+      "description": "阿含經是原始佛教的根本經典，保存了釋迦牟尼佛最早期的教說。漢譯四部阿含與巴利五部尼柯耶大體對應，是研究佛陀本懷的第一手資料。近代以來，阿含經在佛學研究中的重要性日益凸顯。",
+      "mainTexts": [
+        {
+          "key": "agama-main-t0001",
+          "title": "長阿含經",
+          "cbeta_id": "T0001",
+          "author": "佛陀耶舍、竺佛念",
+          "dynasty": "姚秦",
+          "note": "22卷30經，對應巴利長部尼柯耶 (DN)"
+        },
+        {
+          "key": "agama-main-t0026",
+          "title": "中阿含經",
+          "cbeta_id": "T0026",
+          "author": "瞿曇僧伽提婆",
+          "dynasty": "東晉",
+          "note": "60卷222經，對應巴利中部尼柯耶 (MN)"
+        },
+        {
+          "key": "agama-main-t0099",
+          "title": "雜阿含經",
+          "cbeta_id": "T0099",
+          "author": "求那跋陀羅",
+          "dynasty": "劉宋",
+          "note": "50卷1362經，對應巴利相應部尼柯耶 (SN)，最核心的阿含"
+        },
+        {
+          "key": "agama-main-t0125",
+          "title": "增一阿含經",
+          "cbeta_id": "T0125",
+          "author": "瞿曇僧伽提婆",
+          "dynasty": "東晉",
+          "note": "51卷，對應巴利增支部尼柯耶 (AN)"
+        },
+        {
+          "key": "agama-main-t0100",
+          "title": "別譯雜阿含經",
+          "cbeta_id": "T0100",
+          "author": "失譯",
+          "dynasty": "不詳",
+          "note": "雜阿含部分經異譯"
+        },
+        {
+          "key": "agama-main-t0007",
+          "title": "佛說大般涅槃經",
+          "cbeta_id": "T0007",
+          "author": "法顯",
+          "dynasty": "東晉",
+          "note": "長阿含遊行經異譯，記佛陀入滅"
+        }
+      ],
+      "commentaries": [
+        {
+          "key": "agama-commentary-t1579",
+          "title": "瑜伽師地論·攝事分",
+          "cbeta_id": "T1579",
+          "author": "彌勒菩薩說，玄奘譯",
+          "dynasty": "唐",
+          "note": "卷85-100為雜阿含經註釋"
+        },
+        {
+          "key": "agama-commentary-t1545",
+          "title": "阿毗達磨大毗婆沙論",
+          "cbeta_id": "T1545",
+          "author": "五百大阿羅漢造，玄奘譯",
+          "dynasty": "唐",
+          "note": "200卷，解釋阿含教義的百科全書"
+        },
+        {
+          "key": "agama-commentary-t1558",
+          "title": "阿毗達磨俱舍論",
+          "cbeta_id": "T1558",
+          "author": "世親造，玄奘譯",
+          "dynasty": "唐",
+          "note": "阿含教義體系化總結"
+        },
+        {
+          "key": "agama-commentary-t1646",
+          "title": "成實論",
+          "cbeta_id": "T1646",
+          "author": "訶梨跋摩造，鳩摩羅什譯",
+          "dynasty": "姚秦",
+          "note": "經部論師系統化阿含義理"
+        }
+      ],
+      "resources": {
+        "reading": [
+          {
+            "key": "agama-reading-cbetaonline-dila-edu-tw-1",
+            "name": "CBETA 阿含部",
+            "url": "https://cbetaonline.dila.edu.tw/zh/T0001",
+            "desc": "四部阿含全文在線"
+          },
+          {
+            "key": "agama-reading-suttacentral-net-2",
+            "name": "SuttaCentral",
+            "url": "https://suttacentral.net/",
+            "desc": "巴利尼柯耶多語言對照，漢巴對讀"
+          },
+          {
+            "key": "agama-reading-www-accesstoinsight-org-3",
+            "name": "Access to Insight",
+            "url": "https://www.accesstoinsight.org/tipitaka/index.html",
+            "desc": "巴利經藏經典英譯"
+          },
+          {
+            "key": "agama-reading-agama-buddhason-org-4",
+            "name": "莊春江 阿含經南北對讀",
+            "url": "https://agama.buddhason.org/",
+            "desc": "漢譯阿含與巴利尼柯耶逐經對照"
+          }
+        ],
+        "translation": [
+          {
+            "key": "agama-translation-wisdomexperience-org-1",
+            "name": "Bhikkhu Bodhi 尼柯耶英譯",
+            "url": "https://wisdomexperience.org/authors/bhikkhu-bodhi/",
+            "desc": "當代最權威的巴利經藏完整英譯"
+          },
+          {
+            "key": "agama-translation-84000-co-2",
+            "name": "84000 阿含經藏譯英",
+            "url": "https://84000.co/",
+            "desc": "部分阿含經從藏文翻譯"
+          },
+          {
+            "key": "agama-translation-www-bdkamerica-org-3",
+            "name": "BDK 長阿含經英譯",
+            "url": "https://www.bdkamerica.org/",
+            "desc": "Numata 基金會長阿含英譯"
+          },
+          {
+            "key": "agama-translation-www-suttafriends-org-4",
+            "name": "Sutta Friends Foundation",
+            "url": "https://www.suttafriends.org/",
+            "desc": "雜阿含英譯計劃"
+          }
+        ],
+        "manuscript": [
+          {
+            "key": "agama-manuscript-idp-bl-uk-1",
+            "name": "IDP 國際敦煌項目",
+            "url": "https://idp.bl.uk/",
+            "desc": "敦煌阿含經寫本數字影像"
+          },
+          {
+            "key": "agama-manuscript-gandhari-org-2",
+            "name": "Gandhari.org",
+            "url": "https://gandhari.org/",
+            "desc": "犍陀羅語阿含寫本（最古層佛經寫本）"
+          },
+          {
+            "key": "agama-manuscript-www-dila-edu-tw-3",
+            "name": "DILA 梵文寫本數據庫",
+            "url": "https://www.dila.edu.tw/",
+            "desc": "梵文阿含殘卷研究"
+          }
+        ],
+        "research": [
+          {
+            "key": "agama-research-yinshun-edu-org-tw-1",
+            "name": "印順法師《雜阿含經論會編》",
+            "url": "https://yinshun-edu.org.tw/",
+            "desc": "阿含研究里程碑著作"
+          },
+          {
+            "key": "agama-research-buddhism-lib-ntu-edu-tw-2",
+            "name": "臺大佛學數位圖書館",
+            "url": "https://buddhism.lib.ntu.edu.tw/",
+            "desc": "阿含經研究論文全文"
+          },
+          {
+            "key": "agama-research-suttacentral-net-3",
+            "name": "SuttaCentral Parallels",
+            "url": "https://suttacentral.net/",
+            "desc": "漢巴藏梵平行經文數據庫"
+          },
+          {
+            "key": "agama-research-poj-peeters-leuven-be-4",
+            "name": "JIABS",
+            "url": "https://poj.peeters-leuven.be/content.php?url=journal&journal_code=JIABS",
+            "desc": "早期佛教研究權威期刊"
+          }
+        ],
+        "temple": [
+          {
+            "key": "agama-temple-bodhimonastery-org-1",
+            "name": "Bodhi Monastery",
+            "url": "https://bodhimonastery.org/",
+            "desc": "美國，菩提比丘常駐，阿含教學"
+          },
+          {
+            "key": "agama-temple-www-amaravati-org-2",
+            "name": "Amaravati Buddhist Monastery",
+            "url": "https://www.amaravati.org/",
+            "desc": "英國，阿姜查傳承，原始佛教修行"
+          }
+        ]
+      },
+      "searchQuery": "阿含经/尼柯耶"
+    },
+    {
+      "id": "esoteric",
+      "name": "密教系列",
+      "tradition": "真言宗/天台密教",
+      "description": "密教（真言宗、金剛乘）以《大日經》和《金剛頂經》為兩大根本經典，強調三密加持（身口意）和曼荼羅修法。善無畏、金剛智、不空三大士將密教傳入中國，空海大師東傳日本創立真言宗。",
+      "mainTexts": [
+        {
+          "key": "esoteric-main-t0848",
+          "title": "大毗盧遮那成佛神變加持經（大日經）",
+          "cbeta_id": "T0848",
+          "author": "善無畏、一行",
+          "dynasty": "唐",
+          "note": "胎藏界根本經典，7卷"
+        },
+        {
+          "key": "esoteric-main-t0865",
+          "title": "金剛頂一切如來真實攝大乘現證大教王經",
+          "cbeta_id": "T0865",
+          "author": "不空",
+          "dynasty": "唐",
+          "note": "金剛界根本經典"
+        },
+        {
+          "key": "esoteric-main-t0893",
+          "title": "蘇悉地羯羅經",
+          "cbeta_id": "T0893",
+          "author": "善無畏",
+          "dynasty": "唐",
+          "note": "密教事部修法根本經典"
+        },
+        {
+          "key": "esoteric-main-t0882",
+          "title": "佛說一切如來真實攝大乘現證三昧大教王經",
+          "cbeta_id": "T0882",
+          "author": "施護",
+          "dynasty": "宋",
+          "note": "金剛頂經廣本，30卷"
+        },
+        {
+          "key": "esoteric-main-t0243",
+          "title": "大樂金剛不空真實三麼耶經",
+          "cbeta_id": "T0243",
+          "author": "不空",
+          "dynasty": "唐",
+          "note": "般若理趣經，密教般若觀"
+        },
+        {
+          "key": "esoteric-main-t0994",
+          "title": "仁王護國般若波羅蜜多經陀羅尼唸誦儀軌",
+          "cbeta_id": "T0994",
+          "author": "不空",
+          "dynasty": "唐",
+          "note": "護國密法"
+        }
+      ],
+      "commentaries": [
+        {
+          "key": "esoteric-commentary-t1796",
+          "title": "大日經疏",
+          "cbeta_id": "T1796",
+          "author": "一行",
+          "dynasty": "唐",
+          "note": "大日經最重要註釋，20卷"
+        },
+        {
+          "key": "esoteric-commentary-t1665",
+          "title": "金剛頂經疏",
+          "cbeta_id": "T1665",
+          "author": "不空述，含光記",
+          "dynasty": "唐"
+        },
+        {
+          "key": "esoteric-commentary-x0349",
+          "title": "大日經義釋",
+          "cbeta_id": "X0349",
+          "author": "溫古（覺苑）",
+          "dynasty": "遼",
+          "note": "大日經疏的再註釋"
+        },
+        {
+          "key": "esoteric-commentary-t2425",
+          "title": "十住心論",
+          "cbeta_id": "T2425",
+          "author": "空海",
+          "dynasty": "日本平安",
+          "note": "空海判教代表作，十種心"
+        },
+        {
+          "key": "esoteric-commentary-t2428",
+          "title": "即身成佛義",
+          "cbeta_id": "T2428",
+          "author": "空海",
+          "dynasty": "日本平安",
+          "note": "真言宗核心教義"
+        },
+        {
+          "key": "esoteric-commentary-t2429",
+          "title": "聲字實相義",
+          "cbeta_id": "T2429",
+          "author": "空海",
+          "dynasty": "日本平安",
+          "note": "真言宗語言哲學"
+        }
+      ],
+      "resources": {
+        "reading": [
+          {
+            "key": "esoteric-reading-cbetaonline-dila-edu-tw-1",
+            "name": "CBETA 密教部",
+            "url": "https://cbetaonline.dila.edu.tw/zh/T0848",
+            "desc": "大日經及密教經典全文"
+          },
+          {
+            "key": "esoteric-reading-21dzk-l-u-tokyo-ac-jp-2",
+            "name": "SAT 大正藏",
+            "url": "https://21dzk.l.u-tokyo.ac.jp/SAT/",
+            "desc": "東京大學大正藏數據庫"
+          },
+          {
+            "key": "esoteric-reading-encyclopediaofbuddhism-org-3",
+            "name": "Encyclopaedia of Buddhism",
+            "url": "https://encyclopediaofbuddhism.org/wiki/Vajrayāna",
+            "desc": "金剛乘詞條"
+          }
+        ],
+        "translation": [
+          {
+            "key": "esoteric-translation-84000-co-1",
+            "name": "84000 密續英譯",
+            "url": "https://84000.co/canon-sections/tantra-collection",
+            "desc": "藏傳密續英譯合集"
+          },
+          {
+            "key": "esoteric-translation-www-bdkamerica-org-2",
+            "name": "BDK 大日經英譯",
+            "url": "https://www.bdkamerica.org/",
+            "desc": "Numata 基金會英譯"
+          },
+          {
+            "key": "esoteric-translation-www-dsbcproject-org-3",
+            "name": "DSBC 梵文密教文獻",
+            "url": "https://www.dsbcproject.org/",
+            "desc": "梵文密教原典數字化"
+          }
+        ],
+        "manuscript": [
+          {
+            "key": "esoteric-manuscript-www-reihokan-or-jp-1",
+            "name": "高野山靈寶館",
+            "url": "https://www.reihokan.or.jp/",
+            "desc": "真言宗總本山，密教文物"
+          },
+          {
+            "key": "esoteric-manuscript-idp-bl-uk-2",
+            "name": "IDP 國際敦煌項目",
+            "url": "https://idp.bl.uk/",
+            "desc": "敦煌密教寫本與絹畫"
+          },
+          {
+            "key": "esoteric-manuscript-library-bdrc-io-3",
+            "name": "BDRC 藏文密續",
+            "url": "https://library.bdrc.io/",
+            "desc": "藏傳密教文獻數字化"
+          }
+        ],
+        "research": [
+          {
+            "key": "esoteric-research-www-koyasan-u-ac-jp-1",
+            "name": "高野山大學密教文化研究所",
+            "url": "https://www.koyasan-u.ac.jp/",
+            "desc": "真言宗最高學府"
+          },
+          {
+            "key": "esoteric-research-www-shuchiin-ac-jp-2",
+            "name": "種智院大學",
+            "url": "https://www.shuchiin.ac.jp/",
+            "desc": "空海創立，密教研究"
+          },
+          {
+            "key": "esoteric-research-www-tais-ac-jp-3",
+            "name": "大正大學綜合佛教研究所",
+            "url": "https://www.tais.ac.jp/",
+            "desc": "密教學術研究中心"
+          }
+        ],
+        "temple": [
+          {
+            "key": "esoteric-temple-www-koyasan-or-jp-1",
+            "name": "高野山金剛峰寺",
+            "url": "https://www.koyasan.or.jp/en/",
+            "desc": "真言宗總本山，世界遺產"
+          },
+          {
+            "key": "esoteric-temple-toji-or-jp-2",
+            "name": "東寺（教王護國寺）",
+            "url": "https://toji.or.jp/en/",
+            "desc": "京都，空海主持的密教道場"
+          },
+          {
+            "key": "esoteric-temple-www-xa-travel-com-3",
+            "name": "青龍寺",
+            "url": "https://www.xa-travel.com/attractions/qinglongsi.html",
+            "desc": "西安，空海入唐求法之地"
+          }
+        ]
+      },
+      "searchQuery": "密教"
+    },
+    {
+      "id": "nirvana",
+      "name": "涅槃經系列",
+      "tradition": "涅槃宗/如來藏",
+      "description": "《大般涅槃經》是佛陀入滅前的最後教說，提出「一切眾生悉有佛性」的思想，對中國佛教影響深遠。涅槃學派（涅槃宗）曾與成實學派並列南北朝佛學兩大主流，其佛性論深刻影響了禪宗和天台宗。",
+      "mainTexts": [
+        {
+          "key": "nirvana-main-t0374",
+          "title": "大般涅槃經（北本）",
+          "cbeta_id": "T0374",
+          "author": "曇無讖",
+          "dynasty": "北涼",
+          "note": "40卷，最完整的漢譯本"
+        },
+        {
+          "key": "nirvana-main-t0375",
+          "title": "大般涅槃經（南本）",
+          "cbeta_id": "T0375",
+          "author": "慧嚴等再治",
+          "dynasty": "劉宋",
+          "note": "36卷，南方流通本"
+        },
+        {
+          "key": "nirvana-main-t0376",
+          "title": "佛說大般泥洹經",
+          "cbeta_id": "T0376",
+          "author": "法顯",
+          "dynasty": "東晉",
+          "note": "6卷，最早漢譯，僅前分"
+        },
+        {
+          "key": "nirvana-main-t0377",
+          "title": "大般涅槃經後分",
+          "cbeta_id": "T0377",
+          "author": "若那跋陀羅",
+          "dynasty": "唐",
+          "note": "補譯遺缺部分"
+        },
+        {
+          "key": "nirvana-main-t0353",
+          "title": "勝鬘師子吼一乘大方便方廣經",
+          "cbeta_id": "T0353",
+          "author": "求那跋陀羅",
+          "dynasty": "劉宋",
+          "note": "如來藏思想核心經典"
+        },
+        {
+          "key": "nirvana-main-t0666",
+          "title": "大方等如來藏經",
+          "cbeta_id": "T0666",
+          "author": "佛陀跋陀羅",
+          "dynasty": "東晉",
+          "note": "最早明確使用「如來藏」概念"
+        },
+        {
+          "key": "nirvana-main-t0668",
+          "title": "佛說不增不減經",
+          "cbeta_id": "T0668",
+          "author": "菩提流支",
+          "dynasty": "元魏",
+          "note": "如來藏系重要經典"
+        }
+      ],
+      "commentaries": [
+        {
+          "key": "nirvana-commentary-t1763",
+          "title": "大般涅槃經集解",
+          "cbeta_id": "T1763",
+          "author": "寶亮等",
+          "dynasty": "梁",
+          "note": "彙集南朝諸師涅槃註疏"
+        },
+        {
+          "key": "nirvana-commentary-t1768",
+          "title": "涅槃經遊意",
+          "cbeta_id": "T1768",
+          "author": "吉藏",
+          "dynasty": "隋",
+          "note": "三論宗立場的涅槃經導論"
+        },
+        {
+          "key": "nirvana-commentary-t1766",
+          "title": "涅槃玄義發源機要",
+          "cbeta_id": "T1766",
+          "author": "智圓",
+          "dynasty": "宋",
+          "note": "天台宗涅槃註疏"
+        },
+        {
+          "key": "nirvana-commentary-t1611",
+          "title": "究竟一乘寶性論",
+          "cbeta_id": "T1611",
+          "author": "勒那摩提",
+          "dynasty": "元魏",
+          "note": "如來藏/佛性論系統論著"
+        },
+        {
+          "key": "nirvana-commentary-t1610",
+          "title": "佛性論",
+          "cbeta_id": "T1610",
+          "author": "天親菩薩造，真諦譯",
+          "dynasty": "陳",
+          "note": "佛性思想體系化"
+        },
+        {
+          "key": "nirvana-commentary-t1666",
+          "title": "大乘起信論",
+          "cbeta_id": "T1666",
+          "author": "馬鳴菩薩造，真諦譯",
+          "dynasty": "陳",
+          "note": "如來藏與唯識融合的重要論典"
+        }
+      ],
+      "resources": {
+        "reading": [
+          {
+            "key": "nirvana-reading-cbetaonline-dila-edu-tw-1",
+            "name": "CBETA 涅槃部",
+            "url": "https://cbetaonline.dila.edu.tw/zh/T0374",
+            "desc": "大般涅槃經全文在線"
+          },
+          {
+            "key": "nirvana-reading-21dzk-l-u-tokyo-ac-jp-2",
+            "name": "SAT 大正藏",
+            "url": "https://21dzk.l.u-tokyo.ac.jp/SAT/",
+            "desc": "東京大學大正藏數據庫"
+          },
+          {
+            "key": "nirvana-reading-ntireader-org-3",
+            "name": "NTI Reader",
+            "url": "https://ntireader.org/taisho/t0374.html",
+            "desc": "涅槃經中英佛典閱讀器"
+          }
+        ],
+        "translation": [
+          {
+            "key": "nirvana-translation-84000-co-1",
+            "name": "84000 涅槃經",
+            "url": "https://84000.co/translation/toh119",
+            "desc": "大般涅槃經藏譯英"
+          },
+          {
+            "key": "nirvana-translation-www-nirvanasutra-net-2",
+            "name": "Nirvana Sutra.net",
+            "url": "https://www.nirvanasutra.net/",
+            "desc": "Mark Blum 英譯全文在線"
+          },
+          {
+            "key": "nirvana-translation-www-bdkamerica-org-3",
+            "name": "BDK 勝鬘經英譯",
+            "url": "https://www.bdkamerica.org/",
+            "desc": "Numata 基金會英譯"
+          }
+        ],
+        "manuscript": [
+          {
+            "key": "nirvana-manuscript-idp-bl-uk-1",
+            "name": "IDP 國際敦煌項目",
+            "url": "https://idp.bl.uk/",
+            "desc": "敦煌涅槃經寫本影像"
+          },
+          {
+            "key": "nirvana-manuscript-www-e-dunhuang-com-2",
+            "name": "數字敦煌",
+            "url": "https://www.e-dunhuang.com/",
+            "desc": "涅槃變相壁畫全景"
+          },
+          {
+            "key": "nirvana-manuscript-www-shuge-org-3",
+            "name": "書格 古籍善本",
+            "url": "https://www.shuge.org/",
+            "desc": "涅槃經宋元刻本影像"
+          }
+        ],
+        "research": [
+          {
+            "key": "nirvana-research-buddhism-lib-ntu-edu-tw-1",
+            "name": "臺大佛學數位圖書館",
+            "url": "https://buddhism.lib.ntu.edu.tw/",
+            "desc": "涅槃經與佛性論研究論文"
+          },
+          {
+            "key": "nirvana-research-plato-stanford-edu-2",
+            "name": "斯坦福哲學百科 · 佛性",
+            "url": "https://plato.stanford.edu/entries/buddha-nature/",
+            "desc": "佛性/如來藏思想學術綜述"
+          },
+          {
+            "key": "nirvana-research-buddhanexus2-kc-tbts-uni-hamburg-de-3",
+            "name": "BuddhaNexus 文本比對",
+            "url": "https://buddhanexus2.kc-tbts.uni-hamburg.de/",
+            "desc": "涅槃經跨語種平行對照"
+          }
+        ],
+        "temple": [
+          {
+            "key": "nirvana-temple-www-otani-ac-jp-1",
+            "name": "大谷大學",
+            "url": "https://www.otani.ac.jp/",
+            "desc": "日本京都，涅槃經與真宗研究重鎮"
+          }
+        ]
+      },
+      "searchQuery": "涅槃经"
+    },
+    {
+      "id": "abhidharma",
+      "name": "阿毗達磨系列",
+      "tradition": "部派佛教",
+      "description": "阿毗達磨（論藏）是對佛陀教說的系統化分析與歸納。說一切有部的「一身六足」七論和南傳上座部的七論構成兩大阿毗達磨體系。世親的《俱舍論》被譽為「聰明論」，是學習阿毗達磨的最佳入門。",
+      "mainTexts": [
+        {
+          "key": "abhidharma-main-t1544",
+          "title": "阿毗達磨發智論",
+          "cbeta_id": "T1544",
+          "author": "迦多衍尼子造，玄奘譯",
+          "dynasty": "唐",
+          "note": "有部「身論」，阿毗達磨根本論"
+        },
+        {
+          "key": "abhidharma-main-t1545",
+          "title": "阿毗達磨大毗婆沙論",
+          "cbeta_id": "T1545",
+          "author": "五百大阿羅漢造，玄奘譯",
+          "dynasty": "唐",
+          "note": "200卷，發智論註釋，百科全書式鉅著"
+        },
+        {
+          "key": "abhidharma-main-t1558",
+          "title": "阿毗達磨俱舍論",
+          "cbeta_id": "T1558",
+          "author": "世親造，玄奘譯",
+          "dynasty": "唐",
+          "note": "30卷，「聰明論」，學阿毗達磨必讀"
+        },
+        {
+          "key": "abhidharma-main-t1559",
+          "title": "阿毗達磨俱舍論（真諦譯）",
+          "cbeta_id": "T1559",
+          "author": "世親造，真諦譯",
+          "dynasty": "陳",
+          "note": "舊譯本，22卷"
+        },
+        {
+          "key": "abhidharma-main-t1562",
+          "title": "阿毗達磨順正理論",
+          "cbeta_id": "T1562",
+          "author": "眾賢造，玄奘譯",
+          "dynasty": "唐",
+          "note": "80卷，有部正統反駁世親"
+        },
+        {
+          "key": "abhidharma-main-t1543",
+          "title": "阿毗曇八犍度論",
+          "cbeta_id": "T1543",
+          "author": "迦旃延子造，僧伽提婆等譯",
+          "dynasty": "符秦",
+          "note": "發智論舊譯"
+        },
+        {
+          "key": "abhidharma-main-t1536",
+          "title": "阿毗達磨集異門足論",
+          "cbeta_id": "T1536",
+          "author": "舍利子說，玄奘譯",
+          "dynasty": "唐",
+          "note": "六足論之一"
+        },
+        {
+          "key": "abhidharma-main-t1537",
+          "title": "阿毗達磨法蘊足論",
+          "cbeta_id": "T1537",
+          "author": "大目乾連說，玄奘譯",
+          "dynasty": "唐",
+          "note": "六足論之一"
+        }
+      ],
+      "commentaries": [
+        {
+          "key": "abhidharma-commentary-t1821",
+          "title": "俱舍論記",
+          "cbeta_id": "T1821",
+          "author": "普光",
+          "dynasty": "唐",
+          "note": "俱舍論最重要註釋，30卷"
+        },
+        {
+          "key": "abhidharma-commentary-t1822",
+          "title": "俱舍論疏",
+          "cbeta_id": "T1822",
+          "author": "法寶",
+          "dynasty": "唐",
+          "note": "俱舍論疏釋，30卷"
+        },
+        {
+          "key": "abhidharma-commentary-t1823",
+          "title": "俱舍論頌疏",
+          "cbeta_id": "T1823",
+          "author": "圓暉",
+          "dynasty": "唐",
+          "note": "俱舍偈頌註釋，入門首選"
+        },
+        {
+          "key": "abhidharma-commentary-t1552",
+          "title": "雜阿毗曇心論",
+          "cbeta_id": "T1552",
+          "author": "法救造，僧伽跋摩譯",
+          "dynasty": "劉宋",
+          "note": "俱舍論之前的阿毗達磨綱要"
+        }
+      ],
+      "resources": {
+        "reading": [
+          {
+            "key": "abhidharma-reading-cbetaonline-dila-edu-tw-1",
+            "name": "CBETA 毗曇部",
+            "url": "https://cbetaonline.dila.edu.tw/zh/T1558",
+            "desc": "俱舍論及全部阿毗達磨論典"
+          },
+          {
+            "key": "abhidharma-reading-suttacentral-net-2",
+            "name": "SuttaCentral 阿毗達磨",
+            "url": "https://suttacentral.net/abhidhamma",
+            "desc": "巴利阿毗達磨七論"
+          },
+          {
+            "key": "abhidharma-reading-deerpark-app-3",
+            "name": "Deerpark 佛經閱讀器",
+            "url": "https://deerpark.app/",
+            "desc": "優雅排版閱讀"
+          }
+        ],
+        "translation": [
+          {
+            "key": "abhidharma-translation-www-bdkamerica-org-1",
+            "name": "BDK 俱舍論英譯",
+            "url": "https://www.bdkamerica.org/",
+            "desc": "Leo Pruden 英譯全本"
+          },
+          {
+            "key": "abhidharma-translation-wisdomexperience-org-2",
+            "name": "Bhikkhu Bodhi 阿毗達磨導論",
+            "url": "https://wisdomexperience.org/product/comprehensive-manual-of-abhidhamma/",
+            "desc": "南傳阿毗達磨概要英譯"
+          },
+          {
+            "key": "abhidharma-translation-84000-co-3",
+            "name": "84000 俱舍論",
+            "url": "https://84000.co/",
+            "desc": "藏文俱舍論英譯"
+          }
+        ],
+        "manuscript": [
+          {
+            "key": "abhidharma-manuscript-en-unesco-org-1",
+            "name": "吉爾吉特寫本 (UNESCO)",
+            "url": "https://en.unesco.org/memoryoftheworld/registry/303",
+            "desc": "含阿毗達磨梵文殘卷"
+          },
+          {
+            "key": "abhidharma-manuscript-gretil-sub-uni-goettingen-de-2",
+            "name": "GRETIL 梵文文本",
+            "url": "https://gretil.sub.uni-goettingen.de/",
+            "desc": "俱舍論梵文電子文本"
+          },
+          {
+            "key": "abhidharma-manuscript-www-dsbcproject-org-3",
+            "name": "DSBC 梵文佛典",
+            "url": "https://www.dsbcproject.org/",
+            "desc": "阿毗達磨梵文原典"
+          }
+        ],
+        "research": [
+          {
+            "key": "abhidharma-research-buddhism-lib-ntu-edu-tw-1",
+            "name": "臺大佛學數位圖書館",
+            "url": "https://buddhism.lib.ntu.edu.tw/",
+            "desc": "俱舍論與部派佛教論文"
+          },
+          {
+            "key": "abhidharma-research-plato-stanford-edu-2",
+            "name": "斯坦福哲學百科 · Abhidharma",
+            "url": "https://plato.stanford.edu/entries/abhidharma/",
+            "desc": "阿毗達磨哲學學術綜述"
+          },
+          {
+            "key": "abhidharma-research-ocbs-org-3",
+            "name": "牛津佛教研究中心",
+            "url": "https://ocbs.org/",
+            "desc": "阿毗達磨比較研究"
+          }
+        ],
+        "temple": [
+          {
+            "key": "abhidharma-temple-www-dila-edu-tw-1",
+            "name": "法鼓文理學院",
+            "url": "https://www.dila.edu.tw/",
+            "desc": "阿毗達磨研究課程"
+          },
+          {
+            "key": "abhidharma-temple-www-paauk-org-2",
+            "name": "Pa-Auk Forest Monastery",
+            "url": "https://www.paauk.org/",
+            "desc": "緬甸，阿毗達磨實修傳統"
+          }
+        ]
+      },
+      "searchQuery": "阿毗达磨"
+    },
+    {
+      "id": "pali-canon",
+      "name": "南傳巴利三藏",
+      "tradition": "上座部佛教",
+      "description": "巴利三藏（Tipitaka）是上座部佛教的完整典籍，包含經藏（Sutta Pitaka）、律藏（Vinaya Pitaka）和論藏（Abhidhamma Pitaka）。它是現存最完整、最古老的佛教經典體系，以巴利語傳承，主要流傳於斯里蘭卡、緬甸、泰國等南傳佛教國家。",
+      "mainTexts": [
+        {
+          "key": "pali-canon-main-1",
+          "title": "長部尼柯耶 (Dīgha Nikāya)",
+          "cbeta_id": "",
+          "author": "",
+          "dynasty": "",
+          "note": "34經，含大念處經、梵網經等"
+        },
+        {
+          "key": "pali-canon-main-2",
+          "title": "中部尼柯耶 (Majjhima Nikāya)",
+          "cbeta_id": "",
+          "author": "",
+          "dynasty": "",
+          "note": "152經，佛教修行最核心教導"
+        },
+        {
+          "key": "pali-canon-main-3",
+          "title": "相應部尼柯耶 (Saṃyutta Nikāya)",
+          "cbeta_id": "",
+          "author": "",
+          "dynasty": "",
+          "note": "按主題分類的經集"
+        },
+        {
+          "key": "pali-canon-main-4",
+          "title": "增支部尼柯耶 (Aṅguttara Nikāya)",
+          "cbeta_id": "",
+          "author": "",
+          "dynasty": "",
+          "note": "按數字法數分類"
+        },
+        {
+          "key": "pali-canon-main-5",
+          "title": "小部尼柯耶 (Khuddaka Nikāya)",
+          "cbeta_id": "",
+          "author": "",
+          "dynasty": "",
+          "note": "含法句經、本生經、經集等15部"
+        },
+        {
+          "key": "pali-canon-main-6",
+          "title": "法句經 (Dhammapada)",
+          "cbeta_id": "",
+          "author": "",
+          "dynasty": "",
+          "note": "423偈，佛教最廣泛流傳的經典"
+        }
+      ],
+      "commentaries": [
+        {
+          "key": "pali-canon-commentary-1",
+          "title": "清淨道論 (Visuddhimagga)",
+          "cbeta_id": "",
+          "author": "覺音 (Buddhaghosa)",
+          "dynasty": "5世紀",
+          "note": "上座部最重要的論著，修行百科全書"
+        },
+        {
+          "key": "pali-canon-commentary-2",
+          "title": "攝阿毗達磨義論 (Abhidhammattha Sangaha)",
+          "cbeta_id": "",
+          "author": "阿耨樓陀 (Anuruddha)",
+          "dynasty": "11世紀",
+          "note": "南傳阿毗達磨入門必讀"
+        },
+        {
+          "key": "pali-canon-commentary-t1462",
+          "title": "善見律毗婆沙",
+          "cbeta_id": "T1462",
+          "author": "僧伽跋陀羅",
+          "dynasty": "南齊",
+          "note": "巴利律藏註釋書漢譯"
+        },
+        {
+          "key": "pali-canon-commentary-4",
+          "title": "彌蘭陀王問經 (Milindapañha)",
+          "cbeta_id": "",
+          "author": "",
+          "dynasty": "約公元前1世紀",
+          "note": "彌蘭陀王與那先比丘問答"
+        }
+      ],
+      "resources": {
+        "reading": [
+          {
+            "key": "pali-canon-reading-suttacentral-net-1",
+            "name": "SuttaCentral",
+            "url": "https://suttacentral.net/",
+            "desc": "巴利三藏多語言平臺，含完整英譯"
+          },
+          {
+            "key": "pali-canon-reading-www-accesstoinsight-org-2",
+            "name": "Access to Insight",
+            "url": "https://www.accesstoinsight.org/",
+            "desc": "經典巴利經文英譯庫"
+          },
+          {
+            "key": "pali-canon-reading-www-dhammatalks-org-3",
+            "name": "DhammaTalks",
+            "url": "https://www.dhammatalks.org/suttas/index.html",
+            "desc": "Thanissaro Bhikkhu 經文英譯"
+          },
+          {
+            "key": "pali-canon-reading-tipitaka-org-4",
+            "name": "Tipitaka.org",
+            "url": "https://tipitaka.org/",
+            "desc": "六種文字三藏全文"
+          },
+          {
+            "key": "pali-canon-reading-www-digitalpalireader-online-5",
+            "name": "Digital Pali Reader",
+            "url": "https://www.digitalpalireader.online/",
+            "desc": "巴利原文在線閱讀器"
+          }
+        ],
+        "translation": [
+          {
+            "key": "pali-canon-translation-wisdomexperience-org-1",
+            "name": "Bhikkhu Bodhi 完整英譯",
+            "url": "https://wisdomexperience.org/authors/bhikkhu-bodhi/",
+            "desc": "四部尼柯耶權威英譯"
+          },
+          {
+            "key": "pali-canon-translation-suttacentral-net-2",
+            "name": "Bhikkhu Sujato 英譯",
+            "url": "https://suttacentral.net/",
+            "desc": "SuttaCentral 現代英譯，CC0 許可"
+          },
+          {
+            "key": "pali-canon-translation-palitextsociety-org-3",
+            "name": "PTS 巴利聖典協會",
+            "url": "https://palitextsociety.org/",
+            "desc": "巴利文本與英譯出版"
+          },
+          {
+            "key": "pali-canon-translation-agama-buddhason-org-4",
+            "name": "莊春江 巴利經藏中譯",
+            "url": "https://agama.buddhason.org/",
+            "desc": "巴利經藏完整中譯"
+          }
+        ],
+        "manuscript": [
+          {
+            "key": "pali-canon-manuscript-tipitaka-org-1",
+            "name": "CSCD 巴利三藏電子版",
+            "url": "https://tipitaka.org/romn/",
+            "desc": "第六次結集版巴利原文"
+          },
+          {
+            "key": "pali-canon-manuscript-www-buddhanet-net-2",
+            "name": "Sri Lanka Encyclopaedia of Buddhism",
+            "url": "https://www.buddhanet.net/encyclopedia.htm",
+            "desc": "斯里蘭卡佛教百科"
+          },
+          {
+            "key": "pali-canon-manuscript-cudl-lib-cam-ac-uk-3",
+            "name": "劍橋大學 巴利寫本",
+            "url": "https://cudl.lib.cam.ac.uk/",
+            "desc": "館藏巴利貝葉寫本數字化"
+          }
+        ],
+        "research": [
+          {
+            "key": "pali-canon-research-palitextsociety-org-1",
+            "name": "巴利聖典協會 (PTS)",
+            "url": "https://palitextsociety.org/",
+            "desc": "1881年成立，巴利文本研究核心"
+          },
+          {
+            "key": "pali-canon-research-www-bdkamerica-org-2",
+            "name": "Numata Center for Buddhist Translation",
+            "url": "https://www.bdkamerica.org/",
+            "desc": "巴利經典翻譯研究"
+          },
+          {
+            "key": "pali-canon-research-dsal-uchicago-edu-3",
+            "name": "牛津巴利語-英語詞典",
+            "url": "https://dsal.uchicago.edu/dictionaries/pali/",
+            "desc": "PTS 巴利詞典在線版"
+          },
+          {
+            "key": "pali-canon-research-plato-stanford-edu-4",
+            "name": "斯坦福哲學百科 · Theravada",
+            "url": "https://plato.stanford.edu/entries/theravada/",
+            "desc": "上座部佛教學術綜述"
+          }
+        ],
+        "temple": [
+          {
+            "key": "pali-canon-temple-www-anuradhapura-org-1",
+            "name": "Mahavihara（大寺）",
+            "url": "https://www.anuradhapura.org/",
+            "desc": "斯里蘭卡阿努拉德普勒，上座部根本道場"
+          },
+          {
+            "key": "pali-canon-temple-www-dhammakaya-or-th-2",
+            "name": "Wat Phra Dhammakaya",
+            "url": "https://www.dhammakaya.or.th/",
+            "desc": "泰國，大藏經數字化項目"
+          },
+          {
+            "key": "pali-canon-temple-www-internationalmeditationcentre-org-3",
+            "name": "International Meditation Centre",
+            "url": "https://www.internationalmeditationcentre.org/",
+            "desc": "緬甸，烏巴慶傳承內觀禪修"
+          }
+        ]
+      },
+      "searchQuery": "南传巴利三藏"
+    }
+  ]
+}
