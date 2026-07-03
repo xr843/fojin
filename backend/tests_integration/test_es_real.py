@@ -266,17 +266,22 @@ async def test_search_content_collapses_by_work(seeded_indices):
     assert {j["juan_num"] for j in hit["matched_juans"]} == {1, 2}
 
 
-@pytest.mark.xfail(
-    reason=(
-        "sort='title' sorts on title_zh.keyword (and sort='dynasty' on "
-        "dynasty.keyword) but the mapping defines the keyword subfield as "
-        "title_zh.raw and dynasty as a plain keyword field — the real server "
-        "rejects the sort. The mocked unit suite can never see this; kept as "
-        "xfail documentation until the mapping/sort mismatch is fixed."
-    ),
-    strict=False,
-)
 async def test_search_texts_title_sort(seeded_indices):
+    """sort="title" must sort on the real keyword sub-field (title_zh.raw,
+    not title_zh.keyword) — a mismatch the mocked unit suite can't see,
+    caught here because the real server 400s on an unmapped field."""
     es = seeded_indices
     resp = await search_texts(es, "般若", sort="title")
-    assert resp.total >= 1
+    assert resp.total == 2
+    # 般若波羅蜜多心經 (般 U+822C) sorts before 金剛般若波羅蜜經 (金 U+91D1).
+    assert [r.cbeta_id for r in resp.results] == ["T0251", "T0235"]
+
+
+async def test_search_texts_dynasty_sort(seeded_indices):
+    """sort="dynasty" must sort on the dynasty field itself — it's mapped as
+    a plain `keyword`, so it has no ".keyword" sub-field to sort on."""
+    es = seeded_indices
+    resp = await search_texts(es, "", sort="dynasty")
+    assert resp.total == 3
+    # 唐 (U+5510) < 姚秦 (U+59DA) < 後秦 (U+5F8C)
+    assert [r.dynasty for r in resp.results] == ["唐", "姚秦", "後秦"]
