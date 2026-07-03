@@ -507,7 +507,18 @@ export default function ChatPage() {
     try { window.localStorage.setItem("fojin.chat.modelId", id); } catch { /* ignore */ }
   }, []);
   const [sessionId, setSessionId] = useState<number | undefined>();
-  const [messages, setMessages] = useState<ChatMessageItem[]>([]);
+  const [messages, setMessages] = useState<ChatMessageItem[]>(() => {
+    // 登录归来恢复暂存对话（无论登录成功与否，回到 /chat 都不该丢对话）。
+    // 读取放在惰性初始化（纯读取），removeItem 留给下面的挂载 effect。
+    try {
+      const raw = sessionStorage.getItem("fojin.chat.guestTranscript");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch { /* ignore */ }
+    return [];
+  });
   const [sending, setSending] = useState(false);
   // 游客转化钩子：游客拿到第一条 AI 回复后提示"登录可保存历史"。
   // 数据背景：月 730 chat 用户 vs 65 注册——多数游客不知道对话会丢。
@@ -532,17 +543,8 @@ export default function ChatPage() {
     } catch { /* ignore */ }
     navigate("/login");
   }, [messages, navigate]);
-  // 登录归来恢复暂存对话（无论登录成功与否，回到 /chat 都不该丢对话）
   useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem("fojin.chat.guestTranscript");
-      if (!raw) return;
-      sessionStorage.removeItem("fojin.chat.guestTranscript");
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        setMessages((prev) => (prev.length === 0 ? parsed : prev));
-      }
-    } catch { /* ignore */ }
+    try { sessionStorage.removeItem("fojin.chat.guestTranscript"); } catch { /* ignore */ }
   }, []);
   const [attachments, setAttachments] = useState<ChatAttachmentMeta[]>([]);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
@@ -560,7 +562,7 @@ export default function ChatPage() {
     });
   };
   const [sessionFilter, setSessionFilter] = useState("");
-  const tabIndexRef = useRef(-1);
+  const [tabIndex, setTabIndex] = useState(-1);
   const [hasOlderMessages, setHasOlderMessages] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -802,7 +804,7 @@ export default function ChatPage() {
     });
   };
 
-  const streamingIdRef = useRef<number>(0);
+  const [streamingId, setStreamingId] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
 
   const handleCancel = useCallback(() => {
@@ -866,7 +868,7 @@ export default function ChatPage() {
     };
 
     const assistantId = Date.now() + 1;
-    streamingIdRef.current = assistantId;
+    setStreamingId(assistantId);
     const assistantMsg: ChatMessageItem = {
       id: assistantId,
       role: "assistant",
@@ -972,7 +974,7 @@ export default function ChatPage() {
       onDone: () => {
         clearTimeout(timeoutId);
         abortRef.current = null;
-        streamingIdRef.current = 0;
+        setStreamingId(0);
         setSending(false);
         // Clear attachment chips only after successful stream completion.
         // On error the chips stay so the user can retry without re-uploading.
@@ -1065,13 +1067,13 @@ export default function ChatPage() {
       if (val && !tabSuggestions.includes(val)) return;
       e.preventDefault();
       e.stopPropagation();
-      const nextIndex = (tabIndexRef.current + 1) % tabSuggestions.length;
-      tabIndexRef.current = nextIndex;
+      const nextIndex = (tabIndex + 1) % tabSuggestions.length;
+      setTabIndex(nextIndex);
       setInput(tabSuggestions[nextIndex]);
     };
     el.addEventListener("keydown", handler);
     return () => el.removeEventListener("keydown", handler);
-  }, [tabSuggestions]);
+  }, [tabSuggestions, tabIndex]);
 
   // Handle pre-filled message from URL params (e.g. from "Ask XiaoJin" button on reader page)
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1369,7 +1371,7 @@ export default function ChatPage() {
               <MessageBubble
                 key={m.id}
                 m={m}
-                isStreaming={streamingIdRef.current === m.id}
+                isStreaming={streamingId === m.id}
                 sending={sending}
                 user={user}
                 markdownComponents={markdownComponents}
@@ -1468,13 +1470,13 @@ export default function ChatPage() {
               <Input.TextArea
                 ref={(instance) => { inputRef.current = instance?.resizableTextArea?.textArea ?? null; }}
                 value={input}
-                onChange={(e) => { setInput(e.target.value); tabIndexRef.current = -1; }}
+                onChange={(e) => { setInput(e.target.value); setTabIndex(-1); }}
                 onPressEnter={(e) => {
                   if (e.shiftKey) return;
                   e.preventDefault();
                   handleSend();
                 }}
-                placeholder={tabSuggestions.length > 0 ? `${tabSuggestions[(tabIndexRef.current + 1) % tabSuggestions.length]}    ⇥ Tab    ⇧⏎ ${t("chat.newline_hint")}` : t("chat.input_placeholder")}
+                placeholder={tabSuggestions.length > 0 ? `${tabSuggestions[(tabIndex + 1) % tabSuggestions.length]}    ⇥ Tab    ⇧⏎ ${t("chat.newline_hint")}` : t("chat.input_placeholder")}
                 disabled={sending}
                 autoSize={{ minRows: 2, maxRows: 8 }}
                 variant="borderless"

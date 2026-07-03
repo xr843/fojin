@@ -31,11 +31,16 @@ export default function KGMentionsPanel({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  const [prevEntityId, setPrevEntityId] = useState(entityId);
+  if (prevEntityId !== entityId) {
+    setPrevEntityId(entityId);
     setLoading(true);
     setError(null);
     setMentions(null);
+  }
+
+  useEffect(() => {
+    let cancelled = false;
     getKGEntityMentions(entityId)
       .then((res) => {
         if (cancelled) return;

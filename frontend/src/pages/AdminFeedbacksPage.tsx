@@ -27,38 +27,49 @@ export default function AdminFeedbacksPage() {
   const [items, setItems] = useState<AdminFeedbackItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
   const [replyModal, setReplyModal] = useState<AdminFeedbackItem | null>(null);
   const [replyText, setReplyText] = useState("");
   const [replying, setReplying] = useState(false);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await getAdminFeedbacks({
-        page,
-        size: 20,
-        status: statusFilter,
+  const fetchData = useCallback(() => {
+    return getAdminFeedbacks({ page, size: 20, status: statusFilter })
+      .then((res) => {
+        setItems(res.items);
+        setTotal(res.total);
+      })
+      .catch(() => {
+        message.error(t("admin_crud.feedback.load_error"));
+      })
+      .finally(() => {
+        setLoading(false);
       });
-      setItems(res.items);
-      setTotal(res.total);
-    } catch {
-      message.error(t("admin_crud.feedback.load_error"));
-    } finally {
-      setLoading(false);
-    }
   }, [page, statusFilter, t]);
 
+  // Spinner state for param changes is adjusted during render; the fetch
+  // effect below only sets state from promise callbacks.
+  const queryKey = `${page}|${statusFilter}`;
+  const [prevQueryKey, setPrevQueryKey] = useState(queryKey);
+  if (prevQueryKey !== queryKey) {
+    setPrevQueryKey(queryKey);
+    setLoading(true);
+  }
+
   useEffect(() => {
-    fetchData();
+    void fetchData();
+  }, [fetchData]);
+
+  const refresh = useCallback(() => {
+    setLoading(true);
+    void fetchData();
   }, [fetchData]);
 
   const handleStatusChange = async (id: number, status: string) => {
     try {
       await updateFeedbackStatus(id, status);
       message.success(t("admin_crud.feedback.status_updated"));
-      fetchData();
+      refresh();
     } catch {
       message.error(t("admin_crud.common.action_failed"));
     }
@@ -77,7 +88,7 @@ export default function AdminFeedbacksPage() {
       message.success(t("admin_crud.feedback.reply_sent"));
       setReplyModal(null);
       setReplyText("");
-      fetchData();
+      refresh();
     } catch {
       message.error(t("admin_crud.feedback.reply_failed"));
     } finally {

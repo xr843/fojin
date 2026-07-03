@@ -116,6 +116,14 @@ export default function SourcesPage() {
     (v: Capability) => setCapability(capability === v ? null : v),
     [capability, setCapability],
   );
+  // Local mirrors for free-text inputs so typing stays smooth; URL is written
+  // after a short debounce. Resynced below when URL changes externally
+  // (back/forward, shared link landing).
+  const [searchInput, setSearchInput] = useState(search);
+  const [tryInput, setTryInput] = useState(searchQuery);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout>>();
+
   const setGroupBy = useCallback(
     (v: GroupBy) => {
       updateParam("group", v, "region");
@@ -127,25 +135,22 @@ export default function SourcesPage() {
     [updateParam],
   );
 
-  // Local mirrors for free-text inputs so typing stays smooth; URL is written
-  // after a short debounce. useEffect resyncs when URL changes externally
-  // (back/forward, shared link landing).
-  const [searchInput, setSearchInput] = useState(search);
-  const [tryInput, setTryInput] = useState(searchQuery);
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
-  const searchDebounceRef = useRef<ReturnType<typeof setTimeout>>();
   const GROUP_COLLAPSE_LIMIT = 12;
   const toggleGroup = useCallback((name: string) => {
     setExpandedGroups((prev) => ({ ...prev, [name]: !prev[name] }));
   }, []);
 
-  useEffect(() => {
+  // Resync mirrors when the URL changes externally — adjusted during render.
+  const [prevSearch, setPrevSearch] = useState(search);
+  if (prevSearch !== search) {
+    setPrevSearch(search);
     setSearchInput(search);
-  }, [search]);
-
-  useEffect(() => {
+  }
+  const [prevSearchQuery, setPrevSearchQuery] = useState(searchQuery);
+  if (prevSearchQuery !== searchQuery) {
+    setPrevSearchQuery(searchQuery);
     setTryInput(searchQuery);
-  }, [searchQuery]);
+  }
 
   const handleSearchInputChange = useCallback(
     (v: string) => {

@@ -86,11 +86,18 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
   const [shareUrl, setShareUrl] = useState<string>(FALLBACK_SHARE_URL);
   const [creatingShare, setCreatingShare] = useState(false);
 
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (prevOpen !== open) {
+    setPrevOpen(open);
+    if (open) {
+      setCreatingShare(true);
+      setShareUrl(FALLBACK_SHARE_URL);
+    }
+  }
+
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    setCreatingShare(true);
-    setShareUrl(FALLBACK_SHARE_URL);
     createSharedQA({ question, answer, sources })
       .then((res) => {
         if (!cancelled) setShareUrl(res.url);
