@@ -54,7 +54,7 @@ export default function SearchPage() {
   // Autocomplete suggestions
   const [acOptions, setAcOptions] = useState<{ value: string }[]>([]);
   const [acInput, setAcInput] = useState(query);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const fetchSuggestions = useCallback((value: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
