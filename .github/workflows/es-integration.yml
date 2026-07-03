@@ -1,0 +1,95 @@
+# Real-Elasticsearch integration lane.
+#
+# The default backend CI job mocks the ES client entirely (tests/conftest.py),
+# so a client bump (e.g. dependabot elasticsearch 8.x -> 9.x) can go green
+# without ever talking to a real server. This lane builds the repo's own
+# elasticsearch/Dockerfile (8.13.4 + analysis-icu — exactly what prod runs),
+# boots it on the runner, and runs backend/tests_integration/ against it.
+#
+# Intentionally a separate, path-filtered, NON-required workflow: it only
+# runs when ES-relevant files change and never slows down or gates the main
+# CI jobs.
+
+name: ES Integration
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "backend/requirements.txt"
+      - "backend/requirements-dev.txt"
+      - "backend/app/core/elasticsearch.py"
+      - "backend/app/services/search.py"
+      - "backend/tests_integration/**"
+      - "elasticsearch/Dockerfile"
+      - ".github/workflows/es-integration.yml"
+  pull_request:
+    branches: [main, master]
+    paths:
+      - "backend/requirements.txt"
+      - "backend/requirements-dev.txt"
+      - "backend/app/core/elasticsearch.py"
+      - "backend/app/services/search.py"
+      - "backend/tests_integration/**"
+      - "elasticsearch/Dockerfile"
+      - ".github/workflows/es-integration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  es-integration:
+    name: Backend tests vs real Elasticsearch
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build production Elasticsearch image (8.13.4 + analysis-icu)
+        run: docker build -t fojin-es-test elasticsearch/
+
+      - name: Start Elasticsearch container
+        # Mirrors the runtime env in docker-compose.yml (single node,
+        # security off, modest heap).
+        run: |
+          docker run -d --name fojin-es-test \
+            -p 9200:9200 \
+            -e discovery.type=single-node \
+            -e xpack.security.enabled=false \
+            -e "ES_JAVA_OPTS=-Xms512m -Xmx512m" \
+            fojin-es-test
+
+      - name: Wait for Elasticsearch to be healthy
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf "http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=2s" > /dev/null; then
+              echo "Elasticsearch healthy after ~$((i * 2))s"
+              curl -s "http://localhost:9200"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Elasticsearch did not become healthy within 120s"
+          docker logs fojin-es-test
+          exit 1
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Install dependencies
+        working-directory: backend
+        run: pip install -r requirements-dev.txt
+
+      - name: Run integration tests against real Elasticsearch
+        working-directory: backend
+        env:
+          ES_HOST: http://localhost:9200
+        run: python -m pytest -q tests_integration/
+
+      - name: Dump Elasticsearch logs on failure
+        if: failure()
+        run: docker logs fojin-es-test
