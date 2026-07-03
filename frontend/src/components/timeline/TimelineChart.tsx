@@ -97,7 +97,7 @@ export default function TimelineChart({
   });
 
   // Setup zoom
-  const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown>>();
+  const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown>>(undefined);
 
   useEffect(() => {
     const svg = svgRef.current;
