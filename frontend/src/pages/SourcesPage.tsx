@@ -122,7 +122,7 @@ export default function SourcesPage() {
   const [searchInput, setSearchInput] = useState(search);
   const [tryInput, setTryInput] = useState(searchQuery);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
-  const searchDebounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const setGroupBy = useCallback(
     (v: GroupBy) => {
