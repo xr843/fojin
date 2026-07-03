@@ -8,6 +8,15 @@ updates:
     labels:
       - dependencies
       - backend
+    groups:
+      # Batch routine pip bumps into one weekly PR; majors stay individual so breaking
+      # changes to security-sensitive libs (cryptography, PyJWT, bcrypt) get reviewed one by one.
+      pip-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: npm
     directory: /frontend
@@ -17,6 +26,45 @@ updates:
     labels:
       - dependencies
       - frontend
+    groups:
+      # React runtime and its @types must move together: a solo @types/react-dom 19.x bump
+      # against React 18 failed npm install on an unsatisfiable peer dep (PR #866).
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      # i18next plugins peer-depend on the i18next core, so the family bumps as one PR.
+      i18n:
+        patterns:
+          - "i18next"
+          - "i18next-*"
+          - "react-i18next"
+      # ESLint core, shared configs and plugins are dev tooling that version in lockstep;
+      # one PR instead of several reduces review noise.
+      eslint:
+        patterns:
+          - "eslint"
+          - "@eslint/*"
+          - "typescript-eslint"
+          - "eslint-plugin-*"
+      # Remaining dev-dependency minor/patch bumps arrive as one weekly PR; majors are
+      # excluded so breaking changes stay individually reviewable.
+      dev-minor-and-patch:
+        dependency-type: development
+        update-types:
+          - "minor"
+          - "patch"
+        patterns:
+          - "*"
+        exclude-patterns: # already owned by the groups above
+          - "@types/react"
+          - "@types/react-dom"
+          - "eslint"
+          - "@eslint/*"
+          - "typescript-eslint"
+          - "eslint-plugin-*"
 
   - package-ecosystem: github-actions
     directory: /
