@@ -1,7 +1,8 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useQuery } from "@tanstack/react-query";
+import { AutoComplete } from "antd";
 import {
   DatabaseOutlined,
   SearchOutlined,
@@ -16,7 +17,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { InfoCircleOutlined, CloseOutlined } from "@ant-design/icons";
 import SourceSelector from "../components/SourceSelector";
-import { getStats, getSources, getFilters } from "../api/client";
+import { getStats, getSources, getFilters, getSearchSuggestions } from "../api/client";
 import { getLangName } from "../utils/sourceUrls";
 import { getReadingHistory } from "../utils/readingHistory";
 import { useAuthStore } from "../stores/authStore";
@@ -44,9 +45,30 @@ export default function HomePage() {
   const { data: sources } = useQuery({ queryKey: ["sources"], queryFn: getSources, enabled: sourceOpen });
   const { data: filters } = useQuery({ queryKey: ["filters"], queryFn: getFilters });
 
+  // 搜索联想：复用 SearchPage 已有的 /search/suggest 接口与防抖模式
+  const [acOptions, setAcOptions] = useState<{ value: string }[]>([]);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const fetchSuggestions = useCallback((value: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!value || value.length < 1) {
+      setAcOptions([]);
+      return;
+    }
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const suggestions = await getSearchSuggestions(value);
+        setAcOptions(suggestions.map((s) => ({ value: s })));
+      } catch {
+        setAcOptions([]);
+      }
+    }, 300);
+  }, []);
+
   const handleSearch = (q?: string) => {
     const term = (q ?? query).trim();
     if (term) {
+      setAcOptions([]);
       const params = new URLSearchParams({ q: term });
       if (selectedSources.size > 0) {
         params.set("sources", Array.from(selectedSources).join(","));
@@ -101,15 +123,23 @@ export default function HomePage() {
               {sourceOpen ? <UpOutlined /> : <DownOutlined />}
             </button>
             <div className="search-combo-divider" />
-            <input
-              ref={inputRef}
-              className="search-combo-input"
-              placeholder={t("home.search_placeholder")}
+            <AutoComplete
+              className="search-combo-ac"
+              options={acOptions}
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={handleKeyDown}
-              aria-label={t("home.search_label")}
-            />
+              onChange={setQuery}
+              onSearch={fetchSuggestions}
+              onSelect={(value: string) => handleSearch(value)}
+              popupMatchSelectWidth={280}
+            >
+              <input
+                ref={inputRef}
+                className="search-combo-input"
+                placeholder={t("home.search_placeholder")}
+                onKeyDown={handleKeyDown}
+                aria-label={t("home.search_label")}
+              />
+            </AutoComplete>
             <button className="search-combo-btn" onClick={() => handleSearch()}>
               <SearchOutlined /> <span className="search-combo-btn-text">{t("home.search_btn")}</span>
             </button>
@@ -149,23 +179,6 @@ export default function HomePage() {
                 《{truncateTitle(e.title)}》{t("home.juan_n", { n: e.juan })}
               </button>
             ))}
-          </div>
-        )}
-
-        {!user && !tipDismissed && (
-          <div className="home-tip">
-            <InfoCircleOutlined style={{ marginRight: 6, flexShrink: 0 }} />
-            <span>
-              {t("home.guest_tip.before")}
-              <a onClick={() => navigate("/login")} style={{ cursor: "pointer", textDecoration: "underline" }}>
-                {t("home.guest_tip.login")}
-              </a>
-              {t("home.guest_tip.after")}
-            </span>
-            <CloseOutlined
-              onClick={() => setTipDismissed(true)}
-              style={{ marginLeft: 8, cursor: "pointer", flexShrink: 0, fontSize: 12, opacity: 0.6 }}
-            />
           </div>
         )}
 
@@ -218,6 +231,23 @@ export default function HomePage() {
             <div className="home-feature-desc">{t("home.feature_collections_desc")}</div>
           </div>
         </div>
+
+        {!user && !tipDismissed && (
+          <div className="home-tip">
+            <InfoCircleOutlined style={{ marginRight: 6, flexShrink: 0 }} />
+            <span>
+              {t("home.guest_tip.before")}
+              <a onClick={() => navigate("/login")} style={{ cursor: "pointer", textDecoration: "underline" }}>
+                {t("home.guest_tip.login")}
+              </a>
+              {t("home.guest_tip.after")}
+            </span>
+            <CloseOutlined
+              onClick={() => setTipDismissed(true)}
+              style={{ marginLeft: 8, cursor: "pointer", flexShrink: 0, fontSize: 12, opacity: 0.6 }}
+            />
+          </div>
+        )}
 
         <div className="home-trust">
           {t("home.trust")} ·{" "}
