@@ -2114,3 +2114,33 @@ export async function postAiDiff(chunks: AiDiffChunkInput[]): Promise<AiDiffResp
   const { data } = await api.post<AiDiffResponse>("/alignment/ai-diff", { chunks });
   return data;
 }
+
+// --- Admin: cross-canon alignment coverage (ops view) ---
+
+export interface AlignmentCoverageItem {
+  text_id: number;
+  title_zh: string;
+  dynasty: string | null;
+  pair_count: number;
+  aligned_juans: number;
+  total_juans: number;
+  remaining_juans: number | null;
+  coverage_pct: number | null;
+  avg_confidence: number | null;
+  partner_langs: string[];
+}
+
+export interface AlignmentCoverageResponse {
+  items: AlignmentCoverageItem[];
+  total: number;
+}
+
+export async function getAlignmentCoverage(
+  limit = 200,
+): Promise<AlignmentCoverageResponse> {
+  const { data } = await api.get<AlignmentCoverageResponse>(
+    "/admin/alignment-coverage",
+    { params: { limit } },
+  );
+  return data;
+}

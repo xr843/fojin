@@ -99,6 +99,7 @@ export default function Layout() {
               { label: t("nav.admin_suggestions"), path: "/admin/suggestions" },
               { label: t("nav.admin_annotations"), path: "/admin/annotations" },
               { label: t("nav.admin_feedbacks"), path: "/admin/feedbacks" },
+              { label: t("nav.admin_alignment"), path: "/admin/alignment" },
               { label: t("nav.admin_audit_log"), path: "/admin/audit-log" },
             ],
           },
