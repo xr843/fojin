@@ -129,4 +129,22 @@ describe("TextDetailPage", () => {
     expect(screen.getByRole("link", { name: /Read on CBETA/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Export citation/ })).toBeInTheDocument();
   });
+
+  it("emits hreflang alternates for every supported UI language", async () => {
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText("般若波罗蜜多心经")).toBeInTheDocument());
+    await waitFor(() => expect(document.head.querySelectorAll('link[rel="alternate"]').length).toBeGreaterThan(0));
+
+    const alternates = new Map(
+      Array.from(document.head.querySelectorAll('link[rel="alternate"]')).map((el) => [
+        el.getAttribute("hreflang"),
+        el.getAttribute("href"),
+      ]),
+    );
+    expect(alternates.get("x-default")).toBe("https://fojin.app/texts/1");
+    expect(alternates.get("zh")).toBe("https://fojin.app/texts/1");
+    expect(alternates.get("en")).toBe("https://fojin.app/texts/1?lang=en");
+    expect(alternates.get("zh-Hant")).toBe("https://fojin.app/texts/1?lang=zh-Hant");
+  });
 });

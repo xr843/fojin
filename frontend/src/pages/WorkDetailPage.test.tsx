@@ -172,4 +172,25 @@ describe("WorkDetailPage", () => {
     expect(screen.getByRole("link", { name: /Read/ })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Details/ })).toBeInTheDocument();
   });
+
+  it("emits hreflang alternates for every supported UI language", async () => {
+    mockGetWork.mockResolvedValue(work());
+    mockGetWorkWitnesses.mockResolvedValue([]);
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getAllByText("妙法蓮華經").length).toBeGreaterThan(0));
+    await waitFor(() => expect(document.head.querySelectorAll('link[rel="alternate"]').length).toBeGreaterThan(0));
+
+    const alternates = new Map(
+      Array.from(document.head.querySelectorAll('link[rel="alternate"]')).map((el) => [
+        el.getAttribute("hreflang"),
+        el.getAttribute("href"),
+      ]),
+    );
+    expect(alternates.get("x-default")).toBe("https://fojin.app/works/lotus-sutra");
+    expect(alternates.get("zh")).toBe("https://fojin.app/works/lotus-sutra");
+    expect(alternates.get("en")).toBe("https://fojin.app/works/lotus-sutra?lang=en");
+    expect(alternates.get("zh-Hant")).toBe("https://fojin.app/works/lotus-sutra?lang=zh-Hant");
+  });
 });

@@ -390,6 +390,8 @@ export default function SourcesPage() {
         <link rel="canonical" href="https://fojin.app/sources" />
         <link rel="alternate" hrefLang="x-default" href="https://fojin.app/sources" />
         <link rel="alternate" hrefLang="zh" href="https://fojin.app/sources" />
+        <link rel="alternate" hrefLang="en" href="https://fojin.app/sources?lang=en" />
+        <link rel="alternate" hrefLang="zh-Hant" href="https://fojin.app/sources?lang=zh-Hant" />
       </Helmet>
       <div className="sources-header">
         <h1 className="sources-title">{t("sources.heading")}</h1>

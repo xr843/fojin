@@ -348,6 +348,18 @@ describe("remaining page i18n", () => {
     expect(screen.getByRole("button", { name: /Text details/ })).toBeInTheDocument();
     expect(screen.getByText("More popular sutras")).toBeInTheDocument();
     expect(screen.getByText(/Scripture data provided by/)).toBeInTheDocument();
+
+    await waitFor(() => expect(document.head.querySelectorAll('link[rel="alternate"]').length).toBeGreaterThan(0));
+    const alternates = new Map(
+      Array.from(document.head.querySelectorAll('link[rel="alternate"]')).map((el) => [
+        el.getAttribute("hreflang"),
+        el.getAttribute("href"),
+      ]),
+    );
+    expect(alternates.get("x-default")).toBe("https://fojin.app/sutras/heart-sutra");
+    expect(alternates.get("zh")).toBe("https://fojin.app/sutras/heart-sutra");
+    expect(alternates.get("en")).toBe("https://fojin.app/sutras/heart-sutra?lang=en");
+    expect(alternates.get("zh-Hant")).toBe("https://fojin.app/sutras/heart-sutra?lang=zh-Hant");
   });
 
   it("renders sutra landing content from locale data", async () => {
@@ -407,5 +419,17 @@ describe("remaining page i18n", () => {
 
     expect(screen.getByText(/Search and browse freely, no account needed/)).toBeInTheDocument();
     expect(screen.getByText("Sign in")).toBeInTheDocument();
+
+    await waitFor(() => expect(document.head.querySelectorAll('link[rel="alternate"]').length).toBeGreaterThan(0));
+    const alternates = new Map(
+      Array.from(document.head.querySelectorAll('link[rel="alternate"]')).map((el) => [
+        el.getAttribute("hreflang"),
+        el.getAttribute("href"),
+      ]),
+    );
+    expect(alternates.get("x-default")).toBe("https://fojin.app/");
+    expect(alternates.get("zh")).toBe("https://fojin.app/");
+    expect(alternates.get("en")).toBe("https://fojin.app/?lang=en");
+    expect(alternates.get("zh-Hant")).toBe("https://fojin.app/?lang=zh-Hant");
   });
 });
