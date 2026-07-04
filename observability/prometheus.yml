@@ -1,0 +1,19 @@
+# Prometheus scrape config for FoJin (used by docker-compose.observability.yml).
+#
+# Scrapes both backend replicas over the compose network — /metrics is NOT
+# proxied by nginx (see backend/app/core/metrics.py for the exposure model),
+# so this is the only intended way to reach it.
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+scrape_configs:
+  - job_name: fojin-backend
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["backend:8000"]
+        labels:
+          replica: "1"
+      - targets: ["backend2:8000"]
+        labels:
+          replica: "2"
