@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app.config import settings
+from app.core.metrics import timed_rag_retrieval
 from app.database import async_session
 from app.models.dictionary import DictionaryEntry
 from app.schemas.chat import ChatSource
@@ -675,6 +676,7 @@ async def _lookup_dictionary_terms(db: AsyncSession, query: str) -> str:
         return ""
 
 
+@timed_rag_retrieval
 async def retrieve_rag_context(
     db: AsyncSession,
     query: str,

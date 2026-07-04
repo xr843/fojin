@@ -44,6 +44,7 @@ from dataclasses import dataclass
 
 from opencc import OpenCC
 
+from app.core.metrics import CITATION_GUARD_MUTATIONS_TOTAL
 from app.schemas.chat import ChatSource
 
 logger = logging.getLogger(__name__)
@@ -221,6 +222,7 @@ def log_mutations(
     if not mutations:
         return
     for m in mutations:
+        CITATION_GUARD_MUTATIONS_TOTAL.labels(kind=m.kind).inc()
         logger.warning(
             "citation_guard %s msg_id=%s title=%r orig=%r repl=%r "
             "orig_juan=%s corrected_juan=%s",

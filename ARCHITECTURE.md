@@ -234,6 +234,8 @@ app/services/*.py     业务层：核心逻辑都在这（RAG、检索、对齐�
 
 **部署走 `./deploy.sh`**（不要手动 `docker rm` + force-recreate，会竞态停服）。内部服务（PG/Redis/ES/backend/umami）只绑 `127.0.0.1`；nginx 负责 gzip、安全响应头、SSE 不压缩。前端容器对 docker host 网络可达，多用户环境需加认证反代。
 
+**指标**：backend 在根路径暴露 `/metrics`（Prometheus 格式，nginx 不代理 → 仅内网；实现在 `app/core/metrics.py`）。HTTP 按路由模板计数/延迟 + RAG 检索耗时 + 引用护栏改写计数。抓取栈是可选 overlay（`docker-compose.observability.yml`），详见 `docs/OBSERVABILITY.md`。
+
 **本地开发**（详见 README "Development"）：
 ```bash
 # 后端

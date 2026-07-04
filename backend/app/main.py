@@ -522,6 +522,13 @@ app.include_router(seo_persons.router)
 app.include_router(seo_dict.router)
 
 
+# Observability: instrument HTTP metrics and mount /metrics (network-internal;
+# see app/core/metrics.py for the exposure model — nginx must not proxy it).
+from app.core.metrics import setup_metrics
+
+setup_metrics(app, enabled=settings.metrics_enabled)
+
+
 @app.get("/api/health")
 async def health(request: Request):
     components: dict[str, str] = {}

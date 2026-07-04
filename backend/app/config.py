@@ -58,6 +58,11 @@ class Settings(BaseSettings):
     reranker_api_key: str = ""   # Falls back to embedding_api_key if empty
     reranker_model: str = "BAAI/bge-reranker-v2-m3"
 
+    # Observability — expose Prometheus metrics at /metrics (app root, not
+    # /api; not proxied by nginx, so network-internal only). Set false to
+    # not mount the endpoint at all. See app/core/metrics.py.
+    metrics_enabled: bool = True
+
     # 典津 API (guji.cckb.cn)
     dianjin_api_key: str = ""
     dianjin_api_url: str = "https://guji.cckb.cn/api"

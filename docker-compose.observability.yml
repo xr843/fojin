@@ -1,0 +1,32 @@
+# Optional observability overlay — Prometheus scraping both backend replicas.
+#
+# Opt-in by design (not part of the default six services):
+#   docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
+#
+# The UI binds to 127.0.0.1:9090 only (same policy as PG/ES/Redis/backend);
+# reach it over SSH port-forward: ssh -L 9090:127.0.0.1:9090 <host>.
+# Memory is capped low because this box has a history of cgroup OOM storms
+# (see CHANGELOG 2026-06-11); 30d retention of one 30s-interval job is tiny.
+services:
+  prometheus:
+    image: prom/prometheus:v3.5.4 # LTS line
+    container_name: fojin-prometheus
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    mem_limit: 256m
+    cpus: 0.25
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=30d
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - promdata:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+
+volumes:
+  promdata:
