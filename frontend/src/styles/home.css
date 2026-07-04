@@ -162,7 +162,19 @@
   flex-shrink: 0;
 }
 
-/* 输入框 */
+/* 输入框（联想下拉包裹层，撑满剩余空间） */
+.search-combo-ac {
+  flex: 1;
+  height: 100%;
+  min-width: 0;
+}
+.search-combo-ac .ant-select-selector {
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  height: 100% !important;
+}
+
 .search-combo-input {
   flex: 1;
   height: 100%;
@@ -258,7 +270,7 @@
   display: flex;
   align-items: center;
   max-width: 600px;
-  margin: 12px auto 0;
+  margin: 24px auto 0;
   padding: 8px 14px;
   font-size: 12px;
   color: var(--fj-ink-light);

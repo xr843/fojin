@@ -405,7 +405,7 @@ describe("remaining page i18n", () => {
   it("renders home visitor tip in the active UI language", async () => {
     renderWithProviders(<HomePage />);
 
-    expect(screen.getByText(/Search and browse without an account/)).toBeInTheDocument();
+    expect(screen.getByText(/Search and browse freely, no account needed/)).toBeInTheDocument();
     expect(screen.getByText("Sign in")).toBeInTheDocument();
   });
 });
