@@ -316,6 +316,10 @@ export default function PersonPage() {
         <title>{helmetTitle}</title>
         <meta name="description" content={helmetDesc} />
         <link rel="canonical" href={`https://fojin.app/person/${entity.id}`} />
+        <link rel="alternate" hrefLang="x-default" href={`https://fojin.app/person/${entity.id}`} />
+        <link rel="alternate" hrefLang="zh" href={`https://fojin.app/person/${entity.id}`} />
+        <link rel="alternate" hrefLang="en" href={`https://fojin.app/person/${entity.id}?lang=en`} />
+        <link rel="alternate" hrefLang="zh-Hant" href={`https://fojin.app/person/${entity.id}?lang=zh-Hant`} />
         <meta property="og:type" content="profile" />
         <meta property="og:title" content={helmetTitle} />
         <meta property="og:description" content={helmetDesc} />

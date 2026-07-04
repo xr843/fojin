@@ -90,6 +90,8 @@ export default function TextDetailPage() {
         <link rel="canonical" href={`https://fojin.app/texts/${id}`} />
         <link rel="alternate" hrefLang="x-default" href={`https://fojin.app/texts/${id}`} />
         <link rel="alternate" hrefLang="zh" href={`https://fojin.app/texts/${id}`} />
+        <link rel="alternate" hrefLang="en" href={`https://fojin.app/texts/${id}?lang=en`} />
+        <link rel="alternate" hrefLang="zh-Hant" href={`https://fojin.app/texts/${id}?lang=zh-Hant`} />
         <meta property="og:type" content="book" />
         <meta property="og:title" content={t("textDetail.pageTitle", { title: text.title_zh })} />
         <meta property="og:description" content={shortDescription} />

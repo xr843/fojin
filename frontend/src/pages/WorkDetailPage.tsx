@@ -92,6 +92,10 @@ export default function WorkDetailPage() {
         <title>{t("workDetail.pageTitle", { title: work.title_primary })}</title>
         <meta name="description" content={metaDesc} />
         <link rel="canonical" href={canonicalUrl} />
+        <link rel="alternate" hrefLang="x-default" href={canonicalUrl} />
+        <link rel="alternate" hrefLang="zh" href={canonicalUrl} />
+        <link rel="alternate" hrefLang="en" href={`${canonicalUrl}?lang=en`} />
+        <link rel="alternate" hrefLang="zh-Hant" href={`${canonicalUrl}?lang=zh-Hant`} />
         <meta property="og:type" content="book" />
         <meta property="og:title" content={t("workDetail.ogTitle", { title: work.title_primary })} />
         <meta property="og:description" content={metaDesc} />
