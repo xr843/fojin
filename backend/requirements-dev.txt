@@ -2,6 +2,7 @@
 -r requirements.txt
 pytest>=9.1.1
 pytest-asyncio>=1.4.0
+pytest-cov>=7.1.0
 anyio>=4.14.1
 pytest-anyio==0.0.0
 aiosqlite>=0.22.1  # in-memory async DB for build_works integration tests

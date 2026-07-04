@@ -65,3 +65,4 @@ CLAUDE.md
 *.bak
 data/
 !backend/app/data/
+.coverage

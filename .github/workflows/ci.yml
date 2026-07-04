@@ -32,7 +32,16 @@ jobs:
         run: pip install ruff==0.9.7 && ruff check app/ eval/
 
       - name: Run tests
-        run: python -m pytest -q tests/
+        # Coverage is MEASURED for the chat-pipeline core (chat orchestration,
+        # RAG retrieval, citation guard) so drift shows up in the job log —
+        # deliberately no threshold gate yet. Baseline at introduction
+        # (2026-07-04): chat 56%, rag_retrieval 47%, citation_guard 96%.
+        run: >
+          python -m pytest -q tests/
+          --cov=app.services.chat
+          --cov=app.services.rag_retrieval
+          --cov=app.services.citation_guard
+          --cov-report=term
 
   frontend:
     name: Frontend build
