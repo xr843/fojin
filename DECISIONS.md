@@ -10,6 +10,11 @@
 - **决策**: 使用 PostgreSQL pgvector 扩展 + HNSW 索引（`pgvector/pgvector:pg15` Docker 镜像）
 - **备选方案**: Milvus/Weaviate（独立运维成本高，单机场景无需专用向量库）；Pinecone（SaaS 依赖，数据主权不可控）
 - **后果**: 向量与业务数据同库，简化运维和事务一致性；HNSW 索引在 420K 量级下性能足够；未来数据量级增长到千万级可能需要重新评估
+- **重估触发条件（2026-07 补记）**: 当前约 680K 向量（从 420K 增长）。别凭"感觉慢"就动手迁移——迁移到专用向量库是高成本、单人项目扛不动的大动作。**同时满足**以下任一硬信号才启动评估，否则维持现状：
+  1. **检索延迟**：`fojin_rag_retrieval_seconds` 的 p95 持续（跨多日）> 3s，且已排除 LLM/rerank API 侧耗时（该指标含召回+rerank，先用 PromQL 拆分确认瓶颈真在 pgvector 召回而非 cross-encoder API）；
+  2. **数据规模**：向量行数 > 300 万（约当前 4–5 倍），HNSW 构建/内存开始挤占 Postgres 3g `mem_limit`（观察 dmesg oom-kill，见 CHANGELOG 2026-06 的 OOM 史）；
+  3. **召回质量**：`fojin_rag_context_chunks` 的 0 桶率上升或评测回归门 Recall@5 下降，且定位到是 HNSW 近似召回丢真值（需对比精确扫描）。
+  - 先尝试的**廉价缓解**（按此顺序，迁移是最后手段）：调 HNSW `ef_search`/`m` 参数、给 `buddhist_texts` 过滤列建复合索引缩小候选集、把冷门语料分区、给 Postgres 加内存。真到千万级 + 上述硬信号才评估 Qdrant/Milvus 或 pgvector 分片。相关观测指标见 `docs/OBSERVABILITY.md`。
 
 ## ADR-002: 全文搜索 — Elasticsearch 8
 
