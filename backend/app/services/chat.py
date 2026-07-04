@@ -73,6 +73,7 @@ from app.services.llm_client import (  # noqa: F401
     _resolve_with_model_override,
     _with_reasoning_headroom,
 )
+from app.services.llm_cost import record_llm_cost
 from app.services.master_profiles import get_master
 from app.services.prompt_builder import (  # noqa: F401
     _FAILED_ANSWER_PREFIXES,
@@ -539,6 +540,13 @@ async def send_message(
     # not anchored in the retrieved sources. See app/services/citation_guard
     # for the full rationale — this is the deterministic backstop after the
     # prompt's moral one.
+    #
+    # Record estimated spend of the served call (platform vs BYOK) using the
+    # raw answer, before the guard rewrites it. Never raises into chat.
+    record_llm_cost(
+        model=model, provider=provider, is_byok=is_byok,
+        prompt_messages=llm_messages, completion=answer,
+    )
     answer, _citation_mutations = enforce_citation_whitelist(answer, sources)
     # Quote verifier runs after the citation guard so quotes attached
     # to citations the guard already stripped don't get double-flagged.
@@ -944,6 +952,13 @@ async def send_message_stream(
     # silently re-introduce the hallucination this guard exists to
     # prevent.
     cg_start = _time.monotonic()
+    # Estimated spend of the served call (model/provider are the winning
+    # attempt's after the stream loop; is_byok reflects platform vs BYOK).
+    # Uses the raw full_answer, before the guard produces corrected_answer.
+    record_llm_cost(
+        model=model, provider=provider, is_byok=is_byok,
+        prompt_messages=llm_messages, completion=full_answer,
+    )
     corrected_answer, _citation_mutations = enforce_citation_whitelist(full_answer, sources)
     # Quote verifier runs after citation_guard so flagged-and-stripped
     # citations don't carry their quotes into a second annotation.
