@@ -72,9 +72,29 @@ cd /home/admin/fojin && docker compose exec -T backend eval/run_regression.sh \
 > ⚠️ **建立首个 baseline 前必须在 prod 核对经名能匹配上**：黄金经名是简体，要和 prod `buddhist_texts.title_zh`（CBETA 繁体规范名）折叠后**精确相等**才算命中。先跑
 > `python -m eval.run_eval --no-llm --category source_lookup`，确认有 `gold_sources` 的题 `retrieval_metrics.recall@5 > 0`（**不是 0**）。若为 0，多半是黄金经名与 DB 规范名用词不一致（如缺「佛說」前缀、译本不同），改对再把该次结果存为 baseline——否则会把"标题对不上"的隐性 0 命中固化成基准，回归门形同虚设。
 
+## 反馈闭环：让线上失败自动变成评测候选
+
+`test_set.json` 是手工静态集，没有任何东西把线上真实失败喂回来——同一个错误可以一直回归而门测不到。`from_feedback.py` 把两个已入库的失败信号
+
+1. 用户点踩（`chat_messages.feedback == 'down'`），
+2. 后台答案质量队列里被判 `bad` 的（`answer_reviews.verdict == 'bad'`，带 `failure_category`）
+
+配上产生该回答的用户问题（复用 `answer_quality._attach_questions` 的同事务同 `created_at` 配对逻辑），产出**候选**：
+
+```bash
+# 需要 prod 语料库 DB（chat_messages / answer_reviews 在那里）
+python -m eval.from_feedback --window-days 90 --limit 200
+# → eval/reports/feedback-candidates-<时间戳>.json
+```
+
+**为什么是候选而不是直接进 test_set**：黄金条目需要 `reference_sources` / `reference_answer_points`——即*正确*答案的出处，而一个坏答案按定义不含它。工具只负责浮出"值得加进去的问题"和"观察到的失败证据"，`curate` 块留空由人来填。填之前务必按上面 ⚠️ 的规则核对经名能和 `buddhist_texts.title_zh` 折叠匹配，否则回归门形同虚设。
+
+> 建议做法：这一步跑在能连 prod DB 的地方（cron 或手动），产出的候选文件人工过一遍、补全 `curate`，再挑值得的并进 `test_set.json`。这样 90→200+ 的扩集是"由真实失败驱动"而非凭空想题。
+
 ## 文件
 
 - `retrieval_metrics.py` — 确定性指标纯函数（CI 单测覆盖）
 - `run_eval.py` — RAG→(LLM)→打分→报告→回归门
 - `scorer.py` — LLM-as-judge + out-of-scope 规则评分
+- `from_feedback.py` — 线上点踩/后台判坏 → 评测候选（CI 单测 `tests/test_from_feedback.py`）
 - `test_set.json` — 黄金评测集
