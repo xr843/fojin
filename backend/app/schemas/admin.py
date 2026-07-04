@@ -3,6 +3,24 @@ from datetime import datetime
 from pydantic import BaseModel, Field, model_validator
 
 
+class AlignmentCoverageItem(BaseModel):
+    text_id: int
+    title_zh: str
+    dynasty: str | None
+    pair_count: int
+    aligned_juans: int
+    total_juans: int
+    remaining_juans: int | None  # None when total_juans unknown (0)
+    coverage_pct: float | None   # None when total_juans unknown
+    avg_confidence: float | None
+    partner_langs: list[str]
+
+
+class AlignmentCoverageResponse(BaseModel):
+    items: list[AlignmentCoverageItem]
+    total: int  # number of lzh texts with any cross-canon alignment
+
+
 class AdminOverview(BaseModel):
     total_users: int
     new_users_today: int

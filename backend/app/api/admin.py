@@ -17,6 +17,8 @@ from app.schemas.admin import (
     AdminUserItem,
     AdminUserListResponse,
     AdminUserUpdate,
+    AlignmentCoverageItem,
+    AlignmentCoverageResponse,
     AnswerQueueResponse,
     AnswerReviewCreate,
     AnswerReviewResult,
@@ -31,6 +33,7 @@ from app.services.admin_service import (
     list_users,
     record_audit,
 )
+from app.services.alignment_coverage import compute_alignment_coverage
 from app.services.answer_quality import (
     build_bad_answer_queue,
     review_stats,
@@ -50,6 +53,21 @@ async def stats_overview(
 
     redis = getattr(app.state, "redis", None)
     return await get_overview(db, redis)
+
+
+@router.get("/alignment-coverage", response_model=AlignmentCoverageResponse)
+async def alignment_coverage(
+    limit: int = Query(200, ge=1, le=1000),
+    _user=Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Per-lzh-text cross-canon alignment coverage, biggest-gap first — an ops
+    view for deciding which sutra to align next. Admin-only."""
+    items = await compute_alignment_coverage(db, limit=limit)
+    return AlignmentCoverageResponse(
+        items=[AlignmentCoverageItem(**it) for it in items],
+        total=len(items),
+    )
 
 
 @router.get("/stats/trends", response_model=AdminTrends)
