@@ -14,13 +14,16 @@ from unittest.mock import MagicMock
 import pytest
 
 from app.core.exceptions import ServiceError
-from app.services import chat as chat_module
-from app.services.chat import (
+
+# _resolve_* and their settings/decrypt_api_key collaborators live in
+# llm_client after the P1-3 chat-service split; patch targets follow the code.
+from app.services import llm_client as llm_module
+from app.services.llm_catalog import CATALOG, CATALOG_BY_ID, DEFAULT_MODEL_ID
+from app.services.llm_client import (
     PROVIDER_URLS,
     _resolve_llm_config,
     _resolve_with_model_override,
 )
-from app.services.llm_catalog import CATALOG, CATALOG_BY_ID, DEFAULT_MODEL_ID
 
 
 def test_catalog_ids_are_unique():
@@ -38,18 +41,18 @@ def test_default_model_id_is_in_catalog():
 
 def test_resolve_with_no_model_id_falls_back_to_default(monkeypatch):
     """No model_id → behave exactly like _resolve_llm_config(user)."""
-    monkeypatch.setattr(chat_module.settings, "llm_api_url", "https://api.deepseek.com/v1")
-    monkeypatch.setattr(chat_module.settings, "llm_api_key", "platform-key")
-    monkeypatch.setattr(chat_module.settings, "llm_model", "deepseek-v4-pro")
+    monkeypatch.setattr(llm_module.settings, "llm_api_url", "https://api.deepseek.com/v1")
+    monkeypatch.setattr(llm_module.settings, "llm_api_key", "platform-key")
+    monkeypatch.setattr(llm_module.settings, "llm_model", "deepseek-v4-pro")
 
     assert _resolve_with_model_override(None, None) == _resolve_llm_config(None)
 
 
 def test_resolve_with_unknown_model_id_falls_back_gracefully(monkeypatch):
     """Stale localStorage id must not 400 — fall back to default."""
-    monkeypatch.setattr(chat_module.settings, "llm_api_url", "https://api.deepseek.com/v1")
-    monkeypatch.setattr(chat_module.settings, "llm_api_key", "platform-key")
-    monkeypatch.setattr(chat_module.settings, "llm_model", "deepseek-v4-pro")
+    monkeypatch.setattr(llm_module.settings, "llm_api_url", "https://api.deepseek.com/v1")
+    monkeypatch.setattr(llm_module.settings, "llm_api_key", "platform-key")
+    monkeypatch.setattr(llm_module.settings, "llm_model", "deepseek-v4-pro")
 
     result = _resolve_with_model_override(None, "vendor:nonsense-model")
     assert result == _resolve_llm_config(None)
@@ -57,8 +60,8 @@ def test_resolve_with_unknown_model_id_falls_back_gracefully(monkeypatch):
 
 def test_resolve_platform_deepseek_pro(monkeypatch):
     """DeepSeek V4 Pro on platform key → returns deepseek URL + override model."""
-    monkeypatch.setattr(chat_module.settings, "llm_api_url", "https://api.deepseek.com/v1")
-    monkeypatch.setattr(chat_module.settings, "llm_api_key", "platform-key")
+    monkeypatch.setattr(llm_module.settings, "llm_api_url", "https://api.deepseek.com/v1")
+    monkeypatch.setattr(llm_module.settings, "llm_api_key", "platform-key")
 
     url, key, model, is_byok, provider = _resolve_with_model_override(None, "deepseek:v4-pro")
     assert url == PROVIDER_URLS["deepseek"]
@@ -70,8 +73,8 @@ def test_resolve_platform_deepseek_pro(monkeypatch):
 
 def test_resolve_platform_mismatch_raises(monkeypatch):
     """Platform configured as DeepSeek, user picks Moonshot, no BYOK → ServiceError."""
-    monkeypatch.setattr(chat_module.settings, "llm_api_url", "https://api.deepseek.com/v1")
-    monkeypatch.setattr(chat_module.settings, "llm_api_key", "platform-key")
+    monkeypatch.setattr(llm_module.settings, "llm_api_url", "https://api.deepseek.com/v1")
+    monkeypatch.setattr(llm_module.settings, "llm_api_key", "platform-key")
 
     with pytest.raises(ServiceError) as exc_info:
         _resolve_with_model_override(None, "moonshot:kimi-k2.6")
@@ -81,10 +84,10 @@ def test_resolve_platform_mismatch_raises(monkeypatch):
 
 def test_resolve_byok_matching_provider_overrides_model(monkeypatch):
     """User has Moonshot BYOK, picks Moonshot model → use BYOK key + override model."""
-    monkeypatch.setattr(chat_module.settings, "llm_api_url", "https://api.deepseek.com/v1")
-    monkeypatch.setattr(chat_module.settings, "llm_api_key", "platform-key")
+    monkeypatch.setattr(llm_module.settings, "llm_api_url", "https://api.deepseek.com/v1")
+    monkeypatch.setattr(llm_module.settings, "llm_api_key", "platform-key")
     monkeypatch.setattr(
-        chat_module, "decrypt_api_key", lambda blob, version=1: "user-moonshot-key"
+        llm_module, "decrypt_api_key", lambda blob, version=1: "user-moonshot-key"
     )
 
     user = MagicMock()
@@ -105,8 +108,8 @@ def test_resolve_byok_matching_provider_overrides_model(monkeypatch):
 
 def test_resolve_byok_provider_mismatch_falls_to_platform(monkeypatch):
     """User has Moonshot BYOK but picks DeepSeek → platform path (DeepSeek configured)."""
-    monkeypatch.setattr(chat_module.settings, "llm_api_url", "https://api.deepseek.com/v1")
-    monkeypatch.setattr(chat_module.settings, "llm_api_key", "platform-key")
+    monkeypatch.setattr(llm_module.settings, "llm_api_url", "https://api.deepseek.com/v1")
+    monkeypatch.setattr(llm_module.settings, "llm_api_key", "platform-key")
 
     user = MagicMock()
     user.id = 42
