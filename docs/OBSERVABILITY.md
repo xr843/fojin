@@ -42,6 +42,10 @@ ssh -L 9090:127.0.0.1:9090 <host>   # 然后浏览器打开 http://localhost:909
 | `fojin_rag_retrieval_seconds` | Histogram | `retrieve_rag_context` 全程（pgvector 召回 + rerank）。问答链路里除 LLM 外最大的耗时项 |
 | `fojin_rag_context_chunks` | Histogram | 每次检索喂给 LLM 的 chunk 数。0 桶暴涨 = 检索空手而归，值得告警 |
 | `fojin_citation_guard_mutations_total` | Counter（`kind`） | 反幻觉护栏改写次数。上升 = 模型在编造引用（检索或 prompt 回归）——学术工具最坏的失败模式 |
+| `fojin_llm_estimated_tokens_total` | Counter（`provider` `model` `byok` `type`） | 估算 LLM token 数（prompt/completion）。chat 不抓真实 usage（流式需改 SSE 协议），按字符估算 × 单价——量级参考，非账单对账 |
+| `fojin_llm_estimated_cost_usd_total` | Counter（`provider` `model` `byok`） | 估算 LLM 花费（美元）。**`byok="false"` 才是平台掏钱的部分**；`byok="true"` 是用户自带 key。价格表在 `app/services/llm_cost.py`，涨价时更新 |
+
+> 成本护栏当前只做**可观测**，没有硬性封顶（真正的 per-user 日限额已由 `chat_quota` 的请求数配额兜底：匿名 10 / 登录 200）。要不要加"平台日预算超限即软降级"是产品决策——先在 Grafana 上按下面的 PromQL 观察 `byok="false"` 的花费趋势，需要再决定阈值。
 
 ### 常用 PromQL
 
@@ -60,6 +64,12 @@ sum(rate(fojin_rag_context_chunks_bucket{le="0"}[1h])) / sum(rate(fojin_rag_cont
 
 # 引用护栏改写速率（告警候选：> 0 持续即值得看）
 sum by (kind) (rate(fojin_citation_guard_mutations_total[1h]))
+
+# 平台掏钱的 LLM 花费速率（$/小时，排除 BYOK）—— 预算告警候选
+sum(rate(fojin_llm_estimated_cost_usd_total{byok="false"}[1h])) * 3600
+
+# 按模型看平台花费占比（哪个模型在烧钱）
+sum by (model) (rate(fojin_llm_estimated_cost_usd_total{byok="false"}[6h]))
 ```
 
 ## 实现注记（改代码前先读）

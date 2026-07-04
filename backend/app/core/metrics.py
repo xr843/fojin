@@ -89,6 +89,23 @@ CITATION_GUARD_MUTATIONS_TOTAL = Counter(
     ["kind"],
 )
 
+# Estimated LLM spend (chat never captures real token usage — streaming would
+# need an SSE-protocol change — so these are char-based estimates × a blended
+# per-model price; see app/services/llm_cost.py). The ``byok`` label separates
+# platform-paid calls (byok="false", the ones that cost the operator money) from
+# user-key calls (byok="true"). Order-of-magnitude — for trend/alerting, not
+# billing reconciliation.
+LLM_ESTIMATED_TOKENS_TOTAL = Counter(
+    "fojin_llm_estimated_tokens_total",
+    "Estimated LLM tokens by provider, model, byok and type (prompt/completion)",
+    ["provider", "model", "byok", "type"],
+)
+LLM_ESTIMATED_COST_USD_TOTAL = Counter(
+    "fojin_llm_estimated_cost_usd_total",
+    "Estimated LLM cost in USD by provider, model and byok",
+    ["provider", "model", "byok"],
+)
+
 
 _Retrieval = TypeVar("_Retrieval", bound=Callable[..., Awaitable])
 
