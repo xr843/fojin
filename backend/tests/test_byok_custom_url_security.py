@@ -103,7 +103,9 @@ async def test_save_custom_api_key_accepts_public_https_custom_url(client):
 
 
 def test_resolve_llm_config_rejects_unsafe_persisted_custom_url(monkeypatch):
-    from app.services import chat
+    # _resolve_llm_config and decrypt_api_key live in llm_client after the
+    # P1-3 split; the runtime DNS guard call stays in chat._build_llm_http_client.
+    from app.services import llm_client
 
     user = _fake_user()
     user.id = 7
@@ -112,10 +114,10 @@ def test_resolve_llm_config_rejects_unsafe_persisted_custom_url(monkeypatch):
     user.api_model = "custom-model"
     user.api_custom_url = "https://127.0.0.1:8000/v1"
 
-    monkeypatch.setattr(chat, "decrypt_api_key", lambda *_args, **_kwargs: "sk-user")
+    monkeypatch.setattr(llm_client, "decrypt_api_key", lambda *_args, **_kwargs: "sk-user")
 
     with pytest.raises(ServiceError, match="自定义 API 地址"):
-        chat._resolve_llm_config(user)
+        llm_client._resolve_llm_config(user)
 
 
 @pytest.mark.anyio
@@ -225,7 +227,10 @@ async def test_prepare_chat_rejects_custom_byok_when_runtime_dns_guard_fails(mon
     user.api_custom_url = "https://llm.example.com/v1"
 
     guard = AsyncMock(side_effect=ValueError("自定义 API 地址 解析到内网地址"))
-    monkeypatch.setattr(chat, "decrypt_api_key", lambda *_args, **_kwargs: "sk-user")
+    # decrypt_api_key moved to llm_client (P1-3 split); the DNS guard call stays
+    # in chat._build_llm_http_client, so its patch target is still chat.
+    from app.services import llm_client
+    monkeypatch.setattr(llm_client, "decrypt_api_key", lambda *_args, **_kwargs: "sk-user")
     monkeypatch.setattr(chat, "ensure_public_https_url_resolves", guard)
 
     with pytest.raises(ServiceError, match="自定义 API 地址"):
