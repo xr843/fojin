@@ -275,7 +275,7 @@
 .home-trust {
   font-family: "Noto Serif SC", serif;
   font-size: 11px;
-  color: var(--fj-ink-muted);
+  color: var(--fj-ink-light);
   margin-top: 24px;
   letter-spacing: 0.5px;
   text-align: center;
@@ -584,7 +584,7 @@
 
 .home-feature-desc {
   font-size: 11px;
-  color: var(--fj-ink-muted);
+  color: var(--fj-ink-light);
   line-height: 1.5;
 }
 
