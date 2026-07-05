@@ -1,9 +1,16 @@
 import asyncio
+import os
 import sys
-from pathlib import Path
 from logging.config import fileConfig
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+# Migrations don't need the app's production secret validation. app.config now
+# fail-fasts when FOJIN_ENV is unset (treated as production) without strong
+# secrets, so default to development here unless the caller (e.g. the prod
+# entrypoint) already set it.
+os.environ.setdefault("FOJIN_ENV", "development")
 
 from alembic import context
 from sqlalchemy import pool
@@ -12,12 +19,24 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from app.config import settings
 from app.database import Base
 from app.models import (  # noqa: F401
-    BuddhistText, TextContent, User, Bookmark, ReadingHistory,
-    DataSource, TextIdentifier, TextRelation,
-    KGEntity, KGRelation, IIIFManifest,
-    TextEmbedding, ChatSession, ChatMessage,
-    Annotation, AnnotationReview,
-    DictionaryEntry, AdminAuditLog,
+    AdminAuditLog,
+    Annotation,
+    AnnotationReview,
+    Bookmark,
+    BuddhistText,
+    ChatMessage,
+    ChatSession,
+    DataSource,
+    DictionaryEntry,
+    IIIFManifest,
+    KGEntity,
+    KGRelation,
+    ReadingHistory,
+    TextContent,
+    TextEmbedding,
+    TextIdentifier,
+    TextRelation,
+    User,
 )
 
 config = context.config
