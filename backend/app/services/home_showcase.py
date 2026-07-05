@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 # Cache TTL for the whole aggregate, and the rotation bucket size. 15 min keeps
 # the homepage lively without hammering the DB.
 SHOWCASE_TTL = 900
-_SHOWCASE_CACHE_KEY = "home:showcase:v2"  # v2: pools (not single picks)
+_SHOWCASE_CACHE_KEY = "home:showcase:v3"  # v3: sources.names pool added
 
 # A small candidate pool size for rotation-by-seed queries: fetch a bounded set
 # cheaply, then pick one deterministically per time bucket.
