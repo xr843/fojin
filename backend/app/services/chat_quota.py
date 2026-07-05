@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 # Free daily limits for users without their own API key
 FREE_DAILY_LIMIT_USER = 200      # Logged-in users — effectively unlimited for normal use, caps abuse
 FREE_DAILY_LIMIT_ANONYMOUS = 10  # Anonymous users (encourage registration)
+# Research fans out into several paid LLM + embedding calls per request, so it
+# gets its own daily budget well below the chat limit.
+FREE_DAILY_LIMIT_RESEARCH = 30
 
 
 async def _check_daily_quota(db: AsyncSession, user: User) -> None:
@@ -86,6 +89,42 @@ async def _check_anonymous_quota(redis, client_ip: str) -> None:
         raise
     except Exception:
         logger.warning("Redis anonymous quota check failed", exc_info=True)
+
+
+def _research_quota_key(user_id: int) -> str:
+    """Redis key for per-user daily research quota."""
+    today = date.today().isoformat()
+    return f"research:user:{user_id}:{today}"
+
+
+async def check_research_quota(redis, user: User) -> None:
+    """Check + increment a per-user daily research quota.
+
+    Research runs on the platform key and fans out into several paid LLM +
+    embedding calls per request, so it needs a hard per-user cap. The counter
+    is keyed by ``user.id`` (not IP), so a proxy pool can't widen it. BYOK
+    users pay with their own key and are exempt, mirroring the chat path.
+
+    Fails **closed** (``ServiceError``) when Redis is unavailable — unlike the
+    best-effort chat rate limiter, letting this expensive path run unbounded
+    during a Redis outage would reopen the wallet-DoS it guards against.
+
+    Raises ``QuotaExceededError`` when the daily budget is spent.
+    """
+    if user.encrypted_api_key:  # BYOK — user pays their own key
+        return
+    if not redis:
+        raise ServiceError("研究助手暂时不可用，请稍后重试")
+    key = _research_quota_key(user.id)
+    try:
+        current = await redis.incr(key)
+        if current == 1:
+            await redis.expire(key, 86400)  # 24h TTL
+    except Exception:
+        logger.warning("Redis research quota check failed", exc_info=True)
+        raise ServiceError("研究助手暂时不可用，请稍后重试") from None
+    if current > FREE_DAILY_LIMIT_RESEARCH:
+        raise QuotaExceededError(limit=FREE_DAILY_LIMIT_RESEARCH)
 
 
 def _validate_message(message: str) -> None:

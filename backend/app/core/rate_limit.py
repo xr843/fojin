@@ -19,6 +19,9 @@ STRICT_PATHS: dict[str, int] = {
     "/api/auth/change-password": 5,
     "/api/search": 60,
     "/api/search/content": 30,
+    # Paid-inference endpoints (embedding / LLM on the platform key).
+    "/api/search/semantic": settings.rate_limit_semantic,
+    "/api/research/query": settings.rate_limit_research,
 }
 
 

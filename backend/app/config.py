@@ -92,6 +92,10 @@ class Settings(BaseSettings):
     rate_limit_default: int = 200
     rate_limit_login: int = 10
     rate_limit_register: int = 5
+    # Paid-inference endpoints (platform key): each request triggers embedding
+    # and/or LLM calls, so cap them well below the default per-IP budget.
+    rate_limit_semantic: int = 20
+    rate_limit_research: int = 10
 
     @property
     def database_url(self) -> str:
