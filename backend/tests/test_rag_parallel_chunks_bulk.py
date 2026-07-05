@@ -43,11 +43,11 @@ async def test_single_bulk_query_for_multiple_primaries():
     # Two parallels for primary 0, one for primary 2, none for the rest.
     # Tuple shape matches the SELECT in _attach_parallel_chunks:
     # (primary_idx, other_text_id, other_juan, other_chunk_idx, other_lang,
-    #  confidence, chunk_text, title)
+    #  confidence, chunk_text, title, cbeta_id)
     fake_rows = [
-        (0, 200, 1, 0, "pi", 0.95, "pali chunk a", "Pali Title"),
-        (0, 300, 1, 0, "bo", 0.88, "tibetan chunk a", "Tib Title"),
-        (2, 201, 1, 2, "pi", 0.77, "pali chunk b", "Pali Title 2"),
+        (0, 200, 1, 0, "pi", 0.95, "pali chunk a", "Pali Title", "SC-mn10"),
+        (0, 300, 1, 0, "bo", 0.88, "tibetan chunk a", "Tib Title", "84K-toh11"),
+        (2, 201, 1, 2, "pi", 0.77, "pali chunk b", "Pali Title 2", "SC-mn11"),
     ]
     db = _make_db_with_rows(fake_rows)
 
@@ -63,6 +63,8 @@ async def test_single_bulk_query_for_multiple_primaries():
         "lang": "pi",
         "title": "Pali Title",
         "confidence": 0.95,
+        # Cross-canon parallel gets a portable URN from its cbeta_id + juan.
+        "urn": "fojin:sc/mn10.1",
     }
     assert primaries[1]["parallel_chunks"] == []
     assert len(primaries[2]["parallel_chunks"]) == 1
@@ -77,8 +79,8 @@ async def test_skips_rows_with_null_chunk_text():
     crash, and not produce a malformed parallel_chunk."""
     primaries = [{"text_id": 1, "juan_num": 1, "chunk_index": 0, "score": 0.9}]
     fake_rows = [
-        (0, 999, 1, 0, "pi", 0.5, None, ""),  # missing text_embedding row
-        (0, 998, 1, 0, "bo", 0.4, "tibetan", "T"),
+        (0, 999, 1, 0, "pi", 0.5, None, "", "SC-x"),  # missing text_embedding row
+        (0, 998, 1, 0, "bo", 0.4, "tibetan", "T", "84K-toh1"),
     ]
     db = _make_db_with_rows(fake_rows)
     await _attach_parallel_chunks(db, primaries)
@@ -91,11 +93,13 @@ async def test_skips_rows_with_null_chunk_text():
 async def test_lang_falls_back_to_lzh_when_null():
     primaries = [{"text_id": 1, "juan_num": 1, "chunk_index": 0, "score": 0.9}]
     fake_rows = [
-        (0, 50, 2, 3, None, 0.6, "chunk", "Title"),
+        (0, 50, 2, 3, None, 0.6, "chunk", "Title", "T1234"),
     ]
     db = _make_db_with_rows(fake_rows)
     await _attach_parallel_chunks(db, primaries)
     assert primaries[0]["parallel_chunks"][0]["lang"] == "lzh"
+    # cbeta_id "T1234" + juan 2 → juan-level cbeta-scheme URN.
+    assert primaries[0]["parallel_chunks"][0]["urn"] == "fojin:cbeta/T1234.2"
 
 
 @pytest.mark.asyncio

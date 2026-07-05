@@ -71,6 +71,66 @@ _WORK_ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 _ANCHOR_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 
 
+# Inverse of _SCHEME_PREFIXES for the forward builder: given a stored cbeta_id,
+# pick the ONE canonical scheme to emit. Several schemes can share a prefix
+# (sc/suttacentral → "SC-"); we emit the short canonical name so the URN reads
+# cleanly and still round-trips (resolve_urn re-expands via _SCHEME_PREFIXES).
+# Ordered so the more specific "84K-toh" is tested before any shorter prefix.
+_CANON_PREFIX_SCHEMES: tuple[tuple[str, str], ...] = (
+    ("84K-toh", "84k"),
+    ("GRETIL-", "gretil"),
+    ("SC-", "sc"),
+    ("VRI-", "vri"),
+)
+
+
+def build_urn(
+    cbeta_id: str | None,
+    juan: int | None = None,
+    anchor: str | None = None,
+) -> str | None:
+    """Construct a fojin URN string from a stored cbeta_id — the inverse of
+    :func:`resolve_urn`.
+
+    Returns ``None`` — never raises — when the input can't produce a URN that
+    round-trips cleanly (missing/empty id, or a work_id/anchor with characters
+    the parser rejects). Callers attach the result to a citation as a
+    best-effort portable identifier, so an un-buildable case must degrade to
+    "no URN" silently rather than break answer assembly.
+
+    ``juan``/``anchor`` are emitted only when given; a work-level URN is valid
+    and resolves to the text detail page. Anchors are currently opaque (CBETA
+    line numbers aren't indexed yet — see the module docstring), so callers pass
+    juan-level URNs; the parameter exists so line-level anchoring is a
+    non-breaking add later.
+    """
+    if not isinstance(cbeta_id, str) or not cbeta_id:
+        return None
+
+    scheme = "cbeta"
+    work_id = cbeta_id
+    for prefix, prefix_scheme in _CANON_PREFIX_SCHEMES:
+        if cbeta_id.startswith(prefix):
+            scheme = prefix_scheme
+            work_id = cbeta_id[len(prefix):]
+            break
+
+    # Only emit a URN the parser would accept back — this guarantees the
+    # round-trip parse_urn(build_urn(x)) succeeds and blocks an odd id from
+    # producing a malformed reference a citer might paste into a paper.
+    if not work_id or not _WORK_ID_RE.match(work_id):
+        return None
+    if anchor is not None and not (isinstance(anchor, str) and _ANCHOR_RE.match(anchor)):
+        anchor = None
+
+    urn = f"fojin:{scheme}/{work_id}"
+    if juan is not None and juan >= 1:
+        urn += f".{juan}"
+    if anchor:
+        urn += f"#{anchor}"
+    return urn
+
+
 @dataclass(frozen=True, slots=True)
 class ParsedURN:
     """Structured form of a fojin URN.

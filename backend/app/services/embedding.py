@@ -146,7 +146,7 @@ async def similarity_search(
         "SELECT te.text_id, te.juan_num, te.chunk_index, te.chunk_text, "
         "1 - (te.embedding <=> $1::vector) AS score, "
         "COALESCE(bt.title_zh, '') AS title_zh, "
-        "bt.lang, bt.source_id "
+        "bt.lang, bt.source_id, bt.cbeta_id "
         "FROM text_embeddings te "
         "LEFT JOIN buddhist_texts bt ON bt.id = te.text_id "
         "WHERE te.embedding IS NOT NULL"
@@ -185,6 +185,7 @@ async def similarity_search(
             "title_zh": row[5],
             "lang": row[6] or "lzh",
             "source_id": row[7],
+            "cbeta_id": row[8],
         }
         for row in rows
     ]

@@ -36,6 +36,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.text import BuddhistText, TextContent
 from app.schemas.chat import ChatSource
+from app.services.urn import build_urn
 
 logger = logging.getLogger(__name__)
 
@@ -356,5 +357,6 @@ async def try_precise_text_retrieval(
             title_zh=bt.title_zh or "",
             lang=tc.lang or bt.lang or "lzh",
             source_id=bt.source_id,
+            urn=build_urn(bt.cbeta_id, juan_num),
         )
     ]

@@ -19,6 +19,7 @@ from app.models.dictionary import DictionaryEntry
 from app.schemas.chat import ChatSource
 from app.services.embedding import generate_embedding, similarity_search, source_similarity_search
 from app.services.precise_retrieval import try_precise_text_retrieval
+from app.services.urn import build_urn
 
 logger = logging.getLogger(__name__)
 
@@ -402,7 +403,8 @@ async def _attach_parallel_chunks(db: AsyncSession, results: list[dict]) -> None
                 r.other_lang,
                 r.confidence,
                 te.chunk_text,
-                COALESCE(bt.title_zh, bt.title_sa, bt.title_pi, bt.title_en, '') AS title
+                COALESCE(bt.title_zh, bt.title_sa, bt.title_pi, bt.title_en, '') AS title,
+                bt.cbeta_id
             FROM ranked r
             LEFT JOIN text_embeddings te
                 ON te.text_id = r.other_text_id
@@ -429,6 +431,9 @@ async def _attach_parallel_chunks(db: AsyncSession, results: list[dict]) -> None
                     "lang": row[4] or "lzh",
                     "title": row[7],
                     "confidence": float(row[5]),
+                    # Cross-canon parallels (Pali/Tibetan) are exactly where a
+                    # portable URN matters most; juan-level, None if unbuildable.
+                    "urn": build_urn(row[8], row[2]),
                 }
             )
     except Exception:
@@ -822,7 +827,16 @@ async def retrieve_rag_context(
             await _attach_parallel_chunks(db, search_results)
 
         sources = [
-            ChatSource(**{k: v for k, v in r.items() if k not in ("source_id",)} | {"source_id": r.get("source_id")})
+            ChatSource(
+                **{k: v for k, v in r.items() if k not in ("source_id", "cbeta_id")}
+                | {
+                    "source_id": r.get("source_id"),
+                    # Portable cross-canon citation id, juan-level (line anchors
+                    # aren't indexed yet). build_urn returns None on any id that
+                    # wouldn't round-trip, so this never breaks assembly.
+                    "urn": build_urn(r.get("cbeta_id"), r.get("juan_num")),
+                }
+            )
             for r in search_results
         ]
         context_parts = [_format_context_block(r) for r in search_results]
