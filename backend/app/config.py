@@ -92,6 +92,11 @@ class Settings(BaseSettings):
     rate_limit_default: int = 200
     rate_limit_login: int = 10
     rate_limit_register: int = 5
+    # SMS endpoints — per-IP defense in depth on top of the per-phone caps in
+    # oauth.send_sms_code / verify_sms_code. send costs real money; verify is
+    # the brute-force surface.
+    rate_limit_sms_send: int = 3
+    rate_limit_sms_verify: int = 10
 
     @property
     def database_url(self) -> str:
