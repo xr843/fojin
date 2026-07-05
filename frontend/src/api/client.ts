@@ -519,6 +519,21 @@ export async function getStats(): Promise<Stats> {
   return data;
 }
 
+// Homepage dynamic showcase — live subtitle content for the hero feature cards.
+// Every card key is nullable: a null card means "show the static fallback".
+export interface HomeShowcase {
+  sources: { sources: number; texts: number } | null;
+  chat: { question: string } | null;
+  dictionary: { term: string; definition: string | null } | null;
+  kg: { subject: string; predicate: string; object: string } | null;
+  geo: { count: number; places: string[] } | null;
+}
+
+export async function getHomeShowcase(): Promise<HomeShowcase> {
+  const { data } = await api.get<HomeShowcase>("/home/showcase");
+  return data;
+}
+
 // Reader APIs
 export async function getJuanList(textId: number): Promise<JuanListResponse> {
   const { data } = await api.get<JuanListResponse>(`/texts/${textId}/juans`);
