@@ -20,6 +20,7 @@ RUN find dist -type f \( -name '*.js' -o -name '*.css' -o -name '*.html' -o -nam
 FROM nginx:stable-bookworm
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY security-headers.conf /etc/nginx/security-headers.conf
 
 # Run as non-root nginx user
 RUN chown -R nginx:nginx /usr/share/nginx/html && \
