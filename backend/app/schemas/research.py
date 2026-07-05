@@ -12,9 +12,10 @@ from pydantic import BaseModel, Field
 
 from app.schemas.chat import ChatSource, ChatTrustStatus
 
-# The agent's tool vocabulary. v1 dispatches "corpus" (semantic retrieval over
-# the aligned canon, which brings cross-canon parallels along); the field exists
-# so dictionary/entity dispatch is a non-breaking addition.
+# The agent's tool vocabulary: "corpus" (semantic retrieval over the aligned
+# canon, brings cross-canon parallels along), "dictionary" (term definitions),
+# "entity" (knowledge-graph facts). corpus sources are citation-graded;
+# dictionary/entity results are supplementary background (see ResearchReference).
 ResearchTool = str
 
 
@@ -33,6 +34,20 @@ class ResearchStep(BaseModel):
     num_sources: int = 0
 
 
+class ResearchReference(BaseModel):
+    """A supplementary background hit from the dictionary or knowledge graph.
+
+    Unlike a corpus ``ChatSource``, a reference is NOT citation-graded (it has no
+    《经名》第N卷 form), so it can't be used in a 【】 clickable citation and does
+    not affect the answer's trust status — it grounds definitions and entity
+    facts as background, keeping the "点回原典" contract strictly to corpus
+    passages."""
+    kind: str  # 'dictionary' | 'entity'
+    term: str
+    detail: str = ""
+    source: str | None = None
+
+
 class ResearchReport(BaseModel):
     question: str
     # The agent's decomposition (post-parse, post-cap) — surfaced so the user
@@ -41,6 +56,8 @@ class ResearchReport(BaseModel):
     answer: str
     # De-duplicated sources across all steps; each carries a URN (from #897).
     sources: list[ChatSource]
+    # Supplementary dictionary / knowledge-graph background (non-citable).
+    references: list[ResearchReference] = []
     # Deterministic grounding verdict for the synthesized answer, from the same
     # citation-guard / quote-verifier pipeline the chat path uses.
     trust_status: ChatTrustStatus | None = None

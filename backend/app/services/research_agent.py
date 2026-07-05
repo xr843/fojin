@@ -32,7 +32,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
 from app.schemas.chat import ChatSource, ChatTrustStatus
-from app.schemas.research import ResearchReport, ResearchStep
+from app.schemas.research import ResearchReference, ResearchReport, ResearchStep
 from app.services.chat_trust import build_trust_status
 from app.services.citation_guard import enforce_citation_whitelist
 from app.services.quote_verifier import verify_quoted_content
@@ -41,13 +41,19 @@ logger = logging.getLogger(__name__)
 
 # Type of an injected LLM text completion: (system, user) -> assistant text.
 CompleteFn = Callable[[str, str], Awaitable[str]]
-# Type of a retrieval tool: query -> retrieved sources (each carrying a URN).
+# A corpus retrieval tool: query -> citation-graded sources (each with a URN).
 RetrieveFn = Callable[[str], Awaitable[list[ChatSource]]]
+# A reference tool (dictionary/entity): query -> supplementary background hits.
+ReferenceFn = Callable[[str], Awaitable[list[ResearchReference]]]
+
+# The tools a plan step may dispatch to. Unknown tool names coerce to "corpus".
+_KNOWN_TOOLS = ("corpus", "dictionary", "entity")
 
 # Absolute ceilings independent of the request's max_steps — defence in depth
 # against a planner that emits a pathological plan.
 _HARD_MAX_STEPS = 6
 _MAX_SOURCES = 24
+_MAX_REFERENCES = 20
 _MAX_QUERY_LEN = 200
 
 
@@ -79,15 +85,40 @@ class _Collected:
         return added
 
 
+@dataclass
+class _CollectedRefs:
+    """Accumulator for dictionary/entity references, deduped by (kind, term)."""
+    refs: list[ResearchReference] = field(default_factory=list)
+    _seen: set[tuple[str, str]] = field(default_factory=set)
+
+    def add(self, items: list[ResearchReference]) -> int:
+        added = 0
+        for r in items:
+            if len(self.refs) >= _MAX_REFERENCES:
+                break
+            key = (r.kind, r.term)
+            if key in self._seen:
+                continue
+            self._seen.add(key)
+            self.refs.append(r)
+            added += 1
+        return added
+
+
 def build_plan_prompt(question: str) -> tuple[str, str]:
     """(system, user) prompts that ask the LLM to decompose a research question
-    into 2–5 focused sub-queries as strict JSON."""
+    into 2–5 focused sub-queries, each tagged with the tool to run, as JSON."""
     system = (
-        "你是佛教文献研究的检索规划器。把用户的研究问题拆解成 2-5 个聚焦的中文检索子查询，"
-        "每个子查询针对问题的一个方面（如某个宗派、某部经、某个概念的不同侧面），"
-        "以便分别在佛典语料库中检索。\n"
-        "只输出 JSON，格式：{\"steps\":[{\"query\":\"...\",\"aspect\":\"...\"}]}。"
-        "query 是用于检索的关键词式子查询；aspect 是该子查询考察的方面（简短中文）。"
+        "你是佛教文献研究的检索规划器。把用户的研究问题拆解成 2-5 个聚焦的检索步骤，"
+        "每步针对问题的一个方面，并选择合适的工具：\n"
+        "- \"corpus\"：在佛典语料库中语义检索经文段落（默认，用于义理/经文内容，"
+        "会自动带出跨藏对读）。\n"
+        "- \"dictionary\"：查佛学辞典，解释某个术语/名相的定义。\n"
+        "- \"entity\"：查知识图谱，获取某个人物/经典/宗派/地点的背景事实。\n"
+        "只输出 JSON，格式："
+        "{\"steps\":[{\"tool\":\"corpus\",\"query\":\"...\",\"aspect\":\"...\"}]}。"
+        "query 是关键词式子查询（辞典/实体步骤填要查的术语或名称）；"
+        "aspect 是该步考察的方面（简短中文）。多数步骤应为 corpus。"
         "不要输出 JSON 以外的任何文字。"
     )
     return system, f"研究问题：{question}"
@@ -112,10 +143,10 @@ def parse_plan(text: str, question: str, max_steps: int) -> list[PlanStep]:
                 if not query:
                     continue
                 aspect = str(item.get("aspect", "")).strip()[:80]
-                # tool defaults to corpus; unknown tools coerced to corpus so a
-                # hallucinated tool name never drops a step.
+                # tool defaults to corpus; a hallucinated/unknown tool name
+                # coerces to corpus so a step is never dropped.
                 tool = str(item.get("tool", "corpus")).strip() or "corpus"
-                if tool != "corpus":
+                if tool not in _KNOWN_TOOLS:
                     tool = "corpus"
                 steps.append(PlanStep(tool=tool, query=query, aspect=aspect))
 
@@ -145,28 +176,52 @@ def _extract_json_object(text: str) -> object:
         return None
 
 
-def build_synthesis_prompt(question: str, sources: list[ChatSource]) -> tuple[str, str]:
+def build_synthesis_prompt(
+    question: str,
+    sources: list[ChatSource],
+    references: list[ResearchReference] | None = None,
+) -> tuple[str, str]:
     """(system, user) prompts for the grounded synthesis over collected sources.
 
     Reuses the chat path's citation contract verbatim — the ``[出处: 《X》第N卷]``
     context labels and the ``【《X》第N卷】`` clickable-citation rule — so the same
     citation_guard / quote_verifier that protect chat also protect this answer.
+    Dictionary/entity ``references`` are given as background under a distinct
+    heading and are explicitly NOT citable with 【】, keeping the clickable
+    citation strictly to corpus passages.
     """
     system = (
-        "你是佛教文献研究助手。以下是系统为回答一个研究问题、分多步从佛典语料库中检索到的片段。\n"
-        "请综合这些片段写一篇结构化的研究性回答，比较不同经典/宗派/传承对该问题的处理。\n"
+        "你是佛教文献研究助手。以下是系统为回答一个研究问题、分多步从佛典语料库中检索到的片段，"
+        "以及可选的辞典/知识图谱背景资料。\n"
+        "请综合这些材料写一篇结构化的研究性回答，比较不同经典/宗派/传承对该问题的处理。\n"
         "**引用规则（严格）**：\n"
         "- 只能引用下方 `[出处: 《经名》第N卷]` 标明的经典，格式写作【《经名》第N卷】，"
         "使用出处行里的原始经名与真实卷号，不要改写或杜撰。\n"
         "- 严禁把检索片段之外的经典写成【...】引用；那样会生成打不开的链接，严重伤害可信度。"
         "宁可用散文提及「《X》中说……」。\n"
+        "- **`[背景资料]` 里的辞典/知识图谱条目仅供理解术语与人物，不是经文出处，"
+        "绝不可写成【...】引用**，只能用散文融入。\n"
         "- 直接引文必须逐字来自检索片段，不要凭记忆杜撰原文。\n"
         "- 若检索片段含跨藏对读（parallel_chunks / 巴利·藏），可对比不同传承的表述。\n"
         "- 检索不足以支撑的部分，如实说明，不要编造。"
     )
     context = _format_sources_context(sources)
     user = f"研究问题：{question}\n\n检索到的片段：\n{context}"
+    ref_block = _format_references_context(references or [])
+    if ref_block:
+        user += f"\n\n[背景资料（辞典/知识图谱，不可用【】引用）]：\n{ref_block}"
     return system, user
+
+
+def _format_references_context(references: list[ResearchReference]) -> str:
+    """Render dictionary/entity references into a background block, clearly
+    separate from the citable `[出处: …]` corpus context."""
+    lines: list[str] = []
+    for r in references:
+        kind = {"dictionary": "辞典", "entity": "知识图谱"}.get(r.kind, r.kind)
+        src = f"（{r.source}）" if r.source else ""
+        lines.append(f"- [{kind}] {r.term}{src}: {r.detail}")
+    return "\n".join(lines)
 
 
 def _format_sources_context(sources: list[ChatSource]) -> str:
@@ -192,11 +247,29 @@ def _format_sources_context(sources: list[ChatSource]) -> str:
 
 
 class ResearchAgent:
-    """Plan → retrieve → synthesize, over injected LLM + retrieval tools."""
+    """Plan → retrieve → synthesize, over injected LLM + tools.
 
-    def __init__(self, complete: CompleteFn, corpus_tool: RetrieveFn) -> None:
+    ``corpus_tool`` is required (citation-graded passages); ``dict_tool`` and
+    ``entity_tool`` are optional reference tools. A plan step whose tool has no
+    binding falls back to the corpus tool, so the agent degrades to corpus-only
+    when references aren't wired.
+    """
+
+    def __init__(
+        self,
+        complete: CompleteFn,
+        corpus_tool: RetrieveFn,
+        *,
+        dict_tool: ReferenceFn | None = None,
+        entity_tool: ReferenceFn | None = None,
+    ) -> None:
         self._complete = complete
-        self._tools: dict[str, RetrieveFn] = {"corpus": corpus_tool}
+        self._corpus_tool = corpus_tool
+        self._ref_tools: dict[str, ReferenceFn] = {}
+        if dict_tool is not None:
+            self._ref_tools["dictionary"] = dict_tool
+        if entity_tool is not None:
+            self._ref_tools["entity"] = entity_tool
 
     async def run(self, question: str, max_steps: int = 4) -> ResearchReport:
         question = question.strip()
@@ -210,35 +283,43 @@ class ResearchAgent:
             plan_text = ""
         plan = parse_plan(plan_text, question, max_steps)
 
-        # 2. Retrieve (tools), collecting + deduping across steps.
+        # 2. Dispatch each step: corpus → citation-graded sources; dictionary /
+        #    entity → supplementary references. Both collected + deduped across
+        #    steps. A failing step contributes nothing but doesn't sink the run.
         collected = _Collected()
+        refs = _CollectedRefs()
         run_steps: list[ResearchStep] = []
         for step in plan:
-            tool = self._tools.get(step.tool) or self._tools["corpus"]
+            ref_tool = self._ref_tools.get(step.tool)
             try:
-                srcs = await tool(step.query)
+                if ref_tool is not None:
+                    added = refs.add(await ref_tool(step.query))
+                else:
+                    added = collected.add(await self._corpus_tool(step.query))
             except Exception:
-                logger.warning("research retrieval failed for %r", step.query, exc_info=True)
-                srcs = []
-            added = collected.add(srcs)
+                logger.warning("research step failed (%s %r)", step.tool, step.query, exc_info=True)
+                added = 0
             run_steps.append(
                 ResearchStep(tool=step.tool, query=step.query, aspect=step.aspect, num_sources=added)
             )
 
         sources = collected.sources
+        references = refs.refs
 
         # 3. Synthesize (LLM), then ground the answer with the same guards the
-        #    chat path uses. No sources → don't fabricate; return an honest note.
+        #    chat path uses. No corpus sources → don't fabricate a cited answer;
+        #    return an honest note (references alone can't ground 【】 citations).
         if not sources:
             return ResearchReport(
                 question=question,
                 plan=run_steps,
                 answer="未能检索到与该研究问题相关的佛典片段，无法给出有据可依的回答。",
                 sources=[],
+                references=references,
                 trust_status=build_trust_status("", [], citation_mutations=[], quote_mutations=[]),
             )
 
-        syn_sys, syn_user = build_synthesis_prompt(question, sources)
+        syn_sys, syn_user = build_synthesis_prompt(question, sources, references)
         try:
             answer = await self._complete(syn_sys, syn_user)
         except Exception:
@@ -247,7 +328,8 @@ class ResearchAgent:
 
         answer, trust = ground_answer(answer, sources)
         return ResearchReport(
-            question=question, plan=run_steps, answer=answer, sources=sources, trust_status=trust
+            question=question, plan=run_steps, answer=answer, sources=sources,
+            references=references, trust_status=trust,
         )
 
 
@@ -270,6 +352,9 @@ def ground_answer(answer: str, sources: list[ChatSource]) -> tuple[str, ChatTrus
 _STEP_PGVECTOR_LIMIT = 8
 _SYNTHESIS_MAX_TOKENS = 2600
 _PLAN_MAX_TOKENS = 400
+# Reference (dictionary/entity) lookups are background, so keep them small.
+_REF_LOOKUP_LIMIT = 5
+_REF_DETAIL_CHARS = 400
 
 
 def build_research_agent(db: object, user: object | None) -> ResearchAgent:
@@ -310,4 +395,50 @@ def build_research_agent(db: object, user: object | None) -> ResearchAgent:
         )
         return sources
 
-    return ResearchAgent(complete=complete, corpus_tool=corpus_tool)
+    async def dict_tool(query: str) -> list[ResearchReference]:
+        # Reuse the dictionary endpoint's 简繁-aware headword matching helpers so
+        # the agent's lookups behave like the site's dictionary search.
+        from sqlalchemy import select
+        from sqlalchemy.orm import joinedload
+
+        from app.api.dictionary import _build_exact_prefix_conditions, _zh_variants
+        from app.models.dictionary import DictionaryEntry
+
+        variants = _zh_variants(query)
+        stmt = (
+            select(DictionaryEntry)
+            .where(_build_exact_prefix_conditions(variants))
+            .options(joinedload(DictionaryEntry.source))
+            .limit(_REF_LOOKUP_LIMIT)
+        )
+        rows = (await db.execute(stmt)).unique().scalars().all()  # type: ignore[union-attr]
+        return [
+            ResearchReference(
+                kind="dictionary",
+                term=e.headword,
+                detail=(e.definition or "")[:_REF_DETAIL_CHARS],
+                source=(e.source.name_zh if e.source else None),
+            )
+            for e in rows
+        ]
+
+    async def entity_tool(query: str) -> list[ResearchReference]:
+        from app.services.knowledge_graph import search_entities
+
+        entities, _total = await search_entities(
+            db, query, None, _REF_LOOKUP_LIMIT, 0  # type: ignore[arg-type]
+        )
+        return [
+            ResearchReference(
+                kind="entity",
+                term=e.name_zh,
+                detail=(getattr(e, "description", "") or "")[:_REF_DETAIL_CHARS],
+                source=getattr(e, "entity_type", None),
+            )
+            for e in entities
+        ]
+
+    return ResearchAgent(
+        complete=complete, corpus_tool=corpus_tool,
+        dict_tool=dict_tool, entity_tool=entity_tool,
+    )

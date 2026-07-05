@@ -9,6 +9,7 @@ fabricated citation in the synthesis is really caught here.
 import pytest
 
 from app.schemas.chat import ChatSource, ParallelChunk
+from app.schemas.research import ResearchReference
 from app.services.research_agent import (
     ResearchAgent,
     build_plan_prompt,
@@ -60,9 +61,13 @@ def test_parse_plan_falls_back_to_single_step_on_garbage():
     assert steps[0].query == "如何理解空性"
 
 
-def test_parse_plan_unknown_tool_coerced_to_corpus():
-    steps = parse_plan('{"steps":[{"query":"x","tool":"web_search"}]}', "q", max_steps=4)
-    assert steps[0].tool == "corpus"
+def test_parse_plan_keeps_known_tools_and_coerces_unknown():
+    steps = parse_plan(
+        '{"steps":[{"query":"般若","tool":"corpus"},{"query":"空","tool":"dictionary"},'
+        '{"query":"龙树","tool":"entity"},{"query":"x","tool":"web_search"}]}',
+        "q", max_steps=6,
+    )
+    assert [s.tool for s in steps] == ["corpus", "dictionary", "entity", "corpus"]
 
 
 def test_parse_plan_drops_empty_queries():
@@ -177,6 +182,106 @@ async def test_agent_survives_retrieval_failure_on_one_step():
     # The failed step contributes 0 sources but doesn't sink the run.
     assert [s.num_sources for s in report.plan] == [1, 0]
     assert len(report.sources) == 1
+
+
+# ── multi-tool dispatch (corpus + dictionary + entity) ───────────────────
+
+
+@pytest.mark.anyio
+async def test_agent_routes_steps_to_corpus_dict_and_entity():
+    plan = (
+        '{"steps":['
+        '{"query":"空 般若","tool":"corpus","aspect":"经文"},'
+        '{"query":"空","tool":"dictionary","aspect":"名相"},'
+        '{"query":"龙树","tool":"entity","aspect":"人物"}]}'
+    )
+    llm = _ScriptedLLM(plan, "综合【《般若经》第1卷】。")
+    seen = {"corpus": [], "dict": [], "entity": []}
+
+    async def corpus(q):
+        seen["corpus"].append(q)
+        return [_src(251, "般若经")]
+
+    async def dict_tool(q):
+        seen["dict"].append(q)
+        return [ResearchReference(kind="dictionary", term="空", detail="śūnyatā 定义", source="佛学大辞典")]
+
+    async def entity_tool(q):
+        seen["entity"].append(q)
+        return [ResearchReference(kind="entity", term="龙树", detail="中观创立者", source="person")]
+
+    report = await ResearchAgent(
+        complete=llm, corpus_tool=corpus, dict_tool=dict_tool, entity_tool=entity_tool
+    ).run("空性问题", max_steps=6)
+
+    # Each step routed to the right tool.
+    assert seen["corpus"] == ["空 般若"]
+    assert seen["dict"] == ["空"]
+    assert seen["entity"] == ["龙树"]
+    # Corpus → sources (citable); dict/entity → references (background).
+    assert [s.text_id for s in report.sources] == [251]
+    assert {r.kind for r in report.references} == {"dictionary", "entity"}
+    # Per-step counts recorded for corpus AND reference steps.
+    assert [s.num_sources for s in report.plan] == [1, 1, 1]
+    # The synthesis prompt carried the references under the background heading.
+    _plan_call, syn_call = llm.calls
+    assert "[背景资料" in syn_call[1]
+    assert "śūnyatā 定义" in syn_call[1]
+
+
+@pytest.mark.anyio
+async def test_agent_dedupes_references_by_kind_and_term():
+    plan = '{"steps":[{"query":"空","tool":"dictionary"},{"query":"空义","tool":"dictionary"},{"query":"c","tool":"corpus"}]}'
+    llm = _ScriptedLLM(plan, "答【《般若经》第1卷】")
+
+    async def corpus(q):
+        return [_src(251, "般若经")]
+
+    async def dict_tool(q):
+        # Both dictionary steps return the same headword "空" → deduped to one.
+        return [ResearchReference(kind="dictionary", term="空", detail="d")]
+
+    report = await ResearchAgent(
+        complete=llm, corpus_tool=corpus, dict_tool=dict_tool
+    ).run("q", max_steps=6)
+    assert len(report.references) == 1
+
+
+@pytest.mark.anyio
+async def test_agent_falls_back_to_corpus_when_ref_tool_unwired():
+    # Planner asks for "dictionary" but no dict_tool is injected → corpus used.
+    plan = '{"steps":[{"query":"空","tool":"dictionary"}]}'
+    llm = _ScriptedLLM(plan, "答【《般若经》第1卷】")
+    used = []
+
+    async def corpus(q):
+        used.append(q)
+        return [_src(251, "般若经")]
+
+    report = await ResearchAgent(complete=llm, corpus_tool=corpus).run("q")
+    assert used == ["空"]                    # dictionary step fell back to corpus
+    assert report.references == []
+    assert len(report.sources) == 1
+
+
+@pytest.mark.anyio
+async def test_references_dont_enable_fabricated_citations():
+    # An entity reference names 《楞严经》 but it was NOT retrieved as a corpus
+    # source; if the synthesis 【】-cites it, the guard must still strip it.
+    plan = '{"steps":[{"query":"楞严","tool":"entity"},{"query":"心经","tool":"corpus"}]}'
+    llm = _ScriptedLLM(plan, "如【《楞严经》第5卷】所述。")
+
+    async def corpus(q):
+        return [_src(251, "般若波罗蜜多心经")]
+
+    async def entity_tool(q):
+        return [ResearchReference(kind="entity", term="楞严经", detail="经典", source="text")]
+
+    report = await ResearchAgent(
+        complete=llm, corpus_tool=corpus, entity_tool=entity_tool
+    ).run("q")
+    assert "【《楞严经》" not in report.answer          # fabricated cite stripped
+    assert report.trust_status.state == "citation_corrected"
 
 
 # ── prompt + grounding units ─────────────────────────────────────────────
