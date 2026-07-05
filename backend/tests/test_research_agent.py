@@ -307,6 +307,17 @@ def test_build_plan_prompt_asks_for_json():
     assert "空性问题" in user
 
 
+def test_synthesis_prompt_requires_verbatim_quotes():
+    """The faithfulness fix: the synthesis system prompt must forbid quote-marking
+    non-verbatim (paraphrased) text — the root cause of quote_unverified answers
+    observed in the first prod baseline."""
+    from app.services.research_agent import build_synthesis_prompt
+
+    system, _user = build_synthesis_prompt("q", [_src(251, "心经")])
+    assert "逐字" in system            # verbatim-only rule present
+    assert "您提供的" in system         # ...as the "don't say 您提供的" instruction
+
+
 def test_ground_answer_passes_clean_answer_through():
     answer = "《心经》讲空【《心经》第1卷】。"
     out, trust = ground_answer(answer, [_src(251, "心经")])
