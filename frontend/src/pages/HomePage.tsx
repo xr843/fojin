@@ -50,17 +50,42 @@ export default function HomePage() {
   // undefined and each card renders its static `feature_*_desc` fallback.
   const { data: showcase } = useQuery({ queryKey: ["homeShowcase"], queryFn: getHomeShowcase, staleTime: 5 * 60_000 });
 
+  // One random value per pool, fixed once at mount (a lazy initializer is the
+  // allowed place for the impure Math.random). So every page load / refresh
+  // shows a different pick from each cached pool — the cards feel alive without
+  // any extra backend round-trip.
+  const [rand] = useState(() => ({
+    chat: Math.random(), dict: Math.random(), kg: Math.random(),
+    geo: Math.random(), col: Math.random(),
+  }));
+
+  // Pick one item from each cached pool using the per-mount random values.
+  const sc = useMemo(() => {
+    const at = (r: number, len: number) => Math.floor(r * len) % Math.max(1, len);
+    const q = showcase?.chat?.questions ?? [];
+    const terms = showcase?.dictionary?.terms ?? [];
+    const triples = showcase?.kg?.triples ?? [];
+    const places = showcase?.geo?.places ?? [];
+    return {
+      sources: showcase?.sources ?? null,
+      chat: q.length ? q[at(rand.chat, q.length)] : null,
+      dict: terms.length ? terms[at(rand.dict, terms.length)] : null,
+      kg: triples.length ? triples[at(rand.kg, triples.length)] : null,
+      geo: showcase?.geo && showcase.geo.count > 0
+        ? { count: showcase.geo.count, places: places.length
+            ? [0, 1, 2].map((i) => places[(at(rand.geo, places.length) + i) % places.length]) : [] }
+        : null,
+    };
+  }, [showcase, rand]);
+
   // 经典专题 card is driven by the frontend's own collection content (the server
-  // doesn't hold it). Rotate the featured names by a coarse time bucket so the
-  // card feels alive without a backend round-trip. The bucket is captured once
-  // at mount (a lazy initializer is the allowed place for the impure Date.now).
-  const [rotationBucket] = useState(() => Math.floor(Date.now() / (15 * 60_000)));
+  // doesn't hold it). Pick a random featured slice per load, same as the pools.
   const collectionsDesc = useMemo(() => {
     const cols = getLocalizedCollections(i18n.language).map((c) => c.name).filter(Boolean);
     if (cols.length === 0) return null;
-    const start = rotationBucket % cols.length;
+    const start = Math.floor(rand.col * cols.length) % cols.length;
     return [0, 1, 2].map((i) => cols[(start + i) % cols.length]).join(" · ");
-  }, [i18n.language, rotationBucket]);
+  }, [i18n.language, rand.col]);
 
   // 搜索联想：复用 SearchPage 已有的 /search/suggest 接口与防抖模式
   const [acOptions, setAcOptions] = useState<{ value: string }[]>([]);
@@ -223,10 +248,10 @@ export default function HomePage() {
             <DatabaseOutlined className="home-feature-icon" />
             <div className="home-feature-title">{t("home.feature_sources_title")}</div>
             <div className="home-feature-desc">
-              {showcase?.sources
+              {sc.sources
                 ? t("home.sc_sources", {
-                    sources: showcase.sources.sources.toLocaleString(),
-                    texts: showcase.sources.texts.toLocaleString(),
+                    sources: sc.sources.sources.toLocaleString(),
+                    texts: sc.sources.texts.toLocaleString(),
                   })
                 : t("home.feature_sources_desc")}
             </div>
@@ -234,26 +259,26 @@ export default function HomePage() {
           <div
             className="home-feature-card"
             onClick={() =>
-              navigate(showcase?.chat?.question ? `/chat?q=${encodeURIComponent(showcase.chat.question)}` : "/chat")
+              navigate(sc.chat ? `/chat?q=${encodeURIComponent(sc.chat)}` : "/chat")
             }
           >
             <RobotOutlined className="home-feature-icon" />
             <div className="home-feature-title">{t("home.feature_chat_title")}</div>
             <div className="home-feature-desc">
-              {showcase?.chat?.question || t("home.feature_chat_desc")}
+              {sc.chat || t("home.feature_chat_desc")}
             </div>
           </div>
           <div
             className="home-feature-card"
             onClick={() =>
-              navigate(showcase?.dictionary?.term ? `/dictionary?q=${encodeURIComponent(showcase.dictionary.term)}` : "/dictionary")
+              navigate(sc.dict ? `/dictionary?q=${encodeURIComponent(sc.dict.term)}` : "/dictionary")
             }
           >
             <FileTextOutlined className="home-feature-icon" />
             <div className="home-feature-title">{t("home.feature_dict_title")}</div>
             <div className="home-feature-desc">
-              {showcase?.dictionary?.term
-                ? `${showcase.dictionary.term}${showcase.dictionary.definition ? ` — ${showcase.dictionary.definition}` : ""}`
+              {sc.dict
+                ? `${sc.dict.term}${sc.dict.definition ? ` — ${sc.dict.definition}` : ""}`
                 : t("home.feature_dict_desc")}
             </div>
           </div>
@@ -261,8 +286,8 @@ export default function HomePage() {
             <ApartmentOutlined className="home-feature-icon" />
             <div className="home-feature-title">{t("home.feature_kg_title")}</div>
             <div className="home-feature-desc">
-              {showcase?.kg
-                ? `${showcase.kg.subject} → ${showcase.kg.predicate} → ${showcase.kg.object}`
+              {sc.kg
+                ? `${sc.kg.subject} → ${sc.kg.predicate} → ${sc.kg.object}`
                 : t("home.feature_kg_desc")}
             </div>
           </div>
@@ -270,10 +295,10 @@ export default function HomePage() {
             <GlobalOutlined className="home-feature-icon" />
             <div className="home-feature-title">{t("home.feature_geo_title")}</div>
             <div className="home-feature-desc">
-              {showcase?.geo && showcase.geo.count > 0
+              {sc.geo
                 ? t("home.sc_geo", {
-                    count: showcase.geo.count.toLocaleString(),
-                    places: showcase.geo.places.slice(0, 3).join("、"),
+                    count: sc.geo.count.toLocaleString(),
+                    places: sc.geo.places.join("、"),
                   })
                 : t("home.feature_geo_desc")}
             </div>

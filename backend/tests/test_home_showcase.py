@@ -1,8 +1,8 @@
 """Tests for the homepage dynamic showcase service.
 
 Uses an in-memory SQLite DB seeded with a few rows so each card's real query
-runs, plus asserts the two guarantees: independent per-card degradation
-(a card with no data → None, page still returns) and time-bucket rotation.
+runs, and asserts: per-card POOLS (the frontend picks one at random per load),
+independent per-card degradation (no data → None), and cache passthrough.
 """
 
 import pytest
@@ -15,7 +15,7 @@ from app.models.knowledge_graph import KGEntity, KGRelation
 from app.models.source import DataSource
 from app.models.text import BuddhistText
 from app.services import home_showcase
-from app.services.home_showcase import _pick, _seed, _short_gloss, get_home_showcase
+from app.services.home_showcase import _short_gloss, get_home_showcase
 
 _MODELS = (BuddhistText, DataSource, DictionaryEntry, HotQuestion, KGEntity, KGRelation)
 
@@ -47,17 +47,18 @@ async def seeded_db():
 
 
 @pytest.mark.anyio
-async def test_showcase_populates_each_card_from_real_data(seeded_db):
+async def test_showcase_returns_pools_per_card(seeded_db):
     out = await get_home_showcase(seeded_db, redis=None)
     assert out["sources"] == {"sources": 1, "texts": 1}
-    # HOT_TERMS rotates; 般若 is in the list, and its definition is seeded, so
-    # whichever term is picked, the dictionary card is a dict (never crashes).
-    assert isinstance(out["dictionary"], dict)
-    # predicate "translated" is mapped to its Chinese label "译".
-    assert out["kg"] == {"subject": "玄奘", "predicate": "译", "object": "大般若經"}
+    # KG returns a POOL of triples; the seeded translated→译 triple is in it.
+    assert {"subject": "玄奘", "predicate": "译", "object": "大般若經"} in out["kg"]["triples"]
+    # Dictionary returns a POOL of {term, definition}; 般若 (seeded) is present.
+    terms = {e["term"] for e in out["dictionary"]["terms"]}
+    assert "般若" in terms
     assert out["geo"]["count"] == 1
     assert "那烂陀寺" in out["geo"]["places"]
-    assert isinstance(out["chat"], dict) and out["chat"]["question"]
+    # Chat returns a non-empty pool of questions.
+    assert isinstance(out["chat"]["questions"], list) and out["chat"]["questions"]
 
 
 @pytest.mark.anyio
@@ -70,13 +71,13 @@ async def test_empty_db_degrades_each_card_to_none_not_crash():
     async with factory() as s:
         out = await get_home_showcase(s, redis=None)
     await engine.dispose()
-    # No sources/texts, no KG, no geo → those cards None; chat still has the
-    # DEFAULT_HOT_QUESTIONS fallback; dictionary term exists but no definition row.
+    # No sources/texts, no KG, no geo, no dictionary rows → those cards None;
+    # chat still has the DEFAULT_HOT_QUESTIONS fallback pool.
     assert out["sources"] is None
     assert out["kg"] is None
     assert out["geo"] is None
-    assert out["chat"]["question"]                      # default hot questions
-    assert out["dictionary"]["definition"] is None      # term w/o seeded entry
+    assert out["dictionary"] is None                     # no HOT_TERMS entries seeded
+    assert out["chat"]["questions"]                      # default hot questions
 
 
 @pytest.mark.anyio
@@ -107,22 +108,3 @@ def test_short_gloss_trims_long_definitions():
     assert _short_gloss("寂静") == "寂静"
     assert _short_gloss("") is None
     assert _short_gloss(None) is None
-
-
-def test_pick_rotates_by_seed():
-    items = ["a", "b", "c"]
-    assert _pick(items, 0) == "a"
-    assert _pick(items, 1) == "b"
-    assert _pick(items, 3) == "a"                        # wraps
-    assert _pick([], 5) is None
-
-
-def test_seed_is_stable_within_bucket(monkeypatch):
-    # Anchor on a bucket boundary so "TTL-1 later" stays in the same bucket.
-    base = home_showcase.SHOWCASE_TTL * 1000
-    monkeypatch.setattr(home_showcase.time, "time", lambda: float(base))
-    s1 = _seed()
-    monkeypatch.setattr(home_showcase.time, "time", lambda: float(base + home_showcase.SHOWCASE_TTL - 1))
-    assert _seed() == s1                                 # same bucket
-    monkeypatch.setattr(home_showcase.time, "time", lambda: float(base + home_showcase.SHOWCASE_TTL))
-    assert _seed() == s1 + 1                             # next bucket
