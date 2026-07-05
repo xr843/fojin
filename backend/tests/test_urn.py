@@ -12,9 +12,9 @@ from app.services.urn import (
     ParsedURN,
     URNParseError,
     build_reader_url,
+    build_urn,
     parse_urn,
 )
-
 
 # ──────────────────────────────────────────────────────────────────────
 # parse_urn — happy path
@@ -169,3 +169,63 @@ def test_expand_work_id_applies_scheme_prefix(
     # contain '.' which the parser routes to juan. For the prefix
     # expansion unit test we bypass that and construct ParsedURN by hand.
     assert _expand_work_id(_p(scheme, payload)) == expected_cbeta_id
+
+
+# ──────────────────────────────────────────────────────────────────────
+# build_urn — forward builder (cbeta_id → URN), inverse of resolve_urn
+
+
+@pytest.mark.parametrize("cbeta_id,expected", [
+    ("T0001", "fojin:cbeta/T0001"),
+    ("X0123", "fojin:cbeta/X0123"),
+    ("SC-mn10", "fojin:sc/mn10"),
+    ("84K-toh11", "fojin:84k/11"),
+    ("GRETIL-ramayana", "fojin:gretil/ramayana"),
+    ("VRI-dn1", "fojin:vri/dn1"),
+])
+def test_build_urn_emits_canonical_scheme(cbeta_id: str, expected: str) -> None:
+    assert build_urn(cbeta_id) == expected
+
+
+def test_build_urn_appends_juan_and_anchor() -> None:
+    assert build_urn("T0001", 5) == "fojin:cbeta/T0001.5"
+    assert build_urn("SC-mn10", 2) == "fojin:sc/mn10.2"
+    assert build_urn("T0001", 5, "p0001a01") == "fojin:cbeta/T0001.5#p0001a01"
+
+
+@pytest.mark.parametrize("cbeta_id,juan", [
+    ("T0001", 3),
+    ("X0123", None),
+    ("SC-mn10", 1),
+    ("84K-toh11", 2),
+    ("GRETIL-ramayana", 7),
+    ("VRI-dn1", None),
+])
+def test_build_urn_round_trips_through_parse_and_expand(
+    cbeta_id: str, juan: int | None
+) -> None:
+    """build_urn → parse_urn → _expand_work_id must recover the original
+    cbeta_id (and juan): the whole point of emitting only round-trippable URNs."""
+    from app.services.urn import _expand_work_id
+
+    urn = build_urn(cbeta_id, juan)
+    assert urn is not None
+    parsed = parse_urn(urn)
+    assert _expand_work_id(parsed) == cbeta_id
+    assert parsed.juan == juan
+
+
+@pytest.mark.parametrize("cbeta_id", [None, "", "SC-", "SC-an1.1", "T 0001", "T0001."])
+def test_build_urn_returns_none_when_not_round_trippable(cbeta_id) -> None:
+    """Missing id, empty work payload, or a work_id carrying '.'/space that the
+    parser would reject → None, never a malformed reference or an exception."""
+    assert build_urn(cbeta_id) is None
+
+
+def test_build_urn_drops_invalid_anchor_but_keeps_urn() -> None:
+    """A bad anchor must not sink an otherwise-valid citation id."""
+    assert build_urn("T0001", 5, "has spaces") == "fojin:cbeta/T0001.5"
+
+
+def test_build_urn_ignores_non_positive_juan() -> None:
+    assert build_urn("T0001", 0) == "fojin:cbeta/T0001"

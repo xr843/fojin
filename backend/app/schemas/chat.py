@@ -76,6 +76,10 @@ class ParallelChunk(BaseModel):
     lang: str
     title: str = ""
     confidence: float = 1.0
+    # Portable cross-canon citation id (fojin:sc/mn10.1 …), None when the
+    # source has no cbeta_id or one that wouldn't round-trip. Optional for
+    # backward compat with chat history stored before this field existed.
+    urn: str | None = None
 
 
 class ChatSource(BaseModel):
@@ -90,6 +94,9 @@ class ChatSource(BaseModel):
     lang: str = "lzh"
     source_id: int | None = None
     parallel_chunks: list[ParallelChunk] = []
+    # Portable cross-canon citation id (fojin:cbeta/T0001.1 …) built from the
+    # source's cbeta_id; None when unavailable. Backward-compatible optional.
+    urn: str | None = None
 
 
 ChatTrustState = Literal[
