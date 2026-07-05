@@ -40,7 +40,11 @@ def build_trust_status(
     if not valid_sources:
         state = "no_sources"
     elif quote_mutations:
-        state = "quote_unverified"
+        # verify_quoted_content now *downgrades* a non-verbatim quote to prose,
+        # so a quote mutation means "we relaxed a paraphrase-as-quote" — the
+        # served answer is honest. This is a correction tier (like
+        # citation_corrected), not the old "unverified" warning.
+        state = "quote_relaxed"
     elif citation_mutations:
         state = "citation_corrected"
     elif citation_count:

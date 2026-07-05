@@ -960,6 +960,7 @@
   "chat.retry": "Retry",
   "chat.trust.verified": "Citations verified",
   "chat.trust.citation_corrected": "Citations corrected",
+  "chat.trust.quote_relaxed": "Some quotes relaxed to paraphrase",
   "chat.trust.quote_unverified": "Some quotes were not text-verified",
   "chat.trust.sources_available": "Relevant sources retrieved",
   "chat.trust.no_sources": "No clickable sources found",

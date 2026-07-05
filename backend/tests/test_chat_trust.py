@@ -60,15 +60,18 @@ def test_verified_status_counts_citations_and_source_scores():
     assert status.min_source_score == 0.77
 
 
-def test_status_prioritizes_unverified_quotes_over_corrected_citations():
+def test_status_prioritizes_relaxed_quotes_over_corrected_citations():
+    # verify_quoted_content now downgrades a non-verbatim quote, so a quote
+    # mutation → the (fixed) answer is marked quote_relaxed, taking priority
+    # over a citation correction.
     status = build_trust_status(
-        "经云：「假引文假引文假引文」【《心经》第1卷】",
+        "经云：假引文假引文假引文【《心经》第1卷】",
         [_src()],
         citation_mutations=[_citation_mutation()],
         quote_mutations=[_quote_mutation()],
     )
 
-    assert status.state == "quote_unverified"
+    assert status.state == "quote_relaxed"
     assert status.citation_mutation_count == 1
     assert status.quote_mutation_count == 1
 

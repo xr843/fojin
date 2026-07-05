@@ -46,14 +46,17 @@ def test_hallucinated_title_counts_as_corrected_not_grounded():
     assert row["fully_grounded"] == 0
 
 
-def test_fabricated_quote_counts_as_quote_unverified():
-    # Real citation, invented ≥12-char quote absent from the cited chunk.
+def test_fabricated_quote_is_downgraded_and_served_trustworthy():
+    # Real citation, invented ≥12-char quote absent from the cited chunk →
+    # verify_quoted_content downgrades it, so the served answer is honest:
+    # trust=quote_relaxed, NOT verified (a quote was relaxed), but it counts as
+    # served_trustworthy (no misrepresentation remains).
     answer = "经云：「假引文假引文假引文假引文」【《心经》第1卷】"
     row = compute_faithfulness(answer, [_src()])
-    assert row["trust_state"] == "quote_unverified"
-    assert row["quote_mutations"] >= 1
-    assert row["quote_unverified"] == 1
-    assert row["fully_grounded"] == 0
+    assert row["trust_state"] == "quote_relaxed"
+    assert row["quotes_downgraded"] >= 1
+    assert row["fully_grounded"] == 0            # not strictly verified
+    assert row["served_trustworthy"] == 1        # but honest as served
 
 
 def test_no_sources_is_ungrounded():

@@ -960,6 +960,7 @@
   "chat.retry": "重试",
   "chat.trust.verified": "引用已校验",
   "chat.trust.citation_corrected": "引用已校正",
+  "chat.trust.quote_relaxed": "部分引文已转述（非逐字）",
   "chat.trust.quote_unverified": "部分引文未逐字核实",
   "chat.trust.sources_available": "已检索到相关来源",
   "chat.trust.no_sources": "未检索到可点击出处",

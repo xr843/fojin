@@ -137,6 +137,10 @@ function trustStatusColor(status?: ChatTrustStatus | null): string {
   switch (status?.state) {
     case "verified":
       return "#3f7d20";
+    case "quote_relaxed":
+      // A paraphrase-as-quote was relaxed to prose (fixed) — a correction, not
+      // a warning, so use the accent tone rather than the legacy amber.
+      return "var(--fj-accent)";
     case "quote_unverified":
       return "#a66300";
     case "no_sources":
