@@ -101,6 +101,7 @@ class Settings(BaseSettings):
     # and/or LLM calls, so cap them well below the default per-IP budget.
     rate_limit_semantic: int = 20
     rate_limit_research: int = 10
+    rate_limit_ai_diff: int = 10
 
     @property
     def database_url(self) -> str:
