@@ -1,8 +1,17 @@
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AccessDeniedError, NotFoundError, ValidationError
 from app.models.annotation import Annotation
+
+
+def _visible_to(viewer_id: int | None):
+    """WHERE clause for annotations a viewer may see: approved ones are public;
+    a signed-in viewer also sees their own (in any status). Anonymous sees only
+    approved. Keeps other users' drafts/pending/rejected private."""
+    if viewer_id is None:
+        return Annotation.status == "approved"
+    return or_(Annotation.status == "approved", Annotation.user_id == viewer_id)
 
 
 async def create_annotation(
@@ -32,6 +41,9 @@ async def create_annotation(
 
 
 async def get_annotation(session: AsyncSession, annotation_id: int) -> Annotation:
+    """Unfiltered lookup — used internally by update/delete/submit/review, which
+    enforce their own ownership/role checks. Do NOT use for read endpoints; use
+    get_visible_annotation so other users' non-approved rows stay private."""
     result = await session.execute(select(Annotation).where(Annotation.id == annotation_id))
     ann = result.scalar_one_or_none()
     if ann is None:
@@ -39,12 +51,28 @@ async def get_annotation(session: AsyncSession, annotation_id: int) -> Annotatio
     return ann
 
 
+async def get_visible_annotation(
+    session: AsyncSession, annotation_id: int, viewer_id: int | None = None
+) -> Annotation:
+    """Fetch a single annotation for a reader, enforcing visibility. Approved is
+    public; the owner also sees their own. Anything else 404s (not 403, so we
+    don't reveal that a hidden annotation exists)."""
+    ann = await get_annotation(session, annotation_id)
+    if ann.status != "approved" and ann.user_id != viewer_id:
+        raise NotFoundError("标注未找到")
+    return ann
+
+
 async def list_annotations_for_text(
-    session: AsyncSession, text_id: int, juan_num: int
+    session: AsyncSession, text_id: int, juan_num: int, viewer_id: int | None = None
 ) -> list[Annotation]:
     result = await session.execute(
         select(Annotation)
-        .where(Annotation.text_id == text_id, Annotation.juan_num == juan_num)
+        .where(
+            Annotation.text_id == text_id,
+            Annotation.juan_num == juan_num,
+            _visible_to(viewer_id),
+        )
         .order_by(Annotation.start_pos)
     )
     return list(result.scalars().all())
