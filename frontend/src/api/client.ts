@@ -1424,6 +1424,9 @@ export interface ChatSource {
   lang?: string;
   source_id?: number;
   parallel_chunks?: ParallelChunk[];
+  // Portable cross-canon citation id (fojin:cbeta/T0001.1 …), null when the
+  // source has no round-trippable cbeta_id.
+  urn?: string | null;
 }
 
 export interface ChunkContextItem {
@@ -1613,6 +1616,39 @@ export interface ChatTrustStatus {
   quote_mutation_count: number;
   max_source_score?: number | null;
   min_source_score?: number | null;
+}
+
+// --- Research assistant (POST /api/research/query) ---
+
+export interface ResearchStep {
+  tool: string; // "corpus" | "dictionary" | "entity"
+  query: string;
+  aspect: string;
+  num_sources: number;
+}
+
+export interface ResearchReference {
+  kind: string; // "dictionary" | "entity"
+  term: string;
+  detail: string;
+  source?: string | null;
+}
+
+export interface ResearchReport {
+  question: string;
+  plan: ResearchStep[];
+  answer: string;
+  sources: ChatSource[];
+  references: ResearchReference[];
+  trust_status?: ChatTrustStatus | null;
+}
+
+export async function runResearch(question: string, maxSteps = 4): Promise<ResearchReport> {
+  const { data } = await api.post<ResearchReport>("/research/query", {
+    question,
+    max_steps: maxSteps,
+  });
+  return data;
 }
 
 export interface ChatMessageItem {

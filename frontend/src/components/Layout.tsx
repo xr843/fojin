@@ -13,6 +13,7 @@ import {
   MenuOutlined,
   DashboardOutlined,
   RobotOutlined,
+  ExperimentOutlined,
   GithubOutlined,
   GlobalOutlined,
   // BarChartOutlined,   // dashboard nav hidden (数据总览 暂不对外公开)
@@ -75,6 +76,7 @@ export default function Layout() {
   }> = [
     { icon: <DatabaseOutlined />, label: t("nav.sources"), path: "/sources" },
     { icon: <RobotOutlined />, label: t("nav.chat"), path: "/chat" },
+    { icon: <ExperimentOutlined />, label: t("nav.research"), path: "/research" },
     { icon: <FileTextOutlined />, label: t("nav.dictionary"), path: "/dictionary" },
     { icon: <ApartmentOutlined />, label: t("nav.kg"), path: "/kg" },
     { icon: <GlobalOutlined />, label: t("nav.geo"), path: "/map" },
