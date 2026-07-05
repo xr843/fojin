@@ -191,11 +191,21 @@ async def google_callback(code: str, db: AsyncSession) -> TokenResponse:
         user_resp.raise_for_status()
         g_user = user_resp.json()
 
+    # Only trust the email for account matching when Google says it's verified.
+    # _find_or_create_user links a social login to any existing user with the
+    # same email, so an unverified address would let a caller asserting someone
+    # else's email take over that account. Unverified → treat as no email (a
+    # fresh account with a noreply placeholder is created instead). Mirrors the
+    # GitHub path, which only accepts verified emails.
+    email = g_user.get("email")
+    if g_user.get("email_verified") not in (True, "true"):
+        email = None
+
     user = await _find_or_create_user(
         db,
         provider="google",
         provider_user_id=g_user["sub"],
-        email=g_user.get("email"),
+        email=email,
         display_name=g_user.get("name"),
         provider_data={"picture": g_user.get("picture")},
     )
