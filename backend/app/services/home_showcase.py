@@ -21,7 +21,6 @@ periods (feels alive) while staying stable within one (cacheable).
 from __future__ import annotations
 
 import logging
-import time
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,7 +37,7 @@ logger = logging.getLogger(__name__)
 # Cache TTL for the whole aggregate, and the rotation bucket size. 15 min keeps
 # the homepage lively without hammering the DB.
 SHOWCASE_TTL = 900
-_SHOWCASE_CACHE_KEY = "home:showcase:v1"
+_SHOWCASE_CACHE_KEY = "home:showcase:v2"  # v2: pools (not single picks)
 
 # A small candidate pool size for rotation-by-seed queries: fetch a bounded set
 # cheaply, then pick one deterministically per time bucket.
@@ -65,14 +64,11 @@ _PREDICATE_LABELS = {
 }
 
 
-def _seed() -> int:
-    """Time-bucketed rotation seed — stable within a cache period, advancing
-    across periods so revisits see fresh content."""
-    return int(time.time() // SHOWCASE_TTL)
-
-
-def _pick(items: list, seed: int):
-    return items[seed % len(items)] if items else None
+# Each card returns a POOL of candidates (cached SHOWCASE_TTL); the frontend
+# picks one at random on every page load, so the card varies per refresh while
+# the DB work stays cached. Pool sizes are small — enough variety, tiny payload.
+_CHAT_POOL = 8
+_GEO_POOL = 8
 
 
 def _short_gloss(definition: str | None) -> str | None:
@@ -114,43 +110,43 @@ async def _sources_card(db: AsyncSession) -> dict | None:
         return None
 
 
-async def _chat_card(db: AsyncSession, redis, seed: int) -> dict | None:
+async def _chat_card(db: AsyncSession, redis) -> dict | None:
+    """A pool of hot questions; the frontend shows one at random per load."""
     try:
         questions = await get_hot_questions(db, redis)
-        q = _pick(questions, seed)
-        return {"question": q} if q else None
+        pool = [q for q in questions if q][:_CHAT_POOL]
+        return {"questions": pool} if pool else None
     except Exception:
         logger.warning("showcase chat_card failed", exc_info=True)
         return None
 
 
-async def _dictionary_card(db: AsyncSession, seed: int) -> dict | None:
+async def _dictionary_card(db: AsyncSession) -> dict | None:
+    """A pool of hot terms + short glosses (one batched query over HOT_TERMS)."""
     try:
-        term = _pick(HOT_TERMS, seed)
-        if not term:
-            return None
-        row = (
+        rows = (
             await db.execute(
                 select(DictionaryEntry.headword, DictionaryEntry.definition)
-                .where(DictionaryEntry.headword == term)
-                .limit(1)
+                .where(DictionaryEntry.headword.in_(HOT_TERMS))
             )
-        ).first()
-        if row is None:
-            return {"term": term, "definition": None}
-        return {"term": row[0], "definition": _short_gloss(row[1])}
+        ).all()
+        # One gloss per headword (first row wins), preserving HOT_TERMS order.
+        by_term: dict[str, str | None] = {}
+        for headword, definition in rows:
+            if headword not in by_term:
+                by_term[headword] = _short_gloss(definition)
+        terms = [{"term": t, "definition": by_term[t]} for t in HOT_TERMS if t in by_term]
+        return {"terms": terms} if terms else None
     except Exception:
         logger.warning("showcase dictionary_card failed", exc_info=True)
         return None
 
 
-async def _kg_card(db: AsyncSession, seed: int) -> dict | None:
-    """A readable knowledge-graph triple (subject —predicate→ object).
+async def _kg_card(db: AsyncSession) -> dict | None:
+    """A pool of readable knowledge-graph triples (subject —predicate→ object).
 
-    Bounded: fetches a small pool of relations whose subject is a person (the
-    most human-readable triples: 玄奘 —译→ …) and both endpoints have a name,
-    then rotates. Person-subject filter keeps the sample coherent without an
-    expensive scan."""
+    Person-subject filter keeps the sample human-readable (玄奘 —译→ …) without
+    an expensive scan; the frontend shows one triple at random per load."""
     try:
         subj = aliased(KGEntity)
         obj = aliased(KGEntity)
@@ -167,17 +163,22 @@ async def _kg_card(db: AsyncSession, seed: int) -> dict | None:
                 .limit(_POOL)
             )
         ).all()
-        picked = _pick(rows, seed)
-        if picked is None:
-            return None
-        predicate = _PREDICATE_LABELS.get(picked[1], picked[1])
-        return {"subject": picked[0], "predicate": predicate, "object": picked[2]}
+        triples = [
+            {
+                "subject": r[0],
+                "predicate": _PREDICATE_LABELS.get(r[1], r[1]),
+                "object": r[2],
+            }
+            for r in rows
+        ]
+        return {"triples": triples} if triples else None
     except Exception:
         logger.warning("showcase kg_card failed", exc_info=True)
         return None
 
 
-async def _geo_card(db: AsyncSession, seed: int) -> dict | None:
+async def _geo_card(db: AsyncSession) -> dict | None:
+    """Site count + a pool of place names; the frontend samples a few per load."""
     try:
         count = (
             await db.execute(
@@ -188,14 +189,12 @@ async def _geo_card(db: AsyncSession, seed: int) -> dict | None:
             await db.execute(
                 select(KGEntity.name_zh)
                 .where(KGEntity.entity_type.in_(_GEO_TYPES), KGEntity.name_zh.is_not(None))
-                .limit(_POOL)
+                .limit(_GEO_POOL)
             )
         ).scalars().all()
         if not count and not names:
             return None
-        # Rotate the featured slice so the names vary across periods.
-        featured = names[seed % max(1, len(names)) :][:3] or names[:3]
-        return {"count": int(count), "places": list(featured)}
+        return {"count": int(count), "places": list(names)}
     except Exception:
         logger.warning("showcase geo_card failed", exc_info=True)
         return None
@@ -216,13 +215,12 @@ async def get_home_showcase(db: AsyncSession, redis=None) -> dict:
         except Exception:
             logger.debug("showcase cache read failed", exc_info=True)
 
-    seed = _seed()
     showcase = {
         "sources": await _sources_card(db),
-        "chat": await _chat_card(db, redis, seed),
-        "dictionary": await _dictionary_card(db, seed),
-        "kg": await _kg_card(db, seed),
-        "geo": await _geo_card(db, seed),
+        "chat": await _chat_card(db, redis),
+        "dictionary": await _dictionary_card(db),
+        "kg": await _kg_card(db),
+        "geo": await _geo_card(db),
     }
 
     if redis is not None:
