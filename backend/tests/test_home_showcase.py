@@ -59,6 +59,10 @@ async def test_showcase_returns_pools_per_card(seeded_db):
     assert "那烂陀寺" in out["geo"]["places"]
     # Chat returns a non-empty pool of questions.
     assert isinstance(out["chat"]["questions"], list) and out["chat"]["questions"]
+    # Legacy single-pick fields coexist (backward-compat for PWA-cached old FE).
+    assert out["chat"]["question"] == out["chat"]["questions"][0]
+    assert out["kg"]["subject"] == out["kg"]["triples"][0]["subject"]
+    assert out["dictionary"]["term"] == out["dictionary"]["terms"][0]["term"]
 
 
 @pytest.mark.anyio

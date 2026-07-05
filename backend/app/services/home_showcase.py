@@ -115,7 +115,10 @@ async def _chat_card(db: AsyncSession, redis) -> dict | None:
     try:
         questions = await get_hot_questions(db, redis)
         pool = [q for q in questions if q][:_CHAT_POOL]
-        return {"questions": pool} if pool else None
+        # `question` (first of pool) is a legacy field kept for one release so a
+        # PWA-cached old frontend (which reads .question) still works during the
+        # service-worker update window. Safe to drop once SWs have propagated.
+        return {"questions": pool, "question": pool[0]} if pool else None
     except Exception:
         logger.warning("showcase chat_card failed", exc_info=True)
         return None
@@ -136,7 +139,10 @@ async def _dictionary_card(db: AsyncSession) -> dict | None:
             if headword not in by_term:
                 by_term[headword] = _short_gloss(definition)
         terms = [{"term": t, "definition": by_term[t]} for t in HOT_TERMS if t in by_term]
-        return {"terms": terms} if terms else None
+        if not terms:
+            return None
+        # Legacy single-pick fields (see _chat_card) for PWA-cached old frontends.
+        return {"terms": terms, "term": terms[0]["term"], "definition": terms[0]["definition"]}
     except Exception:
         logger.warning("showcase dictionary_card failed", exc_info=True)
         return None
@@ -171,7 +177,10 @@ async def _kg_card(db: AsyncSession) -> dict | None:
             }
             for r in rows
         ]
-        return {"triples": triples} if triples else None
+        if not triples:
+            return None
+        # Legacy single-pick fields (see _chat_card) for PWA-cached old frontends.
+        return {"triples": triples, **triples[0]}
     except Exception:
         logger.warning("showcase kg_card failed", exc_info=True)
         return None
