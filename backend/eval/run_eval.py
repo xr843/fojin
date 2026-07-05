@@ -29,6 +29,12 @@ from app.config import settings
 from app.database import async_session
 from app.services.chat import _build_llm_messages
 from app.services.rag_retrieval import retrieve_rag_context
+from eval.faithfulness import (
+    TRUST_STATES,
+    aggregate_faithfulness,
+    compute_faithfulness,
+    detect_faithfulness_regressions,
+)
 from eval.retrieval_metrics import (
     aggregate,
     compute_metrics,
@@ -114,6 +120,13 @@ async def run_single_question(question_data: dict, skip_llm: bool = False) -> di
     result["answer"] = answer
     result["model"] = model
 
+    # Deterministic citation-faithfulness: replay the production trust pipeline
+    # (citation guard → quote verifier → trust status) over the raw answer. Needs
+    # the answer, so it is populated only on LLM-on runs and skipped for errored
+    # generations (which carry no citations and would drag the rates down).
+    if not answer.startswith("[ERROR]"):
+        result["faithfulness"] = compute_faithfulness(answer, sources)
+
     # Step 3: Scoring
     if category == "out_of_scope":
         result["scores"] = score_out_of_scope(answer, question_data.get("expected_behavior", "refuse"))
@@ -132,6 +145,48 @@ async def run_single_question(question_data: dict, skip_llm: bool = False) -> di
         "total_s": round(time.monotonic() - t0, 2),
     }
     return result
+
+
+def _fmt_rate(value: object) -> str:
+    """Percent string for a 0..1 rate, or 'N/A' when the rate is unmeasured."""
+    return f"{round(value * 100, 1)}%" if isinstance(value, int | float) else "N/A"
+
+
+def _faithfulness_section(faith_agg: dict) -> list[str]:
+    """Render the deterministic citation-faithfulness block as report lines.
+
+    Empty ``faith_agg`` (a ``--no-llm`` retrieval-only run generates no answers
+    to check) returns an explanatory note instead of misleading zeros.
+    """
+    if not faith_agg:
+        return [
+            "", "## 引用忠实度（确定性 / 每一句可点回原典）", "",
+            "*本次为 --no-llm 检索评测，未生成回答，故无忠实度数据。*", "",
+        ]
+
+    state_names = {
+        "verified": "已核验",
+        "sources_available": "有来源未引用",
+        "citation_corrected": "引用被纠正",
+        "quote_unverified": "引文未核实",
+        "no_sources": "无来源",
+    }
+    dist = faith_agg.get("state_distribution", {})
+    lines = [
+        "", "## 引用忠实度（确定性 / 每一句可点回原典）", "",
+        f"*基于 {faith_agg.get('num_answers', 0)} 道生成回答，重放线上"
+        "「引用守卫 → 引文核验 → 可信状态」管线*", "",
+        "| 指标 | 值 |", "|------|-----|",
+        f"| 引用可核验率 (citation_grounding_rate) | {_fmt_rate(faith_agg.get('citation_grounding_rate'))} |",
+        f"| 有引用回答的完全核验率 (verified_rate_of_cited) | {_fmt_rate(faith_agg.get('verified_rate_of_cited'))} |",
+        f"| 含未核实引文的回答数 | {faith_agg.get('answers_with_unverified_quote', 0)} |",
+        f"| 引用总数 / 有引用回答数 | {faith_agg.get('total_citations', 0)} / {faith_agg.get('answers_with_citations', 0)} |",
+        "", "**可信状态分布**", "",
+        "| 状态 | 数量 |", "|------|------|",
+    ]
+    lines += [f"| {state_names.get(s, s)} | {dist.get(s, 0)} |" for s in TRUST_STATES]
+    lines.append("")
+    return lines
 
 
 def generate_report(results: list[dict], tag: str = "") -> str:
@@ -177,6 +232,9 @@ def generate_report(results: list[dict], tag: str = "") -> str:
         if r.get("retrieval_metrics", {}).get("num_gold", 0) > 0
     )
 
+    # Deterministic citation-faithfulness (replays the runtime trust pipeline).
+    faith_agg = aggregate_faithfulness([r.get("faithfulness") for r in results])
+
     cat_names = {
         "term_explanation": "名相解释", "source_lookup": "经文出处",
         "historical": "人物历史", "comparative": "义理比较",
@@ -203,7 +261,12 @@ def generate_report(results: list[dict], tag: str = "") -> str:
         f"| Hit@5 | {round(retr_agg.get('hit@5', 0), 3)} |",
         f"| MRR | {round(retr_agg.get('mrr', 0), 3)} |",
         f"| Precision@5 | {round(retr_agg.get('precision@5', 0), 3)} |",
-        "", "## 分类得分", "",
+    ]
+
+    lines += _faithfulness_section(faith_agg)
+
+    lines += [
+        "## 分类得分", "",
         "| 分类 | 题数 | 检索 | 引用 | 完整 | 无编造 |",
         "|------|------|------|------|------|--------|",
     ]
@@ -257,6 +320,12 @@ async def main():
                         help="Allowed drop before a metric counts as a regression (default 0.02)")
     parser.add_argument("--min-recall5", type=float,
                         help="Exit non-zero if mean Recall@5 falls below this absolute floor")
+    parser.add_argument("--min-citation-grounding", type=float,
+                        help="Exit non-zero if citation_grounding_rate falls below this floor "
+                             "(LLM-on runs only — needs generated answers)")
+    parser.add_argument("--min-verified-rate", type=float,
+                        help="Exit non-zero if verified_rate_of_cited falls below this floor "
+                             "(LLM-on runs only — needs generated answers)")
     args = parser.parse_args()
 
     test_set = load_test_set()
@@ -320,6 +389,7 @@ async def main():
 
     # Regression gate: usable wherever the corpus DB is reachable (e.g. prod cron).
     current_agg = aggregate([r["retrieval_metrics"] for r in results if r.get("retrieval_metrics")])
+    current_faith = aggregate_faithfulness([r.get("faithfulness") for r in results])
     gate_failed = False
 
     if args.baseline:
@@ -329,6 +399,15 @@ async def main():
                 [r["retrieval_metrics"] for r in baseline_results if r.get("retrieval_metrics")]
             )
             regressions = detect_regressions(current_agg, baseline_agg, args.regression_tolerance)
+            # Faithfulness regressions only when BOTH runs generated answers —
+            # a --no-llm baseline or current run has no rates to compare.
+            baseline_faith = aggregate_faithfulness(
+                [r.get("faithfulness") for r in baseline_results]
+            )
+            if current_faith and baseline_faith:
+                regressions += detect_faithfulness_regressions(
+                    current_faith, baseline_faith, args.regression_tolerance
+                )
             print(f"\n{'='*60}\n回归检查（对照 {args.baseline}）：")
             if regressions:
                 for reg in regressions:
@@ -336,7 +415,7 @@ async def main():
                 if args.fail_on_regression:
                     gate_failed = True
             else:
-                print("  ✓ 检索指标无回归")
+                print("  ✓ 检索/忠实度指标无回归")
         except (OSError, ValueError, KeyError) as exc:
             print(f"\n[baseline 对照失败] {exc}")
 
@@ -344,6 +423,21 @@ async def main():
         recall5 = current_agg.get("recall@5")
         if recall5 is None or recall5 < args.min_recall5:
             print(f"\n  ⚠️  Recall@5 {recall5} 低于下限 {args.min_recall5}")
+            gate_failed = True
+
+    # Faithfulness floors. current_faith is empty on --no-llm runs; treat a
+    # requested floor with no data to check as a failure so a misconfigured
+    # gate (floor set but LLM off) is loud rather than silently passing.
+    for flag_val, key, label in (
+        (args.min_citation_grounding, "citation_grounding_rate", "引用可核验率"),
+        (args.min_verified_rate, "verified_rate_of_cited", "有引用回答完全核验率"),
+    ):
+        if flag_val is None:
+            continue
+        rate = current_faith.get(key)
+        if rate is None or rate < flag_val:
+            shown = f"{rate:.3f}" if isinstance(rate, int | float) else "N/A（本次未生成回答）"
+            print(f"\n  ⚠️  {label} {shown} 低于下限 {flag_val}")
             gate_failed = True
 
     if gate_failed:
