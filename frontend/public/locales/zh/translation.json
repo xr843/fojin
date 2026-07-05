@@ -395,6 +395,8 @@
   "home.stat_label": "平台数据统计",
   "home.feature_sources_title": "数据源",
   "home.feature_sources_desc": "汇聚 CBETA、SuttaCentral 等全球数字佛典资源",
+  "home.sc_sources": "{{sources}} 个来源 · {{texts}} 部经典",
+  "home.sc_geo": "{{count}} 处圣迹 · {{places}}",
   "home.feature_kg_title": "知识图谱",
   "home.feature_kg_desc": "例如：鸠摩罗什 → 译经 → 《妙法莲华经》",
   "home.feature_chat_title": "AI 问答",
