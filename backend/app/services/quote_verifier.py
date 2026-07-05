@@ -32,13 +32,15 @@ The check is deliberately conservative:
   quote inside a 繁-script source citation has already lost the
   attribution chain it claimed to preserve, so failing the check is
   the correct behaviour.
-- On miss we append **one consolidated caveat** at the end of the answer
-  (before any ``[追问]`` block) rather than annotating each quote inline.
-  The earlier per-quote inline ⚠️ markers fired so often on *correct*
-  canonical quotes — retrieval favours dense commentaries over the base
-  sutra that actually contains the line — that they disfigured sound answers
-  mid-sentence and inside tables. The single trailing caveat keeps the
-  unverified-status signal; per-quote detail still reaches the logs.
+- On miss we **downgrade** the quote: strip its open/close marks (or the
+  ``> `` blockquote prefix) so the passage reads as the model's own prose,
+  still followed by its citation. fojin thus never *serves* a false verbatim
+  quote — the earlier design only appended a caveat and left the misquote in
+  place. Each downgrade is recorded as a ``QuoteMutation`` for telemetry (how
+  often the model paraphrases-as-quote is a model-quality signal), and the
+  trust status marks the answer ``quote_relaxed`` (a correction tier, not a
+  warning) rather than ``quote_unverified``. The measured-but-useless prompt
+  approach (PR #901) is why this is done deterministically instead.
 
 The verifier is wired *after* ``enforce_citation_whitelist`` so quotes
 attached to citations the guard already stripped (unverified titles)
@@ -99,12 +101,15 @@ MAX_QUOTE_CITATION_GAP_CHARS = 80
 # in 「」/“”/'' and may span several lines.
 _QUOTE_OPEN = "「『“‘\""
 _QUOTE_CLOSE = "」』”’\""
+# Groups capture every part so a failing quote can be *downgraded* — rebuilt as
+# ``quote + gap + cite`` with the open/close marks dropped, turning a false
+# verbatim quote into honest prose that still cites the source.
 _QUOTE_CITATION_RE = re.compile(
     r"[" + re.escape(_QUOTE_OPEN) + r"]"
     r"(?P<quote>.{" + str(MIN_QUOTE_CHARS) + r",400}?)"
     r"[" + re.escape(_QUOTE_CLOSE) + r"]"
-    r".{0," + str(MAX_QUOTE_CITATION_GAP_CHARS) + r"}?"
-    r"【《(?P<title>[^》]+)》(?:第(?P<juan>\d+)卷)?】",
+    r"(?P<gap>.{0," + str(MAX_QUOTE_CITATION_GAP_CHARS) + r"}?)"
+    r"(?P<cite>【《(?P<title>[^》]+)》(?:第(?P<juan>\d+)卷)?】)",
     re.DOTALL,
 )
 
@@ -130,15 +135,6 @@ _BLOCKQUOTE_CITATION_RE = re.compile(
     r"【《(?P<title>[^》]+)》(?:第(?P<juan>\d+)卷)?】",
     re.MULTILINE,
 )
-
-# Marker placed at the start of the verifier's own appended caveat
-# blockquote (see ``_QUOTE_CAVEAT``). If the answer is fed back through
-# ``verify_quoted_content`` a second time — or a downstream pipeline
-# concatenates verified answers — the blockquote scanner must skip the
-# caveat itself, otherwise a real ``【《X》】`` citation that follows
-# elsewhere in the answer would pair with the warning blockquote and
-# emit a spurious second mutation.
-_CAVEAT_BLOCK_MARKER = "⚠️ 本回答"
 
 
 # Punctuation we strip from both sides of the substring test. Includes
@@ -235,115 +231,58 @@ def _find_sources(
     return exact or title_only
 
 
-# A single, unobtrusive caveat appended once when ≥1 quote fails verification,
-# replacing the previous per-quote inline ⚠️ markers. Because retrieval favours
-# dense commentaries over base sutras, those inline markers fired on the LLM's
-# *correct* canonical quotes (e.g. 「照见五蕴皆空」 under a 心经 commentary that
-# doesn't contain the line) and disfigured otherwise-sound answers mid-sentence
-# and inside tables. One caveat paragraph (placed before any [追问] block) keeps
-# the scholarly signal without breaking the prose; per-quote detail still goes to
-# the logs via QuoteMutation.
-_QUOTE_CAVEAT = "> ⚠️ 本回答中部分直接引文未能在检索到的经文片段中逐字核实，建议点按引用链接核对原文。"
-
-
-def _append_caveat(answer: str) -> str:
-    """Insert the quote caveat as its own paragraph, before any trailing
-    ``[追问]`` suggestion lines so it reads as part of the answer body rather
-    than after the follow-up buttons (which the frontend renders separately and
-    the backend strips before persistence)."""
-    lines = answer.split("\n")
-    for i, line in enumerate(lines):
-        if line.strip().startswith("[追问]"):
-            head = "\n".join(lines[:i]).rstrip()
-            tail = "\n".join(lines[i:])
-            return f"{head}\n\n{_QUOTE_CAVEAT}\n\n{tail}"
-    return answer.rstrip() + f"\n\n{_QUOTE_CAVEAT}"
-
-
-def _strip_existing_caveat(answer: str) -> str:
-    """Remove a previously-appended caveat blockquote so it can be re-emitted
-    at the correct position below any newly-appearing fabricated content.
-
-    Matches the canonical ``_QUOTE_CAVEAT`` line verbatim (the caveat is a
-    single-line blockquote, so this is unambiguous) and trims one trailing
-    blank line so we don't accumulate paragraph spacing on repeated passes.
-    """
-    if _QUOTE_CAVEAT not in answer:
-        return answer
-    return re.sub(
-        r"\n*" + re.escape(_QUOTE_CAVEAT) + r"\n*",
-        "\n\n",
-        answer,
-    ).rstrip()
+def _quote_failure_reason(
+    quote: str, title: str, juan: int | None, sources: list[ChatSource], *, blockquote: bool
+) -> str | None:
+    """Return a failure reason if ``quote`` is not verbatim in the cited source,
+    else None (verified). Same detection as before — only the *action* changed
+    from flag-and-caveat to downgrade."""
+    candidates = _find_sources(sources, title, juan)
+    if not candidates:
+        return "blockquote_not_in_source" if blockquote else "no_matching_source"
+    normalised = _normalise(quote)
+    if any(normalised in _normalise(c.chunk_text) for c in candidates):
+        return None
+    return "blockquote_not_in_source" if blockquote else "quote_not_in_source"
 
 
 def verify_quoted_content(
     answer: str, sources: list[ChatSource]
 ) -> tuple[str, list[QuoteMutation]]:
-    """Flag quoted segments that aren't substrings of the cited source's
-    chunk_text. Unchanged answers (no quote-citation pairs, or all quotes
-    verified) are returned identical, with an empty mutations list.
+    """Downgrade quoted segments that aren't verbatim in the cited source.
 
-    Implementation: regex scans for ``「…」【《X》第N卷】`` proximity pairs and
-    normalises both sides. Any failing pair is recorded as a QuoteMutation
-    (for logging); if there is at least one, a single consolidated caveat is
-    appended once to the answer (before any ``[追问]`` block). Multiple
-    failures share the one caveat rather than each getting an inline marker.
-    """
+    Detection is unchanged (a ``「…」【《X》第N卷】`` / blockquote pair whose quote
+    isn't a substring of any retrieved chunk of the cited text, 繁→简 folded).
+    The *action* is now deterministic: instead of appending a caveat, the quote
+    marks are stripped so the passage reads as the model's own prose while still
+    citing the source — fojin never *serves* a false verbatim quote. Each
+    downgrade is recorded as a ``QuoteMutation`` for telemetry.
+
+    Returns ``(corrected_answer, mutations)``; an answer with no failing quotes
+    is returned identical with an empty list. Idempotent: a downgraded passage
+    carries no quote marks, so a second pass is a no-op (and returns no
+    mutations — the served answer is already clean)."""
     if not answer or "【《" not in answer:
         return answer, []
 
     mutations: list[QuoteMutation] = []
 
-    for m in _QUOTE_CITATION_RE.finditer(answer):
+    def _downgrade_inline(m: re.Match[str]) -> str:
         quote = m.group("quote").strip()
-        title = m.group("title")
-        juan_str = m.group("juan")
-        juan = int(juan_str) if juan_str else None
         if len(quote) < MIN_QUOTE_CHARS:
-            continue
+            return m.group(0)
+        title = m.group("title")
+        juan = int(m.group("juan")) if m.group("juan") else None
+        reason = _quote_failure_reason(quote, title, juan, sources, blockquote=False)
+        if reason is None:
+            return m.group(0)
+        mutations.append(QuoteMutation(quote=quote, title=title, juan=juan, reason=reason))
+        # Drop the open/close marks: keep the text (now prose) + gap + citation.
+        return m.group("quote") + m.group("gap") + m.group("cite")
 
-        candidates = _find_sources(sources, title, juan)
-        if not candidates:
-            mutations.append(
-                QuoteMutation(
-                    quote=quote, title=title, juan=juan,
-                    reason="no_matching_source",
-                )
-            )
-            continue
-
-        # Pass if the quote is a substring of ANY retrieved chunk for the
-        # cited text — a multi-chunk retrieval scatters the passage across
-        # several chunks of the same juan.
-        normalised_quote = _normalise(quote)
-        if not any(
-            normalised_quote in _normalise(c.chunk_text) for c in candidates
-        ):
-            mutations.append(
-                QuoteMutation(
-                    quote=quote, title=title, juan=juan,
-                    reason="quote_not_in_source",
-                )
-            )
-
-    mutations.extend(_scan_blockquotes(answer, sources))
-
-    if not mutations:
-        return answer, mutations
-
-    # Idempotent caveat: ``chat.py`` calls this verifier twice (once on
-    # the streamed answer, once on the post-correction answer) and the
-    # second input can carry forward a caveat the first pass appended.
-    # Strip any existing caveat so the re-append lands at the bottom of
-    # the current (possibly extended) answer body — this preserves the
-    # single-caveat invariant while still surfacing newly-introduced
-    # fabrications that appear *after* the prior caveat, which a plain
-    # "skip if marker present" check would silently swallow.
-    if _CAVEAT_BLOCK_MARKER in answer:
-        answer = _strip_existing_caveat(answer)
-
-    return _append_caveat(answer), mutations
+    corrected = _QUOTE_CITATION_RE.sub(_downgrade_inline, answer)
+    corrected = _downgrade_blockquotes(corrected, sources, mutations)
+    return corrected, mutations
 
 
 def _strip_blockquote_markers(block: str) -> str:
@@ -369,56 +308,33 @@ def _strip_blockquote_markers(block: str) -> str:
     return " ".join(out_lines).strip()
 
 
-def _scan_blockquotes(
-    answer: str, sources: list[ChatSource]
-) -> list[QuoteMutation]:
-    """Detect ``> …`` blockquote / ``【《X》第N卷】`` pairs and verify them
-    against the cited source's chunk_text with the same substring
-    semantics as the inline scanner.
+def _downgrade_blockquotes(
+    answer: str, sources: list[ChatSource], mutations: list[QuoteMutation]
+) -> str:
+    """Downgrade ``> …`` blockquote / ``【《X》第N卷】`` pairs whose quote isn't
+    verbatim in the cited source: strip the per-line ``> `` markers so the block
+    becomes an ordinary paragraph (still followed by its citation). Appends a
+    QuoteMutation per downgrade to ``mutations``.
 
-    Returns the list of failing mutations (empty if every blockquote
-    verifies, or there are none). The caller decides whether to append
-    the shared caveat — multiple blockquote failures must collapse into
-    the same single caveat as the inline path, so producing inline-style
-    mutations here and letting the caller pool them is the right shape.
-    """
-    out: list[QuoteMutation] = []
-    for m in _BLOCKQUOTE_CITATION_RE.finditer(answer):
+    Same substring detection as the inline path. A verifying blockquote is left
+    untouched. Idempotent: a downgraded block no longer starts with ``>``, so a
+    second pass doesn't match it."""
+    def _sub(m: re.Match[str]) -> str:
         block = m.group("block")
         quote = _strip_blockquote_markers(block)
-        # Skip the verifier's own self-appended caveat blockquote so a
-        # second pass over already-verified output doesn't pair the
-        # warning text with an unrelated downstream citation.
-        if _CAVEAT_BLOCK_MARKER in quote:
-            continue
         if len(quote) < MIN_QUOTE_CHARS:
-            continue
-
+            return m.group(0)
         title = m.group("title")
-        juan_str = m.group("juan")
-        juan = int(juan_str) if juan_str else None
+        juan = int(m.group("juan")) if m.group("juan") else None
+        reason = _quote_failure_reason(quote, title, juan, sources, blockquote=True)
+        if reason is None:
+            return m.group(0)
+        mutations.append(QuoteMutation(quote=quote, title=title, juan=juan, reason=reason))
+        # Replace the blockquote body with its unmarked prose; keep everything
+        # after the block (gap + citation) exactly as matched.
+        return quote + "\n\n" + m.group(0)[len(block):]
 
-        candidates = _find_sources(sources, title, juan)
-        if not candidates:
-            out.append(
-                QuoteMutation(
-                    quote=quote, title=title, juan=juan,
-                    reason="blockquote_not_in_source",
-                )
-            )
-            continue
-
-        normalised_quote = _normalise(quote)
-        if not any(
-            normalised_quote in _normalise(c.chunk_text) for c in candidates
-        ):
-            out.append(
-                QuoteMutation(
-                    quote=quote, title=title, juan=juan,
-                    reason="blockquote_not_in_source",
-                )
-            )
-    return out
+    return _BLOCKQUOTE_CITATION_RE.sub(_sub, answer)
 
 
 def log_quote_mutations(

@@ -31,20 +31,29 @@ from app.services.chat_trust import build_trust_status
 from app.services.citation_guard import enforce_citation_whitelist
 from app.services.quote_verifier import verify_quoted_content
 
-# The five states build_trust_status can emit, in descending trust order. Kept
+# The states build_trust_status can emit, in descending trust order. Kept
 # explicit (rather than imported from the Literal) so the report renders a
 # stable, ordered distribution even for states absent from a given run.
+# ``quote_unverified`` is legacy (pre-downgrade); new runs emit ``quote_relaxed``.
 TRUST_STATES = (
     "verified",
     "sources_available",
     "citation_corrected",
+    "quote_relaxed",
     "quote_unverified",
     "no_sources",
 )
 
+# Trust states in which the *served* answer contains no misrepresentation — a
+# resolvable citation or honest prose. verified = clean; citation_corrected /
+# quote_relaxed = the guards fixed it. This is the brand number ("what fojin
+# serves is honest"), distinct from verified_rate (raw, zero-correction LLM
+# quality).
+_TRUSTWORTHY_STATES = frozenset({"verified", "citation_corrected", "quote_relaxed"})
+
 # Grounding rates a regression gate watches. Mirrors retrieval_metrics'
 # _METRIC_PREFIXES convention (bookkeeping counts are excluded).
-_GATED_RATES = ("citation_grounding_rate", "verified_rate_of_cited")
+_GATED_RATES = ("citation_grounding_rate", "verified_rate_of_cited", "served_trustworthy_rate")
 
 
 def compute_faithfulness(answer: str, sources: list[ChatSource]) -> dict:
@@ -75,9 +84,16 @@ def compute_faithfulness(answer: str, sources: list[ChatSource]) -> dict:
         "citations_grounded": citations_grounded,
         "has_citations": 1 if trust.citation_count else 0,
         # "verified" is the only state with ≥1 citation and zero citation/quote
-        # mutations — the literal "every citation and quote checks out" answer.
+        # mutations — the strict "every citation and quote checks out first try"
+        # answer (raw LLM quality).
         "fully_grounded": 1 if trust.state == "verified" else 0,
-        "quote_unverified": 1 if trust.quote_mutation_count else 0,
+        # Served-honest: the answer cites and, after the guards, misrepresents
+        # nothing (verified / citation_corrected / quote_relaxed).
+        "served_trustworthy": 1 if (trust.citation_count and trust.state in _TRUSTWORTHY_STATES) else 0,
+        # Number of paraphrase-as-quote passages the verifier downgraded — a
+        # raw model-quality signal, no longer a trust penalty (the served answer
+        # is fixed).
+        "quotes_downgraded": trust.quote_mutation_count,
     }
 
 
@@ -102,6 +118,7 @@ def aggregate_faithfulness(rows: list[dict]) -> dict:
     grounded_citations = sum(r["citations_grounded"] for r in rows)
     answers_with_citations = sum(r["has_citations"] for r in rows)
     fully_grounded = sum(r["fully_grounded"] for r in rows)
+    served_trustworthy = sum(r.get("served_trustworthy", 0) for r in rows)
 
     distribution = dict.fromkeys(TRUST_STATES, 0)
     for r in rows:
@@ -119,7 +136,13 @@ def aggregate_faithfulness(rows: list[dict]) -> dict:
         "verified_rate_of_cited": (
             fully_grounded / answers_with_citations if answers_with_citations else None
         ),
-        "answers_with_unverified_quote": sum(r["quote_unverified"] for r in rows),
+        # The brand number: among citing answers, the fraction whose SERVED text
+        # misrepresents nothing (post-guard). The deterministic quote-downgrade
+        # moves this toward the citation-grounding ceiling.
+        "served_trustworthy_rate": (
+            served_trustworthy / answers_with_citations if answers_with_citations else None
+        ),
+        "answers_with_downgraded_quote": sum(1 for r in rows if r.get("quotes_downgraded")),
         "total_citations": total_citations,
         "answers_with_citations": answers_with_citations,
         "state_distribution": distribution,

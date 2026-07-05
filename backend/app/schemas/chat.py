@@ -102,6 +102,11 @@ class ChatSource(BaseModel):
 ChatTrustState = Literal[
     "verified",
     "citation_corrected",
+    # A non-verbatim quote was downgraded to prose (deterministic fix) — a
+    # correction tier, not a warning.
+    "quote_relaxed",
+    # Legacy: emitted by the old caveat-only path; retained so diagnostics
+    # persisted before the downgrade change still deserialize.
     "quote_unverified",
     "sources_available",
     "no_sources",

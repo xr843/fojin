@@ -1600,6 +1600,7 @@ export interface ChatSessionItem {
 export type ChatTrustState =
   | "verified"
   | "citation_corrected"
+  | "quote_relaxed"
   | "quote_unverified"
   | "sources_available"
   | "no_sources";

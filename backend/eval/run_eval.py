@@ -57,7 +57,9 @@ def load_test_set() -> dict:
         return json.load(f)
 
 
-async def run_single_question(question_data: dict, skip_llm: bool = False) -> dict:
+async def run_single_question(
+    question_data: dict, skip_llm: bool = False, temperature: float = 0.7
+) -> dict:
     """Run a single question through the RAG + LLM pipeline and score it."""
     qid = question_data["id"]
     question = question_data["question"]
@@ -109,7 +111,7 @@ async def run_single_question(question_data: dict, skip_llm: bool = False) -> di
             resp = await client.post(
                 f"{api_url}/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}"},
-                json={"model": model, "messages": llm_messages, "temperature": 0.7, "max_tokens": 2000},
+                json={"model": model, "messages": llm_messages, "temperature": temperature, "max_tokens": 2000},
             )
             resp.raise_for_status()
             answer = resp.json()["choices"][0]["message"]["content"]
@@ -168,7 +170,8 @@ def _faithfulness_section(faith_agg: dict) -> list[str]:
         "verified": "已核验",
         "sources_available": "有来源未引用",
         "citation_corrected": "引用被纠正",
-        "quote_unverified": "引文未核实",
+        "quote_relaxed": "引文已转述（降级）",
+        "quote_unverified": "引文未核实（旧）",
         "no_sources": "无来源",
     }
     dist = faith_agg.get("state_distribution", {})
@@ -178,8 +181,9 @@ def _faithfulness_section(faith_agg: dict) -> list[str]:
         "「引用守卫 → 引文核验 → 可信状态」管线*", "",
         "| 指标 | 值 |", "|------|-----|",
         f"| 引用可核验率 (citation_grounding_rate) | {_fmt_rate(faith_agg.get('citation_grounding_rate'))} |",
-        f"| 有引用回答的完全核验率 (verified_rate_of_cited) | {_fmt_rate(faith_agg.get('verified_rate_of_cited'))} |",
-        f"| 含未核实引文的回答数 | {faith_agg.get('answers_with_unverified_quote', 0)} |",
+        f"| **服务可信率 (served_trustworthy_rate)** | **{_fmt_rate(faith_agg.get('served_trustworthy_rate'))}** |",
+        f"| 完全核验率·严格 (verified_rate_of_cited) | {_fmt_rate(faith_agg.get('verified_rate_of_cited'))} |",
+        f"| 含转述降级引文的回答数 | {faith_agg.get('answers_with_downgraded_quote', 0)} |",
         f"| 引用总数 / 有引用回答数 | {faith_agg.get('total_citations', 0)} / {faith_agg.get('answers_with_citations', 0)} |",
         "", "**可信状态分布**", "",
         "| 状态 | 数量 |", "|------|------|",
@@ -312,6 +316,9 @@ async def main():
     parser.add_argument("--category", type=str, help="Only run questions from this category")
     parser.add_argument("--limit", type=int, help="Limit number of questions")
     parser.add_argument("--no-llm", action="store_true", help="Skip LLM, only test RAG retrieval")
+    parser.add_argument("--temperature", type=float, default=0.7,
+                        help="LLM sampling temperature. Use 0 for a deterministic, reproducible "
+                             "run when measuring a faithfulness delta (default 0.7 matches prod chat)")
     parser.add_argument("--tag", type=str, default="", help="Tag for the report")
     parser.add_argument("--baseline", type=str, help="Prior raw eval JSON to compare retrieval metrics against")
     parser.add_argument("--fail-on-regression", action="store_true",
@@ -347,7 +354,7 @@ async def main():
     for i, q in enumerate(questions):
         print(f"  [{i+1}/{len(questions)}] {q['id']}: {q['question'][:40]}...", end="", flush=True)
         try:
-            result = await run_single_question(q, skip_llm=args.no_llm)
+            result = await run_single_question(q, skip_llm=args.no_llm, temperature=args.temperature)
             results.append(result)
             score = result["scores"]
             t = result["timing"]["total_s"]
