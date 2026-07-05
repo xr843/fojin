@@ -216,6 +216,98 @@ async def test_custom_byok_http_client_uses_pinned_transport(monkeypatch):
 
 
 @pytest.mark.anyio
+async def test_session_title_custom_byok_routes_through_pinned_transport(monkeypatch):
+    """Session-title generation must pin BYOK custom endpoints, not use a bare
+    client that re-resolves DNS (SSRF / rebinding). If the pin guard rejects
+    the URL, it returns None without issuing the request."""
+    from app.services import chat
+
+    pin = AsyncMock(side_effect=ValueError("自定义 API 地址 解析到内网地址"))
+    monkeypatch.setattr(chat, "create_pinned_https_transport", pin)
+
+    title = await chat._generate_session_title(
+        "https://llm.example.com/v1", "sk-user", "custom-model",
+        "用户问题", "AI 回答", provider="custom",
+    )
+
+    assert title is None
+    pin.assert_awaited_once_with("https://llm.example.com/v1", label="自定义 API 地址")
+
+
+@pytest.mark.anyio
+async def test_research_agent_custom_byok_routes_through_pinned_transport(monkeypatch):
+    """The research agent's LLM calls must pin BYOK custom endpoints too — this
+    path previously used a bare client with no runtime DNS check at all."""
+    from unittest.mock import MagicMock
+
+    from app.core import url_security
+    from app.services import llm_client, research_agent
+
+    monkeypatch.setattr(
+        llm_client,
+        "_resolve_llm_config",
+        lambda _user: ("https://llm.example.com/v1", "sk-user", "custom-model", True, "custom"),
+    )
+    pin = AsyncMock(side_effect=ValueError("自定义 API 地址 解析到内网地址"))
+    monkeypatch.setattr(url_security, "create_pinned_https_transport", pin)
+
+    agent = research_agent.build_research_agent(db=MagicMock(), user=MagicMock())
+    with pytest.raises(ValueError, match="自定义 API 地址"):
+        await agent._complete("system prompt", "user question")
+
+    pin.assert_awaited_once_with("https://llm.example.com/v1", label="自定义 API 地址")
+
+
+@pytest.mark.anyio
+async def test_research_agent_platform_provider_uses_default_transport(monkeypatch):
+    """Non-custom (platform/known) providers use fixed trusted URLs and must NOT
+    invoke the pinning path (which would add needless DNS work / failure modes)."""
+    from unittest.mock import MagicMock
+
+    from app.core import url_security
+    from app.services import llm_client, research_agent
+
+    monkeypatch.setattr(
+        llm_client,
+        "_resolve_llm_config",
+        lambda _user: ("https://api.deepseek.com/v1", "sk-plat", "deepseek", False, "deepseek"),
+    )
+    pin = AsyncMock()
+    monkeypatch.setattr(url_security, "create_pinned_https_transport", pin)
+
+    captured = {}
+
+    class _Resp:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"choices": [{"message": {"content": "答案"}}]}
+
+    class _Client:
+        def __init__(self, *args, **kwargs):
+            captured["transport"] = kwargs.get("transport", "MISSING")
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+        async def post(self, *args, **kwargs):
+            return _Resp()
+
+    monkeypatch.setattr("httpx.AsyncClient", _Client)
+
+    agent = research_agent.build_research_agent(db=MagicMock(), user=MagicMock())
+    out = await agent._complete("system", "user")
+
+    assert out == "答案"
+    pin.assert_not_awaited()
+    assert captured["transport"] is None
+
+
+@pytest.mark.anyio
 async def test_prepare_chat_rejects_custom_byok_when_runtime_dns_guard_fails(monkeypatch):
     from app.services import chat
 

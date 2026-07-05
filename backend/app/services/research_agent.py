@@ -366,17 +366,27 @@ def build_research_agent(db: object, user: object | None) -> ResearchAgent:
     """
     import httpx
 
+    from app.core.url_security import create_pinned_https_transport
     from app.services.llm_client import _resolve_llm_config
     from app.services.rag_retrieval import retrieve_rag_context
 
-    api_url, api_key, model, _is_byok, _provider = _resolve_llm_config(user)  # type: ignore[arg-type]
+    api_url, api_key, model, _is_byok, provider = _resolve_llm_config(user)  # type: ignore[arg-type]
 
     async def complete(system: str, user_msg: str) -> str:
         # OpenAI-compatible chat/completions — the same call shape eval/run_eval
         # uses in prod. max_tokens differs per call site (plan vs synthesis) but
         # the planner prompt is short, so one modest ceiling covers both.
         messages = [{"role": "system", "content": system}, {"role": "user", "content": user_msg}]
-        async with httpx.AsyncClient(timeout=60) as client:
+        # For BYOK "custom" endpoints, pin the outbound connection to a
+        # validated public IP (runtime DNS check + rebinding-proof transport) —
+        # the same guard the chat path applies. Platform/known providers use
+        # fixed, trusted base URLs, so they need no per-request pinning.
+        transport = (
+            await create_pinned_https_transport(api_url, label="自定义 API 地址")
+            if provider == "custom"
+            else None
+        )
+        async with httpx.AsyncClient(timeout=60, transport=transport) as client:
             resp = await client.post(
                 f"{api_url}/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}"},
