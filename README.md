@@ -359,7 +359,7 @@ cd backend && pytest tests/ -q
 
 - **No analytics phone-home.** The Umami tracking script is opt-in via build-time `VITE_UMAMI_URL` + `VITE_UMAMI_WEBSITE_ID`; if either is unset, the frontend ships without telemetry.
 - **LLM / embedding traffic is upstream by default.** Stock config calls DeepSeek + SiliconFlow with your platform key — user questions go there. Point `LLM_API_URL` / `EMBEDDING_API_URL` at a local OpenAI-compatible server (vLLM, Ollama, LM Studio) for a fully offline setup, or have each user provide their own key via the in-app BYOK flow.
-- **The frontend container is reachable from the docker host network, not only `127.0.0.1`.** On a multi-user LAN this means anyone on the network can hit your instance. Front it with an authenticated reverse proxy, or change the `frontend.ports` mapping in `docker-compose.yml` to bind on `127.0.0.1`.
+- **The frontend container binds to `127.0.0.1` by default** (set via `FRONTEND_BIND`), so out of the box it's reachable only from the host — put an authenticated reverse proxy or CDN in front of it as the public entry. If you need direct LAN/remote access without a proxy, set `FRONTEND_BIND=0.0.0.0`; note that Docker publishes ports through its own iptables rules that bypass host firewalls like `ufw`, so anyone who can reach the host on that port hits your instance.
 
 See [SECURITY.md](SECURITY.md) for the full picture.
 
