@@ -205,7 +205,10 @@ async def _generate_session_title(
         {"role": "user", "content": f"用户问：{message[:100]}\n回答：{answer[:200]}"},
     ]
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
+        # Route through the shared client builder so a BYOK "custom" endpoint
+        # gets the same IP-pinned, rebinding-proof transport as the main chat
+        # path — a bare client here would re-resolve DNS and reopen SSRF.
+        async with await _build_llm_http_client(api_url, provider, 10) as client:
             if _is_anthropic(api_url, provider):
                 body = _build_anthropic_body(model, messages, temperature=0.3, max_tokens=_with_reasoning_headroom(model, 64))
                 resp = await client.post(f"{api_url}/messages", headers=_build_anthropic_headers(api_key), json=body)

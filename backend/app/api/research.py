@@ -9,13 +9,14 @@ several LLM + retrieval calls and so must be bounded to signed-in users.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user
 from app.database import get_db
 from app.models.user import User
 from app.schemas.research import ResearchReport, ResearchRequest
+from app.services.chat_quota import check_research_quota
 from app.services.research_agent import build_research_agent
 
 router = APIRouter(prefix="/research", tags=["research"])
@@ -24,6 +25,7 @@ router = APIRouter(prefix="/research", tags=["research"])
 @router.post("/query", response_model=ResearchReport)
 async def research_query(
     request: ResearchRequest,
+    http_request: Request,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ResearchReport:
@@ -33,5 +35,9 @@ async def research_query(
     sources (each with a URN), the synthesized answer, and the deterministic
     trust status of that answer.
     """
+    # A single request fans out into several paid LLM + embedding calls on the
+    # platform key, so enforce a per-user daily budget (BYOK users exempt).
+    redis = getattr(http_request.app.state, "redis", None)
+    await check_research_quota(redis, user)
     agent = build_research_agent(db, user)
     return await agent.run(request.question, max_steps=request.max_steps)

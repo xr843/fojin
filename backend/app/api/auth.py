@@ -400,10 +400,11 @@ async def sms_verification_login(
     db: AsyncSession = Depends(get_db),
 ):
     """Verify SMS code and login (or register if new user)."""
+    phone = data.phone.strip()
     redis_client = request.app.state.redis
-    valid = await verify_sms_code(data.phone, data.code, redis_client)
+    valid = await verify_sms_code(phone, data.code, redis_client)
     if not valid:
         from fastapi import HTTPException
 
         raise HTTPException(status_code=400, detail="验证码错误或已过期")
-    return await sms_login(data.phone, db)
+    return await sms_login(phone, db)

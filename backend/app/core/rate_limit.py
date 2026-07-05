@@ -17,8 +17,13 @@ STRICT_PATHS: dict[str, int] = {
     "/api/auth/login": settings.rate_limit_login,
     "/api/auth/register": settings.rate_limit_register,
     "/api/auth/change-password": 5,
+    "/api/auth/sms/send-code": settings.rate_limit_sms_send,
+    "/api/auth/sms/login": settings.rate_limit_sms_verify,
     "/api/search": 60,
     "/api/search/content": 30,
+    # Paid-inference endpoints (embedding / LLM on the platform key).
+    "/api/search/semantic": settings.rate_limit_semantic,
+    "/api/research/query": settings.rate_limit_research,
 }
 
 
