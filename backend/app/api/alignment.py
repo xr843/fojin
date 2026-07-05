@@ -627,6 +627,11 @@ async def get_full_parallel_content(
 
 # === V2: AI difference analysis ===
 
+from fastapi import Request
+
+from app.core.client_ip import get_real_client_ip
+from app.core.deps import get_optional_user
+from app.models.user import User
 from app.schemas.ai_diff import AiDiffRequest, AiDiffResponse
 from app.services.ai_diff import get_or_create_diff
 
@@ -634,10 +639,24 @@ from app.services.ai_diff import get_or_create_diff
 @router.post("/ai-diff", response_model=AiDiffResponse)
 async def ai_diff(
     payload: AiDiffRequest,
+    request: Request,
+    user: User | None = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ) -> AiDiffResponse:
-    """Generate (or fetch cached) cross-canon difference analysis for 2-4 selected chunks."""
-    cached, prompt_version, model, analysis = await get_or_create_diff(db, payload.chunks)
+    """Generate (or fetch cached) cross-canon difference analysis for 2-4 selected chunks.
+
+    Public, but each fresh (cache-miss) analysis is a platform LLM call, so it's
+    rate-limited (STRICT_PATHS) and counts against a per-caller daily quota.
+    """
+    redis = getattr(request.app.state, "redis", None)
+    identity = f"user:{user.id}" if user else f"ip:{get_real_client_ip(request, default='unknown')}"
+    cached, prompt_version, model, analysis = await get_or_create_diff(
+        db,
+        payload.chunks,
+        redis=redis,
+        quota_identity=identity,
+        quota_is_authenticated=user is not None,
+    )
     return AiDiffResponse(
         cached=cached,
         prompt_version=prompt_version,

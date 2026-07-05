@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from datetime import date
 from typing import Any
 
 import httpx
@@ -17,11 +18,38 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.core.exceptions import QuotaExceededError
 from app.models.ai_diff_cache import AiDiffCache
 from app.schemas.ai_diff import AiDiffChunk
 from app.services.ai_diff_prompt import PROMPT_VERSION, SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
+
+# Daily budget for *fresh* (cache-miss) analyses, which each cost a platform
+# LLM call. The endpoint stays public, so anonymous callers get a modest daily
+# cap keyed by IP; signed-in users get a higher one keyed by user id.
+FREE_DAILY_AI_DIFF_ANONYMOUS = 20
+FREE_DAILY_AI_DIFF_USER = 100
+
+
+async def _check_ai_diff_quota(redis, identity: str | None, is_authenticated: bool) -> None:
+    """Enforce the daily fresh-analysis budget. Best-effort: the per-IP limit in
+    STRICT_PATHS is the hard backstop, so a Redis outage degrades to rate
+    limiting only rather than blocking this public feature. Raises
+    QuotaExceededError when the budget is spent."""
+    if redis is None or identity is None:
+        return
+    limit = FREE_DAILY_AI_DIFF_USER if is_authenticated else FREE_DAILY_AI_DIFF_ANONYMOUS
+    key = f"ai_diff:{identity}:{date.today().isoformat()}"
+    try:
+        current = await redis.incr(key)
+        if current == 1:
+            await redis.expire(key, 86400)  # 24h TTL
+    except Exception:
+        logger.warning("ai_diff quota check failed; allowing", exc_info=True)
+        return
+    if current > limit:
+        raise QuotaExceededError(limit=limit)
 
 
 def compute_chunks_hash(
@@ -55,12 +83,20 @@ def compute_chunks_hash(
 
 
 async def get_or_create_diff(
-    db: AsyncSession, chunks: list[AiDiffChunk]
+    db: AsyncSession,
+    chunks: list[AiDiffChunk],
+    *,
+    redis=None,
+    quota_identity: str | None = None,
+    quota_is_authenticated: bool = False,
 ) -> tuple[bool, str, str, dict[str, Any]]:
     """Return (cached, prompt_version, model, analysis).
 
     `cached=True` means the row was served from `ai_diff_cache`.
     `cached=False` means a fresh LLM call was made and the row was inserted.
+
+    A fresh call consumes the caller's daily quota (see _check_ai_diff_quota);
+    cache hits are free and never counted.
     """
     model = _resolve_model()
     digest = compute_chunks_hash(chunks, PROMPT_VERSION, model)
@@ -69,6 +105,9 @@ async def get_or_create_diff(
     if cached is not None:
         return True, cached.prompt_version, cached.model, cached.analysis
 
+    # Cache miss → a real platform LLM call. Enforce the daily budget here so
+    # cached re-views stay free.
+    await _check_ai_diff_quota(redis, quota_identity, quota_is_authenticated)
     analysis = await _call_llm(chunks, model)
 
     row = AiDiffCache(
