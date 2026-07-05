@@ -49,7 +49,8 @@ async def seeded_db():
 @pytest.mark.anyio
 async def test_showcase_returns_pools_per_card(seeded_db):
     out = await get_home_showcase(seeded_db, redis=None)
-    assert out["sources"] == {"sources": 1, "texts": 1}
+    assert out["sources"]["sources"] == 1 and out["sources"]["texts"] == 1
+    assert out["sources"]["names"] == ["CBETA"]          # active source name pool
     # KG returns a POOL of triples; the seeded translated→译 triple is in it.
     assert {"subject": "玄奘", "predicate": "译", "object": "大般若經"} in out["kg"]["triples"]
     # Dictionary returns a POOL of {term, definition}; 般若 (seeded) is present.

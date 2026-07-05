@@ -524,7 +524,7 @@ export async function getStats(): Promise<Stats> {
 // Each card is a POOL (cached ~15min); the frontend picks one at random per page
 // load so the card varies on every refresh without extra backend load.
 export interface HomeShowcase {
-  sources: { sources: number; texts: number } | null;
+  sources: { sources: number; texts: number; names?: string[] } | null;
   chat: { questions: string[] } | null;
   dictionary: { terms: { term: string; definition: string | null }[] } | null;
   kg: { triples: { subject: string; predicate: string; object: string }[] } | null;

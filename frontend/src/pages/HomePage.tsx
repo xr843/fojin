@@ -55,25 +55,40 @@ export default function HomePage() {
   // shows a different pick from each cached pool — the cards feel alive without
   // any extra backend round-trip.
   const [rand] = useState(() => ({
-    chat: Math.random(), dict: Math.random(), kg: Math.random(),
-    geo: Math.random(), col: Math.random(),
+    sources: Math.random(), chat: Math.random(), dict: Math.random(),
+    kg: Math.random(), geo: Math.random(), col: Math.random(),
   }));
 
   // Pick one item from each cached pool using the per-mount random values.
   const sc = useMemo(() => {
     const at = (r: number, len: number) => Math.floor(r * len) % Math.max(1, len);
+    // Deterministic seeded shuffle → take n. Uses only the passed seed (pure),
+    // so multi-item cards (source names, geo places) get a fully-random distinct
+    // sample per load, not an overlapping sliding window.
+    const sample = (arr: string[], n: number, seed: number): string[] => {
+      const a = arr.slice();
+      let s = Math.floor(seed * 2 ** 31) || 1;
+      const rnd = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(rnd() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a.slice(0, n);
+    };
     const q = showcase?.chat?.questions ?? [];
     const terms = showcase?.dictionary?.terms ?? [];
     const triples = showcase?.kg?.triples ?? [];
     const places = showcase?.geo?.places ?? [];
+    const srcNames = showcase?.sources?.names ?? [];
     return {
-      sources: showcase?.sources ?? null,
+      sources: showcase?.sources
+        ? { count: showcase.sources.sources, names: sample(srcNames, 3, rand.sources) }
+        : null,
       chat: q.length ? q[at(rand.chat, q.length)] : null,
       dict: terms.length ? terms[at(rand.dict, terms.length)] : null,
       kg: triples.length ? triples[at(rand.kg, triples.length)] : null,
       geo: showcase?.geo && showcase.geo.count > 0
-        ? { count: showcase.geo.count, places: places.length
-            ? [0, 1, 2].map((i) => places[(at(rand.geo, places.length) + i) % places.length]) : [] }
+        ? { count: showcase.geo.count, places: sample(places, 3, rand.geo) }
         : null,
     };
   }, [showcase, rand]);
@@ -248,10 +263,10 @@ export default function HomePage() {
             <DatabaseOutlined className="home-feature-icon" />
             <div className="home-feature-title">{t("home.feature_sources_title")}</div>
             <div className="home-feature-desc">
-              {sc.sources
-                ? t("home.sc_sources", {
-                    sources: sc.sources.sources.toLocaleString(),
-                    texts: sc.sources.texts.toLocaleString(),
+              {sc.sources && sc.sources.names.length > 0
+                ? t("home.sc_sources_names", {
+                    sources: sc.sources.count.toLocaleString(),
+                    names: sc.sources.names.join("、"),
                   })
                 : t("home.feature_sources_desc")}
             </div>
