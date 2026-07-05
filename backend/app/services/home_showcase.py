@@ -45,6 +45,25 @@ _SHOWCASE_CACHE_KEY = "home:showcase:v1"
 _POOL = 12
 _GEO_TYPES = ("place", "monastery")
 
+# Max chars of a dictionary definition shown on the card — kept short so the
+# subtitle stays ~2 lines (the CSS also hard-clamps to 2 lines as a backstop).
+_DEF_MAX_CHARS = 24
+
+# Human-readable Chinese labels for the KG predicate vocabulary, so the card
+# reads "智昇 → 活跃于 → 唐" instead of a raw "active_in" machine code. Covers the
+# full predicate set in the graph; an unmapped predicate falls back to itself.
+_PREDICATE_LABELS = {
+    "teacher_of": "授学",
+    "translated": "译",
+    "translated_at": "译于",
+    "alt_translation": "异译",
+    "cites": "引",
+    "commentary_on": "注",
+    "associated_with": "关联",
+    "active_in": "活跃于",
+    "member_of_school": "属",
+}
+
 
 def _seed() -> int:
     """Time-bucketed rotation seed — stable within a cache period, advancing
@@ -54,6 +73,26 @@ def _seed() -> int:
 
 def _pick(items: list, seed: int):
     return items[seed % len(items)] if items else None
+
+
+def _short_gloss(definition: str | None) -> str | None:
+    """Trim a dictionary definition to a short card-sized gloss.
+
+    Classical-Chinese definitions run long and multi-clause; on the card we want
+    at most ~一句. Take up to the first sentence break, then hard-cap the chars,
+    appending an ellipsis when truncated. Returns None for an empty definition so
+    the card shows just the term."""
+    text = (definition or "").strip().replace("\n", " ")
+    if not text:
+        return None
+    # Prefer cutting at the first sentence/clause boundary if it lands early.
+    for mark in ("。", "；", "！", "，"):
+        idx = text.find(mark)
+        if 0 < idx <= _DEF_MAX_CHARS:
+            return text[:idx]
+    if len(text) <= _DEF_MAX_CHARS:
+        return text
+    return text[:_DEF_MAX_CHARS].rstrip("，、 ") + "…"
 
 
 async def _sources_card(db: AsyncSession) -> dict | None:
@@ -99,8 +138,7 @@ async def _dictionary_card(db: AsyncSession, seed: int) -> dict | None:
         ).first()
         if row is None:
             return {"term": term, "definition": None}
-        definition = (row[1] or "").strip().replace("\n", " ")
-        return {"term": row[0], "definition": definition[:60] or None}
+        return {"term": row[0], "definition": _short_gloss(row[1])}
     except Exception:
         logger.warning("showcase dictionary_card failed", exc_info=True)
         return None
@@ -132,7 +170,8 @@ async def _kg_card(db: AsyncSession, seed: int) -> dict | None:
         picked = _pick(rows, seed)
         if picked is None:
             return None
-        return {"subject": picked[0], "predicate": picked[1], "object": picked[2]}
+        predicate = _PREDICATE_LABELS.get(picked[1], picked[1])
+        return {"subject": picked[0], "predicate": predicate, "object": picked[2]}
     except Exception:
         logger.warning("showcase kg_card failed", exc_info=True)
         return None
