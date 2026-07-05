@@ -59,6 +59,7 @@ from datetime import UTC
 from app.api import (
     admin,
     alignment,
+    alignment_review,
     annotations,
     auth,
     bookmarks,
@@ -502,6 +503,7 @@ app.include_router(feedback.router, prefix="/api")
 
 # Admin dashboard
 app.include_router(admin.router, prefix="/api")
+app.include_router(alignment_review.router, prefix="/api")
 
 # Notifications
 app.include_router(notification.router, prefix="/api")
