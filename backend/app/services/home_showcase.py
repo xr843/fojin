@@ -68,7 +68,8 @@ _PREDICATE_LABELS = {
 # picks one at random on every page load, so the card varies per refresh while
 # the DB work stays cached. Pool sizes are small — enough variety, tiny payload.
 _CHAT_POOL = 8
-_GEO_POOL = 8
+_GEO_POOL = 12
+_SOURCES_POOL = 12
 
 
 def _short_gloss(definition: str | None) -> str | None:
@@ -102,9 +103,19 @@ async def _sources_card(db: AsyncSession) -> dict | None:
                 select(func.count(DataSource.id)).where(DataSource.is_active.is_(True))
             )
         ).scalar() or 0
+        # A pool of active source names so the card varies per load (the raw
+        # counts alone never change — and are already shown in the hero stats).
+        names = (
+            await db.execute(
+                select(DataSource.name_zh)
+                .where(DataSource.is_active.is_(True), DataSource.name_zh.is_not(None))
+                .limit(_SOURCES_POOL)
+            )
+        ).scalars().all()
         if not texts and not sources:
             return None
-        return {"sources": int(sources), "texts": int(texts)}
+        # texts kept for backward compat (PWA-cached old frontend reads it).
+        return {"sources": int(sources), "texts": int(texts), "names": list(names)}
     except Exception:
         logger.warning("showcase sources_card failed", exc_info=True)
         return None
