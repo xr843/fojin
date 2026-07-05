@@ -97,6 +97,10 @@ class Settings(BaseSettings):
     # the brute-force surface.
     rate_limit_sms_send: int = 3
     rate_limit_sms_verify: int = 10
+    # Paid-inference endpoints (platform key): each request triggers embedding
+    # and/or LLM calls, so cap them well below the default per-IP budget.
+    rate_limit_semantic: int = 20
+    rate_limit_research: int = 10
 
     @property
     def database_url(self) -> str:
