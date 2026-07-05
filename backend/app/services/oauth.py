@@ -206,19 +206,26 @@ async def google_callback(code: str, db: AsyncSession) -> TokenResponse:
 # ── SMS Login ────────────────────────────────────────────────
 
 
+# Max wrong guesses allowed per issued code before it is burned. Keeps the
+# 6-digit code (1e6 space) far out of brute-force range: at most this many
+# tries per code, and a fresh code is itself rate-limited to 1/min per phone.
+_SMS_MAX_ATTEMPTS = 5
+_SMS_CODE_TTL = 300  # seconds
+
+
 async def send_sms_code(phone: str, redis_client) -> bool:
     """Send a 6-digit verification code via Alibaba Cloud SMS."""
-    code = "".join(secrets.choice(string.digits) for _ in range(6))
-
-    # Store in Redis with 5-minute TTL
-    key = f"sms_code:{phone}"
-    await redis_client.set(key, code, ex=300)
-
-    # Rate limit: 1 SMS per minute
+    # Rate limit first: 1 SMS per minute per phone. Checking (and claiming the
+    # slot) before issuing a code means a throttled resend can't overwrite the
+    # live code or reset the brute-force attempt counter below.
     rate_key = f"sms_rate:{phone}"
-    if await redis_client.exists(rate_key):
+    if not await redis_client.set(rate_key, "1", ex=60, nx=True):
         return False
-    await redis_client.set(rate_key, "1", ex=60)
+
+    code = "".join(secrets.choice(string.digits) for _ in range(6))
+    await redis_client.set(f"sms_code:{phone}", code, ex=_SMS_CODE_TTL)
+    # A fresh code gets a fresh attempt budget.
+    await redis_client.delete(f"sms_attempt:{phone}")
 
     if not settings.aliyun_sms_access_key_id:
         # Development mode: log the code instead of sending
@@ -236,11 +243,26 @@ async def send_sms_code(phone: str, redis_client) -> bool:
 
 
 async def verify_sms_code(phone: str, code: str, redis_client) -> bool:
-    """Verify the SMS code."""
+    """Verify the SMS code, capping brute-force attempts per issued code."""
     key = f"sms_code:{phone}"
     stored = await redis_client.get(key)
-    if stored and stored == code:
+    if not stored:
+        return False
+
+    # Count this attempt against a per-phone budget tied to the current code.
+    # The counter is global to the phone (not per-IP), so a proxy pool can't
+    # widen the window. Exhausting it burns the code, forcing a new send.
+    attempt_key = f"sms_attempt:{phone}"
+    attempts = await redis_client.incr(attempt_key)
+    if attempts == 1:
+        await redis_client.expire(attempt_key, _SMS_CODE_TTL)
+    if attempts > _SMS_MAX_ATTEMPTS:
         await redis_client.delete(key)
+        return False
+
+    if secrets.compare_digest(stored, code):
+        await redis_client.delete(key)
+        await redis_client.delete(attempt_key)
         return True
     return False
 
