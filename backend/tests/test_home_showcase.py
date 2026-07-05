@@ -15,7 +15,7 @@ from app.models.knowledge_graph import KGEntity, KGRelation
 from app.models.source import DataSource
 from app.models.text import BuddhistText
 from app.services import home_showcase
-from app.services.home_showcase import _pick, _seed, get_home_showcase
+from app.services.home_showcase import _pick, _seed, _short_gloss, get_home_showcase
 
 _MODELS = (BuddhistText, DataSource, DictionaryEntry, HotQuestion, KGEntity, KGRelation)
 
@@ -40,7 +40,7 @@ async def seeded_db():
         nalanda = KGEntity(entity_type="monastery", name_zh="那烂陀寺")
         s.add_all([xuanzang, sutra, nalanda])
         await s.flush()
-        s.add(KGRelation(subject_id=xuanzang.id, predicate="译", object_id=sutra.id))
+        s.add(KGRelation(subject_id=xuanzang.id, predicate="translated", object_id=sutra.id))
         await s.commit()
         yield s
     await engine.dispose()
@@ -53,6 +53,7 @@ async def test_showcase_populates_each_card_from_real_data(seeded_db):
     # HOT_TERMS rotates; 般若 is in the list, and its definition is seeded, so
     # whichever term is picked, the dictionary card is a dict (never crashes).
     assert isinstance(out["dictionary"], dict)
+    # predicate "translated" is mapped to its Chinese label "译".
     assert out["kg"] == {"subject": "玄奘", "predicate": "译", "object": "大般若經"}
     assert out["geo"]["count"] == 1
     assert "那烂陀寺" in out["geo"]["places"]
@@ -93,6 +94,19 @@ async def test_showcase_reads_from_redis_cache_when_present(seeded_db):
                 "dictionary": None, "kg": None, "geo": None}
     out = await get_home_showcase(seeded_db, redis=_Redis(json.dumps(sentinel)))
     assert out == sentinel                               # served from cache, DB untouched
+
+
+def test_short_gloss_trims_long_definitions():
+    # Cuts at the first sentence break when it lands early.
+    assert _short_gloss("法相以唯識為中道，三論以八不為中道，天台以實相為中道") == "法相以唯識為中道"
+    # No early break → hard char cap with an ellipsis.
+    long = "阿" * 40
+    g = _short_gloss(long)
+    assert g.endswith("…") and len(g) <= home_showcase._DEF_MAX_CHARS + 1
+    # Short definition passes through unchanged; empty → None.
+    assert _short_gloss("寂静") == "寂静"
+    assert _short_gloss("") is None
+    assert _short_gloss(None) is None
 
 
 def test_pick_rotates_by_seed():

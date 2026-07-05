@@ -598,6 +598,15 @@
   font-size: 11px;
   color: var(--fj-ink-light);
   line-height: 1.5;
+  /* Clamp to exactly two lines so dynamic showcase content of any length
+     (e.g. a long dictionary definition) can't stretch the card — every card
+     in the row stays the same compact height. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  height: 33px;
 }
 
 /* ---------- 响应式：平板 ---------- */
