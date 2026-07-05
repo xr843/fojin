@@ -126,9 +126,14 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-_fojin_env = os.environ.get("FOJIN_ENV", "development").lower()
+# Secure by default: an unset FOJIN_ENV is treated as production, so a bare
+# `uvicorn` started outside docker-compose can't silently boot with the
+# insecure default secrets. Local dev, tests, and alembic opt into the relaxed
+# path by setting FOJIN_ENV=development explicitly (see backend/conftest.py and
+# alembic/env.py).
+_fojin_env = os.environ.get("FOJIN_ENV", "production").lower()
 
-if _fojin_env == "production":
+if _fojin_env != "development":
     if settings.jwt_secret_key == _DEFAULT_JWT_SECRET or len(settings.jwt_secret_key) < 32:
         raise RuntimeError(
             "FATAL: In production, JWT_SECRET_KEY must be set and at least 32 characters. "
