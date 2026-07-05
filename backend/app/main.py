@@ -74,6 +74,7 @@ from app.api import (
     notification,
     og,
     relations,
+    research,
     rss,
     search,
     search_unified,
@@ -461,6 +462,7 @@ app.include_router(alignment.router, prefix="/api")
 
 # Phase 3 routers
 app.include_router(chat.router, prefix="/api")
+app.include_router(research.router, prefix="/api")
 app.include_router(share.router, prefix="/api")
 app.include_router(og.router, prefix="/api")
 app.include_router(annotations.router, prefix="/api")
