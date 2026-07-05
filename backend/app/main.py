@@ -69,6 +69,7 @@ from app.api import (
     feed,
     feedback,
     history,
+    home,
     iiif,
     knowledge_graph,
     notification,
@@ -463,6 +464,7 @@ app.include_router(alignment.router, prefix="/api")
 # Phase 3 routers
 app.include_router(chat.router, prefix="/api")
 app.include_router(research.router, prefix="/api")
+app.include_router(home.router, prefix="/api")
 app.include_router(share.router, prefix="/api")
 app.include_router(og.router, prefix="/api")
 app.include_router(annotations.router, prefix="/api")

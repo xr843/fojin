@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useQuery } from "@tanstack/react-query";
@@ -17,7 +17,8 @@ import {
 import { useTranslation } from "react-i18next";
 import { InfoCircleOutlined, CloseOutlined } from "@ant-design/icons";
 import SourceSelector from "../components/SourceSelector";
-import { getStats, getSources, getFilters, getSearchSuggestions } from "../api/client";
+import { getStats, getSources, getFilters, getSearchSuggestions, getHomeShowcase } from "../api/client";
+import { getLocalizedCollections } from "../data/collections";
 import { getLangName } from "../utils/sourceUrls";
 import { getReadingHistory } from "../utils/readingHistory";
 import { useAuthStore } from "../stores/authStore";
@@ -31,7 +32,7 @@ function truncateTitle(title: string, max = 12): string {
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuthStore();
   const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
   const [sourceOpen, setSourceOpen] = useState(false);
@@ -44,6 +45,22 @@ export default function HomePage() {
   const { data: stats } = useQuery({ queryKey: ["stats"], queryFn: getStats });
   const { data: sources } = useQuery({ queryKey: ["sources"], queryFn: getSources, enabled: sourceOpen });
   const { data: filters } = useQuery({ queryKey: ["filters"], queryFn: getFilters });
+
+  // Dynamic hero-card content. Best-effort: on error/loading, `showcase` is
+  // undefined and each card renders its static `feature_*_desc` fallback.
+  const { data: showcase } = useQuery({ queryKey: ["homeShowcase"], queryFn: getHomeShowcase, staleTime: 5 * 60_000 });
+
+  // 经典专题 card is driven by the frontend's own collection content (the server
+  // doesn't hold it). Rotate the featured names by a coarse time bucket so the
+  // card feels alive without a backend round-trip. The bucket is captured once
+  // at mount (a lazy initializer is the allowed place for the impure Date.now).
+  const [rotationBucket] = useState(() => Math.floor(Date.now() / (15 * 60_000)));
+  const collectionsDesc = useMemo(() => {
+    const cols = getLocalizedCollections(i18n.language).map((c) => c.name).filter(Boolean);
+    if (cols.length === 0) return null;
+    const start = rotationBucket % cols.length;
+    return [0, 1, 2].map((i) => cols[(start + i) % cols.length]).join(" · ");
+  }, [i18n.language, rotationBucket]);
 
   // 搜索联想：复用 SearchPage 已有的 /search/suggest 接口与防抖模式
   const [acOptions, setAcOptions] = useState<{ value: string }[]>([]);
@@ -205,32 +222,68 @@ export default function HomePage() {
           <div className="home-feature-card" onClick={() => navigate("/sources")}>
             <DatabaseOutlined className="home-feature-icon" />
             <div className="home-feature-title">{t("home.feature_sources_title")}</div>
-            <div className="home-feature-desc">{t("home.feature_sources_desc")}</div>
+            <div className="home-feature-desc">
+              {showcase?.sources
+                ? t("home.sc_sources", {
+                    sources: showcase.sources.sources.toLocaleString(),
+                    texts: showcase.sources.texts.toLocaleString(),
+                  })
+                : t("home.feature_sources_desc")}
+            </div>
           </div>
-          <div className="home-feature-card" onClick={() => navigate("/chat")}>
+          <div
+            className="home-feature-card"
+            onClick={() =>
+              navigate(showcase?.chat?.question ? `/chat?q=${encodeURIComponent(showcase.chat.question)}` : "/chat")
+            }
+          >
             <RobotOutlined className="home-feature-icon" />
             <div className="home-feature-title">{t("home.feature_chat_title")}</div>
-            <div className="home-feature-desc">{t("home.feature_chat_desc")}</div>
+            <div className="home-feature-desc">
+              {showcase?.chat?.question || t("home.feature_chat_desc")}
+            </div>
           </div>
-          <div className="home-feature-card" onClick={() => navigate("/dictionary")}>
+          <div
+            className="home-feature-card"
+            onClick={() =>
+              navigate(showcase?.dictionary?.term ? `/dictionary?q=${encodeURIComponent(showcase.dictionary.term)}` : "/dictionary")
+            }
+          >
             <FileTextOutlined className="home-feature-icon" />
             <div className="home-feature-title">{t("home.feature_dict_title")}</div>
-            <div className="home-feature-desc">{t("home.feature_dict_desc")}</div>
+            <div className="home-feature-desc">
+              {showcase?.dictionary?.term
+                ? `${showcase.dictionary.term}${showcase.dictionary.definition ? ` — ${showcase.dictionary.definition}` : ""}`
+                : t("home.feature_dict_desc")}
+            </div>
           </div>
           <div className="home-feature-card" onClick={() => navigate("/kg")}>
             <ApartmentOutlined className="home-feature-icon" />
             <div className="home-feature-title">{t("home.feature_kg_title")}</div>
-            <div className="home-feature-desc">{t("home.feature_kg_desc")}</div>
+            <div className="home-feature-desc">
+              {showcase?.kg
+                ? `${showcase.kg.subject} → ${showcase.kg.predicate} → ${showcase.kg.object}`
+                : t("home.feature_kg_desc")}
+            </div>
           </div>
           <div className="home-feature-card" onClick={() => navigate("/map")}>
             <GlobalOutlined className="home-feature-icon" />
             <div className="home-feature-title">{t("home.feature_geo_title")}</div>
-            <div className="home-feature-desc">{t("home.feature_geo_desc")}</div>
+            <div className="home-feature-desc">
+              {showcase?.geo && showcase.geo.count > 0
+                ? t("home.sc_geo", {
+                    count: showcase.geo.count.toLocaleString(),
+                    places: showcase.geo.places.slice(0, 3).join("、"),
+                  })
+                : t("home.feature_geo_desc")}
+            </div>
           </div>
           <div className="home-feature-card" onClick={() => navigate("/collections")}>
             <BookOutlined className="home-feature-icon" />
             <div className="home-feature-title">{t("home.feature_collections_title")}</div>
-            <div className="home-feature-desc">{t("home.feature_collections_desc")}</div>
+            <div className="home-feature-desc">
+              {collectionsDesc || t("home.feature_collections_desc")}
+            </div>
           </div>
         </div>
 
