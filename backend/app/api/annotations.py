@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, get_optional_user
 from app.core.role_guard import require_role
 from app.database import get_db
 from app.models.user import User
@@ -9,7 +9,7 @@ from app.schemas.annotation import AnnotationCreate, AnnotationResponse, Annotat
 from app.services.annotation import (
     create_annotation,
     delete_annotation,
-    get_annotation,
+    get_visible_annotation,
     list_annotations_for_text,
     review_annotation,
     submit_annotation,
@@ -36,19 +36,23 @@ async def create(
 async def list_by_text(
     text_id: int = Query(...),
     juan_num: int = Query(1),
+    user: User | None = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """获取指定文本卷的标注列表。"""
-    return await list_annotations_for_text(db, text_id, juan_num)
+    """获取指定文本卷的标注列表（公开的 approved + 本人的全部状态）。"""
+    return await list_annotations_for_text(
+        db, text_id, juan_num, viewer_id=user.id if user else None
+    )
 
 
 @router.get("/{annotation_id}", response_model=AnnotationResponse)
 async def get(
     annotation_id: int,
+    user: User | None = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """获取标注详情。"""
-    return await get_annotation(db, annotation_id)
+    """获取标注详情（仅 approved 或本人）。"""
+    return await get_visible_annotation(db, annotation_id, viewer_id=user.id if user else None)
 
 
 @router.put("/{annotation_id}", response_model=AnnotationResponse)
