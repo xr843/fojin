@@ -254,7 +254,14 @@ services:
     mem_limit: 128m
     cpus: 0.25
     ports:
-      - "${FRONTEND_PORT:-3000}:80"
+      # Bind to loopback by default, like every other service here. Docker
+      # publishes ports via its own iptables rules that bypass host firewalls
+      # (e.g. ufw), so "3000:80" would expose the container — and the /api and
+      # /umami proxies behind it — on the host's public interface, defeating a
+      # CDN/WAF and leaking the origin IP. A host reverse proxy or CDN should be
+      # the public entry. Self-hosters wanting direct LAN/remote access without
+      # a proxy can set FRONTEND_BIND=0.0.0.0.
+      - "${FRONTEND_BIND:-127.0.0.1}:${FRONTEND_PORT:-3000}:80"
 
 volumes:
   pgdata:
