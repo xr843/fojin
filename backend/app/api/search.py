@@ -170,7 +170,9 @@ async def semantic_search(
     """Semantic search using pgvector embedding similarity.
 
     语义搜索。基于向量相似度在 34.7 万段经文中检索语义最相关的内容。支持按朝代、分类、语言和数据源筛选。"""
-    return await search_semantic(db, q, size, dynasty, category, lang, sources)
+    # Strip first so blank/whitespace-only queries short-circuit before the
+    # paid embedding call and can't each bust the embedding cache.
+    return await search_semantic(db, q.strip(), size, dynasty, category, lang, sources)
 
 
 _filters_cache: dict = {"data": None, "expires": 0}
