@@ -27,35 +27,50 @@ directly.
 
 ## Install & run
 
+Once published to PyPI, no clone needed — run it with `uvx` (nothing to
+install) or `pip`:
+
 ```bash
-cd mcp-server
-pip install -e .
-python -m fojin_mcp          # stdio transport (the MCP default)
+uvx fojin-mcp                 # zero-install, stdio transport (the MCP default)
+# or
+pip install fojin-mcp && fojin-mcp
+```
+
+From a checkout (development):
+
+```bash
+cd mcp-server && pip install -e . && python -m fojin_mcp
 ```
 
 By default it talks to `https://fojin.app/api`. Point it elsewhere (self-host,
 staging) with an env var:
 
 ```bash
-FOJIN_API_BASE_URL=http://localhost:8000/api python -m fojin_mcp
+FOJIN_API_BASE_URL=http://localhost:8000/api uvx fojin-mcp
 ```
 
 ### Claude Desktop
 
-Add to `claude_desktop_config.json`:
+Add to `claude_desktop_config.json` (Settings → Developer → Edit Config):
 
 ```json
 {
   "mcpServers": {
     "fojin": {
-      "command": "python",
-      "args": ["-m", "fojin_mcp"]
+      "command": "uvx",
+      "args": ["fojin-mcp"]
     }
   }
 }
 ```
 
-(or use the installed `fojin-mcp` console script as `"command"`.)
+(or `"command": "fojin-mcp"` if you `pip install`ed it, or `python -m fojin_mcp`
+from a checkout.) Restart Claude Desktop; the six fojin tools then appear.
+
+### ChatGPT / other MCP clients
+
+Any client that speaks MCP over stdio can launch `uvx fojin-mcp` (or the
+`fojin-mcp` console script) and will discover the six tools automatically.
 
 ## Design
 
@@ -78,6 +93,22 @@ Add to `claude_desktop_config.json`:
 pip install -e '.[dev]'
 pytest -q          # unit tests (no network)
 ```
+
+## Publishing (maintainer)
+
+CI (`.github/workflows/mcp-server.yml`) lints, tests, and builds the package on
+every change under `mcp-server/`. To release to PyPI, bump `version` in
+`pyproject.toml`, then push a tag:
+
+```bash
+git tag mcp-v0.1.0 && git push origin mcp-v0.1.0
+```
+
+`.github/workflows/mcp-publish.yml` builds and uploads. It needs credentials
+once — set up **either** PyPI Trusted Publishing (recommended; no secret) for
+project `fojin-mcp` / repo `xr843/fojin` / workflow `mcp-publish.yml` /
+environment `pypi`, **or** a `PYPI_API_TOKEN` repo secret (then uncomment the
+`password:` line in the workflow).
 
 ## License
 

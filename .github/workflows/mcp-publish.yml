@@ -1,0 +1,47 @@
+name: Publish fojin-mcp
+
+# Publishes the fojin-mcp package to PyPI when a version tag is pushed
+# (e.g. `git tag mcp-v0.1.0 && git push origin mcp-v0.1.0`), or on manual
+# dispatch. Everything is prepared so publishing is a one-step action for the
+# maintainer — it only needs credentials, set up ONE of:
+#
+#   1. Trusted Publishing (recommended, no secret): on PyPI, add a
+#      "pending publisher" for project `fojin-mcp`, repo `xr843/fojin`,
+#      workflow `mcp-publish.yml`, environment `pypi`. Then this runs as-is.
+#   2. API token: create a repo secret `PYPI_API_TOKEN` with a PyPI token
+#      scoped to `fojin-mcp`, and uncomment the `password:` line below.
+on:
+  push:
+    tags: ["mcp-v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Build + publish to PyPI
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write # required for Trusted Publishing
+    defaults:
+      run:
+        working-directory: mcp-server
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Build sdist + wheel
+        run: pip install build && python -m build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: mcp-server/dist/
+          # Trusted Publishing needs no password. For token auth instead,
+          # set the PYPI_API_TOKEN secret and uncomment the next line:
+          # password: ${{ secrets.PYPI_API_TOKEN }}
