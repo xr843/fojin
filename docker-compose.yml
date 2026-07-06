@@ -217,14 +217,21 @@ services:
         condition: service_healthy
 
   umami:
-    image: ghcr.io/umami-software/umami:postgresql-latest
+    # Pinned by digest (v3.0.3) instead of the floating postgresql-latest tag,
+    # so a pull can't silently swap in unreviewed code or run a surprise
+    # schema migration. Bump deliberately.
+    image: ghcr.io/umami-software/umami:postgresql-latest@sha256:28f263fe06f79ebffa5a6a6e9bd33b7a278e9342a88e0bdac812416c9f9e4361
     container_name: fojin-umami
     restart: always
     logging: *default-logging
     mem_limit: 384m
     cpus: 0.5
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-fojin}:${POSTGRES_PASSWORD}@postgres:5432/umami
+      # Use a dedicated least-privilege role that can only reach the umami DB,
+      # so a compromise of this third-party container can't read/write the main
+      # fojin database (user table, BYOK ciphertexts). Falls back to the main
+      # postgres account when UMAMI_DB_* are unset (backward compatible).
+      DATABASE_URL: postgresql://${UMAMI_DB_USER:-${POSTGRES_USER:-fojin}}:${UMAMI_DB_PASSWORD:-${POSTGRES_PASSWORD}}@postgres:5432/umami
       APP_SECRET: ${UMAMI_APP_SECRET:?Set UMAMI_APP_SECRET in .env}
       BASE_PATH: /umami
     ports:
