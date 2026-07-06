@@ -23,7 +23,7 @@ PG_FILE="fojin_pg_${TIMESTAMP}.sql.gz"
 CFG_FILE="fojin_configs_${TIMESTAMP}.tar.gz"
 CRON_FILE="fojin_cron_${TIMESTAMP}.txt"
 BUCKET="oss://fojin-prod-backup"
-GPG_RECIPIENT="C8D283D7427137C35D1D086AAE6F12A74AB34DB5"  # fojin-backup pubkey; private key held off-server (see SECURITY.md)
+GPG_RECIPIENT="8699CAC05E36453C0869BF62931E4CC8792263E9"  # fojin-backup pubkey; private key held off-server (see SECURITY.md)
 
 mkdir -p "$BACKUP_DIR"
 
