@@ -127,7 +127,12 @@ CONTENT_INDEX_SETTINGS = {
 
 async def init_es() -> AsyncElasticsearch:
     global es_client
-    es_client = AsyncElasticsearch(settings.es_host)
+    if settings.es_password:
+        es_client = AsyncElasticsearch(
+            settings.es_host, basic_auth=(settings.es_user, settings.es_password)
+        )
+    else:
+        es_client = AsyncElasticsearch(settings.es_host)
     return es_client
 
 

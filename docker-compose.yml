@@ -49,7 +49,10 @@ services:
     cpus: 1.5
     environment:
       - discovery.type=single-node
-      - xpack.security.enabled=false
+      # Require auth. HTTP TLS stays off — ES is bound to 127.0.0.1 only, so
+      # basic auth over plaintext http on the loopback is the intended model.
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=false
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
     ports:
       - "127.0.0.1:${ES_PORT:-9200}:9200"
@@ -103,6 +106,8 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      ES_USER: ${ES_USER:-elastic}
+      ES_PASSWORD: ${ES_PASSWORD:-}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env (32+ chars)}
       # P0-1: BYOK encryption key, independent of JWT_SECRET_KEY.
       API_KEY_ENCRYPTION_KEY: ${API_KEY_ENCRYPTION_KEY:?Set API_KEY_ENCRYPTION_KEY in .env (Fernet.generate_key() output)}
@@ -179,6 +184,8 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      ES_USER: ${ES_USER:-elastic}
+      ES_PASSWORD: ${ES_PASSWORD:-}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env (32+ chars)}
       API_KEY_ENCRYPTION_KEY: ${API_KEY_ENCRYPTION_KEY:?Set API_KEY_ENCRYPTION_KEY in .env (Fernet.generate_key() output)}
       FOJIN_ENV: ${FOJIN_ENV:-production}
