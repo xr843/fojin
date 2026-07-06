@@ -18,6 +18,8 @@ class Settings(BaseSettings):
 
     # Elasticsearch
     es_host: str = "http://localhost:9200"
+    es_user: str = "elastic"
+    es_password: str = ""  # empty → connect without auth (backward compatible)
 
     # Redis
     redis_host: str = "localhost"
