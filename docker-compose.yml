@@ -68,12 +68,18 @@ services:
     logging: *default-logging
     mem_limit: 256m
     cpus: 0.5
+    # Require a password when REDIS_PASSWORD is set (empty → no auth, backward
+    # compatible). Read from the container env, not interpolated into argv.
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    command: sh -c 'exec redis-server --requirepass "$$REDIS_PASSWORD"'
     ports:
       - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - redisdata:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      # Works with or without a password: auth ping first, else plain ping.
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping 2>/dev/null | grep -q PONG || redis-cli ping 2>/dev/null | grep -q PONG"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -96,6 +102,7 @@ services:
       ES_HOST: http://elasticsearch:9200
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env (32+ chars)}
       # P0-1: BYOK encryption key, independent of JWT_SECRET_KEY.
       API_KEY_ENCRYPTION_KEY: ${API_KEY_ENCRYPTION_KEY:?Set API_KEY_ENCRYPTION_KEY in .env (Fernet.generate_key() output)}
@@ -171,6 +178,7 @@ services:
       ES_HOST: http://elasticsearch:9200
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env (32+ chars)}
       API_KEY_ENCRYPTION_KEY: ${API_KEY_ENCRYPTION_KEY:?Set API_KEY_ENCRYPTION_KEY in .env (Fernet.generate_key() output)}
       FOJIN_ENV: ${FOJIN_ENV:-production}
