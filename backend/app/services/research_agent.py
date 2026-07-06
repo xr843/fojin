@@ -367,10 +367,24 @@ def build_research_agent(db: object, user: object | None) -> ResearchAgent:
     import httpx
 
     from app.core.url_security import create_pinned_https_transport
-    from app.services.llm_client import _resolve_llm_config
+    from app.services.llm_client import (
+        PROVIDER_DEFAULT_MODELS,
+        _is_reasoning_model,
+        _resolve_llm_config,
+    )
     from app.services.rag_retrieval import retrieve_rag_context
 
     api_url, api_key, model, _is_byok, provider = _resolve_llm_config(user)  # type: ignore[arg-type]
+    # One research request fans out into a plan + a synthesis LLM call (plus
+    # retrievals) and must return within a hard ~100s upstream (CDN) timeout.
+    # A slow reasoning model (e.g. deepseek-v4-pro) routinely spends 40-60s
+    # per call on hidden reasoning, pushing the round trip past that ceiling so
+    # the whole request is dropped even though the backend finished. Prefer the
+    # provider's fast default for research — it roughly halves each call without
+    # meaningfully hurting plan/synthesis quality. BYOK "custom" endpoints have
+    # no known fast sibling, so they keep the user's model.
+    if _is_reasoning_model(model) and provider in PROVIDER_DEFAULT_MODELS:
+        model = PROVIDER_DEFAULT_MODELS[provider]
 
     async def complete(system: str, user_msg: str) -> str:
         # OpenAI-compatible chat/completions — the same call shape eval/run_eval
