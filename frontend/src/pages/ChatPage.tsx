@@ -980,6 +980,20 @@ export default function ChatPage() {
         abortRef.current = null;
         setStreamingId(0);
         setSending(false);
+        // Empty completion: the stream ended without ever delivering a token
+        // (and without an error frame — e.g. a bare `done`). If the bubble is
+        // still the thinking placeholder, nothing will ever replace it and it
+        // hangs on the fake "正在检索…" state forever. Convert it to the failure
+        // sentinel so the existing retry button renders (mirrors onError). When
+        // the backend already sent an `error`, onError ran first and the content
+        // is no longer THINKING_SENTINEL, so this is a no-op — safe either way.
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId && m.content === THINKING_SENTINEL
+              ? { ...m, content: REQUEST_FAILED_SENTINEL }
+              : m,
+          ),
+        );
         // Clear attachment chips only after successful stream completion.
         // On error the chips stay so the user can retry without re-uploading.
         if (attachmentIdsForSend.length > 0) {
