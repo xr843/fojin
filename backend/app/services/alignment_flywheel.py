@@ -40,6 +40,15 @@ DEFAULT_SIMILARITY_THRESHOLD = 0.5
 # Cross-canon target languages a source (lzh) chunk is matched against.
 DEFAULT_TARGET_LANGS = ("pi", "bo", "sa")
 
+# Anchor-expansion deltas: chunk offsets on BOTH sides of a known-aligned pair.
+# Alignment has strong locality — consecutive passages in two parallel texts
+# align consecutively — so a confirmed pair's neighbours are high-prior
+# candidates. This is both faster (index lookups + one distance each, no kNN
+# scan) and far more precise than a blind cross-lingual kNN, whose ~0.6 hits are
+# mostly spurious (a Chan 語錄 "matching" a Kangyur text). Grows the moat
+# outward from its own verified edges.
+_ANCHOR_DELTAS = (1, -1, 2, -2)
+
 
 @dataclass(frozen=True)
 class ChunkRef:
@@ -53,6 +62,20 @@ class ChunkRef:
 def pair_key(a: ChunkRef, b: ChunkRef) -> tuple:
     """Directed dedup key for a candidate pair (source a → target b)."""
     return (a.text_id, a.juan_num, a.chunk_index, b.text_id, b.juan_num, b.chunk_index)
+
+
+def propose_anchor_neighbour(
+    a: ChunkRef, b: ChunkRef, delta: int
+) -> tuple[ChunkRef, ChunkRef] | None:
+    """From a known-aligned pair (a↔b), propose the pair ``delta`` chunks away on
+    both sides — the alignment-locality candidate. Returns None if either side
+    would go before chunk 0."""
+    if a.chunk_index + delta < 0 or b.chunk_index + delta < 0:
+        return None
+    return (
+        ChunkRef(a.text_id, a.juan_num, a.chunk_index + delta, a.lang),
+        ChunkRef(b.text_id, b.juan_num, b.chunk_index + delta, b.lang),
+    )
 
 
 def select_new_candidates(
@@ -232,6 +255,71 @@ async def mine_candidates(
             total += await stage_candidates(db, source, triples)
         except Exception:
             logger.warning("mine_candidates failed for %s", source, exc_info=True)
+    await db.commit()
+    return total
+
+
+async def _pair_similarity(db: AsyncSession, a: ChunkRef, b: ChunkRef) -> float | None:
+    """Cosine similarity between two specific chunks, or None if either has no
+    embedding. Cheap (two PK lookups + one distance) — no scan."""
+    row = (await db.execute(
+        text(
+            "SELECT 1 - (e1.embedding <=> e2.embedding) "
+            "FROM text_embeddings e1, text_embeddings e2 "
+            "WHERE e1.text_id = :at AND e1.juan_num = :aj AND e1.chunk_index = :ac "
+            "  AND e2.text_id = :bt AND e2.juan_num = :bj AND e2.chunk_index = :bc "
+            "  AND e1.embedding IS NOT NULL AND e2.embedding IS NOT NULL"
+        ),
+        {"at": a.text_id, "aj": a.juan_num, "ac": a.chunk_index,
+         "bt": b.text_id, "bj": b.juan_num, "bc": b.chunk_index},
+    )).first()
+    return float(row[0]) if row else None
+
+
+async def mine_from_anchors(
+    db: AsyncSession,
+    *,
+    limit: int = 200,
+    threshold: float = DEFAULT_SIMILARITY_THRESHOLD,
+    deltas: tuple[int, ...] = _ANCHOR_DELTAS,
+) -> int:
+    """Grow the moat outward from its verified edges: for each known-aligned pair
+    (anchor), propose the neighbouring chunk pairs (±delta on both sides) and
+    stage those above ``threshold`` that aren't already known.
+
+    Far better precision than the blind cross-lingual kNN (alignment locality),
+    and fast — each candidate is two PK lookups + one distance, no 246K-row scan.
+    Best-effort per anchor; returns total staged."""
+    anchors = (await db.execute(
+        text(
+            "SELECT text_a_id, text_a_juan_num, text_a_chunk_index, text_a_lang, "
+            "       text_b_id, text_b_juan_num, text_b_chunk_index, text_b_lang "
+            "FROM alignment_pairs "
+            "WHERE text_a_id IS NOT NULL AND text_b_id IS NOT NULL "
+            "  AND text_a_chunk_index IS NOT NULL AND text_b_chunk_index IS NOT NULL "
+            "LIMIT :limit"
+        ),
+        {"limit": limit},
+    )).all()
+
+    total = 0
+    for r in anchors:
+        a = ChunkRef(text_id=r[0], juan_num=r[1], chunk_index=r[2], lang=r[3] or "lzh")
+        b = ChunkRef(text_id=r[4], juan_num=r[5], chunk_index=r[6], lang=r[7] or "lzh")
+        for delta in deltas:
+            prop = propose_anchor_neighbour(a, b, delta)
+            if prop is None:
+                continue
+            na, nb = prop
+            try:
+                sim = await _pair_similarity(db, na, nb)
+                if sim is None:
+                    continue
+                existing = await _existing_pair_keys(db, na)
+                triples = select_new_candidates(na, [(nb, sim)], existing, threshold=threshold)
+                total += await stage_candidates(db, na, triples, source_name="anchor-expansion")
+            except Exception:
+                logger.warning("mine_from_anchors failed for %s->%s", na, nb, exc_info=True)
     await db.commit()
     return total
 

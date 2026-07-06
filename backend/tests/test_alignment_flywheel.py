@@ -16,6 +16,7 @@ from app.services.alignment_flywheel import (
     ChunkRef,
     list_pending,
     pair_key,
+    propose_anchor_neighbour,
     review_candidate,
     select_new_candidates,
 )
@@ -51,6 +52,18 @@ def test_select_skips_same_text_and_existing_and_dupes():
 def test_pair_key_is_directed():
     a, b = _ref(1), _ref(2)
     assert pair_key(a, b) != pair_key(b, a)
+
+
+def test_propose_anchor_neighbour_offsets_both_sides():
+    a = _ref(1, juan=2, cidx=5, lang="lzh")
+    b = _ref(9, juan=1, cidx=3, lang="bo")
+    na, nb = propose_anchor_neighbour(a, b, 1)
+    assert (na.text_id, na.juan_num, na.chunk_index) == (1, 2, 6)
+    assert (nb.text_id, nb.juan_num, nb.chunk_index) == (9, 1, 4)
+    assert nb.lang == "bo"                                # lang preserved
+    # -1 works too; going before chunk 0 is refused.
+    assert propose_anchor_neighbour(a, b, -1)[1].chunk_index == 2
+    assert propose_anchor_neighbour(_ref(1, cidx=0), _ref(2, cidx=5), -1) is None
 
 
 # ── review state machine (SQLite) ────────────────────────────────────────
