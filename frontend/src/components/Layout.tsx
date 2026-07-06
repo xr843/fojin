@@ -13,9 +13,9 @@ import {
   MenuOutlined,
   DashboardOutlined,
   RobotOutlined,
-  ExperimentOutlined,
   GithubOutlined,
   GlobalOutlined,
+  // ExperimentOutlined,  // research nav hidden (研究助手 待重构后再上线)
   // BarChartOutlined,   // dashboard nav hidden (数据总览 暂不对外公开)
   // FieldTimeOutlined,  // timeline nav deferred (pending polish)
   // NotificationOutlined,  // activity nav deferred (empty Source-Updates subtab)
@@ -76,7 +76,10 @@ export default function Layout() {
   }> = [
     { icon: <DatabaseOutlined />, label: t("nav.sources"), path: "/sources" },
     { icon: <RobotOutlined />, label: t("nav.chat"), path: "/chat" },
-    { icon: <ExperimentOutlined />, label: t("nav.research"), path: "/research" },
+    // 研究助手(/research)暂从导航撤下：当前输出偏"更长的问答"，未凸显跨藏对比这一
+    // 差异化，等重构(跨藏对比表 + 内联可点证据 + 流式)后再上线。后端 API 与
+    // fojin-mcp 保留，/research 路由仍可直达。
+    // { icon: <ExperimentOutlined />, label: t("nav.research"), path: "/research" },
     { icon: <FileTextOutlined />, label: t("nav.dictionary"), path: "/dictionary" },
     { icon: <ApartmentOutlined />, label: t("nav.kg"), path: "/kg" },
     { icon: <GlobalOutlined />, label: t("nav.geo"), path: "/map" },
