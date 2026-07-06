@@ -59,7 +59,10 @@ services:
     volumes:
       - esdata:/usr/share/elasticsearch/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      # Auth-agnostic: ES is up whether it answers 200 (no security) or 401
+      # (security on, no creds). A down node yields 000. Avoids embedding the
+      # password in the healthcheck.
+      test: ["CMD-SHELL", "c=$$(curl -s -o /dev/null -w '%{http_code}' http://localhost:9200/_cluster/health); [ \"$$c\" = 200 ] || [ \"$$c\" = 401 ]"]
       interval: 10s
       timeout: 5s
       retries: 10
