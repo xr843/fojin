@@ -10,10 +10,13 @@ Ask a question in plain language and FoJin's assistant **"XiaoJin"** answers fro
 
 What makes those answers trustworthy is the corpus underneath. FoJin aggregates **613 data sources** into one searchable platform — 10,500+ texts with 23,500+ volumes of full content in Classical Chinese, Pali, Tibetan and Sanskrit, **the first LLM-driven trilingual cross-canon parallel reading platform** (CBETA × SuttaCentral × 84000) with LLM-verified chunk-level alignment, a 110K+ entity knowledge graph on a Deck.GL geo map, and 32 dictionaries with 748K entries. Every feature exists to make the answers more grounded — and to let you go deeper once you have one.
 
+FoJin is built to be **open, cross-canon, verifiable Buddhist knowledge infrastructure** — not just a site to read, but a corpus other tools can *call*. Every passage carries a stable, resolvable cross-canon **URN** (`fojin:cbeta/T0001.1`), and the **[`fojin-mcp`](https://pypi.org/project/fojin-mcp/)** server lets AI assistants (Claude, ChatGPT, any [MCP](https://modelcontextprotocol.io) client) answer from FoJin's cited passages directly.
+
 [Live Demo](https://fojin.app) &nbsp;&middot;&nbsp; [API Docs](https://fojin.app/docs) &nbsp;&middot;&nbsp; [中文文档](./docs/README_zh.md) &nbsp;&middot;&nbsp; [Discussions](https://github.com/xr843/fojin/discussions) &nbsp;&middot;&nbsp; [Discord](https://discord.gg/76SZeuJekq) &nbsp;&middot;&nbsp; [Report Bug](https://github.com/xr843/fojin/issues)
 
 [![CI](https://github.com/xr843/fojin/actions/workflows/ci.yml/badge.svg)](https://github.com/xr843/fojin/actions/workflows/ci.yml)
 [![Security Scan](https://github.com/xr843/fojin/actions/workflows/security.yml/badge.svg)](https://github.com/xr843/fojin/actions/workflows/security.yml)
+[![fojin-mcp on PyPI](https://img.shields.io/pypi/v/fojin-mcp?label=fojin-mcp&color=3775A9)](https://pypi.org/project/fojin-mcp/)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/xr843/fojin?style=social)](https://github.com/xr843/fojin)
 
@@ -32,6 +35,9 @@ Buddhist texts are scattered across hundreds of databases worldwide — CBETA, S
 | What you need | How FoJin helps |
 |---|---|
 | **Ask a question, get a sourced answer** | **AI Q&A ("XiaoJin")** — RAG over 680K+ passages, reranking, root-sutra recall, clickable 【《sutra》juan N】 citations, cross-canon citation drawer, anti-hallucination guards |
+| **Trust the answer** | **Verifiable answers** — deterministic citation whitelist + verbatim-quote downgrade + per-answer trust state; ~98% served-trustworthy at temp 0 |
+| Research a hard, multi-step question | **Research Assistant** (`/research`) — plans across corpus + dictionaries + knowledge graph, then synthesises a cited answer behind the same guards |
+| Call FoJin from an AI assistant | **MCP server** — [`uvx fojin-mcp`](https://pypi.org/project/fojin-mcp/); 6 read-only, URN-addressable tools for Claude / ChatGPT |
 | Ask in a master's voice | **Master Persona Mode** — 15 historical masters, each with tradition-scoped RAG |
 | Find a sutra across databases | **Multi-dimensional search** across 10,500+ texts from 613 sources |
 | Read the full text online | **8,900+ texts** with 23,500+ volumes of full content, CBETA-style layout |
@@ -79,6 +85,28 @@ ls backend/scripts/archive/imports/
 ```
 
 Each importer downloads data directly from the original source (CBETA, SuttaCentral, etc.) — no data is bundled in this repository.
+
+## Use FoJin from your AI tools (MCP)
+
+FoJin's verified, cross-canon corpus is callable directly from AI assistants (Claude Desktop, ChatGPT, or any [MCP](https://modelcontextprotocol.io) client) via the published **[`fojin-mcp`](https://pypi.org/project/fojin-mcp/)** server — so the assistant answers Buddhist questions from FoJin's cited passages instead of hallucinating.
+
+```bash
+uvx fojin-mcp                 # zero-install run
+# or: pip install fojin-mcp && fojin-mcp
+```
+
+It exposes six **read-only** tools over the public API, each returning passages with a stable, resolvable cross-canon **URN** (`fojin:cbeta/T0001.1`):
+
+| Tool | What it does |
+|---|---|
+| `search_corpus` | Semantic search across the aggregated canon |
+| `read_passage` | Read a specific text / volume |
+| `get_parallels` | Cross-canon parallels (汉 ↔ 巴利 ↔ 藏) for a passage |
+| `lookup_dictionary` | Term lookup across 32 dictionaries |
+| `lookup_entity` | Knowledge-graph entity facts |
+| `resolve_urn` | Resolve a FoJin URN to its source location |
+
+Claude Desktop config and ChatGPT setup are in **[`mcp-server/README.md`](mcp-server/README.md)**. The server is a thin, read-only client: it holds no credentials, bundles no corpus, and only calls FoJin's public endpoints — its default target is `https://fojin.app/api`, overridable via `FOJIN_API_BASE_URL` to point at a self-hosted instance.
 
 ## Features
 
@@ -186,6 +214,8 @@ Confidence distribution: all pairs ≥ 0.75. Hand-verified precision on the orig
 
 RAG layer automatically includes parallel_chunks in the LLM context when a retrieved chunk has alignments, so answers can naturally reference "the Pali version says…" without hallucinating.
 
+**Growing the alignment set — the flywheel:** beyond the batch pipeline above, an *alignment flywheel* (`backend/app/services/alignment_flywheel.py`) mines new candidate parallels by expanding outward from already-verified pairs — neighbouring chunks tend to align too, so this is both fast and precise where blind nearest-neighbour search drowns in same-language matches. Candidates are staged for **human review** and only promoted into the ground-truth `alignment_pairs` once accepted (`method='flywheel-verified'`). Nothing is auto-promoted — human review is the precision gate — and each verified alignment makes the next round of mining better.
+
 ### AI Q&A — "XiaoJin"
 
 **This is FoJin's core.** Ask questions in natural language; XiaoJin answers from canonical Buddhist texts using RAG (Retrieval-Augmented Generation) over 680K+ embedding vectors with an HNSW index for fast semantic search. Answers stay grounded because retrieval combines vector similarity, keyword reranking, and **root-sutra recall** (the sutra you asked about is always pulled into context), and every quoted passage is checked against the retrieved sources before it can become a clickable citation. Features include:
@@ -204,6 +234,20 @@ RAG layer automatically includes parallel_chunks in the LLM context when a retri
 - BYOK (Bring Your Own Key) support for multiple LLM providers
 
 <p align="center"><img src="./docs/screenshots/ai-chat-answer.png" alt="AI Q&A answering about Xuanzang's disciples" width="800"></p>
+
+### Verifiable answers — 每一句都能点回原典
+
+Trust is the point. Every answer passes three **deterministic** guards before it reaches you:
+
+- **Citation whitelist** — a 【《sutra》juan N】 citation is stripped or corrected unless that exact source was actually retrieved, so a citation link never points at something FoJin didn't read.
+- **Quote verification** — text inside quote marks is checked to be a *verbatim* substring of the retrieved passage (traditional/simplified folded); a non-verbatim "quote" is **downgraded** to plain prose rather than passed off as scripture.
+- **Trust state** — each answer is labelled `verified` / `citation_corrected` / `quote_relaxed` / `no_sources` so you can see how grounded it is.
+
+Measured on the eval harness at temperature 0, the raw model is verbatim-faithful only ~11% of the time — but after the guards **~98% of served answers are trustworthy**: FoJin either points you to a real source or honestly hedges, and never fabricates scripture. The metric (`served_trustworthy_rate`) is tracked in `backend/eval/faithfulness.py` as a regression gate.
+
+### Research Assistant (研究助手)
+
+For multi-step questions a single search can't answer — *"how is śūnyatā treated across Prajñāpāramitā, Madhyamaka and Yogācāra, with cited cross-canon parallels?"* — the research assistant **plans** the question into steps, **retrieves** across the corpus, dictionaries and knowledge graph, then **synthesises** a grounded answer. The synthesis runs through the *same* citation guards as chat, so the agent can plan freely but **cannot cite what it didn't retrieve**. Available at `/research` (sign-in required); API at `POST /api/research/query`.
 
 ### Master Persona Mode (法师模式)
 
@@ -295,7 +339,8 @@ FoJin aggregates data from major Buddhist digital projects worldwide. Sources ar
 | Database | PostgreSQL 15 + pgvector (HNSW index) + pg_trgm |
 | Search | Elasticsearch 8 (ICU tokenizer) |
 | Cache | Redis 7 |
-| AI | RAG (680K+ vectors, BGE-M3, HNSW) + 14 master personas + multi-provider LLM (OpenAI/Anthropic/DeepSeek/DashScope/Gemini/+10 more) |
+| AI | RAG (680K+ vectors, BGE-M3, HNSW) + 14 master personas + multi-provider LLM (OpenAI/Anthropic/DeepSeek/DashScope/Gemini/+10 more) + deterministic citation/quote guards |
+| Integration | MCP server ([`fojin-mcp`](https://pypi.org/project/fojin-mcp/), stdio) + public REST API with OpenAPI/Swagger docs + cross-canon URN scheme |
 | Deploy | Docker Compose, Nginx (gzip, security headers), Cloudflare CDN |
 | CI | GitHub Actions (lint, test, security scan) |
 
@@ -418,11 +463,15 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 - [x] GFM markdown tables in AI answers (remark-gfm) — comparative responses render as proper tables
 - [x] Anti-hallucination citation rules (Rule 4/4b) — forbid wrapping non-retrieved sutra names in 【…】
 - [x] Server-side SEO meta injection for `/texts/{id}` pages — proper `<title>` / `<description>` per sutra for search engines (SPA route crawlability)
+- [x] **Deterministic answer verifiability** — citation whitelist + verbatim-quote downgrade + per-answer trust state; `served_trustworthy_rate` ~98% at temp 0 as an eval regression gate
+- [x] **Cross-canon URN scheme** — stable, resolvable passage identifiers (`fojin:cbeta/T0001.1`) interoperable with CBETA / SuttaCentral / 84000 / GRETIL / VRI
+- [x] **MCP server — published to PyPI as [`fojin-mcp`](https://pypi.org/project/fojin-mcp/)** — 6 read-only, URN-addressable tools; callable from Claude Desktop / ChatGPT
+- [x] **Agentic research assistant** (`/research`) — plan → retrieve (corpus + dictionary + KG) → grounded synthesis behind the same citation guards
+- [x] **Alignment flywheel** — anchor-expansion candidate mining + human-review promotion into ground-truth alignments
 - [ ] Trilingual MVP v1.1 — expand to 20+ sutras (Lotus, Avataṃsaka, Madhyamakakārikā, Laṅkāvatāra, full Āgama↔Nikāya)
 - [ ] Topic ontology browsing page
 - [ ] Cross-lingual search (query in Chinese, find Sanskrit/Pali/Tibetan results)
 - [ ] Open data export (JSON/CSV for researchers)
-- [ ] MCP Server for AI assistant integration
 - [ ] OCR pipeline for scanned texts
 - [ ] Collaborative annotation sharing
 - [ ] Integration with Zotero and reference managers
