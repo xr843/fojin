@@ -8,6 +8,8 @@
 
 让这些答案可信的，是底下这套语料。FoJin 把 **613 个数据源** 聚合成一个可检索平台 —— 10,500+ 部经典、23,500+ 卷全文（汉、巴利、藏、梵四大传统），**全球首个 LLM 驱动的三藏对读 RAG 平台**（CBETA × SuttaCentral × 84000，段落级对应由 LLM 验证），11 万+ 实体的知识图谱地图，32 部辞典 748K 词条。每个功能的存在，都是为了让答案更有据可查 —— 也让你拿到答案后能继续深挖。
 
+FoJin 的定位是 **开放、跨藏、可验证的佛学知识基础设施** —— 不只是一个供人阅读的网站，而是一套别的工具可以「调用」的语料。每一段经文都带一个稳定、可解析的跨藏 **URN**（`fojin:cbeta/T0001.1`），而 **[`fojin-mcp`](https://pypi.org/project/fojin-mcp/)** 服务器让 AI 助手（Claude、ChatGPT、任意 [MCP](https://modelcontextprotocol.io) 客户端）直接从 FoJin 已校验的引文作答。
+
 [在线 Demo](https://fojin.app) · [API 文档](https://fojin.app/docs) · [English README](../README.md) · [Discussions](https://github.com/xr843/fojin/discussions) · [Discord](https://discord.gg/76SZeuJekq) · [报告 Bug](https://github.com/xr843/fojin/issues)
 
 ---
@@ -21,6 +23,9 @@
 | 你需要做什么 | FoJin 怎么帮 |
 |---|---|
 | **提个问题，得到有出处的答案** | **AI 问答（小津）** —— RAG 覆盖 68 万+ 段经文、重排、本经召回、可点击 `【《经名》第N卷】` 引文、跨藏引文抽屉、反幻觉校验 |
+| **相信这个答案** | **可验证答案** —— 确定性引文白名单 + 逐字引号降级 + 每条答案信任状态；temp=0 下约 98% 对外可信 |
+| 研究一个多步的难题 | **研究助手**（`/research`）—— 跨语料 + 辞典 + 知识图谱规划检索，再走同一套闸门综合成带引文的答案 |
+| 从 AI 助手里调用 FoJin | **MCP 服务器** —— [`uvx fojin-mcp`](https://pypi.org/project/fojin-mcp/)；6 个只读、URN 可寻址工具，供 Claude / ChatGPT 调用 |
 | 用某位法师的口吻问 | **法师人格模式** —— 15 位历史法师，各自限定其宗派核心经典 RAG |
 | 跨数据库找一部经 | **多维检索** 覆盖 613 数据源中的 10,500+ 部 |
 | 在线阅读全文 | **8,900+ 部** 共 23,500+ 卷 CBETA 风格全文 |
@@ -66,6 +71,28 @@ ls backend/scripts/archive/imports/
 ```
 
 每个 importer 直接从原始源（CBETA、SuttaCentral 等）下载 —— 本仓库不附带任何数据。
+
+## 从你的 AI 工具里调用 FoJin（MCP）
+
+FoJin 已校验的跨藏语料，可通过已发布的 **[`fojin-mcp`](https://pypi.org/project/fojin-mcp/)** 服务器，被 AI 助手（Claude Desktop、ChatGPT 或任意 [MCP](https://modelcontextprotocol.io) 客户端）直接调用 —— 助手从 FoJin 的引文作答，而不是凭空幻觉。
+
+```bash
+uvx fojin-mcp                 # 免安装直接运行
+# 或：pip install fojin-mcp && fojin-mcp
+```
+
+它对外暴露 6 个**只读**工具（走公开 API），每个返回的经文都带稳定、可解析的跨藏 **URN**（`fojin:cbeta/T0001.1`）：
+
+| 工具 | 作用 |
+|---|---|
+| `search_corpus` | 跨聚合藏经语义检索 |
+| `read_passage` | 读取指定经典 / 卷 |
+| `get_parallels` | 某段经文的跨藏平行（汉 ↔ 巴利 ↔ 藏） |
+| `lookup_dictionary` | 32 部辞典术语查询 |
+| `lookup_entity` | 知识图谱实体事实 |
+| `resolve_urn` | 把 FoJin URN 解析到原典位置 |
+
+Claude Desktop 配置和 ChatGPT 接入见 **[`mcp-server/README.md`](../mcp-server/README.md)**。该服务器是一个薄的只读客户端：**不含任何凭据、不打包任何语料**，只调用 FoJin 的公开端点 —— 默认目标 `https://fojin.app/api`，可用 `FOJIN_API_BASE_URL` 改指向自托管实例。
 
 ## 主要功能
 
@@ -117,6 +144,8 @@ ls backend/scripts/archive/imports/
 
 RAG 检索层自动在命中 alignment 时把 `parallel_chunks` 注入 LLM context，回答可自然引用"巴利本作…"或"藏译作…"，禁止虚构。
 
+**做大对齐集 —— 飞轮**：在上面的批处理管道之外，一套*对齐飞轮*（`backend/app/services/alignment_flywheel.py`）从已验证的对齐对**向外扩展**去挖新候选 —— 相邻 chunk 往往也对齐，所以在盲搜最近邻会被同语言匹配淹没的地方，这套方法又快又准。候选进入**人工评审**队列，只有被接受后才提升为 ground-truth `alignment_pairs`（`method='flywheel-verified'`）。**绝不自动入库 —— 人工评审是精度闸门**，而每确认一组对齐，都让下一轮挖掘更好。
+
 ### 辞典查询
 
 32 部权威辞典共 748,000+ 词条，覆盖汉/巴/梵/藏/英 6 语种 —— NTI Reader、DPD、Apte、Monier-Williams、Rangjung Yeshe、佛光、丁福保、Soothill 等。完整词典清单见英文 README 详情。
@@ -141,6 +170,20 @@ RAG 检索层自动在命中 alignment 时把 `parallel_chunks` 注入 LLM conte
 - **「问小津」按钮** 阅读器选中文字直接问
 - **Tab 键** 输入框中循环建议问题
 - BYOK（Bring Your Own Key）支持多个 LLM 厂商
+
+### 可验证答案 —— 每一句都能点回原典
+
+信任就是重点。每条答案在到你面前之前，都过三道**确定性**闸门：
+
+- **引文白名单** —— `【《经名》第N卷】` 引文，若那个来源没被真正检索到，就剥掉或纠正；引文链接绝不会指向 FoJin 没读过的东西。
+- **引号核验** —— 引号里的文字必须是检索到原文的**逐字**子串（繁简已折叠）；不是逐字的"引文"会被**降级**成普通叙述，而不是冒充经文。
+- **信任状态** —— 每条答案标注 `verified` / `citation_corrected` / `quote_relaxed` / `no_sources`，让你看清它有多有据。
+
+在评测集上 temp=0 实测：原始模型只有约 11% 是逐字可信的，但过完这三道闸门后，**对外服务的答案约 98% 可信** —— FoJin 要么把你带到真实原文，要么如实存疑，绝不伪造经文。该指标（`served_trustworthy_rate`）在 `backend/eval/faithfulness.py` 里作为回归门槛被持续跟踪。
+
+### 研究助手（研究助手）
+
+面对一次检索答不了的多步问题 —— *"空性在般若、中观、唯识三系里如何被处理，并给出带引文的跨藏平行段落？"* —— 研究助手把问题**拆解**成步骤，跨语料、辞典、知识图谱**检索**，再**综合**出有据可查的答案。综合环节走的是和聊天*完全相同*的引文闸门，所以 agent 可以自由规划，但**不能引用它没检索到的东西**。入口在 `/research`（需登录）；API 为 `POST /api/research/query`。
 
 ### 法师人格模式
 
@@ -227,7 +270,8 @@ FoJin 聚合全球主要佛教数字项目的数据。按研究领域分类（�
 | 数据库 | PostgreSQL 15 + pgvector (HNSW) + pg_trgm |
 | 搜索 | Elasticsearch 8 (ICU 分词) |
 | 缓存 | Redis 7 |
-| AI | RAG（680K+ 向量，BGE-M3，HNSW）+ 14 法师人格 + 多 LLM 厂商（OpenAI/Anthropic/DeepSeek/DashScope/Gemini/+10 家） |
+| AI | RAG（680K+ 向量，BGE-M3，HNSW）+ 14 法师人格 + 多 LLM 厂商（OpenAI/Anthropic/DeepSeek/DashScope/Gemini/+10 家）+ 确定性引文/引号闸门 |
+| 集成 | MCP 服务器（[`fojin-mcp`](https://pypi.org/project/fojin-mcp/)，stdio）+ 公开 REST API（OpenAPI/Swagger 文档）+ 跨藏 URN 方案 |
 | 部署 | Docker Compose, Nginx (gzip, 安全头), Cloudflare CDN |
 | CI | GitHub Actions（lint、test、安全扫描） |
 
@@ -282,6 +326,11 @@ cd backend && pytest tests/ -q
 - [x] AI 答案 GFM markdown 表格渲染
 - [x] 反伪造引用规则强化
 - [x] 服务端 SEO meta 注入（每部经典独立标题/描述）
+- [x] **确定性答案可验证性** —— 引文白名单 + 逐字引号降级 + 每条答案信任状态；temp=0 下 `served_trustworthy_rate` 约 98%，作为评测回归门槛
+- [x] **跨藏 URN 方案** —— 稳定、可解析的经文标识（`fojin:cbeta/T0001.1`），与 CBETA / SuttaCentral / 84000 / GRETIL / VRI 互通
+- [x] **MCP 服务器 —— 已发布到 PyPI（[`fojin-mcp`](https://pypi.org/project/fojin-mcp/)）** —— 6 个只读、URN 可寻址工具，供 Claude Desktop / ChatGPT 调用
+- [x] **Agentic 研究助手**（`/research`）—— 规划 → 检索（语料 + 辞典 + 知识图谱）→ 走同一套引文闸门的有据综合
+- [x] **对齐飞轮** —— anchor-expansion 候选挖掘 + 人工评审后提升为 ground-truth 对齐
 
 **正在做**：
 - [ ] 三语 MVP v1.1 —— 扩展到 20+ 经典（法华、华严、中论、楞伽、阿含全量 ↔ 尼柯耶）
