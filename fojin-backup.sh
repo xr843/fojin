@@ -23,6 +23,7 @@ PG_FILE="fojin_pg_${TIMESTAMP}.sql.gz"
 CFG_FILE="fojin_configs_${TIMESTAMP}.tar.gz"
 CRON_FILE="fojin_cron_${TIMESTAMP}.txt"
 BUCKET="oss://fojin-prod-backup"
+GPG_RECIPIENT="C8D283D7427137C35D1D086AAE6F12A74AB34DB5"  # fojin-backup pubkey; private key held off-server (see SECURITY.md)
 
 mkdir -p "$BACKUP_DIR"
 
@@ -38,7 +39,7 @@ if [ "$PG_SIZE" -lt 1048576 ]; then
 fi
 echo "[$(date)] Local pg backup: ${BACKUP_DIR}/${PG_FILE} (${PG_SIZE} bytes)"
 
-if /usr/local/bin/ossutil cp "${BACKUP_DIR}/${PG_FILE}" "${BUCKET}/pg/${PG_FILE}"; then
+if gpg --batch --yes --trust-model always -r "$GPG_RECIPIENT" -o "${BACKUP_DIR}/${PG_FILE}.gpg" --encrypt "${BACKUP_DIR}/${PG_FILE}" && /usr/local/bin/ossutil cp "${BACKUP_DIR}/${PG_FILE}.gpg" "${BUCKET}/pg/${PG_FILE}.gpg" && rm -f "${BACKUP_DIR}/${PG_FILE}.gpg"; then
     echo "[$(date)] OSS pg upload success: ${BUCKET}/pg/${PG_FILE}"
 else
     echo "[$(date)] WARNING: OSS pg upload failed, local backup kept"
@@ -74,7 +75,7 @@ if [ "$CFG_SIZE" -lt 1024 ]; then
     echo "[$(date)] WARNING: configs tarball too small (${CFG_SIZE} bytes)"
 else
     echo "[$(date)] Local configs backup: ${BACKUP_DIR}/${CFG_FILE} (${CFG_SIZE} bytes)"
-    if /usr/local/bin/ossutil cp "${BACKUP_DIR}/${CFG_FILE}" "${BUCKET}/configs/${CFG_FILE}"; then
+    if gpg --batch --yes --trust-model always -r "$GPG_RECIPIENT" -o "${BACKUP_DIR}/${CFG_FILE}.gpg" --encrypt "${BACKUP_DIR}/${CFG_FILE}" && /usr/local/bin/ossutil cp "${BACKUP_DIR}/${CFG_FILE}.gpg" "${BUCKET}/configs/${CFG_FILE}.gpg" && rm -f "${BACKUP_DIR}/${CFG_FILE}.gpg"; then
         echo "[$(date)] OSS configs upload success: ${BUCKET}/configs/${CFG_FILE}"
     else
         echo "[$(date)] WARNING: OSS configs upload failed"
