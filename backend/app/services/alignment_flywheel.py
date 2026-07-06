@@ -169,10 +169,18 @@ async def _cross_lang_neighbours(
         return []
     emb = src[0]  # asyncpg returns the pgvector column as a '[...]' string
 
-    # A filtered cross-lingual kNN scans more than a normal query; give it room
-    # so it isn't cancelled by the default statement_timeout (SET LOCAL scopes it
-    # to this transaction only).
-    await raw.exec_driver_sql("SET LOCAL statement_timeout = 25000")
+    # Cross-lingual kNN can't use the HNSW index: an lzh chunk's nearest
+    # neighbours are overwhelmingly other lzh chunks (same-language dominance),
+    # so an index scan's top-ef_search candidates contain no pi/bo/sa and the
+    # lang filter returns nothing. Force a sequential scan of the target-language
+    # subset — correct (all distances computed), but O(target rows) per source
+    # chunk (~1min over 246K), so this is an OFFLINE/cron miner, not on-demand.
+    # (SCALE follow-up: a per-language embedding index would make this fast.)
+    # Fetched the source embedding above WITH indexes on; disable them only now
+    # so that lookup stayed fast.
+    await raw.exec_driver_sql("SET LOCAL enable_indexscan = off")
+    await raw.exec_driver_sql("SET LOCAL enable_bitmapscan = off")
+    await raw.exec_driver_sql("SET LOCAL statement_timeout = 120000")
     rows = (await raw.exec_driver_sql(
         "SELECT te.text_id, te.juan_num, te.chunk_index, bt.lang, "
         "       1 - (te.embedding <=> $1::vector) AS sim "
