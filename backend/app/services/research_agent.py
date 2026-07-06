@@ -25,6 +25,7 @@ production bindings.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -290,15 +291,27 @@ class ResearchAgent:
         collected = _Collected()
         refs = _CollectedRefs()
         run_steps: list[ResearchStep] = []
-        for step in plan:
+
+        async def _run_step(step):
             ref_tool = self._ref_tools.get(step.tool)
             try:
                 if ref_tool is not None:
-                    added = refs.add(await ref_tool(step.query))
-                else:
-                    added = collected.add(await self._corpus_tool(step.query))
+                    return step, "ref", await ref_tool(step.query)
+                return step, "corpus", await self._corpus_tool(step.query)
             except Exception:
                 logger.warning("research step failed (%s %r)", step.tool, step.query, exc_info=True)
+                return step, "error", None
+
+        # Steps are independent retrievals, so run them concurrently — sequential
+        # awaits made an N-step query take ~N× a single retrieval (tens of
+        # seconds under load, blowing the upstream timeout). gather preserves
+        # order, so the dedup fold + step reporting below stay deterministic.
+        for step, kind, result in await asyncio.gather(*(_run_step(s) for s in plan)):
+            if kind == "ref":
+                added = refs.add(result)
+            elif kind == "corpus":
+                added = collected.add(result)
+            else:
                 added = 0
             run_steps.append(
                 ResearchStep(tool=step.tool, query=step.query, aspect=step.aspect, num_sources=added)
@@ -367,6 +380,7 @@ def build_research_agent(db: object, user: object | None) -> ResearchAgent:
     import httpx
 
     from app.core.url_security import create_pinned_https_transport
+    from app.database import async_session
     from app.services.llm_client import (
         PROVIDER_DEFAULT_MODELS,
         _is_reasoning_model,
@@ -415,10 +429,13 @@ def build_research_agent(db: object, user: object | None) -> ResearchAgent:
             return resp.json()["choices"][0]["message"]["content"] or ""
 
     async def corpus_tool(query: str) -> list[ChatSource]:
-        sources, _context = await retrieve_rag_context(
-            db, query, pgvector_limit=_STEP_PGVECTOR_LIMIT  # type: ignore[arg-type]
-        )
-        return sources
+        # Own session per call: steps run concurrently (asyncio.gather in run())
+        # and a single AsyncSession can't be shared across concurrent operations.
+        async with async_session() as session:
+            sources, _context = await retrieve_rag_context(
+                session, query, pgvector_limit=_STEP_PGVECTOR_LIMIT
+            )
+            return sources
 
     async def dict_tool(query: str) -> list[ResearchReference]:
         # Reuse the dictionary endpoint's 简繁-aware headword matching helpers so
@@ -436,7 +453,8 @@ def build_research_agent(db: object, user: object | None) -> ResearchAgent:
             .options(joinedload(DictionaryEntry.source))
             .limit(_REF_LOOKUP_LIMIT)
         )
-        rows = (await db.execute(stmt)).unique().scalars().all()  # type: ignore[union-attr]
+        async with async_session() as session:
+            rows = (await session.execute(stmt)).unique().scalars().all()
         return [
             ResearchReference(
                 kind="dictionary",
@@ -450,9 +468,10 @@ def build_research_agent(db: object, user: object | None) -> ResearchAgent:
     async def entity_tool(query: str) -> list[ResearchReference]:
         from app.services.knowledge_graph import search_entities
 
-        entities, _total = await search_entities(
-            db, query, None, _REF_LOOKUP_LIMIT, 0  # type: ignore[arg-type]
-        )
+        async with async_session() as session:
+            entities, _total = await search_entities(
+                session, query, None, _REF_LOOKUP_LIMIT, 0
+            )
         return [
             ResearchReference(
                 kind="entity",
