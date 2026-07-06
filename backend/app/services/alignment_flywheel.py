@@ -32,9 +32,11 @@ from app.models.alignment_candidate import AlignmentCandidate
 logger = logging.getLogger(__name__)
 
 # Default cosine-similarity floor for a chunk pair to be worth a human's time.
-# Deliberately conservative — the miner is high-recall, review is the precision
-# stage, but staging near-random pairs just wastes review effort.
-DEFAULT_SIMILARITY_THRESHOLD = 0.62
+# CROSS-lingual similarity (lzh↔pi, different scripts in one embedding space)
+# runs lower than intra-lingual, so this is lower than a same-language search
+# would use. The miner is high-recall; review is the precision stage. Tunable
+# per run.
+DEFAULT_SIMILARITY_THRESHOLD = 0.5
 # Cross-canon target languages a source (lzh) chunk is matched against.
 DEFAULT_TARGET_LANGS = ("pi", "bo", "sa")
 
@@ -148,23 +150,37 @@ async def _cross_lang_neighbours(
 ) -> list[tuple[ChunkRef, float]]:
     """Top-k nearest cross-language chunks to ``source`` by embedding cosine
     similarity (pgvector). fojin embeds all languages in one space, so this is a
-    meaningful lzh↔pi↔bo match. Correlated on the source chunk's own embedding."""
+    meaningful lzh↔pi↔bo match.
+
+    Perf: the source embedding is fetched once and passed as a literal (mirroring
+    ``embedding.similarity_search``), not a correlated ``(SELECT … FROM src)``
+    subquery — the subquery form made the planner re-evaluate per row and blow
+    the statement timeout on prod. The mine also raises the per-statement timeout
+    since a filtered cross-lingual scan is heavier than a normal query."""
     lang_list = ",".join(f"'{lg}'" for lg in target_langs if lg.isalpha())  # nosec B608 — whitelist langs
-    rows = (await db.execute(
-        text(
-            "WITH src AS ("
-            "  SELECT embedding FROM text_embeddings "
-            "  WHERE text_id = :tid AND juan_num = :juan AND chunk_index = :cidx"
-            ") "
-            "SELECT te.text_id, te.juan_num, te.chunk_index, bt.lang, "
-            "       1 - (te.embedding <=> (SELECT embedding FROM src)) AS sim "
-            "FROM text_embeddings te JOIN buddhist_texts bt ON bt.id = te.text_id "
-            f"WHERE bt.lang IN ({lang_list}) AND te.embedding IS NOT NULL "
-            "  AND (SELECT embedding FROM src) IS NOT NULL "
-            "ORDER BY te.embedding <=> (SELECT embedding FROM src) "
-            "LIMIT :k"
-        ),
-        {"tid": source.text_id, "juan": source.juan_num, "cidx": source.chunk_index, "k": k},
+    raw = await db.connection()
+
+    src = (await raw.exec_driver_sql(
+        "SELECT embedding FROM text_embeddings "
+        "WHERE text_id = $1 AND juan_num = $2 AND chunk_index = $3",
+        (source.text_id, source.juan_num, source.chunk_index),
+    )).first()
+    if not src or src[0] is None:
+        return []
+    emb = src[0]  # asyncpg returns the pgvector column as a '[...]' string
+
+    # A filtered cross-lingual kNN scans more than a normal query; give it room
+    # so it isn't cancelled by the default statement_timeout (SET LOCAL scopes it
+    # to this transaction only).
+    await raw.exec_driver_sql("SET LOCAL statement_timeout = 25000")
+    rows = (await raw.exec_driver_sql(
+        "SELECT te.text_id, te.juan_num, te.chunk_index, bt.lang, "
+        "       1 - (te.embedding <=> $1::vector) AS sim "
+        "FROM text_embeddings te JOIN buddhist_texts bt ON bt.id = te.text_id "
+        f"WHERE bt.lang IN ({lang_list}) AND te.embedding IS NOT NULL "
+        "ORDER BY te.embedding <=> $1::vector "
+        "LIMIT $2",
+        (emb, k),
     )).all()
     return [
         (ChunkRef(text_id=r[0], juan_num=r[1], chunk_index=r[2], lang=r[3] or "lzh"), float(r[4]))
