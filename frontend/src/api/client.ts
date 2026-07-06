@@ -1645,11 +1645,16 @@ export interface ResearchReport {
   trust_status?: ChatTrustStatus | null;
 }
 
-export async function runResearch(question: string, maxSteps = 4): Promise<ResearchReport> {
-  const { data } = await api.post<ResearchReport>("/research/query", {
-    question,
-    max_steps: maxSteps,
-  });
+export async function runResearch(question: string, maxSteps = 3): Promise<ResearchReport> {
+  // The agent fans out into a plan + several retrievals + a synthesis, all on a
+  // (often reasoning-class) LLM, so a single call routinely runs 60-90s — far
+  // past the 15s axios default. Give it a 3-minute ceiling so the client waits
+  // instead of aborting with a spurious "research failed".
+  const { data } = await api.post<ResearchReport>(
+    "/research/query",
+    { question, max_steps: maxSteps },
+    { timeout: 180000 },
+  );
   return data;
 }
 

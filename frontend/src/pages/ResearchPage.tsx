@@ -48,7 +48,9 @@ export default function ResearchPage() {
   const [question, setQuestion] = useState("");
 
   const mutation = useMutation<ResearchReport, Error, string>({
-    mutationFn: (q: string) => runResearch(q, 4),
+    // 3 steps already yields ~10 cited sources; 4 pushes total latency toward
+    // the ~100s upstream (Cloudflare) ceiling, so keep the default at 3.
+    mutationFn: (q: string) => runResearch(q, 3),
   });
 
   const submit = () => {
