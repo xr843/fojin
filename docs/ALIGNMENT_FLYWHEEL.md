@@ -17,6 +17,28 @@ open alignment output.
 
 ## 1. Mine (prod / cron — needs the corpus DB + pgvector)
 
+Two strategies, in order of preference:
+
+**`mine_from_anchors` (preferred — precise + fast).** Grows the moat outward
+from its verified edges: for each known-aligned pair, propose the neighbouring
+chunk pairs (±1, ±2 on both sides — alignment has strong locality) and stage the
+ones above threshold. Each candidate is two PK lookups + one distance (no scan),
+and precision is high because the prior is a confirmed alignment — unlike the
+blind kNN below, whose ~0.6 cross-lingual hits are mostly spurious (a Chan 語錄
+"matching" a Kangyur text).
+
+```python
+from app.services.alignment_flywheel import mine_from_anchors
+n = await mine_from_anchors(db, limit=500, threshold=0.5)
+```
+
+**`mine_candidates` (blind cross-lingual kNN — high recall, low precision, slow).**
+For source-language chunks with no aligned neighbour to expand from. Correct but
+~60s/chunk (same-language dominance forces a sequential scan of the 246K target
+embeddings — HNSW returns nothing useful), so offline only. Scale/precision
+follow-up: a per-language embedding index + LLM pre-verification of candidates.
+
+
 `app.services.alignment_flywheel.mine_candidates` embeds each source-language
 (default `lzh`) chunk against the cross-canon target languages (`pi`/`bo`/`sa`)
 in fojin's shared embedding space, and stages new pairs above a similarity
