@@ -313,6 +313,7 @@ interface MessageBubbleProps {
   onShare: (m: ChatMessageItem) => void;
   onRetry: (m: ChatMessageItem) => void;
   onFeedback: (m: ChatMessageItem, dir: "up" | "down") => void;
+  onSourceClick: (source: ChatSource) => void;
 }
 
 /** One chat message row, memoised on (m, isStreaming, sending, user). A streaming
@@ -323,7 +324,7 @@ interface MessageBubbleProps {
     which was the dominant "越聊越卡" jank in long conversations. */
 function MessageBubbleInner({
   m, isStreaming, sending, user, markdownComponents,
-  onSuggestionClick, onShare, onRetry, onFeedback,
+  onSuggestionClick, onShare, onRetry, onFeedback, onSourceClick,
 }: MessageBubbleProps) {
   // Read t here (not as a prop): on a mid-conversation language switch, i18next's
   // subscription re-renders the bubble — which memo does NOT block, since memo
@@ -346,6 +347,25 @@ function MessageBubbleInner({
     () => (isAssistantText ? tightenLists(injectCitationLinks(cleanContent, m.sources)) + (isStreaming ? " ▌" : "") : ""),
     [isAssistantText, cleanContent, m.sources, isStreaming],
   );
+
+  // Distinct retrieved sources (deduped by text + fascicle) shown as a
+  // persistent "参考经文" list under the answer. Inline 【…】 citations only
+  // appear when the LLM names the sutra in prose; this surfaces EVERY retrieved
+  // source, so any of them can be opened in the citation drawer and checked
+  // against the original one click away — even when the model paraphrased.
+  const sourceChips = useMemo(() => {
+    if (!isAssistantText || !m.sources) return [] as ChatSource[];
+    const seen = new Set<string>();
+    const out: ChatSource[] = [];
+    for (const s of m.sources) {
+      if (!s.title_zh) continue; // no title → nothing meaningful to label the chip with
+      const key = `${s.text_id}:${s.juan_num}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(s);
+    }
+    return out;
+  }, [isAssistantText, m.sources]);
   const trustLabelKey = trustStatusLabelKey(m.trust_status);
 
   return (
@@ -393,6 +413,28 @@ function MessageBubbleInner({
                     }}
                   >
                     {t(trustLabelKey)}
+                  </div>
+                )}
+                {sourceChips.length > 0 && (
+                  <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                    <span style={{ fontSize: 12, color: "var(--fj-ink-muted)" }}>{t("chat.reference_sources")}</span>
+                    {sourceChips.map((s) => (
+                      <button
+                        key={`${s.text_id}:${s.juan_num}`}
+                        type="button"
+                        onClick={() => onSourceClick(s)}
+                        style={{
+                          display: "inline-flex", alignItems: "center", gap: 4,
+                          padding: "3px 10px", borderRadius: 12,
+                          border: "1px solid rgba(176,141,87,0.5)", background: "rgba(176,141,87,0.06)",
+                          color: "var(--fj-ink-muted)", fontSize: 12, lineHeight: 1.6, cursor: "pointer", transition: "all 0.2s",
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(176,141,87,0.16)"; e.currentTarget.style.color = "var(--fj-accent)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(176,141,87,0.06)"; e.currentTarget.style.color = "var(--fj-ink-muted)"; }}
+                      >
+                        {t("reader.citation.title_with_juan", { title: s.title_zh, n: s.juan_num })}
+                      </button>
+                    ))}
                   </div>
                 )}
                 {suggestions.length > 0 && !sending && (
@@ -1051,6 +1093,27 @@ export default function ChatPage() {
     }
   }, [messages, handleSendMessage]);
 
+  const handleSourceClick = useCallback((s: ChatSource) => {
+    // Behavioural signal, mirroring inline citation clicks: opening a source
+    // from the persistent list is engagement with / trust in the retrieved text.
+    if (typeof umami !== "undefined") {
+      umami.track("source_click", { text_id: s.text_id });
+    }
+    const chunkIndex = s.chunk_index ?? -1;
+    if (chunkIndex < 0) {
+      // No chunk anchor (legacy / non-chunked source) — fall back to the reader,
+      // same as the inline-citation legacy path.
+      navigate(`/texts/${s.text_id}/read?juan=${s.juan_num}`);
+      return;
+    }
+    setCitationTarget({
+      textId: s.text_id,
+      juanNum: s.juan_num,
+      chunkIndex,
+      titleZh: s.title_zh ?? "",
+    });
+  }, [navigate]);
+
   const handleFeedbackMessage = useCallback((m: ChatMessageItem, dir: "up" | "down") => {
     const newFeedback = m.feedback === dir ? null : dir;
     setMessages((prev) => prev.map((x) => x.id === m.id ? { ...x, feedback: newFeedback } : x));
@@ -1397,6 +1460,7 @@ export default function ChatPage() {
                 onShare={handleShareMessage}
                 onRetry={handleRetryMessage}
                 onFeedback={handleFeedbackMessage}
+                onSourceClick={handleSourceClick}
               />
             ))}
             {/* Streaming cursor is shown inline via ▌ in the message bubble */}

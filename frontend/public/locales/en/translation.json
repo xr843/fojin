@@ -960,6 +960,7 @@
   "chat.upload_failed": "Upload failed, please try again later",
   "chat.thinking": "Searching scriptures and generating an answer",
   "chat.request_failed": "Request failed, please retry",
+  "chat.reference_sources": "Sources",
   "chat.export_empty": "No conversation to export",
   "chat.export_time": "Exported: {{time}}",
   "chat.export_role_user": "User",
