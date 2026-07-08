@@ -25,6 +25,13 @@ STRICT_PATHS: dict[str, int] = {
     "/api/search/semantic": settings.rate_limit_semantic,
     "/api/research/query": settings.rate_limit_research,
     "/api/alignment/ai-diff": settings.rate_limit_ai_diff,
+    # Chat / AI Q&A — the most expensive endpoint (platform-key RAG embedding +
+    # streaming LLM + a held DB pool slot), previously left at the loose
+    # default. Exact-path map (STRICT_PATHS.get(path)), so both routes are
+    # listed; each gets its own per-IP window at the same limit (production
+    # traffic is effectively all /stream).
+    "/api/chat": settings.rate_limit_chat,
+    "/api/chat/stream": settings.rate_limit_chat,
 }
 
 

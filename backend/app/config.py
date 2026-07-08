@@ -105,6 +105,11 @@ class Settings(BaseSettings):
     rate_limit_semantic: int = 20
     rate_limit_research: int = 10
     rate_limit_ai_diff: int = 10
+    # Chat (AI Q&A) — the most expensive endpoint: RAG retrieval always uses the
+    # platform embedding key (even for BYOK users) plus a long streaming LLM
+    # call and a DB pool slot. 30/min/IP is generous for real use (a stream
+    # takes seconds) while capping abuse far below the 200 default.
+    rate_limit_chat: int = 30
 
     @property
     def database_url(self) -> str:
