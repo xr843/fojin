@@ -21,6 +21,7 @@ periods (feels alive) while staying stable within one (cacheable).
 from __future__ import annotations
 
 import logging
+from itertools import zip_longest
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -42,7 +43,14 @@ _SHOWCASE_CACHE_KEY = "home:showcase:v3"  # v3: sources.names pool added
 # A small candidate pool size for rotation-by-seed queries: fetch a bounded set
 # cheaply, then pick one deterministically per time bucket.
 _POOL = 12
-_GEO_TYPES = ("place", "monastery")
+
+# KG card: query each of these predicates separately and round-robin the results
+# so the pool spans relation types instead of whatever the physical scan hits
+# first (which was 100% active_in). translated (译) + teacher_of (授学) are the
+# illustrative person→X edges; active_in (活跃于) is filler. All three have
+# person subjects.
+_KG_FEATURED_PREDICATES = ("translated", "teacher_of", "active_in")
+_KG_PER_PREDICATE = 5
 
 # Max chars of a dictionary definition shown on the card — kept short so the
 # subtitle stays ~2 lines (the CSS also hard-clamps to 2 lines as a backstop).
@@ -74,13 +82,13 @@ _SOURCES_POOL = 12
 # harvest, so most rows' name_zh holds a foreign native name (고경사, "Chùa …",
 # even a typo'd "Tibetian Budist Temple"). Sampling arbitrary rows put those on
 # the homepage. This card is a storefront: show a fixed pool of well-known
-# Chinese temples and sacred mountains instead. The real total (~60k) still
-# comes from the live count; only these example names are curated. The frontend
-# samples a few of these per page load.
+# Chinese temples instead. All entries are monasteries (寺院) so they match the
+# card's "座佛教寺院" label — no sacred mountains, which aren't temples. The real
+# total comes from the live monastery count; only these names are curated.
 _GEO_FEATURED = (
     "少林寺", "灵隐寺", "白马寺", "寒山寺", "法门寺", "大慈恩寺",
     "国清寺", "栖霞寺", "南普陀寺", "金山寺", "大昭寺", "扎什伦布寺",
-    "五台山", "普陀山", "峨眉山", "九华山",
+    "隆兴寺", "广济寺", "华严寺", "归元寺",
 )
 
 
@@ -147,6 +155,12 @@ async def _chat_card(db: AsyncSession, redis) -> dict | None:
         return None
 
 
+def _has_cjk(s: str | None) -> bool:
+    """True if the string contains at least one CJK ideograph — used to tell a
+    real Chinese gloss from a bare English/Sanskrit transliteration."""
+    return any("一" <= c <= "鿿" for c in (s or ""))
+
+
 async def _dictionary_card(db: AsyncSession) -> dict | None:
     """A pool of hot terms + short glosses (one batched query over HOT_TERMS)."""
     try:
@@ -156,12 +170,26 @@ async def _dictionary_card(db: AsyncSession) -> dict | None:
                 .where(DictionaryEntry.headword.in_(HOT_TERMS))
             )
         ).all()
-        # One gloss per headword (first row wins), preserving HOT_TERMS order.
+        # Prefer a Chinese gloss per headword. A single-entry term (e.g. 如来 whose
+        # only entry defines it as "Tathagata") would otherwise deterministically
+        # surface a bare transliteration, which reads as broken on a 佛学辞典 card.
+        # Keep the first gloss seen, but upgrade to a Chinese one if a later row
+        # has it.
         by_term: dict[str, str | None] = {}
         for headword, definition in rows:
-            if headword not in by_term:
-                by_term[headword] = _short_gloss(definition)
-        terms = [{"term": t, "definition": by_term[t]} for t in HOT_TERMS if t in by_term]
+            gloss = _short_gloss(definition)
+            if not gloss:
+                continue
+            cur = by_term.get(headword)
+            if cur is None or (not _has_cjk(cur) and _has_cjk(gloss)):
+                by_term[headword] = gloss
+        # Only surface terms whose chosen gloss is actually Chinese — drop any
+        # term left with only a non-Chinese gloss rather than show it.
+        terms = [
+            {"term": t, "definition": by_term[t]}
+            for t in HOT_TERMS
+            if by_term.get(t) and _has_cjk(by_term[t])
+        ]
         if not terms:
             return None
         # Legacy single-pick fields (see _chat_card) for PWA-cached old frontends.
@@ -174,24 +202,35 @@ async def _dictionary_card(db: AsyncSession) -> dict | None:
 async def _kg_card(db: AsyncSession) -> dict | None:
     """A pool of readable knowledge-graph triples (subject —predicate→ object).
 
-    Person-subject filter keeps the sample human-readable (玄奘 —译→ …) without
-    an expensive scan; the frontend shows one triple at random per load."""
+    Person-subject filter keeps the sample human-readable (玄奘 —译→ …). We query
+    each featured predicate separately and round-robin the results so the pool
+    spans relation TYPES: a single ``LIMIT`` over the physical scan returned 100%
+    ``active_in→唐`` and hid the 22k teacher_of / 2.8k translated edges. The
+    frontend shows one triple at random per load."""
     try:
         subj = aliased(KGEntity)
         obj = aliased(KGEntity)
-        rows = (
-            await db.execute(
-                select(subj.name_zh, KGRelation.predicate, obj.name_zh)
-                .join(subj, KGRelation.subject_id == subj.id)
-                .join(obj, KGRelation.object_id == obj.id)
-                .where(
-                    subj.entity_type == "person",
-                    subj.name_zh.is_not(None),
-                    obj.name_zh.is_not(None),
+
+        async def _pred_rows(pred: str) -> list:
+            return (
+                await db.execute(
+                    select(subj.name_zh, KGRelation.predicate, obj.name_zh)
+                    .join(subj, KGRelation.subject_id == subj.id)
+                    .join(obj, KGRelation.object_id == obj.id)
+                    .where(
+                        subj.entity_type == "person",
+                        KGRelation.predicate == pred,
+                        subj.name_zh.is_not(None),
+                        obj.name_zh.is_not(None),
+                    )
+                    .limit(_KG_PER_PREDICATE)
                 )
-                .limit(_POOL)
-            )
-        ).all()
+            ).all()
+
+        # translated (译) + teacher_of (授学) are the illustrative ones; active_in
+        # (活跃于) is kept as filler but no longer allowed to dominate.
+        per_pred = [await _pred_rows(p) for p in _KG_FEATURED_PREDICATES]
+        rows = [r for tier in zip_longest(*per_pred) for r in tier if r]
         triples = [
             {
                 "subject": r[0],
@@ -212,15 +251,16 @@ async def _kg_card(db: AsyncSession) -> dict | None:
 async def _geo_card(db: AsyncSession) -> dict | None:
     """Live site count + a curated pool of well-known temple names.
 
-    The count is the real total over the geo entity types; the example names are
-    the curated ``_GEO_FEATURED`` pool (not sampled from the DB, which would
-    surface foreign native names). The frontend samples a few names per load.
-    Returns None when there is no geo data so the card degrades cleanly.
+    The count is the live monastery total — monasteries only, to match the
+    "座佛教寺院" label (the ``place`` rows, ~0.6%, aren't temples). The example
+    names are the curated ``_GEO_FEATURED`` pool (not sampled from the DB, which
+    would surface foreign native names). The frontend samples a few names per
+    load. Returns None when there is no geo data so the card degrades cleanly.
     """
     try:
         count = (
             await db.execute(
-                select(func.count(KGEntity.id)).where(KGEntity.entity_type.in_(_GEO_TYPES))
+                select(func.count(KGEntity.id)).where(KGEntity.entity_type == "monastery")
             )
         ).scalar() or 0
         if not count:
