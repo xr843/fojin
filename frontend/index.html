@@ -26,6 +26,10 @@
 
     <link rel="alternate" type="application/rss+xml" title="佛津 FoJin — 最新收录" href="https://fojin.app/feed.xml" />
     <link rel="preload" href="/fonts/MaShanZheng-title.woff2" as="font" type="font/woff2" crossorigin />
+    <!-- Hero background: preload so the (tiny, ~19KB) WebP starts downloading during
+         HTML parse in parallel with the JS bundle, instead of only after React mounts
+         the <img>. Kills the white→image flash on first paint. -->
+    <link rel="preload" href="/landscape-bg.webp" as="image" fetchpriority="high" />
     <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
     <!-- Umami Analytics is opt-in at build time via VITE_UMAMI_URL + VITE_UMAMI_WEBSITE_ID;

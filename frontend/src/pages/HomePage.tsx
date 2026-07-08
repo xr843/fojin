@@ -159,7 +159,7 @@ export default function HomePage() {
       </Helmet>
       <section className="home-hero">
         <div className="home-hero-bg">
-          <img src="/landscape-bg.png" alt="" />
+          <img src="/landscape-bg.webp" alt="" decoding="async" />
         </div>
         <h1 className="home-title">
           <span className="home-title-accent">{t("home.title_accent")}</span>{t("home.title_rest")}
@@ -178,7 +178,7 @@ export default function HomePage() {
             >
               <DatabaseOutlined />
               <span className="search-combo-src-text">{srcLabel}</span>
-              <span className="search-combo-badge">{srcCount}</span>
+              <span className="search-combo-badge">{srcCount || "—"}</span>
               {sourceOpen ? <UpOutlined /> : <DownOutlined />}
             </button>
             <div className="search-combo-divider" />
