@@ -222,8 +222,23 @@ export default function AdminDashboardPage() {
     );
   }
 
-  const overview = overviewQuery.data!;
-  const trends = trendsQuery.data!;
+  // React Query can report a query as neither loading nor error while its data is
+  // still undefined — status:'pending' + fetchStatus:'idle' (e.g. the gap after a
+  // transient 503, before a retry lands). `isLoading` is `isPending && isFetching`,
+  // so it reads false there. Guarding on the actual payload (instead of a `!`
+  // assertion) keeps a momentary backend blip from throwing at `trends.messages`
+  // and taking the whole admin route down via the ErrorBoundary; the page shows a
+  // spinner and recovers once the data arrives.
+  const overview = overviewQuery.data;
+  const trends = trendsQuery.data;
+
+  if (!overview || !trends) {
+    return (
+      <div style={{ textAlign: "center", padding: 80 }}>
+        <Spin size="large" />
+      </div>
+    );
+  }
 
   // Dual Y-axis: 消息数 (tens~hundreds) on the left, 新增用户 + 活跃用户
   // (single digits ~ teens) on the right. On a shared axis the two
