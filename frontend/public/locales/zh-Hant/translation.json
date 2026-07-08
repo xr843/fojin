@@ -960,6 +960,7 @@
   "chat.upload_failed": "上傳失敗，請稍後重試",
   "chat.thinking": "正在檢索經文並生成回答",
   "chat.request_failed": "請求失敗，請重試",
+  "chat.reference_sources": "參考經文",
   "chat.export_empty": "暫無對話內容可匯出",
   "chat.export_time": "匯出時間: {{time}}",
   "chat.export_role_user": "用戶",

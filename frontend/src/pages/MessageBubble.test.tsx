@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeAll } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import type { Components } from "react-markdown";
 import { MessageBubble } from "./ChatPage";
-import type { ChatMessageItem } from "../api/client";
+import type { ChatMessageItem, ChatSource } from "../api/client";
+import type { TextId } from "../types/branded";
 
 // antd (Button/Tooltip) reads matchMedia via useBreakpoint under jsdom.
 beforeAll(() => {
@@ -21,11 +22,24 @@ function msg(o: Partial<ChatMessageItem> = {}): ChatMessageItem {
   return { id: 1, role: "assistant", content: "answer", sources: null, created_at: "2026-06-18", ...o };
 }
 
+function src(o: Partial<ChatSource> = {}): ChatSource {
+  return {
+    text_id: 1 as TextId,
+    juan_num: 1,
+    chunk_index: 0,
+    chunk_text: "色不異空",
+    score: 0.9,
+    title_zh: "心經",
+    ...o,
+  };
+}
+
 function renderBubble(props: Partial<React.ComponentProps<typeof MessageBubble>> = {}) {
   const onSuggestionClick = vi.fn();
   const onShare = vi.fn();
   const onRetry = vi.fn();
   const onFeedback = vi.fn();
+  const onSourceClick = vi.fn();
   render(
     <MessageBubble
       m={msg()}
@@ -37,10 +51,11 @@ function renderBubble(props: Partial<React.ComponentProps<typeof MessageBubble>>
       onShare={onShare}
       onRetry={onRetry}
       onFeedback={onFeedback}
+      onSourceClick={onSourceClick}
       {...props}
     />,
   );
-  return { onSuggestionClick, onShare, onRetry, onFeedback };
+  return { onSuggestionClick, onShare, onRetry, onFeedback, onSourceClick };
 }
 
 describe("MessageBubble", () => {
@@ -54,7 +69,7 @@ describe("MessageBubble", () => {
       <MessageBubble
         m={msg({ content: "正在生成" })} isStreaming sending user={null}
         markdownComponents={markdownComponents}
-        onSuggestionClick={vi.fn()} onShare={vi.fn()} onRetry={vi.fn()} onFeedback={vi.fn()}
+        onSuggestionClick={vi.fn()} onShare={vi.fn()} onRetry={vi.fn()} onFeedback={vi.fn()} onSourceClick={vi.fn()}
       />,
     );
     expect(container.textContent).toContain("▌");
@@ -123,5 +138,40 @@ describe("MessageBubble", () => {
     expect(buttons).toHaveLength(4);
     fireEvent.click(buttons[2]); // like
     expect(onFeedback).toHaveBeenCalledWith(expect.objectContaining({ id: 42 }), "up");
+  });
+
+  it("renders a persistent 参考经文 source list and fires onSourceClick", () => {
+    const s = src({ text_id: 5 as TextId, juan_num: 16, title_zh: "雜阿含經" });
+    const { onSourceClick } = renderBubble({ m: msg({ sources: [s] }) });
+    // Label + a clickable chip for the retrieved source, even though the answer
+    // text never named it inline.
+    expect(screen.getByText("参考经文")).toBeInTheDocument();
+    const chip = screen.getByText("《雜阿含經》 第16卷");
+    fireEvent.click(chip);
+    expect(onSourceClick).toHaveBeenCalledWith(expect.objectContaining({ text_id: 5, juan_num: 16 }));
+  });
+
+  it("dedupes the source list by text + fascicle", () => {
+    renderBubble({
+      m: msg({
+        sources: [
+          src({ text_id: 1 as TextId, juan_num: 1, chunk_index: 0, title_zh: "心經" }),
+          src({ text_id: 1 as TextId, juan_num: 1, chunk_index: 3, title_zh: "心經" }), // same 卷, other chunk
+          src({ text_id: 2 as TextId, juan_num: 1, title_zh: "金剛經" }),
+        ],
+      }),
+    });
+    expect(screen.getAllByText("《心經》 第1卷")).toHaveLength(1);
+    expect(screen.getByText("《金剛經》 第1卷")).toBeInTheDocument();
+  });
+
+  it("shows no source list when the answer has no retrieved sources", () => {
+    renderBubble({ m: msg({ sources: null }) });
+    expect(screen.queryByText("参考经文")).toBeNull();
+  });
+
+  it("skips sources without a title (nothing to label the chip with)", () => {
+    renderBubble({ m: msg({ sources: [src({ title_zh: undefined })] }) });
+    expect(screen.queryByText("参考经文")).toBeNull();
   });
 });
