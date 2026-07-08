@@ -32,6 +32,11 @@
   height: 100%;
   z-index: 0;
   pointer-events: none;
+  /* Placeholder tint matching the ink-wash image's tones (warm sky → misty
+     water) so the split-second before the WebP paints shows a soft gradient
+     instead of a stark #f8f5ef flash. The <img> (object-fit: cover) fully
+     covers this once loaded. */
+  background: linear-gradient(180deg, #f4e8d6 0%, #ece0cb 40%, #d3dad0 75%, #c6cec5 100%);
 }
 
 .home-hero-bg img {
