@@ -56,8 +56,13 @@ async def test_showcase_returns_pools_per_card(seeded_db):
     # Dictionary returns a POOL of {term, definition}; 般若 (seeded) is present.
     terms = {e["term"] for e in out["dictionary"]["terms"]}
     assert "般若" in terms
+    # count is the live geo total (1 seeded monastery); places are the CURATED
+    # featured pool (not sampled from the DB, so foreign native names never leak
+    # onto the homepage). The seeded 那烂陀寺 therefore does NOT appear.
     assert out["geo"]["count"] == 1
-    assert "那烂陀寺" in out["geo"]["places"]
+    assert out["geo"]["places"] == list(home_showcase._GEO_FEATURED)
+    assert "少林寺" in out["geo"]["places"]
+    assert "那烂陀寺" not in out["geo"]["places"]
     # Chat returns a non-empty pool of questions.
     assert isinstance(out["chat"]["questions"], list) and out["chat"]["questions"]
     # Legacy single-pick fields coexist (backward-compat for PWA-cached old FE).
@@ -100,6 +105,18 @@ async def test_showcase_reads_from_redis_cache_when_present(seeded_db):
                 "dictionary": None, "kg": None, "geo": None}
     out = await get_home_showcase(seeded_db, redis=_Redis(json.dumps(sentinel)))
     assert out == sentinel                               # served from cache, DB untouched
+
+
+def test_geo_featured_pool_is_pure_chinese():
+    """The whole point of curating the pool: no latin/hangul/kana names ever
+    reach the homepage. Each featured name must be CJK-Han only (a handful of
+    well-known temples / sacred mountains)."""
+    import re
+
+    non_han = re.compile(r"[A-Za-z가-힣぀-ヿ]")  # latin / hangul / kana
+    assert home_showcase._GEO_FEATURED, "featured pool must be non-empty"
+    for name in home_showcase._GEO_FEATURED:
+        assert not non_han.search(name), f"featured name not pure-Chinese: {name!r}"
 
 
 def test_short_gloss_trims_long_definitions():
