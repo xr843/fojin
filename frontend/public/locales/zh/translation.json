@@ -694,7 +694,7 @@
   "chat.page_title": "小津 AI 佛典问答 — 佛津 FoJin",
   "chat.title": "小津 AI 佛典问答",
   "chat.subtitle": "可以问我关于佛经内容、佛教历史、经典翻译等问题",
-  "chat.subtitle2": "每条回答均附经文原文引用",
+  "chat.subtitle2": "答案标注经文出处，可点开核对原文",
   "chat.new_chat": "新对话",
   "chat.configure_key": "配置 API Key",
   "chat.key_configured": "已配置 Key",
