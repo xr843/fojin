@@ -100,6 +100,15 @@ logger = logging.getLogger(__name__)
 # browsers per spec, so this is invisible to the frontend consumer.
 LLM_STREAM_HEARTBEAT_INTERVAL_S = 25.0
 
+# Fixed backoff before a single same-provider retry of a transient
+# pre-first-token stream failure (see _stream_attempt). Kept short: the goal
+# is to ride out a one-off blip (connection reset, upstream 5xx/429/timeout),
+# not to wait out a sustained outage — that's what the platform fallback is
+# for. No jitter: a per-request single retry doesn't need thundering-herd
+# spread, and this module avoids time.monotonic-based randomness in the hot
+# path.
+LLM_STREAM_RETRY_BACKOFF_S = 0.5
+
 # Provider → base URL mapping (most are OpenAI-compatible; Anthropic uses its own format)
 
 
@@ -858,6 +867,44 @@ async def send_message_stream(
                     except (json.JSONDecodeError, IndexError, KeyError):
                         continue
 
+    async def _stream_attempt(u: str, k: str, m: str, p: str):
+        """One provider's stream, retried ONCE on a *transient* failure that
+        happens *before* any token is yielded.
+
+        Retrying after tokens have already streamed would duplicate output, so
+        we only retry while this attempt has produced nothing (``yielded`` is
+        False). Only transient failures are retried — a connection reset or an
+        upstream 5xx/429/timeout usually succeeds on an immediate second try;
+        a 4xx (bad key, model-not-found, invalid request) will just fail again,
+        so we surface it straight away. This is the only resilience a BYOK
+        request gets — it has no cross-provider fallback.
+        """
+        retried = False
+        while True:
+            yielded = False
+            try:
+                async for chunk in _stream_llm_once(u, k, m, p):
+                    yielded = True
+                    yield chunk
+                return
+            except (httpx.TimeoutException, httpx.HTTPStatusError, httpx.RequestError) as exc:
+                status = getattr(getattr(exc, "response", None), "status_code", None)
+                transient = (
+                    status in (429, 500, 502, 503, 504)
+                    if isinstance(exc, httpx.HTTPStatusError)
+                    # TimeoutException / ConnectError / ReadError etc. are all
+                    # network-level and worth one retry.
+                    else True
+                )
+                if yielded or retried or not transient:
+                    raise
+                retried = True
+                logger.warning(
+                    "LLM stream transient failure (%s, status=%s); retrying %s/%s once after %.1fs",
+                    type(exc).__name__, status, p, m, LLM_STREAM_RETRY_BACKOFF_S,
+                )
+                await asyncio.sleep(LLM_STREAM_RETRY_BACKOFF_S)
+
     # Build attempt list: primary first, then platform fallback (only for non-BYOK)
     attempts: list[tuple[str, str, str, str, bool]] = [(api_url, api_key, model, provider, False)]
     if not is_byok:
@@ -872,7 +919,7 @@ async def send_message_stream(
         for idx, (att_url, att_key, att_model, att_provider, is_fb) in enumerate(attempts):
             try:
                 async for kind, content in _interleave_heartbeat(
-                    _stream_llm_once(att_url, att_key, att_model, att_provider),
+                    _stream_attempt(att_url, att_key, att_model, att_provider),
                     heartbeat_interval=LLM_STREAM_HEARTBEAT_INTERVAL_S,
                 ):
                     if kind == "ping":
