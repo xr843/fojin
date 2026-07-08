@@ -52,6 +52,7 @@ import re
 import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 
 from opencc import OpenCC
 
@@ -71,6 +72,19 @@ _t2s = OpenCC("t2s")
 # LLMs routinely shorten "色不异空，空不异色" to "色不异空" and we don't
 # want to flag that.
 MIN_QUOTE_CHARS = 12
+
+# Fuzzy-classification of a FAILED quote (measurement only — never changes
+# the served answer). A failed quote whose best windowed similarity to the
+# cited chunk is >= this is bucketed "near_miss" (almost verbatim: a variant
+# character, edition/punctuation difference, or a correct quote the retriever
+# didn't surface — i.e. likely-correct text the downgrade wrongly strips);
+# below it is "absent" (a paraphrase or fabrication). 0.85 keeps 1–2 differing
+# chars in a ~12-char quote on the near_miss side while excluding paraphrases.
+NEAR_MISS_THRESHOLD = 0.85
+
+# Cap on how many sliding windows _windowed_ratio evaluates, so a
+# pathologically long chunk can't make failure-classification quadratic.
+_MAX_RATIO_WINDOWS = 256
 
 # Maximum distance (chars) between the closing quote and the start of
 # the trailing 【《X》第N卷】 reference for them to count as bound. A
@@ -159,6 +173,15 @@ class QuoteMutation:
     # have different LLM root causes and different downstream prompt
     # mitigations.
     reason: str
+    # Fuzzy-match telemetry for the failed quote (measurement only — does NOT
+    # affect the served answer). ``similarity`` is the best windowed
+    # SequenceMatcher ratio of the normalised quote against the cited chunk
+    # (0.0 when the cite matched no retrieved chunk). ``bucket`` is
+    # "near_miss" (>= NEAR_MISS_THRESHOLD — a likely-correct quote the
+    # retriever missed) or "absent" (paraphrase / fabrication). Defaulted so
+    # every existing construction site and consumer stays valid.
+    similarity: float = 0.0
+    bucket: str = "absent"
 
 
 def _normalise(s: str) -> str:
@@ -246,6 +269,64 @@ def _quote_failure_reason(
     return "blockquote_not_in_source" if blockquote else "quote_not_in_source"
 
 
+def _windowed_ratio(needle: str, haystack: str) -> float:
+    """Best ``SequenceMatcher`` ratio of ``needle`` against any same-length
+    window of ``haystack``. Windowing stops a short quote's score from being
+    diluted by a long (~500-char) chunk. Both inputs must already be
+    ``_normalise``d. Coarse step + a window cap keep it O(reasonable); the
+    tail window is always included so a match at the very end isn't missed."""
+    if not needle or not haystack:
+        return 0.0
+    nlen = len(needle)
+    if len(haystack) <= nlen:
+        return SequenceMatcher(None, needle, haystack, autojunk=False).ratio()
+    step = max(1, nlen // 4)
+    starts = list(range(0, len(haystack) - nlen + 1, step))
+    tail = len(haystack) - nlen
+    if starts[-1] != tail:
+        starts.append(tail)
+    if len(starts) > _MAX_RATIO_WINDOWS:
+        # Evenly subsample to bound cost on pathologically long chunks.
+        stride = len(starts) / _MAX_RATIO_WINDOWS
+        starts = [starts[int(i * stride)] for i in range(_MAX_RATIO_WINDOWS)]
+    best = 0.0
+    for s in starts:
+        r = SequenceMatcher(None, needle, haystack[s : s + nlen], autojunk=False).ratio()
+        if r > best:
+            best = r
+            if best >= 0.999:
+                break
+    return best
+
+
+def _classify_failure(
+    quote: str, title: str, juan: int | None, sources: list[ChatSource]
+) -> tuple[float, str]:
+    """Best fuzzy similarity + bucket for a quote that already FAILED the
+    verbatim substring test. Measurement only — never changes the answer.
+
+    ``similarity`` is the max windowed ratio of the normalised quote against
+    any candidate chunk of the cited text (0.0 when the cite matched no
+    retrieved chunk at all). ``bucket`` splits the two very different failure
+    modes that a flat verified_rate conflates:
+      * ``near_miss`` (>= ``NEAR_MISS_THRESHOLD``): almost verbatim — a variant
+        character, an edition/punctuation difference, or a correct quote whose
+        source chunk the retriever didn't surface. A likely-correct quote the
+        downgrade wrongly strips.
+      * ``absent``: nowhere near the source — a paraphrase or fabrication.
+    """
+    candidates = _find_sources(sources, title, juan)
+    if not candidates:
+        return 0.0, "absent"
+    nq = _normalise(quote)
+    similarity = max(
+        (_windowed_ratio(nq, _normalise(c.chunk_text)) for c in candidates),
+        default=0.0,
+    )
+    bucket = "near_miss" if similarity >= NEAR_MISS_THRESHOLD else "absent"
+    return similarity, bucket
+
+
 def verify_quoted_content(
     answer: str, sources: list[ChatSource]
 ) -> tuple[str, list[QuoteMutation]]:
@@ -276,12 +357,27 @@ def verify_quoted_content(
         reason = _quote_failure_reason(quote, title, juan, sources, blockquote=False)
         if reason is None:
             return m.group(0)
-        mutations.append(QuoteMutation(quote=quote, title=title, juan=juan, reason=reason))
+        similarity, bucket = _classify_failure(quote, title, juan, sources)
+        mutations.append(QuoteMutation(
+            quote=quote, title=title, juan=juan, reason=reason,
+            similarity=similarity, bucket=bucket,
+        ))
         # Drop the open/close marks: keep the text (now prose) + gap + citation.
         return m.group("quote") + m.group("gap") + m.group("cite")
 
     corrected = _QUOTE_CITATION_RE.sub(_downgrade_inline, answer)
     corrected = _downgrade_blockquotes(corrected, sources, mutations)
+    if mutations:
+        near_miss = sum(1 for m in mutations if m.bucket == "near_miss")
+        absent = len(mutations) - near_miss
+        # One structured line per answer so a `grep quote_verify` over logs
+        # shows how much of the (post-downgrade) "unverified" volume is
+        # likely-correct near-misses vs. real paraphrase/fabrication —
+        # i.e. how much of the low verified_rate is a measurement artifact.
+        logger.info(
+            "quote_verify buckets: near_miss=%d absent=%d total_failed=%d",
+            near_miss, absent, len(mutations),
+        )
     return corrected, mutations
 
 
@@ -329,7 +425,11 @@ def _downgrade_blockquotes(
         reason = _quote_failure_reason(quote, title, juan, sources, blockquote=True)
         if reason is None:
             return m.group(0)
-        mutations.append(QuoteMutation(quote=quote, title=title, juan=juan, reason=reason))
+        similarity, bucket = _classify_failure(quote, title, juan, sources)
+        mutations.append(QuoteMutation(
+            quote=quote, title=title, juan=juan, reason=reason,
+            similarity=similarity, bucket=bucket,
+        ))
         # Replace the blockquote body with its unmarked prose; keep everything
         # after the block (gap + citation) exactly as matched.
         return quote + "\n\n" + m.group(0)[len(block):]
