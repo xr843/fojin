@@ -208,7 +208,12 @@ export default defineConfig({
       registerType: "autoUpdate",
       manifest: false, // We provide our own manifest.json in public/
       workbox: {
-        globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
+        // Include webp so the real hero (landscape-bg.webp, ~19KB) is precached;
+        // exclude landscape-bg.png (577KB) — it's only the og:image for social
+        // crawlers, which don't run a service worker, so precaching it into every
+        // PWA install just wastes ~577KB the user never sees.
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,webp}"],
+        globIgnores: ["**/landscape-bg.png"],
         navigateFallbackDenylist: [/^\/api\//],
         skipWaiting: true,
         clientsClaim: true,
