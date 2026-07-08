@@ -939,6 +939,26 @@ async def send_message_stream(
         provider,
     )
 
+    # Empty-completion guard: the stream finished without ever producing an
+    # answer token AND without emitting an error (an error path sets
+    # ``full_answer = full_answer or error_msg``, so a still-empty
+    # ``full_answer`` uniquely identifies "silent empty completion"). Left
+    # alone we'd fall through to a bare ``done`` while the bubble is still on
+    # the thinking placeholder — the frontend then hangs on "正在检索…"
+    # forever with no answer, no error, and no retry. Surface it as an
+    # ``error`` (mirrors the prep-error path above) so the client shows its
+    # retry affordance, then close the stream. Nothing to citation-guard or
+    # persist, so return early.
+    if not received_first_token and not full_answer:
+        logger.warning(
+            "chat/stream produced no tokens and no error (session_id=%s, provider=%s)",
+            chat_session_id, provider,
+        )
+        empty_msg = "抱歉，本次未能生成任何回答内容，请重试。"
+        yield f"data: {json.dumps({'type': 'error', 'message': empty_msg}, ensure_ascii=False)}\n\n"
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+        return
+
     # Citation guard: rewrite any 【《X》第N卷】 not anchored in the
     # retrieved sources. The user has already seen the raw stream; we
     # emit a final 'citation_correction' event so the frontend can swap
