@@ -415,7 +415,7 @@
   "home.feature_sources_desc": "Aggregating CBETA, SuttaCentral and global Buddhist digital resources",
   "home.sc_sources": "{{sources}} sources · {{texts}} texts",
   "home.sc_sources_names": "{{sources}} sources · {{names}}",
-  "home.sc_geo": "{{count}} sacred sites · {{places}}",
+  "home.sc_geo": "{{count}} Buddhist temples worldwide · {{places}}",
   "home.feature_kg_title": "Knowledge Graph",
   "home.feature_kg_desc": "e.g. Kumārajīva → translated → Lotus Sutra",
   "home.feature_chat_title": "AI Q&A",

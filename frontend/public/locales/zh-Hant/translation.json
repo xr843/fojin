@@ -415,7 +415,7 @@
   "home.feature_sources_desc": "匯聚 CBETA、SuttaCentral 等全球數字佛典資源",
   "home.sc_sources": "{{sources}} 個來源 · {{texts}} 部經典",
   "home.sc_sources_names": "{{sources}} 個來源 · {{names}}",
-  "home.sc_geo": "{{count}} 處聖跡 · {{places}}",
+  "home.sc_geo": "{{count}} 座佛教寺院 · {{places}}",
   "home.feature_kg_title": "知識圖譜",
   "home.feature_kg_desc": "例如：鳩摩羅什 → 譯經 → 《妙法蓮華經》",
   "home.feature_chat_title": "AI 問答",

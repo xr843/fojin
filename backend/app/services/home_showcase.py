@@ -68,8 +68,20 @@ _PREDICATE_LABELS = {
 # picks one at random on every page load, so the card varies per refresh while
 # the DB work stays cached. Pool sizes are small — enough variety, tiny payload.
 _CHAT_POOL = 8
-_GEO_POOL = 12
 _SOURCES_POOL = 12
+
+# Curated example names for the geo card. The geo layer is a global OSM/Wikidata
+# harvest, so most rows' name_zh holds a foreign native name (고경사, "Chùa …",
+# even a typo'd "Tibetian Budist Temple"). Sampling arbitrary rows put those on
+# the homepage. This card is a storefront: show a fixed pool of well-known
+# Chinese temples and sacred mountains instead. The real total (~60k) still
+# comes from the live count; only these example names are curated. The frontend
+# samples a few of these per page load.
+_GEO_FEATURED = (
+    "少林寺", "灵隐寺", "白马寺", "寒山寺", "法门寺", "大慈恩寺",
+    "国清寺", "栖霞寺", "南普陀寺", "金山寺", "大昭寺", "扎什伦布寺",
+    "五台山", "普陀山", "峨眉山", "九华山",
+)
 
 
 def _short_gloss(definition: str | None) -> str | None:
@@ -198,23 +210,22 @@ async def _kg_card(db: AsyncSession) -> dict | None:
 
 
 async def _geo_card(db: AsyncSession) -> dict | None:
-    """Site count + a pool of place names; the frontend samples a few per load."""
+    """Live site count + a curated pool of well-known temple names.
+
+    The count is the real total over the geo entity types; the example names are
+    the curated ``_GEO_FEATURED`` pool (not sampled from the DB, which would
+    surface foreign native names). The frontend samples a few names per load.
+    Returns None when there is no geo data so the card degrades cleanly.
+    """
     try:
         count = (
             await db.execute(
                 select(func.count(KGEntity.id)).where(KGEntity.entity_type.in_(_GEO_TYPES))
             )
         ).scalar() or 0
-        names = (
-            await db.execute(
-                select(KGEntity.name_zh)
-                .where(KGEntity.entity_type.in_(_GEO_TYPES), KGEntity.name_zh.is_not(None))
-                .limit(_GEO_POOL)
-            )
-        ).scalars().all()
-        if not count and not names:
+        if not count:
             return None
-        return {"count": int(count), "places": list(names)}
+        return {"count": int(count), "places": list(_GEO_FEATURED)}
     except Exception:
         logger.warning("showcase geo_card failed", exc_info=True)
         return None
