@@ -109,14 +109,72 @@ async def test_showcase_reads_from_redis_cache_when_present(seeded_db):
 
 def test_geo_featured_pool_is_pure_chinese():
     """The whole point of curating the pool: no latin/hangul/kana names ever
-    reach the homepage. Each featured name must be CJK-Han only (a handful of
-    well-known temples / sacred mountains)."""
+    reach the homepage. Each featured name must be CJK-Han only (well-known
+    temples — matching the card's 座佛教寺院 label)."""
     import re
 
     non_han = re.compile(r"[A-Za-z가-힣぀-ヿ]")  # latin / hangul / kana
     assert home_showcase._GEO_FEATURED, "featured pool must be non-empty"
     for name in home_showcase._GEO_FEATURED:
         assert not non_han.search(name), f"featured name not pure-Chinese: {name!r}"
+
+
+@pytest.mark.anyio
+async def test_dictionary_card_prefers_chinese_gloss_over_transliteration():
+    """A term whose only gloss is a bare transliteration (如来 → "Tathagata")
+    must be dropped, not shown; a term with both keeps the Chinese gloss."""
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as conn:
+        await conn.run_sync(DataSource.__table__.create)
+        await conn.run_sync(DictionaryEntry.__table__.create)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    async with factory() as s:
+        src = DataSource(name_zh="测试辞典", code="test-dict", is_active=True)
+        s.add(src)
+        await s.flush()
+        s.add(DictionaryEntry(headword="如来", definition="Tathagata", lang="en",
+                              source_id=src.id, external_id="t1"))
+        s.add(DictionaryEntry(headword="般若", definition="prajñā", lang="sa",
+                              source_id=src.id, external_id="t2"))
+        s.add(DictionaryEntry(headword="般若", definition="照见诸法实相的智慧。", lang="zh",
+                              source_id=src.id, external_id="t3"))
+        await s.commit()
+        card = await home_showcase._dictionary_card(s)
+    await engine.dispose()
+
+    terms = {t["term"]: t["definition"] for t in (card or {}).get("terms", [])}
+    assert "如来" not in terms                       # English-only → dropped
+    assert terms.get("般若") == "照见诸法实相的智慧"    # Chinese gloss chosen over prajñā
+
+
+@pytest.mark.anyio
+async def test_kg_card_pool_spans_multiple_predicates():
+    """Regression for the "100% active_in→唐" bug: with translated + teacher_of
+    + active_in data present, the pool must span more than one relation type."""
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as conn:
+        await conn.run_sync(KGEntity.__table__.create)
+        await conn.run_sync(KGRelation.__table__.create)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    async with factory() as s:
+        kj = KGEntity(entity_type="person", name_zh="鸠摩罗什")
+        dx = KGEntity(entity_type="person", name_zh="道宣")
+        xz = KGEntity(entity_type="person", name_zh="玄奘")
+        lotus = KGEntity(entity_type="text", name_zh="妙法莲华经")
+        wg = KGEntity(entity_type="person", name_zh="文纲")
+        tang = KGEntity(entity_type="dynasty", name_zh="唐")
+        s.add_all([kj, dx, xz, lotus, wg, tang])
+        await s.flush()
+        s.add(KGRelation(subject_id=kj.id, predicate="translated", object_id=lotus.id))
+        s.add(KGRelation(subject_id=dx.id, predicate="teacher_of", object_id=wg.id))
+        s.add(KGRelation(subject_id=xz.id, predicate="active_in", object_id=tang.id))
+        await s.commit()
+        card = await home_showcase._kg_card(s)
+    await engine.dispose()
+
+    preds = {t["predicate"] for t in (card or {}).get("triples", [])}
+    assert len(preds) >= 2, f"pool should span multiple predicates, got {preds}"
+    assert "译" in preds and "授学" in preds
 
 
 def test_short_gloss_trims_long_definitions():
