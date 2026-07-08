@@ -125,12 +125,19 @@ async def test_dictionary_card_prefers_chinese_gloss_over_transliteration():
     must be dropped, not shown; a term with both keeps the Chinese gloss."""
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:
+        await conn.run_sync(DataSource.__table__.create)
         await conn.run_sync(DictionaryEntry.__table__.create)
     factory = async_sessionmaker(engine, expire_on_commit=False)
     async with factory() as s:
-        s.add(DictionaryEntry(headword="如来", definition="Tathagata", lang="en"))
-        s.add(DictionaryEntry(headword="般若", definition="prajñā", lang="sa"))
-        s.add(DictionaryEntry(headword="般若", definition="照见诸法实相的智慧。", lang="zh"))
+        src = DataSource(name_zh="测试辞典", code="test-dict", is_active=True)
+        s.add(src)
+        await s.flush()
+        s.add(DictionaryEntry(headword="如来", definition="Tathagata", lang="en",
+                              source_id=src.id, external_id="t1"))
+        s.add(DictionaryEntry(headword="般若", definition="prajñā", lang="sa",
+                              source_id=src.id, external_id="t2"))
+        s.add(DictionaryEntry(headword="般若", definition="照见诸法实相的智慧。", lang="zh",
+                              source_id=src.id, external_id="t3"))
         await s.commit()
         card = await home_showcase._dictionary_card(s)
     await engine.dispose()
