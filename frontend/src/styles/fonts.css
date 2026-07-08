@@ -2,17 +2,15 @@
 
 @import url('/fonts/noto-serif-sc.css');
 
-/* Subset: only 佛津 (1.6KB) — preloaded in index.html for instant title render */
-@font-face {
-  font-family: 'Ma Shan Zheng';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('/fonts/MaShanZheng-title.woff2') format('woff2');
-  unicode-range: U+4F5B, U+6D25;
-}
-
-/* Full charset fallback for any other Ma Shan Zheng usage */
+/* Full Ma Shan Zheng (brush calligraphy). In practice ONLY the English brand
+   "FoJin" (Latin glyphs, en locale) needs it — Chinese renders 佛津 from the
+   4KB subset below. Declared BEFORE the subset on purpose: when two @font-face
+   rules of one family have overlapping unicode-range, the LATER-declared face
+   wins for the overlapping codepoints. The subset's range (U+4F5B, U+6D25) is a
+   subset of this full face's implicit U+0-10FFFF, so whichever is declared last
+   wins for 佛津. Previously the subset came first and this full face second, so
+   the full face won and EVERY page — Chinese included — downloaded 3.2MB just to
+   draw the two-character 佛津 brand. Keeping it first lets the subset win. */
 @font-face {
   font-family: 'Ma Shan Zheng';
   font-style: normal;
@@ -21,10 +19,14 @@
   src: url('/fonts/MaShanZheng-Regular.woff2') format('woff2');
 }
 
+/* Subset: only 佛津 (4KB) — preloaded in index.html for instant title render.
+   Declared LAST so it wins for U+4F5B/U+6D25: Chinese pages draw the brand from
+   this tiny file and never fetch the full face above. */
 @font-face {
-  font-family: 'ZCOOL XiaoWei';
+  font-family: 'Ma Shan Zheng';
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url('/fonts/ZCOOLXiaoWei-Regular.woff2') format('woff2');
+  src: url('/fonts/MaShanZheng-title.woff2') format('woff2');
+  unicode-range: U+4F5B, U+6D25;
 }
