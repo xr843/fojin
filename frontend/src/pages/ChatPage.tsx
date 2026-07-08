@@ -432,7 +432,7 @@ function MessageBubbleInner({
                         onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(176,141,87,0.16)"; e.currentTarget.style.color = "var(--fj-accent)"; }}
                         onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(176,141,87,0.06)"; e.currentTarget.style.color = "var(--fj-ink-muted)"; }}
                       >
-                        {`《${s.title_zh}》${s.juan_num ? ` 第${s.juan_num}卷` : ""}`}
+                        {t("reader.citation.title_with_juan", { title: s.title_zh, n: s.juan_num })}
                       </button>
                     ))}
                   </div>

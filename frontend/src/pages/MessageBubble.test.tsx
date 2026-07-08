@@ -146,7 +146,7 @@ describe("MessageBubble", () => {
     // Label + a clickable chip for the retrieved source, even though the answer
     // text never named it inline.
     expect(screen.getByText("参考经文")).toBeInTheDocument();
-    const chip = screen.getByText("《雜阿含經》 第16卷");
+    const chip = screen.getByText("《雜阿含經》· 第 16 卷");
     fireEvent.click(chip);
     expect(onSourceClick).toHaveBeenCalledWith(expect.objectContaining({ text_id: 5, juan_num: 16 }));
   });
@@ -161,8 +161,8 @@ describe("MessageBubble", () => {
         ],
       }),
     });
-    expect(screen.getAllByText("《心經》 第1卷")).toHaveLength(1);
-    expect(screen.getByText("《金剛經》 第1卷")).toBeInTheDocument();
+    expect(screen.getAllByText("《心經》· 第 1 卷")).toHaveLength(1);
+    expect(screen.getByText("《金剛經》· 第 1 卷")).toBeInTheDocument();
   });
 
   it("shows no source list when the answer has no retrieved sources", () => {
