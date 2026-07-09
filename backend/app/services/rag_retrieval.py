@@ -52,7 +52,7 @@ ENABLE_PARALLEL_RAG = settings.enable_parallel_rag if hasattr(settings, "enable_
 ENABLE_MITRA_RAG_PARALLELS = (
     settings.enable_mitra_rag_parallels if hasattr(settings, "enable_mitra_rag_parallels") else True
 )
-MITRA_PARALLEL_K = 3   # max MITRA rows fetched per primary chunk
+MITRA_CANDIDATE_K = 8  # MITRA rows fetched per primary chunk to rank (candidate pool)
 MITRA_PARALLEL_SHOW = 2  # max MITRA parallels rendered per primary (new langs only)
 
 # Display labels for parallel-language annotations in the [跨藏对读] block.
@@ -458,31 +458,68 @@ def _group_mitra_rows(rows) -> dict[int, list[dict]]:
     foreign-parallel dicts. Pure (no I/O) so it's unit-testable.
 
     Row shape matches the SELECT in ``_attach_mitra_parallels``:
-    ``(primary_idx, foreign_lang, foreign_text, confidence)``. Rows with empty
+    ``(primary_idx, foreign_lang, foreign_text, zh_text, confidence)``. ``zh_text``
+    is the 汉 side of the aligned sentence, kept for relevance ranking (see
+    ``_rank_mitra_by_relevance``); it is not rendered. Rows with empty
     ``foreign_text`` are skipped (nothing to show the model).
     """
     grouped: dict[int, list[dict]] = {}
     for row in rows:
-        primary_idx, lang, foreign_text, confidence = row[0], row[1], row[2], row[3]
+        primary_idx, lang, foreign_text, zh_text, confidence = row[0], row[1], row[2], row[3], row[4]
         if not foreign_text:
             continue
         grouped.setdefault(primary_idx, []).append(
             {
                 "lang": lang or "",
                 "chunk_text": foreign_text,
+                "zh_text": zh_text or "",
                 "confidence": float(confidence) if confidence is not None else 1.0,
             }
         )
     return grouped
 
 
-async def _attach_mitra_parallels(db: AsyncSession, results: list[dict]) -> None:
+def _cjk_overlap(query: str, text: str) -> int:
+    """Count of distinct CJK characters shared between ``query`` and ``text``.
+
+    A cheap, dependency-free relevance signal (same spirit as _keyword_rerank's
+    character overlap): Buddhist doctrinal phrases are distinctive character
+    sequences, so a MITRA sentence whose 汉 side shares more of the question's
+    characters is the one the user actually asked about.
+    """
+    q = {c for c in query if "一" <= c <= "鿿"}
+    if not q:
+        return 0
+    z = {c for c in text if "一" <= c <= "鿿"}
+    return len(q & z)
+
+
+def _rank_mitra_by_relevance(items: list[dict], query: str) -> list[dict]:
+    """Re-order a primary's MITRA parallels so the sentence most relevant to the
+    question comes first — instead of the previous highest-confidence-first.
+
+    A chunk anchors many MITRA sentences (whole 500-char window); picking by
+    confidence surfaced an arbitrary one (e.g. 「受想行识亦复如是」 for a 「色即是空」
+    question). Rank by (汉-side overlap with the query) desc, then confidence
+    desc as tie-breaker. Pure — no I/O. ``_format_context_block`` then dedups by
+    language over this order, so the most relevant sentence per language wins.
+    """
+    return sorted(
+        items,
+        key=lambda it: (_cjk_overlap(query, it.get("zh_text", "")), it.get("confidence", 0.0)),
+        reverse=True,
+    )
+
+
+async def _attach_mitra_parallels(db: AsyncSession, results: list[dict], query: str) -> None:
     """Attach MITRA cross-lingual parallels to each result's ``mitra_parallels``.
 
     Mirrors ``_attach_parallel_chunks``' single-bulk-query shape, but reads
     ``mitra_alignments`` (chunk-anchored on the 汉 side by (text_id, juan_num,
-    chunk_index) — indexed by ix_mitra_align_chunk). Top-``MITRA_PARALLEL_K`` per
-    primary by confidence.
+    chunk_index) — indexed by ix_mitra_align_chunk). Fetches the top-
+    ``MITRA_CANDIDATE_K`` per primary by confidence, then re-ranks that pool by
+    relevance to ``query`` (see ``_rank_mitra_by_relevance``) so the sentence the
+    user actually asked about wins, not an arbitrary high-confidence one.
 
     Kept in a SEPARATE ``mitra_parallels`` key (not ``parallel_chunks``): MITRA's
     foreign side is inline source text with no ingested chunk, so it can't carry
@@ -510,6 +547,7 @@ async def _attach_mitra_parallels(db: AsyncSession, results: list[dict]) -> None
                     p.idx AS primary_idx,
                     ma.foreign_lang,
                     ma.foreign_text,
+                    ma.zh_text,
                     ma.confidence,
                     ROW_NUMBER() OVER (
                         PARTITION BY p.idx ORDER BY ma.confidence DESC, ma.id
@@ -520,14 +558,17 @@ async def _attach_mitra_parallels(db: AsyncSession, results: list[dict]) -> None
                    AND ma.juan_num = p.juan
                    AND ma.chunk_index = p.cidx
             )
-            SELECT primary_idx, foreign_lang, foreign_text, confidence
+            SELECT primary_idx, foreign_lang, foreign_text, zh_text, confidence
             FROM ranked
-            WHERE rn <= {MITRA_PARALLEL_K}
+            WHERE rn <= {MITRA_CANDIDATE_K}
             ORDER BY primary_idx, rn
         """)
         rows = (await db.execute(bulk_sql)).fetchall()
         for idx, items in _group_mitra_rows(rows).items():
-            results[idx]["mitra_parallels"] = items
+            # Re-rank the confidence-fetched pool by relevance to the question so
+            # the sentence the user asked about surfaces (format then dedups by
+            # language over this order and shows the top MITRA_PARALLEL_SHOW).
+            results[idx]["mitra_parallels"] = _rank_mitra_by_relevance(items, query)
     except Exception:
         logger.exception("Failed to attach mitra parallels")
 
@@ -940,7 +981,7 @@ async def retrieve_rag_context(
             # LLM — reader panel already shows them; this brings them to the
             # answer side. Separate mitra_parallels key, LLM-context-only.
             if ENABLE_MITRA_RAG_PARALLELS:
-                await _attach_mitra_parallels(db, search_results)
+                await _attach_mitra_parallels(db, search_results, query)
 
         sources = [
             ChatSource(

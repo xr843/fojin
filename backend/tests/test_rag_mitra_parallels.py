@@ -1,18 +1,12 @@
 """Tests for feeding MITRA parallels into the chat RAG context.
 
 `mitra_alignments` (~908K Skt/Tib↔汉 sentence pairs, chunk-anchored on the 汉
-side) was previously only surfaced in the reader panel. `_attach_mitra_parallels`
-now also brings it to the answer side as an LLM-context-only `mitra_parallels`
-field, and `_format_context_block` renders it in the [跨藏对读] block for
-languages the small self-built alignment_pairs table didn't cover.
-
-Asserts:
-  1. _group_mitra_rows groups by primary + skips empty foreign_text (pure).
-  2. _attach_mitra_parallels: one bulk query, populates mitra_parallels,
-     empty input = no DB call, DB error is swallowed.
-  3. _format_context_block: renders MITRA parallels, dedups languages already
-     covered by alignment_pairs, caps at MITRA_PARALLEL_SHOW, and is unchanged
-     when there are no MITRA parallels.
+side) is surfaced to the answer side as an LLM-context-only `mitra_parallels`
+field. A chunk anchors many MITRA sentences, so `_attach_mitra_parallels` fetches
+a confidence pool then re-ranks it by relevance to the question
+(`_rank_mitra_by_relevance`) — so 「色即是空」's Sanskrit wins over an arbitrary
+「受想行识」 sentence in the same chunk. `_format_context_block` renders the top
+results in [跨藏对读], deduped by language.
 """
 
 from unittest.mock import AsyncMock, MagicMock
@@ -22,8 +16,10 @@ import pytest
 from app.services.rag_retrieval import (
     MITRA_PARALLEL_SHOW,
     _attach_mitra_parallels,
+    _cjk_overlap,
     _format_context_block,
     _group_mitra_rows,
+    _rank_mitra_by_relevance,
 )
 
 
@@ -38,18 +34,47 @@ def _make_db_with_rows(rows):
 # ── _group_mitra_rows (pure) ──────────────────────────────────────────
 
 def test_group_mitra_rows_groups_and_skips_empty():
-    # row shape: (primary_idx, foreign_lang, foreign_text, confidence)
+    # row shape: (primary_idx, foreign_lang, foreign_text, zh_text, confidence)
     rows = [
-        (0, "sa", "sanskrit A", 0.99),
-        (0, "bo", "tibetan A", 0.90),
-        (0, "sa", "", 0.80),          # empty foreign_text → skipped
-        (2, "bo", "tibetan B", 0.70),
+        (0, "sa", "sanskrit A", "汉A", 0.99),
+        (0, "bo", "tibetan A", "汉B", 0.90),
+        (0, "sa", "", "汉C", 0.80),        # empty foreign_text → skipped
+        (2, "bo", "tibetan B", "汉D", 0.70),
     ]
     grouped = _group_mitra_rows(rows)
     assert set(grouped.keys()) == {0, 2}
     assert [p["chunk_text"] for p in grouped[0]] == ["sanskrit A", "tibetan A"]
-    assert grouped[0][0] == {"lang": "sa", "chunk_text": "sanskrit A", "confidence": 0.99}
+    assert grouped[0][0] == {"lang": "sa", "chunk_text": "sanskrit A", "zh_text": "汉A", "confidence": 0.99}
     assert grouped[2][0]["lang"] == "bo"
+
+
+# ── relevance ranking (pure) ──────────────────────────────────────────
+
+def test_cjk_overlap_counts_shared_characters():
+    assert _cjk_overlap("色即是空的梵文", "色即是空空即是色") == 4  # 色即是空
+    assert _cjk_overlap("色即是空的梵文", "受想行识亦复如是") == 1  # 是
+    assert _cjk_overlap("", "色即是空") == 0
+    assert _cjk_overlap("rūpaṃ", "śūnyatā") == 0  # no CJK either side
+
+
+def test_rank_prefers_query_relevant_sentence_over_higher_confidence():
+    """The whole point: a 「受想行识」 sentence with HIGHER confidence must lose to
+    the 「色即是空」 sentence the user actually asked about."""
+    items = [
+        {"lang": "sa", "chunk_text": "Evam eva vedanā", "zh_text": "受想行识亦复如是", "confidence": 0.99},
+        {"lang": "sa", "chunk_text": "rūpaṃ śūnyatā", "zh_text": "色即是空空即是色", "confidence": 0.80},
+    ]
+    ranked = _rank_mitra_by_relevance(items, "《心经》「色即是空」的梵文是什么")
+    assert ranked[0]["chunk_text"] == "rūpaṃ śūnyatā", "the query-relevant sentence must rank first"
+
+
+def test_rank_falls_back_to_confidence_when_no_overlap():
+    items = [
+        {"lang": "sa", "chunk_text": "low", "zh_text": "毫不相关", "confidence": 0.40},
+        {"lang": "bo", "chunk_text": "high", "zh_text": "另一无关", "confidence": 0.90},
+    ]
+    ranked = _rank_mitra_by_relevance(items, "色即是空")
+    assert ranked[0]["chunk_text"] == "high"  # overlap tie (0) → confidence desc
 
 
 # ── _attach_mitra_parallels (bulk) ────────────────────────────────────
@@ -58,24 +83,25 @@ def test_group_mitra_rows_groups_and_skips_empty():
 async def test_empty_results_no_db_call():
     db = _make_db_with_rows([])
     results: list[dict] = []
-    await _attach_mitra_parallels(db, results)
+    await _attach_mitra_parallels(db, results, "任意问题")
     assert db.execute.await_count == 0
     assert results == []
 
 
 @pytest.mark.asyncio
-async def test_single_bulk_query_populates_mitra_parallels():
+async def test_single_bulk_query_ranks_relevant_sentence_first():
     primaries = [{"text_id": 100 + i, "juan_num": 1, "chunk_index": i} for i in range(3)]
+    # primary 0 has two Sanskrit sentences; the 受想行识 one has higher confidence
+    # but the query asks about 色即是空 — relevance must reorder them.
     rows = [
-        (0, "sa", "sanskrit", 0.98),
-        (0, "bo", "tibetan", 0.91),
-        (2, "sa", "sanskrit c", 0.60),
+        (0, "sa", "Evam eva vedanā", "受想行识亦复如是", 0.99),
+        (0, "sa", "rūpaṃ śūnyatā", "色即是空空即是色", 0.80),
+        (2, "sa", "prajñā", "般若", 0.60),
     ]
     db = _make_db_with_rows(rows)
-    await _attach_mitra_parallels(db, primaries)
+    await _attach_mitra_parallels(db, primaries, "「色即是空」的梵文原文")
     assert db.execute.await_count == 1, "must be a single bulk query"
-    assert len(primaries[0]["mitra_parallels"]) == 2
-    assert primaries[0]["mitra_parallels"][0]["chunk_text"] == "sanskrit"
+    assert primaries[0]["mitra_parallels"][0]["chunk_text"] == "rūpaṃ śūnyatā"
     assert primaries[1]["mitra_parallels"] == []
     assert primaries[2]["mitra_parallels"][0]["lang"] == "sa"
 
@@ -85,7 +111,7 @@ async def test_db_error_is_swallowed():
     db = MagicMock()
     db.execute = AsyncMock(side_effect=RuntimeError("boom"))
     primaries = [{"text_id": 1, "juan_num": 1, "chunk_index": 0}]
-    await _attach_mitra_parallels(db, primaries)  # must not raise
+    await _attach_mitra_parallels(db, primaries, "问题")  # must not raise
     assert primaries[0]["mitra_parallels"] == []
 
 
@@ -109,9 +135,6 @@ def test_mitra_only_renders_in_block():
 
 
 def test_mitra_dedups_language_already_covered_by_alignment_pairs():
-    """If alignment_pairs already gave a Tibetan (bo) parallel, the MITRA
-    Tibetan is skipped, but MITRA Sanskrit (sa) — which alignment_pairs lacks —
-    is still added."""
     r = _result(
         parallel_chunks=[{"lang": "bo", "chunk_text": "藏文对读", "juan_num": 2, "title": "甘珠尔"}],
         mitra_parallels=[
