@@ -213,3 +213,57 @@ def test_a_drop_in_verbatim_quote_rate_is_a_regression():
         tolerance=0.02,
     )
     assert any("verbatim_quote_rate" in r for r in regressions)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# The report is where a human reads these numbers. A metric that exists
+# only in the aggregate dict — and in the regression gate — is invisible
+# to the person deciding what to work on next. verbatim_quote_rate was
+# added in #953 and never rendered; the 2026-07-09 baseline had to be
+# recomputed by hand from the raw JSON to read it.
+# ──────────────────────────────────────────────────────────────────────
+
+
+def test_report_renders_verbatim_quote_rate():
+    from eval.run_eval import _faithfulness_section
+
+    lines = _faithfulness_section(
+        {
+            "num_answers": 90,
+            "answers_with_citations": 62,
+            "answers_with_quotes": 53,
+            "total_citations": 314,
+            "citation_grounding_rate": 0.978,
+            "verified_rate_of_cited": 0.484,
+            "verbatim_quote_rate": 0.566,
+            "served_trustworthy_rate": 0.968,
+            "answers_with_downgraded_quote": 23,
+            "state_distribution": {},
+        }
+    )
+    body = "\n".join(lines)
+    assert "verbatim_quote_rate" in body
+    assert "56.6%" in body
+    assert "53" in body          # answers_with_quotes, the honest denominator
+
+
+def test_report_shows_na_when_no_answer_quoted():
+    """verbatim_quote_rate is None when nothing quoted — render N/A, not 0%."""
+    from eval.run_eval import _faithfulness_section
+
+    lines = _faithfulness_section(
+        {
+            "num_answers": 5,
+            "answers_with_citations": 3,
+            "answers_with_quotes": 0,
+            "verbatim_quote_rate": None,
+            "citation_grounding_rate": 1.0,
+            "verified_rate_of_cited": 0.0,
+            "served_trustworthy_rate": 1.0,
+            "total_citations": 3,
+            "answers_with_downgraded_quote": 0,
+            "state_distribution": {},
+        }
+    )
+    body = "\n".join(lines)
+    assert "N/A" in body

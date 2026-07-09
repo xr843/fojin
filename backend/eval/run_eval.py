@@ -179,13 +179,23 @@ def _faithfulness_section(faith_agg: dict) -> list[str]:
         "", "## 引用忠实度（确定性 / 每一句可点回原典）", "",
         f"*基于 {faith_agg.get('num_answers', 0)} 道生成回答，重放线上"
         "「引用守卫 → 引文核验 → 可信状态」管线*", "",
-        "| 指标 | 值 |", "|------|-----|",
-        f"| 引用可核验率 (citation_grounding_rate) | {_fmt_rate(faith_agg.get('citation_grounding_rate'))} |",
-        f"| **服务可信率 (served_trustworthy_rate)** | **{_fmt_rate(faith_agg.get('served_trustworthy_rate'))}** |",
-        f"| 完全核验率·严格 (verified_rate_of_cited) | {_fmt_rate(faith_agg.get('verified_rate_of_cited'))} |",
-        f"| 含转述降级引文的回答数 | {faith_agg.get('answers_with_downgraded_quote', 0)} |",
-        f"| 引用总数 / 有引用回答数 | {faith_agg.get('total_citations', 0)} / {faith_agg.get('answers_with_citations', 0)} |",
-        "", "**可信状态分布**", "",
+        "| 指标 | 值 | 分母 |", "|------|-----|------|",
+        f"| 引用可核验率 (citation_grounding_rate) | {_fmt_rate(faith_agg.get('citation_grounding_rate'))} "
+        f"| {faith_agg.get('total_citations', 0)} 条引用 |",
+        f"| **服务可信率 (served_trustworthy_rate)** | **{_fmt_rate(faith_agg.get('served_trustworthy_rate'))}** "
+        f"| {faith_agg.get('answers_with_citations', 0)} 条有引用回答 |",
+        f"| 完全核验率·严格 (verified_rate_of_cited) | {_fmt_rate(faith_agg.get('verified_rate_of_cited'))} "
+        f"| {faith_agg.get('answers_with_citations', 0)} 条有引用回答 |",
+        f"| **逐字引用保真度 (verbatim_quote_rate)** | **{_fmt_rate(faith_agg.get('verbatim_quote_rate'))}** "
+        f"| {faith_agg.get('answers_with_quotes', 0)} 条含可核验引文的回答 |",
+        f"| 含转述降级引文的回答数 | {faith_agg.get('answers_with_downgraded_quote', 0)} | — |",
+        "",
+        "> `verified_rate_of_cited` 的分母是**有引用**的回答:引用了来源却一个字都不引原文的",
+        "> 回答记 0,不记 1 —— 它什么都没核验。`verbatim_quote_rate` 的分母是**真的引用了",
+        "> 原文**的回答,回答「模型把原典放进引号里时,有多少次是逐字的」。两者独立移动,",
+        "> 所以一次 run 无法靠少引用来刷分。",
+        "",
+        "**可信状态分布**", "",
         "| 状态 | 数量 |", "|------|------|",
     ]
     lines += [f"| {state_names.get(s, s)} | {dist.get(s, 0)} |" for s in TRUST_STATES]
@@ -415,14 +425,22 @@ async def main():
         raw_path = REPORTS_DIR / f"eval-{timestamp}{tag_suffix}.json"
         raw_path.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
         saved = f"\nReport: {report_path}\nRaw: {raw_path}"
-    except OSError:
-        # Fallback: write to /tmp when running inside Docker
+    except OSError as exc:
+        # Fallback: /tmp is ephemeral — it dies with the container, taking the
+        # run's raw JSON (and thus any future --baseline) with it. In prod
+        # ``eval/reports`` is a bind mount of ``backend/eval/reports`` on the
+        # host, owned by admin(1000) while the container runs as app(999), so an
+        # unwritable dir silently downgraded every report to a temp file. Say so.
         fallback = Path("/tmp")
         report_path = fallback / f"eval-{timestamp}{tag_suffix}.md"
         report_path.write_text(report, encoding="utf-8")
         raw_path = fallback / f"eval-{timestamp}{tag_suffix}.json"
         raw_path.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
-        saved = f"\nReport: {report_path}\nRaw: {raw_path}"
+        saved = (
+            f"\n⚠️  {REPORTS_DIR} 不可写（{exc}）——报告写到了 EPHEMERAL 的 /tmp，"
+            f"容器重启即丢失。\n    修复：chgrp 999 backend/eval/reports && chmod g+w backend/eval/reports"
+            f"\nReport: {report_path}\nRaw: {raw_path}"
+        )
 
     print(f"\n{'='*60}")
     print(report)
