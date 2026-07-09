@@ -61,18 +61,43 @@ fojin 的品牌承诺是「每一句都能点回原典」。这层把它从口�
 （收敛成用户在消息上看到的 `ChatTrustState`）—— 然后聚合成：
 
 - **`citation_grounding_rate`**：全部引用中，经守卫核验未被改写的比例（按引用数加权，非按题平均）。
-- **`verified_rate_of_cited`**：**有引用**的回答里，完全核验（无引用改写、无未核实引文）的比例 —— 即「每一句都能点回原典」的题面数字。
+- **`verified_rate_of_cited`**：**有引用**的回答里，完全核验的比例。分母是有引用的回答；**引用了来源却一个字都不引原文的回答记 0，不记 1** —— 它什么都没核验。
+- **`verbatim_quote_rate`**：**真的引用了原文**的回答里，每条引文都逐字对上的比例 —— 「模型把原典放进引号里时，有多少次是逐字的」。
 - 可信状态分布（已核验 / 引用被纠正 / 引文未核实 / 有来源未引用 / 无来源）。
+
+后两个指标**分母不同、独立移动**，必须一起看。只看 `verified_rate_of_cited` 会奖励模型**少引用原典**（不引用 → 无引文可失败）；只看 `verbatim_quote_rate` 会忽略「压根不引用」这一整类失败。
+
+> **注意分母只覆盖到哪里。** `verify_quoted_content` 目前在答案不含 `【《…》】` 标记时**整条跳过核验**
+> （见其首行早退）。生产实测 544 条答案中 237 条（43.6%）无此标记 → 上述所有比率都只统计了另外
+> 56%。修好之前，别把这些数字当成"全部答案"的质量。
 
 在**原始模型输出**（守卫处理前）上度量：数字变差 = 底层模型 grounding 退化的**早期信号**，线上守卫随后在服务时补救此处计到的问题。
 
 ```bash
-# 需要生成回答（不能 --no-llm）；忠实度段落会出现在报告里
-python -m eval.run_eval --tag nightly
+# 需要生成回答（不能 --no-llm）。⚠️ 必须 --temperature 0：
+# 默认 0.7 下 n=1 的前后对比，~10 个百分点的摆动约等于 2 个标准误，是噪声不是信号。
+python -m eval.run_eval --tag nightly --temperature 0
 
 # 作为门：低于下限即非零退出（仅 LLM-on 运行有意义）
-python -m eval.run_eval --min-citation-grounding 0.98 --min-verified-rate 0.85 --tag gate
+python -m eval.run_eval --temperature 0 --min-citation-grounding 0.95 --min-verified-rate 0.40 --tag gate
 ```
+
+### 当前基线（2026-07-09，90 题，`--temperature 0`）
+
+| 指标 | 值 | 分母 |
+|------|-----|------|
+| `citation_grounding_rate` | 97.8% | 314 条引用 |
+| `verified_rate_of_cited` | 48.4% | 62 条有引用回答 |
+| `verbatim_quote_rate` | **56.6%** | 53 条含可核验引文的回答 |
+
+原始 JSON：`eval/reports/eval-20260709-045853-baseline-temp0.json`（宿主机 `backend/eval/reports/`，bind mount 进容器）。
+把它传给 `--baseline` 才能比较忠实度；`baseline.json` 是 `--no-llm` 检索基线，**不含 faithfulness 行**，只能门检索指标。
+
+同一套指标在 537 条**真实生产答案**上回放得到 `verbatim_quote_rate = 38.1%` —— **题库比生产宽容约 20 个百分点**，不要拿 eval 数字代表线上质量。
+
+> 报告写入 `eval/reports/`。容器以 `app(999)` 运行而该目录属主是 `admin(1000)`，若权限不对，
+> run_eval 会退到 **ephemeral 的 `/tmp`**（重启即丢）并打印警告。修复：
+> `chgrp 999 backend/eval/reports && chmod g+w backend/eval/reports`
 
 > 现有 `run_regression.sh` 用 `--no-llm`（只测检索、省 token），**不含**忠实度门。忠实度需要生成回答，
 > 建议单独排一个**低频 LLM-on** 的 cron 跑上面的门（成本更高），与高频的 `--no-llm` 检索门分开。
