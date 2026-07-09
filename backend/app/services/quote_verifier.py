@@ -424,6 +424,36 @@ def verify_quoted_content(
     return corrected, mutations
 
 
+def count_checked_quotes(answer: str, sources: list[ChatSource]) -> int:
+    """How many quoted passages :func:`verify_quoted_content` actually examines.
+
+    Zero mutations means one of two very different things — every quote checked
+    out, or the answer quoted nothing at all — and callers that score an answer
+    cannot tell them apart from the mutation list alone. ``verified`` therefore
+    used to be awarded to an answer that cited a source and quoted none of it:
+    "no evidence" scored as "evidence checked out", and the metric rewarded a
+    model for quoting the canon *less*.
+
+    Counted here, not returned from ``verify_quoted_content``, so the existing
+    two-tuple contract and its call sites stay untouched. The candidate
+    predicate (paired marks, ``MIN_QUOTE_CHARS``) is the one both scanners
+    apply before they verify anything, and ``test_count_checked_quotes_matches``
+    pins the two together."""
+    if not answer or "【《" not in answer:
+        return 0
+    inline = sum(
+        1
+        for m in _QUOTE_CITATION_RE.finditer(answer)
+        if len(_matched_quote(m).strip()) >= MIN_QUOTE_CHARS
+    )
+    blocks = sum(
+        1
+        for m in _BLOCKQUOTE_CITATION_RE.finditer(answer)
+        if len(_strip_blockquote_markers(m.group("block"))) >= MIN_QUOTE_CHARS
+    )
+    return inline + blocks
+
+
 def _strip_blockquote_markers(block: str) -> str:
     """Strip the per-line ``> `` Markdown prefix from a blockquote so we
     can hand the joined body to the substring test.

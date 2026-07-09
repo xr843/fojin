@@ -311,6 +311,40 @@ def generate_report(results: list[dict], tag: str = "") -> str:
     return "\n".join(lines)
 
 
+def compare_baseline(
+    baseline_path: str,
+    current_agg: dict,
+    current_faith: dict,
+    tolerance: float = 0.02,
+) -> tuple[list[str], str | None]:
+    """Compare this run against a prior raw eval JSON.
+
+    Returns ``(regressions, error)``. ``error`` is a message when the baseline
+    could not be read or parsed — a state the caller must not confuse with "no
+    regressions found", which is why the two are separate return values rather
+    than an empty list. Extracted from ``main`` so the distinction is testable
+    without a corpus DB.
+    """
+    try:
+        baseline_results = json.loads(Path(baseline_path).read_text(encoding="utf-8"))
+        baseline_agg = aggregate(
+            [r["retrieval_metrics"] for r in baseline_results if r.get("retrieval_metrics")]
+        )
+        regressions = detect_regressions(current_agg, baseline_agg, tolerance)
+        # Faithfulness regressions only when BOTH runs generated answers —
+        # a --no-llm baseline or current run has no rates to compare.
+        baseline_faith = aggregate_faithfulness(
+            [r.get("faithfulness") for r in baseline_results]
+        )
+        if current_faith and baseline_faith:
+            regressions += detect_faithfulness_regressions(
+                current_faith, baseline_faith, tolerance
+            )
+        return regressions, None
+    except (OSError, ValueError, KeyError) as exc:
+        return [], str(exc)
+
+
 async def main():
     parser = argparse.ArgumentParser(description="Run AI Chat evaluation")
     parser.add_argument("--category", type=str, help="Only run questions from this category")
@@ -400,31 +434,24 @@ async def main():
     gate_failed = False
 
     if args.baseline:
-        try:
-            baseline_results = json.loads(Path(args.baseline).read_text(encoding="utf-8"))
-            baseline_agg = aggregate(
-                [r["retrieval_metrics"] for r in baseline_results if r.get("retrieval_metrics")]
-            )
-            regressions = detect_regressions(current_agg, baseline_agg, args.regression_tolerance)
-            # Faithfulness regressions only when BOTH runs generated answers —
-            # a --no-llm baseline or current run has no rates to compare.
-            baseline_faith = aggregate_faithfulness(
-                [r.get("faithfulness") for r in baseline_results]
-            )
-            if current_faith and baseline_faith:
-                regressions += detect_faithfulness_regressions(
-                    current_faith, baseline_faith, args.regression_tolerance
-                )
-            print(f"\n{'='*60}\n回归检查（对照 {args.baseline}）：")
-            if regressions:
-                for reg in regressions:
-                    print(f"  ⚠️  {reg}")
-                if args.fail_on_regression:
-                    gate_failed = True
-            else:
-                print("  ✓ 检索/忠实度指标无回归")
-        except (OSError, ValueError, KeyError) as exc:
-            print(f"\n[baseline 对照失败] {exc}")
+        regressions, error = compare_baseline(
+            args.baseline, current_agg, current_faith, args.regression_tolerance
+        )
+        print(f"\n{'='*60}\n回归检查（对照 {args.baseline}）：")
+        if error is not None:
+            # A baseline we could not read is not a baseline we passed. Falling
+            # through here left gate_failed False, so --fail-on-regression exited
+            # 0 on a corrupt or missing file — the gate silently stopped gating.
+            print(f"  ⚠️  [baseline 对照失败] {error}")
+            if args.fail_on_regression:
+                gate_failed = True
+        elif regressions:
+            for reg in regressions:
+                print(f"  ⚠️  {reg}")
+            if args.fail_on_regression:
+                gate_failed = True
+        else:
+            print("  ✓ 检索/忠实度指标无回归")
 
     if args.min_recall5 is not None:
         recall5 = current_agg.get("recall@5")

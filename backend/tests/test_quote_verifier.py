@@ -524,3 +524,25 @@ def test_english_quote_with_typographic_apostrophe_is_still_checked():
     _, muts = verify_quoted_content(answer, [src])
     assert len(muts) == 1
     assert muts[0].quote == "the Buddha’s own words, plainly stated"
+
+
+def test_count_checked_quotes_matches_the_verifier():
+    """The counter and the verifier must agree on what counts as a quote:
+    when every quote fails, one mutation is recorded per checked quote."""
+    from app.services.quote_verifier import count_checked_quotes
+
+    src = _src(7, "心經", 1, "无关原文")
+    answer = (
+        "云：「假引文片段一假引文片段一」【《心經》第1卷】\n"
+        "又：「假引文片段二假引文片段二」【《心經》第1卷】"
+    )
+    _, muts = verify_quoted_content(answer, [src])
+    assert count_checked_quotes(answer, [src]) == len(muts) == 2
+
+
+def test_count_checked_quotes_ignores_emphasis_and_short_fragments():
+    from app.services.quote_verifier import count_checked_quotes
+
+    src = _src(3, "瑜伽師地論", 3, "必与舍受相应。")
+    answer = "「念」维持「寻」，论中说必与舍受相应【《瑜伽師地論》第3卷】。"
+    assert count_checked_quotes(answer, [src]) == 0

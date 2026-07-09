@@ -87,3 +87,40 @@ def test_gate_fail_with_partial_creds_skips_alert_but_still_fails(tmp_path):
     proc, calls = _run(tmp_path, gate_exit=1, chat_id=None)
     assert proc.returncode == 1, "partial creds must not mask the regression"
     assert calls == "", "incomplete creds → no curl attempt"
+
+
+# ──────────────────────────────────────────────────────────────────────
+# run_eval's own baseline gate had the very failure this wrapper guards
+# against: an unreadable or corrupt --baseline printed a note and fell
+# through with gate_failed still False, so --fail-on-regression exited 0.
+# "Could not compare" is not "no regression".
+# ──────────────────────────────────────────────────────────────────────
+
+
+def test_missing_baseline_file_reports_an_error_not_a_clean_comparison(tmp_path):
+    from eval.run_eval import compare_baseline
+
+    regressions, error = compare_baseline(
+        str(tmp_path / "does-not-exist.json"), current_agg={}, current_faith={}
+    )
+    assert error is not None
+    assert regressions == []
+
+
+def test_corrupt_baseline_json_reports_an_error(tmp_path):
+    from eval.run_eval import compare_baseline
+
+    bad = tmp_path / "baseline.json"
+    bad.write_text("{ this is not json", encoding="utf-8")
+    regressions, error = compare_baseline(str(bad), current_agg={}, current_faith={})
+    assert error is not None
+
+
+def test_readable_baseline_compares_cleanly(tmp_path):
+    from eval.run_eval import compare_baseline
+
+    good = tmp_path / "baseline.json"
+    good.write_text("[]", encoding="utf-8")
+    regressions, error = compare_baseline(str(good), current_agg={}, current_faith={})
+    assert error is None
+    assert regressions == []
