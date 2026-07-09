@@ -45,6 +45,19 @@ RERANK_CANDIDATE_LIMIT = 32
 # Controlled by env var so it can be disabled in one place if needed.
 ENABLE_PARALLEL_RAG = settings.enable_parallel_rag if hasattr(settings, "enable_parallel_rag") else True
 
+# Feed imported MITRA parallels (mitra_alignments, ~908K Skt/Tib↔汉 sentence
+# pairs, chunk-anchored on the 汉 side) into the LLM context alongside the
+# self-built alignment_pairs. MITRA's foreign side is inline source text with
+# no ingested chunk, so it is LLM-context-only (never a clickable citation).
+ENABLE_MITRA_RAG_PARALLELS = (
+    settings.enable_mitra_rag_parallels if hasattr(settings, "enable_mitra_rag_parallels") else True
+)
+MITRA_PARALLEL_K = 3   # max MITRA rows fetched per primary chunk
+MITRA_PARALLEL_SHOW = 2  # max MITRA parallels rendered per primary (new langs only)
+
+# Display labels for parallel-language annotations in the [跨藏对读] block.
+_LANG_LABEL = {"pi": "巴利", "bo": "藏", "sa": "梵", "en": "英", "lzh": "汉"}
+
 # Per-lang top-k budgets for parallel mode. Total retrieved = LZH_K + PI_K + BO_K.
 # Keep larger for lzh since 95%+ users read Chinese and primary narrative stays in lzh.
 # LZH_K is deliberately generous (well above MAX_CONTEXT_CHUNKS): the cross-encoder
@@ -440,6 +453,85 @@ async def _attach_parallel_chunks(db: AsyncSession, results: list[dict]) -> None
         logger.exception("Failed to attach parallel chunks")
 
 
+def _group_mitra_rows(rows) -> dict[int, list[dict]]:
+    """Group MITRA bulk-query rows by their primary index into inline
+    foreign-parallel dicts. Pure (no I/O) so it's unit-testable.
+
+    Row shape matches the SELECT in ``_attach_mitra_parallels``:
+    ``(primary_idx, foreign_lang, foreign_text, confidence)``. Rows with empty
+    ``foreign_text`` are skipped (nothing to show the model).
+    """
+    grouped: dict[int, list[dict]] = {}
+    for row in rows:
+        primary_idx, lang, foreign_text, confidence = row[0], row[1], row[2], row[3]
+        if not foreign_text:
+            continue
+        grouped.setdefault(primary_idx, []).append(
+            {
+                "lang": lang or "",
+                "chunk_text": foreign_text,
+                "confidence": float(confidence) if confidence is not None else 1.0,
+            }
+        )
+    return grouped
+
+
+async def _attach_mitra_parallels(db: AsyncSession, results: list[dict]) -> None:
+    """Attach MITRA cross-lingual parallels to each result's ``mitra_parallels``.
+
+    Mirrors ``_attach_parallel_chunks``' single-bulk-query shape, but reads
+    ``mitra_alignments`` (chunk-anchored on the 汉 side by (text_id, juan_num,
+    chunk_index) — indexed by ix_mitra_align_chunk). Top-``MITRA_PARALLEL_K`` per
+    primary by confidence.
+
+    Kept in a SEPARATE ``mitra_parallels`` key (not ``parallel_chunks``): MITRA's
+    foreign side is inline source text with no ingested chunk, so it can't carry
+    a ParallelChunk's required (text_id, juan_num, chunk_index) and must never be
+    turned into a clickable citation. It is consumed only by
+    ``_format_context_block`` (LLM context); it is intentionally NOT sent to the
+    frontend/quote-verifier. Any DB failure is logged and swallowed (parallels
+    are enrichment, never load-bearing) — same contract as _attach_parallel_chunks.
+    """
+    if not results:
+        return
+    for r in results:
+        r.setdefault("mitra_parallels", [])
+    try:
+        primary_keys: list[tuple[int, int, int, int]] = [
+            (i, int(r["text_id"]), int(r["juan_num"]), int(r["chunk_index"])) for i, r in enumerate(results)
+        ]
+        values_sql = ", ".join(f"({idx}, {tid}, {juan}, {cidx})" for idx, tid, juan, cidx in primary_keys)
+        bulk_sql = sql_text(f"""
+            WITH primaries(idx, tid, juan, cidx) AS (
+                VALUES {values_sql}
+            ),
+            ranked AS (
+                SELECT
+                    p.idx AS primary_idx,
+                    ma.foreign_lang,
+                    ma.foreign_text,
+                    ma.confidence,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY p.idx ORDER BY ma.confidence DESC, ma.id
+                    ) AS rn
+                FROM primaries p
+                JOIN mitra_alignments ma
+                    ON ma.text_id = p.tid
+                   AND ma.juan_num = p.juan
+                   AND ma.chunk_index = p.cidx
+            )
+            SELECT primary_idx, foreign_lang, foreign_text, confidence
+            FROM ranked
+            WHERE rn <= {MITRA_PARALLEL_K}
+            ORDER BY primary_idx, rn
+        """)
+        rows = (await db.execute(bulk_sql)).fetchall()
+        for idx, items in _group_mitra_rows(rows).items():
+            results[idx]["mitra_parallels"] = items
+    except Exception:
+        logger.exception("Failed to attach mitra parallels")
+
+
 def _format_context_block(result: dict) -> str:
     """Format a single RAG result into the LLM context string.
 
@@ -449,14 +541,33 @@ def _format_context_block(result: dict) -> str:
     header = f"[出处: {_format_source_label(result)}]"
     body = result["chunk_text"]
     parallels = result.get("parallel_chunks") or []
-    if parallels:
+    mitra = result.get("mitra_parallels") or []
+    if parallels or mitra:
         parallel_lines = []
-        for p in parallels[:3]:  # cap at 3 parallels per primary source
-            lang_label = {"pi": "巴利", "bo": "藏", "sa": "梵", "en": "英", "lzh": "汉"}.get(p["lang"], p["lang"])
+        shown_langs: set[str] = set()
+        for p in parallels[:3]:  # cap at 3 clickable (alignment_pairs) parallels
+            lang_label = _LANG_LABEL.get(p["lang"], p["lang"])
+            shown_langs.add(p["lang"])
             title = p.get("title", "") or "其他藏经"
             parallel_lines.append(f"  · [{lang_label}] 《{title}》 第{p['juan_num']}卷: {p['chunk_text'][:300]}")
-        parallel_block = "\n[跨藏对读 parallel_chunks]\n" + "\n".join(parallel_lines)
-        return f"{header}\n{body}{parallel_block}"
+        # MITRA inline parallels: add only languages the alignment_pairs
+        # parallels didn't already cover (esp. Sanskrit, which alignment_pairs
+        # lacks) so the model sees maximally diverse cross-canon evidence
+        # without redundant duplicates. Foreign side is inline source text, so
+        # no 《title》第N卷 deep-link — marked (MITRA 对读) for provenance.
+        mitra_shown = 0
+        for mp in mitra:
+            if mitra_shown >= MITRA_PARALLEL_SHOW:
+                break
+            if mp["lang"] in shown_langs:
+                continue
+            lang_label = _LANG_LABEL.get(mp["lang"], mp["lang"])
+            shown_langs.add(mp["lang"])
+            mitra_shown += 1
+            parallel_lines.append(f"  · [{lang_label}] (MITRA 对读): {mp['chunk_text'][:300]}")
+        if parallel_lines:
+            parallel_block = "\n[跨藏对读 parallel_chunks]\n" + "\n".join(parallel_lines)
+            return f"{header}\n{body}{parallel_block}"
     return f"{header}\n{body}"
 
 
@@ -825,10 +936,17 @@ async def retrieve_rag_context(
         # aligned chunks' text into parallel_chunks for downstream use.
         if ENABLE_PARALLEL_RAG and search_results:
             await _attach_parallel_chunks(db, search_results)
+            # Also surface the imported MITRA parallels (esp. Sanskrit) to the
+            # LLM — reader panel already shows them; this brings them to the
+            # answer side. Separate mitra_parallels key, LLM-context-only.
+            if ENABLE_MITRA_RAG_PARALLELS:
+                await _attach_mitra_parallels(db, search_results)
 
         sources = [
             ChatSource(
-                **{k: v for k, v in r.items() if k not in ("source_id", "cbeta_id")}
+                # mitra_parallels is an internal LLM-context-only field (inline
+                # foreign text, no chunk coords) — never sent to the frontend.
+                **{k: v for k, v in r.items() if k not in ("source_id", "cbeta_id", "mitra_parallels")}
                 | {
                     "source_id": r.get("source_id"),
                     # Portable cross-canon citation id, juan-level (line anchors
