@@ -61,6 +61,13 @@ class Settings(BaseSettings):
     reranker_api_key: str = ""   # Falls back to embedding_api_key if empty
     reranker_model: str = "BAAI/bge-reranker-v2-m3"
 
+    # Feed the imported MITRA cross-lingual parallels (mitra_alignments,
+    # ~908K Skt/Tib↔汉 sentence pairs) into the chat RAG context, not just the
+    # reader panel. Adds [跨藏对读] evidence for languages the small self-built
+    # alignment_pairs table doesn't cover (esp. Sanskrit). Set false to roll
+    # back to alignment_pairs-only parallels without a redeploy.
+    enable_mitra_rag_parallels: bool = True
+
     # Observability — expose Prometheus metrics at /metrics (app root, not
     # /api; not proxied by nginx, so network-internal only). Set false to
     # not mount the endpoint at all. See app/core/metrics.py.
