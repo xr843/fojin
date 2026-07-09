@@ -29,7 +29,7 @@ from __future__ import annotations
 from app.schemas.chat import ChatSource
 from app.services.chat_trust import build_trust_status
 from app.services.citation_guard import enforce_citation_whitelist
-from app.services.quote_verifier import verify_quoted_content
+from app.services.quote_verifier import count_checked_quotes, verify_quoted_content
 
 # The states build_trust_status can emit, in descending trust order. Kept
 # explicit (rather than imported from the Literal) so the report renders a
@@ -53,7 +53,12 @@ _TRUSTWORTHY_STATES = frozenset({"verified", "citation_corrected", "quote_relaxe
 
 # Grounding rates a regression gate watches. Mirrors retrieval_metrics'
 # _METRIC_PREFIXES convention (bookkeeping counts are excluded).
-_GATED_RATES = ("citation_grounding_rate", "verified_rate_of_cited", "served_trustworthy_rate")
+_GATED_RATES = (
+    "citation_grounding_rate",
+    "verified_rate_of_cited",
+    "served_trustworthy_rate",
+    "verbatim_quote_rate",
+)
 
 
 def compute_faithfulness(answer: str, sources: list[ChatSource]) -> dict:
@@ -68,6 +73,7 @@ def compute_faithfulness(answer: str, sources: list[ChatSource]) -> dict:
     # The verifier runs *after* the guard by design (see quote_verifier's
     # module docstring) so quotes attached to already-stripped citations
     # aren't double-flagged.
+    quote_count = count_checked_quotes(corrected, sources)
     _, quote_mutations = verify_quoted_content(corrected, sources)
     trust = build_trust_status(
         answer,
@@ -83,10 +89,18 @@ def compute_faithfulness(answer: str, sources: list[ChatSource]) -> dict:
         "quote_mutations": trust.quote_mutation_count,
         "citations_grounded": citations_grounded,
         "has_citations": 1 if trust.citation_count else 0,
-        # "verified" is the only state with ≥1 citation and zero citation/quote
-        # mutations — the strict "every citation and quote checks out first try"
-        # answer (raw LLM quality).
-        "fully_grounded": 1 if trust.state == "verified" else 0,
+        # How many quoted passages the verifier examined. Zero means the answer
+        # quoted nothing, which is NOT the same as "its quotes checked out".
+        "quote_count": quote_count,
+        "has_checked_quotes": 1 if quote_count else 0,
+        # ≥1 citation, ≥1 quote, and zero citation/quote mutations — the strict
+        # "every citation and quote checks out first try" answer (raw LLM
+        # quality). The ``quote_count`` term is what stops an answer that cites
+        # a source and quotes none of it from passing vacuously: ``verified``
+        # only asserts "no mutation", and no quotes produce no mutations.
+        "fully_grounded": 1 if (trust.state == "verified" and quote_count) else 0,
+        # Of the answers that did quote, did every quote hold up verbatim?
+        "quotes_all_verbatim": 1 if (quote_count and not quote_mutations) else 0,
         # Served-honest: the answer cites and, after the guards, misrepresents
         # nothing (verified / citation_corrected / quote_relaxed).
         "served_trustworthy": 1 if (trust.citation_count and trust.state in _TRUSTWORTHY_STATES) else 0,
@@ -119,6 +133,8 @@ def aggregate_faithfulness(rows: list[dict]) -> dict:
     answers_with_citations = sum(r["has_citations"] for r in rows)
     fully_grounded = sum(r["fully_grounded"] for r in rows)
     served_trustworthy = sum(r.get("served_trustworthy", 0) for r in rows)
+    answers_with_quotes = sum(r.get("has_checked_quotes", 0) for r in rows)
+    quotes_all_verbatim = sum(r.get("quotes_all_verbatim", 0) for r in rows)
 
     distribution = dict.fromkeys(TRUST_STATES, 0)
     for r in rows:
@@ -131,11 +147,20 @@ def aggregate_faithfulness(rows: list[dict]) -> dict:
         "citation_grounding_rate": (
             grounded_citations / total_citations if total_citations else None
         ),
-        # Among answers that cite at all, the fraction fully verified (no
-        # citation or quote mutation) — the headline "每一句都能点回原典" number.
+        # Among answers that cite at all, the fraction that also quoted and had
+        # every citation and quote hold up. An answer that cites without quoting
+        # scores 0 here, not 1 — it verified nothing.
         "verified_rate_of_cited": (
             fully_grounded / answers_with_citations if answers_with_citations else None
         ),
+        # The quote-fidelity number, denominated in answers that actually quoted:
+        # "when the model puts canon in quote marks, how often is it verbatim?"
+        # Kept separate from verified_rate_of_cited so a run cannot improve by
+        # quoting less — the two move independently and both are reported.
+        "verbatim_quote_rate": (
+            quotes_all_verbatim / answers_with_quotes if answers_with_quotes else None
+        ),
+        "answers_with_quotes": answers_with_quotes,
         # The brand number: among citing answers, the fraction whose SERVED text
         # misrepresents nothing (post-guard). The deterministic quote-downgrade
         # moves this toward the citation-grounding ceiling.

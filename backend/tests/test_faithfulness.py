@@ -17,24 +17,54 @@ from eval.faithfulness import (
 from app.schemas.chat import ChatSource
 
 
-def _src(title: str = "心经", juan: int = 1) -> ChatSource:
+# A chunk long enough to hold a quote at or above MIN_QUOTE_CHARS (12), so a
+# test can exercise a quote the verifier actually checks rather than one it
+# skips as too short to distinguish from normalisation noise.
+_LONG_CHUNK = "舍利子，色不异空，空不异色，色即是空，空即是色。"
+
+
+def _src(title: str = "心经", juan: int = 1, chunk_text: str = "色不异空，空不异色。") -> ChatSource:
     return ChatSource(
         text_id=7,
         juan_num=juan,
         chunk_index=0,
-        chunk_text="色不异空，空不异色。",
+        chunk_text=chunk_text,
         score=0.9,
         title_zh=title,
     )
 
 
-def test_clean_answer_is_fully_grounded():
-    row = compute_faithfulness("见【《心经》第1卷】。", [_src()])
+def test_clean_answer_with_a_checked_quote_is_fully_grounded():
+    """The positive case: a citation *and* a verbatim quote the verifier checked.
+
+    This test used to pass the answer "见【《心经》第1卷】。" — a citation with no
+    quote at all — and assert ``fully_grounded == 1``. It was asserting the
+    vacuous pass: zero quote mutations because zero quotes were examined. The
+    quote below is 14 chars, above MIN_QUOTE_CHARS, so it is actually verified.
+    """
+    row = compute_faithfulness(
+        "经云：「色不异空，空不异色，色即是空」【《心经》第1卷】",
+        [_src(chunk_text=_LONG_CHUNK)],
+    )
     assert row["trust_state"] == "verified"
     assert row["citation_count"] == 1
     assert row["citation_mutations"] == 0
+    assert row["quote_count"] == 1
     assert row["fully_grounded"] == 1
     assert row["citations_grounded"] == 1
+
+
+def test_citation_without_a_quote_keeps_the_badge_but_not_the_metric():
+    """The user-facing trust badge and the eval gauge deliberately diverge here.
+
+    ``trust_state`` stays ``verified`` (nothing the answer served is false — it
+    cited a real source and misquoted nothing), but ``fully_grounded`` is 0
+    because no quote was ever checked. Conflating the two is what let the gauge
+    reward a model for quoting the canon less."""
+    row = compute_faithfulness("见【《心经》第1卷】。", [_src()])
+    assert row["trust_state"] == "verified"
+    assert row["quote_count"] == 0
+    assert row["fully_grounded"] == 0
 
 
 def test_hallucinated_title_counts_as_corrected_not_grounded():
@@ -127,3 +157,59 @@ def test_detect_regressions_skips_none_rates():
     current = {"citation_grounding_rate": None}
     baseline = {"citation_grounding_rate": 0.95}
     assert detect_faithfulness_regressions(current, baseline) == []
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Vacuous pass: "no evidence" was being scored as "evidence checked out"
+#
+# `verified` only means "≥1 citation and zero mutations". An answer that cites
+# a source but quotes nothing has zero quote mutations vacuously, so it scored
+# as fully grounded. Replaying 537 prod answers, 124 of 202 `verified` answers
+# contained no checkable quote at all — and the metric rewards a model for
+# quoting the canon *less*, which is the opposite of what fojin sells.
+# ──────────────────────────────────────────────────────────────────────
+
+
+def test_answer_that_cites_but_never_quotes_is_not_fully_grounded():
+    """Citing a source without quoting it is honest, but nothing was verified."""
+    row = compute_faithfulness("本经讲的是空性的道理【《心经》第1卷】。", [_src()])
+    assert row["citation_count"] == 1
+    assert row["quote_count"] == 0
+    assert row["fully_grounded"] == 0
+
+
+def test_quote_below_min_length_is_not_checked_and_not_fully_grounded():
+    """MIN_QUOTE_CHARS exists because short fragments are normalisation noise.
+    A sub-threshold quote is therefore *unverified*, not *verified* — the same
+    absence-of-evidence the vacuous pass turned into a pass."""
+    row = compute_faithfulness("经云：「色不异空」【《心经》第1卷】", [_src()])
+    assert row["quote_count"] == 0
+    assert row["fully_grounded"] == 0
+
+
+def test_verbatim_quote_rate_denominator_is_answers_that_quoted():
+    """Answers that never quoted must not dilute the quote-fidelity rate."""
+    src = _src(chunk_text=_LONG_CHUNK)
+    quoted_ok = compute_faithfulness(
+        "经云：「色不异空，空不异色，色即是空」【《心经》第1卷】", [src]
+    )
+    quoted_bad = compute_faithfulness(
+        "经云：「五阴覆盖般若灵明，使众生心识昏蒙」【《心经》第1卷】", [src]
+    )
+    never_quoted = compute_faithfulness("本经讲的是空性的道理【《心经》第1卷】。", [src])
+
+    agg = aggregate_faithfulness([quoted_ok, quoted_bad, never_quoted])
+    assert agg["answers_with_quotes"] == 2
+    assert agg["verbatim_quote_rate"] == 0.5      # 1 of the 2 that quoted
+    # …and the citation-level rate sees all three.
+    assert agg["answers_with_citations"] == 3
+
+
+def test_a_drop_in_verbatim_quote_rate_is_a_regression():
+    """The new quote-fidelity number must gate, not merely decorate the report."""
+    regressions = detect_faithfulness_regressions(
+        {"verbatim_quote_rate": 0.30},
+        {"verbatim_quote_rate": 0.50},
+        tolerance=0.02,
+    )
+    assert any("verbatim_quote_rate" in r for r in regressions)
