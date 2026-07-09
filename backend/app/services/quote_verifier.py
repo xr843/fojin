@@ -115,9 +115,6 @@ MAX_QUOTE_CITATION_GAP_CHARS = 80
 # in 「」/“”/'' and may span several lines.
 _QUOTE_OPEN = "「『“‘\""
 _QUOTE_CLOSE = "」』”’\""
-# Which close mark closes which open mark. An unpaired match (「…” ) is not a
-# quotation — it is two unrelated marks the scanner happened to straddle.
-_QUOTE_PAIRS = {"「": "」", "『": "』", "“": "”", "‘": "’", '"': '"'}
 
 # A quote body runs to the **first** mark that closes its own opener, and never
 # across a line break. Both bounds are load-bearing, and both were missing:
