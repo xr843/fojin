@@ -115,17 +115,60 @@ MAX_QUOTE_CITATION_GAP_CHARS = 80
 # in 「」/“”/'' and may span several lines.
 _QUOTE_OPEN = "「『“‘\""
 _QUOTE_CLOSE = "」』”’\""
+# Which close mark closes which open mark. An unpaired match (「…” ) is not a
+# quotation — it is two unrelated marks the scanner happened to straddle.
+_QUOTE_PAIRS = {"「": "」", "『": "』", "“": "”", "‘": "’", '"': '"'}
+
+# A quote body runs to the **first** mark that closes its own opener, and never
+# across a line break. Both bounds are load-bearing, and both were missing:
+#
+# - Unbounded by its closing mark, the lazy body walked *past* it to whichever
+#   later mark happened to sit within the gap window of a citation. CJK prose
+#   uses 「」 for emphasis constantly (「念」「寻」), so an answer that emphasised
+#   two terms and cited a source three lines down had the entire span between
+#   them captured as one "quote" and then downgraded as fabricated.
+# - Unbounded by the line, that walk crossed paragraphs, swallowing bullet
+#   lists and markdown bold. Blockquotes are a separate multi-line construct
+#   with their own scanner below; an inline quote is single-line.
+#
+# Prod diagnostics 2026-07-09 (chat_answer_diagnostics): 69% of the quotes
+# bucketed ``absent`` contained a newline and 45% contained ``**``, mean length
+# 145 chars — against 36 chars and zero newlines for the ``near_miss`` (real)
+# ones. The verifier was mostly measuring itself.
+#
+# Only the *paired* mark terminates the body. Excluding every close mark from
+# every body would trade over-capture for under-verification: U+2019 is both a
+# closing single quote and the English apostrophe, so “the Buddha’s words” would
+# stop being checked at all.
+_QUOTE_PAIRS = {"「": "」", "『": "』", "“": "”", "‘": "’", '"': '"'}
+
 # Groups capture every part so a failing quote can be *downgraded* — rebuilt as
 # ``quote + gap + cite`` with the open/close marks dropped, turning a false
-# verbatim quote into honest prose that still cites the source.
+# verbatim quote into honest prose that still cites the source. One alternation
+# branch per mark family, since stdlib ``re`` forbids reusing a group name and
+# cannot backreference across two different characters.
 _QUOTE_CITATION_RE = re.compile(
-    r"[" + re.escape(_QUOTE_OPEN) + r"]"
-    r"(?P<quote>.{" + str(MIN_QUOTE_CHARS) + r",400}?)"
-    r"[" + re.escape(_QUOTE_CLOSE) + r"]"
-    r"(?P<gap>.{0," + str(MAX_QUOTE_CITATION_GAP_CHARS) + r"}?)"
+    r"(?:"
+    + r"|".join(
+        r"(?P<open" + str(i) + r">" + re.escape(o) + r")"
+        r"(?P<quote" + str(i) + r">[^\n" + re.escape(c) + r"]"
+        r"{" + str(MIN_QUOTE_CHARS) + r",400})"
+        + re.escape(c)
+        for i, (o, c) in enumerate(_QUOTE_PAIRS.items())
+    )
+    + r")"
+    r"(?P<gap>[^\n]{0," + str(MAX_QUOTE_CITATION_GAP_CHARS) + r"}?)"
     r"(?P<cite>【《(?P<title>[^》]+)》(?:第(?P<juan>\d+)卷)?】)",
-    re.DOTALL,
 )
+
+
+def _matched_quote(m: re.Match[str]) -> str:
+    """The body of whichever mark-family branch matched."""
+    for i in range(len(_QUOTE_PAIRS)):
+        q = m.group("quote" + str(i))
+        if q is not None:
+            return q
+    raise AssertionError("no quote branch matched")  # pragma: no cover
 
 # Match a contiguous Markdown blockquote block followed (within the
 # usual gap window of subsequent non-blockquote text) by a
@@ -349,7 +392,7 @@ def verify_quoted_content(
     mutations: list[QuoteMutation] = []
 
     def _downgrade_inline(m: re.Match[str]) -> str:
-        quote = m.group("quote").strip()
+        quote = _matched_quote(m).strip()
         if len(quote) < MIN_QUOTE_CHARS:
             return m.group(0)
         title = m.group("title")
@@ -363,7 +406,7 @@ def verify_quoted_content(
             similarity=similarity, bucket=bucket,
         ))
         # Drop the open/close marks: keep the text (now prose) + gap + citation.
-        return m.group("quote") + m.group("gap") + m.group("cite")
+        return _matched_quote(m) + m.group("gap") + m.group("cite")
 
     corrected = _QUOTE_CITATION_RE.sub(_downgrade_inline, answer)
     corrected = _downgrade_blockquotes(corrected, sources, mutations)

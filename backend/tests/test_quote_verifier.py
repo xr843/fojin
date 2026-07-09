@@ -421,3 +421,106 @@ def test_blockquote_and_inline_failures_both_downgraded():
     assert len(muts) == 2
     reasons = {m.reason for m in muts}
     assert reasons == {"quote_not_in_source", "blockquote_not_in_source"}
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Over-capture: 「」 as CJK emphasis, not quotation
+#
+# Prod evidence (chat_answer_diagnostics, 2026-07-09): of 75 quotes the
+# verifier bucketed ``absent``, 69% contained a newline, 45% contained
+# markdown bold, mean length 145 chars — while the 3 ``near_miss`` (real)
+# quotes averaged 36 chars with no newlines. The inline regex was walking
+# past nested marks and across paragraphs to reach any citation within the
+# gap window, so ordinary emphasis got downgraded as a fabricated quote.
+# ──────────────────────────────────────────────────────────────────────
+
+
+def test_emphasis_marks_are_not_extracted_as_a_quote():
+    """CJK 「」 used for emphasis must not be captured as a quotation.
+
+    The passage below quotes nothing verbatim; every 「…」 is emphasis and
+    each is shorter than MIN_QUOTE_CHARS. Nothing should be downgraded, and
+    the served answer must keep its emphasis marks intact."""
+    src = _src(3, "瑜伽師地論", 3, "必与舍受相应，能持寻伺。")
+    answer = (
+        "「念」的功能正是维持、把持这种「寻」，如果伴随苦乐，寻就会波动。\n\n"
+        "逐句消文：\n"
+        "- **「第二依地门」**：这是论中分析此种心所的第二门。\n"
+        "- 论中说必与舍受相应【《瑜伽師地論》第3卷】。\n"
+    )
+    out, muts = verify_quoted_content(answer, [src])
+    assert muts == []
+    assert out == answer
+    assert "「念」" in out and "「寻」" in out
+
+
+def test_quote_capture_stops_at_the_first_closing_mark():
+    """A quote must not swallow a later 「…」 pair to reach a citation."""
+    src = _src(3, "瑜伽師地論", 3, "无关原文")
+    answer = "「甲」中间夹了很多很多很多的散文字句「乙」【《瑜伽師地論》第3卷】"
+    out, muts = verify_quoted_content(answer, [src])
+    assert muts == []
+    assert out == answer
+
+
+def test_quote_does_not_span_a_newline():
+    """An inline quote is a single-line construct; blockquotes have their own
+    scanner. A 「 that never closes on its line must not capture across lines."""
+    src = _src(7, "心經", 1, "无关原文")
+    answer = "开头出现一个孤立的「引号但这一行没有闭合\n下一行才闭合了引号」【《心經》第1卷】"
+    out, muts = verify_quoted_content(answer, [src])
+    assert muts == []
+    assert out == answer
+
+
+def test_mismatched_open_and_close_marks_do_not_pair():
+    """「 must be closed by 」 — not by ” or a straight quote."""
+    src = _src(7, "心經", 1, "无关原文")
+    answer = '云：「这是一段足够长的假引文内容啊”【《心經》第1卷】'
+    out, muts = verify_quoted_content(answer, [src])
+    assert muts == []
+    assert out == answer
+
+
+def test_real_paraphrase_as_quote_is_still_downgraded():
+    """Regression guard: the actual feature must survive the precision fix."""
+    src = _src(7, "心經", 1, "五陰覆蓋，使昏迷故。")
+    answer = "论云：「五阴覆盖般若灵明，使众生心识昏蒙」【《心經》第1卷】"
+    out, muts = verify_quoted_content(answer, [src])
+    assert len(muts) == 1
+    assert "「" not in out
+    assert "五阴覆盖般若灵明，使众生心识昏蒙" in out
+
+
+def test_real_verbatim_quote_still_verifies():
+    """Regression guard: a genuine verbatim quote is left alone."""
+    src = _src(7, "心經", 1, "舍利子，色不异空，空不异色，色即是空。")
+    answer = "经云：「色不异空，空不异色，色即是空」【《心經》第1卷】"
+    out, muts = verify_quoted_content(answer, [src])
+    assert muts == []
+    assert out == answer
+
+
+def test_quote_does_not_bind_to_a_citation_across_paragraphs():
+    """The gap window is 80 chars of *the same line*, per the module docstring:
+    a quote separated from the citation by commentary isn't attributable to it."""
+    src = _src(7, "心經", 1, "无关原文")
+    answer = (
+        "论中说：「一段足够长的十二字以上引文」，此处先不展开。\n\n"
+        "下面这段解说与上文无关【《心經》第1卷】"
+    )
+    out, muts = verify_quoted_content(answer, [src])
+    assert muts == []
+    assert out == answer
+
+
+def test_english_quote_with_typographic_apostrophe_is_still_checked():
+    """U+2019 doubles as a closing single quote *and* an English apostrophe.
+    Excluding it from every quote body would silently stop verifying English
+    quotes (84000 / SuttaCentral translations), trading over-capture for
+    under-verification. Only the mark that *pairs* with the opener may end it."""
+    src = _src(9, "Dhammapada", 1, "Unrelated canonical text.")
+    answer = '“the Buddha’s own words, plainly stated”【《Dhammapada》第1卷】'
+    _, muts = verify_quoted_content(answer, [src])
+    assert len(muts) == 1
+    assert muts[0].quote == "the Buddha’s own words, plainly stated"
