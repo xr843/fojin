@@ -28,23 +28,44 @@ Phase 3 与 Phase 5 互相独立，可并行；Phase 4 依赖 Phase 2（字符�
 
 ---
 
-## Phase 0 — 部署前去重预检 ⚠️（Gate for deploy）
+## Phase 0 — 部署前预检 ⚠️（Gate for deploy）
+
+### 0a. 核对迁移链起点（务必先做）
+
+CLAUDE.md 反复警告：撞 `down_revision` 会整站宕。部署前先确认 prod 当前版本是 `0166` 的干净祖先（正常应为 `0165`），否则 0166–0170 可能应用不上或撞链：
+```bash
+docker compose exec -T backend alembic current   # 期望 0165（或已知在 0166 之下的祖先）
+docker compose exec -T backend alembic heads      # 期望单头 0170
+```
+若 prod 不在预期祖先上，**先停下排查**，不要部署。
+
+### 0b. 去重预检
 
 **为什么**：迁移 `0168` 会给 `text_embeddings` 加 `(text_id, juan_num, chunk_index)` 唯一约束，加约束前会在同一事务里**删除重复行**（保留最小 `id`，embeddings 可再生故安全）。先量一下重复规模，避免大表上自联删除意外拖长部署。
 
 **命令**（在 prod 库上，只读）：
 ```sql
+-- 重复规模
 SELECT count(*) AS dup_groups, sum(cnt - 1) AS rows_to_delete
 FROM (
   SELECT text_id, juan_num, chunk_index, count(*) AS cnt
   FROM text_embeddings GROUP BY 1,2,3 HAVING count(*) > 1
 ) d;
+
+-- 诊断：重复行的 chunk_text 是否「不同」（真损坏，需排查）还是「相同」（纯重跑副本，可安全删）
+SELECT count(*) AS groups_with_divergent_text
+FROM (
+  SELECT text_id, juan_num, chunk_index
+  FROM text_embeddings GROUP BY 1,2,3
+  HAVING count(*) > 1 AND count(DISTINCT chunk_text) > 1
+) d;
 ```
 
 **判读**：
 - `dup_groups = 0` → 无重复，Phase 1 直接部署。
-- 数千级以内 → 正常，部署时迁移会多花几秒~几十秒。
-- 数十万级 → 先跑一次 `fojin-backup.sh`，并考虑在低峰期部署（自联删除会扫大表）。
+- 数千级以内、且 `groups_with_divergent_text = 0` → 正常（纯重跑副本），部署时迁移多花几秒~几十秒。
+- `groups_with_divergent_text > 0` → 重复行内容不一致，keep-lowest-id 是**任意选择**；先查清为何同位置有不同文本（分块管线问题？），再决定是否直接部署。
+- 数十万级 → 先跑一次 `fojin-backup.sh`，并在低峰期部署（自联删除会扫大表）。
 
 ---
 
@@ -71,9 +92,16 @@ SELECT column_name FROM information_schema.columns
 SELECT column_name FROM information_schema.columns
  WHERE table_name='mitra_alignments' AND column_name='mitra_e_score';
 ```
-**部署后立即可用**（无需后续步骤）：跨语搜索 `GET /api/search/parallel-sentences`（对现有 MITRA 试点数据）、数据集导出 `GET /exports/alignments.jsonl`（chunk 级）。
+**部署后可用（有条件）**：跨语搜索 `GET /api/search/parallel-sentences` 与数据集导出 `GET /exports/alignments.jsonl`（chunk 级）**只在对应表已有数据时才有结果**。先确认 prod 存量——若为 0，跨语搜索要等 Phase 3b 导入、chunk 数据集要等 prod 已跑过 `build_alignments.py`：
+```sql
+SELECT (SELECT count(*) FROM mitra_alignments) AS mitra_rows,
+       (SELECT count(*) FROM alignment_pairs)  AS chunk_pairs;
+```
 
-**回滚**：`docker compose exec -T backend alembic downgrade 0165`（会 drop 新表/新列；0168 删掉的重复 embeddings 不恢复——重跑 `scripts/repair_stale_embeddings.py` 再生）。
+**回滚 ⚠️**：`docker compose exec -T backend alembic downgrade 0165`。
+- 会 drop `sentence_alignments`(0170)、`mitra_e_score` 列(0169)、`alignment_pairs` 的 char 偏移列(0168)、`alignment_candidates`(0167)。
+- **一旦跑过 Phase 3c（回填分数）或 Phase 4a（句级 refine），回滚就会毁掉这些算出来的数据**（需重跑，且重跑有 embedding API 成本）。干净回滚只在 Phase 2 之前。
+- 0168 删掉的重复 embeddings 不随 downgrade 恢复——重跑 `scripts/repair_stale_embeddings.py` 再生。
 
 ---
 
@@ -106,7 +134,7 @@ SELECT count(*) FILTER (WHERE text_a_char_start IS NOT NULL) AS a_anchored,
 
 ### 3b. 全量导入 ⚠️（~174 万行）
 
-**Gate**：3a 已确认；`mitra-parallel` TSV 数据已下载到 VPS 某目录。
+**Gate**：3a 已确认；`mitra-parallel` TSV 数据已下载到 VPS 某目录（数据集来自 [dharmamitra/mitra-parallel](https://github.com/dharmamitra/mitra-parallel)，arXiv:2601.06400，CC-BY-SA-4.0；把其 `tsv/` 目录路径给 `--mitra-dir`）。
 
 ```bash
 # dry-run 先验定位率
@@ -122,6 +150,8 @@ docker compose exec -T backend python scripts/import_mitra_alignments.py \
 
 **为什么**：`mitra_e_score` 是 BGE-M3 cosine 代理分。回填后 RAG 的 MITRA 对读门（`enable_mitra_score_gate`，NULL 宽容）自动生效，跨语搜索排序也用它。
 
+**前置**：确认 prod 的 embedding 端点已配（`embedding_api_url`/`embedding_api_key`）且能承压——这一步是百万级批量调用，上游限流会拖垮它。若指向共享上游，先确认配额/QPS。
+
 ```bash
 # 断点续跑（只填 mitra_e_score IS NULL；每批 64 条 embed+写）
 docker compose exec -T backend python scripts/backfill_mitra_scores.py --log-every 5000
@@ -130,20 +160,29 @@ docker compose exec -T backend python scripts/backfill_mitra_scores.py --log-eve
 
 ### 3d. 标定 `mitra_min_score`
 
+⚠️ **先验证代理分是否有判别力**：`mitra_e_score` 是对**已被 MITRA 断言为平行**的两句算 cosine——已知平行句本就偏高 cosine，分布可能挤在高位、筛不出好坏。标定前先看分布：
+```sql
+SELECT width_bucket(mitra_e_score, 0, 1, 10) AS decile, count(*)
+FROM mitra_alignments WHERE mitra_e_score IS NOT NULL GROUP BY 1 ORDER BY 1;
+```
+若绝大多数落在最高 1–2 桶，说明该代理分区分度差，`mitra_min_score` 门的实际价值有限（真正的语义质检要等 MITRA-E 9B，尚未接入）——此时更宜保持默认、不强行卡阈值。
+
 ```bash
 # 导出分层标定样本 → 人工标注 ~200 对 → 定阈值
 docker compose exec -T backend python scripts/backfill_mitra_scores.py \
   --export-calibration 500 /tmp/mitra_calib.jsonl
 ```
-人工标注后选定阈值（默认 `0.30`），在 `.env` 设 `MITRA_MIN_SCORE=<值>` 并滚动重启。**标定完成前不要调高**——NULL 宽容门在回填前是 no-op，回填后按此阈值筛低质。
+人工标注后选定阈值（默认 `0.30`），在 `.env` 设 `MITRA_MIN_SCORE=<值>` 并滚动重启。**标定完成前不要调高**——NULL 宽容门在回填前是 no-op，回填后按此阈值筛低质。注意：回填**进行中**时表内混有已评分/未评分行，门是部分生效的；等回填跑完再依赖它。
 
 ---
 
 ## Phase 4 — 句级对齐（护城河核心）
 
+> **覆盖范围提醒**：`refine_sentence_alignments.py` 只遍历 `alignment_pairs`（curated chunk 对，量级 ~3千），**不**处理 MITRA 或全语料。因此 `sentence_alignments`、乃至将来的**阅读器逐句对读，只会在有 curated 对齐的那些经上亮，不是全站**。要扩覆盖，得先靠 Phase 5（margin 扩量）/ Phase 6（飞轮）把 chunk 级对齐做大，再重跑本步。
+
 ### 4a. 产出句级数据 ⚠️（调 embedding API）
 
-**Gate**：Phase 2 已回填锚点（否则退化到 chunk 级切分，可接受但不理想）。
+**Gate**：Phase 2 已回填锚点（否则退化到 chunk 级切分，可接受但不理想）；embedding 端点可达（同 3c）。
 
 ```bash
 # dry-run 看切句/对齐效果
@@ -194,7 +233,20 @@ docker compose exec -T backend python scripts/build_alignments.py --margin-accep
 
 ## Phase 6 — 飞轮常态运行
 
-挖候选（长跑，生产/cron，非 HTTP）→ 管理员在 `/admin/alignment/review` 人工复核 → accept 即以 `method='flywheel-verified'` 入 `alignment_pairs`。细节见 [`ALIGNMENT_FLYWHEEL.md`](ALIGNMENT_FLYWHEEL.md)。新入库的对齐会成为 Phase 4 下一轮 refine 的输入 —— 闭环。
+挖候选 → 管理员在 `/admin/alignment/review` 人工复核 → accept 即以 `method='flywheel-verified'` 入 `alignment_pairs`。挖矿是 async service（`alignment_flywheel.py`），**没有 CLI/HTTP 包装**，用 python heredoc 触发（`mine_from_anchors` 精度优先，`mine_candidates` 高召回低精度慢，详见 [`ALIGNMENT_FLYWHEEL.md`](ALIGNMENT_FLYWHEEL.md)）：
+```bash
+docker compose exec -T backend python - <<'PY'
+import asyncio
+from app.database import async_session
+from app.services.alignment_flywheel import mine_from_anchors
+async def main():
+    async with async_session() as db:
+        n = await mine_from_anchors(db, limit=500, threshold=0.5)
+        print("staged candidates:", n)
+asyncio.run(main())
+PY
+```
+适合挂夜间 cron（小 `limit`，让复核跟得上）。新入库的对齐会成为 Phase 4 下一轮 refine 的输入 —— 闭环。
 
 ---
 
