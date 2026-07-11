@@ -69,6 +69,39 @@ class SegmentRef:
 
 
 @dataclass(frozen=True, slots=True)
+class SentencePairRecord:
+    """One normalized sentence-level parallel from ``sentence_alignments``.
+
+    Phase 4 Package C: a finer-grained companion to :class:`ParallelRecord`,
+    kept separate because the sentence store's shape differs (both sides carry a
+    verbatim ``sent_text`` substring and sub-paragraph char spans on BOTH sides
+    so the reader can highlight the exact aligned run inside each paragraph).
+
+    ``self_ref`` is the requested text's side (``text_id``/``juan_num`` echo the
+    query args, ``char_start``/``char_end``/``lang`` are its own offsets);
+    ``other_ref`` is the counterpart (its ``text_id``/``juan_num``/offsets/lang).
+    ``chunk_index`` is always None — sentence rows anchor on char offsets, not
+    positional chunk indices.
+
+    ``similarity`` is the averaged cross-lingual cosine of the aligned
+    sentence(s) — a real quality score (unlike MITRA's constant import flag), so
+    no ``confidence_kind`` tag is needed. ``align_type`` is the bertalign move
+    (``1-1`` / ``1-2`` / ``2-1``), ``method`` the producer, ``is_verified`` the
+    reviewer flag.
+    """
+
+    self_ref: SegmentRef
+    other_ref: SegmentRef
+    self_text: str
+    other_text: str
+    similarity: float
+    align_type: str
+    method: str
+    is_verified: bool
+    title: str = ""
+
+
+@dataclass(frozen=True, slots=True)
 class ParallelRecord:
     """One normalized parallel, whichever store it came from.
 
@@ -352,4 +385,89 @@ async def get_text_parallels(
         ))
 
     records.sort(key=lambda r: (0 if r.relation_type == "parallel" else 1, r.other_cbeta_id or ""))
+    return records
+
+
+async def get_sentence_parallels(
+    session: AsyncSession,
+    text_id: int,
+    juan_num: int,
+    *,
+    limit: int = 200,
+) -> list[SentencePairRecord]:
+    """All sentence-level parallels for one (text_id, juan_num), both directions.
+
+    Reads ``sentence_alignments`` direction-agnostically: the requested text may
+    sit on side A or side B of any given row, so a single CASE (mirroring
+    :func:`get_chunk_parallels`) folds each match to "self" (the requested side)
+    vs "other" (the counterpart), and ``buddhist_texts`` is LEFT JOINed on the
+    resolved counterpart id for its display title. One set-based query, no N+1.
+
+    Rows come back in reading order — the self side's ``char_start`` ascending —
+    with ``similarity`` DESC as the tiebreak so the strongest alignment wins when
+    two rows share a leading offset. ``char_start``/``char_end`` are carried on
+    BOTH sides so the reader can highlight the exact sub-paragraph spans.
+
+    Returns ``[]`` when the table has no rows for this juan (the dark state the
+    read endpoint serves until ``refine_sentence_alignments.py`` backfills).
+    """
+    rows = (await session.execute(
+        sql_text("""
+            WITH base AS (
+                SELECT sa.*,
+                       (sa.text_a_id = :tid AND sa.text_a_juan_num = :juan) AS a_is_src
+                FROM sentence_alignments sa
+                WHERE (sa.text_a_id = :tid AND sa.text_a_juan_num = :juan)
+                   OR (sa.text_b_id = :tid AND sa.text_b_juan_num = :juan)
+            ),
+            resolved AS (
+                SELECT
+                    CASE WHEN a_is_src THEN text_a_char_start ELSE text_b_char_start END AS self_cs,
+                    CASE WHEN a_is_src THEN text_a_char_end   ELSE text_b_char_end   END AS self_ce,
+                    CASE WHEN a_is_src THEN text_a_lang       ELSE text_b_lang       END AS self_lang,
+                    CASE WHEN a_is_src THEN sent_a_text       ELSE sent_b_text       END AS self_text,
+                    CASE WHEN a_is_src THEN text_b_id         ELSE text_a_id         END AS other_tid,
+                    CASE WHEN a_is_src THEN text_b_juan_num   ELSE text_a_juan_num   END AS other_juan,
+                    CASE WHEN a_is_src THEN text_b_char_start ELSE text_a_char_start END AS other_cs,
+                    CASE WHEN a_is_src THEN text_b_char_end   ELSE text_a_char_end   END AS other_ce,
+                    CASE WHEN a_is_src THEN text_b_lang       ELSE text_a_lang       END AS other_lang,
+                    CASE WHEN a_is_src THEN sent_b_text       ELSE sent_a_text       END AS other_text,
+                    similarity, align_type, method, is_verified
+                FROM base
+            )
+            SELECT
+                r.self_cs, r.self_ce, r.self_lang, r.self_text,
+                r.other_tid, r.other_juan, r.other_cs, r.other_ce, r.other_lang, r.other_text,
+                r.similarity, r.align_type, r.method, r.is_verified,
+                COALESCE(bt.title_zh, bt.title_sa, bt.title_pi, bt.title_en, '') AS other_title
+            FROM resolved r
+            LEFT JOIN buddhist_texts bt ON bt.id = r.other_tid
+            ORDER BY r.self_cs, r.similarity DESC
+            LIMIT :limit
+        """),
+        {"tid": text_id, "juan": juan_num, "limit": limit},
+    )).fetchall()
+
+    records: list[SentencePairRecord] = []
+    for row in rows:
+        (self_cs, self_ce, self_lang, self_text,
+         other_tid, other_juan, other_cs, other_ce, other_lang, other_text,
+         similarity, align_type, method, is_verified, other_title) = row
+        records.append(SentencePairRecord(
+            self_ref=SegmentRef(
+                text_id=text_id, juan_num=juan_num,
+                lang=self_lang, char_start=self_cs, char_end=self_ce,
+            ),
+            other_ref=SegmentRef(
+                text_id=other_tid, juan_num=other_juan,
+                lang=other_lang, char_start=other_cs, char_end=other_ce,
+            ),
+            self_text=self_text or "",
+            other_text=other_text or "",
+            similarity=float(similarity) if similarity is not None else 0.0,
+            align_type=align_type or "",
+            method=method or "",
+            is_verified=bool(is_verified),
+            title=other_title or "",
+        ))
     return records

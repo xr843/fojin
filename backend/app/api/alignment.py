@@ -19,9 +19,14 @@ from sqlalchemy import bindparam
 from sqlalchemy import text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.core.cache import cache_get, cache_set
 from app.database import get_db
-from app.services.alignment_read_model import MITRA_CHUNK_LIMIT, get_chunk_parallels
+from app.services.alignment_read_model import (
+    MITRA_CHUNK_LIMIT,
+    get_chunk_parallels,
+    get_sentence_parallels,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/alignment", tags=["alignment"])
@@ -93,6 +98,67 @@ class JuanAlignmentResponse(BaseModel):
     total_chunks: int
     chunks_with_parallels: int
     entries: list[JuanAlignmentEntry]
+
+
+class SentenceSideSelf(BaseModel):
+    """The requested text's side of a sentence pair.
+
+    No text_id/juan_num — they are the path params echoed on the response
+    envelope. char_start/char_end index into text_contents.content for
+    (response.text_id, response.juan_num, lang), so the reader can highlight the
+    exact sub-paragraph span; ``text`` is the verbatim sentence at those offsets.
+    """
+    char_start: int
+    char_end: int
+    lang: str
+    text: str
+
+
+class SentenceSideOther(BaseModel):
+    """The counterpart text's side of a sentence pair.
+
+    Carries its own text_id/juan_num (deep-link target) plus char_start/char_end
+    into that text's content and the counterpart display ``title``.
+    """
+    text_id: int
+    juan_num: int
+    char_start: int
+    char_end: int
+    lang: str
+    title: str = ""
+    text: str
+
+
+class SentencePair(BaseModel):
+    """One aligned sentence pair (sentence_alignments row), direction-normalized.
+
+    side_a is always the requested text; side_b the counterpart. ``similarity``
+    is the averaged cross-lingual cosine (a real quality score); ``align_type``
+    is the bertalign move ('1-1' | '1-2' | '2-1'); ``method`` the producer;
+    ``is_verified`` the reviewer flag.
+    """
+    side_a: SentenceSideSelf
+    side_b: SentenceSideOther
+    similarity: float
+    align_type: str
+    method: str
+    is_verified: bool
+
+
+class SentenceAlignmentResponse(BaseModel):
+    """All sentence-level parallels for one (text_id, juan_num).
+
+    Frozen frontend contract (client.ts, future 逐句对读 reader view), parallel
+    to JuanAlignmentResponse for the chunk endpoints. Ships DARK: when the
+    ``enable_sentence_parallels`` flag is off — or the sentence_alignments table
+    has no rows for this juan — ``total`` is 0 and ``pairs`` is [] (never an
+    error). Self-activates once the flag is on AND the prod refinement job has
+    populated the table.
+    """
+    text_id: int
+    juan_num: int
+    total: int
+    pairs: list[SentencePair]
 
 
 class CanonicalParallel(BaseModel):
@@ -409,6 +475,84 @@ async def get_juan_alignment(
         total_chunks=total_chunks,
         chunks_with_parallels=len(entries),
         entries=entries,
+    )
+
+
+@router.get("/sentences/{text_id}/{juan_num}", response_model=SentenceAlignmentResponse)
+async def get_sentence_alignment(
+    text_id: int,
+    juan_num: int,
+    limit: int = Query(200, ge=1, le=500),
+    db: AsyncSession = Depends(get_db),
+) -> SentenceAlignmentResponse:
+    """Get all sentence-level (逐句) parallels for one juan.
+
+    Phase 4 Package C read path for the future reader's sentence-by-sentence
+    parallel view. Thin adapter over
+    services.alignment_read_model.get_sentence_parallels (the direction-agnostic
+    read of sentence_alignments lives there); this handler only maps records to
+    the wire shape and enforces the dark-ship gate.
+
+    Frozen response contract (mirrors the chunk endpoints for client.ts):
+
+        {
+          "text_id": int, "juan_num": int, "total": int,
+          "pairs": [
+            {
+              "side_a": {"char_start", "char_end", "lang", "text"},   # requested text
+              "side_b": {"text_id", "juan_num", "char_start", "char_end",
+                         "lang", "title", "text"},                    # counterpart
+              "similarity": float,        # averaged cross-lingual cosine
+              "align_type": str,          # '1-1' | '1-2' | '2-1'
+              "method": str,
+              "is_verified": bool
+            }
+          ]
+        }
+
+    Ships DARK behind ``settings.enable_sentence_parallels`` (default False): the
+    flag being off short-circuits to an empty payload WITHOUT touching the DB.
+    Even with the flag on, an empty sentence_alignments table naturally yields
+    total=0 / pairs=[] — the endpoint never errors, and self-activates once the
+    flag is on AND prod's refine_sentence_alignments.py has populated rows.
+    """
+    if not settings.enable_sentence_parallels:
+        return SentenceAlignmentResponse(
+            text_id=text_id, juan_num=juan_num, total=0, pairs=[]
+        )
+
+    records = await get_sentence_parallels(db, text_id, juan_num, limit=limit)
+
+    pairs = [
+        SentencePair(
+            side_a=SentenceSideSelf(
+                char_start=rec.self_ref.char_start or 0,
+                char_end=rec.self_ref.char_end or 0,
+                lang=rec.self_ref.lang or "",
+                text=rec.self_text,
+            ),
+            side_b=SentenceSideOther(
+                text_id=rec.other_ref.text_id or 0,
+                juan_num=rec.other_ref.juan_num or 0,
+                char_start=rec.other_ref.char_start or 0,
+                char_end=rec.other_ref.char_end or 0,
+                lang=rec.other_ref.lang or "",
+                title=rec.title or "",
+                text=rec.other_text,
+            ),
+            similarity=rec.similarity,
+            align_type=rec.align_type,
+            method=rec.method,
+            is_verified=rec.is_verified,
+        )
+        for rec in records
+    ]
+
+    return SentenceAlignmentResponse(
+        text_id=text_id,
+        juan_num=juan_num,
+        total=len(pairs),
+        pairs=pairs,
     )
 
 
