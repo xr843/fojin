@@ -3,6 +3,7 @@ from collections import defaultdict
 
 from elasticsearch import AsyncElasticsearch
 from sqlalchemy import or_, select
+from sqlalchemy import text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.elasticsearch import CONTENT_INDEX_NAME, INDEX_NAME
@@ -831,3 +832,150 @@ async def search_semantic(
     ]
 
     return SemanticSearchResponse(total=len(hits), results=hits)
+
+
+# ---------------------------------------------------------------------------
+# Cross-lingual parallel sentences (MITRA)
+# ---------------------------------------------------------------------------
+#
+# Query a Chinese phrase, get aligned Sanskrit/Tibetan sentences (with their
+# Chinese counterpart + source) mined by the MITRA project over pilot Taishō
+# texts. Reads mitra_alignments (~896K sentence-level rows, Skt/Tib↔汉),
+# populated on prod; coverage is deliberately sparse (10 pilot texts today,
+# more after a future full import), so an empty result is the natural dark
+# state — no feature flag.
+#
+# Match strategy — ILIKE substring on zh_text (precise phrase containment,
+# the useful primitive for "find the aligned foreign sentence for this 汉
+# phrase") with pg_trgm ``similarity`` as the match-quality ranking signal
+# (a sentence that *is* the query ranks above a long one merely containing
+# it). pg_trgm is available (see CLAUDE.md / DECISIONS.md).
+#
+# Index behavior — migration 0156/0169 index mitra_alignments only on
+# (text_id, juan_num, chunk_index[, mitra_e_score]), taisho_id, and text_id;
+# there is NO btree/trgm index on zh_text (nor on foreign_lang). So the phrase
+# match is a filtered sequential scan. We bound worst-case cost with an early
+# ``LIMIT :scan_cap`` candidate cut *before* the similarity sort, so a
+# hyper-common substring can't force an unbounded sort over the whole table
+# (Postgres stops scanning once scan_cap matches are collected). A future
+# ``gin_trgm_ops`` index on zh_text (owned by a migration, out of scope here)
+# would make this index-accelerated and let the ranking see the global best
+# candidates — see TODO below.
+#
+# Ranking — (1) match quality (pg_trgm similarity of zh_text vs the query),
+# (2) mitra_e_score DESC NULLS LAST, (3) id. The mitra_e_score ordering is
+# NULL-PERMISSIVE (unscored rows are still returned, ranked last within a
+# score tier), mirroring the established _attach_mitra_parallels gate: there
+# is no ``mitra_e_score >= x`` predicate, so this stays a no-op until a prod
+# backfill populates the column.
+
+# Cap on the candidate rows pulled before the similarity sort — bounds the
+# per-query scan/sort when a common phrase matches a huge number of rows.
+PARALLEL_SCAN_CAP = 500
+
+
+def _dedup_parallel_key(foreign_lang: str, foreign_text: str) -> tuple[str, str]:
+    """Key for collapsing near-identical foreign sentences.
+
+    Normalizes away case + whitespace differences (common across MITRA's
+    Sanskrit/Tibetan romanizations) and keys on a leading window, so two
+    rows that differ only by spacing/casing collapse to one.
+    """
+    normalized = "".join((foreign_text or "").lower().split())[:80]
+    return (foreign_lang or "", normalized)
+
+
+async def search_parallel_sentences(
+    db: AsyncSession,
+    query: str,
+    lang: str = "all",
+    limit: int = 20,
+) -> list[dict]:
+    """Aligned foreign-language sentences whose Chinese counterpart matches ``query``.
+
+    Set-based single query (no N+1): filter mitra_alignments.zh_text by ILIKE
+    substring (+ optional foreign_lang), rank by pg_trgm match quality then
+    mitra_e_score DESC NULLS LAST then id, join buddhist_texts for the title.
+    Near-identical foreign sentences are deduped in Python (preserving the SQL
+    rank order — the highest-ranked copy wins). Returns up to ``limit`` plain
+    dicts; the router wraps them in the response schema.
+
+    TODO(sentence_alignments): once the verified 汉巴/汉藏 store
+    (sentence_alignments) is populated, UNION it in here (tagged source so the
+    card can badge "verified" vs MITRA), ordering verified rows ahead of MITRA.
+    """
+    q = (query or "").strip()
+    if not q:
+        return []
+
+    # Escape LIKE metacharacters in the user phrase so they match literally.
+    escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    params: dict = {
+        "q": q,
+        "pattern": f"%{escaped}%",
+        "scan_cap": PARALLEL_SCAN_CAP,
+        "limit": max(1, limit),
+    }
+
+    lang_clause = ""
+    if lang in ("sa", "bo"):
+        lang_clause = "AND foreign_lang = :lang"
+        params["lang"] = lang
+
+    # candidates: bounded scan (LIMIT before the sort caps work on common
+    # phrases). ranked: apply match-quality + NULL-permissive score ordering
+    # over the (small) candidate set, then join the title.
+    sql = sql_text(f"""
+        WITH candidates AS (
+            SELECT id, zh_text, foreign_text, foreign_lang, taisho_id,
+                   text_id, juan_num, mitra_e_score, source, license
+            FROM mitra_alignments
+            WHERE zh_text ILIKE :pattern ESCAPE '\\'
+              {lang_clause}
+            LIMIT :scan_cap
+        )
+        SELECT c.zh_text, c.foreign_text, c.foreign_lang, c.taisho_id,
+               c.text_id, c.juan_num, c.mitra_e_score, c.source, c.license,
+               COALESCE(bt.title_zh, '') AS title
+        FROM candidates c
+        LEFT JOIN buddhist_texts bt ON bt.id = c.text_id
+        ORDER BY similarity(c.zh_text, :q) DESC,
+                 c.mitra_e_score DESC NULLS LAST,
+                 c.id
+        LIMIT :scan_cap
+    """)
+
+    try:
+        rows = (await db.execute(sql, params)).fetchall()
+    except Exception:
+        logger.exception("跨语对照搜索：数据库查询失败")
+        await db.rollback()
+        return []
+
+    seen: set[tuple[str, str]] = set()
+    results: list[dict] = []
+    for row in rows:
+        (zh_text, foreign_text, foreign_lang, taisho_id, text_id,
+         juan_num, mitra_e_score, source, license_, title) = row
+        if not foreign_text:
+            continue
+        key = _dedup_parallel_key(foreign_lang, foreign_text)
+        if key in seen:
+            continue
+        seen.add(key)
+        results.append({
+            "zh_text": zh_text or "",
+            "foreign_text": foreign_text,
+            "foreign_lang": foreign_lang or "sa",
+            "taisho_id": taisho_id or "",
+            "text_id": text_id,
+            "title": title or "",
+            "juan_num": juan_num,
+            "mitra_e_score": float(mitra_e_score) if mitra_e_score is not None else None,
+            "source": source or "mitra-parallel",
+            "license": license_ or "CC-BY-SA-4.0",
+        })
+        if len(results) >= max(1, limit):
+            break
+
+    return results
