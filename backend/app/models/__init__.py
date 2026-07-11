@@ -16,6 +16,7 @@ from app.models.hot_question import HotQuestion
 from app.models.iiif import IIIFManifest
 from app.models.knowledge_graph import KGEntity, KGRelation
 from app.models.relation import TextRelation
+from app.models.sentence_alignment import SentenceAlignment
 from app.models.source import DataSource, SourceDistribution, TextIdentifier
 from app.models.term_concept import TermConcept, TermConceptEntry
 from app.models.text import (
@@ -50,6 +51,7 @@ __all__ = [
     "KGEntity",
     "KGRelation",
     "ReadingHistory",
+    "SentenceAlignment",
     "SourceDistribution",
     "SourceUpdate",
     "TermConcept",
