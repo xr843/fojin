@@ -1428,6 +1428,7 @@
   "reader.parallel.read_full": "Read full text →",
   "reader.parallel.tab_canonical": "By text",
   "reader.parallel.tab_chunk": "By passage",
+  "reader.parallel.tab_sentence": "By sentence",
   "reader.parallel.sentence.loading": "Loading sentence alignments...",
   "reader.parallel.sentence.empty": "No sentence-level alignment for this fascicle",
   "reader.parallel.sentence.load_error": "Failed to load sentence alignment",

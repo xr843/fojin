@@ -1428,6 +1428,7 @@
   "reader.parallel.read_full": "阅读全文 →",
   "reader.parallel.tab_canonical": "按经对读",
   "reader.parallel.tab_chunk": "按段对读",
+  "reader.parallel.tab_sentence": "按句对读",
   "reader.parallel.sentence.loading": "加载逐句对齐中…",
   "reader.parallel.sentence.empty": "本卷暂无逐句对齐",
   "reader.parallel.sentence.load_error": "逐句对齐加载失败",
