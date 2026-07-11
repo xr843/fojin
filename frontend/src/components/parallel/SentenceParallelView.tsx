@@ -1,3 +1,4 @@
+import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Spin, Alert, Empty, Tag, Button } from "antd";
 import { useTranslation } from "react-i18next";
@@ -26,18 +27,32 @@ function alignBadgeKey(alignType: SentencePair["align_type"]): string | null {
   return null;
 }
 
-function SentencePairCard({ pair }: { pair: SentencePair }) {
+function SentencePairCard({
+  pair,
+  active,
+  onToggle,
+}: {
+  pair: SentencePair;
+  active: boolean;
+  onToggle: (el: HTMLDivElement | null) => void;
+}) {
   const { t } = useTranslation();
+  const ref = useRef<HTMLDivElement>(null);
   const badgeKey = alignBadgeKey(pair.align_type);
   return (
     <div
-      className="sentence-pair-card"
+      ref={ref}
+      data-testid="sentence-pair-card"
+      className={`sentence-pair-card${active ? " is-active" : ""}`}
+      onClick={() => onToggle(ref.current)}
       style={{
         padding: "10px 12px",
         marginBottom: 10,
         borderRadius: 4,
-        background: "#fff",
-        border: "1px solid #e8e8e8",
+        cursor: "pointer",
+        background: active ? "#e6f4ff" : "#fff",
+        border: `1px solid ${active ? "#69b1ff" : "#e8e8e8"}`,
+        transition: "background 0.15s, border-color 0.15s",
       }}
     >
       <div
@@ -103,6 +118,15 @@ function SentencePairCard({ pair }: { pair: SentencePair }) {
  */
 export default function SentenceParallelView({ textId, juanNum }: Props) {
   const { t } = useTranslation();
+  // Click-to-pin: which pair index is active (null = none). Pure UI state.
+  const [active, setActive] = useState<number | null>(null);
+  // Reset the active pin when the reader navigates to another text/juan, so a
+  // stale index can't stay highlighted against a different pair list.
+  const [prevKey, setPrevKey] = useState(`${textId}:${juanNum}`);
+  if (prevKey !== `${textId}:${juanNum}`) {
+    setPrevKey(`${textId}:${juanNum}`);
+    setActive(null);
+  }
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["sentence-parallels", textId, juanNum],
     queryFn: () => getSentenceParallels(textId, juanNum),
@@ -147,7 +171,17 @@ export default function SentenceParallelView({ textId, juanNum }: Props) {
   return (
     <div className="sentence-parallel-view" style={{ flex: 1, overflow: "auto", padding: "8px 12px" }}>
       {data.pairs.map((p, i) => (
-        <SentencePairCard key={i} pair={p} />
+        <SentencePairCard
+          key={i}
+          pair={p}
+          active={active === i}
+          onToggle={(el) => {
+            const next = active === i ? null : i;
+            setActive(next);
+            // jsdom has no real scrollIntoView — guard so tests don't throw.
+            if (next !== null) el?.scrollIntoView?.({ block: "nearest" });
+          }}
+        />
       ))}
     </div>
   );

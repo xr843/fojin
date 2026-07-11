@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import SentenceParallelView from "./SentenceParallelView";
@@ -83,5 +83,21 @@ describe("SentenceParallelView", () => {
     mockGet.mockRejectedValue(new Error("boom"));
     render(<SentenceParallelView textId={1} juanNum={5} />, { wrapper });
     expect(await screen.findByRole("alert")).toBeInTheDocument();
+  });
+
+  it("click-to-pin: clicking a card activates it, clicking again clears", async () => {
+    const pairA = pair({ side_a: { char_start: 0, char_end: 5, lang: "lzh", text: "第一句。" } });
+    const pairB = pair({ side_a: { char_start: 5, char_end: 10, lang: "lzh", text: "第二句。" } });
+    mockGet.mockResolvedValue(resp([pairA, pairB]));
+    render(<SentenceParallelView textId={1} juanNum={5} />, { wrapper });
+    const cards = await screen.findAllByTestId("sentence-pair-card");
+    expect(cards).toHaveLength(2);
+
+    fireEvent.click(cards[0]);
+    expect(cards[0].className).toMatch(/is-active/);
+    expect(cards[1].className).not.toMatch(/is-active/);
+
+    fireEvent.click(cards[0]);
+    expect(cards[0].className).not.toMatch(/is-active/);
   });
 });
