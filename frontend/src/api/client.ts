@@ -2203,3 +2203,41 @@ export async function getAlignmentCoverage(
   );
   return data;
 }
+
+// --- Admin: cross-canon alignment candidate review (flywheel) ---
+
+export interface AlignmentCandidate {
+  id: number;
+  text_a_id: number;
+  text_a_title: string | null;
+  text_a_juan_num: number;
+  text_a_lang: string;
+  text_b_id: number;
+  text_b_title: string | null;
+  text_b_juan_num: number;
+  text_b_lang: string;
+  similarity: number;
+  source: string;
+  status: string;
+}
+
+export async function getAlignmentCandidates(
+  limit = 50,
+): Promise<AlignmentCandidate[]> {
+  const { data } = await api.get<AlignmentCandidate[]>(
+    "/admin/alignment-candidates",
+    { params: { limit } },
+  );
+  return data;
+}
+
+export async function reviewAlignmentCandidate(
+  id: number,
+  accept: boolean,
+): Promise<AlignmentCandidate> {
+  const { data } = await api.post<AlignmentCandidate>(
+    `/admin/alignment-candidates/${id}/review`,
+    { accept },
+  );
+  return data;
+}
