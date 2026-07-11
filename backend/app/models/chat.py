@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -8,6 +8,11 @@ from app.database import Base
 
 class TextEmbedding(Base):
     __tablename__ = "text_embeddings"
+    # Mirrors migration 0168: chunk identity is positional (all alignment
+    # stores reference chunks by this triple with no FK), so it must be unique.
+    __table_args__ = (
+        UniqueConstraint("text_id", "juan_num", "chunk_index", name="uq_text_embeddings_pos"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     text_id: Mapped[int] = mapped_column(Integer, ForeignKey("buddhist_texts.id"), index=True)
