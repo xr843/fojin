@@ -114,9 +114,28 @@ class TestSplitOther:
         assert [s.text for s in sents] == ["Really?!", "Yes."]
 
     def test_blank_lines_collapse(self):
-        text = "A.\n\n\nB."
+        text = "Aa.\n\n\nBb."
         sents = split_sentences(text, "en")
-        assert [s.text for s in sents] == ["A.", "B."]
+        assert [s.text for s in sents] == ["Aa.", "Bb."]
+
+    def test_degenerate_fragments_dropped(self):
+        # Bare punctuation and single-char stubs (the prod garbage: "。", "身。")
+        # must be filtered — they produced spurious cross-lingual alignments.
+        assert split_sentences("。", "lzh") == []
+        assert split_sentences("身。", "lzh") == []
+        # A real short verse line survives (≥2 content chars).
+        assert [s.text for s in split_sentences("諸行無常。", "lzh")] == ["諸行無常。"]
+        # Mixed: only the meaningful sentence is kept, the "。" stub is dropped.
+        got = [s.text for s in split_sentences("身。諸行無常。", "lzh")]
+        assert got == ["諸行無常。"]
+
+    def test_degenerate_fragment_offsets_stay_exact(self):
+        # Dropping a leading stub must not corrupt the surviving sentence's offsets.
+        text = "身。諸行無常。"
+        sents = split_sentences(text, "lzh", base_offset=100)
+        assert len(sents) == 1
+        s = sents[0]
+        assert text[s.char_start - 100 : s.char_end - 100] == s.text
 
 
 # ── cosine_matrix ───────────────────────────────────────────────────────────
