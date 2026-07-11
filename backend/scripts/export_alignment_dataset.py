@@ -1,151 +1,165 @@
-"""Export verified cross-canon alignment pairs as a publishable JSONL dataset.
+"""Export FoJin's cross-canon alignments as a publishable, license-stamped JSONL dataset.
 
-FoJin's chunk-level alignments (Pāli–Classical Chinese, Classical Chinese–
+FoJin's cross-canon alignments (Pāli–Classical Chinese, Classical Chinese–
 Tibetan) are the project's most citable asset: parallel segments across
 Buddhist canons barely exist in machine-readable form anywhere. This script
-turns the `alignment_pairs` table into a flat, self-describing JSONL suitable
-for a HuggingFace dataset release (one record per pair, full provenance).
+turns them into a flat, self-describing JSONL suitable for a public / HuggingFace
+dataset release. The heavy lifting (SQL, record shapes, card aggregation) lives
+in :mod:`app.services.alignment_export`, shared with the HTTP endpoint
+``GET /exports/alignments.jsonl`` so the two never drift.
 
-Output schema (one JSON object per line):
+Output = a **dataset card** as the first JSONL line (or a companion ``--card``
+file), then one JSON object per record.
+
+Chunk granularity (default) record:
     {
-      "id": 12345,                      # stable alignment_pairs.id
+      "id": 12345,
       "lang_src": "pi", "lang_tgt": "lzh",
-      "src": {"text_id", "canonical_id", "title", "juan", "chunk_index"},
+      "src": {"text_id", "canonical_id", "title", "juan", "chunk_index",
+              "license": {"spdx", "url"}, "attribution": "..."},
       "tgt": {...same...},
       "segment_src": "...", "segment_tgt": "...",
-      "confidence": 0.92,               # LLM verifier confidence at build time
-      "method": "embed_llm",            # alignment pipeline variant
-      "verified": false                 # human-verified flag
+      "confidence": 0.92,
+      "method": "embed_llm",
+      "verified": false
+    }
+
+Sentence granularity (``--sentence``) record:
+    {
+      "id": 1, "align_type": "1-1", "similarity": 0.87, "method": "sentence-bertalign",
+      "src": {"text_id", "title", "juan", "char_start", "char_end", "lang",
+              "text", "license", "attribution"},
+      "tgt": {...same...}
     }
 
 Usage (run inside the backend container or with backend deps):
-    python -m scripts.export_alignment_dataset --out /tmp/fojin_alignments.jsonl
-    python -m scripts.export_alignment_dataset --min-confidence 0.85 --langs pi-lzh
+    python -m scripts.export_alignment_dataset --out /tmp/fojin_alignments.jsonl --version 1.0.0 --date 2026-07-11
+    python -m scripts.export_alignment_dataset --sentence --out /tmp/fojin_sentences.jsonl
+    python -m scripts.export_alignment_dataset --min-confidence 0.85 --langs pi-lzh,lzh-bo
+    python -m scripts.export_alignment_dataset --methods manual,expert,flywheel-verified   # only reviewed rows
+    python -m scripts.export_alignment_dataset --card /tmp/card.json --out /tmp/data.jsonl  # card in a side file
     python -m scripts.export_alignment_dataset --stats   # distribution only, no file
 
 Notes:
-    - Read-only: single SELECT, no writes, safe against production.
-    - Segments are canonical-source text (CBETA / SuttaCentral / etc. ingests);
-      the underlying scriptures are public domain. The alignment annotations
-      are FoJin's and ship under CC BY-SA 4.0 (see dataset card).
+    - Read-only: every statement is a SELECT; safe against production. (Do not
+      run it against a live DB from here — validate with fixtures / the tests.)
+    - Streaming: records are keyset-paginated, never fully buffered in memory.
+    - ``--version`` / ``--date`` are passed in (not read from the wall clock); an
+      omitted ``--date`` leaves ``generated_at`` off the card.
+    - Segments are canonical-source text (CBETA / SuttaCentral / 84000 ingests);
+      the alignment annotations are FoJin's and ship under CC BY-SA 4.0. Each
+      record and the card carry per-source license metadata (see the dataset
+      card, ``backend/docs/alignment-dataset-card.md``).
 """
 
 import argparse
 import asyncio
 import json
 import sys
-from collections import Counter
 from pathlib import Path
-
-from sqlalchemy import text
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.database import async_session
-
-EXPORT_SQL = """
-SELECT
-    p.id,
-    p.text_a_lang        AS lang_src,
-    p.text_b_lang        AS lang_tgt,
-    p.text_a_id,
-    ta.cbeta_id          AS src_canonical_id,
-    ta.title_zh          AS src_title,
-    p.text_a_juan_num    AS src_juan,
-    p.text_a_chunk_index AS src_chunk,
-    p.text_b_id,
-    tb.cbeta_id          AS tgt_canonical_id,
-    tb.title_zh          AS tgt_title,
-    p.text_b_juan_num    AS tgt_juan,
-    p.text_b_chunk_index AS tgt_chunk,
-    ea.chunk_text        AS segment_src,
-    eb.chunk_text        AS segment_tgt,
-    p.confidence,
-    p.method,
-    p.is_verified
-FROM alignment_pairs p
-JOIN buddhist_texts ta ON ta.id = p.text_a_id
-JOIN buddhist_texts tb ON tb.id = p.text_b_id
--- alignment_pairs stores chunk references; the segment text lives in
--- text_embeddings (chunk_text), addressed by (text_id, juan_num, chunk_index)
-JOIN text_embeddings ea
-  ON ea.text_id = p.text_a_id
- AND ea.juan_num = p.text_a_juan_num
- AND ea.chunk_index = p.text_a_chunk_index
-JOIN text_embeddings eb
-  ON eb.text_id = p.text_b_id
- AND eb.juan_num = p.text_b_juan_num
- AND eb.chunk_index = p.text_b_chunk_index
-WHERE p.confidence >= :min_confidence
-ORDER BY p.text_a_id, p.text_a_juan_num, p.text_a_chunk_index, p.id
-"""
+from app.services.alignment_export import (
+    build_card,
+    collect_card_facts,
+    compute_stats,
+    iter_records,
+)
 
 
-def to_record(row) -> dict:
-    return {
-        "id": row.id,
-        "lang_src": row.lang_src,
-        "lang_tgt": row.lang_tgt,
-        "src": {
-            "text_id": row.text_a_id,
-            "canonical_id": row.src_canonical_id,
-            "title": row.src_title,
-            "juan": row.src_juan,
-            "chunk_index": row.src_chunk,
-        },
-        "tgt": {
-            "text_id": row.text_b_id,
-            "canonical_id": row.tgt_canonical_id,
-            "title": row.tgt_title,
-            "juan": row.tgt_juan,
-            "chunk_index": row.tgt_chunk,
-        },
-        "segment_src": row.segment_src,
-        "segment_tgt": row.segment_tgt,
-        "confidence": row.confidence,
-        "method": row.method,
-        "verified": row.is_verified,
-    }
+def _split(value: str | None) -> list[str] | None:
+    if not value:
+        return None
+    items = [v.strip() for v in value.split(",") if v.strip()]
+    return items or None
 
 
 async def run(args: argparse.Namespace) -> None:
-    wanted_langs = set(args.langs.split(",")) if args.langs else None
-
-    async with async_session() as session:
-        result = await session.execute(
-            text(EXPORT_SQL), {"min_confidence": args.min_confidence}
-        )
-        rows = result.fetchall()
-
-    records = [
-        to_record(r)
-        for r in rows
-        if wanted_langs is None or f"{r.lang_src}-{r.lang_tgt}" in wanted_langs
-    ]
-
-    dist = Counter(f"{r['lang_src']}-{r['lang_tgt']}" for r in records)
-    texts = len({(r["src"]["text_id"], r["tgt"]["text_id"]) for r in records})
-    print(f"pairs: {len(records)}  text-pairs: {texts}  min_conf: {args.min_confidence}")
-    for langs, n in dist.most_common():
-        confs = [r["confidence"] for r in records if f"{r['lang_src']}-{r['lang_tgt']}" == langs]
-        print(f"  {langs}: {n} pairs, avg conf {sum(confs) / len(confs):.3f}")
+    granularity = "sentence" if args.sentence else "chunk"
+    langs = _split(args.langs)
+    methods = _split(args.methods)
 
     if args.stats:
+        stats = await compute_stats(
+            granularity=granularity,
+            min_confidence=args.min_confidence,
+            langs=langs,
+            methods=methods,
+        )
+        total = sum(s["count"] for s in stats)
+        print(f"{granularity} records: {total}  min_score: {args.min_confidence}")
+        for s in stats:
+            key = s.get("langs") or s.get("align_type")
+            avg = s["avg_score"]
+            avg_str = f"{avg:.3f}" if avg is not None else "n/a"
+            print(f"  {key}: {s['count']} records, avg {avg_str}")
         return
 
+    record_count, source_licenses = await collect_card_facts(
+        granularity=granularity,
+        min_confidence=args.min_confidence,
+        langs=langs,
+        methods=methods,
+    )
+    card = build_card(
+        granularity=granularity,
+        version=args.version,
+        generated_at=args.date,
+        record_count=record_count,
+        source_licenses=source_licenses,
+    )
+
     out = Path(args.out)
+    written = 0
     with out.open("w", encoding="utf-8") as f:
-        for rec in records:
+        if args.card:
+            Path(args.card).write_text(
+                json.dumps(card, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+            )
+        else:
+            f.write(json.dumps(card, ensure_ascii=False) + "\n")
+        async for rec in iter_records(
+            granularity=granularity,
+            min_confidence=args.min_confidence,
+            langs=langs,
+            methods=methods,
+        ):
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-    print(f"wrote {out} ({out.stat().st_size / 1024:.0f} KB)")
+            written += 1
+
+    card_loc = f"card → {args.card}" if args.card else "card = line 1"
+    print(
+        f"wrote {out} ({out.stat().st_size / 1024:.0f} KB, {written} records, {card_loc}); "
+        f"card record_count={record_count}, sources={len(source_licenses)}"
+    )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--out", default="/tmp/fojin_alignments.jsonl")
-    parser.add_argument("--min-confidence", type=float, default=0.75)
+    parser.add_argument(
+        "--sentence",
+        action="store_true",
+        help="export sentence_alignments (finer granularity) instead of chunk pairs",
+    )
+    parser.add_argument("--min-confidence", type=float, default=0.75, dest="min_confidence")
     parser.add_argument("--langs", help="comma-separated lang pairs, e.g. pi-lzh,lzh-bo")
-    parser.add_argument("--stats", action="store_true", help="print distribution only")
+    parser.add_argument(
+        "--methods",
+        help="comma-separated method filter, e.g. manual,expert,flywheel-verified "
+        "(exclude unreviewed producers like embed_llm/embed_margin)",
+    )
+    parser.add_argument("--version", help="dataset version string for the card, e.g. 1.0.0")
+    parser.add_argument(
+        "--date",
+        help="generated_at date for the card (e.g. 2026-07-11); omitted when absent",
+    )
+    parser.add_argument(
+        "--card",
+        help="write the dataset card to this JSON file instead of embedding it as line 1",
+    )
+    parser.add_argument("--stats", action="store_true", help="print distribution only, no file")
     args = parser.parse_args()
     asyncio.run(run(args))
 

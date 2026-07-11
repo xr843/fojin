@@ -77,6 +77,19 @@ class Settings(BaseSettings):
     mitra_min_score: float = 0.30
     enable_mitra_score_gate: bool = True
 
+    # Sentence-level 逐句对读 read path (Phase 4 Package C). Gates
+    # GET /alignment/sentences/{text_id}/{juan_num}, which serves the future
+    # reader's sentence-by-sentence parallel view out of ``sentence_alignments``.
+    # Ships DARK (default False): the endpoint returns a clean empty payload
+    # (total=0, pairs=[]) instead of querying, so the contract is live and
+    # client.ts types can land before the prod refinement job
+    # (refine_sentence_alignments.py) populates the table or any UI exists.
+    # Flip true via env once BOTH the data is backfilled and the reader UI
+    # ships; set false again to instantly roll back to the dark state without a
+    # redeploy (and even when true, an empty table self-serves the same empty
+    # payload — never an error).
+    enable_sentence_parallels: bool = False
+
     # Observability — expose Prometheus metrics at /metrics (app root, not
     # /api; not proxied by nginx, so network-internal only). Set false to
     # not mount the endpoint at all. See app/core/metrics.py.

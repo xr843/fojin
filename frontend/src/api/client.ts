@@ -446,6 +446,37 @@ export async function searchSemantic(params: {
   return data;
 }
 
+// 跨语对照搜索（MITRA 平行语料）: 输入中文短语，返回对齐的梵/藏语句及其汉文对照
+export interface ParallelSentenceHit {
+  zh_text: string;
+  foreign_text: string;
+  foreign_lang: string;
+  taisho_id: string;
+  text_id: TextId;
+  title: string;
+  juan_num: number | null;
+  mitra_e_score: number | null;
+  source: string;
+  license: string;
+}
+
+export interface ParallelSentencesResponse {
+  total: number;
+  results: ParallelSentenceHit[];
+  error?: string;
+}
+
+export async function searchParallelSentences(
+  q: string,
+  opts: { lang?: string; limit?: number } = {},
+): Promise<ParallelSentencesResponse> {
+  const { data } = await api.get<ParallelSentencesResponse>("/search/parallel-sentences", {
+    params: { q, lang: opts.lang, limit: opts.limit },
+    timeout: 30000,
+  });
+  return data;
+}
+
 export async function getSearchSuggestions(q: string): Promise<string[]> {
   const { data } = await api.get<{ suggestions: string[] }>("/search/suggest", { params: { q } });
   return data.suggestions;
