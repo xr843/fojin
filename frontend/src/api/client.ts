@@ -1596,6 +1596,55 @@ export async function getFullParallelContent(textId: number): Promise<FullParall
   return data;
 }
 
+// --- Sentence-level alignment (逐句对读, P4-C frozen contract) ---
+// GET /api/alignment/sentences/{text_id}/{juan_num} — side_a is always the
+// requested text (current juan, Chinese side), side_b the counterpart foreign
+// text (carries its own text_id/juan_num for future deep-linking). Ships dark:
+// an empty sentence_alignments table (or the flag off) yields total=0 / pairs=[]
+// and never errors.
+export interface SentenceSideA {
+  char_start: number;
+  char_end: number;
+  lang: string;
+  text: string;
+}
+
+export interface SentenceSideB {
+  text_id: number;
+  juan_num: number;
+  char_start: number;
+  char_end: number;
+  lang: string;
+  title: string;
+  text: string;
+}
+
+export interface SentencePair {
+  side_a: SentenceSideA;
+  side_b: SentenceSideB;
+  similarity: number;
+  align_type: "1-1" | "1-2" | "2-1";
+  method: string;
+  is_verified: boolean;
+}
+
+export interface SentenceAlignmentResponse {
+  text_id: number;
+  juan_num: number;
+  total: number;
+  pairs: SentencePair[];
+}
+
+export async function getSentenceParallels(
+  textId: number,
+  juanNum: number,
+): Promise<SentenceAlignmentResponse> {
+  const { data } = await api.get<SentenceAlignmentResponse>(
+    `/alignment/sentences/${textId}/${juanNum}`,
+  );
+  return data;
+}
+
 export interface ChunkContextResponse {
   text_id: TextId;
   juan_num: number;

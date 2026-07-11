@@ -4,8 +4,9 @@ import { Empty, Spin, Alert, Collapse, Tag, Progress, Tabs, Button } from "antd"
 import { LinkOutlined, BookOutlined, ExpandAltOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { getJuanAlignment, getCanonicalParallels, getFullParallelContent } from "../api/client";
+import { getJuanAlignment, getCanonicalParallels, getFullParallelContent, getSentenceParallels } from "../api/client";
 import OtherVersions from "./OtherVersions";
+import SentenceParallelView from "./parallel/SentenceParallelView";
 
 interface Props {
   textId: number;
@@ -407,6 +408,19 @@ export default function ReaderParallelPanel({ textId, juanNum }: Props) {
     staleTime: 10 * 60 * 1000,
     retry: false,
   });
+  // Ship-dark gate for 按句对读: only surface the sentence tab once the frozen
+  // P4-C endpoint reports rows for this juan. Shares SentenceParallelView's
+  // query key, so react-query dedupes — this is a lightweight total-only read,
+  // not a second request. Left off the effectiveKey default logic on purpose
+  // (design: sentence stays a third clickable tab, never the auto-default).
+  const { data: sentence } = useQuery({
+    queryKey: ["sentence-parallels", textId, juanNum],
+    queryFn: () => getSentenceParallels(textId, juanNum),
+    enabled: textId > 0,
+    staleTime: 10 * 60 * 1000,
+    retry: false,
+  });
+  const hasSentence = (sentence?.total ?? 0) > 0;
   // Once the canonical query has SETTLED (success or error), default to 按段对读
   // unless canonical actually has content. Treating the error path as "empty" is
   // deliberate: a failed canonical query must not strand the user on the empty
@@ -436,6 +450,15 @@ export default function ReaderParallelPanel({ textId, juanNum }: Props) {
             label: t("reader.parallel.tab_chunk"),
             children: <ChunkView textId={textId} juanNum={juanNum} />,
           },
+          ...(hasSentence
+            ? [
+                {
+                  key: "sentence",
+                  label: t("reader.parallel.tab_sentence"),
+                  children: <SentenceParallelView textId={textId} juanNum={juanNum} />,
+                },
+              ]
+            : []),
         ]}
       />
     </div>
