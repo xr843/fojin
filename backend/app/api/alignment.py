@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cache import cache_get, cache_set
 from app.database import get_db
+from app.services.alignment_read_model import MITRA_CHUNK_LIMIT, get_chunk_parallels
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/alignment", tags=["alignment"])
@@ -41,9 +42,9 @@ ALIGNMENT_CATALOG_CACHE_KEY = "alignment:catalog:v2"
 ALIGNMENT_CATALOG_TTL = 25200  # 7h — must exceed WARM_INTERVAL so the loop keeps it warm
 ALIGNMENT_CATALOG_WARM_INTERVAL = 21600  # 6h — background re-warm cadence (< TTL)
 
-# A fojin chunk (paragraph) can contain many MITRA sentence-level parallels;
-# cap per chunk so the reader panel stays bounded on dense texts.
-MITRA_CHUNK_LIMIT = 50
+# MITRA_CHUNK_LIMIT (per-chunk cap on MITRA sentence-level parallels) is owned
+# by app.services.alignment_read_model and imported above so the single-chunk
+# service path and the batched juan endpoint can never drift apart.
 
 # Per-chunk cap on fojin↔fojin parallels in the juan index, matching the
 # single-chunk endpoint's default limit.
@@ -135,105 +136,41 @@ async def get_chunk_alignment(
 ) -> ChunkAlignmentResponse:
     """Get all aligned parallels for a single chunk.
 
-    Checks both sides of alignment_pairs (text_a_* and text_b_*) so the
-    alignment is direction-agnostic.
+    Thin adapter over services.alignment_read_model.get_chunk_parallels (the
+    direction-agnostic merge of alignment_pairs + mitra_alignments lives
+    there). The HTTP response shape is a frozen contract with the frontend
+    (client.ts getChunkAlignment) and MUST NOT change here.
     """
-    rows = (await db.execute(
-        sql_text("""
-            SELECT
-                CASE WHEN ap.text_a_id = :tid AND ap.text_a_juan_num = :juan AND ap.text_a_chunk_index = :cidx
-                     THEN ap.text_b_id ELSE ap.text_a_id END,
-                CASE WHEN ap.text_a_id = :tid AND ap.text_a_juan_num = :juan AND ap.text_a_chunk_index = :cidx
-                     THEN ap.text_b_juan_num ELSE ap.text_a_juan_num END,
-                CASE WHEN ap.text_a_id = :tid AND ap.text_a_juan_num = :juan AND ap.text_a_chunk_index = :cidx
-                     THEN ap.text_b_chunk_index ELSE ap.text_a_chunk_index END,
-                CASE WHEN ap.text_a_id = :tid AND ap.text_a_juan_num = :juan AND ap.text_a_chunk_index = :cidx
-                     THEN ap.text_b_lang ELSE ap.text_a_lang END,
-                ap.confidence
-            FROM alignment_pairs ap
-            WHERE (
-                (ap.text_a_id = :tid AND ap.text_a_juan_num = :juan AND ap.text_a_chunk_index = :cidx)
-                OR
-                (ap.text_b_id = :tid AND ap.text_b_juan_num = :juan AND ap.text_b_chunk_index = :cidx)
-            )
-            AND ap.text_a_chunk_index IS NOT NULL
-            -- confidence is coarse and heavily tied (e.g. 0.9 for hundreds of
-            -- pairs), so confidence-only ordering picks an arbitrary 5 under the
-            -- LIMIT. Tiebreak on the counterpart identity (output cols 1,2,3 =
-            -- other_tid/other_juan/other_cidx) so this single-chunk endpoint and
-            -- the batched juan endpoint always select the SAME rows in the SAME
-            -- order — otherwise the "多语对读" panel and a chunk deep-link disagree.
-            ORDER BY ap.confidence DESC, 1, 2, 3
-            LIMIT :limit
-        """),
-        {"tid": text_id, "juan": juan_num, "cidx": chunk_index, "limit": limit},
-    )).fetchall()
+    records = await get_chunk_parallels(db, text_id, juan_num, chunk_index, limit=limit)
 
     parallels: list[ParallelPair] = []
-    for row in rows:
-        other_tid, other_juan, other_cidx, other_lang, conf = row
-        text_row = (await db.execute(
-            sql_text(
-                "SELECT te.chunk_text, "
-                "COALESCE(bt.title_zh, bt.title_sa, bt.title_pi, bt.title_en, '') "
-                "FROM text_embeddings te "
-                "LEFT JOIN buddhist_texts bt ON bt.id = te.text_id "
-                "WHERE te.text_id = :tid AND te.juan_num = :juan AND te.chunk_index = :cidx"
-            ),
-            {"tid": other_tid, "juan": other_juan, "cidx": other_cidx},
-        )).fetchone()
-        if text_row:
-            original_preview: str | None = None
-            original_lang: str | None = None
-            if other_lang in ("pi", "sa"):
-                orig_row = (await db.execute(
-                    sql_text(
-                        "SELECT lang, LEFT(content, 500) FROM text_contents "
-                        "WHERE text_id = :tid AND juan_num = :juan AND lang = :lang "
-                        "LIMIT 1"
-                    ),
-                    {"tid": other_tid, "juan": other_juan, "lang": other_lang},
-                )).fetchone()
-                if orig_row and orig_row[1]:
-                    original_lang = orig_row[0]
-                    original_preview = orig_row[1]
-
+    for rec in records:
+        if rec.source == "mitra":
+            # Inline foreign sentence: no fojin chunk to deep-link, ids are 0
+            # and chunk_text carries the foreign text (legacy contract).
+            foreign_lang = rec.other_ref.lang or "sa"
             parallels.append(ParallelPair(
-                text_id=other_tid,
-                juan_num=other_juan,
-                chunk_index=other_cidx,
-                chunk_text=text_row[0],
-                lang=other_lang or "lzh",
-                title=text_row[1] or "",
-                confidence=float(conf),
-                original_preview=original_preview,
-                original_lang=original_lang,
+                text_id=0,
+                juan_num=0,
+                chunk_index=0,
+                chunk_text=rec.preview or "",
+                lang=foreign_lang,
+                title="MITRA 平行（藏）" if foreign_lang == "bo" else "MITRA 平行（梵）",
+                confidence=rec.confidence if rec.confidence is not None else 1.0,
+                source="mitra-parallel",
             ))
-
-    # MITRA cross-lingual parallels (inline Sanskrit/Tibetan, CC BY-SA 4.0).
-    # The foreign side has no fojin chunk, so chunk_text carries the foreign
-    # sentence and the deep-link ids are 0. A fojin chunk (a paragraph) can hold
-    # many MITRA sentence-pairs, so this uses its own larger cap.
-    mitra_rows = (await db.execute(
-        sql_text(
-            "SELECT foreign_text, foreign_lang, confidence "
-            "FROM mitra_alignments "
-            "WHERE text_id = :tid AND juan_num = :juan AND chunk_index = :cidx "
-            "ORDER BY foreign_lang, id LIMIT :limit"
-        ),
-        {"tid": text_id, "juan": juan_num, "cidx": chunk_index, "limit": MITRA_CHUNK_LIMIT},
-    )).fetchall()
-    for foreign_text, foreign_lang, conf in mitra_rows:
-        parallels.append(ParallelPair(
-            text_id=0,
-            juan_num=0,
-            chunk_index=0,
-            chunk_text=foreign_text,
-            lang=foreign_lang or "sa",
-            title="MITRA 平行（藏）" if foreign_lang == "bo" else "MITRA 平行（梵）",
-            confidence=float(conf) if conf is not None else 1.0,
-            source="mitra-parallel",
-        ))
+        else:
+            parallels.append(ParallelPair(
+                text_id=rec.other_ref.text_id or 0,
+                juan_num=rec.other_ref.juan_num or 0,
+                chunk_index=rec.other_ref.chunk_index or 0,
+                chunk_text=rec.preview or "",
+                lang=rec.other_ref.lang or "lzh",
+                title=rec.title or "",
+                confidence=rec.confidence if rec.confidence is not None else 1.0,
+                original_preview=rec.original_preview,
+                original_lang=rec.original_lang,
+            ))
 
     return ChunkAlignmentResponse(
         source_text_id=text_id,

@@ -20,9 +20,16 @@ ships the substring gate only.
 
 Usage (inside backend container, DB reachable):
     python scripts/import_mitra_alignments.py --mitra-dir /tmp/mitra-tsv
-    python scripts/import_mitra_alignments.py --mitra-dir /tmp/mitra-tsv --all
+    python scripts/import_mitra_alignments.py --mitra-dir /tmp/mitra-tsv --all \
+        --skip-existing --log-every 25
     python scripts/import_mitra_alignments.py --mitra-dir /tmp/mitra-tsv \
-        --taisho T0262,T0945 --dry-run
+        --taisho-ids T0262,T0945 --dry-run
+
+With no scope flag the run covers exactly the 10 pilot texts (PILOT_TAISHO),
+so historical re-runs stay reproducible. Idempotency: per text the importer
+wipes and re-inserts atomically (one transaction); --skip-existing instead
+skips any text that already has rows — use it to resume an interrupted --all
+run and to protect backfilled mitra_e_score values, which a wipe would erase.
 """
 from __future__ import annotations
 
@@ -171,6 +178,46 @@ def _locate(ns: str, juan: int | None, tj_index, t_index):
     return None, None, "none"
 
 
+def _dedup_key(row: dict) -> tuple[str, str, str, str]:
+    """Script-level uniqueness key for one alignment row.
+
+    The table has no unique constraint (bulk-load table; the DB-level guard is
+    only the per-text wipe), so this is the strongest natural key available:
+    the Taishō line ref + foreign segment id + both text sides. zh_segment is
+    location-specific (e.g. T04n0192_002:0010c23_13), so a formulaic sentence
+    repeated at two places in a text is NOT collapsed — only true duplicates
+    (the same alignment appearing in more than one MITRA TSV file) are.
+    """
+    return (row["zh_segment"], row["foreign_segment"], row["zh_text"], row["foreign_text"])
+
+
+def _dedup_rows(rows: list[dict]) -> tuple[list[dict], int]:
+    """Drop exact duplicate rows within one text's import, keeping the first
+    occurrence (deterministic). Returns (unique_rows, dropped_count)."""
+    seen: set[tuple[str, str, str, str]] = set()
+    out: list[dict] = []
+    for row in rows:
+        key = _dedup_key(row)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(row)
+    return out, len(rows) - len(out)
+
+
+def _partition_imported(targets: list[str], imported: set[str]) -> tuple[list[str], list[str]]:
+    """Split targets into (todo, skipped) preserving order.
+
+    The idempotency key is the Taishō id: a text is "imported" when its
+    text_id already has any mitra_alignments rows. Safe because _import_one
+    writes a text's delete+insert atomically in one transaction, so a text
+    either has its full row set or nothing.
+    """
+    todo = [t for t in targets if t not in imported]
+    skipped = [t for t in targets if t in imported]
+    return todo, skipped
+
+
 def _pairs_for(tsv_dir: str, taisho: str):
     """Yield (mitra_file, zh_seg, zh, fo_seg, fo) for one Taishō text."""
     files = [
@@ -241,6 +288,9 @@ async def _import_one(conn, taisho: str, tsv_dir: str, dry: bool) -> tuple[int, 
         )
 
     if not dry:
+        rows, dropped = _dedup_rows(rows)
+        if dropped:
+            print(f"  {taisho}: dropped {dropped} exact duplicate row(s)")
         await conn.execute(
             sql_text("DELETE FROM mitra_alignments WHERE text_id = :tid"), {"tid": text_id}
         )
@@ -266,13 +316,35 @@ def _resolve_targets(args) -> list[str]:
     return PILOT_TAISHO
 
 
-async def main() -> int:
+def _build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--mitra-dir", required=True, help="path to mitra-parallel/tsv")
-    ap.add_argument("--taisho", help="comma-separated Taishō ids (default: pilot 10)")
+    ap.add_argument(
+        "--taisho",
+        "--taisho-ids",
+        dest="taisho",
+        help="comma-separated Taishō ids, e.g. T0099,T0310 (default: pilot 10)",
+    )
     ap.add_argument("--all", action="store_true", help="all Chinese-bearing texts present in fojin")
     ap.add_argument("--dry-run", action="store_true", help="localize + report, no writes")
-    args = ap.parse_args()
+    ap.add_argument(
+        "--skip-existing",
+        action="store_true",
+        help="skip texts that already have mitra_alignments rows (resume an "
+        "interrupted run; protects backfilled mitra_e_score, which the "
+        "default wipe+re-import would erase)",
+    )
+    ap.add_argument(
+        "--log-every",
+        type=int,
+        default=25,
+        help="print cumulative progress every N texts (default 25; 0 disables)",
+    )
+    return ap
+
+
+async def main() -> int:
+    args = _build_parser().parse_args()
 
     if not os.path.isdir(args.mitra_dir):
         print(f"ERROR: --mitra-dir not found: {args.mitra_dir}")
@@ -293,7 +365,25 @@ async def main() -> int:
     failed: list[str] = []
     try:
         async with engine.connect() as conn:
-            for taisho in targets:
+            if args.skip_existing:
+                imported = {
+                    row[0]
+                    for row in (
+                        await conn.execute(
+                            sql_text(
+                                """
+                                SELECT DISTINCT bt.taisho_id
+                                FROM mitra_alignments ma
+                                JOIN buddhist_texts bt ON bt.id = ma.text_id
+                                """
+                            )
+                        )
+                    ).fetchall()
+                }
+                targets, already = _partition_imported(targets, imported)
+                print(f"skip-existing: {len(already)} already imported, {len(targets)} to do")
+
+            for idx, taisho in enumerate(targets, 1):
                 try:
                     c, lcount = await _import_one(conn, taisho, args.mitra_dir, args.dry_run)
                     tot_c += c
@@ -304,6 +394,14 @@ async def main() -> int:
                     await conn.rollback()
                     failed.append(taisho)
                     print(f"  {taisho}: FAILED ({type(e).__name__}: {e})")
+                if args.log_every and idx % args.log_every == 0:
+                    elapsed = time.time() - t0
+                    rate = tot_l / elapsed if elapsed > 0 else 0.0
+                    eta = (len(targets) - idx) * elapsed / idx
+                    print(
+                        f"progress: {idx}/{len(targets)} texts, localized={tot_l} rows, "
+                        f"{rate:.0f} rows/s, elapsed={elapsed:.0f}s, eta={eta:.0f}s"
+                    )
     finally:
         await engine.dispose()
     pct = tot_l * 100 // max(tot_c, 1)
