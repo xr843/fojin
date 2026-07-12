@@ -1490,5 +1490,7 @@
   "chat.epigraph_unset": "未设",
   "chat.master_lens": "依此宗风解经",
   "chat.change_master": "更换宗风",
-  "chat.master_disclaimer": "以下为 AI 依据典籍生成的诠释，非祖师本人开示。每处引证均标注经号与卷次，可点开核对原文。"
+  "chat.master_disclaimer": "以下为 AI 依据典籍生成的诠释，非祖师本人开示。每处引证均标注经号与卷次，可点开核对原文。",
+  "chat.gallery_strip": "以宗风解经 · {{n}} 位祖师",
+  "chat.gallery_view_all": "全部"
 }
