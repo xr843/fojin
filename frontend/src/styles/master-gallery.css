@@ -1,0 +1,300 @@
+/* 祖师长廊 — master picker.
+   No portraits by design: a cinnabar name-seal stands in for the avatar.
+   Every colour below comes from the existing FoJin token set; --fj-accent
+   (#8b2500) already *is* seal-ink red, so the seal needs no new colour. */
+
+.mg {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.mg-loading {
+  display: flex;
+  justify-content: center;
+  padding: 40px 0;
+}
+
+/* ── Lineage filter chips ── */
+.mg-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mg-chip {
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--fj-border, #d9d0c1);
+  background: transparent;
+  color: var(--fj-ink-light, #5c4f3d);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.mg-chip:hover {
+  border-color: var(--fj-accent, #8b2500);
+  color: var(--fj-accent, #8b2500);
+}
+
+.mg-chip:focus-visible {
+  outline: 2px solid var(--fj-accent, #8b2500);
+  outline-offset: 2px;
+}
+
+.mg-chip[aria-pressed="true"] {
+  background: var(--fj-accent, #8b2500);
+  border-color: var(--fj-accent, #8b2500);
+  color: #fff;
+}
+
+.mg-chip-n {
+  margin-left: 5px;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 通用助手 sits apart from the lineage filters — it is a choice, not a filter. */
+.mg-chip-plain {
+  margin-left: auto;
+}
+
+/* ── Card grid ── */
+.mg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(252px, 1fr));
+  gap: 12px;
+}
+
+.mg-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: #fffdfa;
+  border: 1px solid var(--fj-border, #d9d0c1);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: border-color 0.16s, box-shadow 0.16s, transform 0.16s;
+}
+
+.mg-card:hover {
+  border-color: var(--fj-accent, #8b2500);
+  box-shadow: 0 4px 14px -6px rgba(139, 37, 0, 0.28);
+  transform: translateY(-1px);
+}
+
+.mg-card:focus-visible {
+  outline: 2px solid var(--fj-accent, #8b2500);
+  outline-offset: 2px;
+}
+
+.mg-card.is-selected {
+  border-color: var(--fj-accent, #8b2500);
+  box-shadow: inset 0 0 0 1px var(--fj-accent, #8b2500);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mg-card,
+  .mg-chip {
+    transition: none;
+  }
+  .mg-card:hover {
+    transform: none;
+  }
+}
+
+.mg-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+
+/* ── The seal (白文印: name reversed out of cinnabar) ── */
+.mg-seal {
+  flex-shrink: 0;
+  background: var(--fj-accent, #8b2500);
+  border-radius: 2px;
+  display: grid;
+  place-items: center;
+  padding: 3px;
+}
+
+.mg-seal-text {
+  font-family: "Noto Serif SC", "Source Han Serif SC", serif;
+  font-weight: 700;
+  line-height: 1.05;
+  color: #fdf6ee;
+  letter-spacing: 0.02em;
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  white-space: nowrap;
+}
+
+.mg-id {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mg-name {
+  font-family: "Noto Serif SC", "Source Han Serif SC", serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--fj-ink, #2b2318);
+  letter-spacing: 0.02em;
+}
+
+.mg-meta {
+  font-size: 12px;
+  color: var(--fj-ink-muted, #9a8e7a);
+  font-variant-numeric: tabular-nums;
+}
+
+.mg-school {
+  color: var(--fj-ink-light, #5c4f3d);
+}
+
+.mg-rule {
+  height: 1px;
+  background: var(--fj-border, #d9d0c1);
+}
+
+/* ── The description: the spine. Every card has one, because it answers the
+      question someone browsing actually has — "which of these do I pick?".
+      It is OUR editorial prose, so it is set plainly: no 「」, no citation, no
+      badge. It must never be mistakable for something we claim he said. ── */
+.mg-desc {
+  display: block;
+  font-family: "Noto Serif SC", "Source Han Serif SC", serif;
+  font-size: 13.5px;
+  line-height: 1.8;
+  color: var(--fj-ink-light, #5c4f3d);
+  min-height: 2.8em; /* ~2 lines, so a short description doesn't collapse the card */
+}
+
+/* ── The quote: the evidence, and a different job from the description above.
+      Only the seven masters whose own writing we host can carry one. Set darker
+      and larger than the description it follows — this is the quotation, and the
+      one thing on the card the reader can go and verify. ── */
+.mg-quote {
+  display: block;
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--fj-border, #d9d0c1);
+  font-family: "Noto Serif SC", "Source Han Serif SC", serif;
+  font-size: 14.5px;
+  line-height: 1.8;
+  color: var(--fj-ink, #2b2318);
+}
+
+/* ── Source line: every quote carries its citation and its verified state,
+      in the same vocabulary the chat answers already use. ── */
+/* Kept to a single row: a long title (《六祖大師法寶壇經》,《華嚴一乘教義分齊章》)
+   would otherwise wrap and push the ↗ onto its own line, so cards in the same
+   row ended up different heights. The title truncates; the CBETA id — the part
+   you actually cite — always stays visible. */
+.mg-src {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  min-width: 0;
+  font-size: 11.5px;
+  color: var(--fj-ink-muted, #9a8e7a);
+}
+
+.mg-ref {
+  font-family: "Noto Serif SC", "Source Han Serif SC", serif;
+  color: var(--fj-ink-light, #5c4f3d);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mg-badge,
+.mg-open {
+  flex-shrink: 0;
+}
+
+.mg-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10.5px;
+  font-weight: 600;
+  background: #e8f0e4;
+  color: #3f6b32;
+  white-space: nowrap;
+}
+
+.mg-open {
+  margin-left: auto;
+  color: var(--fj-accent, #8b2500);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.mg-open:focus-visible {
+  outline: 2px solid var(--fj-accent, #8b2500);
+  outline-offset: 1px;
+  border-radius: 2px;
+}
+
+/* ── Persona header, shown above the thread once a lineage is chosen ── */
+.mg-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 14px;
+  background: #fffdfa;
+  border: 1px solid var(--fj-border, #d9d0c1);
+  border-radius: 3px;
+}
+
+.mg-head-id {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.mg-head-name {
+  font-family: "Noto Serif SC", "Source Han Serif SC", serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--fj-ink, #2b2318);
+}
+
+.mg-head-sub {
+  font-size: 11.5px;
+  color: var(--fj-ink-muted, #9a8e7a);
+}
+
+.mg-head-swap {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* The disclaimer is not fine print — it is the fuse on the whole persona idea. */
+.mg-disclaimer {
+  margin-top: 8px;
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: var(--fj-ink-muted, #9a8e7a);
+  padding: 8px 12px;
+  background: var(--fj-bg-alt, #f0ebe2);
+  border-left: 2px solid var(--fj-border, #d9d0c1);
+  border-radius: 3px;
+}

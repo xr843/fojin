@@ -214,7 +214,9 @@ Confidence distribution: all pairs ≥ 0.75. Hand-verified precision on the orig
 
 RAG layer automatically includes parallel_chunks in the LLM context when a retrieved chunk has alignments, so answers can naturally reference "the Pali version says…" without hallucinating.
 
-**Growing the alignment set — the flywheel:** beyond the batch pipeline above, an *alignment flywheel* (`backend/app/services/alignment_flywheel.py`) mines new candidate parallels by expanding outward from already-verified pairs — neighbouring chunks tend to align too, so this is both fast and precise where blind nearest-neighbour search drowns in same-language matches. Candidates are staged for **human review** and only promoted into the ground-truth `alignment_pairs` once accepted (`method='flywheel-verified'`). Nothing is auto-promoted — human review is the precision gate — and each verified alignment makes the next round of mining better.
+**Growing the alignment set — the flywheel:** beyond the batch pipeline above, an *alignment flywheel* (`backend/app/services/alignment_flywheel.py`) mines new candidate parallels by expanding outward from already-verified pairs — neighbouring chunks tend to align too, so this is both fast and precise where blind nearest-neighbour search drowns in same-language matches. Candidates are staged for **human review** (admin UI at `/admin/alignment/review`) and only promoted into the ground-truth `alignment_pairs` once accepted (`method='flywheel-verified'`). Nothing is auto-promoted — human review is the precision gate — and each verified alignment makes the next round of mining better. A **margin-based candidate router** in `build_alignments.py` routes recalled candidates into auto-accept / LLM-verify / auto-reject bands by ratio-margin, cutting LLM cost while keeping auto-accept off by default so the precision guarantee holds.
+
+**From chunks to sentences — the depth play:** verified chunk pairs seed **sentence-level alignment** (`backend/scripts/refine_sentence_alignments.py` + `services/sentence_align.py`): a pure-Python bertalign-style dynamic program subdivides each aligned paragraph into 1-1 / 1-2 / 2-1 sentence pairs over BGE-M3 cosine similarity, anchored to stable character offsets and stored in `sentence_alignments`. This backs precise 逐句对读 and cross-lingual sentence lookup. Two consumption surfaces already ship: **cross-lingual sentence search** (`GET /api/search/parallel-sentences` — query in Chinese, get aligned Sanskrit/Tibetan sentences over the ~896K-pair MITRA store) and a **versioned, license-stamped public dataset export** (`GET /exports/alignments.jsonl`) that turns the alignment corpus into a citable research artifact. Alignment quality is guarded by a dedicated **eval harness** (gold set + precision/recall/calibration metrics + regression gate) alongside the RAG eval, and MITRA cross-canon parallels feed the RAG context gated by a proxy quality score (`mitra_e_score`).
 
 ### AI Q&A — "XiaoJin"
 
@@ -467,11 +469,16 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 - [x] **Cross-canon URN scheme** — stable, resolvable passage identifiers (`fojin:cbeta/T0001.1`) interoperable with CBETA / SuttaCentral / 84000 / GRETIL / VRI
 - [x] **MCP server — published to PyPI as [`fojin-mcp`](https://pypi.org/project/fojin-mcp/)** — 6 read-only, URN-addressable tools; callable from Claude Desktop / ChatGPT
 - [x] **Agentic research assistant** (`/research`) — plan → retrieve (corpus + dictionary + KG) → grounded synthesis behind the same citation guards
-- [x] **Alignment flywheel** — anchor-expansion candidate mining + human-review promotion into ground-truth alignments
+- [x] **Alignment flywheel** — anchor-expansion candidate mining + human-review promotion (admin UI at `/admin/alignment/review`) into ground-truth alignments
+- [x] **Sentence-level cross-canon alignment** — bertalign-style DP over BGE-M3 embeddings subdivides verified chunk pairs into aligned sentence pairs (`sentence_alignments`); pure-Python, no new deps
+- [x] **Margin-based candidate router** — ratio-margin bands (auto-accept / LLM-verify / auto-reject) in the alignment builder cut LLM cost while preserving the 100%-precision guarantee (auto-accept off by default)
+- [x] **Alignment-quality eval harness** — gold set + deterministic precision/recall/calibration metrics + regression gate mirroring the RAG eval
+- [x] **MITRA cross-lingual parallels in RAG** — ~896K Skt/Tib ↔ 汉 sentence pairs gated by a proxy quality score (`mitra_e_score`, NULL-permissive)
+- [x] Cross-lingual search (query in Chinese, find Sanskrit/Pali/Tibetan results) — over MITRA sentence parallels (`GET /api/search/parallel-sentences`)
+- [x] Open alignment dataset export — versioned, license-stamped JSONL with provenance + `GET /exports/alignments.jsonl` streaming endpoint
 - [ ] Trilingual MVP v1.1 — expand to 20+ sutras (Lotus, Avataṃsaka, Madhyamakakārikā, Laṅkāvatāra, full Āgama↔Nikāya)
+- [ ] Reader 逐句对读 (sentence-level parallel reading UI) — backend contract shipped (`GET /alignment/sentences/...`, ships dark behind `enable_sentence_parallels`); frontend pending prod sentence data
 - [ ] Topic ontology browsing page
-- [ ] Cross-lingual search (query in Chinese, find Sanskrit/Pali/Tibetan results)
-- [ ] Open data export (JSON/CSV for researchers)
 - [ ] OCR pipeline for scanned texts
 - [ ] Collaborative annotation sharing
 - [ ] Integration with Zotero and reference managers

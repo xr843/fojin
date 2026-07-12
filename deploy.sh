@@ -20,6 +20,9 @@
 #     这样即便别的进程 (webhook CD / 手动 git pull) 已经把代码拉下来,
 #     我们也能正确判断未部署的差量。
 #   - 部署后做真实健康检查, 不是 `sleep 10` 了事。
+#   - 部署身份与看门狗一致: /api/version 每请求重读 backend/.deploy-version.json。
+#     判定"无需部署"时也要把身份推进到 HEAD, 否则 eval/tests/docs-only 合并
+#     会让 scheduled smoke 的漂移看门狗误报 CD 停摆 (2026-07-10 事故)。
 #
 set -euo pipefail
 
@@ -257,7 +260,13 @@ $FORCE_BACKEND   && { log "--force-backend 已指定。";   backend_changed=true
 $REBUILD_BACKEND && { log "--rebuild-backend 已指定。"; backend_changed=true; backend_image_changed=true; }
 
 if ! $frontend_changed && ! $backend_changed; then
-  log "无任何变更信号 (marker/.env/flag) — 无需部署。"
+  # 走到这里意味着工作树已 ff 到 NEW_REV 且服务行为与之等价 (eval/tests/docs-only
+  # 等非服务路径改动)。部署身份仍须推进: /api/version 每请求重读该文件 (bind-mount
+  # 即时可见), 不推进的话 scheduled smoke 的漂移看门狗会把"故意不重启"误报成
+  # "CD stalled" (2026-07-10)。此路径后续无 compose 步骤, 写在判定之后不会重演
+  # 2026-07-05 "身份先于部署成功落盘" 的虚报事故。
+  write_deploy_version_file "$NEW_REV"
+  log "无任何变更信号 (marker/.env/flag) — 无需部署 (部署身份已同步到当前 HEAD)。"
   exit 0
 fi
 

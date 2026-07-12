@@ -123,6 +123,11 @@ export default function AdminAlignmentPage() {
             ? t("admin_align.title_with_count", { count: data.total })
             : t("admin_align.title")
         }
+        extra={
+          <Link to="/admin/alignment/review">
+            {t("admin_align.review_link")}
+          </Link>
+        }
       >
         <Typography.Paragraph type="secondary">
           {t("admin_align.subtitle")}

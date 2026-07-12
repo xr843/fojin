@@ -25,6 +25,12 @@ Usage:
     # Override confidence threshold (default 0.75)
     python -m scripts.build_alignments --pair all --threshold 0.85
 
+    # Margin router (Phase 3 Package A): auto-accept is OFF by default. To let
+    # dominant candidates skip the LLM (only after eval-harness validation):
+    python -m scripts.build_alignments --pair heart --margin-accept 1.30
+    # To disable margin auto-reject (LLM-verify everything above the cosine floor):
+    python -m scripts.build_alignments --pair heart --margin-reject 1.0
+
 Guards:
     - Hardcoded cost ceiling $50 — script aborts if estimated LLM spend exceeds
     - Idempotent: unique index uq_align_chunk_pair prevents duplicate inserts
@@ -104,6 +110,116 @@ LLM_PRICE_PER_1K = {
     "deepseek-v4-pro": 0.00087,       # output $0.87/1M (75% off made permanent 2026-05-23 — now the standard rate, no rollback)
 }
 DEFAULT_PRICE_PER_1K = 0.0008    # unknown model → use Haiku estimate
+
+
+# ============================================================================
+# Margin-based candidate router (Phase 3 Package A)
+# ============================================================================
+#
+# The legacy embedding pre-filter was a FLAT cosine floor: keep every recalled
+# candidate with score >= 0.35, then LLM-verify each survivor. The router below
+# replaces that flat floor with a *margin* signal — how dominant is the top
+# candidate over the recalled field? — feeding a 3-band decision, while keeping
+# the curated-quality guarantee (100% precision of persisted alignments) safe
+# BY DEFAULT.
+#
+# Rollout / rollback semantics (mirrors how this codebase gates risky flags):
+#   * DEFAULT (no CLI flags): auto-accept is DISABLED. MARGIN_AUTO_ACCEPT=999.0
+#     is unreachable because margin is a bounded ratio ~[1.0, K] (see below), so
+#     every candidate the router keeps is still LLM-verified before insert. A
+#     default run therefore preserves the existing 100%-precision guarantee, and
+#     is deterministic / reproducible across re-runs.
+#   * auto-REJECT (MARGIN_AUTO_REJECT=1.02) IS active by default, but it only
+#     drops low-margin candidates *before* the LLM call. This can lower
+#     recall / cost, never precision — the LLM would have rejected a top
+#     candidate sitting within ~2% of the field anyway. To restore the pure
+#     flat-floor behaviour (LLM-verify absolutely everything above the floor),
+#     pass --margin-reject 1.0: margin is always >= 1.0, so the band never fires.
+#   * ROLLOUT of auto-accept: once operators validate a lower accept margin on
+#     the alignment eval harness, they lower it via --margin-accept (e.g. 1.30).
+#     Only then do dominant candidates skip the LLM (method="embed_margin"),
+#     which is what cuts $ spend. These rows carry a DISTINCT method value so
+#     they stay auditable / separable from the LLM-verified "embed_llm" rows.
+#
+# Margin definition (see margin_score): the ratio-margin of the top candidate,
+#   best / mean(top-N scores),  N = MARGIN_TOPK clamped to what recall returned.
+# Because best == max(top-N) >= mean(top-N), margin is always >= 1.0 for
+# positive cosines: 1.0 == "top is no better than the field", larger == "top
+# dominates the field".
+
+MARGIN_TOPK = 5                 # N scores averaged in the margin denominator
+MARGIN_COSINE_FLOOR = 0.35      # absolute-cosine junk floor (reuses the old flat 0.35)
+MARGIN_ACCEPT_MIN_COSINE = 0.5  # auto-accept ALSO needs a strong absolute cosine, not
+                                # just a dominant margin (guards the no-LLM accept path)
+MARGIN_AUTO_ACCEPT = 999.0      # margin >= this AND best >= MARGIN_ACCEPT_MIN_COSINE →
+                                # insert WITHOUT an LLM call. 999.0 == effectively
+                                # DISABLED by default so the 100%-precision guarantee
+                                # holds; operators lower it (e.g. 1.30) after validating
+                                # auto-accept on the alignment eval harness.
+MARGIN_AUTO_REJECT = 1.02       # margin < this → drop before the LLM call. Conservative
+                                # default: 1.02 means "top within ~2% of the top-N mean"
+                                # (no clear winner); such candidates the LLM rejects
+                                # anyway. Pass --margin-reject 1.0 to disable the band
+                                # (margin >= 1.0 always → back to flat-floor behaviour).
+
+
+def margin_score(scores: list[float], top_k: int = MARGIN_TOPK) -> float:
+    """Ratio-margin of the top candidate: best / mean(top-`top_k` scores).
+
+    `scores` are candidate cosine similarities, BEST FIRST (as returned by the
+    pgvector recall). `top_k` is clamped to the number of available scores, so a
+    short recall still yields a well-defined margin.
+
+    Interpretation: because best == max(top-k) >= mean(top-k), the result is
+    >= 1.0 for positive cosines. 1.0 means the top candidate is no better than
+    the field (no clear winner); larger means the top candidate dominates.
+
+    Guards (never divides by zero): empty list → 0.0; a non-positive mean
+    (all-zero or negative cosines) → 0.0.
+    """
+    if not scores:
+        return 0.0
+    k = min(top_k, len(scores))
+    if k <= 0:
+        return 0.0
+    top = scores[:k]
+    mean_top = sum(top) / len(top)
+    if mean_top <= 0.0:
+        return 0.0
+    return top[0] / mean_top
+
+
+def classify_candidate(
+    best_score: float,
+    margin: float,
+    *,
+    accept_margin: float,
+    reject_margin: float,
+    cosine_floor: float,
+) -> str:
+    """Route one source chunk's top candidate into exactly one band.
+
+    Returns "auto_accept" | "llm_verify" | "auto_reject". The bands are total
+    and mutually exclusive; precedence, top to bottom:
+
+      1. best_score < cosine_floor                        → "auto_reject" (junk floor)
+      2. margin >= accept_margin
+           AND best_score >= MARGIN_ACCEPT_MIN_COSINE      → "auto_accept" (skip LLM)
+      3. margin < reject_margin                           → "auto_reject" (no winner)
+      4. otherwise                                        → "llm_verify"  (ambiguous)
+
+    auto_accept is evaluated BEFORE auto_reject, so even a misconfigured
+    accept_margin < reject_margin resolves deterministically (accept wins).
+    `cosine_floor` is the lower junk boundary; MARGIN_ACCEPT_MIN_COSINE (module
+    constant) is the separate absolute-quality gate on the no-LLM accept path.
+    """
+    if best_score < cosine_floor:
+        return "auto_reject"
+    if margin >= accept_margin and best_score >= MARGIN_ACCEPT_MIN_COSINE:
+        return "auto_accept"
+    if margin < reject_margin:
+        return "auto_reject"
+    return "llm_verify"
 
 
 # ============================================================================
@@ -629,9 +745,19 @@ async def process_pair(
     threshold: float,
     cost_guard: CostGuard,
     commit_every: int = COMMIT_EVERY_N_CHUNKS,
+    margin_accept: float = MARGIN_AUTO_ACCEPT,
+    margin_reject: float = MARGIN_AUTO_REJECT,
+    margin_topk: int = MARGIN_TOPK,
 ) -> dict[str, int]:
     """Process one MVP pair. Returns counters dict."""
-    stats = {"accepted": 0, "rejected_llm": 0, "rejected_embed": 0, "errors": 0}
+    stats = {
+        "accepted": 0,          # LLM-verified inserts (method=embed_llm)
+        "auto_accepted": 0,     # margin-router inserts, no LLM (method=embed_margin)
+        "rejected_llm": 0,      # LLM said not-parallel / low confidence
+        "rejected_embed": 0,    # no candidate cleared the cosine floor
+        "rejected_margin": 0,   # dropped by the margin band before the LLM call
+        "errors": 0,
+    }
 
     async with async_session() as session:
         a_resolved = await resolve_texts(session, pair.text_a)
@@ -676,7 +802,11 @@ async def process_pair(
                     candidates = await vector_topk_multi_target(
                         session, a_id, src["juan_num"], src["chunk_index"], b_ids, EMBED_TOP_K,
                     )
-                    candidates = [c for c in candidates if c["score"] >= 0.35]
+                    # Margin from the RAW recall scores (best first), computed
+                    # before the junk-floor filter — it measures how far the top
+                    # candidate stands above the whole recalled field.
+                    margin = margin_score([c["score"] for c in candidates], margin_topk)
+                    candidates = [c for c in candidates if c["score"] >= MARGIN_COSINE_FLOOR]
 
                     if not candidates:
                         stats["rejected_embed"] += 1
@@ -684,61 +814,92 @@ async def process_pair(
                         if (not dry_run) and i % commit_every == 0:
                             await session.commit()
                             logger.info(
-                                "  [a:%d/%d] checkpoint at chunk %d/%d: ✓%d ✗llm=%d ✗embed=%d spent=$%.3f",
+                                "  [a:%d/%d] checkpoint at chunk %d/%d: ✓%d ✓auto=%d ✗llm=%d ✗embed=%d ✗margin=%d spent=$%.3f",
                                 a_idx, len(a_resolved), i, len(a_chunks),
-                                stats["accepted"], stats["rejected_llm"], stats["rejected_embed"],
+                                stats["accepted"], stats["auto_accepted"], stats["rejected_llm"],
+                                stats["rejected_embed"], stats["rejected_margin"],
                                 cost_guard.spend_usd(),
                             )
                         continue
 
+                    best_score = candidates[0]["score"]
+                    band = classify_candidate(
+                        best_score, margin,
+                        accept_margin=margin_accept,
+                        reject_margin=margin_reject,
+                        cosine_floor=MARGIN_COSINE_FLOOR,
+                    )
+
                     if dry_run:
                         top = candidates[0]
                         logger.info(
-                            "    [%d/%d] src='%s...' → top score=%.3f tgt=text_id=%s '%s...'",
+                            "    [%d/%d] src='%s...' → top score=%.3f margin=%.3f band=%s tgt=text_id=%s '%s...'",
                             i, len(a_chunks),
                             src["chunk_text"][:40],
-                            top["score"],
+                            top["score"], margin, band,
                             top["text_id"],
                             top["chunk_text"][:40],
                         )
                         continue
 
-                    accepted_for_chunk = 0
-                    for cand in candidates:
-                        if accepted_for_chunk >= MAX_PARALLEL_PER_CHUNK:
-                            break
-
-                        cost_guard.add(AVG_TOKENS_PER_CALL)
-                        try:
-                            cost_guard.check()
-                        except RuntimeError as e:
-                            logger.error("🛑 %s", e)
-                            await session.commit()
-                            return stats
-
-                        try:
-                            verdict = await llm_verify_pair(
-                                http_client, src["chunk_text"], cand["chunk_text"],
-                                a_lang, b_lang_primary,
-                            )
-                        except (httpx.HTTPError, KeyError) as e:
-                            logger.warning("LLM call failed: %s", e)
-                            stats["errors"] += 1
-                            continue
-
-                        if verdict.get("is_parallel") and verdict.get("confidence", 0.0) >= threshold:
+                    if band == "auto_reject":
+                        # Low-margin junk: the top candidate barely beats the
+                        # field, so drop the whole chunk BEFORE any LLM spend.
+                        stats["rejected_margin"] += 1
+                    elif band == "auto_accept":
+                        # Dominant top candidate + strong absolute cosine →
+                        # persist WITHOUT an LLM call (method="embed_margin").
+                        # CostGuard is intentionally NOT charged here — this is
+                        # the path that cuts $ spend. The slice caps the accept
+                        # fan-out at MAX_PARALLEL_PER_CHUNK.
+                        for cand in candidates[:MAX_PARALLEL_PER_CHUNK]:
                             cand_text_id = cand["text_id"]
                             cand_lang = b_lang_map.get(cand_text_id, b_lang_primary)
                             await insert_alignment(
                                 session,
                                 a_id, src["juan_num"], src["chunk_index"], a_lang,
                                 cand_text_id, cand["juan_num"], cand["chunk_index"], cand_lang,
-                                float(verdict["confidence"]),
+                                float(cand["score"]),
+                                method="embed_margin",
                             )
-                            stats["accepted"] += 1
-                            accepted_for_chunk += 1
-                        else:
-                            stats["rejected_llm"] += 1
+                            stats["auto_accepted"] += 1
+                    else:  # band == "llm_verify": existing per-candidate LLM path (unchanged)
+                        accepted_for_chunk = 0
+                        for cand in candidates:
+                            if accepted_for_chunk >= MAX_PARALLEL_PER_CHUNK:
+                                break
+
+                            cost_guard.add(AVG_TOKENS_PER_CALL)
+                            try:
+                                cost_guard.check()
+                            except RuntimeError as e:
+                                logger.error("🛑 %s", e)
+                                await session.commit()
+                                return stats
+
+                            try:
+                                verdict = await llm_verify_pair(
+                                    http_client, src["chunk_text"], cand["chunk_text"],
+                                    a_lang, b_lang_primary,
+                                )
+                            except (httpx.HTTPError, KeyError) as e:
+                                logger.warning("LLM call failed: %s", e)
+                                stats["errors"] += 1
+                                continue
+
+                            if verdict.get("is_parallel") and verdict.get("confidence", 0.0) >= threshold:
+                                cand_text_id = cand["text_id"]
+                                cand_lang = b_lang_map.get(cand_text_id, b_lang_primary)
+                                await insert_alignment(
+                                    session,
+                                    a_id, src["juan_num"], src["chunk_index"], a_lang,
+                                    cand_text_id, cand["juan_num"], cand["chunk_index"], cand_lang,
+                                    float(verdict["confidence"]),
+                                )
+                                stats["accepted"] += 1
+                                accepted_for_chunk += 1
+                            else:
+                                stats["rejected_llm"] += 1
 
                     # Periodic checkpoint so a long single-text_a pair (e.g.
                     # lotus_zh_bo: 182 chunks × ~20 candidates × ~4s/LLM-call
@@ -746,18 +907,20 @@ async def process_pair(
                     if i % commit_every == 0:
                         await session.commit()
                         logger.info(
-                            "  [a:%d/%d] checkpoint at chunk %d/%d: ✓%d ✗llm=%d ✗embed=%d spent=$%.3f",
+                            "  [a:%d/%d] checkpoint at chunk %d/%d: ✓%d ✓auto=%d ✗llm=%d ✗embed=%d ✗margin=%d spent=$%.3f",
                             a_idx, len(a_resolved), i, len(a_chunks),
-                            stats["accepted"], stats["rejected_llm"], stats["rejected_embed"],
+                            stats["accepted"], stats["auto_accepted"], stats["rejected_llm"],
+                            stats["rejected_embed"], stats["rejected_margin"],
                             cost_guard.spend_usd(),
                         )
 
                 # Final commit + progress log after each source text completes
                 await session.commit()
                 logger.info(
-                    "  [a:%d/%d] done: ✓total=%d ✗llm=%d ✗embed=%d spent=$%.3f",
+                    "  [a:%d/%d] done: ✓total=%d ✓auto=%d ✗llm=%d ✗embed=%d ✗margin=%d spent=$%.3f",
                     a_idx, len(a_resolved),
-                    stats["accepted"], stats["rejected_llm"], stats["rejected_embed"],
+                    stats["accepted"], stats["auto_accepted"], stats["rejected_llm"],
+                    stats["rejected_embed"], stats["rejected_margin"],
                     cost_guard.spend_usd(),
                 )
 
@@ -810,7 +973,7 @@ def _parse_juans_argtype(spec: str) -> list[int]:
         raise argparse.ArgumentTypeError(str(e)) from e
 
 
-async def main_async(pair_key: str, dry_run: bool, limit_chunks: int | None, threshold: float, max_spend_usd: float, force_reasoning_model: bool, commit_every: int, juans: list[int] | None = None) -> None:
+async def main_async(pair_key: str, dry_run: bool, limit_chunks: int | None, threshold: float, max_spend_usd: float, force_reasoning_model: bool, commit_every: int, juans: list[int] | None = None, margin_accept: float = MARGIN_AUTO_ACCEPT, margin_reject: float = MARGIN_AUTO_REJECT, margin_topk: int = MARGIN_TOPK) -> None:
     pairs_to_run = (
         MVP_PAIRS if pair_key == "all"
         else [p for p in MVP_PAIRS if p.key == pair_key]
@@ -854,14 +1017,27 @@ async def main_async(pair_key: str, dry_run: bool, limit_chunks: int | None, thr
                 effective_model,
                 VERIFY_LLM_API_URL or settings.llm_api_url,
                 price)
+    logger.info(
+        "Margin router: topk=%d cosine_floor=%.3f accept>=%.3f%s reject<%.3f",
+        margin_topk, MARGIN_COSINE_FLOOR, margin_accept,
+        " (DISABLED)" if margin_accept >= MARGIN_AUTO_ACCEPT else "",
+        margin_reject,
+    )
 
-    overall = {"accepted": 0, "rejected_llm": 0, "rejected_embed": 0, "errors": 0}
+    overall = {
+        "accepted": 0, "auto_accepted": 0,
+        "rejected_llm": 0, "rejected_embed": 0, "rejected_margin": 0,
+        "errors": 0,
+    }
 
     for pair in pairs_to_run:
         logger.info("=" * 70)
         logger.info("Pair: %s — %s", pair.name, pair.description)
         logger.info("=" * 70)
-        stats = await process_pair(pair, dry_run, limit_chunks, threshold, cost_guard, commit_every)
+        stats = await process_pair(
+            pair, dry_run, limit_chunks, threshold, cost_guard, commit_every,
+            margin_accept=margin_accept, margin_reject=margin_reject, margin_topk=margin_topk,
+        )
         for k, v in stats.items():
             overall[k] += v
 
@@ -912,10 +1088,39 @@ if __name__ == "__main__":
              "815 chunks ≈ 11h) run as separate 2-3h sessions per slice; "
              "each slice ships partial coverage immediately.",
     )
+    parser.add_argument(
+        "--margin-accept",
+        type=float,
+        default=MARGIN_AUTO_ACCEPT,
+        help=f"Margin router auto-accept threshold (default {MARGIN_AUTO_ACCEPT} == DISABLED). "
+             "A source chunk whose top candidate has margin >= this AND a strong absolute "
+             f"cosine (>= {MARGIN_ACCEPT_MIN_COSINE}) is inserted WITHOUT an LLM call "
+             "(method=embed_margin). Lower it (e.g. 1.30) ONLY after validating auto-accept "
+             "on the alignment eval harness — a default run LLM-verifies every kept candidate.",
+    )
+    parser.add_argument(
+        "--margin-reject",
+        type=float,
+        default=MARGIN_AUTO_REJECT,
+        help=f"Margin router auto-reject threshold (default {MARGIN_AUTO_REJECT}). Source chunks "
+             "whose top candidate has margin < this are dropped before the LLM call (the LLM "
+             "would reject them anyway). Pass 1.0 to disable the band (margin is always >= 1.0), "
+             "restoring pure flat-floor behaviour (LLM-verify everything above the cosine floor).",
+    )
+    parser.add_argument(
+        "--margin-topk",
+        type=int,
+        default=MARGIN_TOPK,
+        help=f"Number of top recall scores averaged in the margin denominator "
+             f"(default {MARGIN_TOPK}, clamped to what recall returns).",
+    )
     args = parser.parse_args()
 
     asyncio.run(main_async(
         args.pair, args.dry_run, args.limit_chunks, args.threshold,
         args.max_spend_usd, args.force_reasoning_model, args.commit_every,
         args.juans,
+        margin_accept=args.margin_accept,
+        margin_reject=args.margin_reject,
+        margin_topk=args.margin_topk,
     ))

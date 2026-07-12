@@ -19,7 +19,6 @@ import {
   DiffOutlined,
   VerticalAlignTopOutlined,
   DownloadOutlined,
-  NumberOutlined,
 } from "@ant-design/icons";
 import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBookmark, addBookmark, removeBookmark, searchDictionaryGrouped, getJuanApparatus, getJuanLineAnchors, type ApparatusEntryItem } from "../api/client";
 import { useAuthStore } from "../stores/authStore";
@@ -436,7 +435,6 @@ export default function TextReaderPage() {
   const [citationOpen, setCitationOpen] = useState(false);
   const [annotationOpen, setAnnotationOpen] = useState(false);
   const [apparatusOn, setApparatusOn] = useState(false);
-  const [showLineRef, setShowLineRef] = useState(false);
   const [parallelPanelOpen, setParallelPanelOpen] = useState(false);
 
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
@@ -1042,16 +1040,6 @@ export default function TextReaderPage() {
               {t("reader.apparatus.toggle")}
             </Button>
           </Tooltip>
-          <Tooltip title={t("reader.lineref.tooltip")}>
-            <Button
-              size="small"
-              type={showLineRef ? "primary" : "default"}
-              icon={<NumberOutlined />}
-              onClick={() => setShowLineRef((v) => !v)}
-            >
-              {t("reader.lineref.toggle")}
-            </Button>
-          </Tooltip>
           <Tooltip title={t("reader.parallel.tooltip")}>
             <Button
               size="small"
@@ -1134,7 +1122,7 @@ export default function TextReaderPage() {
                   {langData?.default_lang ? getLangLabel(langData.default_lang) : t("reader.compare.original")}
                 </div>
                 <div
-                  className={`reader-body${showLineRef ? " show-lineref" : ""}`}
+                  className="reader-body"
                   style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
                 >
                   {reflowedContent.map((seg, i) => renderSegment(seg, i, readerCtx))}
@@ -1161,7 +1149,7 @@ export default function TextReaderPage() {
           </Row>
         ) : (
           <div
-            className={`reader-body${showLineRef ? " show-lineref" : ""}`}
+            className="reader-body"
             style={{ "--reader-font-size": `${fontSize}px` } as React.CSSProperties}
           >
             {reflowedContent.map((seg, i) => renderSegment(seg, i, readerCtx))}

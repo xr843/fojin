@@ -68,6 +68,28 @@ class Settings(BaseSettings):
     # back to alignment_pairs-only parallels without a redeploy.
     enable_mitra_rag_parallels: bool = True
 
+    # Quality gate for the MITRA parallels above: keep only rows whose proxy
+    # quality score (mitra_e_score) clears mitra_min_score. NULL-permissive —
+    # unscored rows (the whole table until a prod backfill runs) still flow, so
+    # enabling this before the backfill is a no-op. Set enable_mitra_score_gate
+    # false to drop the score predicate entirely and fall back to the pre-gate
+    # confidence ordering, without a redeploy.
+    mitra_min_score: float = 0.30
+    enable_mitra_score_gate: bool = True
+
+    # Sentence-level 逐句对读 read path (Phase 4 Package C). Gates
+    # GET /alignment/sentences/{text_id}/{juan_num}, which serves the future
+    # reader's sentence-by-sentence parallel view out of ``sentence_alignments``.
+    # Ships DARK (default False): the endpoint returns a clean empty payload
+    # (total=0, pairs=[]) instead of querying, so the contract is live and
+    # client.ts types can land before the prod refinement job
+    # (refine_sentence_alignments.py) populates the table or any UI exists.
+    # Flip true via env once BOTH the data is backfilled and the reader UI
+    # ships; set false again to instantly roll back to the dark state without a
+    # redeploy (and even when true, an empty table self-serves the same empty
+    # payload — never an error).
+    enable_sentence_parallels: bool = False
+
     # Observability — expose Prometheus metrics at /metrics (app root, not
     # /api; not proxied by nginx, so network-internal only). Set false to
     # not mount the endpoint at all. See app/core/metrics.py.

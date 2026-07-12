@@ -1,5 +1,8 @@
 # AI Chat 评测 (answer-quality eval)
 
+> 跨藏**对齐质量**（alignment_pairs / mitra_alignments / text_relations 的精确率、校准与回归门）
+> 是独立的一套，见 [`ALIGNMENT_EVAL.md`](ALIGNMENT_EVAL.md)。本文件只讲答案质量评测。
+
 把"答案质量"从凭感觉变成可度量、可回归。两层评分：
 
 | 层 | 是什么 | 需要什么 | 跑在哪 |
@@ -150,3 +153,5 @@ python -m eval.from_feedback --window-days 90 --limit 200
 - `scorer.py` — LLM-as-judge + out-of-scope 规则评分
 - `from_feedback.py` — 线上点踩/后台判坏 → 评测候选（CI 单测 `tests/test_from_feedback.py`）
 - `test_set.json` — 黄金评测集
+- `ALIGNMENT_EVAL.md` + `alignment_metrics.py` / `build_alignment_gold.py` / `run_alignment_eval.py` /
+  `run_alignment_regression.sh` / `alignment_gold.sample.jsonl` — 跨藏对齐质量评测（独立黄金集与回归门）
