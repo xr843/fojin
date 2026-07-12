@@ -31,7 +31,8 @@ path trusts them; see the batch job docstring):
 * ``MIN_SENTENCE_SIMILARITY`` — pairs whose averaged cosine is below this are
   dropped AFTER the DP (bertalign's post-filter): the DP finds the best
   monotonic path, then genuinely unrelated pairs on that path are discarded.
-  0.4 is a conservative cut for BGE-M3 cross-lingual sentence cosines.
+  0.65 keeps confident 汉↔外文 pairs; prod data showed the 0.4–0.6 band was
+  overwhelmingly spurious while hand-verified good parallels score ≥0.75.
 * ``MAX_SENTENCES_PER_CHUNK`` — guard on the O(m·n) DP / embedding batch. Chunk
   pairs are paragraph-sized (rarely >~40 sentences a side); a side past this cap
   is refused rather than risk a pathological run.
@@ -46,8 +47,16 @@ from app.services.embedding import generate_embeddings_batch
 
 # ── tunables (module constants, not config.py) ──────────────────────────────
 GAP_PENALTY = 0.5
-MIN_SENTENCE_SIMILARITY = 0.4
+# Raised 0.4 → 0.65 after prod data (2026-07-12): 97% of 汉↔外文 cross-lingual
+# pairs scored 0.4–0.6 and were mostly spurious; hand-verified good parallels
+# score ≥0.75 ("佛說如是。"↔"That is what the Buddha said" = 0.81). 0.65 keeps
+# confident pairs and drops the low-signal flood.
+MIN_SENTENCE_SIMILARITY = 0.65
 MAX_SENTENCES_PER_CHUNK = 200
+# Drop degenerate "sentences" — bare punctuation ("。") or a 1-char stub ("身。")
+# that the splitter emits from punctuation-dense verse and which produced garbage
+# alignments. Counts alnum chars only (letters / CJK ideographs / digits).
+MIN_MEANINGFUL_SENTENCE_CHARS = 2
 
 # Chinese sentence terminators and the closing quotes that terminate / attach to
 # the preceding sentence. Opening 「『 are deliberately NOT boundaries, so nested
@@ -104,6 +113,10 @@ def _emit(out: list[Sentence], text: str, start: int, end: int, base_offset: int
     while e > s and text[e - 1].isspace():
         e -= 1
     if e <= s:
+        return
+    # Skip degenerate fragments (bare punctuation / single stray char) — they are
+    # noise for cross-lingual alignment. Count content chars (alnum), not punct.
+    if sum(1 for c in text[s:e] if c.isalnum()) < MIN_MEANINGFUL_SENTENCE_CHARS:
         return
     out.append(Sentence(char_start=base_offset + s, char_end=base_offset + e, text=text[s:e]))
 
