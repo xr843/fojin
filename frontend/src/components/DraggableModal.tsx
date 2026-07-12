@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
 import { Modal } from "antd";
 import "../styles/draggable-modal.css";
 
@@ -33,11 +33,6 @@ export default function DraggableModal({ open, title, onCancel, width = 880, chi
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const wrapRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ sx: number; sy: number; ox: number; oy: number; rect: DOMRect } | null>(null);
-
-  // Reopen centred rather than wherever it was last dragged to.
-  useEffect(() => {
-    if (!open) setPos({ x: 0, y: 0 });
-  }, [open]);
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
@@ -87,6 +82,12 @@ export default function DraggableModal({ open, title, onCancel, width = 880, chi
       className="fj-dm"
       open={open}
       onCancel={onCancel}
+      /* Recentre for the next open. Deliberately `afterClose` and not an effect
+         on `open`: it fires however the dialog was dismissed — including when the
+         parent just flips `open` to false (picking a master does exactly that,
+         bypassing onCancel entirely) — and it is a plain callback, so it can't
+         trigger the cascading re-render an effect-with-setState would. */
+      afterClose={() => setPos({ x: 0, y: 0 })}
       footer={null}
       width={width}
       destroyOnClose
