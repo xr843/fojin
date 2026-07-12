@@ -12,6 +12,28 @@ from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True, slots=True)
+class Epigraph:
+    """A representative line for the master, quoted VERBATIM from a text we host.
+
+    The master gallery is an extension of FoJin's citation discipline, not an
+    exception to it: a line only appears on a master's card if it was checked
+    character-for-character against that master's OWN work in our corpus, and it
+    carries its source so the reader can open the passage.
+
+    Verified 2026-07-12 against production (whitespace/punctuation normalized —
+    CBETA content hard-wraps mid-word, so a naive substring check false-negatives).
+    Masters whose own works we do not host get no epigraph: we would rather show
+    nothing than attribute a line we cannot back up.
+    """
+
+    quote: str
+    text_id: int  # buddhist_texts.id — links straight into the reader
+    cbeta_id: str
+    title_zh: str
+    juan: int
+
+
+@dataclass(frozen=True, slots=True)
 class MasterProfile:
     id: str
     name_zh: str
@@ -24,6 +46,9 @@ class MasterProfile:
     system_prompt: str = ""
     # Short description for the frontend selector
     description: str = ""
+    # Verified representative line shown on the master's gallery card. None when
+    # our corpus holds none of the master's own writing (see Epigraph docstring).
+    epigraph: Epigraph | None = None
 
 
 def _master_prompt(name: str, tradition: str, dates: str, rules: str, style: str) -> str:
@@ -68,6 +93,13 @@ _register(MasterProfile(
     description="大乘中观奠基者、八宗共祖，八不中道、缘起性空、二谛中道",
     # 大智度论(39), 中论(40), 十二门论(41), 回诤论(7806), 十住毗婆沙论(7708)
     fojin_text_ids=[39, 40, 41, 7806, 7708],
+    epigraph=Epigraph(
+        quote="眾因緣生法，我說即是空",
+        text_id=40,
+        cbeta_id="T1564",
+        title_zh="中論",
+        juan=4,
+    ),
     system_prompt=(
         '你是龙树菩萨（大乘中观学派奠基者，汉传素尊为"八宗共祖"，印度大乘佛教最重要的论师），印度·中观，约150-250。\n'
         "本内容依据历史佛教文献生成，仅供学习参考。如需正式修行指导，请亲近善知识。\n\n"
@@ -148,6 +180,13 @@ _register(MasterProfile(
     dates="538-597",
     description="天台宗创始人，一念三千、三谛圆融、止观双修",
     fojin_text_ids=[53, 52, 8085, 6513],  # 摩诃止观, 法华玄义, 小止观, 法华经
+    epigraph=Epigraph(
+        quote="止觀明靜，前代未聞",
+        text_id=53,
+        cbeta_id="T1911",
+        title_zh="摩訶止觀",
+        juan=1,
+    ),
     system_prompt=(
         '你是智顗大师（天台宗创始人，被尊为"东土小释迦"），天台宗，538-597。\n'
         "本内容依据历史佛教文献生成，仅供学习参考。如需正式修行指导，请亲近善知识。\n\n"
@@ -256,7 +295,18 @@ _register(MasterProfile(
     tradition="禅宗",
     dates="638-713",
     description="禅宗六祖，直指人心、见性成佛",
+    # NOTE: these IDs are wrong — 8169 is T2013 禪宗永嘉集 (玄覺撰), not 坛经, and
+    # 6513 is T0262 法華經, not 金刚经. 六祖壇經 is T2008 = text_id 58. Left as-is here
+    # because correcting them changes this persona's RAG scope, which is a behaviour
+    # change beyond this UI PR — tracked separately.
     fojin_text_ids=[8169, 6513],  # 坛经, 金刚经 (approximate FoJin IDs)
+    epigraph=Epigraph(
+        quote="菩提本無樹，明鏡亦非臺",
+        text_id=58,
+        cbeta_id="T2008",
+        title_zh="六祖大師法寶壇經",
+        juan=1,
+    ),
     system_prompt=(
         "你是慧能大师（禅宗六祖，南宗禅创立者），禅宗，638-713。\n"
         "本内容依据历史佛教文献生成，仅供学习参考。如需正式修行指导，请亲近善知识。\n\n"
@@ -478,7 +528,14 @@ _register(MasterProfile(
     tradition="华严宗",
     dates="643-712",
     description="华严宗三祖，法界缘起、事事无碍",
-    fojin_text_ids=[8038],  # 金师子章 (approximate)
+    fojin_text_ids=[8038],  # 实为 T1866 華嚴一乘教義分齊章（非金师子章）
+    epigraph=Epigraph(
+        quote="一即一切，一切即一",
+        text_id=8038,
+        cbeta_id="T1866",
+        title_zh="華嚴一乘教義分齊章",
+        juan=4,
+    ),
     system_prompt=(
         "你是法藏大师（华严宗三祖，华严教义体系的真正创立者，武则天国师），华严宗，643-712。\n"
         "本内容依据历史佛教文献生成，仅供学习参考。如需正式修行指导，请亲近善知识。\n\n"
@@ -595,7 +652,14 @@ _register(MasterProfile(
     tradition="三论宗/中观",
     dates="344-413",
     description="中国四大译经家之一，般若空性、中道",
-    fojin_text_ids=[6513],  # 法华经 (approximate)
+    fojin_text_ids=[6513],  # T0262 妙法蓮華經（罗什译）
+    epigraph=Epigraph(
+        quote="諸佛世尊，唯以一大事因緣故出現於世",
+        text_id=6513,
+        cbeta_id="T0262",
+        title_zh="妙法蓮華經",
+        juan=1,
+    ),
     system_prompt=(
         '你是鸠摩罗什（中国四大译经家之一，以文学影响论为首，三论宗实际创始人），三论宗/中观，344-413。\n'
         "本内容依据历史佛教文献生成，仅供学习参考。如需正式修行指导，请亲近善知识。\n\n"
@@ -1457,7 +1521,7 @@ def get_master(master_id: str) -> MasterProfile | None:
 
 
 def list_masters() -> list[dict]:
-    """Return all masters as a list of dicts for the frontend selector."""
+    """Return all masters as a list of dicts for the frontend gallery/selector."""
     return [
         {
             "id": m.id,
@@ -1466,6 +1530,19 @@ def list_masters() -> list[dict]:
             "tradition": m.tradition,
             "dates": m.dates,
             "description": m.description,
+            # None for the masters whose own writing we don't host — the card then
+            # says so rather than showing an unbacked line. See Epigraph docstring.
+            "epigraph": (
+                {
+                    "quote": m.epigraph.quote,
+                    "text_id": m.epigraph.text_id,
+                    "cbeta_id": m.epigraph.cbeta_id,
+                    "title_zh": m.epigraph.title_zh,
+                    "juan": m.epigraph.juan,
+                }
+                if m.epigraph
+                else None
+            ),
         }
         for m in MASTERS.values()
     ]

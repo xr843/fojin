@@ -1481,5 +1481,14 @@
   "admin_align_review.review_error": "操作失敗，請重試",
   "admin_align_review.empty": "暫無待複核的候選對齊",
   "admin_align_review.load_error": "載入失敗，請重試",
-  "admin_align_review.back_to_coverage": "返回覆蓋率"
+  "admin_align_review.back_to_coverage": "返回覆蓋率",
+  "chat.gallery_title": "祖師長廊",
+  "chat.gallery_hint": "選擇一條詮釋進路——以該祖師的宗風解經，而非與其本人對話",
+  "chat.tradition_all": "全部",
+  "chat.epigraph_verified": "已核驗",
+  "chat.epigraph_none": "本站未收其本人著作，故不列代表法語",
+  "chat.epigraph_unset": "未設",
+  "chat.master_lens": "依此宗風解經",
+  "chat.change_master": "更換宗風",
+  "chat.master_disclaimer": "以下為 AI 依據典籍生成的詮釋，非祖師本人開示。每處引證均標註經號與卷次，可點開核對原文。"
 }

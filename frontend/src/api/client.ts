@@ -2324,3 +2324,31 @@ export async function reviewAlignmentCandidate(
   );
   return data;
 }
+
+// ── Buddhist master personas (祖师长廊) ───────────────────────────────────────
+
+/** A representative line, quoted verbatim from a text FoJin hosts and checked
+ *  against the master's OWN work. Null on the profile when our corpus holds none
+ *  of the master's writing — we show that plainly rather than an unbacked line. */
+export interface MasterEpigraph {
+  quote: string;
+  text_id: number;
+  cbeta_id: string;
+  title_zh: string;
+  juan: number;
+}
+
+export interface MasterProfile {
+  id: string;
+  name_zh: string;
+  name_en: string;
+  tradition: string;
+  dates: string;
+  description: string;
+  epigraph: MasterEpigraph | null;
+}
+
+export async function getMasters(): Promise<MasterProfile[]> {
+  const { data } = await api.get<{ masters: MasterProfile[] }>("/chat/masters");
+  return data.masters;
+}

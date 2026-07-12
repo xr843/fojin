@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useMemo, useEffect, lazy, Suspense, memo
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
-import { Input, Button, message, Alert, Tooltip, Modal, Select, Tag, Spin } from "antd";
+import { Input, Button, message, Alert, Tooltip, Modal, Tag, Spin } from "antd";
 import Markdown, { defaultUrlTransform, type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
@@ -34,6 +34,8 @@ import {
 const ShareCard = lazy(() => import("../components/ShareCard"));
 const CitationDrawer = lazy(() => import("../components/CitationDrawer"));
 import ChatModelSelector from "../components/ChatModelSelector";
+import MasterGallery, { MasterSeal } from "../components/MasterGallery";
+import { getMasters } from "../api/client";
 import type { CitationTarget } from "../components/CitationDrawer";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -544,6 +546,18 @@ export default function ChatPage() {
   const { user } = useAuthStore();
   const [input, setInput] = useState("");
   const [masterId, setMasterId] = useState<string | null>(null);
+  // 祖师长廊: opened from the composer to swap lineage mid-thread. The gallery
+  // itself lives in the empty state; this is the way back to it.
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const { data: mastersData } = useQuery({
+    queryKey: ["chat-masters"],
+    queryFn: getMasters,
+    staleTime: 60 * 60 * 1000, // curated data; effectively static
+  });
+  const selectedMaster = useMemo(
+    () => mastersData?.find((m) => m.id === masterId) ?? null,
+    [mastersData, masterId],
+  );
   const [modelId, setModelId] = useState<string>(() => {
     if (typeof window === "undefined") return "deepseek:v4-pro";
     return window.localStorage.getItem("fojin.chat.modelId") || "deepseek:v4-pro";
@@ -1446,6 +1460,32 @@ export default function ChatPage() {
                     </Button>
                   </div>
                 )}
+
+                {/* 祖师长廊 — the second act of the empty state. The 15 master
+                    personas are this product's sharpest differentiator and used
+                    to hide inside a grey dropdown; here they are the front door. */}
+                <div style={{ marginTop: 34, textAlign: "left" }}>
+                  <div style={{ textAlign: "center", marginBottom: 14 }}>
+                    <div style={{
+                      fontSize: 16,
+                      fontFamily: '"Noto Serif SC", serif',
+                      color: "var(--fj-ink)",
+                      marginBottom: 4,
+                    }}>
+                      {t("chat.gallery_title")}
+                    </div>
+                    <div style={{ fontSize: 12.5, lineHeight: 1.7 }}>
+                      {t("chat.gallery_hint")}
+                    </div>
+                  </div>
+                  <MasterGallery
+                    selectedId={masterId}
+                    onSelect={setMasterId}
+                    onOpenSource={(textId, juan) =>
+                      window.open(`/texts/${textId}/read?juan=${juan}`, "_blank", "noopener")
+                    }
+                  />
+                </div>
               </div>
             )}
             {messages.map((m) => (
@@ -1491,56 +1531,60 @@ export default function ChatPage() {
                 }
               />
             )}
-            <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 13, color: "#8b7355", whiteSpace: "nowrap" }}>{t("chat.master_mode")}</span>
-              <Select
-                allowClear
-                placeholder={t("chat.general_assistant")}
-                value={masterId}
-                onChange={(v) => setMasterId(v || null)}
-                style={{ width: 260, fontSize: 13 }}
+            {/* 宗风 selector. Was a grey <Select> reading "通用助手" — the 15 master
+                personas, this product's sharpest differentiator, hid inside it.
+                Now: the chosen lineage is stated plainly, and the gallery is one
+                click away. Wording is "依此宗风解经", never "和祖师聊天" — you are
+                choosing an interpretive lens, not a chat character. */}
+            <div className="mg-head" style={{ marginBottom: 8 }}>
+              {selectedMaster ? (
+                <>
+                  <MasterSeal text={Array.from(selectedMaster.name_zh).slice(0, 2).join("")} size={34} />
+                  <span className="mg-head-id">
+                    <span className="mg-head-name">{selectedMaster.name_zh}</span>
+                    <span className="mg-head-sub">
+                      {selectedMaster.tradition} · {selectedMaster.dates} · {t("chat.master_lens")}
+                    </span>
+                  </span>
+                </>
+              ) : (
+                <span className="mg-head-id">
+                  <span className="mg-head-name">{t("chat.general_assistant")}</span>
+                  <span className="mg-head-sub">{t("chat.gallery_hint")}</span>
+                </span>
+              )}
+              <Button
                 size="small"
-                options={[
-                  { value: "", label: `🟢 ${t("chat.general_assistant")}` },
-                  {
-                    label: t("chat.tradition_han"),
-                    options: [
-                      { value: "zhiyi", label: t("chat.master_zhiyi") },
-                      { value: "huineng", label: t("chat.master_huineng") },
-                      { value: "xuanzang", label: t("chat.master_xuanzang") },
-                      { value: "fazang", label: t("chat.master_fazang") },
-                      { value: "kumarajiva", label: t("chat.master_kumarajiva") },
-                      { value: "yinguang", label: t("chat.master_yinguang") },
-                      { value: "ouyi", label: t("chat.master_ouyi") },
-                      { value: "xuyun", label: t("chat.master_xuyun") },
-                    ],
-                  },
-                  {
-                    label: t("chat.tradition_india"),
-                    options: [
-                      { value: "nagarjuna", label: t("chat.master_nagarjuna") },
-                    ],
-                  },
-                  {
-                    label: t("chat.tradition_tibetan"),
-                    options: [
-                      { value: "atisha", label: t("chat.master_atisha") },
-                      { value: "tsongkhapa", label: t("chat.master_tsongkhapa") },
-                      { value: "milarepa", label: t("chat.master_milarepa") },
-                    ],
-                  },
-                  {
-                    label: t("chat.tradition_theravada"),
-                    options: [
-                      { value: "buddhaghosa", label: t("chat.master_buddhaghosa") },
-                      { value: "mahasi-sayadaw", label: t("chat.master_mahasi") },
-                      { value: "ajahn-chah", label: t("chat.master_ajahn_chah") },
-                    ],
-                  },
-                ]}
-              />
-              {masterId && <span style={{ fontSize: 11, color: "#a09070" }}>{t("chat.rag_scope_hint")}</span>}
+                className="mg-head-swap"
+                onClick={() => setGalleryOpen(true)}
+              >
+                {t("chat.change_master")}
+              </Button>
             </div>
+            {selectedMaster && (
+              <div className="mg-disclaimer" style={{ marginTop: 0, marginBottom: 8 }}>
+                {t("chat.master_disclaimer")}
+              </div>
+            )}
+            <Modal
+              open={galleryOpen}
+              onCancel={() => setGalleryOpen(false)}
+              footer={null}
+              width={880}
+              title={t("chat.gallery_title")}
+              destroyOnClose
+            >
+              <MasterGallery
+                selectedId={masterId}
+                onSelect={(id) => {
+                  setMasterId(id);
+                  setGalleryOpen(false);
+                }}
+                onOpenSource={(textId, juan) =>
+                  window.open(`/texts/${textId}/read?juan=${juan}`, "_blank", "noopener")
+                }
+              />
+            </Modal>
             {!user && !keyStatus?.has_api_key && quota && quota.remaining >= 0 && (
               <Alert
                 message={<span>{t("chat.quota_info", { limit: quota.limit, remaining: quota.remaining })}<a onClick={() => navigate("/login")}>{t("chat.login")}</a>{t("chat.login_quota_hint")}</span>}
