@@ -129,15 +129,24 @@ async def lifespan(app: FastAPI):
 
     app.state.catalog_warm_task = asyncio.create_task(catalog_warm_loop(app.state.redis))
 
+    # Same idea for the map's /kg/geo payload: a cold recompute is ~7s (two seq
+    # scans of kg_entities + serializing ~65k rows). With HTTP caching now in
+    # front of it, organic traffic no longer keeps the Redis key warm, so the
+    # first visitor after each TTL lapse would eat it. Warm it off the request path.
+    from app.api.knowledge_graph import kg_geo_warm_loop
+
+    app.state.kg_geo_warm_task = asyncio.create_task(kg_geo_warm_loop(app.state.redis))
+
     yield
     # Shutdown
-    warm_task = getattr(app.state, "catalog_warm_task", None)
-    if warm_task is not None:
-        warm_task.cancel()
-        # Await the cancellation so it actually completes before the loop closes
-        # (otherwise asyncio emits "Task exception was never retrieved" on teardown).
-        with suppress(asyncio.CancelledError):
-            await warm_task
+    for _task_attr in ("catalog_warm_task", "kg_geo_warm_task"):
+        warm_task = getattr(app.state, _task_attr, None)
+        if warm_task is not None:
+            warm_task.cancel()
+            # Await the cancellation so it actually completes before the loop closes
+            # (otherwise asyncio emits "Task exception was never retrieved" on teardown).
+            with suppress(asyncio.CancelledError):
+                await warm_task
     if _HAS_DIANJIN:
         await get_dianjin_client().close()
     await app.state.redis.close()

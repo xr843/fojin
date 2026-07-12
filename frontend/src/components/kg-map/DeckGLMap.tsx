@@ -164,7 +164,9 @@ export default function DeckGLMap({
       if (currentYear !== null) {
         // Entities without year data are always shown (timeless features).
         // Only filter entities that explicitly fall outside the current year.
-        if (e.year_start !== null || e.year_end !== null) {
+        // `!= null` (not `!== null`): /kg/geo omits null fields, so a missing
+        // year arrives as undefined.
+        if (e.year_start != null || e.year_end != null) {
           const start = e.year_start ?? e.year_end ?? -Infinity;
           const end = e.year_end ?? e.year_start ?? Infinity;
           if (currentYear < start || currentYear > end) return false;
@@ -358,7 +360,7 @@ export default function DeckGLMap({
                 {t("geo.local_name_country", { name: countryLabel })}
               </div>
             )}
-            {(e.year_start !== null || e.year_end !== null) && (
+            {(e.year_start != null || e.year_end != null) && (
               <div className="tooltip-meta">
                 📜 {formatYearRange(t, e.year_start, e.year_end)}
               </div>
@@ -408,10 +410,15 @@ function formatYear(t: TFunction, year: number): string {
   return t("geo.year_ce", { n: year });
 }
 
-function formatYearRange(t: TFunction, start: number | null, end: number | null): string {
-  if (start !== null && end !== null) return `${formatYear(t, start)} — ${formatYear(t, end)}`;
-  if (start !== null) return `${formatYear(t, start)} —`;
-  if (end !== null) return `— ${formatYear(t, end)}`;
+// start/end may be undefined: /kg/geo omits null fields from its payload.
+function formatYearRange(
+  t: TFunction,
+  start?: number | null,
+  end?: number | null,
+): string {
+  if (start != null && end != null) return `${formatYear(t, start)} — ${formatYear(t, end)}`;
+  if (start != null) return `${formatYear(t, start)} —`;
+  if (end != null) return `— ${formatYear(t, end)}`;
   return "";
 }
 
@@ -474,9 +481,10 @@ const COUNTRY_KEY_OVERRIDES: Record<string, string> = {
   "巴西": "geo.country_br",
 };
 
+// desc/nameEn may be undefined: /kg/geo omits null fields from its payload.
 function detectCountryFlag(
-  desc: string | null,
-  nameEn: string | null,
+  desc: string | null | undefined,
+  nameEn: string | null | undefined,
   nameZh: string,
 ): string {
   const haystack = `${desc ?? ""} ${nameEn ?? ""} ${nameZh}`;
@@ -487,8 +495,8 @@ function detectCountryFlag(
 }
 
 function detectCountryName(
-  desc: string | null,
-  nameEn: string | null,
+  desc: string | null | undefined,
+  nameEn: string | null | undefined,
   nameZh: string,
 ): string | null {
   const haystack = `${desc ?? ""} ${nameEn ?? ""} ${nameZh}`;
@@ -505,7 +513,7 @@ function detectScript(s: string): 'cjk' | 'hangul' | 'latin' | 'other' {
   return 'other';
 }
 
-function detectSource(desc: string | null): string | null {
+function detectSource(desc: string | null | undefined): string | null {
   if (!desc) return null;
   const sources = ["OSM", "OpenStreetMap", "Wikidata", "DILA", "BDRC", "GeoNames"];
   for (const s of sources) {
