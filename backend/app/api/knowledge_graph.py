@@ -1,7 +1,9 @@
+import asyncio
 import base64
 import gzip
 import hashlib
 import json
+import logging
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import Response
@@ -21,6 +23,11 @@ KG_TIMELINE_CACHE_TTL = 3600
 # (browser cache / 304) instead of re-downloading ~2.6MB every time.
 KG_MAP_HTTP_MAX_AGE = 600  # 10 min fresh in browser/CDN
 KG_MAP_HTTP_SWR = 1800  # then serve-stale-while-revalidate up to 30 min
+# Background warming for /geo. A cold recompute measured ~7s (two sequential
+# scans of kg_entities + serializing ~65k rows), so without this the first
+# visitor after every TTL lapse eats it. Warm well inside the 30 min TTL.
+KG_GEO_WARM_INTERVAL = 1200  # 20 min
+KG_GEO_WARM_LIMIT = 80000  # the exact shape the map page requests
 from app.schemas.knowledge_graph import (
     KGEntityDetailResponse,
     KGEntityResponse,
@@ -49,16 +56,53 @@ from app.services.knowledge_graph import (
 
 router = APIRouter(prefix="/kg", tags=["knowledge-graph"])
 
+logger = logging.getLogger(__name__)
 
-def _gzip_b64(payload_json: str) -> str:
-    """gzip a JSON string and base64-encode it for Redis (client is
-    decode_responses=True, so raw gzip bytes can't be stored/read as str).
 
-    mtime=0 makes compression deterministic, so identical data always yields the
-    same bytes → the same ETag survives cache expiry/recompute → clients keep
-    getting 304 instead of re-downloading when the data hasn't actually changed."""
-    gz = gzip.compress(payload_json.encode("utf-8"), compresslevel=6, mtime=0)
-    return base64.b64encode(gz).decode("ascii")
+def _gzip_bytes(payload_json: str) -> bytes:
+    """Deterministic gzip (mtime=0): identical data → identical bytes → a stable
+    ETag that survives cache expiry/recompute, so clients keep getting 304
+    instead of re-downloading when the data hasn't actually changed."""
+    return gzip.compress(payload_json.encode("utf-8"), compresslevel=6, mtime=0)
+
+
+def _etag_of(gz: bytes) -> str:
+    return 'W/"' + hashlib.sha1(gz).hexdigest() + '"'  # nosec B324 - cache validator, not security
+
+
+def _etag_key(cache_key: str) -> str:
+    """Tiny sibling key holding just the ETag, so a revalidating client can be
+    answered with 304 without pulling and base64-decoding the ~2.3MB blob."""
+    return cache_key + ":etag"
+
+
+def _map_cache_headers(etag: str, max_age: int, swr: int) -> dict[str, str]:
+    return {
+        "ETag": etag,
+        "Cache-Control": f"public, max-age={max_age}, stale-while-revalidate={swr}",
+        "Vary": "Accept-Encoding",
+    }
+
+
+async def _try_304(
+    redis_client, cache_key: str, request: Request, max_age: int, swr: int
+) -> Response | None:
+    """Answer a conditional request from the tiny ETag key alone (cheap path)."""
+    inm = request.headers.get("if-none-match")
+    if not inm:
+        return None
+    cached_etag = await redis_client.get(_etag_key(cache_key))
+    if cached_etag and cached_etag == inm:
+        return Response(status_code=304, headers=_map_cache_headers(cached_etag, max_age, swr))
+    return None
+
+
+async def _store_gz(redis_client, cache_key: str, gz: bytes, ttl: int) -> None:
+    """Cache gzip bytes as base64 (the redis client is decode_responses=True, so
+    raw binary can't round-trip) plus the small sibling ETag key."""
+    jttl = jittered_ttl(ttl)
+    await redis_client.setex(cache_key, jttl, base64.b64encode(gz).decode("ascii"))
+    await redis_client.setex(_etag_key(cache_key), jttl, _etag_of(gz))
 
 
 def _map_response_from_gz(gz: bytes, request: Request, max_age: int, swr: int) -> Response:
@@ -67,12 +111,8 @@ def _map_response_from_gz(gz: bytes, request: Request, max_age: int, swr: int) -
     Honors If-None-Match (304) and Accept-Encoding. Returning the bytes with
     Content-Encoding: gzip means nginx/CDN pass them through instead of
     re-compressing ~16MB on every request."""
-    etag = 'W/"' + hashlib.sha1(gz).hexdigest() + '"'  # nosec B324 - cache validator, not security
-    headers = {
-        "ETag": etag,
-        "Cache-Control": f"public, max-age={max_age}, stale-while-revalidate={swr}",
-        "Vary": "Accept-Encoding",
-    }
+    etag = _etag_of(gz)
+    headers = _map_cache_headers(etag, max_age, swr)
     if request.headers.get("if-none-match") == etag:
         return Response(status_code=304, headers=headers)
     if "gzip" in request.headers.get("accept-encoding", ""):
@@ -80,6 +120,72 @@ def _map_response_from_gz(gz: bytes, request: Request, max_age: int, swr: int) -
         return Response(content=gz, media_type="application/json", headers=headers)
     # Rare client that doesn't accept gzip (e.g. bare curl): decompress on the fly.
     return Response(content=gzip.decompress(gz), media_type="application/json", headers=headers)
+
+
+def _geo_cache_key(entity_types, year_start, year_end, bounds, limit) -> str:
+    key_payload = json.dumps(
+        {"t": entity_types, "ys": year_start, "ye": year_end, "b": bounds, "l": limit},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    # `gz:` version prefix: values are gzip+base64, not the raw JSON stored by
+    # earlier builds — a new prefix avoids misreading stale entries.
+    return f"kg:geo:gz:{hashlib.sha1(key_payload.encode()).hexdigest()}"  # nosec B324
+
+
+async def _build_geo_payload(db, entity_types, year_start, year_end, bounds, limit) -> str:
+    """Build the /geo JSON, trimmed.
+
+    Only 50 of ~65k geo entities have a year_start and 13 have a year_end, so
+    emitting those (and the other mostly-null fields) as explicit nulls burned
+    ~5.5MB of a ~16MB payload for nothing — exclude_none drops them. Rounding
+    lat/lng to 5 decimals (~1m, far finer than a map dot needs) trims more.
+    Raw JSON ~16MB → ~10.4MB; gzip barely shrinks (it already ate the repeated
+    nulls), so the real win is browser JSON-parse time and memory."""
+    entities, total = await get_geo_entities(
+        db, entity_types, year_start, year_end, bounds, limit
+    )
+    for e in entities:
+        if e.get("latitude") is not None:
+            e["latitude"] = round(e["latitude"], 5)
+        if e.get("longitude") is not None:
+            e["longitude"] = round(e["longitude"], 5)
+    response = KGGeoResponse(
+        entities=[KGGeoEntity(**e) for e in entities],
+        total=total,
+    )
+    return response.model_dump_json(exclude_none=True)
+
+
+async def warm_kg_geo(redis) -> None:
+    """Recompute the map's default /geo payload and refresh its cache, off the
+    request path.
+
+    Opens its own DB session (called from the lifespan loop, not a request).
+    Best-effort: any failure is logged and swallowed so it never affects the app."""
+    from app.database import async_session
+
+    try:
+        cache_key = _geo_cache_key(None, None, None, None, KG_GEO_WARM_LIMIT)
+        async with async_session() as session:
+            payload = await _build_geo_payload(
+                session, None, None, None, None, KG_GEO_WARM_LIMIT
+            )
+        gz = _gzip_bytes(payload)
+        await _store_gz(redis, cache_key, gz, KG_GEO_CACHE_TTL)
+        logger.info("kg geo cache warmed: %d KB gzip", len(gz) // 1024)
+    except Exception:
+        logger.exception("kg geo warm failed")
+
+
+async def kg_geo_warm_loop(redis) -> None:
+    """Background task: warm /geo at startup, then every KG_GEO_WARM_INTERVAL.
+
+    Keeps the cache populated so no real user pays the ~7s cold recompute.
+    Cancelled on shutdown by the lifespan handler."""
+    while True:
+        await warm_kg_geo(redis)
+        await asyncio.sleep(KG_GEO_WARM_INTERVAL)
 
 
 @router.get("/entities", response_model=KGSearchResponse)
@@ -253,33 +359,25 @@ async def get_kg_geo_entities(
     redis_client = getattr(request.app.state, "redis", None)
     cache_key = None
     if redis_client:
-        key_payload = json.dumps(
-            {"t": entity_types, "ys": year_start, "ye": year_end, "b": bounds, "l": limit},
-            sort_keys=True,
-            separators=(",", ":"),
+        cache_key = _geo_cache_key(entity_types, year_start, year_end, bounds, limit)
+        not_modified = await _try_304(
+            redis_client, cache_key, request, KG_MAP_HTTP_MAX_AGE, KG_MAP_HTTP_SWR
         )
-        # `gz:` version prefix: values are now gzip+base64, not raw JSON — a new
-        # prefix avoids misreading stale raw-JSON entries from before this change.
-        cache_key = f"kg:geo:gz:{hashlib.sha1(key_payload.encode()).hexdigest()}"  # nosec B324
+        if not_modified is not None:
+            return not_modified
         cached = await redis_client.get(cache_key)
         if cached:
             return _map_response_from_gz(
                 base64.b64decode(cached), request, KG_MAP_HTTP_MAX_AGE, KG_MAP_HTTP_SWR
             )
 
-    entities, total = await get_geo_entities(
+    payload = await _build_geo_payload(
         db, entity_types, year_start, year_end, bounds, limit
     )
-    response = KGGeoResponse(
-        entities=[KGGeoEntity(**e) for e in entities],
-        total=total,
-    )
-    b64 = _gzip_b64(response.model_dump_json())
+    gz = _gzip_bytes(payload)
     if redis_client and cache_key:
-        await redis_client.setex(cache_key, jittered_ttl(KG_GEO_CACHE_TTL), b64)
-    return _map_response_from_gz(
-        base64.b64decode(b64), request, KG_MAP_HTTP_MAX_AGE, KG_MAP_HTTP_SWR
-    )
+        await _store_gz(redis_client, cache_key, gz, KG_GEO_CACHE_TTL)
+    return _map_response_from_gz(gz, request, KG_MAP_HTTP_MAX_AGE, KG_MAP_HTTP_SWR)
 
 
 @router.get("/lineage-arcs", response_model=KGLineageArcsResponse)
@@ -303,6 +401,11 @@ async def get_kg_lineage_arcs(
             separators=(",", ":"),
         )
         cache_key = f"kg:lineage:gz:{hashlib.sha1(key_payload.encode()).hexdigest()}"  # nosec B324
+        not_modified = await _try_304(
+            redis_client, cache_key, request, KG_MAP_HTTP_MAX_AGE, KG_MAP_HTTP_SWR
+        )
+        if not_modified is not None:
+            return not_modified
         cached = await redis_client.get(cache_key)
         if cached:
             return _map_response_from_gz(
@@ -311,12 +414,13 @@ async def get_kg_lineage_arcs(
 
     arcs, total = await get_lineage_arcs(db, school, year_start, year_end, limit)
     response = KGLineageArcsResponse(arcs=arcs, total=total)
-    b64 = _gzip_b64(response.model_dump_json())
+    # Deliberately NOT exclude_none here (unlike /geo): the map's arc filter and
+    # tooltip test `arc.year === null`, so arcs must keep explicit nulls. The
+    # arcs payload is small anyway (~8k rows, only fetched when 师承 is ticked).
+    gz = _gzip_bytes(response.model_dump_json())
     if redis_client and cache_key:
-        await redis_client.setex(cache_key, jittered_ttl(KG_LINEAGE_CACHE_TTL), b64)
-    return _map_response_from_gz(
-        base64.b64decode(b64), request, KG_MAP_HTTP_MAX_AGE, KG_MAP_HTTP_SWR
-    )
+        await _store_gz(redis_client, cache_key, gz, KG_LINEAGE_CACHE_TTL)
+    return _map_response_from_gz(gz, request, KG_MAP_HTTP_MAX_AGE, KG_MAP_HTTP_SWR)
 
 
 @router.get("/texts/{text_id}/entities", response_model=list[KGEntityResponse])

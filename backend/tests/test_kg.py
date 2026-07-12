@@ -306,18 +306,16 @@ async def test_search_results_expose_relation_count(kg_client):
 # Test 8: /geo map payload — gzip + HTTP caching helper (pure-function level)
 # ---------------------------------------------------------------------------
 def test_map_response_gzip_roundtrip_headers_and_304():
-    import base64
     import gzip
     from types import SimpleNamespace
 
-    from app.api.knowledge_graph import _gzip_b64, _map_response_from_gz
+    from app.api.knowledge_graph import _gzip_bytes, _map_response_from_gz
 
     payload = '{"entities":[{"id":1,"name_zh":"玄奘"}],"total":1}'
-    b64 = _gzip_b64(payload)
-    gz = base64.b64decode(b64)
+    gz = _gzip_bytes(payload)
 
     # Deterministic compression → identical data yields identical bytes (stable ETag).
-    assert _gzip_b64(payload) == b64
+    assert _gzip_bytes(payload) == gz
 
     # gzip-capable client → Content-Encoding: gzip; body decompresses to the original.
     req = SimpleNamespace(headers={"accept-encoding": "gzip, deflate"})
@@ -380,5 +378,86 @@ async def test_geo_cache_headers_and_conditional_304(kg_client):
             headers={"Accept-Encoding": "identity", "If-None-Match": etag},
         )
         assert r2.status_code == 304
+
+
+# ---------------------------------------------------------------------------
+# Test 10: /geo payload is slimmed — null fields omitted, coords rounded
+# ---------------------------------------------------------------------------
+@pytest.mark.anyio
+async def test_geo_payload_omits_nulls_and_rounds_coords(kg_client):
+    geo = [
+        {
+            "id": 1, "entity_type": "temple", "name_zh": "白馬寺", "name_en": None,
+            "description": None, "latitude": 34.7231234567, "longitude": 112.4567891234,
+            "year_start": None, "year_end": None, "province": None, "city": None,
+            "district": None,
+        }
+    ]
+    with patch(f"{_KG_API}.get_geo_entities") as m:
+        m.return_value = (geo, 1)
+        r = await kg_client.get(
+            "/api/kg/geo", params={"limit": 100},
+            headers={"Accept-Encoding": "identity"},
+        )
+        assert r.status_code == 200
+        body = r.text
+        # None-valued fields must not be serialized at all (they were ~5.5MB of
+        # the ~16MB payload: only 50/65k rows have year_start, 13 have year_end).
+        for absent in ("year_start", "year_end", "description", "name_en",
+                       "province", "city", "district"):
+            assert f'"{absent}"' not in body, f"{absent} should be omitted when null"
+        e = r.json()["entities"][0]
+        assert e["latitude"] == 34.72312  # rounded to 5 dp (~1 m)
+        assert e["longitude"] == 112.45679
+        assert e["name_zh"] == "白馬寺"
+
+
+# ---------------------------------------------------------------------------
+# Test 11: conditional requests are answered from the tiny ETag key alone
+# ---------------------------------------------------------------------------
+@pytest.mark.anyio
+async def test_try_304_reads_only_the_small_etag_key():
+    from types import SimpleNamespace
+
+    from app.api.knowledge_graph import _etag_key, _try_304
+
+    etag = 'W/"deadbeef"'
+    redis = AsyncMock()
+    redis.get = AsyncMock(return_value=etag)
+
+    req = SimpleNamespace(headers={"if-none-match": etag})
+    resp = await _try_304(redis, "kg:geo:gz:k", req, 600, 1800)
+    assert resp is not None
+    assert resp.status_code == 304
+    assert resp.headers["etag"] == etag
+    # Crucially: it only touched the tiny sibling key, never the ~2.3MB blob.
+    redis.get.assert_awaited_once_with(_etag_key("kg:geo:gz:k"))
+
+    # A stale/absent validator must NOT short-circuit.
+    redis.get = AsyncMock(return_value='W/"other"')
+    assert await _try_304(redis, "kg:geo:gz:k", req, 600, 1800) is None
+    # No If-None-Match at all → no shortcut, no Redis call.
+    redis.get = AsyncMock(return_value=etag)
+    assert await _try_304(redis, "kg:geo:gz:k", SimpleNamespace(headers={}), 600, 1800) is None
+    redis.get.assert_not_awaited()
+
+
+# ---------------------------------------------------------------------------
+# Test 12: caching writes both the blob and its sibling ETag key
+# ---------------------------------------------------------------------------
+@pytest.mark.anyio
+async def test_store_gz_writes_blob_and_etag_keys():
+    from app.api.knowledge_graph import _etag_of, _gzip_bytes, _store_gz
+
+    redis = AsyncMock()
+    gz = _gzip_bytes('{"total":0,"entities":[]}')
+    await _store_gz(redis, "kg:geo:gz:k", gz, 1800)
+
+    written = {c.args[0]: c.args[2] for c in redis.setex.await_args_list}
+    assert set(written) == {"kg:geo:gz:k", "kg:geo:gz:k:etag"}
+    assert written["kg:geo:gz:k:etag"] == _etag_of(gz)
+    # Blob is stored base64-encoded (redis client is decode_responses=True).
+    import base64
+    assert base64.b64decode(written["kg:geo:gz:k"]) == gz
 
 

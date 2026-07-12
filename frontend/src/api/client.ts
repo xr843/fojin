@@ -780,19 +780,22 @@ export async function getKGStats(): Promise<KGStats> {
   return data;
 }
 
+// /kg/geo is serialized with exclude_none (the payload is ~65k entities; emitting
+// the mostly-null fields as explicit nulls cost ~5.5MB of raw JSON), so every
+// nullable field may be ABSENT rather than null. Compare with `!= null`, never `!== null`.
 export interface KGGeoEntity {
   id: number;
   entity_type: string;
   name_zh: string;
-  name_en: string | null;
-  description: string | null;
+  name_en?: string | null;
+  description?: string | null;
   latitude: number;
   longitude: number;
-  year_start: number | null;
-  year_end: number | null;
-  province: string | null;
-  city: string | null;
-  district: string | null;
+  year_start?: number | null;
+  year_end?: number | null;
+  province?: string | null;
+  city?: string | null;
+  district?: string | null;
 }
 
 export interface KGGeoResponse {
