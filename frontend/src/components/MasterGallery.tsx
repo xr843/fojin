@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { Spin } from "antd";
+import { Spin, Tooltip } from "antd";
 import { getMasters, type MasterProfile } from "../api/client";
 import "../styles/master-gallery.css";
 
@@ -53,6 +53,67 @@ export function MasterSeal({ text, size = 46 }: { text: string; size?: number })
     >
       <span className="mg-seal-text">{text}</span>
     </span>
+  );
+}
+
+/**
+ * The strip that stands in for the gallery on the chat's empty state.
+ *
+ * The full gallery is ~960px tall — taller than the viewport — so putting it
+ * inline turned /chat's front page into a wall of cards you had to scroll past
+ * before you could do the one thing the page is for: ask a question. But hiding
+ * it entirely behind a button is how the 15 personas got lost in the first place.
+ *
+ * So: the seals stay on the page (they are the thing that makes someone curious —
+ * fifteen cinnabar stamps are hard to ignore), and the depth — quotes, 经号,
+ * verification badges — lives one click away in the modal.
+ */
+export function MasterSealStrip({
+  selectedId,
+  onSelect,
+  onOpenAll,
+}: {
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
+  onOpenAll: () => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const { data: masters } = useQuery({
+    queryKey: ["chat-masters"],
+    queryFn: getMasters,
+    staleTime: 60 * 60 * 1000,
+  });
+  const isEn = i18n.language?.startsWith("en");
+
+  if (!masters?.length) return null;
+
+  return (
+    <div className="mg-strip">
+      <span className="mg-strip-label">
+        {t("chat.gallery_strip", { n: masters.length })}
+      </span>
+      <span className="mg-strip-seals">
+        {masters.map((m) => (
+          <Tooltip
+            key={m.id}
+            title={`${isEn ? m.name_en : m.name_zh} · ${m.tradition}`}
+          >
+            <button
+              type="button"
+              className={`mg-strip-seal${selectedId === m.id ? " is-selected" : ""}`}
+              aria-pressed={selectedId === m.id}
+              aria-label={isEn ? m.name_en : m.name_zh}
+              onClick={() => onSelect(m.id)}
+            >
+              <MasterSeal text={sealOf(m)} size={30} />
+            </button>
+          </Tooltip>
+        ))}
+      </span>
+      <button type="button" className="mg-strip-all" onClick={onOpenAll}>
+        {t("chat.gallery_view_all")} →
+      </button>
+    </div>
   );
 }
 

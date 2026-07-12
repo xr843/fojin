@@ -34,7 +34,7 @@ import {
 const ShareCard = lazy(() => import("../components/ShareCard"));
 const CitationDrawer = lazy(() => import("../components/CitationDrawer"));
 import ChatModelSelector from "../components/ChatModelSelector";
-import MasterGallery, { MasterSeal } from "../components/MasterGallery";
+import MasterGallery, { MasterSeal, MasterSealStrip } from "../components/MasterGallery";
 import { getMasters } from "../api/client";
 import type { CitationTarget } from "../components/CitationDrawer";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -1461,31 +1461,16 @@ export default function ChatPage() {
                   </div>
                 )}
 
-                {/* 祖师长廊 — the second act of the empty state. The 15 master
-                    personas are this product's sharpest differentiator and used
-                    to hide inside a grey dropdown; here they are the front door. */}
-                <div style={{ marginTop: 34, textAlign: "left" }}>
-                  <div style={{ textAlign: "center", marginBottom: 14 }}>
-                    <div style={{
-                      fontSize: 16,
-                      fontFamily: '"Noto Serif SC", serif',
-                      color: "var(--fj-ink)",
-                      marginBottom: 4,
-                    }}>
-                      {t("chat.gallery_title")}
-                    </div>
-                    <div style={{ fontSize: 12.5, lineHeight: 1.7 }}>
-                      {t("chat.gallery_hint")}
-                    </div>
-                  </div>
-                  <MasterGallery
-                    selectedId={masterId}
-                    onSelect={setMasterId}
-                    onOpenSource={(textId, juan) =>
-                      window.open(`/texts/${textId}/read?juan=${juan}`, "_blank", "noopener")
-                    }
-                  />
-                </div>
+                {/* 祖师长廊, as a strip. The full gallery is ~960px — taller than
+                    the viewport — so inlining it buried the one thing this page is
+                    for (asking a question) under a wall of cards, complete with a
+                    scroll-inside-a-scroll. The seals stay visible because they are
+                    what makes anyone curious; the depth is one click away. */}
+                <MasterSealStrip
+                  selectedId={masterId}
+                  onSelect={setMasterId}
+                  onOpenAll={() => setGalleryOpen(true)}
+                />
               </div>
             )}
             {messages.map((m) => (

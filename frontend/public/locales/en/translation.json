@@ -1490,5 +1490,7 @@
   "chat.epigraph_unset": "Not set",
   "chat.master_lens": "Reading through this lineage",
   "chat.change_master": "Change lineage",
-  "chat.master_disclaimer": "What follows is an AI interpretation generated from the canon — not the master's own teaching. Every citation carries its text and fascicle number; open it to check the original."
+  "chat.master_disclaimer": "What follows is an AI interpretation generated from the canon — not the master's own teaching. Every citation carries its text and fascicle number; open it to check the original.",
+  "chat.gallery_strip": "Read through a lineage · {{n}} masters",
+  "chat.gallery_view_all": "View all"
 }
