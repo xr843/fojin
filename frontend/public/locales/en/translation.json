@@ -1483,12 +1483,12 @@
   "admin_align_review.load_error": "Failed to load, please retry",
   "admin_align_review.back_to_coverage": "Back to coverage",
   "chat.gallery_title": "Master Gallery",
-  "chat.gallery_hint": "Pick an interpretive lineage — read the canon through this master's tradition, not a chat with the person",
+  "chat.gallery_hint": "Switch school — read the canon through a master's approach",
   "chat.tradition_all": "All",
   "chat.epigraph_verified": "Verified",
   "chat.epigraph_none": "No verified representative line selected yet",
   "chat.epigraph_unset": "Not set",
   "chat.master_lens": "Reading through this lineage",
-  "chat.change_master": "Change lineage",
+  "chat.change_master": "Change school",
   "chat.master_disclaimer": "What follows is an AI interpretation generated from the canon — not the master's own teaching. Every citation carries its text and fascicle number; open it to check the original."
 }
