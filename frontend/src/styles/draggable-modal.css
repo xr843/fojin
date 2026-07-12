@@ -1,0 +1,76 @@
+/* Draggable + resizable dialog. See components/DraggableModal.tsx.
+   The drag is JS; the resize is the browser's own grip — no library. */
+
+/* antd puts the size on .ant-modal. Move it onto the content box so the native
+   `resize` grip actually governs the dialog, and let .ant-modal shrink-wrap. */
+.fj-dm.ant-modal {
+  width: auto !important;
+  max-width: 96vw;
+  padding-bottom: 0;
+}
+
+.fj-dm .ant-modal-content {
+  /* Starting size; the user drags the grip from here. */
+  width: var(--fj-dm-w, 880px);
+  height: var(--fj-dm-h, 640px);
+  min-width: 460px;
+  min-height: 320px;
+  max-width: 96vw;
+  max-height: 86vh;
+
+  /* `resize` has no effect while overflow is visible — hidden enables the grip,
+     and the body below carries the scrolling. */
+  resize: both;
+  overflow: hidden;
+
+  display: flex;
+  flex-direction: column;
+}
+
+.fj-dm .ant-modal-header {
+  flex-shrink: 0;
+  margin-bottom: 0;
+  padding-bottom: 12px;
+}
+
+.fj-dm .ant-modal-body {
+  flex: 1;
+  min-height: 0; /* let it actually shrink inside the flex column */
+  overflow-y: auto;
+  padding-top: 12px;
+}
+
+/* The grab handle: the whole title row. */
+.fj-dm-title {
+  cursor: move;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none; /* so a drag doesn't scroll the page on touch/pen */
+  padding: 2px 0;
+}
+
+/* Make the native resize grip visible against the paper ground — the default
+   is nearly invisible on a light card. */
+.fj-dm .ant-modal-content::-webkit-resizer {
+  background: linear-gradient(
+    135deg,
+    transparent 0 45%,
+    var(--fj-border, #d9d0c1) 45% 55%,
+    transparent 55% 70%,
+    var(--fj-border, #d9d0c1) 70% 80%,
+    transparent 80%
+  );
+}
+
+@media (max-width: 640px) {
+  /* Dragging a dialog around a phone screen is not a feature. */
+  .fj-dm .ant-modal-content {
+    width: 96vw;
+    height: 80vh;
+    min-width: 0;
+    resize: none;
+  }
+  .fj-dm-title {
+    cursor: default;
+  }
+}
