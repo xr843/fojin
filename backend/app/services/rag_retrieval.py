@@ -55,6 +55,17 @@ ENABLE_MITRA_RAG_PARALLELS = (
 MITRA_CANDIDATE_K = 8  # MITRA rows fetched per primary chunk to rank (candidate pool)
 MITRA_PARALLEL_SHOW = 2  # max MITRA parallels rendered per primary (new langs only)
 
+# Quality gate on the MITRA candidate pool: keep only rows whose proxy quality
+# score (mitra_e_score) clears MITRA_MIN_SCORE, and fetch best-scored first so
+# the top-K pool is the highest-quality one. The predicate is NULL-PERMISSIVE —
+# unscored rows still flow, so this is a no-op until a prod backfill populates
+# mitra_e_score. Set enable_mitra_score_gate false to drop the predicate and
+# restore the pre-gate confidence ordering (byte-for-byte the old behavior).
+ENABLE_MITRA_SCORE_GATE = (
+    settings.enable_mitra_score_gate if hasattr(settings, "enable_mitra_score_gate") else True
+)
+MITRA_MIN_SCORE = settings.mitra_min_score if hasattr(settings, "mitra_min_score") else 0.30
+
 # Display labels for parallel-language annotations in the [跨藏对读] block.
 _LANG_LABEL = {"pi": "巴利", "bo": "藏", "sa": "梵", "en": "英", "lzh": "汉"}
 
@@ -538,6 +549,20 @@ async def _attach_mitra_parallels(db: AsyncSession, results: list[dict], query: 
             (i, int(r["text_id"]), int(r["juan_num"]), int(r["chunk_index"])) for i, r in enumerate(results)
         ]
         values_sql = ", ".join(f"({idx}, {tid}, {juan}, {cidx})" for idx, tid, juan, cidx in primary_keys)
+        # Quality gate branches cleanly on the flag. When on, a NULL-PERMISSIVE
+        # score predicate lets unscored (pre-backfill) rows through while scored
+        # rows must clear MITRA_MIN_SCORE, and the window orders by mitra_e_score
+        # first so Postgres can serve both via the ix_mitra_align_chunk_escore
+        # partial index. When off, this is byte-for-byte the pre-gate query:
+        # no predicate, original ma.confidence DESC ordering.
+        if ENABLE_MITRA_SCORE_GATE:
+            score_predicate = "AND (ma.mitra_e_score IS NULL OR ma.mitra_e_score >= :min_score)"
+            order_expr = "ma.mitra_e_score DESC NULLS LAST, ma.id"
+            params = {"min_score": MITRA_MIN_SCORE}
+        else:
+            score_predicate = ""
+            order_expr = "ma.confidence DESC, ma.id"
+            params = {}
         bulk_sql = sql_text(f"""
             WITH primaries(idx, tid, juan, cidx) AS (
                 VALUES {values_sql}
@@ -550,20 +575,21 @@ async def _attach_mitra_parallels(db: AsyncSession, results: list[dict], query: 
                     ma.zh_text,
                     ma.confidence,
                     ROW_NUMBER() OVER (
-                        PARTITION BY p.idx ORDER BY ma.confidence DESC, ma.id
+                        PARTITION BY p.idx ORDER BY {order_expr}
                     ) AS rn
                 FROM primaries p
                 JOIN mitra_alignments ma
                     ON ma.text_id = p.tid
                    AND ma.juan_num = p.juan
                    AND ma.chunk_index = p.cidx
+                   {score_predicate}
             )
             SELECT primary_idx, foreign_lang, foreign_text, zh_text, confidence
             FROM ranked
             WHERE rn <= {MITRA_CANDIDATE_K}
             ORDER BY primary_idx, rn
         """)
-        rows = (await db.execute(bulk_sql)).fetchall()
+        rows = (await db.execute(bulk_sql, params)).fetchall()
         for idx, items in _group_mitra_rows(rows).items():
             # Re-rank the confidence-fetched pool by relevance to the question so
             # the sentence the user asked about surfaces (format then dedups by

@@ -797,21 +797,6 @@
   height: 0;
   overflow: hidden;
 }
-/* 「显示行首」开：把零宽行锚渲染成 CBETA 页·栏·行号浅色上标。 */
-.reader-body.show-lineref .cbeta-line {
-  width: auto;
-  height: auto;
-  overflow: visible;
-  vertical-align: super;
-  margin: 0 0.25em;
-  font-size: 0.6em;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  color: #b8860b;
-  user-select: none;
-}
-.reader-body.show-lineref .cbeta-line::before {
-  content: attr(data-ref);
-}
 .cbeta-line-flash {
   animation: cbeta-line-flash-kf 2.2s ease-out;
 }

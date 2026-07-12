@@ -10,12 +10,13 @@ import {
 import {
   SearchOutlined, VerticalAlignTopOutlined, CloseOutlined,
 } from "@ant-design/icons";
-import { searchTexts, searchContent, searchDictionary, searchCrossLanguage, searchSemantic, searchUnified, getSources, getSearchSuggestions, searchDictionaryGrouped, getCbetaRedirect } from "../api/client";
+import { searchTexts, searchContent, searchDictionary, searchCrossLanguage, searchSemantic, searchUnified, searchParallelSentences, getSources, getSearchSuggestions, searchDictionaryGrouped, getCbetaRedirect } from "../api/client";
 import type { DictGroupedSearchResponse } from "../api/client";
 import { hasDirectSearchUrl } from "../utils/sourceUrls";
 import { addSearchHistory, getSearchHistory, type SearchHistoryItem } from "../utils/history";
 import { localizedSourceName } from "../utils/sourceName";
 import { ResultCard, ExternalSourcesSection, DictCard, ContentCard, CrossLangCard, SemanticCard, UnifiedResults } from "../components/search";
+import ParallelSentenceCard from "../components/search/ParallelSentenceCard";
 import "../styles/search.css";
 import "../styles/sources.css";
 
@@ -109,6 +110,9 @@ export default function SearchPage() {
   const langFilter = searchParams.get("tl") || (legacyLangIsFilter ? legacyLangParam : "");
   const dictLang = searchParams.get("dict_lang") || "";
   const [dictPage, setDictPage] = useState(1);
+  // Cross-lingual (MITRA) foreign-language filter: all | sa | bo. Local state
+  // (like the parallel query's non-paginated shape) — not URL-driven.
+  const [parallelLang, setParallelLang] = useState<string>("all");
   const [dynasty] = useState<string>();
   const [category] = useState<string>();
   const [showTop, setShowTop] = useState(false);
@@ -170,6 +174,14 @@ export default function SearchPage() {
     queryKey: ["searchUnified", query, selectedSources, langFilter],
     queryFn: () => searchUnified({ q: query, sources: selectedSources || undefined, lang: langFilter || undefined }),
     enabled: query.length > 0 && tab === "all",
+  });
+
+  // Cross-lingual parallel sentences (MITRA). Non-paginated; empty result is
+  // the natural dark state (coverage is sparse and grows with imports).
+  const { data: parallelData, isLoading: parallelLoading, isError: parallelError, refetch: refetchParallel } = useQuery({
+    queryKey: ["searchParallel", query, parallelLang],
+    queryFn: () => searchParallelSentences(query, { lang: parallelLang === "all" ? undefined : parallelLang, limit: 30 }),
+    enabled: query.length > 0 && tab === "parallel",
   });
 
   // Dictionary knowledge card (parallel, non-blocking)
@@ -361,6 +373,7 @@ export default function SearchPage() {
             { key: "all", label: t("search.tab_all") },
             { key: "catalog", label: t("search.tab_catalog") },
             { key: "content", label: t("search.tab_content") },
+            { key: "parallel", label: t("search.tab_parallel") },
           ]}
           size="small"
         />
@@ -369,6 +382,8 @@ export default function SearchPage() {
             ? t("search.subtitle_all")
             : tab === "catalog"
             ? t("search.subtitle_catalog")
+            : tab === "parallel"
+            ? t("search.subtitle_parallel")
             : t("search.subtitle_content")}
         </div>
       </div>
@@ -389,8 +404,8 @@ export default function SearchPage() {
         </div>
       ) : (
         <div className="s-layout">
-          {/* 左侧筛选（辞典 Tab 不显示） */}
-          {tab !== "dictionary" && <aside className="s-sidebar">
+          {/* 左侧筛选（辞典 / 跨语对照 Tab 不显示） */}
+          {tab !== "dictionary" && tab !== "parallel" && <aside className="s-sidebar">
             <div className="s-filter-group">
               <div className="s-filter-title">🌐 {t("search.filter_region")}</div>
               <div className="s-filter-scroll">
@@ -454,6 +469,56 @@ export default function SearchPage() {
                 {/* 外部数据源结果 */}
                 {!unifiedLoading && !unifiedError && query.length > 0 && filteredExtSources.length > 0 && (
                   <ExternalSourcesSection sources={filteredExtSources} query={query} />
+                )}
+              </>
+            ) : tab === "parallel" ? (
+              <>
+                <div className="s-result-header">
+                  <span className="s-result-count">
+                    {t("search.found_parallel", { n: (parallelData?.total || 0).toLocaleString() })}
+                  </span>
+                  <Select
+                    size="small"
+                    value={parallelLang}
+                    onChange={(v) => { setPage(1); setParallelLang(v); }}
+                    style={{ width: 110 }}
+                    options={[
+                      { value: "all", label: t("search.lang_all") },
+                      { value: "sa", label: t("lang.sa") },
+                      { value: "bo", label: t("lang.bo") },
+                    ]}
+                  />
+                </div>
+
+                {parallelLoading && Array.from({ length: 5 }).map((_, i) => (
+                  <div className="s-card" key={`skel-par-${i}`}>
+                    <div className="s-card-body">
+                      <Skeleton active paragraph={{ rows: 2 }} title={false} />
+                    </div>
+                  </div>
+                ))}
+
+                {!parallelLoading && parallelError && (
+                  <Result
+                    status="error"
+                    title={t("search.failed_title")}
+                    subTitle={t("search.failed_subtitle")}
+                    extra={<Button type="primary" onClick={() => refetchParallel()}>{t("search.retry")}</Button>}
+                  />
+                )}
+
+                {!parallelLoading && !parallelError && parallelData?.error && (
+                  <Alert type="warning" message={parallelData.error} showIcon closable style={{ marginBottom: 12 }} />
+                )}
+
+                {!parallelLoading && !parallelError && parallelData && parallelData.results.map((hit, i) => (
+                  <ParallelSentenceCard key={`${hit.text_id}_${hit.taisho_id}_${i}`} hit={hit} rank={i + 1} />
+                ))}
+
+                {!parallelLoading && !parallelError && parallelData && parallelData.results.length === 0 && (
+                  <div className="s-empty-state" style={{ margin: "24px 0 12px", padding: "16px 20px", background: "var(--fj-sand-light, #faf7f2)", border: "1px solid #e8e0d4", borderRadius: 6, color: "#6b5d4a", fontSize: 14 }}>
+                    {t("search.parallel_empty")}
+                  </div>
                 )}
               </>
             ) : (

@@ -24,10 +24,15 @@ function formatYear(t: TFunction, year: number): string {
   return t("geo.year_ce", { n: year });
 }
 
-function formatYearRange(t: TFunction, start: number | null, end: number | null): string {
-  if (start !== null && end !== null) return `${formatYear(t, start)} — ${formatYear(t, end)}`;
-  if (start !== null) return `${formatYear(t, start)} —`;
-  if (end !== null) return `— ${formatYear(t, end)}`;
+// start/end may be undefined: /kg/geo omits null fields from its payload.
+function formatYearRange(
+  t: TFunction,
+  start?: number | null,
+  end?: number | null,
+): string {
+  if (start != null && end != null) return `${formatYear(t, start)} — ${formatYear(t, end)}`;
+  if (start != null) return `${formatYear(t, start)} —`;
+  if (end != null) return `— ${formatYear(t, end)}`;
   return "";
 }
 
