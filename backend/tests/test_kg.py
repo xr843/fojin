@@ -302,3 +302,83 @@ async def test_search_results_expose_relation_count(kg_client):
         assert results[1]["relation_count"] == 0
 
 
+# ---------------------------------------------------------------------------
+# Test 8: /geo map payload — gzip + HTTP caching helper (pure-function level)
+# ---------------------------------------------------------------------------
+def test_map_response_gzip_roundtrip_headers_and_304():
+    import base64
+    import gzip
+    from types import SimpleNamespace
+
+    from app.api.knowledge_graph import _gzip_b64, _map_response_from_gz
+
+    payload = '{"entities":[{"id":1,"name_zh":"玄奘"}],"total":1}'
+    b64 = _gzip_b64(payload)
+    gz = base64.b64decode(b64)
+
+    # Deterministic compression → identical data yields identical bytes (stable ETag).
+    assert _gzip_b64(payload) == b64
+
+    # gzip-capable client → Content-Encoding: gzip; body decompresses to the original.
+    req = SimpleNamespace(headers={"accept-encoding": "gzip, deflate"})
+    resp = _map_response_from_gz(gz, req, 600, 1800)
+    assert resp.status_code == 200
+    assert resp.headers["content-encoding"] == "gzip"
+    assert "public" in resp.headers["cache-control"]
+    assert "max-age=600" in resp.headers["cache-control"]
+    etag = resp.headers["etag"]
+    assert etag.startswith('W/"')
+    assert gzip.decompress(resp.body).decode() == payload
+
+    # Matching If-None-Match → 304 with no body, ETag echoed back.
+    req304 = SimpleNamespace(headers={"accept-encoding": "gzip", "if-none-match": etag})
+    resp304 = _map_response_from_gz(gz, req304, 600, 1800)
+    assert resp304.status_code == 304
+    assert resp304.headers["etag"] == etag
+    assert not resp304.body
+
+    # Client that doesn't accept gzip → plain JSON, no Content-Encoding.
+    reqid = SimpleNamespace(headers={"accept-encoding": "identity"})
+    respid = _map_response_from_gz(gz, reqid, 600, 1800)
+    assert "content-encoding" not in respid.headers
+    assert respid.body.decode() == payload
+
+
+# ---------------------------------------------------------------------------
+# Test 9: /geo endpoint exposes cache headers and honors conditional requests
+# ---------------------------------------------------------------------------
+@pytest.mark.anyio
+async def test_geo_cache_headers_and_conditional_304(kg_client):
+    geo = [
+        {
+            "id": 1, "entity_type": "person", "name_zh": "玄奘", "name_en": None,
+            "description": None, "latitude": 34.34, "longitude": 108.94,
+            "year_start": 602, "year_end": 664, "province": None, "city": None,
+            "district": None,
+        }
+    ]
+    with patch(f"{_KG_API}.get_geo_entities") as m:
+        m.return_value = (geo, 1)
+        # Accept-Encoding: identity keeps the body uncompressed so httpx doesn't
+        # transparently decode it — lets us assert the JSON and headers directly.
+        r = await kg_client.get(
+            "/api/kg/geo", params={"limit": 100},
+            headers={"Accept-Encoding": "identity"},
+        )
+        assert r.status_code == 200
+        assert "public" in r.headers["cache-control"]
+        assert "max-age=" in r.headers["cache-control"]
+        etag = r.headers["etag"]
+        assert etag
+        data = r.json()
+        assert data["total"] == 1
+        assert data["entities"][0]["name_zh"] == "玄奘"
+
+        # Re-request with the ETag → 304 Not Modified (no re-download).
+        r2 = await kg_client.get(
+            "/api/kg/geo", params={"limit": 100},
+            headers={"Accept-Encoding": "identity", "If-None-Match": etag},
+        )
+        assert r2.status_code == 304
+
+
