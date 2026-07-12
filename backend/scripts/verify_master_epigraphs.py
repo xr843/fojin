@@ -39,6 +39,49 @@ from app.config import settings
 from app.services.master_profiles import MASTERS
 from app.services.quote_verifier import _normalise
 
+# Names a master's own works are filed under in buddhist_texts.translator. Needed
+# because the DB spells some of them differently from name_zh — 蕅益's works are
+# attributed to his dharma name 智旭, and Tibetan/Pali names have 繁/简 variants.
+#
+# This drives the NEGATIVE half of the check, and it exists because the positive
+# half alone was not enough: the first cut of the gallery verified the 5 masters
+# that HAD a line and never checked the 10 that didn't — so 玄奘's card claimed
+# 「本站未收其本人著作」 while 《成唯識論》(T1585) sat right there in the corpus, and
+# 蕅益's did the same over 《教觀綱宗》(T1939). A card that states something we can't
+# back is the exact failure this product exists to prevent, so assert it can't.
+CORPUS_ALIASES: dict[str, list[str]] = {
+    "nagarjuna": ["龍樹", "龙树"],
+    "zhiyi": ["智顗"],
+    "huineng": ["慧能", "宗寶"],
+    "xuanzang": ["玄奘"],
+    "fazang": ["法藏"],
+    "kumarajiva": ["鳩摩羅什", "鸠摩罗什"],
+    "yinguang": ["印光"],
+    "ouyi": ["智旭", "蕅益"],
+    "xuyun": ["虛雲", "虚云"],
+    "milarepa": ["米拉日巴", "密勒日巴"],
+    "ajahn-chah": ["阿姜查"],
+    "tsongkhapa": ["宗喀巴"],
+    "atisha": ["阿底峽", "阿底峡"],
+    "buddhaghosa": ["覺音", "觉音"],
+    "mahasi-sayadaw": ["馬哈希", "马哈希"],
+}
+
+
+async def _works_we_host(s: AsyncSession, master_id: str) -> list[tuple]:
+    """Texts in our corpus attributed to this master (author or translator)."""
+    aliases = CORPUS_ALIASES.get(master_id, [])
+    if not aliases:
+        return []
+    rows = await s.execute(
+        sql(
+            "SELECT cbeta_id, title_zh FROM buddhist_texts "
+            "WHERE translator ILIKE ANY(:pats) ORDER BY id LIMIT 5"
+        ),
+        {"pats": [f"%{a}%" for a in aliases]},
+    )
+    return list(rows.fetchall())
+
 
 async def main() -> int:
     engine = create_async_engine(settings.database_url)
@@ -49,7 +92,18 @@ async def main() -> int:
         for mid, m in MASTERS.items():
             ep = m.epigraph
             if ep is None:
-                print(f"  —  {m.name_zh:<12} 未设 (no work of his in the corpus)")
+                # The card shows 未设. Prove we are entitled to say that: if the
+                # corpus DOES hold this master's own work, a line should have been
+                # curated from it and the card is quietly misleading.
+                works = await _works_we_host(s, mid)
+                if works:
+                    listed = "; ".join(f"{c}《{t}》" for c, t in works[:3])
+                    failures.append(
+                        f"{mid}: card shows 未设, but we host his work — {listed}. Curate a line."
+                    )
+                    print(f"  ⚠️  {m.name_zh:<12} 未设,但库中有其著作:{listed}")
+                else:
+                    print(f"  —  {m.name_zh:<12} 未设 (corpus holds none of his work — confirmed)")
                 continue
 
             checked += 1
