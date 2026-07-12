@@ -177,10 +177,17 @@
   min-height: 3.6em;
 }
 
-.mg-quote-none {
-  font-size: 13px;
-  color: var(--fj-ink-muted, #9a8e7a);
-  line-height: 1.7;
+/* The fallback when we hold none of a master's own writing: his editorial
+   description. Set apart from a quote on purpose — no 「」, no citation, no
+   badge, and a lighter weight — so it can never be mistaken for something we
+   are claiming he said. */
+.mg-desc {
+  display: block;
+  font-family: "Noto Serif SC", "Source Han Serif SC", serif;
+  font-size: 13.5px;
+  line-height: 1.8;
+  color: var(--fj-ink-light, #5c4f3d);
+  min-height: 3.6em;
 }
 
 /* ── Source line: every quote carries its citation and its verified state,
@@ -224,11 +231,6 @@
   background: #e8f0e4;
   color: #3f6b32;
   white-space: nowrap;
-}
-
-.mg-badge-none {
-  background: #ecebe8;
-  color: #83796a;
 }
 
 .mg-open {
