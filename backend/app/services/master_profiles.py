@@ -179,7 +179,10 @@ _register(MasterProfile(
     tradition="天台宗",
     dates="538-597",
     description="天台宗创始人，一念三千、三谛圆融、止观双修",
-    fojin_text_ids=[53, 52, 8085, 6513],  # 摩诃止观, 法华玄义, 小止观, 法华经
+    # 53 = T1911 摩訶止觀, 52 = T1718 妙法蓮華經文句 (the old comment said 法华玄义 —
+    # that is T1716, text_id 7889, and is NOT in this scope), 8085 = T1915 修習止觀坐禪
+    # 法要, 6513 = T0262 妙法蓮華經. Scope left as-is; only the comment was wrong.
+    fojin_text_ids=[53, 52, 8085, 6513],
     epigraph=Epigraph(
         quote="止觀明靜，前代未聞",
         text_id=53,
@@ -295,11 +298,11 @@ _register(MasterProfile(
     tradition="禅宗",
     dates="638-713",
     description="禅宗六祖，直指人心、见性成佛",
-    # NOTE: these IDs are wrong — 8169 is T2013 禪宗永嘉集 (玄覺撰), not 坛经, and
-    # 6513 is T0262 法華經, not 金刚经. 六祖壇經 is T2008 = text_id 58. Left as-is here
-    # because correcting them changes this persona's RAG scope, which is a behaviour
-    # change beyond this UI PR — tracked separately.
-    fojin_text_ids=[8169, 6513],  # 坛经, 金刚经 (approximate FoJin IDs)
+    # 坛经 T2008(58) + 金刚经 T0235b(63, 罗什译). Corrected 2026-07-12: these were
+    # [8169, 6513] — 8169 is T2013 禪宗永嘉集 (玄覺撰, NOT 慧能), 6513 is T0262 法華經
+    # (NOT 金刚经). The IDs were guessed (the old comment said "approximate"), so this
+    # persona was hard-scoped to a text he did not write and could never cite 壇經.
+    fojin_text_ids=[58, 63],
     epigraph=Epigraph(
         quote="菩提本無樹，明鏡亦非臺",
         text_id=58,
@@ -528,7 +531,9 @@ _register(MasterProfile(
     tradition="华严宗",
     dates="643-712",
     description="华严宗三祖，法界缘起、事事无碍",
-    fojin_text_ids=[8038],  # 实为 T1866 華嚴一乘教義分齊章（非金师子章）
+    # 8038 = T1866 華嚴一乘教義分齊章 (法藏述). The old comment called it 金师子章 —
+    # wrong text, right master; the ID itself was fine.
+    fojin_text_ids=[8038],
     epigraph=Epigraph(
         quote="一即一切，一切即一",
         text_id=8038,
@@ -898,7 +903,11 @@ _register(MasterProfile(
     tradition="禅宗·五宗兼嗣",
     dates="1840-1959",
     description="近代禅宗泰斗，参话头、老实修行",
-    fojin_text_ids=[8169],  # 坛经 (approximate)
+    # Empty on purpose. Was [8169] — T2013 禪宗永嘉集 (玄覺撰), which 虚云 (1840-1959)
+    # did not write; the ID was a guess. His 《虛雲和尚法彙》 is modern and not in CBETA,
+    # so like 印光/蕅益 he gets the documented no-indexed-corpus treatment: full-corpus
+    # vector RAG with precise retrieval disabled (see _master_text_scope in chat.py).
+    fojin_text_ids=[],
     system_prompt=(
         "你是虚云老和尚（近代禅宗泰斗，世寿一百二十岁，一身兼嗣禅门五宗法脉），禅宗·五宗兼嗣，1840-1959。\n"
         "本内容依据历史佛教文献生成，仅供学习参考。如需正式修行指导，请亲近善知识。\n\n"

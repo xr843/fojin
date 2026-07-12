@@ -63,6 +63,49 @@ def test_epigraph_points_at_the_verified_source(master_id, expected):
     assert ep.text_id == text_id
 
 
+def test_epigraph_text_lies_inside_the_masters_own_rag_scope():
+    """The line on a master's card must come from a text that master is scoped to.
+
+    This is the invariant that would have caught the 慧能 bug: his fojin_text_ids
+    were guessed ([8169, 6513] — 永嘉集 by 玄覺, and 法華經), so the persona was
+    hard-scoped to a text he did not write and could never cite 壇經 — while his
+    card quotes 壇經. Card and RAG scope disagreeing is the smell; assert they can't.
+
+    Masters with an EMPTY scope are exempt: `[]` means "no indexed corpus" (see
+    _master_text_scope in chat.py) and those masters carry no epigraph anyway.
+    """
+    for mid, m in MASTERS.items():
+        if m.epigraph is None or not m.fojin_text_ids:
+            continue
+        assert m.epigraph.text_id in m.fojin_text_ids, (
+            f"{mid}: card quotes text_id={m.epigraph.text_id} "
+            f"({m.epigraph.cbeta_id}) but the persona is scoped to "
+            f"{m.fojin_text_ids} — the master cannot actually cite his own epigraph."
+        )
+
+
+# The RAG scope is a HARD filter, and getting it wrong is not cosmetic: a 2026-05-07
+# production trace had 楞严经 leaking into Ajahn Chah's context. These IDs were
+# resolved against the live corpus on 2026-07-12 — pin them so a future guess can't
+# silently replace a verified id.
+EXPECTED_SCOPE = {
+    "nagarjuna": [39, 40, 41, 7806, 7708],  # 大智度論/中論/十二門論/迴諍論/十住毘婆沙論
+    "zhiyi": [53, 52, 8085, 6513],  # 摩訶止觀/法華文句/小止觀/法華經
+    "huineng": [58, 63],  # 六祖壇經 T2008 / 金剛經 T0235b
+    "fazang": [8038],  # 華嚴一乘教義分齊章 T1866
+    "kumarajiva": [6513],  # 妙法蓮華經 T0262（其译）
+    "xuyun": [],  # 《法彙》不在 CBETA — no indexed corpus
+}
+
+
+@pytest.mark.parametrize(("master_id", "expected"), sorted(EXPECTED_SCOPE.items()))
+def test_master_rag_scope_pinned_to_verified_text_ids(master_id, expected):
+    assert MASTERS[master_id].fojin_text_ids == expected, (
+        f"{master_id}: RAG scope changed. text_ids are a hard filter — verify any new "
+        f"id actually is that master's own work before changing this."
+    )
+
+
 def test_list_masters_exposes_epigraph_to_the_frontend():
     masters = list_masters()
     assert len(masters) == len(MASTERS)
