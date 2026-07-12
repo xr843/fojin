@@ -103,9 +103,16 @@ export default function DraggableModal({ open, title, onCancel, width = 880, chi
           {title}
         </div>
       }
+      /* The wrapper IS the sized, resizable box (see .fj-dm-box). It must be —
+         if the sizing lived on .ant-modal-content instead, this wrapper would
+         stretch to the full width of .ant-modal and two things would break:
+         the dialog would sit left-aligned rather than centred, and the drag
+         clamp below would measure the full-width wrapper and let you throw the
+         dialog clean off the screen. */
       modalRender={(node) => (
         <div
           ref={wrapRef}
+          className="fj-dm-box"
           style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}
         >
           {node}
