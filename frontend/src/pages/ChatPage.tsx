@@ -35,6 +35,7 @@ const ShareCard = lazy(() => import("../components/ShareCard"));
 const CitationDrawer = lazy(() => import("../components/CitationDrawer"));
 import ChatModelSelector from "../components/ChatModelSelector";
 import MasterGallery, { MasterSeal } from "../components/MasterGallery";
+import DraggableModal from "../components/DraggableModal";
 import { getMasters } from "../api/client";
 import type { CitationTarget } from "../components/CitationDrawer";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -1541,13 +1542,11 @@ export default function ChatPage() {
                 {t("chat.master_disclaimer")}
               </div>
             )}
-            <Modal
+            <DraggableModal
               open={galleryOpen}
               onCancel={() => setGalleryOpen(false)}
-              footer={null}
               width={880}
               title={t("chat.gallery_title")}
-              destroyOnClose
             >
               <MasterGallery
                 selectedId={masterId}
@@ -1559,7 +1558,7 @@ export default function ChatPage() {
                   window.open(`/texts/${textId}/read?juan=${juan}`, "_blank", "noopener")
                 }
               />
-            </Modal>
+            </DraggableModal>
             {!user && !keyStatus?.has_api_key && quota && quota.remaining >= 0 && (
               <Alert
                 message={<span>{t("chat.quota_info", { limit: quota.limit, remaining: quota.remaining })}<a onClick={() => navigate("/login")}>{t("chat.login")}</a>{t("chat.login_quota_hint")}</span>}
