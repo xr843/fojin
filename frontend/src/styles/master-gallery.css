@@ -185,11 +185,16 @@
 
 /* ── Source line: every quote carries its citation and its verified state,
       in the same vocabulary the chat answers already use. ── */
+/* Kept to a single row: a long title (《六祖大師法寶壇經》,《華嚴一乘教義分齊章》)
+   would otherwise wrap and push the ↗ onto its own line, so cards in the same
+   row ended up different heights. The title truncates; the CBETA id — the part
+   you actually cite — always stays visible. */
 .mg-src {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  min-width: 0;
   font-size: 11.5px;
   color: var(--fj-ink-muted, #9a8e7a);
 }
@@ -197,6 +202,15 @@
 .mg-ref {
   font-family: "Noto Serif SC", "Source Han Serif SC", serif;
   color: var(--fj-ink-light, #5c4f3d);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mg-badge,
+.mg-open {
+  flex-shrink: 0;
 }
 
 .mg-badge {
