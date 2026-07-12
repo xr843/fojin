@@ -34,7 +34,7 @@ import {
 const ShareCard = lazy(() => import("../components/ShareCard"));
 const CitationDrawer = lazy(() => import("../components/CitationDrawer"));
 import ChatModelSelector from "../components/ChatModelSelector";
-import MasterGallery, { MasterSeal, MasterSealStrip } from "../components/MasterGallery";
+import MasterGallery, { MasterSeal } from "../components/MasterGallery";
 import { getMasters } from "../api/client";
 import type { CitationTarget } from "../components/CitationDrawer";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -1461,16 +1461,6 @@ export default function ChatPage() {
                   </div>
                 )}
 
-                {/* 祖师长廊, as a strip. The full gallery is ~960px — taller than
-                    the viewport — so inlining it buried the one thing this page is
-                    for (asking a question) under a wall of cards, complete with a
-                    scroll-inside-a-scroll. The seals stay visible because they are
-                    what makes anyone curious; the depth is one click away. */}
-                <MasterSealStrip
-                  selectedId={masterId}
-                  onSelect={setMasterId}
-                  onOpenAll={() => setGalleryOpen(true)}
-                />
               </div>
             )}
             {messages.map((m) => (
