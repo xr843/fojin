@@ -36,7 +36,7 @@ fojin/
 │   │   ├── schemas/         # Pydantic 请求/响应模型
 │   │   ├── core/            # 基础设施：elasticsearch、rate_limit、auth、exceptions、xml_parser
 │   │   └── data/            # 内置静态数据
-│   ├── alembic/versions/    # 数据库迁移（156 个，schema 演进史）
+│   ├── alembic/versions/    # 数据库迁移（166 个，schema 演进史，最新到 0170）
 │   ├── scripts/             # 数据导入/构建脚本（build_alignments、extract_structured_kg…）
 │   ├── eval/                # 检索/问答质量评测
 │   ├── tests/               # pytest 测试
@@ -98,11 +98,12 @@ app/services/*.py     业务层：核心逻辑都在这（RAG、检索、对齐�
 | **问答（产品核心）** | `chat.py` | `/chat`、`/chat/stream`（SSE）、附件、模型列表、法师、配额、热门问题、会话/消息历史 |
 | 搜索 | `search.py` / `search_unified.py` | 全文/全文内容检索、建议、筛选（走 ES） |
 | 经文 | `texts.py` | 经文元数据、卷（juan）内容读取 |
-| 对齐/跨藏 | `alignment.py` | 跨藏对照面板、catalog（带预热缓存） |
+| 对齐/跨藏 | `alignment.py` / `alignment_review.py` | 跨藏对照面板（chunk/句级）、catalog（带预热缓存）、`/admin` 飞轮候选复核 |
 | 知识图谱 | `knowledge_graph.py` / `relations.py` | 实体、关系、图遍历、平行对读 |
 | 辞典 | `dictionary.py` | 六部辞典检索 |
 | FRBR 作品 | `works.py` | 作品脊椎（只读） |
-| 引用/导出 | `citations.py` / `exports.py` | BibTeX/RIS/Chicago 引用、PDF/EPUB 导出 |
+| 引用/导出 | `citations.py` / `exports.py` | BibTeX/RIS/Chicago 引用、PDF/EPUB 导出、KG 导出、`/exports/alignments.jsonl`（版本化+许可的对齐数据集） |
+| 搜索（跨语） | `search.py` | 另含 `/search/parallel-sentences`：输入汉文→返回梵/藏对齐句（基于 MITRA） |
 | 用户体系 | `auth.py` / `bookmarks.py` / `history.py` / `annotations.py` / `notification.py` | 认证、书签、阅读历史、批注、通知 |
 | 数据源 | `sources.py` / `source_suggestions.py` / `feed.py` | 数据源信息、社区推荐、动态流 |
 | 统计/后台 | `stats.py` / `admin.py` / `feedback.py` | 仪表盘、时间线、管理后台、反馈 |
@@ -117,10 +118,14 @@ app/services/*.py     业务层：核心逻辑都在这（RAG、检索、对齐�
 |---|---|---|
 | `chat.py` | ~1755 | ★ 问答总控：会话/消息 CRUD、`send_message` / `send_message_stream`（SSE）、配额、热门问题 |
 | `master_profiles.py` | ~1390 | 14 位法师人格（三大传统） |
-| `rag_retrieval.py` | ~807 | ★ RAG 检索：`retrieve_rag_context`（向量+全文召回，喂给 LLM） |
+| `rag_retrieval.py` | ~1030 | ★ RAG 检索：`retrieve_rag_context`（向量+全文召回）+ 跨藏对读注入（`_attach_parallel_chunks` / `_attach_mitra_parallels`，MITRA 按 `mitra_e_score` 质量门过滤） |
 | `search.py` | ~829 | 检索逻辑（ES 查询构造、高亮、聚合、collapse） |
 | `knowledge_graph.py` | ~797 | 知识图谱查询与图遍历 |
 | `citation_guard.py` / `citation.py` / `quote_verifier.py` | — | 引用守卫与核验（防 LLM 引用幻觉） |
+| `alignment_read_model.py` | — | ★ 对齐统一读模型：把 `alignment_pairs`/`mitra_alignments`/`text_relations`/`sentence_alignments` 归一为 `ParallelRecord`，供 API 与阅读器消费 |
+| `alignment_flywheel.py` | — | 对齐飞轮：kNN + 锚点扩展挖候选 → `alignment_candidates` → 人工复核 → 入库 |
+| `sentence_align.py` | — | 句级对齐核心：句切分 + 纯 Python bertalign DP（喂 `scripts/refine_sentence_alignments.py`） |
+| `alignment_export.py` / `alignment_coverage.py` | — | 数据集导出（CLI+端点共用）、跨藏覆盖率统计 |
 | `precise_retrieval.py` | — | 精确召回（本经/卷级定位） |
 | `embedding.py` | — | 向量化（BGE-M3，对接 embedding API） |
 | `llm_catalog.py` | — | 多 LLM 供应商目录（OpenAI/Anthropic/DeepSeek/DashScope/Gemini…） |
@@ -130,7 +135,7 @@ app/services/*.py     业务层：核心逻辑都在这（RAG、检索、对齐�
 
 ### 4.3 数据模型 `app/models/`（SQLAlchemy → PostgreSQL）
 
-`text`（经文）、`chat`（会话/消息）、`user`、`knowledge_graph`、`relation`、`work`（FRBR）、`dictionary`、`source`、`annotation`、`feedback`、`feed`、`notification`、`iiif`、`gaiji`、`audit`、`hot_question`、`ai_diff_cache`。
+`text`（经文）、`chat`（会话/消息）、`user`、`knowledge_graph`、`relation`、`work`（FRBR）、`dictionary`、`source`、`annotation`、`feedback`、`feed`、`notification`、`iiif`、`gaiji`、`audit`、`hot_question`、`ai_diff_cache`，以及对齐层的 `alignment_candidate`（飞轮候选）、`sentence_alignment`（句级对齐）。另有无独立模型文件、仅由迁移建表的对齐存量：`alignment_pairs`（chunk 级 LLM 校验对）、`mitra_alignments`（~89.6 万条 MITRA 梵/藏↔汉 句对）、`text_relations`（SuttaCentral 整经级）。
 
 > 注意：**表名 ≠ 模型类名**（例如模型类 `BuddhistSource` 对应表 `data_sources`）。写迁移前务必先 `\dt` 核对真实表名。
 
@@ -145,7 +150,7 @@ app/services/*.py     业务层：核心逻辑都在这（RAG、检索、对齐�
 | **Redis 7** | 缓存 / 限流 / 配额 | 跨藏 catalog 预热、匿名问答配额、用户活跃节流 |
 | **LLM/Embedding API** | 问答生成 + 向量化 | 多供应商；默认走上游，可指向本地 vLLM/Ollama 离线部署 |
 
-**数据库迁移**：`backend/alembic/versions/`（156 个）。部署前务必核对生产 `alembic_version` 与文件链，避免撞链。新增数据源走 alembic 迁移（不走后台 UI）。
+**数据库迁移**：`backend/alembic/versions/`（166 个，最新 0170）。部署前务必核对生产 `alembic_version` 与文件链，避免撞链。新增数据源走 alembic 迁移（不走后台 UI）。
 
 ---
 
@@ -187,6 +192,28 @@ app/services/*.py     业务层：核心逻辑都在这（RAG、检索、对齐�
 > - **SSE 流里 session 生命周期是反复踩坑点**：跨 session 只传 primitive（id），不要传 detached ORM 对象；写侧/读侧都出过"卡在『正在检索经文并生成回答』"。
 > - **service 层截断 cap 与 schema cap 必须同步**，否则 reader 模式 422。
 > - **SSE 静默失败必须 `logger.warning`**，否则前端只看到通用"请求失败"。
+
+### 6.1 对齐层（跨藏对读）——第二条值得读的链路
+
+跨语言经文对齐是 FoJin 的核心护城河之一，是一个多存量、带质检飞轮的子系统。四个物理存量各由不同机制产生，经**统一读模型**对外呈现：
+
+```
+存量（migration 建表）                    产生方式
+  alignment_pairs        chunk 级 LLM 校验对   ← scripts/build_alignments.py（pgvector 召回→margin 三带路由→DeepSeek 校验）
+  mitra_alignments       ~89.6万 梵/藏↔汉句对  ← scripts/import_mitra_alignments.py（MITRA 数据集，mitra_e_score 质量分）
+  text_relations         整经级 SC 平行         ← SuttaCentral Akanuma 表
+  sentence_alignments    句级对齐（char 偏移锚） ← scripts/refine_sentence_alignments.py（sentence_align.py 纯 DP）
+        │
+        ▼
+  services/alignment_read_model.py   归一为 ParallelRecord（方向无关、集合查询无 N+1；MITRA 常量 1.0 标记为 import_flag）
+        │
+        ├──► api/alignment.py         /alignment/chunks·/juans·/canonical·/sentences（句级 ship-dark，enable_sentence_parallels）
+        ├──► services/rag_retrieval   [跨藏对读] 注入 LLM 上下文（MITRA 按 mitra_e_score 质量门过滤）
+        ├──► api/search.py            /search/parallel-sentences 跨语句级搜索
+        └──► api/exports.py           /exports/alignments.jsonl 版本化+许可数据集导出
+```
+
+**飞轮闭环**：`alignment_flywheel.py`（kNN + 锚点扩展）挖候选 → `alignment_candidates` 表 → 管理员在 `/admin/alignment/review` 人工复核 → accept 即以 `method='flywheel-verified'` 入 `alignment_pairs`。**质检**：`backend/eval/` 有独立的对齐质量金标集 + precision/recall/校准指标 + 回归门禁（与 RAG eval 同构）。**稳定锚点**：`alignment_pairs`/`sentence_alignments` 用 `(text_id,juan,char_start/end)` 字符偏移引用 `text_contents`，重分块不会静默毁对齐（migration 0168 起）。
 
 ---
 
@@ -273,12 +300,14 @@ API 文档：后端起来后访问 `/docs`（Swagger）或 `/redoc`。
 | **SSE** | Server-Sent Events，问答回答逐 token 流式推送的传输方式 |
 | **CBETA** | 中华电子佛典协会，最大的中文佛典数据源（约 2.84 亿字入库） |
 | **gaiji（缺字）** | CBETA 中无 Unicode 码位的生僻字，需规范化别名做检索匹配 |
-| **对齐 / 跨藏对照** | 不同语言/藏经版本的经文逐段对应（汉↔藏↔梵↔巴），见 `alignment` 模块 |
+| **对齐 / 跨藏对照** | 不同语言/藏经版本的经文对应（汉↔藏↔梵↔巴），有 chunk 级、句级、整经级三种粒度，见 §6.1 与 `alignment` 模块 |
+| **对齐飞轮** | 从已验证对齐向外挖候选 → 人工复核 → 入库的自增闭环（`alignment_flywheel.py` + `/admin/alignment/review`） |
+| **句级对齐** | 在已对齐段落内用 bertalign 式 DP 细分到句对（1-1/1-2/2-1），存 `sentence_alignments`，带字符偏移锚点 |
 | **FRBR Work（作品脊椎）** | 把同一部经的不同译本/版本归到一个抽象"作品"下，见 `works` 模块 |
 | **KG（知识图谱）** | 人物、经文、宗派、概念之间的实体与关系网 |
 | **法师模式（master）** | 14 位高僧大德的 AI 教学人格（三大传统），见 `master_profiles.py` |
 | **典津（dianjin）** | 跨平台古籍联邦检索（可选模块），与商业"典津"无关 |
-| **MITRA / Dharmamitra** | 外部佛典开源对齐/embedding 栈，可接入对齐与 RAG 主线 |
+| **MITRA / Dharmamitra** | 外部佛典开源对齐/embedding 栈（CC-BY-SA）；`mitra_alignments` 已入 ~89.6 万梵/藏↔汉句对，`mitra_e_score` 为质量代理分，供跨语搜索与 RAG 对读 |
 | **IIIF** | 国际图像互操作框架，用于经文写本图像交付 |
 | **alembic** | 数据库迁移工具，`backend/alembic/versions/` 记录 schema 演进 |
 

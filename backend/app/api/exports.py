@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import async_session, get_db
 from app.models.knowledge_graph import KGEntity, KGRelation
 from app.models.text import BuddhistText
+from app.services import alignment_export
 
 logger = logging.getLogger(__name__)
 
@@ -309,4 +310,47 @@ async def export_kg_jsonld(
         generate_jsonld(),
         media_type="application/ld+json; charset=utf-8",
         headers={"Content-Disposition": "attachment; filename=fojin_kg.jsonld"},
+    )
+
+
+@router.get("/alignments.jsonl")
+async def export_alignments_jsonl(
+    granularity: str = Query(
+        "chunk", pattern="^(chunk|sentence)$", description="chunk pairs or sentence refinement"
+    ),
+    min_confidence: float = Query(
+        0.0, ge=0.0, le=1.0, description="minimum confidence (chunk) / similarity (sentence)"
+    ),
+    methods: str | None = Query(
+        None,
+        description="comma-separated method filter, e.g. manual,expert,flywheel-verified",
+    ),
+):
+    """导出跨藏对齐数据集为 JSONL（第一行是数据集卡片，含许可信息）。
+
+    Streams the same license-stamped JSONL the CLI exporter produces (shared
+    ``services/alignment_export``). Line 1 is the dataset card (aggregated
+    per-source licenses + record count); every subsequent line is one record.
+    Each batch runs in its own short-lived session, so a slow download never
+    pins a pooled connection for the whole response.
+    """
+    method_list = [m.strip() for m in methods.split(",") if m.strip()] if methods else None
+
+    async def generate():
+        async for line in alignment_export.iter_jsonl(
+            granularity=granularity,
+            version=alignment_export.DEFAULT_VERSION,
+            generated_at=None,  # runtime forbids wall-clock here; card omits the date
+            min_confidence=min_confidence,
+            methods=method_list,
+        ):
+            yield line
+
+    return StreamingResponse(
+        generate(),
+        media_type="application/x-ndjson; charset=utf-8",
+        headers={
+            "Content-Disposition": f"attachment; filename=fojin_alignments_{granularity}.jsonl",
+            "Cache-Control": "public, max-age=3600",
+        },
     )

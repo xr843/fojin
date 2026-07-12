@@ -2,6 +2,7 @@ import asyncio
 import time
 
 from fastapi import APIRouter, Depends, Query, Request
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +16,7 @@ from app.services.search import (
     get_suggestions,
     search_content,
     search_cross_language,
+    search_parallel_sentences,
     search_semantic,
     search_texts,
 )
@@ -173,6 +175,58 @@ async def semantic_search(
     # Strip first so blank/whitespace-only queries short-circuit before the
     # paid embedding call and can't each bust the embedding cache.
     return await search_semantic(db, q.strip(), size, dynasty, category, lang, sources)
+
+
+# --- Cross-lingual parallel sentences (MITRA) ------------------------------
+# Response schema defined inline here (mirrors api/alignment.py's inline
+# ParallelPair/*Response contracts) rather than in schemas/text.py.
+
+
+class ParallelSentenceHit(BaseModel):
+    """One aligned sentence pair from mitra_alignments (MITRA, CC BY-SA 4.0).
+
+    ``foreign_text`` is the inline Sanskrit/Tibetan sentence; ``zh_text`` is its
+    Chinese counterpart. ``mitra_e_score`` is a nullable quality proxy (NULL
+    until a prod backfill runs — unscored rows are still returned).
+    """
+    zh_text: str
+    foreign_text: str
+    foreign_lang: str
+    taisho_id: str
+    text_id: int
+    title: str = ""
+    juan_num: int | None = None
+    mitra_e_score: float | None = None
+    source: str = "mitra-parallel"
+    license: str = "CC-BY-SA-4.0"
+
+
+class ParallelSentencesResponse(BaseModel):
+    total: int
+    results: list[ParallelSentenceHit]
+    error: str | None = None
+
+
+@router.get("/search/parallel-sentences", response_model=ParallelSentencesResponse)
+async def parallel_sentences_search(
+    q: str = Query("", max_length=200, description="中文关键词（跨语对照）"),
+    lang: str = Query("all", description="外语筛选 (sa 梵 / bo 藏 / all 全部)"),
+    limit: int = Query(20, ge=1, le=50, description="返回数量"),
+    db: AsyncSession = Depends(get_db),
+) -> ParallelSentencesResponse:
+    """Cross-lingual sentence search over MITRA parallels.
+
+    输入中文短语，返回对齐的梵/藏语句及其汉文对照与出处（MITRA 平行语料，
+    CC BY-SA 4.0）。以 pg_trgm 相似度对 zh_text 排序，mitra_e_score 降序
+    （NULL 宽容），支持按外语语种筛选。数据覆盖随导入逐步增长，空结果为常态。"""
+    # Strip first so blank/whitespace-only queries short-circuit before any
+    # DB scan (search_parallel_sentences also guards, but keep the router thin
+    # and consistent with /search/semantic).
+    rows = await search_parallel_sentences(db, q.strip(), lang, limit)
+    return ParallelSentencesResponse(
+        total=len(rows),
+        results=[ParallelSentenceHit(**r) for r in rows],
+    )
 
 
 _filters_cache: dict = {"data": None, "expires": 0}

@@ -446,6 +446,37 @@ export async function searchSemantic(params: {
   return data;
 }
 
+// 跨语对照搜索（MITRA 平行语料）: 输入中文短语，返回对齐的梵/藏语句及其汉文对照
+export interface ParallelSentenceHit {
+  zh_text: string;
+  foreign_text: string;
+  foreign_lang: string;
+  taisho_id: string;
+  text_id: TextId;
+  title: string;
+  juan_num: number | null;
+  mitra_e_score: number | null;
+  source: string;
+  license: string;
+}
+
+export interface ParallelSentencesResponse {
+  total: number;
+  results: ParallelSentenceHit[];
+  error?: string;
+}
+
+export async function searchParallelSentences(
+  q: string,
+  opts: { lang?: string; limit?: number } = {},
+): Promise<ParallelSentencesResponse> {
+  const { data } = await api.get<ParallelSentencesResponse>("/search/parallel-sentences", {
+    params: { q, lang: opts.lang, limit: opts.limit },
+    timeout: 30000,
+  });
+  return data;
+}
+
 export async function getSearchSuggestions(q: string): Promise<string[]> {
   const { data } = await api.get<{ suggestions: string[] }>("/search/suggest", { params: { q } });
   return data.suggestions;
@@ -749,19 +780,22 @@ export async function getKGStats(): Promise<KGStats> {
   return data;
 }
 
+// /kg/geo is serialized with exclude_none (the payload is ~65k entities; emitting
+// the mostly-null fields as explicit nulls cost ~5.5MB of raw JSON), so every
+// nullable field may be ABSENT rather than null. Compare with `!= null`, never `!== null`.
 export interface KGGeoEntity {
   id: number;
   entity_type: string;
   name_zh: string;
-  name_en: string | null;
-  description: string | null;
+  name_en?: string | null;
+  description?: string | null;
   latitude: number;
   longitude: number;
-  year_start: number | null;
-  year_end: number | null;
-  province: string | null;
-  city: string | null;
-  district: string | null;
+  year_start?: number | null;
+  year_end?: number | null;
+  province?: string | null;
+  city?: string | null;
+  district?: string | null;
 }
 
 export interface KGGeoResponse {
@@ -1565,6 +1599,55 @@ export async function getFullParallelContent(textId: number): Promise<FullParall
   return data;
 }
 
+// --- Sentence-level alignment (逐句对读, P4-C frozen contract) ---
+// GET /api/alignment/sentences/{text_id}/{juan_num} — side_a is always the
+// requested text (current juan, Chinese side), side_b the counterpart foreign
+// text (carries its own text_id/juan_num for future deep-linking). Ships dark:
+// an empty sentence_alignments table (or the flag off) yields total=0 / pairs=[]
+// and never errors.
+export interface SentenceSideA {
+  char_start: number;
+  char_end: number;
+  lang: string;
+  text: string;
+}
+
+export interface SentenceSideB {
+  text_id: number;
+  juan_num: number;
+  char_start: number;
+  char_end: number;
+  lang: string;
+  title: string;
+  text: string;
+}
+
+export interface SentencePair {
+  side_a: SentenceSideA;
+  side_b: SentenceSideB;
+  similarity: number;
+  align_type: "1-1" | "1-2" | "2-1";
+  method: string;
+  is_verified: boolean;
+}
+
+export interface SentenceAlignmentResponse {
+  text_id: number;
+  juan_num: number;
+  total: number;
+  pairs: SentencePair[];
+}
+
+export async function getSentenceParallels(
+  textId: number,
+  juanNum: number,
+): Promise<SentenceAlignmentResponse> {
+  const { data } = await api.get<SentenceAlignmentResponse>(
+    `/alignment/sentences/${textId}/${juanNum}`,
+  );
+  return data;
+}
+
 export interface ChunkContextResponse {
   text_id: TextId;
   juan_num: number;
@@ -2202,4 +2285,70 @@ export async function getAlignmentCoverage(
     { params: { limit } },
   );
   return data;
+}
+
+// --- Admin: cross-canon alignment candidate review (flywheel) ---
+
+export interface AlignmentCandidate {
+  id: number;
+  text_a_id: number;
+  text_a_title: string | null;
+  text_a_juan_num: number;
+  text_a_lang: string;
+  text_b_id: number;
+  text_b_title: string | null;
+  text_b_juan_num: number;
+  text_b_lang: string;
+  similarity: number;
+  source: string;
+  status: string;
+}
+
+export async function getAlignmentCandidates(
+  limit = 50,
+): Promise<AlignmentCandidate[]> {
+  const { data } = await api.get<AlignmentCandidate[]>(
+    "/admin/alignment-candidates",
+    { params: { limit } },
+  );
+  return data;
+}
+
+export async function reviewAlignmentCandidate(
+  id: number,
+  accept: boolean,
+): Promise<AlignmentCandidate> {
+  const { data } = await api.post<AlignmentCandidate>(
+    `/admin/alignment-candidates/${id}/review`,
+    { accept },
+  );
+  return data;
+}
+
+// ── Buddhist master personas (祖师长廊) ───────────────────────────────────────
+
+/** A representative line, quoted verbatim from a text FoJin hosts and checked
+ *  against the master's OWN work. Null on the profile when our corpus holds none
+ *  of the master's writing — we show that plainly rather than an unbacked line. */
+export interface MasterEpigraph {
+  quote: string;
+  text_id: number;
+  cbeta_id: string;
+  title_zh: string;
+  juan: number;
+}
+
+export interface MasterProfile {
+  id: string;
+  name_zh: string;
+  name_en: string;
+  tradition: string;
+  dates: string;
+  description: string;
+  epigraph: MasterEpigraph | null;
+}
+
+export async function getMasters(): Promise<MasterProfile[]> {
+  const { data } = await api.get<{ masters: MasterProfile[] }>("/chat/masters");
+  return data.masters;
 }

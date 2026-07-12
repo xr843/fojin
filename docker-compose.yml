@@ -145,6 +145,8 @@ services:
       ALIYUN_SMS_ACCESS_KEY_SECRET: ${ALIYUN_SMS_ACCESS_KEY_SECRET:-}
       ALIYUN_SMS_SIGN_NAME: ${ALIYUN_SMS_SIGN_NAME:-佛津}
       ALIYUN_SMS_TEMPLATE_CODE: ${ALIYUN_SMS_TEMPLATE_CODE:-}
+      # 逐句对读 (sentence-level parallel) — ship-dark flag, reads from .env; default false.
+      ENABLE_SENTENCE_PARALLELS: ${ENABLE_SENTENCE_PARALLELS:-false}
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     volumes:
@@ -215,6 +217,8 @@ services:
       ALIYUN_SMS_ACCESS_KEY_SECRET: ${ALIYUN_SMS_ACCESS_KEY_SECRET:-}
       ALIYUN_SMS_SIGN_NAME: ${ALIYUN_SMS_SIGN_NAME:-佛津}
       ALIYUN_SMS_TEMPLATE_CODE: ${ALIYUN_SMS_TEMPLATE_CODE:-}
+      # 逐句对读 (sentence-level parallel) — ship-dark flag, reads from .env; default false.
+      ENABLE_SENTENCE_PARALLELS: ${ENABLE_SENTENCE_PARALLELS:-false}
     ports:
       - "127.0.0.1:8001:8000"
     volumes:
