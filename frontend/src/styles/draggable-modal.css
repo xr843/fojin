@@ -1,28 +1,36 @@
 /* Draggable + resizable dialog. See components/DraggableModal.tsx.
    The drag is JS; the resize is the browser's own grip — no library. */
 
-/* antd puts the size on .ant-modal. Move it onto the content box so the native
-   `resize` grip actually governs the dialog, and let .ant-modal shrink-wrap. */
+/* Let .ant-modal shrink out of the way: the box below owns the size. */
 .fj-dm.ant-modal {
   width: auto !important;
-  max-width: 96vw;
   padding-bottom: 0;
 }
 
-.fj-dm .ant-modal-content {
-  /* Starting size; the user drags the grip from here. */
+/* THE box: sized, resizable, and centred. The sizing has to live here rather
+   than on .ant-modal-content — otherwise this wrapper stretches to the full
+   width of .ant-modal, which both left-aligns the dialog and makes the drag
+   clamp (which measures this element) useless. */
+.fj-dm-box {
   width: var(--fj-dm-w, 880px);
   height: var(--fj-dm-h, 640px);
   min-width: 460px;
   min-height: 320px;
   max-width: 96vw;
   max-height: 86vh;
+  margin: 0 auto; /* centred; the drag transform is a delta from here */
 
-  /* `resize` has no effect while overflow is visible — hidden enables the grip,
-     and the body below carries the scrolling. */
+  /* `resize` is ignored while overflow is visible — hidden turns on the grip,
+     and .ant-modal-body below carries the scrolling. */
   resize: both;
   overflow: hidden;
 
+  display: flex;
+}
+
+.fj-dm-box > .ant-modal-content {
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
 }
@@ -35,7 +43,7 @@
 
 .fj-dm .ant-modal-body {
   flex: 1;
-  min-height: 0; /* let it actually shrink inside the flex column */
+  min-height: 0; /* so it can actually shrink inside the flex column */
   overflow-y: auto;
   padding-top: 12px;
 }
@@ -45,13 +53,12 @@
   cursor: move;
   user-select: none;
   -webkit-user-select: none;
-  touch-action: none; /* so a drag doesn't scroll the page on touch/pen */
+  touch-action: none; /* a drag must not scroll the page under it */
   padding: 2px 0;
 }
 
-/* Make the native resize grip visible against the paper ground — the default
-   is nearly invisible on a light card. */
-.fj-dm .ant-modal-content::-webkit-resizer {
+/* The native resize grip is nearly invisible on a light paper ground. */
+.fj-dm-box::-webkit-resizer {
   background: linear-gradient(
     135deg,
     transparent 0 45%,
@@ -64,7 +71,7 @@
 
 @media (max-width: 640px) {
   /* Dragging a dialog around a phone screen is not a feature. */
-  .fj-dm .ant-modal-content {
+  .fj-dm-box {
     width: 96vw;
     height: 80vh;
     min-width: 0;
