@@ -179,12 +179,15 @@ export default function MasterGallery({ selectedId, onSelect, onOpenSource }: Pr
                   </span>
                 </>
               ) : (
-                <>
-                  <span className="mg-quote mg-quote-none">{t("chat.epigraph_none")}</span>
-                  <span className="mg-src">
-                    <span className="mg-badge mg-badge-none">— {t("chat.epigraph_unset")}</span>
-                  </span>
-                </>
+                /* No verified line for this master — our corpus holds none of his
+                   own writing. That is a reason to show no QUOTE; it was never a
+                   reason to show an empty card. The editorial description says what
+                   this lineage is about, which is what someone picking one actually
+                   needs. Deliberately no quote marks, no citation and no badge: the
+                   card makes no claim to be quoting him, so it cannot be wrong about
+                   one. Half a gallery of "not set" placeholders reads as unfinished,
+                   not as principled. */
+                <span className="mg-desc">{m.description}</span>
               )}
             </button>
           );
