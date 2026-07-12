@@ -167,27 +167,32 @@
   background: var(--fj-border, #d9d0c1);
 }
 
-/* ── The quote: the typographic hero of the card ── */
-.mg-quote {
-  display: block;
-  font-family: "Noto Serif SC", "Source Han Serif SC", serif;
-  font-size: 15px;
-  line-height: 1.8;
-  color: var(--fj-ink, #2b2318);
-  min-height: 3.6em;
-}
-
-/* The fallback when we hold none of a master's own writing: his editorial
-   description. Set apart from a quote on purpose — no 「」, no citation, no
-   badge, and a lighter weight — so it can never be mistaken for something we
-   are claiming he said. */
+/* ── The description: the spine. Every card has one, because it answers the
+      question someone browsing actually has — "which of these do I pick?".
+      It is OUR editorial prose, so it is set plainly: no 「」, no citation, no
+      badge. It must never be mistakable for something we claim he said. ── */
 .mg-desc {
   display: block;
   font-family: "Noto Serif SC", "Source Han Serif SC", serif;
   font-size: 13.5px;
   line-height: 1.8;
   color: var(--fj-ink-light, #5c4f3d);
-  min-height: 3.6em;
+  min-height: 2.8em; /* ~2 lines, so a short description doesn't collapse the card */
+}
+
+/* ── The quote: the evidence, and a different job from the description above.
+      Only the seven masters whose own writing we host can carry one. Set darker
+      and larger than the description it follows — this is the quotation, and the
+      one thing on the card the reader can go and verify. ── */
+.mg-quote {
+  display: block;
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--fj-border, #d9d0c1);
+  font-family: "Noto Serif SC", "Source Han Serif SC", serif;
+  font-size: 14.5px;
+  line-height: 1.8;
+  color: var(--fj-ink, #2b2318);
 }
 
 /* ── Source line: every quote carries its citation and its verified state,

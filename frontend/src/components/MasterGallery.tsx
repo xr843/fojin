@@ -148,7 +148,23 @@ export default function MasterGallery({ selectedId, onSelect, onOpenSource }: Pr
 
               <span className="mg-rule" />
 
-              {ep ? (
+              {/* The description is the spine — every card has one, because it is
+                  what answers the question someone browsing here actually has:
+                  "which of these should I pick?". 「眾因緣生法，我說即是空」 is a
+                  beautiful line, but to anyone who doesn't already know 中观 it
+                  answers nothing.
+
+                  The verified quote below is a different job, and only the seven
+                  masters whose own writing we host can do it: the description is
+                  OUR editorial prose (you can only take our word for it), while
+                  the quote is from the canon, checked character-by-character, and
+                  linked to the passage (you can go check us). Every card says what
+                  it is; seven also say "don't take my word — here's the source."
+                  That is the whole product, in one line, and it is why the quote
+                  is an addition here and never a replacement. */}
+              <span className="mg-desc">{m.description}</span>
+
+              {ep && (
                 <>
                   <span className="mg-quote">「{ep.quote}」</span>
                   <span className="mg-src">
@@ -178,16 +194,6 @@ export default function MasterGallery({ selectedId, onSelect, onOpenSource }: Pr
                     )}
                   </span>
                 </>
-              ) : (
-                /* No verified line for this master — our corpus holds none of his
-                   own writing. That is a reason to show no QUOTE; it was never a
-                   reason to show an empty card. The editorial description says what
-                   this lineage is about, which is what someone picking one actually
-                   needs. Deliberately no quote marks, no citation and no badge: the
-                   card makes no claim to be quoting him, so it cannot be wrong about
-                   one. Half a gallery of "not set" placeholders reads as unfinished,
-                   not as principled. */
-                <span className="mg-desc">{m.description}</span>
               )}
             </button>
           );
