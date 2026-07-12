@@ -1486,7 +1486,7 @@
   "chat.gallery_hint": "Pick an interpretive lineage — read the canon through this master's tradition, not a chat with the person",
   "chat.tradition_all": "All",
   "chat.epigraph_verified": "Verified",
-  "chat.epigraph_none": "We host none of this master's own writing, so no line is shown",
+  "chat.epigraph_none": "No verified representative line selected yet",
   "chat.epigraph_unset": "Not set",
   "chat.master_lens": "Reading through this lineage",
   "chat.change_master": "Change lineage",

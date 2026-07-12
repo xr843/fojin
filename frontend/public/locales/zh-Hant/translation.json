@@ -1486,7 +1486,7 @@
   "chat.gallery_hint": "選擇一條詮釋進路——以該祖師的宗風解經，而非與其本人對話",
   "chat.tradition_all": "全部",
   "chat.epigraph_verified": "已核驗",
-  "chat.epigraph_none": "本站未收其本人著作，故不列代表法語",
+  "chat.epigraph_none": "暫未選定經核驗的代表法語",
   "chat.epigraph_unset": "未設",
   "chat.master_lens": "依此宗風解經",
   "chat.change_master": "更換宗風",

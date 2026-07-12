@@ -21,8 +21,10 @@ EXPECTED_VERIFIED = {
     "nagarjuna": ("T1564", 40),
     "zhiyi": ("T1911", 53),
     "huineng": ("T2008", 58),
+    "xuanzang": ("T1585", 44),
     "fazang": ("T1866", 8038),
     "kumarajiva": ("T0262", 6513),
+    "ouyi": ("T1939", 8109),
 }
 
 
@@ -42,10 +44,14 @@ def test_every_epigraph_carries_a_checkable_source():
 def test_only_the_verified_masters_have_an_epigraph():
     """Masters whose own writing we don't host must show nothing.
 
-    Ten of the fifteen are in that position (玄奘/印光/蕅益/虚云/米拉日巴/阿姜查/
-    宗喀巴/阿底峡/觉音/马哈希). Showing them a plausible-sounding line we cannot
-    open would be exactly the failure this product exists to prevent — so if a
-    future edit adds one, this test should make someone justify it.
+    Eight of the fifteen are in that position (印光/虚云/米拉日巴/阿姜查/宗喀巴/
+    阿底峡/觉音/马哈希) — each confirmed against the corpus, not assumed.
+
+    The reverse error is just as bad and we already made it: the first cut left
+    玄奘 and 蕅益 at 未设 while 《成唯識論》(T1585) and 《教觀綱宗》(T1939) sat in the
+    corpus, so their cards claimed we hold none of their writing. That claim is
+    now gone from the UI, and scripts/verify_master_epigraphs.py checks the
+    negative case against the DB so it cannot silently come back.
     """
     with_epigraph = {mid for mid, m in MASTERS.items() if m.epigraph is not None}
     assert with_epigraph == set(EXPECTED_VERIFIED), (

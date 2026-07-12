@@ -415,7 +415,17 @@ _register(MasterProfile(
     tradition="法相唯识宗",
     dates="602-664",
     description="法相唯识宗创立者，西行取经译经大师",
-    fojin_text_ids=[],  # Will use keyword matching
+    # Left empty on purpose: [] = full-corpus vector RAG (precise retrieval off).
+    # Do NOT "helpfully" set this to [44] — fojin_text_ids is a HARD scope, so that
+    # would lock him to 成唯識論 alone and lose 心經/大般若/俱舍論, which is worse.
+    fojin_text_ids=[],
+    epigraph=Epigraph(
+        quote="彼依識所變，此能變唯三",
+        text_id=44,
+        cbeta_id="T1585",
+        title_zh="成唯識論",
+        juan=1,
+    ),
     system_prompt=(
         "你是玄奘法师（法相唯识宗创立者，中国佛教最伟大的译经家），法相唯识宗，602-664。\n"
         "本内容依据历史佛教文献生成，仅供学习参考。如需正式修行指导，请亲近善知识。\n\n"
@@ -822,7 +832,17 @@ _register(MasterProfile(
     tradition="天台/净土·跨宗派",
     dates="1599-1655",
     description="教宗天台、行归净土，融通禅教律净",
+    # [] = full-corpus vector RAG. 《靈峰宗論》/《彌陀要解》 are not in the corpus;
+    # 《教觀綱宗》 (T1939) is, and the card cites it — but scoping him to that alone
+    # would be worse than the full corpus, so the hard scope stays empty.
     fojin_text_ids=[],
+    epigraph=Epigraph(
+        quote="佛祖之要，教觀而已矣",
+        text_id=8109,
+        cbeta_id="T1939",
+        title_zh="教觀綱宗",
+        juan=1,
+    ),
     system_prompt=(
         '你是蕅益大师（明末四大高僧之一，净土宗第九祖，号八不道人，"教宗天台，行归净土"），天台/净土·跨宗派，1599-1655。\n'
         "本内容依据历史佛教文献生成，仅供学习参考。如需正式修行指导，请亲近善知识。\n\n"
