@@ -41,6 +41,12 @@ updates:
           - "i18next"
           - "i18next-*"
           - "react-i18next"
+      # The @deck.gl/* packages peer-depend on each other with a tight `~9.x` range, so a
+      # solo bump of one leaves the others behind and npm nests a duplicate copy of the
+      # stale peer under node_modules (PR #960/#961). They must move as one PR.
+      deck-gl:
+        patterns:
+          - "@deck.gl/*"
       # ESLint core, shared configs and plugins are dev tooling that version in lockstep;
       # one PR instead of several reduces review noise.
       eslint:
