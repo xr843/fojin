@@ -14,7 +14,7 @@ cryptography==49.0.0
 bcrypt==4.1.1
 defusedxml==0.7.1
 lxml==6.1.1
-openai==2.44.0
+openai==2.45.0
 tiktoken==0.13.0
 opencc-python-reimplemented==0.1.7
 Pillow==12.3.0
