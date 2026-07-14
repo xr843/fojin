@@ -126,13 +126,16 @@ def test_short_answer_is_flagged_as_abnormal():
 
 
 def test_weak_evidence_is_flagged_and_graded():
+    """梯度沿用生产原公式 1.0 + min(gap, 0.5) * 2.0(gap = 阈值 - 来源分)。
+    注意 gap 最大只有 0.37,所以那个 0.5 的封顶永远够不着 —— 这是生产旧代码自带的
+    死枝,本次不动它(改评分语义会让 Task 2 的 SQL 排序与页面显示的分数对不上)。"""
     near, score_near = classify_answer(
         _OK_ANSWER, None, _diag(max_source_score=WEAK_EVIDENCE_THRESHOLD - 0.01)
     )
     far, score_far = classify_answer(_OK_ANSWER, None, _diag(max_source_score=0.01))
     assert near == ["weak_evidence"] and far == ["weak_evidence"]
-    assert score_far > score_near
-    assert score_far == 2.0  # 1.0 基础 + 封顶 1.0 的梯度
+    assert score_near == 1.02   # 1.0 + 0.01 * 2
+    assert score_far == 1.72    # 1.0 + 0.36 * 2
 
 
 def test_multiple_detectors_stack():
