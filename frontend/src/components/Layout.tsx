@@ -207,16 +207,25 @@ export default function Layout() {
                   menu={{
                     items: item.children.map((child) => ({
                       key: child.path,
+                      // 角标必须是独立元素排在文字之后。用 <Badge> 包裹 label 会把
+                      // 计数绝对定位到子元素右上角 —— 数字一长(447/758)就压在文字上。
                       label: child.count ? (
-                        <Badge
-                          count={child.count}
-                          size="small"
-                          offset={[10, 0]}
-                          overflowCount={9999}
-                          style={{ marginLeft: 8 }}
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 8,
+                            width: "100%",
+                          }}
                         >
                           <span>{child.label}</span>
-                        </Badge>
+                          <Badge
+                            count={child.count}
+                            size="small"
+                            overflowCount={9999}
+                            style={{ marginLeft: "auto" }}
+                          />
+                        </span>
                       ) : (
                         child.label
                       ),
@@ -401,7 +410,6 @@ export default function Layout() {
                       <Badge
                         count={child.count}
                         size="small"
-                        offset={[10, 0]}
                         overflowCount={9999}
                         style={{ marginLeft: 8 }}
                       />
