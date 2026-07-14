@@ -3,11 +3,11 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.answer_review import AnswerReview
-from app.models.chat import ChatMessage
+from app.models.chat import ChatAnswerDiagnostic, ChatMessage
 
 # --- Detection config -------------------------------------------------------
 # Calibrated 2026-06-30 to ~p10 of the live max(source.score) distribution
@@ -58,22 +58,6 @@ def _is_failed_answer(content: str | None) -> bool:
     """Empty answer or a known LLM-failure reply — excluded from the queue."""
     text = (content or "").strip()
     return not text or text.startswith(_FAILED_ANSWER_PREFIXES)
-
-
-def _max_source_score(sources) -> float | None:
-    """Max blended score across an assistant message's cited passages, or None
-    when there are no parseable sources. Defensive against null/odd JSON."""
-    if not sources:
-        return None
-    try:
-        scores = [
-            float(s["score"])
-            for s in sources
-            if isinstance(s, dict) and s.get("score") is not None
-        ]
-    except (TypeError, ValueError):
-        return None
-    return max(scores) if scores else None
 
 
 def _clean_sources(sources) -> list[dict]:
@@ -137,6 +121,84 @@ def classify_answer(
     return tags, round(score, 3)
 
 
+# --- SQL 侧判据 ------------------------------------------------------------
+# 与 classify_answer 一一对应。判据全部是诊断表上的列比较,所以排序、分页、计数
+# 都能下推到 SQL —— 旧实现把窗口内每条 assistant 消息连同完整 sources JSON 拉进
+# Python 再内存分页(实测 1.8s / 80KB,随流量线性劣化)。
+
+_M = ChatMessage
+_D = ChatAnswerDiagnostic
+
+TAG_PREDICATES = {
+    "downvoted": _M.feedback == "down",
+    "abnormal": func.length(func.trim(_M.content)) < ABNORMAL_MIN_CHARS,
+    "fabricated_citation": and_(_D.citation_count > 0, _D.source_count == 0),
+    "quote_relaxed": _D.quote_mutation_count > 0,
+    "citation_corrected": _D.citation_mutation_count > 0,
+    "weak_evidence": and_(
+        _D.max_source_score.is_not(None),
+        _D.max_source_score < WEAK_EVIDENCE_THRESHOLD,
+    ),
+}
+
+
+def _score_expr():
+    """SQL 版可疑度,与 classify_answer 的算法逐项对齐。梯度用 case 表达(而非
+    LEAST/MIN —— 那两个在 sqlite 与 postgres 上名字不同),保证可移植。"""
+    gap = WEAK_EVIDENCE_THRESHOLD - _D.max_source_score
+    graded = case((gap > 0.5, 1.0), else_=gap * 2.0)
+    return (
+        case((TAG_PREDICATES["downvoted"], WEIGHTS["downvoted"]), else_=0.0)
+        + case((TAG_PREDICATES["abnormal"], WEIGHTS["abnormal"]), else_=0.0)
+        + case(
+            (TAG_PREDICATES["fabricated_citation"], WEIGHTS["fabricated_citation"]),
+            else_=0.0,
+        )
+        + case((TAG_PREDICATES["quote_relaxed"], WEIGHTS["quote_relaxed"]), else_=0.0)
+        + case(
+            (TAG_PREDICATES["citation_corrected"], WEIGHTS["citation_corrected"]),
+            else_=0.0,
+        )
+        + case(
+            (TAG_PREDICATES["weak_evidence"], WEIGHTS["weak_evidence"] + graded),
+            else_=0.0,
+        )
+    )
+
+
+def _base_conditions(window_days: int):
+    """INNER JOIN 诊断表本身就把 7/1 之前的老消息挡在外面 —— 它们没有诊断行,
+    而坏引用的证据在入库时已被 verify_quoted_content 抹平,无法追溯。"""
+    since = datetime.now(UTC) - timedelta(days=window_days)
+    reviewed = select(AnswerReview.message_id)
+    return [
+        _M.role == "assistant",
+        _M.created_at >= since,
+        _M.id.not_in(reviewed),
+    ]
+
+
+def _diag_of(row_d: ChatAnswerDiagnostic) -> DiagnosticSignals:
+    return DiagnosticSignals(
+        citation_count=row_d.citation_count or 0,
+        source_count=row_d.source_count or 0,
+        quote_mutation_count=row_d.quote_mutation_count or 0,
+        citation_mutation_count=row_d.citation_mutation_count or 0,
+        max_source_score=row_d.max_source_score,
+    )
+
+
+async def count_unreviewed(db: AsyncSession, *, window_days: int = 30) -> int:
+    """角标专用:只跑 COUNT,不打分、不拉 sources。导航每次都会读它。"""
+    stmt = (
+        select(func.count())
+        .select_from(_M)
+        .join(_D, _D.message_id == _M.id)
+        .where(*_base_conditions(window_days), or_(*TAG_PREDICATES.values()))
+    )
+    return (await db.execute(stmt)).scalar_one()
+
+
 def _percentiles(samples: list[float]) -> dict[str, float | None]:
     if not samples:
         return {"p10": None, "p25": None, "p50": None, "p90": None}
@@ -198,45 +260,48 @@ async def _attach_questions(db: AsyncSession, items: list[QueueItem]) -> None:
 async def build_bad_answer_queue(
     db: AsyncSession,
     *,
-    window_days: int = 90,
+    window_days: int = 30,
     min_suspicion: float = 0.0,
     category: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> dict:
-    """Live-compute the ranked queue of suspect assistant answers, excluding
-    any message already reviewed."""
-    since = datetime.now(UTC) - timedelta(days=window_days)
-    requested_categories = _requested_categories(category)
-    reviewed = select(AnswerReview.message_id)
+    """引用不可核对的回答队列,按可疑度降序。排序/分页/计数全部在 SQL 内完成。"""
+    base = _base_conditions(window_days)
+    score = _score_expr()
+
+    requested = _requested_categories(category)
+    tag_filter = (
+        or_(*[TAG_PREDICATES[t] for t in requested if t in TAG_PREDICATES])
+        if requested
+        else or_(*TAG_PREDICATES.values())
+    )
+
+    conds = [*base, tag_filter, score >= min_suspicion]
+
+    total = (
+        await db.execute(
+            select(func.count())
+            .select_from(_M)
+            .join(_D, _D.message_id == _M.id)
+            .where(*conds)
+        )
+    ).scalar_one()
+
     rows = (
         await db.execute(
-            select(ChatMessage)
-            .where(
-                ChatMessage.role == "assistant",
-                ChatMessage.created_at >= since,
-                ChatMessage.id.not_in(reviewed),
-            )
-            .order_by(ChatMessage.created_at.desc())
+            select(_M, _D)
+            .join(_D, _D.message_id == _M.id)
+            .where(*conds)
+            .order_by(score.desc(), _M.created_at.desc())
+            .limit(limit)
+            .offset(offset)
         )
-    ).scalars().all()
+    ).all()
 
     items: list[QueueItem] = []
-    score_samples: list[float] = []
-    for m in rows:
-        # Failed/empty generations are bugs, not reviewable answers — never
-        # surface them in the quality queue (nor let them skew the score
-        # distribution used for calibration).
-        if _is_failed_answer(m.content):
-            continue
-        ms = _max_source_score(m.sources)
-        if ms is not None:
-            score_samples.append(ms)
-        tags, score = classify_answer(m.content, m.sources, m.feedback)
-        if not tags or score < min_suspicion:
-            continue
-        if requested_categories and not requested_categories.intersection(tags):
-            continue
+    for m, d in rows:
+        tags, s = classify_answer(m.content, m.feedback, _diag_of(d))
         items.append(
             QueueItem(
                 message_id=m.id,
@@ -244,23 +309,50 @@ async def build_bad_answer_queue(
                 answer=m.content,
                 sources=_clean_sources(m.sources),
                 reason_tags=tags,
-                suspicion_score=score,
+                suspicion_score=s,
                 feedback=m.feedback,
                 created_at=m.created_at,
             )
         )
+    await _attach_questions(db, items)
 
-    items.sort(key=lambda x: x.suspicion_score, reverse=True)
-    total = len(items)
-    page = items[offset : offset + limit]
-    await _attach_questions(db, page)
+    # 标签分布:事后据此校准 WEAK_EVIDENCE_THRESHOLD(本次不动 0.37 这个数值)。
+    dist_row = (
+        await db.execute(
+            select(
+                *[
+                    func.sum(case((pred, 1), else_=0)).label(tag)
+                    for tag, pred in TAG_PREDICATES.items()
+                ]
+            )
+            .select_from(_M)
+            .join(_D, _D.message_id == _M.id)
+            .where(*base, or_(*TAG_PREDICATES.values()))
+        )
+    ).one()
+    tag_distribution = {
+        tag: int(val or 0)
+        for tag, val in zip(TAG_PREDICATES.keys(), dist_row, strict=True)
+    }
+
+    # 来源分数分布仍取窗口内 *全部* 有诊断的回答(不只可疑的),用于校准阈值。
+    samples = [
+        float(v)
+        for (v,) in (
+            await db.execute(
+                select(_D.max_source_score)
+                .select_from(_M)
+                .join(_D, _D.message_id == _M.id)
+                .where(*base, _D.max_source_score.is_not(None))
+            )
+        ).all()
+    ]
 
     return {
         "total_unreviewed": total,
-        "score_distribution": _percentiles(score_samples),
-        # Plain dicts (not QueueItem dataclasses) so the AnswerQueueResponse
-        # response_model validates cleanly without from_attributes coercion.
-        "items": [asdict(it) for it in page],
+        "score_distribution": _percentiles(samples),
+        "tag_distribution": tag_distribution,
+        "items": [asdict(it) for it in items],
     }
 
 
@@ -283,7 +375,19 @@ async def upsert_review(
     if msg is None or msg.role != "assistant":
         raise ValueError("message not found or not an assistant message")
 
-    tags, score = classify_answer(msg.content, msg.sources, msg.feedback)
+    # NOTE(Task 2 minimal fix): classify_answer's signature changed to
+    # (content, feedback, diag) in Task 1; this call site still needs its own
+    # diagnostic-row lookup + the ValueError-when-missing / count_unreviewed
+    # switchover, which is Task 3's job. This patch only stops the
+    # AttributeError crash (msg.feedback used to land in the `diag` slot) so
+    # the queue-adjacent review-flow test in this file keeps passing.
+    diag_row = (
+        await db.execute(
+            select(ChatAnswerDiagnostic).where(ChatAnswerDiagnostic.message_id == message_id)
+        )
+    ).scalar_one_or_none()
+    diag = _diag_of(diag_row) if diag_row is not None else DiagnosticSignals(0, 0, 0, 0, None)
+    tags, score = classify_answer(msg.content, msg.feedback, diag)
     existing = (
         await db.execute(
             select(AnswerReview).where(AnswerReview.message_id == message_id)

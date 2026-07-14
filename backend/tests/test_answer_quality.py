@@ -10,16 +10,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.models.answer_review import AnswerReview
-from app.models.chat import ChatMessage, ChatSession
+from app.models.chat import ChatAnswerDiagnostic, ChatMessage, ChatSession
 from app.schemas.admin import AnswerReviewCreate
 from app.services.answer_quality import (
     WEAK_EVIDENCE_THRESHOLD,
     DiagnosticSignals,
     _is_failed_answer,
-    _max_source_score,
     _percentiles,
     build_bad_answer_queue,
     classify_answer,
+    count_unreviewed,
     upsert_review,
 )
 
@@ -142,13 +142,6 @@ def test_is_failed_answer():
     assert not _is_failed_answer("一段正常的佛学回答内容，解释五蕴。")
 
 
-def test_max_source_score_handles_bad_json():
-    assert _max_source_score(None) is None
-    assert _max_source_score([]) is None
-    assert _max_source_score([{"no_score": 1}]) is None
-    assert _max_source_score(_sources(0.3, 0.7)) == 0.7
-
-
 def test_percentiles_empty_returns_nulls():
     assert _percentiles([]) == {"p10": None, "p25": None, "p50": None, "p90": None}
 
@@ -206,7 +199,7 @@ async def test_review_stats_requires_admin(client):
 async def aq_session():
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:
-        for model in (ChatSession, ChatMessage, AnswerReview):
+        for model in (ChatSession, ChatMessage, AnswerReview, ChatAnswerDiagnostic):
             await conn.run_sync(model.__table__.create)
     factory = async_sessionmaker(engine, expire_on_commit=False)
     async with factory() as s:
@@ -214,9 +207,12 @@ async def aq_session():
     await engine.dispose()
 
 
-async def _seed_turn(s, *, question, answer, sources, feedback=None):
+async def _seed_turn(s, *, question, answer, sources, feedback=None, diag: dict | None = None):
     """Insert a user question + assistant answer that share one created_at, the
-    way the chat save path does (single transaction, equal server-side now())."""
+    way the chat save path does (single transaction, equal server-side now()).
+
+    ``diag=None`` = 没有诊断行 = 2026-07-01 之前的老消息(证据已被
+    verify_quoted_content 在入库前抹平,不可追溯)。"""
     ts = datetime.now(UTC)
     session = ChatSession(user_id=None)
     s.add(session)
@@ -235,8 +231,31 @@ async def _seed_turn(s, *, question, answer, sources, feedback=None):
         created_at=ts,
     )
     s.add(assistant)
+    await s.flush()
+    if diag is not None:
+        s.add(
+            ChatAnswerDiagnostic(
+                message_id=assistant.id, trust_state="verified", **diag
+            )
+        )
     await s.commit()
     return assistant.id
+
+
+def _diag_row(
+    citation_count=1,
+    source_count=3,
+    quote_mutation_count=0,
+    citation_mutation_count=0,
+    max_source_score=0.9,
+):
+    return dict(
+        citation_count=citation_count,
+        source_count=source_count,
+        quote_mutation_count=quote_mutation_count,
+        citation_mutation_count=citation_mutation_count,
+        max_source_score=max_source_score,
+    )
 
 
 @pytest.mark.anyio
@@ -248,6 +267,7 @@ async def test_queue_pairs_question_on_equal_timestamp(aq_session):
         question="什么是五蕴？",
         answer="正常长度的回答内容" * 5,
         sources=[{"text_id": 1, "juan_num": 1, "chunk_text": "x", "score": 0.2}],
+        diag=_diag_row(source_count=1, max_source_score=0.2),
     )
     res = await build_bad_answer_queue(aq_session)
     assert res["total_unreviewed"] == 1
@@ -257,15 +277,21 @@ async def test_queue_pairs_question_on_equal_timestamp(aq_session):
 
 
 @pytest.mark.anyio
-async def test_no_citation_item_serializes_without_sources(aq_session):
-    # I3 regression: a None-sources answer must not break the queue.
+async def test_fabricated_citation_item_serializes_without_sources(aq_session):
+    # I3 regression: a None-sources answer must not break the queue. Under the
+    # new judged criteria, "sources=None + citations claimed" is
+    # fabricated_citation (the old no_citation tag is gone).
     await _seed_turn(
-        aq_session, question="问", answer="正常长度的回答内容" * 5, sources=None
+        aq_session,
+        question="问",
+        answer="正常长度的回答内容" * 5,
+        sources=None,
+        diag=_diag_row(citation_count=2, source_count=0, max_source_score=None),
     )
     res = await build_bad_answer_queue(aq_session)
     assert res["total_unreviewed"] == 1
     assert res["items"][0]["sources"] == []
-    assert "no_citation" in res["items"][0]["reason_tags"]
+    assert "fabricated_citation" in res["items"][0]["reason_tags"]
 
 
 @pytest.mark.anyio
@@ -275,21 +301,24 @@ async def test_queue_can_filter_by_multiple_reason_tags(aq_session):
         question="问一",
         answer="短答",
         sources=[{"text_id": 1, "juan_num": 1, "chunk_text": "x", "score": 0.9}],
+        diag=_diag_row(source_count=1, max_source_score=0.9),
     )
     await _seed_turn(
         aq_session,
         question="问二",
         answer="正常长度的回答内容" * 5,
         sources=None,
+        diag=_diag_row(citation_count=2, source_count=0, max_source_score=None),
     )
     await _seed_turn(
         aq_session,
         question="问三",
         answer="正常长度的回答内容" * 5,
         sources=[{"text_id": 1, "juan_num": 1, "chunk_text": "x", "score": 0.9}],
+        diag=_diag_row(source_count=1, max_source_score=0.9),
     )
 
-    res = await build_bad_answer_queue(aq_session, category="abnormal,no_citation")
+    res = await build_bad_answer_queue(aq_session, category="abnormal,fabricated_citation")
 
     assert res["total_unreviewed"] == 2
     assert {item["question"] for item in res["items"]} == {"问一", "问二"}
@@ -317,6 +346,7 @@ async def test_review_removes_item_and_snapshots(aq_session):
         answer="一段正常但无引经的回答" * 2,
         sources=None,
         feedback="down",
+        diag=_diag_row(citation_count=0, source_count=0, max_source_score=None),
     )
     before = await build_bad_answer_queue(aq_session)
     assert before["total_unreviewed"] == 1
@@ -342,7 +372,7 @@ async def test_review_removes_item_and_snapshots(aq_session):
     assert row.verdict == "bad"
     assert row.failure_category == "recall"
     assert row.suspicion_score > 0
-    assert set(row.detection_reasons) >= {"downvoted", "no_citation"}
+    assert set(row.detection_reasons) >= {"downvoted"}
 
 
 @pytest.mark.anyio
@@ -379,3 +409,89 @@ def test_failed_answer_prefixes_match_chat():
     from app.services import chat
 
     assert chat._FAILED_ANSWER_PREFIXES == aq._FAILED_ANSWER_PREFIXES
+
+
+@pytest.mark.anyio
+async def test_message_without_diagnostic_never_enters_queue(aq_session):
+    """7/1 之前的老消息没有诊断行 —— 证据已在入库时销毁,不可追溯,必须排除。
+    即便它同时命中 downvoted + abnormal 也不能进队列。"""
+    await _seed_turn(
+        aq_session, question="q", answer="太短", sources=_sources(0.9),
+        feedback="down", diag=None,
+    )
+    result = await build_bad_answer_queue(aq_session)
+    assert result["total_unreviewed"] == 0
+    assert result["items"] == []
+
+
+@pytest.mark.anyio
+async def test_clean_answer_with_diagnostic_is_not_queued(aq_session):
+    await _seed_turn(
+        aq_session, question="q", answer=_OK_ANSWER, sources=_sources(0.9),
+        diag=_diag_row(),
+    )
+    result = await build_bad_answer_queue(aq_session)
+    assert result["total_unreviewed"] == 0
+
+
+@pytest.mark.anyio
+async def test_chitchat_without_sources_is_not_queued(aq_session):
+    """"what can you do today?" 这类问题:没引用、没来源 —— 不再是差答案。
+    旧的 no_citation 判据正是在这里制造了 715 条噪音。"""
+    await _seed_turn(
+        aq_session, question="what can you do today?", answer=_OK_ANSWER, sources=None,
+        diag=_diag_row(citation_count=0, source_count=0, max_source_score=None),
+    )
+    result = await build_bad_answer_queue(aq_session)
+    assert result["total_unreviewed"] == 0
+
+
+@pytest.mark.anyio
+async def test_fabricated_citation_enters_queue_with_tag(aq_session):
+    mid = await _seed_turn(
+        aq_session, question="q", answer=_OK_ANSWER, sources=None,
+        diag=_diag_row(citation_count=2, source_count=0, max_source_score=None),
+    )
+    result = await build_bad_answer_queue(aq_session)
+    assert result["total_unreviewed"] == 1
+    assert result["items"][0]["message_id"] == mid
+    assert result["items"][0]["reason_tags"] == ["fabricated_citation"]
+    assert result["tag_distribution"]["fabricated_citation"] == 1
+
+
+@pytest.mark.anyio
+async def test_queue_orders_by_suspicion_desc(aq_session):
+    weak = await _seed_turn(
+        aq_session, question="q1", answer=_OK_ANSWER, sources=_sources(0.30),
+        diag=_diag_row(source_count=1, max_source_score=0.30),
+    )  # weak_evidence ≈ 1.14
+    downvoted = await _seed_turn(
+        aq_session, question="q2", answer=_OK_ANSWER, sources=_sources(0.9),
+        feedback="down", diag=_diag_row(),
+    )  # 5.0
+    result = await build_bad_answer_queue(aq_session)
+    ids = [it["message_id"] for it in result["items"]]
+    assert ids == [downvoted, weak]
+
+
+@pytest.mark.anyio
+async def test_limit_offset_pushed_down_and_total_consistent(aq_session):
+    for i in range(3):
+        await _seed_turn(
+            aq_session, question=f"q{i}", answer=_OK_ANSWER, sources=None,
+            diag=_diag_row(citation_count=1, source_count=0, max_source_score=None),
+        )
+    page = await build_bad_answer_queue(aq_session, limit=2, offset=0)
+    assert page["total_unreviewed"] == 3      # total 是全量,不是本页
+    assert len(page["items"]) == 2            # 本页只有 2 条
+    tail = await build_bad_answer_queue(aq_session, limit=2, offset=2)
+    assert len(tail["items"]) == 1
+
+
+@pytest.mark.anyio
+async def test_count_unreviewed_matches_queue_total(aq_session):
+    await _seed_turn(
+        aq_session, question="q", answer=_OK_ANSWER, sources=None,
+        diag=_diag_row(citation_count=1, source_count=0, max_source_score=None),
+    )
+    assert await count_unreviewed(aq_session) == 1
