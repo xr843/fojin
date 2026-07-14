@@ -386,25 +386,20 @@ async def upsert_review(
     Returns the count of still-unreviewed suspect messages in the default window.
     Raises ValueError if the message does not exist or is not an assistant
     message."""
-    msg = (
-        await db.execute(select(ChatMessage).where(ChatMessage.id == message_id))
-    ).scalar_one_or_none()
-    if msg is None or msg.role != "assistant":
+    row = (
+        await db.execute(
+            select(ChatMessage, ChatAnswerDiagnostic)
+            .join(ChatAnswerDiagnostic, ChatAnswerDiagnostic.message_id == ChatMessage.id)
+            .where(ChatMessage.id == message_id)
+        )
+    ).first()
+    if row is None:
+        raise ValueError("message not found, not an assistant message, or has no diagnostic")
+    msg, diag_row = row
+    if msg.role != "assistant":
         raise ValueError("message not found or not an assistant message")
 
-    # NOTE(Task 2 minimal fix): classify_answer's signature changed to
-    # (content, feedback, diag) in Task 1; this call site still needs its own
-    # diagnostic-row lookup + the ValueError-when-missing / count_unreviewed
-    # switchover, which is Task 3's job. This patch only stops the
-    # AttributeError crash (msg.feedback used to land in the `diag` slot) so
-    # the queue-adjacent review-flow test in this file keeps passing.
-    diag_row = (
-        await db.execute(
-            select(ChatAnswerDiagnostic).where(ChatAnswerDiagnostic.message_id == message_id)
-        )
-    ).scalar_one_or_none()
-    diag = _diag_of(diag_row) if diag_row is not None else DiagnosticSignals(0, 0, 0, 0, None)
-    tags, score = classify_answer(msg.content, msg.feedback, diag)
+    tags, score = classify_answer(msg.content, msg.feedback, _diag_of(diag_row))
     existing = (
         await db.execute(
             select(AnswerReview).where(AnswerReview.message_id == message_id)
@@ -432,8 +427,7 @@ async def upsert_review(
         )
     await db.commit()
 
-    result = await build_bad_answer_queue(db, limit=0)
-    return result["total_unreviewed"]
+    return await count_unreviewed(db)
 
 
 async def review_stats(db: AsyncSession) -> dict:

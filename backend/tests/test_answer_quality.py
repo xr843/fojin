@@ -377,6 +377,49 @@ async def test_review_removes_item_and_snapshots(aq_session):
 
 
 @pytest.mark.anyio
+async def test_upsert_review_snapshots_new_tags_and_returns_cheap_count(aq_session):
+    mid = await _seed_turn(
+        aq_session,
+        question="问",
+        answer=_OK_ANSWER,
+        sources=None,
+        diag=_diag_row(citation_count=1, source_count=0, max_source_score=None),
+    )
+    remaining = await upsert_review(
+        aq_session,
+        message_id=mid,
+        verdict="bad",
+        failure_category="hallucination",
+        note=None,
+        reviewed_by=1,
+    )
+    assert remaining == 0  # 唯一一条已复核
+    row = (
+        await aq_session.execute(
+            select(AnswerReview).where(AnswerReview.message_id == mid)
+        )
+    ).scalar_one()
+    assert row.detection_reasons == ["fabricated_citation"]
+    assert row.suspicion_score == 4.0
+
+
+@pytest.mark.anyio
+async def test_upsert_review_rejects_message_without_diagnostic(aq_session):
+    mid = await _seed_turn(
+        aq_session, question="问", answer=_OK_ANSWER, sources=None, diag=None,
+    )
+    with pytest.raises(ValueError):
+        await upsert_review(
+            aq_session,
+            message_id=mid,
+            verdict="good",
+            failure_category=None,
+            note=None,
+            reviewed_by=1,
+        )
+
+
+@pytest.mark.anyio
 async def test_chat_save_guard_skips_failed_answers(aq_session):
     # The chat-side guard in _save_messages must not persist failed/empty
     # generations (neither the user nor the assistant turn).
