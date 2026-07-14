@@ -1390,9 +1390,12 @@ export async function submitAnswerReview(payload: {
   return data;
 }
 
-export async function getAnswerReviewStats(): Promise<AnswerReviewStats> {
+export async function getAnswerReviewStats(
+  params?: { window?: number },
+): Promise<AnswerReviewStats> {
   const { data } = await api.get<AnswerReviewStats>(
     "/admin/answer-quality/reviews/stats",
+    { params },
   );
   return data;
 }

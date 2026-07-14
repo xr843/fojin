@@ -26,16 +26,23 @@ import { formatAdminDate } from "./adminI18n";
 
 const REASON_LABEL_KEYS: Record<string, string> = {
   downvoted: "admin_aq.reason.downvoted",
+  fabricated_citation: "admin_aq.reason.fabricated_citation",
+  quote_relaxed: "admin_aq.reason.quote_relaxed",
+  citation_corrected: "admin_aq.reason.citation_corrected",
   abnormal: "admin_aq.reason.abnormal",
-  no_citation: "admin_aq.reason.no_citation",
   weak_evidence: "admin_aq.reason.weak_evidence",
 };
 
+// Colors track WEIGHTS severity order in answer_quality.py (downvoted 5 >
+// fabricated_citation 4 > quote_relaxed/abnormal 3 > citation_corrected 2 >
+// weak_evidence 1).
 const REASON_COLORS: Record<string, string> = {
   downvoted: "red",
+  fabricated_citation: "volcano",
+  quote_relaxed: "orange",
+  citation_corrected: "gold",
   abnormal: "purple",
-  no_citation: "orange",
-  weak_evidence: "gold",
+  weak_evidence: "blue",
 };
 
 // Mirrors backend WEAK_EVIDENCE_THRESHOLD (answer_quality.py) — keep in sync if
@@ -57,6 +64,7 @@ export default function AdminAnswerQualityPage() {
   const [items, setItems] = useState<AnswerQueueItem[]>([]);
   const [total, setTotal] = useState(0);
   const [dist, setDist] = useState<ScoreDistribution | null>(null);
+  const [tagDist, setTagDist] = useState<Record<string, number> | null>(null);
   const [reviewStats, setReviewStats] = useState<AnswerReviewStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -75,12 +83,13 @@ export default function AdminAnswerQualityPage() {
         category: reasonFilters.length ? reasonFilters.join(",") : undefined,
         limit: 50,
       }),
-      getAnswerReviewStats(),
+      getAnswerReviewStats({ window: windowDays }),
     ])
       .then(([res, stats]) => {
         setItems(res.items);
         setTotal(res.total_unreviewed);
         setDist(res.score_distribution);
+        setTagDist(res.tag_distribution ?? null);
         setReviewStats(stats);
         setLoadError(false);
       })
@@ -130,7 +139,7 @@ export default function AdminAnswerQualityPage() {
         });
         setItems((prev) => prev.filter((i) => i.message_id !== item.message_id));
         setTotal(res.remaining_unreviewed);
-        void getAnswerReviewStats()
+        void getAnswerReviewStats({ window: windowDays })
           .then(setReviewStats)
           .catch(() => undefined);
         message.success(
@@ -144,7 +153,7 @@ export default function AdminAnswerQualityPage() {
         message.error(t("admin_aq.submit_error"));
       }
     },
-    [t, verdicts],
+    [t, verdicts, windowDays],
   );
 
   const columns: ColumnsType<AnswerQueueItem> = [
@@ -235,6 +244,18 @@ export default function AdminAnswerQualityPage() {
               p10: dist.p10 ?? "—",
               p50: dist.p50 ?? "—",
               p90: dist.p90 ?? "—",
+            })}
+          </Typography.Text>
+        )}
+        {tagDist && Object.keys(tagDist).length > 0 && (
+          <Typography.Text type="secondary">
+            {t("admin_aq.tag_distribution", {
+              detail: Object.entries(tagDist)
+                .map(
+                  ([tag, count]) =>
+                    `${REASON_LABEL_KEYS[tag] ? t(REASON_LABEL_KEYS[tag]) : tag} ${count}`,
+                )
+                .join(" · "),
             })}
           </Typography.Text>
         )}

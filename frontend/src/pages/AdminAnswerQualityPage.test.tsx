@@ -70,6 +70,9 @@ describe("AdminAnswerQualityPage", () => {
     expect(screen.getByText("最低可疑度")).toBeInTheDocument();
     expect(screen.getByText("什么是五蕴？")).toBeInTheDocument();
     expect(getAnswerReviewStats).toHaveBeenCalledTimes(1);
+    // 复核统计必须带上与队列相同的窗口口径,否则「未复核」「已复核」两个数字
+    // 分母错位(默认队列窗口是 30 天)。
+    expect(getAnswerReviewStats).toHaveBeenCalledWith({ window: 30 });
   });
 
   it("请求失败时显示错误态,而不是渲染成「队列已清空」", async () => {
@@ -144,5 +147,36 @@ describe("AdminAnswerQualityPage", () => {
     await waitFor(() => {
       expect(screen.getByText("未复核 1 条")).toBeInTheDocument();
     });
+  });
+
+  it("渲染新标签集(fabricated_citation)的译文,而不是裸 snake_case key", async () => {
+    // 回归测试:后端换血后新增 fabricated_citation / quote_relaxed /
+    // citation_corrected 三个标签,前端词表若没跟上,会原样把 key 渲染出来。
+    vi.mocked(getAnswerQualityQueue).mockResolvedValue({
+      total_unreviewed: 1,
+      score_distribution: { p10: 0.2, p25: 0.3, p50: 0.5, p90: 0.9 },
+      tag_distribution: { fabricated_citation: 1 },
+      items: [
+        {
+          message_id: 11,
+          session_id: 6,
+          question: "凭空引用的问题",
+          answer: "答案",
+          sources: [],
+          reason_tags: ["fabricated_citation"],
+          suspicion_score: 4,
+          feedback: null,
+          created_at: "2026-07-02T00:00:00Z",
+        },
+      ],
+    });
+
+    render(<AdminAnswerQualityPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("凭空引用的问题")).toBeInTheDocument();
+    });
+    expect(screen.getByText("凭空引用")).toBeInTheDocument();
+    expect(screen.queryByText("fabricated_citation")).not.toBeInTheDocument();
   });
 });
