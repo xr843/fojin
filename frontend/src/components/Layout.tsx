@@ -23,7 +23,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { currentUILang } from "../i18n";
 import { useAuthStore } from "../stores/authStore";
-import { getPendingSuggestionCount, getPendingFeedbackCount } from "../api/client";
+import { getAdminPendingSummary, type AdminPendingSummary } from "../api/client";
 import FeedbackButton from "./FeedbackButton";
 import NotificationBell from "./NotificationBell";
 import CursorGlow from "./CursorGlow";
@@ -58,21 +58,24 @@ export default function Layout() {
   const pageBg = "var(--fj-bg)";
   const headerBg = pageBg;
 
-  const [pendingCount, setPendingCount] = useState(0);
+  const [pending, setPending] = useState<AdminPendingSummary | null>(null);
   const isAdmin = user?.role === "admin";
 
   useEffect(() => {
     if (!isAdmin) return;
-    Promise.all([getPendingSuggestionCount(), getPendingFeedbackCount()])
-      .then(([sc, fc]) => setPendingCount(sc + fc))
-      .catch(() => {});
+    getAdminPendingSummary().then(setPending).catch(() => {});
   }, [isAdmin, location.pathname]);
+
+  const inboxCount =
+    (pending?.suggestions ?? 0) + (pending?.feedbacks ?? 0) + (pending?.annotations ?? 0);
+  const adminBadgeTotal =
+    (pending?.answer_quality ?? 0) + (pending?.alignment_candidates ?? 0) + inboxCount;
 
   const navItems: Array<{
     icon: ReactNode;
     label: string;
     path: string;
-    children?: Array<{ label: string; path: string }>;
+    children?: Array<{ label: string; path: string; count?: number }>;
   }> = [
     { icon: <DatabaseOutlined />, label: t("nav.sources"), path: "/sources" },
     { icon: <RobotOutlined />, label: t("nav.chat"), path: "/chat" },
@@ -94,18 +97,29 @@ export default function Layout() {
     ...(isAdmin
       ? [
           {
-            icon: <Badge count={pendingCount} size="small" offset={[4, -2]}><DashboardOutlined /></Badge>,
+            icon: <Badge count={adminBadgeTotal} size="small" offset={[4, -2]}><DashboardOutlined /></Badge>,
             label: t("nav.admin"),
             path: "/admin",
+            // 常驻 4 项。判据是「需不需要你主动定期查看」:
+            //   概览/用户管理 = 日常;差答案队列 + 跨藏对齐 = 有积压要处理。
+            // 源建议/反馈/标注是被动响应型队列(没人提交就没活儿)→ 收进「待办」,
+            // 计数为 0 时整项不渲染。审计日志移出菜单(挂在用户管理页)。
             children: [
               { label: t("nav.admin_overview"), path: "/admin" },
-              { label: t("nav.admin_answer_quality"), path: "/admin/answer-quality" },
               { label: t("nav.admin_users"), path: "/admin/users" },
-              { label: t("nav.admin_suggestions"), path: "/admin/suggestions" },
-              { label: t("nav.admin_annotations"), path: "/admin/annotations" },
-              { label: t("nav.admin_feedbacks"), path: "/admin/feedbacks" },
-              { label: t("nav.admin_alignment"), path: "/admin/alignment" },
-              { label: t("nav.admin_audit_log"), path: "/admin/audit-log" },
+              {
+                label: t("nav.admin_answer_quality"),
+                path: "/admin/answer-quality",
+                count: pending?.answer_quality ?? 0,
+              },
+              {
+                label: t("nav.admin_alignment"),
+                path: "/admin/alignment",
+                count: pending?.alignment_candidates ?? 0,
+              },
+              ...(inboxCount > 0
+                ? [{ label: t("nav.admin_inbox"), path: "/admin/inbox", count: inboxCount }]
+                : []),
             ],
           },
         ]
@@ -187,7 +201,18 @@ export default function Layout() {
                   menu={{
                     items: item.children.map((child) => ({
                       key: child.path,
-                      label: child.label,
+                      label: child.count ? (
+                        <Badge
+                          count={child.count}
+                          size="small"
+                          offset={[10, 0]}
+                          style={{ marginLeft: 8 }}
+                        >
+                          <span>{child.label}</span>
+                        </Badge>
+                      ) : (
+                        child.label
+                      ),
                       onClick: () => navigate(child.path),
                     })),
                   }}
@@ -365,6 +390,9 @@ export default function Layout() {
                     onClick={() => { navigate(child.path); setDrawerOpen(false); }}
                   >
                     {child.label}
+                    {child.count ? (
+                      <Badge count={child.count} size="small" offset={[10, 0]} style={{ marginLeft: 8 }} />
+                    ) : null}
                   </Button>
                 ))}
               </div>
