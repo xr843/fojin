@@ -1460,7 +1460,6 @@
   "admin_align.lang.pli": "巴利",
   "admin_align.lang.san": "梵文",
   "admin_align.lang.en": "英文",
-  "admin_align.review_link": "复核候选对齐",
   "admin_align_review.page_title": "候选对齐复核 · 管理后台",
   "admin_align_review.title": "候选对齐复核",
   "admin_align_review.title_with_count": "候选对齐复核（{{n}} 条待处理）",

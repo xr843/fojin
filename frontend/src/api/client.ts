@@ -1070,11 +1070,6 @@ export async function deleteSourceSuggestion(id: number): Promise<void> {
   await api.delete(`/source-suggestions/${id}`);
 }
 
-export async function getPendingSuggestionCount(): Promise<number> {
-  const { data } = await api.get<{ count: number }>("/source-suggestions/pending-count");
-  return data.count;
-}
-
 export async function reviewAnnotation(
   annotationId: number,
   payload: { action: string; comment?: string },
@@ -1154,11 +1149,6 @@ export async function updateFeedbackStatus(
 
 export async function replyFeedback(id: number, reply: string): Promise<void> {
   await api.post(`/feedbacks/${id}/reply`, { reply });
-}
-
-export async function getPendingFeedbackCount(): Promise<number> {
-  const { data } = await api.get<{ count: number }>("/feedbacks/pending-count");
-  return data.count;
 }
 
 // --- Admin Dashboard ---

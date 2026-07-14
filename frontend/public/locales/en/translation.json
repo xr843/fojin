@@ -1460,7 +1460,6 @@
   "admin_align.lang.pli": "Pali",
   "admin_align.lang.san": "Sanskrit",
   "admin_align.lang.en": "English",
-  "admin_align.review_link": "Review candidates",
   "admin_align_review.page_title": "Alignment Candidate Review · Admin",
   "admin_align_review.title": "Alignment Candidate Review",
   "admin_align_review.title_with_count": "Alignment Candidate Review ({{n}} pending)",
