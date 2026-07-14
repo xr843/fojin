@@ -37,6 +37,7 @@
   "nav.admin_suggestions": "Suggestions",
   "nav.admin_annotations": "Annotations",
   "nav.admin_feedbacks": "Feedbacks",
+  "nav.admin_inbox": "Inbox",
   "nav.admin_audit_log": "Audit Log",
   "admin_crud.common.action_failed": "Action failed",
   "admin_crud.common.cancel": "Cancel",

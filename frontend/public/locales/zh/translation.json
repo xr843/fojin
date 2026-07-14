@@ -37,6 +37,7 @@
   "nav.admin_suggestions": "源建议",
   "nav.admin_annotations": "标注审核",
   "nav.admin_feedbacks": "用户反馈",
+  "nav.admin_inbox": "待办",
   "nav.admin_audit_log": "审计日志",
   "admin_crud.common.action_failed": "操作失败",
   "admin_crud.common.cancel": "取消",

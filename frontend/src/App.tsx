@@ -34,12 +34,10 @@ const ExportsPage = lazy(() => import("./pages/ExportsPage"));
 const CollectionsPage = lazy(() => import("./pages/CollectionsPage"));
 const CrossCanonPage = lazy(() => import("./pages/CrossCanonPage"));
 const TopicsPage = lazy(() => import("./pages/TopicsPage"));
-const AdminSuggestionsPage = lazy(() => import("./pages/AdminSuggestionsPage"));
 const AdminDashboardPage = lazy(() => import("./pages/AdminDashboardPage"));
 const AdminAnswerQualityPage = lazy(() => import("./pages/AdminAnswerQualityPage"));
 const AdminUsersPage = lazy(() => import("./pages/AdminUsersPage"));
-const AdminAnnotationsPage = lazy(() => import("./pages/AdminAnnotationsPage"));
-const AdminFeedbacksPage = lazy(() => import("./pages/AdminFeedbacksPage"));
+const AdminInboxPage = lazy(() => import("./pages/AdminInboxPage"));
 const AdminAuditLogPage = lazy(() => import("./pages/AdminAuditLogPage"));
 const AdminAlignmentPage = lazy(() => import("./pages/AdminAlignmentPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
@@ -96,9 +94,10 @@ function App() {
               <Route path="/admin" element={<AdminDashboardPage />} />
               <Route path="/admin/answer-quality" element={<AdminAnswerQualityPage />} />
               <Route path="/admin/users" element={<AdminUsersPage />} />
-              <Route path="/admin/suggestions" element={<AdminSuggestionsPage />} />
-              <Route path="/admin/annotations" element={<AdminAnnotationsPage />} />
-              <Route path="/admin/feedbacks" element={<AdminFeedbacksPage />} />
+              <Route path="/admin/inbox" element={<AdminInboxPage />} />
+              <Route path="/admin/suggestions" element={<AdminInboxPage />} />
+              <Route path="/admin/annotations" element={<AdminInboxPage />} />
+              <Route path="/admin/feedbacks" element={<AdminInboxPage />} />
               <Route path="/admin/audit-log" element={<AdminAuditLogPage />} />
               <Route path="/admin/alignment" element={<AdminAlignmentPage />} />
               <Route path="/admin/alignment/review" element={<AdminAlignmentPage />} />
