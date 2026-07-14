@@ -97,7 +97,7 @@ export default function Layout() {
     ...(isAdmin
       ? [
           {
-            icon: <Badge count={adminBadgeTotal} size="small" offset={[4, -2]}><DashboardOutlined /></Badge>,
+            icon: <Badge count={adminBadgeTotal} size="small" offset={[4, -2]} overflowCount={9999}><DashboardOutlined /></Badge>,
             label: t("nav.admin"),
             path: "/admin",
             // 常驻 4 项。判据是「需不需要你主动定期查看」:
@@ -198,6 +198,12 @@ export default function Layout() {
               item.children ? (
                 <Dropdown
                   key={item.path}
+                  // Menu items carry count badges and can be wider than the
+                  // trigger button; by default antd/rc-dropdown stretches the
+                  // popup's min-width to match the (narrower) trigger, which
+                  // pushed wide items into a horizontal scrollbar. Force a
+                  // generous min-width instead.
+                  overlayStyle={{ minWidth: 200 }}
                   menu={{
                     items: item.children.map((child) => ({
                       key: child.path,
@@ -206,6 +212,7 @@ export default function Layout() {
                           count={child.count}
                           size="small"
                           offset={[10, 0]}
+                          overflowCount={9999}
                           style={{ marginLeft: 8 }}
                         >
                           <span>{child.label}</span>
@@ -391,7 +398,13 @@ export default function Layout() {
                   >
                     {child.label}
                     {child.count ? (
-                      <Badge count={child.count} size="small" offset={[10, 0]} style={{ marginLeft: 8 }} />
+                      <Badge
+                        count={child.count}
+                        size="small"
+                        offset={[10, 0]}
+                        overflowCount={9999}
+                        style={{ marginLeft: 8 }}
+                      />
                     ) : null}
                   </Button>
                 ))}
