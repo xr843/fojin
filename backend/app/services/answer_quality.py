@@ -24,13 +24,34 @@ ABNORMAL_MIN_CHARS = 20
 # legacy junk rows already in the table).
 _FAILED_ANSWER_PREFIXES = ("抱歉，AI 服务", "AI 服务返回", "您的 API Key 无效")
 
-# reason tag -> base weight in the suspicion score
+# reason tag -> base weight in the suspicion score.
+#
+# 判据是「引用是否可核对」,不是「有没有引经」。旧的 no_citation(= 无任何来源)
+# 把闲聊/元问题("what can you do today?")和真实的引用失败混为一谈,制造了 715
+# 条噪音、淹没了信号,已删除。
 WEIGHTS = {
     "downvoted": 5.0,
+    "fabricated_citation": 4.0,
+    "quote_relaxed": 3.0,
     "abnormal": 3.0,
-    "no_citation": 2.0,
+    "citation_corrected": 2.0,
     "weak_evidence": 1.0,  # plus a graded bonus, see classify_answer
 }
+
+
+@dataclass(frozen=True)
+class DiagnosticSignals:
+    """一条回答在 *入库前* 的引用真相,来自 chat_answer_diagnostics。
+
+    必须从这张表读,不能对 chat_messages.content 重算:verify_quoted_content 的
+    契约是「fojin 从不端出假的逐字引用」,对不上原文的引号在保存前就被剥掉了
+    (quote_verifier.py:373-382),重算只会得到「一切正常」。"""
+
+    citation_count: int
+    source_count: int
+    quote_mutation_count: int
+    citation_mutation_count: int
+    max_source_score: float | None
 
 
 def _is_failed_answer(content: str | None) -> bool:
@@ -75,13 +96,10 @@ def _requested_categories(category: str | None) -> set[str]:
 
 
 def classify_answer(
-    content: str | None, sources, feedback: str | None
+    content: str | None, feedback: str | None, diag: DiagnosticSignals
 ) -> tuple[list[str], float]:
-    """Pure detector. Given an assistant message's columns, return the reason
-    tags it trips and a suspicion score (0.0 = not suspect). Detectors read
-    ``feedback`` (downvoted), ``content`` (abnormal short answers), and
-    ``sources`` (no_citation / weak_evidence). Failed/empty answers are filtered
-    upstream, not scored here."""
+    """Pure detector. 给定一条回答的列 + 它的诊断行,返回命中的标签与可疑度
+    (0.0 = 不可疑)。失败/空回答在上游过滤,不在这里打分。"""
     tags: list[str] = []
     score = 0.0
 
@@ -93,16 +111,28 @@ def classify_answer(
         tags.append("abnormal")
         score += WEIGHTS["abnormal"]
 
-    max_score = _max_source_score(sources)
-    if max_score is None:
-        tags.append("no_citation")
-        score += WEIGHTS["no_citation"]
-    elif max_score < WEAK_EVIDENCE_THRESHOLD:
+    # 引了经却零来源 = 凭空引用,最严重的可核对性失败。
+    if diag.citation_count > 0 and diag.source_count == 0:
+        tags.append("fabricated_citation")
+        score += WEIGHTS["fabricated_citation"]
+
+    # 系统把「转述当原文引」降级过 —— 用户看到的是修好的,但这条本来是错的。
+    if diag.quote_mutation_count > 0:
+        tags.append("quote_relaxed")
+        score += WEIGHTS["quote_relaxed"]
+
+    if diag.citation_mutation_count > 0:
+        tags.append("citation_corrected")
+        score += WEIGHTS["citation_corrected"]
+
+    mss = diag.max_source_score
+    if mss is not None and mss < WEAK_EVIDENCE_THRESHOLD:
         tags.append("weak_evidence")
-        # graded: deeper below threshold => more suspect (bonus capped)
-        score += WEIGHTS["weak_evidence"] + min(
-            WEAK_EVIDENCE_THRESHOLD - max_score, 0.5
-        ) * 2.0
+        # graded: deeper below threshold => more suspect.
+        # 注:gap 最大只有 WEAK_EVIDENCE_THRESHOLD(0.37),所以 0.5 这个封顶永远够
+        # 不着 —— 生产旧代码自带的死枝,此处保持原样不动:改评分语义会让 SQL 侧的
+        # 排序表达式与这里算出的显示分数对不上。
+        score += WEIGHTS["weak_evidence"] + min(WEAK_EVIDENCE_THRESHOLD - mss, 0.5) * 2.0
 
     return tags, round(score, 3)
 

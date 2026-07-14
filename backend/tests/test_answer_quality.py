@@ -14,6 +14,7 @@ from app.models.chat import ChatMessage, ChatSession
 from app.schemas.admin import AnswerReviewCreate
 from app.services.answer_quality import (
     WEAK_EVIDENCE_THRESHOLD,
+    DiagnosticSignals,
     _is_failed_answer,
     _max_source_score,
     _percentiles,
@@ -27,47 +28,99 @@ def _sources(*scores):
     return [{"text_id": 1, "juan_num": 1, "chunk_text": "x", "score": s} for s in scores]
 
 
+def _diag(
+    citation_count=1,
+    source_count=3,
+    quote_mutation_count=0,
+    citation_mutation_count=0,
+    max_source_score=0.9,
+):
+    return DiagnosticSignals(
+        citation_count=citation_count,
+        source_count=source_count,
+        quote_mutation_count=quote_mutation_count,
+        citation_mutation_count=citation_mutation_count,
+        max_source_score=max_source_score,
+    )
+
+
+_OK_ANSWER = "一段足够长的正常回答内容" * 3
+
+
 def test_strong_answer_is_not_suspect():
+    tags, score = classify_answer(_OK_ANSWER, None, _diag())
+    assert tags == []
+    assert score == 0.0
+
+
+def test_chitchat_without_sources_is_not_suspect():
+    """本来就不需要引经的问题(闲聊/元问题):回答没引用、也没来源 —— 不再是差答案。
+    这正是旧 no_citation 判据制造 715 条噪音的地方。"""
     tags, score = classify_answer(
-        "这是一段足够长且引用了可靠经文的回答，详细解释了五蕴的含义、出处"
-        "与彼此关系，并逐一给出对应的经证与上下文脉络，便于读者核对。",
-        _sources(0.82, 0.61),
-        None,
+        _OK_ANSWER, None, _diag(citation_count=0, source_count=0, max_source_score=None)
     )
     assert tags == []
     assert score == 0.0
 
 
+def test_fabricated_citation_is_flagged():
+    """回答引了经,却一条来源都没有 —— 凭空引用。"""
+    tags, score = classify_answer(
+        _OK_ANSWER, None, _diag(citation_count=2, source_count=0, max_source_score=None)
+    )
+    assert tags == ["fabricated_citation"]
+    assert score == 4.0
+
+
+def test_quote_relaxed_is_flagged():
+    tags, score = classify_answer(_OK_ANSWER, None, _diag(quote_mutation_count=1))
+    assert tags == ["quote_relaxed"]
+    assert score == 3.0
+
+
+def test_citation_corrected_is_flagged():
+    tags, score = classify_answer(_OK_ANSWER, None, _diag(citation_mutation_count=2))
+    assert tags == ["citation_corrected"]
+    assert score == 2.0
+
+
 def test_downvoted_is_flagged():
-    tags, score = classify_answer("一段足够长的正常回答" * 3, _sources(0.9), "down")
-    assert "downvoted" in tags
-    assert score > 0
+    tags, score = classify_answer(_OK_ANSWER, "down", _diag())
+    assert tags == ["downvoted"]
+    assert score == 5.0
 
 
 def test_short_answer_is_flagged_as_abnormal():
-    tags, score = classify_answer("不知道", _sources(0.9), None)
+    tags, score = classify_answer("不知道", None, _diag())
     assert tags == ["abnormal"]
-    assert score > 0
-
-
-def test_no_citation_is_flagged():
-    tags, _ = classify_answer("一段足够长的正常回答内容" * 3, None, None)
-    assert "no_citation" in tags
+    assert score == 3.0
 
 
 def test_weak_evidence_is_flagged_and_graded():
+    """梯度沿用生产原公式 1.0 + min(gap, 0.5) * 2.0(gap = 阈值 - 来源分)。"""
     near, score_near = classify_answer(
-        "正常长度的回答内容" * 3, _sources(WEAK_EVIDENCE_THRESHOLD - 0.05), None
+        _OK_ANSWER, None, _diag(max_source_score=WEAK_EVIDENCE_THRESHOLD - 0.01)
     )
-    far, score_far = classify_answer("正常长度的回答内容" * 3, _sources(0.01), None)
-    assert "weak_evidence" in near and "weak_evidence" in far
-    assert score_far > score_near  # deeper below threshold => more suspect
+    far, score_far = classify_answer(_OK_ANSWER, None, _diag(max_source_score=0.01))
+    assert near == ["weak_evidence"] and far == ["weak_evidence"]
+    assert score_near == 1.02   # 1.0 + 0.01 * 2
+    assert score_far == 1.72    # 1.0 + 0.36 * 2
 
 
 def test_multiple_detectors_stack():
-    tags, score = classify_answer("短答", None, "down")
-    assert {"downvoted", "abnormal", "no_citation"} <= set(tags)
-    assert score > 7  # downvoted(5) + abnormal + no_citation(2)
+    tags, score = classify_answer(
+        "太短", "down", _diag(citation_count=1, source_count=0, quote_mutation_count=1)
+    )
+    assert set(tags) == {"downvoted", "abnormal", "fabricated_citation", "quote_relaxed"}
+    assert score == 5.0 + 3.0 + 4.0 + 3.0
+
+
+def test_no_citation_tag_is_gone():
+    """旧判据已删除:任何输入都不该再产出 no_citation。"""
+    tags, _ = classify_answer(
+        _OK_ANSWER, None, _diag(citation_count=0, source_count=0, max_source_score=None)
+    )
+    assert "no_citation" not in tags
 
 
 def test_answer_review_create_requires_bad_failure_category():
