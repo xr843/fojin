@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  Alert,
   Button,
   Card,
   Input,
@@ -58,7 +59,8 @@ export default function AdminAnswerQualityPage() {
   const [dist, setDist] = useState<ScoreDistribution | null>(null);
   const [reviewStats, setReviewStats] = useState<AnswerReviewStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [windowDays, setWindowDays] = useState(90);
+  const [loadError, setLoadError] = useState(false);
+  const [windowDays, setWindowDays] = useState(30);
   const [minSuspicion, setMinSuspicion] = useState(0);
   const [reasonFilters, setReasonFilters] = useState<string[]>([]);
   const [verdicts, setVerdicts] = useState<
@@ -80,8 +82,13 @@ export default function AdminAnswerQualityPage() {
         setTotal(res.total_unreviewed);
         setDist(res.score_distribution);
         setReviewStats(stats);
+        setLoadError(false);
       })
       .catch(() => {
+        // 失败必须显性化:此前只弹 toast、把 total 留在初始 0,于是 500 和
+        // 「队列真的空」长得一模一样 —— 715 条积压就是这样被当成空队列的。
+        setLoadError(true);
+        setItems([]);
         message.error(t("admin_aq.load_error"));
       })
       .finally(() => {
@@ -185,10 +192,32 @@ export default function AdminAnswerQualityPage() {
   return (
     <div style={{ padding: 24 }}>
       <Typography.Title level={3}>{t("nav.admin_answer_quality")}</Typography.Title>
+      {loadError && (
+        <Alert
+          role="alert"
+          type="error"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={t("admin_aq.load_error")}
+          action={
+            <Button
+              size="small"
+              onClick={() => {
+                setLoading(true);
+                void load();
+              }}
+            >
+              {t("common.retry")}
+            </Button>
+          }
+        />
+      )}
       <Space style={{ marginBottom: 16 }} wrap>
-        <Typography.Text strong>
-          {t("admin_aq.unreviewed_total", { count: total })}
-        </Typography.Text>
+        {!loadError && (
+          <Typography.Text strong>
+            {t("admin_aq.unreviewed_total", { count: total })}
+          </Typography.Text>
+        )}
         {reviewStats && (
           <>
             <Typography.Text type="secondary">
@@ -257,7 +286,7 @@ export default function AdminAnswerQualityPage() {
         loading={loading}
         columns={columns}
         dataSource={items}
-        locale={{ emptyText: t("admin_aq.queue_empty") }}
+        locale={{ emptyText: loadError ? t("admin_aq.load_error") : t("admin_aq.queue_empty") }}
         expandable={{
           expandedRowRender: (item) => (
             <Card size="small" bordered={false}>

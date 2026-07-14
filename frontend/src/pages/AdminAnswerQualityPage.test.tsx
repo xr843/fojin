@@ -71,4 +71,17 @@ describe("AdminAnswerQualityPage", () => {
     expect(screen.getByText("什么是五蕴？")).toBeInTheDocument();
     expect(getAnswerReviewStats).toHaveBeenCalledTimes(1);
   });
+
+  it("请求失败时显示错误态,而不是渲染成「队列已清空」", async () => {
+    vi.mocked(getAnswerQualityQueue).mockRejectedValueOnce(new Error("boom"));
+    vi.mocked(getAnswerReviewStats).mockResolvedValueOnce({
+      reviewed_total: 0, good: 0, bad: 0, by_category: {}, last_reviewed_at: null,
+    });
+
+    render(<AdminAnswerQualityPage />);
+
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.queryByText(/队列已清空/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/未复核\s*0\s*条/)).not.toBeInTheDocument();
+  });
 });

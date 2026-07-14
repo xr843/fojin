@@ -150,6 +150,7 @@
   "admin_aq.category.data": "语料缺失",
   "admin_aq.category.other": "其他",
   "admin_aq.load_error": "加载差答案队列失败",
+  "common.retry": "重试",
   "admin_aq.bad_requires_category": "标为 bad 时请先选择失败类型",
   "admin_aq.review_good_success": "已标记 good",
   "admin_aq.review_bad_success": "已标记 bad",

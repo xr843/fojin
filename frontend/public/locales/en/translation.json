@@ -150,6 +150,7 @@
   "admin_aq.category.data": "Missing corpus data",
   "admin_aq.category.other": "Other",
   "admin_aq.load_error": "Failed to load the bad-answer queue",
+  "common.retry": "Retry",
   "admin_aq.bad_requires_category": "Choose a failure type before marking bad",
   "admin_aq.review_good_success": "Marked good",
   "admin_aq.review_bad_success": "Marked bad",
