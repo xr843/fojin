@@ -106,7 +106,7 @@ def test_weak_evidence_is_flagged_and_graded():
     far, score_far = classify_answer(_OK_ANSWER, None, _diag(max_source_score=0.01))
     assert near == ["weak_evidence"] and far == ["weak_evidence"]
     assert score_near == 1.02   # 1.0 + 0.01 * 2
-    assert score_far == 1.72    # 1.0 + 0.36 * 2
+    assert score_far == 1.5     # 1.0 + 0.25 * 2
 
 
 def test_multiple_detectors_stack():
@@ -507,9 +507,9 @@ async def test_fabricated_citation_enters_queue_with_tag(aq_session):
 @pytest.mark.anyio
 async def test_queue_orders_by_suspicion_desc(aq_session):
     weak = await _seed_turn(
-        aq_session, question="q1", answer=_OK_ANSWER, sources=_sources(0.30),
-        diag=_diag_row(source_count=1, max_source_score=0.30),
-    )  # weak_evidence ≈ 1.14
+        aq_session, question="q1", answer=_OK_ANSWER, sources=_sources(0.20),
+        diag=_diag_row(source_count=1, max_source_score=0.20),
+    )  # weak_evidence ≈ 1.12
     downvoted = await _seed_turn(
         aq_session, question="q2", answer=_OK_ANSWER, sources=_sources(0.9),
         feedback="down", diag=_diag_row(),

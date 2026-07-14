@@ -47,7 +47,7 @@ const REASON_COLORS: Record<string, string> = {
 
 // Mirrors backend WEAK_EVIDENCE_THRESHOLD (answer_quality.py) — keep in sync if
 // the backend threshold is recalibrated. Display-only (reds weak sources).
-const WEAK_SCORE = 0.37;
+const WEAK_SCORE = 0.26;
 
 const CATEGORY_OPTION_KEYS = [
   { value: "recall", labelKey: "admin_aq.category.recall" },
