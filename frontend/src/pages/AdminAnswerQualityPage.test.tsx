@@ -33,6 +33,7 @@ describe("AdminAnswerQualityPage", () => {
     vi.mocked(getAnswerQualityQueue).mockResolvedValue({
       total_unreviewed: 1,
       score_distribution: { p10: 0.2, p25: 0.3, p50: 0.5, p90: 0.9 },
+      tag_distribution: { "abnormal": 1 },
       items: [
         {
           message_id: 10,

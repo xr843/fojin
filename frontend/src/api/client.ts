@@ -1364,6 +1364,7 @@ export interface ScoreDistribution {
 export interface AnswerQueueResponse {
   total_unreviewed: number;
   score_distribution: ScoreDistribution;
+  tag_distribution: Record<string, number>;
   items: AnswerQueueItem[];
 }
 
@@ -1403,6 +1404,20 @@ export async function getAnswerReviewStats(): Promise<AnswerReviewStats> {
   const { data } = await api.get<AnswerReviewStats>(
     "/admin/answer-quality/reviews/stats",
   );
+  return data;
+}
+
+export interface AdminPendingSummary {
+  answer_quality: number;
+  alignment_candidates: number;
+  suggestions: number;
+  feedbacks: number;
+  annotations: number;
+}
+
+/** 侧边栏角标的唯一数据源:一次请求拿全部待办计数(后端全部走 COUNT)。 */
+export async function getAdminPendingSummary(): Promise<AdminPendingSummary> {
+  const { data } = await api.get<AdminPendingSummary>("/admin/pending-summary");
   return data;
 }
 
