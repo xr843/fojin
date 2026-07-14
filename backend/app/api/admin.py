@@ -6,6 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.role_guard import require_role
 from app.database import get_db
+from app.models.annotation import Annotation
+from app.models.feedback import Feedback
+from app.models.source import SourceSuggestion
 from app.models.user import User
 from app.schemas.admin import (
     ActiveUserDayDetail,
@@ -13,6 +16,7 @@ from app.schemas.admin import (
     AdminAuditLogListResponse,
     AdminModuleUsage,
     AdminOverview,
+    AdminPendingSummary,
     AdminTrends,
     AdminUserItem,
     AdminUserListResponse,
@@ -25,6 +29,8 @@ from app.schemas.admin import (
     AnswerReviewStats,
 )
 from app.services.admin_service import (
+    count_pending_candidates,
+    count_pending_simple,
     daily_active_user_detail,
     get_overview,
     get_trends,
@@ -36,6 +42,7 @@ from app.services.admin_service import (
 from app.services.alignment_coverage import compute_alignment_coverage
 from app.services.answer_quality import (
     build_bad_answer_queue,
+    count_unreviewed,
     review_stats,
     upsert_review,
 )
@@ -195,7 +202,7 @@ async def audit_log_list(
 
 @router.get("/answer-quality/queue", response_model=AnswerQueueResponse)
 async def answer_quality_queue(
-    window: int = Query(90, ge=1, le=365),
+    window: int = Query(30, ge=1, le=365),
     min_suspicion: float = Query(0.0, ge=0.0),
     category: str | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
@@ -203,11 +210,10 @@ async def answer_quality_queue(
     _user=Depends(require_role("admin")),
     db: AsyncSession = Depends(get_db),
 ):
-    """Live-ranked queue of suspect low-quality assistant answers.
-
-    Detection is read-only over chat_messages; messages already in
-    answer_reviews are excluded. ``score_distribution`` helps calibrate the
-    weak-evidence threshold."""
+    """引用不可核对的回答队列(凭空引用 / 转述当原文引 / 引用被纠正 / 弱证据 /
+    点踩 / 异常短)。只覆盖有诊断行的消息 —— 2026-07-01 之前的回答,坏引用的证据
+    在入库时已被 verify_quoted_content 抹平,无法追溯。``tag_distribution`` 与
+    ``score_distribution`` 用于校准阈值。"""
     return await build_bad_answer_queue(
         db,
         window_days=window,
@@ -247,3 +253,18 @@ async def answer_quality_review_stats(
 ):
     """Labeled-dataset overview: reviewed totals + failure-category breakdown."""
     return await review_stats(db)
+
+
+@router.get("/pending-summary", response_model=AdminPendingSummary)
+async def pending_summary(
+    _user=Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    """侧边栏角标。全部走 COUNT —— 不能在这里跑打分,导航每次都会读它。"""
+    return AdminPendingSummary(
+        answer_quality=await count_unreviewed(db),
+        alignment_candidates=await count_pending_candidates(db),
+        suggestions=await count_pending_simple(db, SourceSuggestion),
+        feedbacks=await count_pending_simple(db, Feedback),
+        annotations=await count_pending_simple(db, Annotation),
+    )
