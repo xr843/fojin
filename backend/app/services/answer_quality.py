@@ -430,14 +430,20 @@ async def upsert_review(
     return await count_unreviewed(db)
 
 
-async def review_stats(db: AsyncSession) -> dict:
+async def review_stats(db: AsyncSession, *, window_days: int = 30) -> dict:
+    """Same ``window_days`` default/semantics as the queue side
+    (``build_bad_answer_queue`` / ``count_unreviewed``) — this used to read the
+    whole table with no time filter while the queue was windowed, so the two
+    numbers displayed side by side on the admin page had silently different
+    denominators."""
+    since = datetime.now(UTC) - timedelta(days=window_days)
     rows = (
         await db.execute(
             select(
                 AnswerReview.verdict,
                 AnswerReview.failure_category,
                 AnswerReview.reviewed_at,
-            )
+            ).where(AnswerReview.reviewed_at >= since)
         )
     ).all()
     good = sum(1 for v, _c, _t in rows if v == "good")

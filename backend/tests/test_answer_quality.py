@@ -1,7 +1,7 @@
 """Answer-quality queue — pure classifier unit tests + API tests."""
 
 import warnings
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
 import pytest
@@ -21,6 +21,7 @@ from app.services.answer_quality import (
     build_bad_answer_queue,
     classify_answer,
     count_unreviewed,
+    review_stats,
     upsert_review,
 )
 
@@ -587,3 +588,48 @@ async def test_unknown_category_matches_nothing(aq_session):
         result = await build_bad_answer_queue(aq_session, category="bogus")
     assert result["total_unreviewed"] == 0
     assert result["items"] == []
+
+
+@pytest.mark.anyio
+async def test_review_stats_windowed_like_queue(aq_session):
+    """review_stats() 必须与队列同口径的时间窗口(默认 30 天)—— 此前它读全表
+    不做任何时间过滤,而前端把两个数字并排显示在同一行,分母悄悄错位。窗口外的
+    复核不该计入 reviewed_total/good/bad。"""
+    mid_in = await _seed_turn(
+        aq_session, question="q1", answer=_OK_ANSWER, sources=None,
+        diag=_diag_row(citation_count=1, source_count=0, max_source_score=None),
+    )
+    mid_out = await _seed_turn(
+        aq_session, question="q2", answer=_OK_ANSWER, sources=None,
+        diag=_diag_row(citation_count=1, source_count=0, max_source_score=None),
+    )
+
+    now = datetime.now(UTC)
+    aq_session.add(
+        AnswerReview(
+            message_id=mid_in,
+            verdict="good",
+            reviewed_at=now - timedelta(days=5),  # 窗口内(30 天）
+        )
+    )
+    aq_session.add(
+        AnswerReview(
+            message_id=mid_out,
+            verdict="bad",
+            failure_category="recall",
+            reviewed_at=now - timedelta(days=60),  # 窗口外
+        )
+    )
+    await aq_session.commit()
+
+    stats = await review_stats(aq_session)
+    assert stats["reviewed_total"] == 1
+    assert stats["good"] == 1
+    assert stats["bad"] == 0
+
+    # widening the window must pick up the older review too — proves the
+    # filter is a real time bound, not an accidental always-true/false.
+    wide = await review_stats(aq_session, window_days=90)
+    assert wide["reviewed_total"] == 2
+    assert wide["good"] == 1
+    assert wide["bad"] == 1

@@ -248,11 +248,14 @@ async def answer_quality_review(
 
 @router.get("/answer-quality/reviews/stats", response_model=AnswerReviewStats)
 async def answer_quality_review_stats(
+    window: int = Query(30, ge=1, le=365),
     _user=Depends(require_role("admin")),
     db: AsyncSession = Depends(get_db),
 ):
-    """Labeled-dataset overview: reviewed totals + failure-category breakdown."""
-    return await review_stats(db)
+    """Labeled-dataset overview: reviewed totals + failure-category breakdown,
+    windowed the same way as the queue (default 30 days) so the two numbers
+    shown together on the admin page share one denominator."""
+    return await review_stats(db, window_days=window)
 
 
 @router.get("/pending-summary", response_model=AdminPendingSummary)
