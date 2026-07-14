@@ -1,12 +1,13 @@
-import { Card, Progress, Table, Tag, Tooltip, Typography } from "antd";
+import { Card, Progress, Table, Tabs, Tag, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   getAlignmentCoverage,
   type AlignmentCoverageItem,
 } from "../api/client";
+import AlignmentReviewPage from "./AlignmentReviewPage";
 
 const LANG_COLORS: Record<string, string> = {
   bo: "geekblue", // Tibetan
@@ -22,7 +23,7 @@ function coverageStatus(pct: number | null): "success" | "active" | "exception" 
   return "active";
 }
 
-export default function AdminAlignmentPage() {
+function CoveragePanel() {
   const { t } = useTranslation();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["admin", "alignment-coverage"],
@@ -115,37 +116,60 @@ export default function AdminAlignmentPage() {
   ];
 
   return (
+    <Card
+      title={
+        data
+          ? t("admin_align.title_with_count", { count: data.total })
+          : t("admin_align.title")
+      }
+    >
+      <Typography.Paragraph type="secondary">
+        {t("admin_align.subtitle")}
+      </Typography.Paragraph>
+      <Table<AlignmentCoverageItem>
+        rowKey="text_id"
+        size="small"
+        loading={isLoading}
+        dataSource={data?.items ?? []}
+        columns={columns}
+        pagination={{ pageSize: 50, hideOnSinglePage: true }}
+        locale={{
+          emptyText: isError
+            ? t("admin_align.load_error")
+            : t("admin_align.empty"),
+        }}
+      />
+    </Card>
+  );
+}
+
+export default function AdminAlignmentPage() {
+  const { t } = useTranslation();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const activeKey = location.pathname.endsWith("/review") ? "review" : "coverage";
+
+  return (
     <div style={{ padding: 24 }}>
       <title>{t("admin_align.page_title")}</title>
-      <Card
-        title={
-          data
-            ? t("admin_align.title_with_count", { count: data.total })
-            : t("admin_align.title")
+      <Tabs
+        activeKey={activeKey}
+        onChange={(key) =>
+          navigate(key === "review" ? "/admin/alignment/review" : "/admin/alignment")
         }
-        extra={
-          <Link to="/admin/alignment/review">
-            {t("admin_align.review_link")}
-          </Link>
-        }
-      >
-        <Typography.Paragraph type="secondary">
-          {t("admin_align.subtitle")}
-        </Typography.Paragraph>
-        <Table<AlignmentCoverageItem>
-          rowKey="text_id"
-          size="small"
-          loading={isLoading}
-          dataSource={data?.items ?? []}
-          columns={columns}
-          pagination={{ pageSize: 50, hideOnSinglePage: true }}
-          locale={{
-            emptyText: isError
-              ? t("admin_align.load_error")
-              : t("admin_align.empty"),
-          }}
-        />
-      </Card>
+        items={[
+          {
+            key: "coverage",
+            label: t("nav.admin_alignment"),
+            children: <CoveragePanel />,
+          },
+          {
+            key: "review",
+            label: t("nav.admin_alignment_review"),
+            children: <AlignmentReviewPage />,
+          },
+        ]}
+      />
     </div>
   );
 }

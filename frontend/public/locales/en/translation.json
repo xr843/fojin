@@ -1438,6 +1438,7 @@
   "reader.parallel.sentence.align_1_2": "1→2",
   "reader.parallel.sentence.align_2_1": "2→1",
   "nav.admin_alignment": "Alignment Coverage",
+  "nav.admin_alignment_review": "Candidate review",
   "admin_align.page_title": "Cross-canon Alignment Coverage · Admin",
   "admin_align.title": "Cross-canon Alignment Coverage",
   "admin_align.title_with_count": "Cross-canon Alignment Coverage ({{count}} texts with alignments)",
