@@ -13,9 +13,15 @@ from app.models.chat import ChatAnswerDiagnostic, ChatMessage
 # Calibrated 2026-06-30 to ~p10 of the live max(source.score) distribution
 # (p10≈0.366), so weak_evidence flags only the bottom decile of retrieval
 # strength rather than ~the bottom quartile. ChatSource.score is the blended
-# vector+rerank score. Re-read score_distribution from the queue endpoint and
-# adjust if the corpus/reranker changes.
-WEAK_EVIDENCE_THRESHOLD = 0.37
+# vector+rerank score.
+#
+# Re-calibrated 2026-07-14: 30-day production distribution has shifted down
+# (p10=0.261, p25=0.316). The old 0.37 sat above p25 — it was flagging over a
+# quarter of answers, well past the "bottom decile" design intent — so it was
+# false-positiving on a growing share of the queue. Reset to the current p10
+# (0.26). Re-read score_distribution from the queue endpoint and recalibrate
+# again if the corpus/reranker changes.
+WEAK_EVIDENCE_THRESHOLD = 0.26
 ABNORMAL_MIN_CHARS = 20
 
 # Prefixes of LLM-failure replies (see chat._FAILED_ANSWER_PREFIXES). Failed /
@@ -113,7 +119,7 @@ def classify_answer(
     if mss is not None and mss < WEAK_EVIDENCE_THRESHOLD:
         tags.append("weak_evidence")
         # graded: deeper below threshold => more suspect.
-        # 注:gap 最大只有 WEAK_EVIDENCE_THRESHOLD(0.37),所以 0.5 这个封顶永远够
+        # 注:gap 最大只有 WEAK_EVIDENCE_THRESHOLD(0.26),所以 0.5 这个封顶永远够
         # 不着 —— 生产旧代码自带的死枝,此处保持原样不动:改评分语义会让 SQL 侧的
         # 排序表达式与这里算出的显示分数对不上。
         score += WEIGHTS["weak_evidence"] + min(WEAK_EVIDENCE_THRESHOLD - mss, 0.5) * 2.0
@@ -333,7 +339,8 @@ async def build_bad_answer_queue(
         )
     await _attach_questions(db, items)
 
-    # 标签分布:事后据此校准 WEAK_EVIDENCE_THRESHOLD(本次不动 0.37 这个数值)。
+    # 标签分布:事后据此校准 WEAK_EVIDENCE_THRESHOLD(2026-07-14 已按 p10 从 0.37
+    # 重新校准到 0.26,见文件顶部注释;后续再变化仍照此读数校准)。
     dist_row = (
         await db.execute(
             select(

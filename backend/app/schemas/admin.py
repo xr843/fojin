@@ -200,8 +200,9 @@ class ScoreDistribution(BaseModel):
 class AnswerQueueResponse(BaseModel):
     total_unreviewed: int
     score_distribution: ScoreDistribution
-    # 标签 -> 命中条数。用来事后校准 WEAK_EVIDENCE_THRESHOLD(现为 0.37,而生产
-    # 实测分布已是 p10=0.31 —— 阈值偏高在误报,但本次不拍脑袋改数值)。
+    # 标签 -> 命中条数。用来事后校准 WEAK_EVIDENCE_THRESHOLD(2026-07-14 已按
+    # 生产实测 p10=0.261 从 0.37 重新校准到 0.26 —— 旧值已高于 p25=0.316,在
+    # 误报;继续用这份分布追踪是否需要再次校准)。
     tag_distribution: dict[str, int] = Field(default_factory=dict)
     items: list[AnswerQueueItem]
 
