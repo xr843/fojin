@@ -97,7 +97,18 @@ export default function Layout() {
     ...(isAdmin
       ? [
           {
-            icon: <Badge count={adminBadgeTotal} size="small" offset={[4, -2]} overflowCount={9999}><DashboardOutlined /></Badge>,
+            // 顶层只用一个红点表示「有活儿」,不显示精确总数:四位数的角标会盖住
+            // 「管理」二字,而且它的 sup 会挡住触发区、导致悬停打不开菜单。精确计数
+            // 由下拉里的每一项各自给出。pointerEvents:none 是双保险。
+            icon: (
+              <Badge
+                dot={adminBadgeTotal > 0}
+                offset={[2, -2]}
+                style={{ pointerEvents: "none" }}
+              >
+                <DashboardOutlined />
+              </Badge>
+            ),
             label: t("nav.admin"),
             path: "/admin",
             // 常驻 4 项。判据是「需不需要你主动定期查看」:
