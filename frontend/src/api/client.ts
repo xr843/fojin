@@ -1070,11 +1070,6 @@ export async function deleteSourceSuggestion(id: number): Promise<void> {
   await api.delete(`/source-suggestions/${id}`);
 }
 
-export async function getPendingSuggestionCount(): Promise<number> {
-  const { data } = await api.get<{ count: number }>("/source-suggestions/pending-count");
-  return data.count;
-}
-
 export async function reviewAnnotation(
   annotationId: number,
   payload: { action: string; comment?: string },
@@ -1154,11 +1149,6 @@ export async function updateFeedbackStatus(
 
 export async function replyFeedback(id: number, reply: string): Promise<void> {
   await api.post(`/feedbacks/${id}/reply`, { reply });
-}
-
-export async function getPendingFeedbackCount(): Promise<number> {
-  const { data } = await api.get<{ count: number }>("/feedbacks/pending-count");
-  return data.count;
 }
 
 // --- Admin Dashboard ---
@@ -1364,6 +1354,7 @@ export interface ScoreDistribution {
 export interface AnswerQueueResponse {
   total_unreviewed: number;
   score_distribution: ScoreDistribution;
+  tag_distribution: Record<string, number>;
   items: AnswerQueueItem[];
 }
 
@@ -1399,10 +1390,27 @@ export async function submitAnswerReview(payload: {
   return data;
 }
 
-export async function getAnswerReviewStats(): Promise<AnswerReviewStats> {
+export async function getAnswerReviewStats(
+  params?: { window?: number },
+): Promise<AnswerReviewStats> {
   const { data } = await api.get<AnswerReviewStats>(
     "/admin/answer-quality/reviews/stats",
+    { params },
   );
+  return data;
+}
+
+export interface AdminPendingSummary {
+  answer_quality: number;
+  alignment_candidates: number;
+  suggestions: number;
+  feedbacks: number;
+  annotations: number;
+}
+
+/** 侧边栏角标的唯一数据源:一次请求拿全部待办计数(后端全部走 COUNT)。 */
+export async function getAdminPendingSummary(): Promise<AdminPendingSummary> {
+  const { data } = await api.get<AdminPendingSummary>("/admin/pending-summary");
   return data;
 }
 

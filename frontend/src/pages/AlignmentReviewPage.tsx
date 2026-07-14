@@ -153,37 +153,29 @@ export default function AlignmentReviewPage() {
   ];
 
   return (
-    <div style={{ padding: 24 }}>
-      <title>{t("admin_align_review.page_title")}</title>
-      <Card
-        title={
-          data
-            ? t("admin_align_review.title_with_count", { n: data.length })
-            : t("admin_align_review.title")
-        }
-        extra={
-          <Link to="/admin/alignment">
-            {t("admin_align_review.back_to_coverage")}
-          </Link>
-        }
-      >
-        <Typography.Paragraph type="secondary">
-          {t("admin_align_review.subtitle")}
-        </Typography.Paragraph>
-        <Table<AlignmentCandidate>
-          rowKey="id"
-          size="small"
-          loading={isLoading}
-          dataSource={data ?? []}
-          columns={columns}
-          pagination={{ pageSize: 50, hideOnSinglePage: true }}
-          locale={{
-            emptyText: isError
-              ? t("admin_align_review.load_error")
-              : t("admin_align_review.empty"),
-          }}
-        />
-      </Card>
-    </div>
+    <Card
+      title={
+        data
+          ? t("admin_align_review.title_with_count", { n: data.length })
+          : t("admin_align_review.title")
+      }
+    >
+      <Typography.Paragraph type="secondary">
+        {t("admin_align_review.subtitle")}
+      </Typography.Paragraph>
+      <Table<AlignmentCandidate>
+        rowKey="id"
+        size="small"
+        loading={isLoading}
+        dataSource={data ?? []}
+        columns={columns}
+        pagination={{ pageSize: 50, hideOnSinglePage: true }}
+        locale={{
+          emptyText: isError
+            ? t("admin_align_review.load_error")
+            : t("admin_align_review.empty"),
+        }}
+      />
+    </Card>
   );
 }

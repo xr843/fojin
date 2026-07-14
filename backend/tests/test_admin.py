@@ -203,3 +203,40 @@ async def test_module_usage_days_clamped(client):
         assert resp2.status_code == 422
     finally:
         app.dependency_overrides.pop(get_current_user, None)
+
+
+# --- Pending-summary endpoint (sidebar badge) ---
+
+@pytest.mark.anyio
+async def test_pending_summary_requires_admin(client):
+    resp = await client.get("/api/admin/pending-summary")
+    assert resp.status_code in (401, 403)
+
+
+@pytest.mark.anyio
+async def test_pending_summary_shape(client):
+    """五个计数齐全 —— 角标是它的唯一消费者,少一个前端就会漏报待办。"""
+    fake_admin = _fake_user(role="admin")
+    from app.main import app
+    from app.core.deps import get_current_user
+
+    app.dependency_overrides[get_current_user] = lambda: fake_admin
+    try:
+        with patch(
+            "app.api.admin.count_unreviewed", new=AsyncMock(return_value=7)
+        ), patch(
+            "app.api.admin.count_pending_candidates", new=AsyncMock(return_value=50)
+        ), patch(
+            "app.api.admin.count_pending_simple", new=AsyncMock(side_effect=[4, 3, 2])
+        ):
+            resp = await client.get("/api/admin/pending-summary")
+            assert resp.status_code == 200
+            assert resp.json() == {
+                "answer_quality": 7,
+                "alignment_candidates": 50,
+                "suggestions": 4,
+                "feedbacks": 3,
+                "annotations": 2,
+            }
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)

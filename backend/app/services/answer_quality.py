@@ -3,11 +3,11 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import and_, case, false, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.answer_review import AnswerReview
-from app.models.chat import ChatMessage
+from app.models.chat import ChatAnswerDiagnostic, ChatMessage
 
 # --- Detection config -------------------------------------------------------
 # Calibrated 2026-06-30 to ~p10 of the live max(source.score) distribution
@@ -24,35 +24,40 @@ ABNORMAL_MIN_CHARS = 20
 # legacy junk rows already in the table).
 _FAILED_ANSWER_PREFIXES = ("抱歉，AI 服务", "AI 服务返回", "您的 API Key 无效")
 
-# reason tag -> base weight in the suspicion score
+# reason tag -> base weight in the suspicion score.
+#
+# 判据是「引用是否可核对」,不是「有没有引经」。旧的 no_citation(= 无任何来源)
+# 把闲聊/元问题("what can you do today?")和真实的引用失败混为一谈,制造了 715
+# 条噪音、淹没了信号,已删除。
 WEIGHTS = {
     "downvoted": 5.0,
+    "fabricated_citation": 4.0,
+    "quote_relaxed": 3.0,
     "abnormal": 3.0,
-    "no_citation": 2.0,
+    "citation_corrected": 2.0,
     "weak_evidence": 1.0,  # plus a graded bonus, see classify_answer
 }
+
+
+@dataclass(frozen=True)
+class DiagnosticSignals:
+    """一条回答在 *入库前* 的引用真相,来自 chat_answer_diagnostics。
+
+    必须从这张表读,不能对 chat_messages.content 重算:verify_quoted_content 的
+    契约是「fojin 从不端出假的逐字引用」,对不上原文的引号在保存前就被剥掉了
+    (quote_verifier.py:373-382),重算只会得到「一切正常」。"""
+
+    citation_count: int
+    source_count: int
+    quote_mutation_count: int
+    citation_mutation_count: int
+    max_source_score: float | None
 
 
 def _is_failed_answer(content: str | None) -> bool:
     """Empty answer or a known LLM-failure reply — excluded from the queue."""
     text = (content or "").strip()
     return not text or text.startswith(_FAILED_ANSWER_PREFIXES)
-
-
-def _max_source_score(sources) -> float | None:
-    """Max blended score across an assistant message's cited passages, or None
-    when there are no parseable sources. Defensive against null/odd JSON."""
-    if not sources:
-        return None
-    try:
-        scores = [
-            float(s["score"])
-            for s in sources
-            if isinstance(s, dict) and s.get("score") is not None
-        ]
-    except (TypeError, ValueError):
-        return None
-    return max(scores) if scores else None
 
 
 def _clean_sources(sources) -> list[dict]:
@@ -75,13 +80,10 @@ def _requested_categories(category: str | None) -> set[str]:
 
 
 def classify_answer(
-    content: str | None, sources, feedback: str | None
+    content: str | None, feedback: str | None, diag: DiagnosticSignals
 ) -> tuple[list[str], float]:
-    """Pure detector. Given an assistant message's columns, return the reason
-    tags it trips and a suspicion score (0.0 = not suspect). Detectors read
-    ``feedback`` (downvoted), ``content`` (abnormal short answers), and
-    ``sources`` (no_citation / weak_evidence). Failed/empty answers are filtered
-    upstream, not scored here."""
+    """Pure detector. 给定一条回答的列 + 它的诊断行,返回命中的标签与可疑度
+    (0.0 = 不可疑)。失败/空回答在上游过滤,不在这里打分。"""
     tags: list[str] = []
     score = 0.0
 
@@ -93,18 +95,122 @@ def classify_answer(
         tags.append("abnormal")
         score += WEIGHTS["abnormal"]
 
-    max_score = _max_source_score(sources)
-    if max_score is None:
-        tags.append("no_citation")
-        score += WEIGHTS["no_citation"]
-    elif max_score < WEAK_EVIDENCE_THRESHOLD:
+    # 引了经却零来源 = 凭空引用,最严重的可核对性失败。
+    if diag.citation_count > 0 and diag.source_count == 0:
+        tags.append("fabricated_citation")
+        score += WEIGHTS["fabricated_citation"]
+
+    # 系统把「转述当原文引」降级过 —— 用户看到的是修好的,但这条本来是错的。
+    if diag.quote_mutation_count > 0:
+        tags.append("quote_relaxed")
+        score += WEIGHTS["quote_relaxed"]
+
+    if diag.citation_mutation_count > 0:
+        tags.append("citation_corrected")
+        score += WEIGHTS["citation_corrected"]
+
+    mss = diag.max_source_score
+    if mss is not None and mss < WEAK_EVIDENCE_THRESHOLD:
         tags.append("weak_evidence")
-        # graded: deeper below threshold => more suspect (bonus capped)
-        score += WEIGHTS["weak_evidence"] + min(
-            WEAK_EVIDENCE_THRESHOLD - max_score, 0.5
-        ) * 2.0
+        # graded: deeper below threshold => more suspect.
+        # 注:gap 最大只有 WEAK_EVIDENCE_THRESHOLD(0.37),所以 0.5 这个封顶永远够
+        # 不着 —— 生产旧代码自带的死枝,此处保持原样不动:改评分语义会让 SQL 侧的
+        # 排序表达式与这里算出的显示分数对不上。
+        score += WEIGHTS["weak_evidence"] + min(WEAK_EVIDENCE_THRESHOLD - mss, 0.5) * 2.0
 
     return tags, round(score, 3)
+
+
+# --- SQL 侧判据 ------------------------------------------------------------
+# 与 classify_answer 一一对应。判据全部是诊断表上的列比较,所以排序、分页、计数
+# 都能下推到 SQL —— 旧实现把窗口内每条 assistant 消息连同完整 sources JSON 拉进
+# Python 再内存分页(实测 1.8s / 80KB,随流量线性劣化)。
+
+_M = ChatMessage
+_D = ChatAnswerDiagnostic
+
+
+def _trimmed_content_len():
+    """等价于 Python 的 len(content.strip())。
+
+    SQL 的 TRIM() 只剥空格,而 Python 的 .strip() 剥所有空白 —— 先把 \\n/\\t/\\r
+    换成空格(1:1 替换,不改变长度),再 TRIM,两侧语义就对齐了。内部空白仍按 1
+    个字符计,与 Python 一致。replace/trim/length 都是 ANSI 标准,SQLite 与
+    Postgres 通吃。"""
+    normalized = func.replace(
+        func.replace(func.replace(_M.content, "\n", " "), "\t", " "), "\r", " "
+    )
+    return func.length(func.trim(normalized))
+
+
+TAG_PREDICATES = {
+    "downvoted": _M.feedback == "down",
+    "abnormal": _trimmed_content_len() < ABNORMAL_MIN_CHARS,
+    "fabricated_citation": and_(_D.citation_count > 0, _D.source_count == 0),
+    "quote_relaxed": _D.quote_mutation_count > 0,
+    "citation_corrected": _D.citation_mutation_count > 0,
+    "weak_evidence": and_(
+        _D.max_source_score.is_not(None),
+        _D.max_source_score < WEAK_EVIDENCE_THRESHOLD,
+    ),
+}
+
+
+def _score_expr():
+    """SQL 版可疑度,与 classify_answer 的算法逐项对齐。梯度用 case 表达(而非
+    LEAST/MIN —— 那两个在 sqlite 与 postgres 上名字不同),保证可移植。"""
+    gap = WEAK_EVIDENCE_THRESHOLD - _D.max_source_score
+    graded = case((gap > 0.5, 1.0), else_=gap * 2.0)
+    return (
+        case((TAG_PREDICATES["downvoted"], WEIGHTS["downvoted"]), else_=0.0)
+        + case((TAG_PREDICATES["abnormal"], WEIGHTS["abnormal"]), else_=0.0)
+        + case(
+            (TAG_PREDICATES["fabricated_citation"], WEIGHTS["fabricated_citation"]),
+            else_=0.0,
+        )
+        + case((TAG_PREDICATES["quote_relaxed"], WEIGHTS["quote_relaxed"]), else_=0.0)
+        + case(
+            (TAG_PREDICATES["citation_corrected"], WEIGHTS["citation_corrected"]),
+            else_=0.0,
+        )
+        + case(
+            (TAG_PREDICATES["weak_evidence"], WEIGHTS["weak_evidence"] + graded),
+            else_=0.0,
+        )
+    )
+
+
+def _base_conditions(window_days: int):
+    """INNER JOIN 诊断表本身就把 7/1 之前的老消息挡在外面 —— 它们没有诊断行,
+    而坏引用的证据在入库时已被 verify_quoted_content 抹平,无法追溯。"""
+    since = datetime.now(UTC) - timedelta(days=window_days)
+    reviewed = select(AnswerReview.message_id)
+    return [
+        _M.role == "assistant",
+        _M.created_at >= since,
+        _M.id.not_in(reviewed),
+    ]
+
+
+def _diag_of(row_d: ChatAnswerDiagnostic) -> DiagnosticSignals:
+    return DiagnosticSignals(
+        citation_count=row_d.citation_count or 0,
+        source_count=row_d.source_count or 0,
+        quote_mutation_count=row_d.quote_mutation_count or 0,
+        citation_mutation_count=row_d.citation_mutation_count or 0,
+        max_source_score=row_d.max_source_score,
+    )
+
+
+async def count_unreviewed(db: AsyncSession, *, window_days: int = 30) -> int:
+    """角标专用:只跑 COUNT,不打分、不拉 sources。导航每次都会读它。"""
+    stmt = (
+        select(func.count())
+        .select_from(_M)
+        .join(_D, _D.message_id == _M.id)
+        .where(*_base_conditions(window_days), or_(*TAG_PREDICATES.values()))
+    )
+    return (await db.execute(stmt)).scalar_one()
 
 
 def _percentiles(samples: list[float]) -> dict[str, float | None]:
@@ -168,45 +274,51 @@ async def _attach_questions(db: AsyncSession, items: list[QueueItem]) -> None:
 async def build_bad_answer_queue(
     db: AsyncSession,
     *,
-    window_days: int = 90,
+    window_days: int = 30,
     min_suspicion: float = 0.0,
     category: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> dict:
-    """Live-compute the ranked queue of suspect assistant answers, excluding
-    any message already reviewed."""
-    since = datetime.now(UTC) - timedelta(days=window_days)
-    requested_categories = _requested_categories(category)
-    reviewed = select(AnswerReview.message_id)
+    """引用不可核对的回答队列,按可疑度降序。排序/分页/计数全部在 SQL 内完成。"""
+    base = _base_conditions(window_days)
+    score = _score_expr()
+
+    requested = _requested_categories(category)
+    if requested:
+        matched_predicates = [TAG_PREDICATES[t] for t in requested if t in TAG_PREDICATES]
+        # 请求的 category 片段全都不是已知标签 —— 应当匹配不到任何行,而不是
+        # 静默退化成"匹配全部"(那会改变语义)。or_() 零参数调用本身也会触发
+        # SADeprecationWarning,未来版本可能直接报错,所以显式给 false()。
+        tag_filter = or_(*matched_predicates) if matched_predicates else false()
+    else:
+        tag_filter = or_(*TAG_PREDICATES.values())
+
+    conds = [*base, tag_filter, score >= min_suspicion]
+
+    total = (
+        await db.execute(
+            select(func.count())
+            .select_from(_M)
+            .join(_D, _D.message_id == _M.id)
+            .where(*conds)
+        )
+    ).scalar_one()
+
     rows = (
         await db.execute(
-            select(ChatMessage)
-            .where(
-                ChatMessage.role == "assistant",
-                ChatMessage.created_at >= since,
-                ChatMessage.id.not_in(reviewed),
-            )
-            .order_by(ChatMessage.created_at.desc())
+            select(_M, _D)
+            .join(_D, _D.message_id == _M.id)
+            .where(*conds)
+            .order_by(score.desc(), _M.created_at.desc())
+            .limit(limit)
+            .offset(offset)
         )
-    ).scalars().all()
+    ).all()
 
     items: list[QueueItem] = []
-    score_samples: list[float] = []
-    for m in rows:
-        # Failed/empty generations are bugs, not reviewable answers — never
-        # surface them in the quality queue (nor let them skew the score
-        # distribution used for calibration).
-        if _is_failed_answer(m.content):
-            continue
-        ms = _max_source_score(m.sources)
-        if ms is not None:
-            score_samples.append(ms)
-        tags, score = classify_answer(m.content, m.sources, m.feedback)
-        if not tags or score < min_suspicion:
-            continue
-        if requested_categories and not requested_categories.intersection(tags):
-            continue
+    for m, d in rows:
+        tags, s = classify_answer(m.content, m.feedback, _diag_of(d))
         items.append(
             QueueItem(
                 message_id=m.id,
@@ -214,23 +326,50 @@ async def build_bad_answer_queue(
                 answer=m.content,
                 sources=_clean_sources(m.sources),
                 reason_tags=tags,
-                suspicion_score=score,
+                suspicion_score=s,
                 feedback=m.feedback,
                 created_at=m.created_at,
             )
         )
+    await _attach_questions(db, items)
 
-    items.sort(key=lambda x: x.suspicion_score, reverse=True)
-    total = len(items)
-    page = items[offset : offset + limit]
-    await _attach_questions(db, page)
+    # 标签分布:事后据此校准 WEAK_EVIDENCE_THRESHOLD(本次不动 0.37 这个数值)。
+    dist_row = (
+        await db.execute(
+            select(
+                *[
+                    func.sum(case((pred, 1), else_=0)).label(tag)
+                    for tag, pred in TAG_PREDICATES.items()
+                ]
+            )
+            .select_from(_M)
+            .join(_D, _D.message_id == _M.id)
+            .where(*base, or_(*TAG_PREDICATES.values()))
+        )
+    ).one()
+    tag_distribution = {
+        tag: int(val or 0)
+        for tag, val in zip(TAG_PREDICATES.keys(), dist_row, strict=True)
+    }
+
+    # 来源分数分布仍取窗口内 *全部* 有诊断的回答(不只可疑的),用于校准阈值。
+    samples = [
+        float(v)
+        for (v,) in (
+            await db.execute(
+                select(_D.max_source_score)
+                .select_from(_M)
+                .join(_D, _D.message_id == _M.id)
+                .where(*base, _D.max_source_score.is_not(None))
+            )
+        ).all()
+    ]
 
     return {
         "total_unreviewed": total,
-        "score_distribution": _percentiles(score_samples),
-        # Plain dicts (not QueueItem dataclasses) so the AnswerQueueResponse
-        # response_model validates cleanly without from_attributes coercion.
-        "items": [asdict(it) for it in page],
+        "score_distribution": _percentiles(samples),
+        "tag_distribution": tag_distribution,
+        "items": [asdict(it) for it in items],
     }
 
 
@@ -244,16 +383,23 @@ async def upsert_review(
     reviewed_by: int | None,
 ) -> int:
     """Create/update the review for a message, snapshotting why it was flagged.
-    Returns the count of still-unreviewed suspect messages in the last 90 days.
+    Returns the count of still-unreviewed suspect messages in the default window.
     Raises ValueError if the message does not exist or is not an assistant
     message."""
-    msg = (
-        await db.execute(select(ChatMessage).where(ChatMessage.id == message_id))
-    ).scalar_one_or_none()
-    if msg is None or msg.role != "assistant":
+    row = (
+        await db.execute(
+            select(ChatMessage, ChatAnswerDiagnostic)
+            .join(ChatAnswerDiagnostic, ChatAnswerDiagnostic.message_id == ChatMessage.id)
+            .where(ChatMessage.id == message_id)
+        )
+    ).first()
+    if row is None:
+        raise ValueError("message not found, not an assistant message, or has no diagnostic")
+    msg, diag_row = row
+    if msg.role != "assistant":
         raise ValueError("message not found or not an assistant message")
 
-    tags, score = classify_answer(msg.content, msg.sources, msg.feedback)
+    tags, score = classify_answer(msg.content, msg.feedback, _diag_of(diag_row))
     existing = (
         await db.execute(
             select(AnswerReview).where(AnswerReview.message_id == message_id)
@@ -281,18 +427,23 @@ async def upsert_review(
         )
     await db.commit()
 
-    result = await build_bad_answer_queue(db, limit=0)
-    return result["total_unreviewed"]
+    return await count_unreviewed(db)
 
 
-async def review_stats(db: AsyncSession) -> dict:
+async def review_stats(db: AsyncSession, *, window_days: int = 30) -> dict:
+    """Same ``window_days`` default/semantics as the queue side
+    (``build_bad_answer_queue`` / ``count_unreviewed``) — this used to read the
+    whole table with no time filter while the queue was windowed, so the two
+    numbers displayed side by side on the admin page had silently different
+    denominators."""
+    since = datetime.now(UTC) - timedelta(days=window_days)
     rows = (
         await db.execute(
             select(
                 AnswerReview.verdict,
                 AnswerReview.failure_category,
                 AnswerReview.reviewed_at,
-            )
+            ).where(AnswerReview.reviewed_at >= since)
         )
     ).all()
     good = sum(1 for v, _c, _t in rows if v == "good")
