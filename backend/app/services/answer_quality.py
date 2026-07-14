@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import and_, case, func, or_, select
+from sqlalchemy import and_, case, false, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.answer_review import AnswerReview
@@ -129,9 +129,23 @@ def classify_answer(
 _M = ChatMessage
 _D = ChatAnswerDiagnostic
 
+
+def _trimmed_content_len():
+    """等价于 Python 的 len(content.strip())。
+
+    SQL 的 TRIM() 只剥空格,而 Python 的 .strip() 剥所有空白 —— 先把 \\n/\\t/\\r
+    换成空格(1:1 替换,不改变长度),再 TRIM,两侧语义就对齐了。内部空白仍按 1
+    个字符计,与 Python 一致。replace/trim/length 都是 ANSI 标准,SQLite 与
+    Postgres 通吃。"""
+    normalized = func.replace(
+        func.replace(func.replace(_M.content, "\n", " "), "\t", " "), "\r", " "
+    )
+    return func.length(func.trim(normalized))
+
+
 TAG_PREDICATES = {
     "downvoted": _M.feedback == "down",
-    "abnormal": func.length(func.trim(_M.content)) < ABNORMAL_MIN_CHARS,
+    "abnormal": _trimmed_content_len() < ABNORMAL_MIN_CHARS,
     "fabricated_citation": and_(_D.citation_count > 0, _D.source_count == 0),
     "quote_relaxed": _D.quote_mutation_count > 0,
     "citation_corrected": _D.citation_mutation_count > 0,
@@ -271,11 +285,14 @@ async def build_bad_answer_queue(
     score = _score_expr()
 
     requested = _requested_categories(category)
-    tag_filter = (
-        or_(*[TAG_PREDICATES[t] for t in requested if t in TAG_PREDICATES])
-        if requested
-        else or_(*TAG_PREDICATES.values())
-    )
+    if requested:
+        matched_predicates = [TAG_PREDICATES[t] for t in requested if t in TAG_PREDICATES]
+        # 请求的 category 片段全都不是已知标签 —— 应当匹配不到任何行,而不是
+        # 静默退化成"匹配全部"(那会改变语义)。or_() 零参数调用本身也会触发
+        # SADeprecationWarning,未来版本可能直接报错,所以显式给 false()。
+        tag_filter = or_(*matched_predicates) if matched_predicates else false()
+    else:
+        tag_filter = or_(*TAG_PREDICATES.values())
 
     conds = [*base, tag_filter, score >= min_suspicion]
 
@@ -366,7 +383,7 @@ async def upsert_review(
     reviewed_by: int | None,
 ) -> int:
     """Create/update the review for a message, snapshotting why it was flagged.
-    Returns the count of still-unreviewed suspect messages in the last 90 days.
+    Returns the count of still-unreviewed suspect messages in the default window.
     Raises ValueError if the message does not exist or is not an assistant
     message."""
     msg = (

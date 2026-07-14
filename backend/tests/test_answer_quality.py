@@ -1,5 +1,6 @@
 """Answer-quality queue — pure classifier unit tests + API tests."""
 
+import warnings
 from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
@@ -495,3 +496,51 @@ async def test_count_unreviewed_matches_queue_total(aq_session):
         diag=_diag_row(citation_count=1, source_count=0, max_source_score=None),
     )
     assert await count_unreviewed(aq_session) == 1
+
+
+@pytest.mark.anyio
+async def test_abnormal_sql_matches_python_strip_on_newlines(aq_session):
+    """回归测试:19 个可见字符 + 11 个换行。Python 的 .strip() 剥掉所有空白,
+    trim 后长度 19 < 20 => abnormal;SQL 的 TRIM() 若只剥空格,trim 后长度仍是
+    30,不会判 abnormal —— 消息会从队列/计数里静默漏掉,且一旦还命中别的标签,
+    SQL 排序分会比 Python 算出的显示分少 3.0(abnormal 的权重),排序与显示就
+    不一致了。这条断言锁死"SQL 排序分 == 页面显示分"。"""
+    answer = "可见字符一二三四五六七八九十一二三四五" + "\n" * 11
+    assert len(answer.strip()) == 19
+    assert len(answer) == 30
+
+    mid = await _seed_turn(
+        aq_session,
+        question="q",
+        answer=answer,
+        sources=None,
+        diag=_diag_row(citation_count=0, source_count=0, max_source_score=None),
+    )
+
+    result = await build_bad_answer_queue(aq_session)
+    assert result["total_unreviewed"] == 1
+
+    item = result["items"][0]
+    assert item["message_id"] == mid
+    assert "abnormal" in item["reason_tags"]
+
+    expected_tags, expected_score = classify_answer(
+        answer, None, _diag(citation_count=0, source_count=0, max_source_score=None)
+    )
+    assert item["reason_tags"] == expected_tags
+    assert item["suspicion_score"] == expected_score
+
+
+@pytest.mark.anyio
+async def test_unknown_category_matches_nothing(aq_session):
+    """category 传入的片段全都不在 TAG_PREDICATES 里 —— 必须匹配不到任何行
+    (不能静默退化成"匹配全部"),也不能触发 or_() 零参数的 SADeprecationWarning。"""
+    await _seed_turn(
+        aq_session, question="q", answer="太短", sources=None,
+        feedback="down", diag=_diag_row(),
+    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        result = await build_bad_answer_queue(aq_session, category="bogus")
+    assert result["total_unreviewed"] == 0
+    assert result["items"] == []
