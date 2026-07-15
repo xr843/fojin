@@ -46,6 +46,22 @@
   object-position: center 70%;
 }
 
+/* 内容区 scrim：山水画下半部（树丛/崖壁）细节最密，正好压在统计数字与
+   功能卡片之下。一层自上而下渐显的暖白蒙版把这块前景轻轻压淡，稳住文字
+   可读性，又保留上半部的天空与山峦。上 42% 完全透明，不动画意主体。 */
+.home-hero-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    transparent 42%,
+    rgba(248, 245, 239, 0.22) 72%,
+    rgba(248, 245, 239, 0.45) 100%
+  );
+}
+
 /* 英雄区内容层 */
 .home-hero > *:not(.home-hero-bg) {
   position: relative;
@@ -87,7 +103,8 @@
   font-size: 15px;
   font-weight: 400;
   color: var(--fj-ink-light);
-  letter-spacing: 8px;
+  /* 收窄字距：8px 拉得过开、在暖色天空上显散，5px 更成词、可读性更好 */
+  letter-spacing: 5px;
   margin-bottom: 28px;
 }
 :lang(en) .home-title {
@@ -100,9 +117,11 @@
 }
 
 /* ---------- 合并搜索栏 ---------- */
+/* 内容列统一宽度：搜索栏 / 热门检索 / 统计 / 功能卡片同宽居中，左右边缘
+   对齐成一条竖线，消除原先「搜索 780 · 统计 700 · 卡片 1080」的细腰错位。 */
 .search-combo {
   width: 100%;
-  max-width: 780px;
+  max-width: 920px;
   margin-bottom: 20px;
   position: relative;
 }
@@ -228,8 +247,9 @@
   gap: 8px;
   flex-wrap: wrap;
   justify-content: center;
-  margin-bottom: 40px;
-  max-width: 780px;
+  /* 40 → 30：为下方正文字号提升腾出垂直空间，固定视口下不溢出 */
+  margin-bottom: 30px;
+  max-width: 920px;
 }
 
 .home-hot-label {
@@ -249,7 +269,7 @@
   border-radius: 14px;
   padding: 3px 14px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
   white-space: nowrap;
 }
 
@@ -291,7 +311,7 @@
 /* ---------- 可信度说明 ---------- */
 .home-trust {
   font-family: "Noto Serif SC", serif;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--fj-ink-light);
   margin-top: 24px;
   letter-spacing: 0.5px;
@@ -314,7 +334,7 @@
   justify-content: center;
   gap: 0;
   width: 100%;
-  max-width: 700px;
+  max-width: 920px;
   margin-bottom: 0;
 }
 
@@ -565,8 +585,9 @@
   display: grid;
   grid-template-columns: repeat(6, 1fr);
   gap: 16px;
-  max-width: 1080px;
-  margin: 32px auto 0;
+  /* 1080 → 920：与搜索栏/统计对齐；margin-top 32 → 24 抵消字号带来的高度 */
+  max-width: 920px;
+  margin: 24px auto 0;
 }
 
 .home-feature-card {
@@ -576,7 +597,8 @@
   padding: 20px 16px;
   text-align: center;
   cursor: pointer;
-  transition: all 0.2s;
+  /* 精确到实际会变的属性，避免 `all` 连带动画布局属性造成 hover 抖动 */
+  transition: background 0.2s, border-color 0.2s, transform 0.2s, box-shadow 0.2s;
 }
 
 .home-feature-card:hover {
@@ -600,18 +622,19 @@
 }
 
 .home-feature-desc {
-  font-size: 11px;
+  /* 11 → 12px：与 hero/标题/caption 形成更连续的字号阶梯，正文更易读 */
+  font-size: 12px;
   color: var(--fj-ink-light);
-  line-height: 1.5;
+  line-height: 1.45;
   /* Clamp to exactly two lines so dynamic showcase content of any length
      (e.g. a long dictionary definition) can't stretch the card — every card
-     in the row stays the same compact height. */
+     in the row stays the same compact height. Height tracks font×line-height×2. */
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   line-clamp: 2;
   overflow: hidden;
-  height: 33px;
+  height: 35px;
 }
 
 /* ---------- 响应式：平板 ---------- */
