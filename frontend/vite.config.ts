@@ -99,9 +99,10 @@ function manualChunks(id: string): string | undefined {
   ) {
     return "vendor-react";
   }
-  if (id.includes("/node_modules/antd/")) {
-    return "vendor-antd";
-  }
+  // antd 不再强制并入单一 vendor chunk：那样会把 admin 才用的 Table/Form 等
+  // 和首页只需的 AutoComplete 焊在一起(~1.15MB),而首页(唯一静态导入的路由)
+  // 一 import antd 就把整块拉进首屏。交回 rolldown 按已有的路由懒加载边界拆分,
+  // 首屏只承担自己那一小片 antd,admin 的重组件留在各自 route chunk。
   if (id.includes("/node_modules/@tanstack/react-query/")) {
     return "vendor-query";
   }
