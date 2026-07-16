@@ -32,6 +32,8 @@ from sqlalchemy import bindparam
 from sqlalchemy import text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.mitra_gate import mitra_score_predicate
+
 logger = logging.getLogger(__name__)
 
 Granularity = Literal["sutta", "chunk"]
@@ -268,14 +270,21 @@ async def get_chunk_parallels(
         ))
 
     # MITRA cross-lingual parallels (inline Sanskrit/Tibetan, CC BY-SA 4.0).
+    # Apply the SAME NULL-permissive quality gate the RAG path uses, so the
+    # drawer never shows a low-scored parallel the answer path already filtered
+    # out. NULL-permissive → a no-op until mitra_e_score is backfilled.
+    mitra_pred, mitra_params = mitra_score_predicate()
+    mitra_gate_sql = f" AND {mitra_pred}" if mitra_pred else ""
     mitra_rows = (await session.execute(
         sql_text(
             "SELECT foreign_text, foreign_lang, confidence "
             "FROM mitra_alignments "
-            "WHERE text_id = :tid AND juan_num = :juan AND chunk_index = :cidx "
+            "WHERE text_id = :tid AND juan_num = :juan AND chunk_index = :cidx"
+            f"{mitra_gate_sql} "
             "ORDER BY foreign_lang, id LIMIT :limit"
         ),
-        {"tid": text_id, "juan": juan_num, "cidx": chunk_index, "limit": MITRA_CHUNK_LIMIT},
+        {"tid": text_id, "juan": juan_num, "cidx": chunk_index,
+         "limit": MITRA_CHUNK_LIMIT, **mitra_params},
     )).fetchall()
     for foreign_text, foreign_lang, conf in mitra_rows:
         records.append(ParallelRecord(

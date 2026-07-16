@@ -68,12 +68,14 @@ class Settings(BaseSettings):
     # back to alignment_pairs-only parallels without a redeploy.
     enable_mitra_rag_parallels: bool = True
 
-    # Quality gate for the MITRA parallels above: keep only rows whose proxy
-    # quality score (mitra_e_score) clears mitra_min_score. NULL-permissive —
-    # unscored rows (the whole table until a prod backfill runs) still flow, so
-    # enabling this before the backfill is a no-op. Set enable_mitra_score_gate
-    # false to drop the score predicate entirely and fall back to the pre-gate
-    # confidence ordering, without a redeploy.
+    # Quality gate for the MITRA parallels: keep only rows whose proxy quality
+    # score (mitra_e_score) clears mitra_min_score. NULL-permissive — unscored
+    # rows (the whole table until a prod backfill runs) still flow, so enabling
+    # this before the backfill is a no-op. Governs ALL MITRA read paths via
+    # services.mitra_gate: the RAG context (_attach_mitra_parallels), the
+    # citation drawer (get_chunk_parallels) and the coverage catalog
+    # (compute_alignment_catalog). Set false to drop the predicate everywhere
+    # and fall back to ungated (pre-gate) behavior, without a redeploy.
     mitra_min_score: float = 0.30
     enable_mitra_score_gate: bool = True
 
