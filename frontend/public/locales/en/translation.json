@@ -1349,6 +1349,7 @@
   "reader.citation.before_context": "... earlier context before passage {{n}} in this fascicle",
   "reader.citation.after_context": "... later context after passage {{n}} in this fascicle",
   "reader.citation.parallel_title": "{{title}}, fascicle {{n}} · confidence {{confidence}}%",
+  "reader.citation.parallel_title_mitra": "{{title}} · CC BY-SA 4.0",
   "reader.citation.open_reader": "Open in reader",
   "reader.parallel.tooltip": "Cross-canon parallels: other versions, canonical parallels, and passage alignments",
   "reader.parallel.button": "Parallels",

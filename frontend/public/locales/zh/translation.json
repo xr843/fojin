@@ -1349,6 +1349,7 @@
   "reader.citation.before_context": "… 前文（本卷第 {{n}} 段之前）",
   "reader.citation.after_context": "… 后文（本卷第 {{n}} 段之后）",
   "reader.citation.parallel_title": "《{{title}}》 第 {{n}} 卷 · 置信度 {{confidence}}%",
+  "reader.citation.parallel_title_mitra": "{{title}} · CC BY-SA 4.0",
   "reader.citation.open_reader": "在阅读器中打开",
   "reader.parallel.tooltip": "跨藏对照（其他版本 · 经级/段级对读）",
   "reader.parallel.button": "跨藏对照",
