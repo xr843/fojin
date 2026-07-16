@@ -63,6 +63,9 @@ class ChatAnswerDiagnostic(Base):
     source_count: Mapped[int] = mapped_column(Integer, default=0)
     citation_mutation_count: Mapped[int] = mapped_column(Integer, default=0)
     quote_mutation_count: Mapped[int] = mapped_column(Integer, default=0)
+    # How many 「…」 quotes were verbatim-checked. Nullable: rows written before
+    # migration 0171 have no value (the count wasn't persisted then).
+    quote_checked_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     max_source_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     min_source_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     citation_mutations: Mapped[list | None] = mapped_column(JSON, nullable=True)

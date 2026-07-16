@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { getChunkContext, getChunkAlignment, type ChunkContextItem, type ParallelPair } from "../api/client";
 import { mapQuoteToBlocks } from "../utils/citationMatch";
+import { hasDisplayConfidence } from "../utils/parallelDisplay";
 
 export interface CitationTarget {
   textId: number;
@@ -343,11 +344,15 @@ export default function CitationDrawer({ target, onClose }: Props) {
                                 fontStyle: "italic",
                               }}
                             >
-                              {t("reader.citation.parallel_title", {
-                                title: p.title,
-                                n: p.juan_num,
-                                confidence: (p.confidence * 100).toFixed(0),
-                              })}
+                              {hasDisplayConfidence(p)
+                                ? t("reader.citation.parallel_title", {
+                                    title: p.title,
+                                    n: p.juan_num,
+                                    confidence: (p.confidence * 100).toFixed(0),
+                                  })
+                                : t("reader.citation.parallel_title_mitra", {
+                                    title: p.title,
+                                  })}
                             </div>
                           )}
                           {p.chunk_text}

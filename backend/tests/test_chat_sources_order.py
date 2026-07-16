@@ -174,6 +174,7 @@ async def test_trust_status_after_tokens_before_sources():
         "source_count": 2,
         "citation_mutation_count": 0,
         "quote_mutation_count": 0,
+        "quote_checked_count": 0,
         "max_source_score": 0.9,
         "min_source_score": 0.8,
     }
