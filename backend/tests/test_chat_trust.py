@@ -99,6 +99,35 @@ def test_status_marks_no_sources_even_when_answer_mentions_texts():
     assert status.min_source_score is None
 
 
+def test_status_reports_how_many_quotes_were_verbatim_checked():
+    # Two cited 「…」 quotes → both are examined by the verifier, so the trust
+    # status must expose that count (the signal the green badge lacked).
+    answer = (
+        "云：「假引文片段一假引文片段一」【《心經》第1卷】\n"
+        "又：「假引文片段二假引文片段二」【《心經》第1卷】"
+    )
+    status = build_trust_status(
+        answer, [_src()], citation_mutations=[], quote_mutations=[]
+    )
+
+    assert status.quote_checked_count == 2
+
+
+def test_verified_answer_with_no_verbatim_quote_reports_zero_checked():
+    # "verified" today only means a citation exists; an answer that cites a
+    # source but quotes nothing verbatim must report quote_checked_count == 0,
+    # so the badge can stop implying a quote was checked when none was.
+    status = build_trust_status(
+        "《心經》阐述空性【《心經》第1卷】",
+        [_src()],
+        citation_mutations=[],
+        quote_mutations=[],
+    )
+
+    assert status.state == "verified"
+    assert status.quote_checked_count == 0
+
+
 @pytest_asyncio.fixture
 async def trust_session():
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")

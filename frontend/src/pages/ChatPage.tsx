@@ -11,6 +11,7 @@ import {
   extractPrecedingQuote,
   pickSourceForQuote,
 } from "../utils/citationMatch";
+import { quoteCheckDetail } from "../utils/trustDetail";
 import {
   SendOutlined,
   RobotOutlined,
@@ -370,6 +371,7 @@ function MessageBubbleInner({
     return out;
   }, [isAssistantText, m.sources]);
   const trustLabelKey = trustStatusLabelKey(m.trust_status);
+  const quoteDetail = quoteCheckDetail(m.trust_status);
 
   return (
     <div style={{
@@ -416,6 +418,14 @@ function MessageBubbleInner({
                     }}
                   >
                     {t(trustLabelKey)}
+                    {quoteDetail && (
+                      <span style={{ color: "var(--fj-ink-muted)" }}>
+                        {" · "}
+                        {quoteDetail.key === "chat.trust.quotes_checked"
+                          ? t(quoteDetail.key, { n: quoteDetail.count })
+                          : t(quoteDetail.key)}
+                      </span>
+                    )}
                   </div>
                 )}
                 {sourceChips.length > 0 && (

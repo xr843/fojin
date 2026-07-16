@@ -1707,6 +1707,9 @@ export interface ChatTrustStatus {
   source_count: number;
   citation_mutation_count: number;
   quote_mutation_count: number;
+  /** How many 「…」 quotes were verbatim-checked against a source. null for
+   *  historical answers reconstructed from a diagnostic (not stored there). */
+  quote_checked_count?: number | null;
   max_source_score?: number | null;
   min_source_score?: number | null;
 }

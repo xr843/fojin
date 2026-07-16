@@ -990,6 +990,8 @@
   "chat.feedback_not_helpful": "Not helpful",
   "chat.retry": "Retry",
   "chat.trust.verified": "Citations verified",
+  "chat.trust.quotes_checked": "{{n}} quote(s) verbatim-checked",
+  "chat.trust.no_verbatim_quote": "no verbatim quote in this answer",
   "chat.trust.citation_corrected": "Citations corrected",
   "chat.trust.quote_relaxed": "Some quotes relaxed to paraphrase",
   "chat.trust.quote_unverified": "Some quotes were not text-verified",

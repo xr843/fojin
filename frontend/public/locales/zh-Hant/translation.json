@@ -990,6 +990,8 @@
   "chat.feedback_not_helpful": "沒幫助",
   "chat.retry": "重試",
   "chat.trust.verified": "引用已校驗",
+  "chat.trust.quotes_checked": "已逐字核驗 {{n}} 條引文",
+  "chat.trust.no_verbatim_quote": "本答案未含逐字引文",
   "chat.trust.citation_corrected": "引用已校正",
   "chat.trust.quote_relaxed": "部分引文已轉述（非逐字）",
   "chat.trust.quote_unverified": "部分引文未逐字核實",

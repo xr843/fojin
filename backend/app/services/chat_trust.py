@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.chat import ChatAnswerDiagnostic
 from app.schemas.chat import ChatSource, ChatTrustStatus
+from app.services.quote_verifier import count_checked_quotes
 
 _CITATION_RE = re.compile(r"【《[^》]+》(?:第[^】]+?卷)?】")
 
@@ -58,6 +59,7 @@ def build_trust_status(
         source_count=len(valid_sources),
         citation_mutation_count=len(citation_mutations),
         quote_mutation_count=len(quote_mutations),
+        quote_checked_count=count_checked_quotes(answer or "", valid_sources),
         max_source_score=max_score,
         min_source_score=min_score,
     )
