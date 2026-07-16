@@ -7,7 +7,11 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.models.chat import ChatAnswerDiagnostic, ChatMessage, ChatSession
 from app.schemas.chat import ChatSource
-from app.services.chat_trust import build_trust_status, persist_answer_diagnostic
+from app.services.chat_trust import (
+    build_trust_status,
+    persist_answer_diagnostic,
+    trust_status_from_diagnostic,
+)
 from app.services.citation_guard import CitationMutation
 from app.services.quote_verifier import QuoteMutation
 
@@ -196,3 +200,49 @@ async def test_persist_answer_diagnostic_upserts_by_message_id(trust_session):
     assert len(rows) == 1
     assert rows[0].trust_state == "verified"
     assert rows[0].citation_mutations == []
+
+
+@pytest.mark.anyio
+async def test_persist_and_reconstruct_quote_checked_count(trust_session):
+    # The verbatim-quote count must survive the diagnostic round-trip so admin
+    # /eval and historical answers see it, not just the live response.
+    session = ChatSession(user_id=None)
+    trust_session.add(session)
+    await trust_session.flush()
+    answer = (
+        "云：「假引文片段一假引文片段一」【《心經》第1卷】\n"
+        "又：「假引文片段二假引文片段二」【《心經》第1卷】"
+    )
+    msg = ChatMessage(
+        session_id=session.id,
+        role="assistant",
+        content=answer,
+        sources=[_src().model_dump()],
+        created_at=datetime.now(UTC),
+    )
+    trust_session.add(msg)
+    await trust_session.commit()
+    await trust_session.refresh(msg)
+
+    status = build_trust_status(
+        answer, [_src()], citation_mutations=[], quote_mutations=[]
+    )
+    assert status.quote_checked_count == 2
+    await persist_answer_diagnostic(
+        trust_session,
+        message_id=msg.id,
+        trust_status=status,
+        citation_mutations=[],
+        quote_mutations=[],
+    )
+
+    row = (
+        await trust_session.execute(
+            select(ChatAnswerDiagnostic).where(ChatAnswerDiagnostic.message_id == msg.id)
+        )
+    ).scalar_one()
+    assert row.quote_checked_count == 2
+
+    reconstructed = trust_status_from_diagnostic(row)
+    assert reconstructed is not None
+    assert reconstructed.quote_checked_count == 2

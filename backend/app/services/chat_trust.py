@@ -90,6 +90,7 @@ def trust_status_from_diagnostic(
         source_count=diagnostic.source_count,
         citation_mutation_count=diagnostic.citation_mutation_count,
         quote_mutation_count=diagnostic.quote_mutation_count,
+        quote_checked_count=diagnostic.quote_checked_count,
         max_source_score=diagnostic.max_source_score,
         min_source_score=diagnostic.min_source_score,
     )
@@ -115,6 +116,7 @@ async def persist_answer_diagnostic(
         "source_count": trust_status.source_count,
         "citation_mutation_count": trust_status.citation_mutation_count,
         "quote_mutation_count": trust_status.quote_mutation_count,
+        "quote_checked_count": trust_status.quote_checked_count,
         "max_source_score": trust_status.max_source_score,
         "min_source_score": trust_status.min_source_score,
         "citation_mutations": _serialize_mutations(citation_mutations),
