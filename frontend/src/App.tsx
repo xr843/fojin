@@ -78,6 +78,7 @@ function App() {
             <Route path="/texts/:id/read" element={<TextReaderPage />} />
             <Route path="/sources" element={<SourcesPage />} />
             <Route path="/collections" element={<CollectionsPage />} />
+            <Route path="/collections/:collectionId" element={<CollectionsPage />} />
             <Route path="/cross-canon" element={<CrossCanonPage />} />
             <Route path="/topics" element={<TopicsPage />} />
             <Route path="/sutras/:slug" element={<SutraLandingPage />} />

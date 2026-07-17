@@ -2,7 +2,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HelmetProvider } from "react-helmet-async";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import i18n from "../i18n";
 import enTranslation from "../../public/locales/en/translation.json";
 import CollectionsPage from "./CollectionsPage";
@@ -25,7 +25,7 @@ function LocationProbe() {
   return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
 }
 
-function renderPage() {
+function renderPage(entry = "/collections") {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -33,8 +33,11 @@ function renderPage() {
   return render(
     <HelmetProvider>
       <QueryClientProvider client={client}>
-        <MemoryRouter initialEntries={["/collections"]}>
-          <CollectionsPage />
+        <MemoryRouter initialEntries={[entry]}>
+          <Routes>
+            <Route path="/collections" element={<CollectionsPage />} />
+            <Route path="/collections/:collectionId" element={<CollectionsPage />} />
+          </Routes>
           <LocationProbe />
         </MemoryRouter>
       </QueryClientProvider>
@@ -136,5 +139,58 @@ describe("CollectionsPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /Avatamsaka Sutra Series/ }));
     expect(screen.getAllByRole("heading", { level: 3 }).length).toBeGreaterThan(0);
     expect(screen.queryAllByRole("heading", { level: 4 })).toHaveLength(0);
+  });
+
+  describe("deep linking", () => {
+    // A collection used to be reachable only by expanding a local useState, so
+    // all 13 shared one URL: unshareable, unbookmarkable, and indistinguishable
+    // to crawlers.
+    it("opens the collection named in the URL", () => {
+      renderPage("/collections/huayan");
+
+      expect(screen.getByText("Online Reading")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /Avatamsaka Sutra Series/ }),
+      ).toHaveAttribute("aria-expanded", "true");
+    });
+
+    it("leaves every collection closed on the bare index", () => {
+      renderPage("/collections");
+
+      expect(screen.queryByText("Online Reading")).not.toBeInTheDocument();
+    });
+
+    it("falls back to the index for an unknown collection id", () => {
+      renderPage("/collections/does-not-exist");
+
+      expect(screen.getByRole("heading", { level: 1, name: "Text Collections" })).toBeInTheDocument();
+      expect(screen.queryByText("Online Reading")).not.toBeInTheDocument();
+    });
+
+    it("puts the opened collection in the URL", () => {
+      renderPage("/collections");
+
+      fireEvent.click(screen.getByRole("button", { name: /Avatamsaka Sutra Series/ }));
+      expect(screen.getByTestId("location")).toHaveTextContent("/collections/huayan");
+    });
+
+    it("returns to the index URL when the collection is closed again", () => {
+      renderPage("/collections/huayan");
+
+      fireEvent.click(screen.getByRole("button", { name: /Avatamsaka Sutra Series/ }));
+      expect(screen.getByTestId("location")).toHaveTextContent("/collections");
+      expect(screen.queryByText("Online Reading")).not.toBeInTheDocument();
+    });
+
+    it("opens only one collection at a time", () => {
+      renderPage("/collections/huayan");
+
+      fireEvent.click(screen.getByRole("button", { name: /Pure Land Sutras/ }));
+
+      expect(screen.getByTestId("location")).toHaveTextContent("/collections/pureland");
+      expect(
+        screen.getByRole("button", { name: /Avatamsaka Sutra Series/ }),
+      ).toHaveAttribute("aria-expanded", "false");
+    });
   });
 });
