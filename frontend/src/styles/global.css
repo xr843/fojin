@@ -5,7 +5,10 @@
   --fj-bg-alt:    #f0ebe2;
   --fj-ink:       #2b2318;
   --fj-ink-light: #5c4f3d;
-  --fj-ink-muted: #9a8e7a;
+  /* Same hue/saturation as the old #9a8e7a, darkened until body copy clears
+     WCAG AA (4.5:1) on both --fj-bg and white cards; #9a8e7a only reached
+     2.96:1 / 3.22:1. See styles/tokens.test.ts. */
+  --fj-ink-muted: #746958;
   --fj-accent:    #8b2500;
   --fj-gold:      #b08d57;
   --fj-border:    #d9d0c1;

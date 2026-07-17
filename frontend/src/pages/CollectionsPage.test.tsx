@@ -86,4 +86,55 @@ describe("CollectionsPage", () => {
 
     expect(screen.getByTestId("location")).toHaveTextContent("/search?q=%E5%8D%8E%E4%B8%A5%E7%BB%8F");
   });
+
+  it("exposes the collection toggle as a button reporting its expanded state", () => {
+    renderPage();
+
+    const toggle = screen.getByRole("button", { name: /Avatamsaka Sutra Series/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+    // The panel the button claims to control must actually exist.
+    const panelId = toggle.getAttribute("aria-controls");
+    expect(panelId).toBeTruthy();
+    expect(document.getElementById(panelId!)).toBeInTheDocument();
+  });
+
+  it("renders an indexed text as a real link to its reader page", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: { T0278: 4242 } });
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: /Avatamsaka Sutra Series/ }));
+
+    // A span with onClick is invisible to keyboards and crawlers; the indexed
+    // title must be an anchor carrying a real href.
+    const link = await screen.findByRole("link", { name: /大方广佛华严经（六十卷）/ });
+    expect(link).toHaveAttribute("href", "/texts/4242");
+  });
+
+  it("does not link texts that are not in the corpus", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: {} });
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: /Avatamsaka Sutra Series/ }));
+
+    expect(screen.getByText("大方广佛华严经（六十卷）")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /大方广佛华严经（六十卷）/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps heading levels contiguous (no h1 -> h3 jump)", () => {
+    renderPage();
+
+    expect(screen.getByRole("heading", { level: 1, name: "Text Collections" })).toBeInTheDocument();
+    // Each collection is a section of the page, so it sits one level under the h1.
+    expect(screen.getAllByRole("heading", { level: 2 }).length).toBeGreaterThan(0);
+    expect(screen.queryAllByRole("heading", { level: 3 })).toHaveLength(0);
+
+    // Expanding reveals sub-sections one level down from the card, not two.
+    fireEvent.click(screen.getByRole("button", { name: /Avatamsaka Sutra Series/ }));
+    expect(screen.getAllByRole("heading", { level: 3 }).length).toBeGreaterThan(0);
+    expect(screen.queryAllByRole("heading", { level: 4 })).toHaveLength(0);
+  });
 });
