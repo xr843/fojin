@@ -27,6 +27,7 @@ import {
   type ResourceCategory,
 } from "../data/collections";
 import { getAlignmentCatalog } from "../api/client";
+import { localizeHan } from "../utils/hanScript";
 import "../styles/sources.css";
 import "../styles/collections.css";
 
@@ -237,7 +238,7 @@ const LANG_TINT: Record<string, string> = { bo: "#7c5cbf", sa: "#bd7b3a", pi: "#
 /** 跨藏对照专区：哪些经有逐段对照语料（可发现性入口）。
     API 失败/空数据时整块隐身，可与 backend 端点解耦部署。 */
 function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useNavigate> }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { data } = useQuery({
     queryKey: ["alignmentCatalog"],
     queryFn: getAlignmentCatalog,
@@ -258,7 +259,17 @@ function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useN
     for (const e of data.entries) {
       let g = m.get(e.text_id);
       if (!g) {
-        g = { text_id: e.text_id, title: e.title_zh || e.cbeta_id, cbeta_id: e.cbeta_id, sample_juan: e.sample_juan, total: 0, langs: [] };
+        // title_zh is CBETA's own string, i.e. always traditional. Render it in
+        // the reader's script instead of leaking the corpus's — otherwise a
+        // 中文简体 visitor gets 大方廣佛華嚴經 sitting under 华严经系列.
+        g = {
+          text_id: e.text_id,
+          title: localizeHan(e.title_zh || e.cbeta_id, i18n.language),
+          cbeta_id: e.cbeta_id,
+          sample_juan: e.sample_juan,
+          total: 0,
+          langs: [],
+        };
         m.set(e.text_id, g);
       }
       g.langs.push({ lang: e.other_lang, count: e.pair_count });
@@ -267,7 +278,7 @@ function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useN
     const arr = [...m.values()];
     arr.forEach((g) => g.langs.sort((a, b) => b.count - a.count));
     return arr.sort((a, b) => b.total - a.total);
-  }, [data]);
+  }, [data, i18n.language]);
 
   if (!data || groups.length === 0) return null;
 
