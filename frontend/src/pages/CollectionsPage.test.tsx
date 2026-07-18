@@ -5,6 +5,7 @@ import { HelmetProvider } from "react-helmet-async";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import i18n from "../i18n";
 import enTranslation from "../../public/locales/en/translation.json";
+import zhHantTranslation from "../../public/locales/zh-Hant/translation.json";
 import CollectionsPage from "./CollectionsPage";
 import { api, getAlignmentCatalog } from "../api/client";
 
@@ -44,7 +45,11 @@ function renderPage() {
 
 describe("CollectionsPage", () => {
   beforeAll(() => {
+    // Only `zh` is inlined into the i18n instance; the others load over
+    // HttpBackend, which never resolves under jsdom. Preload the bundles the
+    // tests switch to, or changeLanguage() hangs until the test times out.
     i18n.addResourceBundle("en", "translation", enTranslation, true, true);
+    i18n.addResourceBundle("zh-Hant", "translation", zhHantTranslation, true, true);
   });
 
   beforeEach(async () => {
@@ -136,5 +141,45 @@ describe("CollectionsPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /Avatamsaka Sutra Series/ }));
     expect(screen.getAllByRole("heading", { level: 3 }).length).toBeGreaterThan(0);
     expect(screen.queryAllByRole("heading", { level: 4 })).toHaveLength(0);
+  });
+
+  describe("cross-canon catalog script", () => {
+    // The catalog passes CBETA's traditional title_zh straight through.
+    const traditionalEntry = {
+      text_id: 43,
+      cbeta_id: "T1579",
+      title_zh: "瑜伽師地論",
+      other_lang: "bo",
+      pair_count: 39046,
+      partner_count: 0,
+      avg_confidence: null,
+      sources: ["mitra"],
+      sample_juan: 1,
+      sample_partner_id: null,
+      sample_partner_title: "",
+    };
+
+    beforeEach(() => {
+      vi.mocked(getAlignmentCatalog).mockResolvedValue({
+        entries: [traditionalEntry],
+        total_pairs: 39046,
+      });
+    });
+
+    it("folds catalog titles to simplified for 中文简体 readers", async () => {
+      await i18n.changeLanguage("zh");
+      renderPage();
+
+      expect(await screen.findByText("瑜伽师地论")).toBeInTheDocument();
+      expect(screen.queryByText("瑜伽師地論")).not.toBeInTheDocument();
+    });
+
+    it("keeps catalog titles traditional for 繁體 readers", async () => {
+      await i18n.changeLanguage("zh-Hant");
+      renderPage();
+
+      expect(await screen.findByText("瑜伽師地論")).toBeInTheDocument();
+      expect(screen.queryByText("瑜伽师地论")).not.toBeInTheDocument();
+    });
   });
 });
