@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
 import { Input, Tag, Empty } from "antd";
@@ -130,10 +130,21 @@ function ResourceTabs({ resources, resourceCategories }: { resources: Collection
   );
 }
 
-function CollectionCard({ coll, cbetaMap, resourceCategories }: { coll: Collection; cbetaMap: Record<string, number>; resourceCategories: ResourceCategoryLabels }) {
+function CollectionCard({
+  coll,
+  cbetaMap,
+  resourceCategories,
+  expanded,
+  onToggle,
+}: {
+  coll: Collection;
+  cbetaMap: Record<string, number>;
+  resourceCategories: ResourceCategoryLabels;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [expanded, setExpanded] = useState(false);
 
   const totalResources = RESOURCE_CATEGORY_KEYS.reduce(
     (sum, k) => sum + (coll.resources[k]?.length || 0),
@@ -155,7 +166,7 @@ function CollectionCard({ coll, cbetaMap, resourceCategories }: { coll: Collecti
           className="coll-card-header"
           aria-expanded={expanded}
           aria-controls={panelId}
-          onClick={() => setExpanded(!expanded)}
+          onClick={onToggle}
         >
           <span className="coll-card-title-row">
             <BookOutlined className="coll-card-icon" aria-hidden="true" />
@@ -374,11 +385,25 @@ function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useN
 export default function CollectionsPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const { collectionId } = useParams<{ collectionId?: string }>();
   const [search, setSearch] = useState("");
   const [showTop, setShowTop] = useState(false);
   const [cbetaMap, setCbetaMap] = useState<Record<string, number>>({});
   const collections = useMemo(() => getLocalizedCollections(i18n.language), [i18n.language]);
   const resourceCategories = useMemo(() => getLocalizedResourceCategories(i18n.language), [i18n.language]);
+
+  // Which collection is open lives in the URL, not in each card's useState, so a
+  // series can be linked, bookmarked and crawled instead of all 13 sharing
+  // /collections. An unknown id degrades to the plain index rather than 404ing —
+  // a stale bookmark should still land somewhere useful.
+  const openCollection = useMemo(
+    () => collections.find((c) => c.id === collectionId),
+    [collections, collectionId],
+  );
+  // One open at a time: the URL names a single collection, so the accordion
+  // state stays a clean bijection with it.
+  const toggleCollection = (id: string) =>
+    navigate(openCollection?.id === id ? "/collections" : `/collections/${id}`);
 
   useEffect(() => {
     const onScroll = () => setShowTop(window.scrollY > 400);
@@ -430,9 +455,27 @@ export default function CollectionsPage() {
 
   return (
     <div className="sources-page">
+      {/* Each /collections/:id must describe itself, or the 13 URLs read as
+          duplicates of the index to a crawler and the deep links cost more
+          than they earn. Canonical points at the open series' own URL. */}
       <Helmet>
-        <title>{t("collections.page_title")}</title>
-        <meta name="description" content={t("collections.page_desc")} />
+        <title>
+          {openCollection
+            ? t("collections.detail_page_title", { name: openCollection.name })
+            : t("collections.page_title")}
+        </title>
+        <meta
+          name="description"
+          content={openCollection ? openCollection.description : t("collections.page_desc")}
+        />
+        <link
+          rel="canonical"
+          href={
+            openCollection
+              ? `https://fojin.app/collections/${openCollection.id}`
+              : "https://fojin.app/collections"
+          }
+        />
       </Helmet>
 
       <div className="sources-header">
@@ -464,7 +507,14 @@ export default function CollectionsPage() {
       ) : (
         <div className="coll-list">
           {filtered.map((c) => (
-            <CollectionCard key={c.id} coll={c} cbetaMap={cbetaMap} resourceCategories={resourceCategories} />
+            <CollectionCard
+              key={c.id}
+              coll={c}
+              cbetaMap={cbetaMap}
+              resourceCategories={resourceCategories}
+              expanded={openCollection?.id === c.id}
+              onToggle={() => toggleCollection(c.id)}
+            />
           ))}
         </div>
       )}
