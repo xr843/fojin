@@ -140,8 +140,12 @@ describe("AdminAnswerQualityPage", () => {
       { timeout: 3000 },
     );
 
-    // 4. 断言错误横幅消失
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    // 4. 断言错误横幅消失。必须 waitFor：第 3 步的 waitFor 只确认 mock 被第二
+    //    次「调用」，但那一刻请求可能尚未 resolve、React 尚未重渲染清除 alert。
+    //    同步断言在慢 CI 上会偶发失败（该测试此前的 flaky 根因）。
+    await waitFor(() => {
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
 
     // 5. 断言"未复核 1 条"出现
     await waitFor(() => {
