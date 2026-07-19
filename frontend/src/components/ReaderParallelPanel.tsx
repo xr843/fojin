@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 import { getJuanAlignment, getCanonicalParallels, getFullParallelContent, getSentenceParallels } from "../api/client";
 import OtherVersions from "./OtherVersions";
 import SentenceParallelView from "./parallel/SentenceParallelView";
+import { hasDisplayConfidence } from "../utils/parallelDisplay";
 
 interface Props {
   textId: number;
@@ -322,7 +323,7 @@ function ChunkView({ textId, juanNum }: Props) {
                             })}
                           </span>
                         )}
-                        {!isMitra && (
+                        {hasDisplayConfidence(p) && (
                           <span style={{ fontSize: 11, color: "#999", marginLeft: "auto" }}>
                             {t("reader.parallel.confidence", { n: (p.confidence * 100).toFixed(0) })}
                           </span>

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cache import cache_get as _cache_get
 from app.core.cache import cache_set
+from app.models.alignment_candidate import AlignmentCandidate
 from app.models.annotation import Annotation
 from app.models.audit import AdminAuditLog
 from app.models.chat import ChatMessage, ChatSession
@@ -401,3 +402,17 @@ async def list_audit_log(
         for row, username in result.all()
     ]
     return total, items
+
+
+async def count_pending_candidates(db: AsyncSession) -> int:
+    return (await db.execute(
+        select(func.count()).select_from(AlignmentCandidate)
+        .where(AlignmentCandidate.status == "pending")
+    )).scalar_one()
+
+
+async def count_pending_simple(db: AsyncSession, model) -> int:
+    """SourceSuggestion / Feedback / Annotation 三者的 pending 计数同构。"""
+    return (await db.execute(
+        select(func.count()).select_from(model).where(model.status == "pending")
+    )).scalar_one()

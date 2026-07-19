@@ -27,6 +27,7 @@ from app.services.alignment_read_model import (
     get_chunk_parallels,
     get_sentence_parallels,
 )
+from app.services.mitra_gate import mitra_score_predicate
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/alignment", tags=["alignment"])
@@ -835,17 +836,24 @@ async def compute_alignment_catalog(
 
     # 2. mitra side (mitra_alignments) — bulk; cheap count + min(juan), NO join/
     #    distinct/array_agg (those pushed the unified query to ~77s on 896K rows).
-    #    Once mitra_e_score is backfilled, add: WHERE mitra_e_score >= 0.30
+    #    Quality-gated by the SAME NULL-permissive predicate as RAG/drawer so the
+    #    catalog counts trustworthy coverage, not raw imports (no-op until the
+    #    mitra_e_score backfill lands). This is the gate the old TODO here asked
+    #    for; it now lives in one place (services.mitra_gate).
+    mitra_pred, mitra_params = mitra_score_predicate()
+    mitra_where = f"WHERE {mitra_pred}" if mitra_pred else ""
     mitra_rows = (
         await db.execute(
             sql_text(
-                """
+                f"""
                 SELECT text_id, foreign_lang, count(*) AS pair_count,
                        min(juan_num) AS sample_juan
                 FROM mitra_alignments
+                {mitra_where}
                 GROUP BY text_id, foreign_lang
                 """
-            )
+            ),
+            mitra_params,
         )
     ).fetchall()
 

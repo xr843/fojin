@@ -174,6 +174,7 @@ const platformActivity: PlatformActivity = {
 const answerQueue: AnswerQueueResponse = {
   total_unreviewed: 1,
   score_distribution: { p10: 0.1, p25: 0.2, p50: 0.5, p90: 0.9 },
+  tag_distribution: { "weak_evidence": 1 },
   items: [
     {
       message_id: 1,

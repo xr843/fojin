@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
 import { Input, Tag, Empty } from "antd";
@@ -27,6 +27,7 @@ import {
   type ResourceCategory,
 } from "../data/collections";
 import { getAlignmentCatalog } from "../api/client";
+import { localizeHan } from "../utils/hanScript";
 import "../styles/sources.css";
 import "../styles/collections.css";
 
@@ -38,27 +39,38 @@ const RESOURCE_ICONS: Record<ResourceCategory, React.ReactNode> = {
   temple: <GlobalOutlined />,
 };
 
-function TextItem({ text, navigate, cbetaMap }: { text: CollectionText; navigate: ReturnType<typeof useNavigate>; cbetaMap: Record<string, number> }) {
+function TextItem({ text, cbetaMap }: { text: CollectionText; cbetaMap: Record<string, number> }) {
   const { t } = useTranslation();
   const textId = text.cbeta_id ? cbetaMap[text.cbeta_id] : undefined;
+  // An indexed text is a real destination, so it gets a real <a href>: keyboard
+  // reachable, middle-clickable, and crawlable. A span+onClick was none of those
+  // — and left every one of these ~180 texts invisible to search engines while
+  // the external resource links below were fully crawlable.
+  const target = textId
+    ? `/texts/${textId}`
+    : text.cbeta_id
+      ? `/search?q=${encodeURIComponent(text.cbeta_id)}`
+      : undefined;
+
   return (
     <div className="coll-text-item">
       <div className="coll-text-main">
-        <span
-          className="coll-text-title"
-          style={textId ? { cursor: "pointer", color: "var(--fj-accent)" } : undefined}
-          onClick={textId ? () => navigate(`/texts/${textId}`) : undefined}
-        >
-          {text.title}
-        </span>
+        {textId ? (
+          <Link className="coll-text-title coll-text-title-link" to={target!}>
+            {text.title}
+          </Link>
+        ) : (
+          <span className="coll-text-title">{text.title}</span>
+        )}
         {text.cbeta_id && (
-          <Tag
-            color={textId ? "green" : "volcano"}
-            style={{ fontSize: 10, margin: 0, lineHeight: "16px", padding: "0 4px", cursor: "pointer" }}
-            onClick={() => textId ? navigate(`/texts/${textId}`) : navigate(`/search?q=${encodeURIComponent(text.cbeta_id!)}`)}
-          >
-            {text.cbeta_id}
-          </Tag>
+          <Link to={target!} aria-label={text.cbeta_id}>
+            <Tag
+              color={textId ? "green" : "volcano"}
+              style={{ fontSize: 10, margin: 0, lineHeight: "16px", padding: "0 4px", cursor: "pointer" }}
+            >
+              {text.cbeta_id}
+            </Tag>
+          </Link>
         )}
         {textId && (
           <Tag color="green" style={{ fontSize: 10, margin: 0, lineHeight: "16px", padding: "0 4px" }}>
@@ -118,10 +130,21 @@ function ResourceTabs({ resources, resourceCategories }: { resources: Collection
   );
 }
 
-function CollectionCard({ coll, cbetaMap, resourceCategories }: { coll: Collection; cbetaMap: Record<string, number>; resourceCategories: ResourceCategoryLabels }) {
+function CollectionCard({
+  coll,
+  cbetaMap,
+  resourceCategories,
+  expanded,
+  onToggle,
+}: {
+  coll: Collection;
+  cbetaMap: Record<string, number>;
+  resourceCategories: ResourceCategoryLabels;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [expanded, setExpanded] = useState(false);
 
   const totalResources = RESOURCE_CATEGORY_KEYS.reduce(
     (sum, k) => sum + (coll.resources[k]?.length || 0),
@@ -129,34 +152,48 @@ function CollectionCard({ coll, cbetaMap, resourceCategories }: { coll: Collecti
   );
 
   const searchName = coll.searchQuery;
+  const panelId = `coll-panel-${coll.id}`;
 
   return (
     <div className="coll-card">
-      <div className="coll-card-header" onClick={() => setExpanded(!expanded)}>
-        <div className="coll-card-title-row">
-          <BookOutlined className="coll-card-icon" />
-          <h3 className="coll-card-name">{coll.name}</h3>
-          <Tag color="geekblue" style={{ fontSize: 11, marginLeft: 8 }}>{coll.tradition}</Tag>
-          <span className="coll-card-count">
-            {t("collections.card_stats", { texts: coll.mainTexts.length + coll.commentaries.length, resources: totalResources })}
+      {/* W3C APG accordion shape: the heading wraps the button, so the card is a
+          real landmark in the heading outline AND the whole header stays one
+          keyboard-reachable control announcing its own expanded state. Everything
+          inside the button is phrasing content to keep the markup valid. */}
+      <h2 className="coll-card-heading">
+        <button
+          type="button"
+          className="coll-card-header"
+          aria-expanded={expanded}
+          aria-controls={panelId}
+          onClick={onToggle}
+        >
+          <span className="coll-card-title-row">
+            <BookOutlined className="coll-card-icon" aria-hidden="true" />
+            <span className="coll-card-name">{coll.name}</span>
+            <Tag color="geekblue" style={{ fontSize: 11, marginLeft: 8 }}>{coll.tradition}</Tag>
+            <span className="coll-card-count">
+              {t("collections.card_stats", { texts: coll.mainTexts.length + coll.commentaries.length, resources: totalResources })}
+            </span>
           </span>
-        </div>
-        <p className="coll-card-desc">{coll.description}</p>
-        <span className="coll-card-toggle">
-          {expanded ? `${t("search.collapse")} ▲` : `${t("collections.expand")} ▼`}
-        </span>
-      </div>
+          <span className="coll-card-desc">{coll.description}</span>
+          {/* The button's own aria-expanded already conveys this to AT. */}
+          <span className="coll-card-toggle" aria-hidden="true">
+            {expanded ? `${t("search.collapse")} ▲` : `${t("collections.expand")} ▼`}
+          </span>
+        </button>
+      </h2>
 
       {expanded && (
-        <div className="coll-card-body">
+        <div className="coll-card-body" id={panelId}>
           {/* 主要经典 */}
           <div className="coll-section">
-            <div className="coll-section-title">
-              <ReadOutlined /> {t("collections.main_texts", { n: coll.mainTexts.length })}
-            </div>
+            <h3 className="coll-section-title">
+              <ReadOutlined aria-hidden="true" /> {t("collections.main_texts", { n: coll.mainTexts.length })}
+            </h3>
             <div className="coll-text-list">
               {coll.mainTexts.map((tx) => (
-                <TextItem key={tx.key} text={tx} navigate={navigate} cbetaMap={cbetaMap} />
+                <TextItem key={tx.key} text={tx} cbetaMap={cbetaMap} />
               ))}
             </div>
           </div>
@@ -164,12 +201,12 @@ function CollectionCard({ coll, cbetaMap, resourceCategories }: { coll: Collecti
           {/* 注疏论释 */}
           {coll.commentaries.length > 0 && (
             <div className="coll-section">
-              <div className="coll-section-title">
-                <BookOutlined /> {t("collections.commentaries", { n: coll.commentaries.length })}
-              </div>
+              <h3 className="coll-section-title">
+                <BookOutlined aria-hidden="true" /> {t("collections.commentaries", { n: coll.commentaries.length })}
+              </h3>
               <div className="coll-text-list">
                 {coll.commentaries.map((tx) => (
-                  <TextItem key={tx.key} text={tx} navigate={navigate} cbetaMap={cbetaMap} />
+                  <TextItem key={tx.key} text={tx} cbetaMap={cbetaMap} />
                 ))}
               </div>
             </div>
@@ -177,9 +214,9 @@ function CollectionCard({ coll, cbetaMap, resourceCategories }: { coll: Collecti
 
           {/* 分类资源 */}
           <div className="coll-section">
-            <div className="coll-section-title">
-              <LinkOutlined /> {t("collections.resources", { n: totalResources })}
-            </div>
+            <h3 className="coll-section-title">
+              <LinkOutlined aria-hidden="true" /> {t("collections.resources", { n: totalResources })}
+            </h3>
             <ResourceTabs resources={coll.resources} resourceCategories={resourceCategories} />
           </div>
 
@@ -212,7 +249,7 @@ const LANG_TINT: Record<string, string> = { bo: "#7c5cbf", sa: "#bd7b3a", pi: "#
 /** 跨藏对照专区：哪些经有逐段对照语料（可发现性入口）。
     API 失败/空数据时整块隐身，可与 backend 端点解耦部署。 */
 function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useNavigate> }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { data } = useQuery({
     queryKey: ["alignmentCatalog"],
     queryFn: getAlignmentCatalog,
@@ -233,7 +270,17 @@ function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useN
     for (const e of data.entries) {
       let g = m.get(e.text_id);
       if (!g) {
-        g = { text_id: e.text_id, title: e.title_zh || e.cbeta_id, cbeta_id: e.cbeta_id, sample_juan: e.sample_juan, total: 0, langs: [] };
+        // title_zh is CBETA's own string, i.e. always traditional. Render it in
+        // the reader's script instead of leaking the corpus's — otherwise a
+        // 中文简体 visitor gets 大方廣佛華嚴經 sitting under 华严经系列.
+        g = {
+          text_id: e.text_id,
+          title: localizeHan(e.title_zh || e.cbeta_id, i18n.language),
+          cbeta_id: e.cbeta_id,
+          sample_juan: e.sample_juan,
+          total: 0,
+          langs: [],
+        };
         m.set(e.text_id, g);
       }
       g.langs.push({ lang: e.other_lang, count: e.pair_count });
@@ -242,7 +289,7 @@ function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useN
     const arr = [...m.values()];
     arr.forEach((g) => g.langs.sort((a, b) => b.count - a.count));
     return arr.sort((a, b) => b.total - a.total);
-  }, [data]);
+  }, [data, i18n.language]);
 
   if (!data || groups.length === 0) return null;
 
@@ -266,10 +313,11 @@ function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useN
   return (
     <div className="coll-card" style={{ marginBottom: 24 }}>
       <div className="coll-section" style={{ padding: "16px 20px" }}>
-        <div className="coll-section-title">
-          <TranslationOutlined /> {t("collections.alignment_title", { texts: groups.length, pairs: data.total_pairs.toLocaleString() })}
-        </div>
-        <p style={{ fontSize: 12, color: "var(--fj-ink-muted)", margin: "4px 0 12px" }}>
+        {/* Peer of the collection cards in the outline, so h2 like they are. */}
+        <h2 className="coll-section-title">
+          <TranslationOutlined aria-hidden="true" /> {t("collections.alignment_title", { texts: groups.length, pairs: data.total_pairs.toLocaleString() })}
+        </h2>
+        <p style={{ fontSize: 13, color: "var(--fj-ink-muted)", margin: "4px 0 12px" }}>
           {t("collections.alignment_desc")}
         </p>
         <div className="cc-table-wrap">
@@ -337,11 +385,25 @@ function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useN
 export default function CollectionsPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const { collectionId } = useParams<{ collectionId?: string }>();
   const [search, setSearch] = useState("");
   const [showTop, setShowTop] = useState(false);
   const [cbetaMap, setCbetaMap] = useState<Record<string, number>>({});
   const collections = useMemo(() => getLocalizedCollections(i18n.language), [i18n.language]);
   const resourceCategories = useMemo(() => getLocalizedResourceCategories(i18n.language), [i18n.language]);
+
+  // Which collection is open lives in the URL, not in each card's useState, so a
+  // series can be linked, bookmarked and crawled instead of all 13 sharing
+  // /collections. An unknown id degrades to the plain index rather than 404ing —
+  // a stale bookmark should still land somewhere useful.
+  const openCollection = useMemo(
+    () => collections.find((c) => c.id === collectionId),
+    [collections, collectionId],
+  );
+  // One open at a time: the URL names a single collection, so the accordion
+  // state stays a clean bijection with it.
+  const toggleCollection = (id: string) =>
+    navigate(openCollection?.id === id ? "/collections" : `/collections/${id}`);
 
   useEffect(() => {
     const onScroll = () => setShowTop(window.scrollY > 400);
@@ -393,9 +455,27 @@ export default function CollectionsPage() {
 
   return (
     <div className="sources-page">
+      {/* Each /collections/:id must describe itself, or the 13 URLs read as
+          duplicates of the index to a crawler and the deep links cost more
+          than they earn. Canonical points at the open series' own URL. */}
       <Helmet>
-        <title>{t("collections.page_title")}</title>
-        <meta name="description" content={t("collections.page_desc")} />
+        <title>
+          {openCollection
+            ? t("collections.detail_page_title", { name: openCollection.name })
+            : t("collections.page_title")}
+        </title>
+        <meta
+          name="description"
+          content={openCollection ? openCollection.description : t("collections.page_desc")}
+        />
+        <link
+          rel="canonical"
+          href={
+            openCollection
+              ? `https://fojin.app/collections/${openCollection.id}`
+              : "https://fojin.app/collections"
+          }
+        />
       </Helmet>
 
       <div className="sources-header">
@@ -427,7 +507,14 @@ export default function CollectionsPage() {
       ) : (
         <div className="coll-list">
           {filtered.map((c) => (
-            <CollectionCard key={c.id} coll={c} cbetaMap={cbetaMap} resourceCategories={resourceCategories} />
+            <CollectionCard
+              key={c.id}
+              coll={c}
+              cbetaMap={cbetaMap}
+              resourceCategories={resourceCategories}
+              expanded={openCollection?.id === c.id}
+              onToggle={() => toggleCollection(c.id)}
+            />
           ))}
         </div>
       )}

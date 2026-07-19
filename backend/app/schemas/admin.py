@@ -200,7 +200,21 @@ class ScoreDistribution(BaseModel):
 class AnswerQueueResponse(BaseModel):
     total_unreviewed: int
     score_distribution: ScoreDistribution
+    # 标签 -> 命中条数。用来事后校准 WEAK_EVIDENCE_THRESHOLD(2026-07-14 已按
+    # 生产实测 p10=0.261 从 0.37 重新校准到 0.26 —— 旧值已高于 p25=0.316,在
+    # 误报;继续用这份分布追踪是否需要再次校准)。
+    tag_distribution: dict[str, int] = Field(default_factory=dict)
     items: list[AnswerQueueItem]
+
+
+class AdminPendingSummary(BaseModel):
+    """侧边栏角标的唯一数据源。全部是 COUNT,导航每次都会读。"""
+
+    answer_quality: int
+    alignment_candidates: int
+    suggestions: int
+    feedbacks: int
+    annotations: int
 
 
 class AnswerReviewCreate(BaseModel):

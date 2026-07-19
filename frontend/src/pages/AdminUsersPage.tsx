@@ -3,6 +3,7 @@ import { Table, Tag, Input, Select, Space, Typography, message, Popconfirm, Swit
 import { SearchOutlined } from "@ant-design/icons";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 import {
   getAdminUsers,
   updateAdminUser,
@@ -172,16 +173,19 @@ export default function AdminUsersPage() {
           <Typography.Title level={4} style={{ margin: 0 }}>
             {t("admin_crud.users.heading")}
           </Typography.Title>
-          <Input.Search
-            placeholder={t("admin_crud.users.search_placeholder")}
-            allowClear
-            prefix={<SearchOutlined />}
-            style={{ width: 280 }}
-            onSearch={(v) => {
-              setSearch(v);
-              setPage(1);
-            }}
-          />
+          <Space>
+            <Input.Search
+              placeholder={t("admin_crud.users.search_placeholder")}
+              allowClear
+              prefix={<SearchOutlined />}
+              style={{ width: 280 }}
+              onSearch={(v) => {
+                setSearch(v);
+                setPage(1);
+              }}
+            />
+            <Link to="/admin/audit-log" style={{ fontSize: 13 }}>{t("nav.admin_audit_log")}</Link>
+          </Space>
         </Space>
         <Table
           rowKey="id"
