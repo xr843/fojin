@@ -2,9 +2,10 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HelmetProvider } from "react-helmet-async";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import i18n from "../i18n";
 import enTranslation from "../../public/locales/en/translation.json";
+import zhHantTranslation from "../../public/locales/zh-Hant/translation.json";
 import CollectionsPage from "./CollectionsPage";
 import { api, getAlignmentCatalog } from "../api/client";
 
@@ -25,7 +26,7 @@ function LocationProbe() {
   return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
 }
 
-function renderPage() {
+function renderPage(entry = "/collections") {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -33,8 +34,11 @@ function renderPage() {
   return render(
     <HelmetProvider>
       <QueryClientProvider client={client}>
-        <MemoryRouter initialEntries={["/collections"]}>
-          <CollectionsPage />
+        <MemoryRouter initialEntries={[entry]}>
+          <Routes>
+            <Route path="/collections" element={<CollectionsPage />} />
+            <Route path="/collections/:collectionId" element={<CollectionsPage />} />
+          </Routes>
           <LocationProbe />
         </MemoryRouter>
       </QueryClientProvider>
@@ -44,7 +48,11 @@ function renderPage() {
 
 describe("CollectionsPage", () => {
   beforeAll(() => {
+    // Only `zh` is inlined into the i18n instance; the others load over
+    // HttpBackend, which never resolves under jsdom. Preload the bundles the
+    // tests switch to, or changeLanguage() hangs until the test times out.
     i18n.addResourceBundle("en", "translation", enTranslation, true, true);
+    i18n.addResourceBundle("zh-Hant", "translation", zhHantTranslation, true, true);
   });
 
   beforeEach(async () => {
@@ -85,5 +93,149 @@ describe("CollectionsPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /Search FoJin/ }));
 
     expect(screen.getByTestId("location")).toHaveTextContent("/search?q=%E5%8D%8E%E4%B8%A5%E7%BB%8F");
+  });
+
+  it("exposes the collection toggle as a button reporting its expanded state", () => {
+    renderPage();
+
+    const toggle = screen.getByRole("button", { name: /Avatamsaka Sutra Series/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+    // The panel the button claims to control must actually exist.
+    const panelId = toggle.getAttribute("aria-controls");
+    expect(panelId).toBeTruthy();
+    expect(document.getElementById(panelId!)).toBeInTheDocument();
+  });
+
+  it("renders an indexed text as a real link to its reader page", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: { T0278: 4242 } });
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: /Avatamsaka Sutra Series/ }));
+
+    // A span with onClick is invisible to keyboards and crawlers; the indexed
+    // title must be an anchor carrying a real href.
+    const link = await screen.findByRole("link", { name: /大方广佛华严经（六十卷）/ });
+    expect(link).toHaveAttribute("href", "/texts/4242");
+  });
+
+  it("does not link texts that are not in the corpus", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: {} });
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: /Avatamsaka Sutra Series/ }));
+
+    expect(screen.getByText("大方广佛华严经（六十卷）")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /大方广佛华严经（六十卷）/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps heading levels contiguous (no h1 -> h3 jump)", () => {
+    renderPage();
+
+    expect(screen.getByRole("heading", { level: 1, name: "Text Collections" })).toBeInTheDocument();
+    // Each collection is a section of the page, so it sits one level under the h1.
+    expect(screen.getAllByRole("heading", { level: 2 }).length).toBeGreaterThan(0);
+    expect(screen.queryAllByRole("heading", { level: 3 })).toHaveLength(0);
+
+    // Expanding reveals sub-sections one level down from the card, not two.
+    fireEvent.click(screen.getByRole("button", { name: /Avatamsaka Sutra Series/ }));
+    expect(screen.getAllByRole("heading", { level: 3 }).length).toBeGreaterThan(0);
+    expect(screen.queryAllByRole("heading", { level: 4 })).toHaveLength(0);
+  });
+
+  describe("cross-canon catalog script", () => {
+    // The catalog passes CBETA's traditional title_zh straight through.
+    const traditionalEntry = {
+      text_id: 43,
+      cbeta_id: "T1579",
+      title_zh: "瑜伽師地論",
+      other_lang: "bo",
+      pair_count: 39046,
+      partner_count: 0,
+      avg_confidence: null,
+      sources: ["mitra"],
+      sample_juan: 1,
+      sample_partner_id: null,
+      sample_partner_title: "",
+    };
+
+    beforeEach(() => {
+      vi.mocked(getAlignmentCatalog).mockResolvedValue({
+        entries: [traditionalEntry],
+        total_pairs: 39046,
+      });
+    });
+
+    it("folds catalog titles to simplified for 中文简体 readers", async () => {
+      await i18n.changeLanguage("zh");
+      renderPage();
+
+      expect(await screen.findByText("瑜伽师地论")).toBeInTheDocument();
+      expect(screen.queryByText("瑜伽師地論")).not.toBeInTheDocument();
+    });
+
+    it("keeps catalog titles traditional for 繁體 readers", async () => {
+      await i18n.changeLanguage("zh-Hant");
+      renderPage();
+
+      expect(await screen.findByText("瑜伽師地論")).toBeInTheDocument();
+      expect(screen.queryByText("瑜伽师地论")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("deep linking", () => {
+    // A collection used to be reachable only by expanding a local useState, so
+    // all 13 shared one URL: unshareable, unbookmarkable, and indistinguishable
+    // to crawlers.
+    it("opens the collection named in the URL", () => {
+      renderPage("/collections/huayan");
+
+      expect(screen.getByText("Online Reading")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /Avatamsaka Sutra Series/ }),
+      ).toHaveAttribute("aria-expanded", "true");
+    });
+
+    it("leaves every collection closed on the bare index", () => {
+      renderPage("/collections");
+
+      expect(screen.queryByText("Online Reading")).not.toBeInTheDocument();
+    });
+
+    it("falls back to the index for an unknown collection id", () => {
+      renderPage("/collections/does-not-exist");
+
+      expect(screen.getByRole("heading", { level: 1, name: "Text Collections" })).toBeInTheDocument();
+      expect(screen.queryByText("Online Reading")).not.toBeInTheDocument();
+    });
+
+    it("puts the opened collection in the URL", () => {
+      renderPage("/collections");
+
+      fireEvent.click(screen.getByRole("button", { name: /Avatamsaka Sutra Series/ }));
+      expect(screen.getByTestId("location")).toHaveTextContent("/collections/huayan");
+    });
+
+    it("returns to the index URL when the collection is closed again", () => {
+      renderPage("/collections/huayan");
+
+      fireEvent.click(screen.getByRole("button", { name: /Avatamsaka Sutra Series/ }));
+      expect(screen.getByTestId("location")).toHaveTextContent("/collections");
+      expect(screen.queryByText("Online Reading")).not.toBeInTheDocument();
+    });
+
+    it("opens only one collection at a time", () => {
+      renderPage("/collections/huayan");
+
+      fireEvent.click(screen.getByRole("button", { name: /Pure Land Sutras/ }));
+
+      expect(screen.getByTestId("location")).toHaveTextContent("/collections/pureland");
+      expect(
+        screen.getByRole("button", { name: /Avatamsaka Sutra Series/ }),
+      ).toHaveAttribute("aria-expanded", "false");
+    });
   });
 });

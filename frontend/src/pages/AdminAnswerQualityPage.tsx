@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  Alert,
   Button,
   Card,
   Input,
@@ -25,21 +26,28 @@ import { formatAdminDate } from "./adminI18n";
 
 const REASON_LABEL_KEYS: Record<string, string> = {
   downvoted: "admin_aq.reason.downvoted",
+  fabricated_citation: "admin_aq.reason.fabricated_citation",
+  quote_relaxed: "admin_aq.reason.quote_relaxed",
+  citation_corrected: "admin_aq.reason.citation_corrected",
   abnormal: "admin_aq.reason.abnormal",
-  no_citation: "admin_aq.reason.no_citation",
   weak_evidence: "admin_aq.reason.weak_evidence",
 };
 
+// Colors track WEIGHTS severity order in answer_quality.py (downvoted 5 >
+// fabricated_citation 4 > quote_relaxed/abnormal 3 > citation_corrected 2 >
+// weak_evidence 1).
 const REASON_COLORS: Record<string, string> = {
   downvoted: "red",
+  fabricated_citation: "volcano",
+  quote_relaxed: "orange",
+  citation_corrected: "gold",
   abnormal: "purple",
-  no_citation: "orange",
-  weak_evidence: "gold",
+  weak_evidence: "blue",
 };
 
 // Mirrors backend WEAK_EVIDENCE_THRESHOLD (answer_quality.py) — keep in sync if
 // the backend threshold is recalibrated. Display-only (reds weak sources).
-const WEAK_SCORE = 0.37;
+const WEAK_SCORE = 0.26;
 
 const CATEGORY_OPTION_KEYS = [
   { value: "recall", labelKey: "admin_aq.category.recall" },
@@ -56,9 +64,11 @@ export default function AdminAnswerQualityPage() {
   const [items, setItems] = useState<AnswerQueueItem[]>([]);
   const [total, setTotal] = useState(0);
   const [dist, setDist] = useState<ScoreDistribution | null>(null);
+  const [tagDist, setTagDist] = useState<Record<string, number> | null>(null);
   const [reviewStats, setReviewStats] = useState<AnswerReviewStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [windowDays, setWindowDays] = useState(90);
+  const [loadError, setLoadError] = useState(false);
+  const [windowDays, setWindowDays] = useState(30);
   const [minSuspicion, setMinSuspicion] = useState(0);
   const [reasonFilters, setReasonFilters] = useState<string[]>([]);
   const [verdicts, setVerdicts] = useState<
@@ -73,15 +83,21 @@ export default function AdminAnswerQualityPage() {
         category: reasonFilters.length ? reasonFilters.join(",") : undefined,
         limit: 50,
       }),
-      getAnswerReviewStats(),
+      getAnswerReviewStats({ window: windowDays }),
     ])
       .then(([res, stats]) => {
         setItems(res.items);
         setTotal(res.total_unreviewed);
         setDist(res.score_distribution);
+        setTagDist(res.tag_distribution ?? null);
         setReviewStats(stats);
+        setLoadError(false);
       })
       .catch(() => {
+        // 失败必须显性化:此前只弹 toast、把 total 留在初始 0,于是 500 和
+        // 「队列真的空」长得一模一样 —— 715 条积压就是这样被当成空队列的。
+        setLoadError(true);
+        setItems([]);
         message.error(t("admin_aq.load_error"));
       })
       .finally(() => {
@@ -123,7 +139,7 @@ export default function AdminAnswerQualityPage() {
         });
         setItems((prev) => prev.filter((i) => i.message_id !== item.message_id));
         setTotal(res.remaining_unreviewed);
-        void getAnswerReviewStats()
+        void getAnswerReviewStats({ window: windowDays })
           .then(setReviewStats)
           .catch(() => undefined);
         message.success(
@@ -137,7 +153,7 @@ export default function AdminAnswerQualityPage() {
         message.error(t("admin_aq.submit_error"));
       }
     },
-    [t, verdicts],
+    [t, verdicts, windowDays],
   );
 
   const columns: ColumnsType<AnswerQueueItem> = [
@@ -185,10 +201,32 @@ export default function AdminAnswerQualityPage() {
   return (
     <div style={{ padding: 24 }}>
       <Typography.Title level={3}>{t("nav.admin_answer_quality")}</Typography.Title>
+      {loadError && (
+        <Alert
+          role="alert"
+          type="error"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={t("admin_aq.load_error")}
+          action={
+            <Button
+              size="small"
+              onClick={() => {
+                setLoading(true);
+                void load();
+              }}
+            >
+              {t("common.retry")}
+            </Button>
+          }
+        />
+      )}
       <Space style={{ marginBottom: 16 }} wrap>
-        <Typography.Text strong>
-          {t("admin_aq.unreviewed_total", { count: total })}
-        </Typography.Text>
+        {!loadError && (
+          <Typography.Text strong>
+            {t("admin_aq.unreviewed_total", { count: total })}
+          </Typography.Text>
+        )}
         {reviewStats && (
           <>
             <Typography.Text type="secondary">
@@ -206,6 +244,18 @@ export default function AdminAnswerQualityPage() {
               p10: dist.p10 ?? "—",
               p50: dist.p50 ?? "—",
               p90: dist.p90 ?? "—",
+            })}
+          </Typography.Text>
+        )}
+        {tagDist && Object.keys(tagDist).length > 0 && (
+          <Typography.Text type="secondary">
+            {t("admin_aq.tag_distribution", {
+              detail: Object.entries(tagDist)
+                .map(
+                  ([tag, count]) =>
+                    `${REASON_LABEL_KEYS[tag] ? t(REASON_LABEL_KEYS[tag]) : tag} ${count}`,
+                )
+                .join(" · "),
             })}
           </Typography.Text>
         )}
@@ -257,7 +307,7 @@ export default function AdminAnswerQualityPage() {
         loading={loading}
         columns={columns}
         dataSource={items}
-        locale={{ emptyText: t("admin_aq.queue_empty") }}
+        locale={{ emptyText: loadError ? t("admin_aq.load_error") : t("admin_aq.queue_empty") }}
         expandable={{
           expandedRowRender: (item) => (
             <Card size="small" bordered={false}>

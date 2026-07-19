@@ -119,6 +119,12 @@ class ChatTrustStatus(BaseModel):
     source_count: int = 0
     citation_mutation_count: int = 0
     quote_mutation_count: int = 0
+    # How many 「…」 quotes were actually verbatim-checked against a source.
+    # Lets the UI distinguish "cited AND a quote checked out" from "cited but
+    # quoted nothing verbatim" — a green "verified" badge alone conflates them.
+    # None for historical answers reconstructed from a diagnostic row (the
+    # count predates persistence and is not stored).
+    quote_checked_count: int | None = None
     max_source_score: float | None = None
     min_source_score: float | None = None
 
