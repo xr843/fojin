@@ -66,3 +66,6 @@ CLAUDE.md
 data/
 !backend/app/data/
 .coverage
+
+# Local research notes — internal strategy snapshots, not for publication
+docs/research/
