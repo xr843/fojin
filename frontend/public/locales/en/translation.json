@@ -1097,6 +1097,7 @@
   "geo.country_tw": "Taiwan",
   "geo.country_br": "Brazil",
   "collections.page_title": "Text Collections | FoJin",
+  "collections.detail_page_title": "{{name}} — Text Collections | FoJin",
   "collections.page_desc": "Browse Buddhist classics by series, including main texts, commentaries, and related resources.",
   "collections.title": "Text Collections",
   "collections.subtitle": "{{series}} series · {{texts}} texts · {{resources}} external resources",

@@ -1097,6 +1097,7 @@
   "geo.country_tw": "台湾",
   "geo.country_br": "巴西",
   "collections.page_title": "经典专题 | 佛津",
+  "collections.detail_page_title": "{{name}} — 经典专题 | 佛津",
   "collections.page_desc": "按经论系列分类浏览佛教经典，包含主要经典、注疏论释及相关资源。",
   "collections.title": "经典专题",
   "collections.subtitle": "{{series}} 个经论系列 · {{texts}} 部典籍 · {{resources}} 个外部资源",
