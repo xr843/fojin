@@ -40,6 +40,25 @@ STATIC_PAGES = [
     ("/sutras/medicine-buddha-sutra", "monthly", "0.9"),
     ("/sutras/platform-sutra", "monthly", "0.9"),
     ("/sutras/vimalakirti-sutra", "monthly", "0.9"),
+    # Full cross-canon browse (~1000 aligned texts) — a larger index than
+    # /collections, and previously not listed at all.
+    ("/cross-canon", "weekly", "0.7"),
+    # Curated series deep links. These mirror the ids in
+    # frontend/src/content/collectionLocales/*.json; tests/test_sitemap_collections.py
+    # fails if the two lists drift apart.
+    ("/collections/huayan", "monthly", "0.7"),
+    ("/collections/prajna", "monthly", "0.7"),
+    ("/collections/lotus", "monthly", "0.7"),
+    ("/collections/shurangama", "monthly", "0.7"),
+    ("/collections/pureland", "monthly", "0.7"),
+    ("/collections/yogacara", "monthly", "0.7"),
+    ("/collections/chan", "monthly", "0.7"),
+    ("/collections/vinaya", "monthly", "0.7"),
+    ("/collections/agama", "monthly", "0.7"),
+    ("/collections/esoteric", "monthly", "0.7"),
+    ("/collections/nirvana", "monthly", "0.7"),
+    ("/collections/abhidharma", "monthly", "0.7"),
+    ("/collections/pali-canon", "monthly", "0.7"),
 ]
 
 

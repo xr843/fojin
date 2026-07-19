@@ -19,10 +19,31 @@
   box-shadow: 0 2px 12px rgba(139, 37, 0, 0.08);
 }
 
+/* The heading only carries the outline level; the button inside it owns all the
+   visual weight, so strip the h2's UA styling. */
+.coll-card-heading {
+  margin: 0;
+  font: inherit;
+}
+
+/* The whole card header is one <button> (accordion pattern) — reset the UA
+   button box so it lays out exactly like the <div> it replaced. */
 .coll-card-header {
+  display: block;
+  width: 100%;
   padding: 20px 24px;
   cursor: pointer;
   user-select: none;
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+.coll-card-header:focus-visible {
+  outline: 2px solid var(--fj-accent, #8b2500);
+  outline-offset: -2px;
 }
 
 .coll-card-title-row {
@@ -46,21 +67,22 @@
 }
 
 .coll-card-count {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--fj-ink-muted, #9a8e7a);
   margin-left: auto;
 }
 
 .coll-card-desc {
+  display: block;
   margin: 8px 0 4px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--fj-ink-muted, #9a8e7a);
-  line-height: 1.6;
+  line-height: 1.7;
 }
 
 .coll-card-toggle {
   display: inline-block;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--fj-accent, #8b2500);
   margin-top: 4px;
 }
@@ -79,10 +101,10 @@
 }
 
 .coll-section-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--fj-ink, #2c2417);
-  margin-bottom: 8px;
+  margin: 0 0 8px;
   padding-bottom: 4px;
   border-bottom: 1px dashed rgba(217, 208, 193, 0.5);
   font-family: "Noto Serif SC", serif;
@@ -123,10 +145,26 @@
   color: var(--fj-ink, #2c2417);
 }
 
+/* Indexed titles are anchors now; keep the previous inline-styled look. */
+.coll-text-title-link {
+  color: var(--fj-accent, #8b2500);
+  text-decoration: none;
+}
+
+.coll-text-title-link:hover {
+  text-decoration: underline;
+}
+
+.coll-text-title-link:focus-visible {
+  outline: 2px solid var(--fj-accent, #8b2500);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
 .coll-text-meta {
   display: flex;
   gap: 8px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--fj-ink-muted, #9a8e7a);
   margin-top: 2px;
   flex-wrap: wrap;

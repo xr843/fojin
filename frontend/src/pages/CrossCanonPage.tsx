@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Tag, Input, Empty, Spin } from "antd";
 import { TranslationOutlined, SearchOutlined } from "@ant-design/icons";
 import { getAlignmentCatalog } from "../api/client";
+import { localizeHan } from "../utils/hanScript";
 import { taishoSection, SECTION_ORDER } from "../data/taishoSections";
 
 const LANG_LABELS: Record<string, { labelKey: string; color: string }> = {
@@ -28,7 +29,7 @@ type Work = {
     完整 ~1000 部跨语对齐经典，按 Taishō 部类分组 + 语种/部类筛选 + 搜索。
     纯前端：复用 cached catalog，部类从 cbeta_id（T-number）推导。 */
 export default function CrossCanonPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [langFilter, setLangFilter] = useState<"all" | "both" | "bo" | "sa">("all");
   const [section, setSection] = useState<string>("");
@@ -50,7 +51,9 @@ export default function CrossCanonPage() {
       if (!w) {
         w = {
           text_id: e.text_id,
-          title: e.title_zh || e.cbeta_id,
+          // CBETA's title_zh is always traditional; render it in the reader's
+          // script. Also makes the search box below match what's on screen.
+          title: localizeHan(e.title_zh || e.cbeta_id, i18n.language),
           section: taishoSection(e.cbeta_id),
           sample_juan: e.sample_juan,
           total: 0,
@@ -68,7 +71,7 @@ export default function CrossCanonPage() {
     const arr = [...m.values()];
     arr.forEach((w) => w.langs.sort((a, b) => b.count - a.count));
     return arr.sort((a, b) => b.total - a.total);
-  }, [data]);
+  }, [data, i18n.language]);
 
   const sectionCounts = useMemo(() => {
     const c = new Map<string, number>();
