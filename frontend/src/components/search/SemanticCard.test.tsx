@@ -77,11 +77,12 @@ describe("SemanticCard 组件", () => {
     expect(screen.getByText(snippet)).toBeInTheDocument();
   });
 
-  it("阅读按钮链接到 /read/{text_id}/{juan_num}", () => {
+  // /read/:id/:juan 从来就不是一条路由（App.tsx 只有 /texts/:id/read），点进去必然 404。
+  it("阅读按钮链接到站内阅读器 /texts/{text_id}/read?juan={juan_num}", () => {
     renderCard(makeHit({ text_id: 99 as TextId, juan_num: 3, has_content: true }));
 
     const readLink = screen.getByText("阅读").closest("a");
-    expect(readLink).toHaveAttribute("href", "/read/99/3");
+    expect(readLink).toHaveAttribute("href", "/texts/99/read?juan=3");
   });
 
   it("has_content 为 false 时不渲染阅读按钮", () => {

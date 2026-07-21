@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Tag, Button } from "antd";
-import { LinkOutlined } from "@ant-design/icons";
+import { LinkOutlined, ReadOutlined } from "@ant-design/icons";
+import { Link } from "react-router-dom";
 import { sanitizeHighlight } from "../../utils/sanitize";
-import { buildCbetaReadUrl } from "../../utils/sourceUrls";
+import { buildCbetaReadUrl, buildReaderUrl } from "../../utils/sourceUrls";
 import type { ContentSearchHit } from "../../api/client";
 
 const LANG_KEYS: Record<string, string> = {
@@ -41,13 +42,21 @@ export default function ContentCard({ hit, rank }: { hit: ContentSearchHit; rank
             <div key={j} className="s-card-meta" style={{ lineHeight: 1.7 }}
               dangerouslySetInnerHTML={{ __html: `...${sanitizeHighlight(h)}...` }} />
           ))}
-          {cbetaUrl && (
-            <Button type="primary" size="small" icon={<LinkOutlined />}
-              style={{ background: "#8b2500", borderColor: "#8b2500", marginTop: 6 }}
-              href={cbetaUrl} target="_blank" rel="noopener noreferrer">
-              {t("search.cbeta_read")}
-            </Button>
-          )}
+          {/* 站内阅读器排在前面：它带标注、校勘、跨藏对照，CBETA 外链只作次要出口 */}
+          <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+            <Link to={buildReaderUrl(hit.text_id, hit.juan_num)}>
+              <Button type="primary" size="small" icon={<ReadOutlined />}
+                style={{ background: "#8b2500", borderColor: "#8b2500" }}>
+                {t("search.read")}
+              </Button>
+            </Link>
+            {cbetaUrl && (
+              <Button size="small" icon={<LinkOutlined />}
+                href={cbetaUrl} target="_blank" rel="noopener noreferrer">
+                {t("search.cbeta_read")}
+              </Button>
+            )}
+          </div>
         </div>
         {/* 展开其他匹配卷 */}
         {hasMore && expanded && hit.matched_juans
@@ -59,6 +68,11 @@ export default function ContentCard({ hit, rank }: { hit: ContentSearchHit; rank
                 <div key={k} className="s-card-meta" style={{ lineHeight: 1.7 }}
                   dangerouslySetInnerHTML={{ __html: `...${sanitizeHighlight(h)}...` }} />
               ))}
+              <Link to={buildReaderUrl(hit.text_id, j.juan_num)}>
+                <Button size="small" icon={<ReadOutlined />} style={{ marginTop: 6 }}>
+                  {t("search.read")}
+                </Button>
+              </Link>
             </div>
           ))}
         {hasMore && (
