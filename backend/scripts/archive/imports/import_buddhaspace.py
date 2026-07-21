@@ -30,7 +30,13 @@ import json
 import os
 import re
 import sys
+
+# Imported as a bare name, not as the ``html`` module: _strip_html()'s parameter
+# is itself called ``html`` and would shadow it.
+from html import unescape
 from urllib.parse import unquote, urljoin
+
+from scripts.fix_dict_html_entities import decode_numeric_entities
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -114,9 +120,20 @@ def _strip_html(html: str) -> str:
     text_out = re.sub(r"</?p[^>]*>", "\n", text_out, flags=re.IGNORECASE)
     # Remove all other HTML tags
     text_out = re.sub(r"<[^>]+>", "", text_out)
-    # Decode HTML entities
-    text_out = text_out.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
-    text_out = text_out.replace("&nbsp;", " ").replace("&quot;", '"')
+    # Decode HTML entities.
+    #
+    # This used to be a hand-rolled chain of five .replace() calls with no
+    # handling for numeric character references, which is how 2,463 headwords and
+    # 7,663 definitions ended up in prod reading '&#X4E98;以' instead of '亘以'
+    # (see scripts/fix_dict_html_entities.py). The '&amp;' -> '&' replacement ran
+    # first, so a source '&amp;#X4E98;' was turned INTO the literal '&#X4E98;'
+    # and then never decoded.
+    #
+    # html.unescape() handles named + numeric references correctly in one pass.
+    # buddhaspace.org double-escapes its rare characters, so after unescape we
+    # still hold a literal '&#X4E98;' — decode_numeric_entities() finishes the job.
+    text_out = unescape(text_out)
+    text_out = decode_numeric_entities(text_out)
     # Normalize whitespace per line, collapse blank lines
     lines = [line.strip() for line in text_out.split("\n")]
     text_out = "\n".join(line for line in lines if line)

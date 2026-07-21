@@ -48,6 +48,7 @@ class DataSourceResponse(BaseModel):
     health_status: str = "ok"
     health_checked_at: datetime | None = None
     health_detail: str | None = None
+    health_confidence: str = "high"
     license_spdx: str | None = None
     license_url: str | None = None
     license_notes: str | None = None

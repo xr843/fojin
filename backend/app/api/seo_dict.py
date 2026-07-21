@@ -52,7 +52,13 @@ router = APIRouter(tags=["seo"])
 _DEFINITION_PREVIEW_CHARS = 220
 _REVERSE_INDEX_LIMIT = 8
 _MAX_HEADWORD_LEN = 200
-_MIN_HEADWORD_LEN = 2  # single-char terms match ~everything + defeat the trgm index
+# pg_trgm can only use ix_text_contents_content_trgm for an unanchored
+# ``ILIKE '%term%'`` when the pattern holds at least one *complete* trigram —
+# i.e. 3+ characters. At 2 characters the planner extracts nothing and falls
+# back to a Seq Scan over 276MB of TOASTed content, so the lookup can never
+# finish inside _REVERSE_INDEX_TIMEOUT_MS. This was 2 (single-char only), which
+# let every 2-char headword through to a guaranteed-timeout seq scan.
+_MIN_HEADWORD_LEN = 3
 # Cap how long the best-effort reverse-index lookup may hold a pool connection.
 # Terms the trgm index can't serve seq-scan the 406MB content table; bounding
 # this (vs the global ~60s) is what stops crawler load from exhausting the pool.
@@ -120,10 +126,11 @@ async def _fetch_reverse_index(
 
     text_contents.content has a GIN trigram index (ix_text_contents_content_trgm,
     migration 0157) that serves most ILIKE substring matches sub-second. But
-    short/uncommon CJK terms the index can't serve seq-scan the 406MB table for
-    tens of seconds; under crawler load those pile up and exhaust the connection
-    pool (prod outage 2026-06-23). This block is a best-effort SEO nicety, so:
-      - skip single-char headwords (match ~everything, worst case for trgm), and
+    terms the index can't serve seq-scan the content table for tens of seconds;
+    under crawler load those pile up and exhaust the connection pool (prod outage
+    2026-06-23). This block is a best-effort SEO nicety, so:
+      - skip headwords under _MIN_HEADWORD_LEN chars — pg_trgm cannot extract a
+        trigram from them, so they are guaranteed seq scans (see the constant),
       - cap the per-query statement_timeout so a slow lookup fails fast and
         releases its pool connection instead of holding it ~60s; on timeout we
         drop the "appears in N sutras" block rather than starve the pool.
