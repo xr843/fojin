@@ -39,12 +39,16 @@ from sqlalchemy.orm import sessionmaker
 from app.api.sources import SOURCES_LIST_CACHE_KEY
 from app.config import settings
 from app.services.source_health import (
+    CONFIDENCE_HIGH,
+    HOST_PUBLIC,
     SSL_CHAIN_INCOMPLETE,
     SSL_ERROR,
     VALID_STATUSES,
+    classify_cert,
     classify_health,
-    host_is_public,
+    classify_host,
     is_incomplete_chain_error,
+    probe_confidence,
     resolve_unreachable_since,
 )
 
@@ -80,15 +84,85 @@ def _error_kind(exc: Exception) -> str:
 HEALTH_DETAIL_MAXLEN = 500
 
 
-def _verdict(code: str, status: str | None, detail: str | None) -> dict:
+def _verdict(
+    code: str,
+    status: str | None,
+    detail: str | None,
+    confidence: str = CONFIDENCE_HIGH,
+) -> dict:
     """A probe result. ``detail`` is the storage-ready health_detail value:
     the redirect target for ``moved``, the failure reason otherwise, ``None``
     for ``ok`` (and for skipped probes, where ``status`` is also ``None``).
 
+    ``confidence`` says whether the verdict holds beyond this prober's vantage
+    — see :func:`app.services.source_health.probe_confidence`. Only ``high``
+    verdicts are safe to present as a fault of the source itself. It defaults to
+    ``high`` because the paths that do not pass it (skipped probes, malformed
+    URLs, redirect-budget exhaustion) are all conclusions the prober reaches
+    from the stored config alone, with no network ambiguity.
+
     ``detail`` is hard-capped to the column width — see HEALTH_DETAIL_MAXLEN."""
     if detail is not None and len(detail) > HEALTH_DETAIL_MAXLEN:
         detail = detail[: HEALTH_DETAIL_MAXLEN - 1] + "…"
-    return {"code": code, "status": status, "detail": detail}
+    return {"code": code, "status": status, "detail": detail, "confidence": confidence}
+
+
+def leaf_facts_from_der(der: bytes) -> tuple[datetime | None, list[str]]:
+    """Parse a DER leaf into its ``notAfter`` and dNSName SANs.
+
+    Split out from the socket work above so the parsing — the part that depends
+    on the ``cryptography`` API surface — is unit-testable against a real
+    certificate without a network. Returns ``(None, [])`` for anything
+    unparseable, i.e. "could not re-check"."""
+    if not der:
+        return None, []
+    try:
+        cert = x509.load_der_x509_certificate(der)
+    except Exception:
+        return None, []
+    try:
+        san = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName).value.get_values_for_type(
+            x509.DNSName
+        )
+    except x509.ExtensionNotFound:
+        san = []
+    return cert.not_valid_after_utc, list(san)
+
+
+def _read_leaf_facts(host: str, port: int) -> tuple[datetime | None, list[str]]:
+    """The leaf certificate's ``notAfter`` and dNSName SANs, or ``(None, [])``.
+
+    Read with verification disabled so the cert is legible even when the chain
+    does not validate — it is inspected, never trusted. This is what lets
+    :func:`classify_cert` re-derive a verdict from the certificate itself rather
+    than from whatever OpenSSL made of the handshake on this particular host,
+    which is how a healthy source (leaf valid, hostname covered) stops being
+    badged over a vantage-specific TLS failure.
+
+    Any failure returns ``(None, [])`` — "could not re-check", which downgrades
+    confidence rather than inventing a verdict. Blocking socket/TLS work; call
+    via ``asyncio.to_thread``."""
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    try:
+        with (
+            socket.create_connection((host, port), timeout=TIMEOUT) as sock,
+            ctx.wrap_socket(sock, server_hostname=host) as ssock,
+        ):
+            der = ssock.getpeercert(binary_form=True)
+    except Exception:
+        return None, []
+    return leaf_facts_from_der(der)
+
+
+async def _cert_recheck(url: str) -> str:
+    """Re-derive the cert verdict for ``url``'s host from the leaf itself."""
+    parts = urlsplit(url)
+    if not parts.hostname:
+        return classify_cert(host="", not_after=None, san_dns=[], now=datetime.now(UTC))
+    not_after, san = await asyncio.to_thread(_read_leaf_facts, parts.hostname, parts.port or 443)
+    return classify_cert(host=parts.hostname, not_after=not_after, san_dns=san, now=datetime.now(UTC))
 
 
 async def _serves_content(client: httpx.AsyncClient, url: str) -> bool:
@@ -179,12 +253,24 @@ async def _probe_once(
     try:
         for _ in range(MAX_REDIRECTS + 1):
             host = urlsplit(current).hostname
-            if not host_is_public(host):
-                # Host does not resolve, or resolves to a non-public address —
-                # refuse to probe it. From an editor's view the source is
-                # effectively unreachable.
+            reachability = classify_host(host)
+            if reachability != HOST_PUBLIC:
+                # Refuse to probe. Both buckets end as "unreachable" from an
+                # editor's view, but they are not equally trustworthy: a name
+                # that resolves into non-public space is a fact this prober
+                # established (and the SSRF target the guard exists for), while
+                # a DNS failure on a single VPS routinely says nothing about the
+                # site. Keep them distinct in the detail and in the confidence.
+                status = classify_health(
+                    error=reachability, status_code=None, requested_url=url, final_url=None
+                )
                 return (
-                    _verdict(code, "unreachable", f"unresolvable or non-public host: {host}"),
+                    _verdict(
+                        code,
+                        status,
+                        f"{reachability}: {host}",
+                        probe_confidence(status=status, error=reachability, cert=None),
+                    ),
                     False,
                 )
             resp = await client.get(current, follow_redirects=False, timeout=TIMEOUT)
@@ -219,7 +305,15 @@ async def _probe_once(
         status = classify_health(
             error="redirect_loop", status_code=None, requested_url=url, final_url=None
         )
-        return _verdict(code, status, f"exceeded {MAX_REDIRECTS} redirect hops"), False
+        return (
+            _verdict(
+                code,
+                status,
+                f"exceeded {MAX_REDIRECTS} redirect hops",
+                probe_confidence(status=status, error="redirect_loop", cert=None),
+            ),
+            False,
+        )
     except Exception as exc:  # every probe failure maps to a health verdict
         kind = _error_kind(exc)
         if (
@@ -234,7 +328,18 @@ async def _probe_once(
             )
             return _verdict(code, status, None), False
         status = classify_health(error=kind, status_code=None, requested_url=url, final_url=None)
-        return _verdict(code, status, f"{kind}: {str(exc)[:160]}"), kind in ("timeout", "connect")
+        # A rejected handshake is not by itself evidence the *site* is broken:
+        # re-read the leaf and see whether the certificate is actually expired
+        # or actually issued for another name. When it checks out, the fault is
+        # local to this vantage and the verdict drops to low confidence.
+        cert = await _cert_recheck(current) if kind == SSL_ERROR else None
+        detail = f"{kind}: {str(exc)[:160]}"
+        if cert is not None:
+            detail = f"{detail} [leaf: {cert}]"
+        return (
+            _verdict(code, status, detail, probe_confidence(status=status, error=kind, cert=cert)),
+            kind in ("timeout", "connect"),
+        )
 
 
 async def probe(
@@ -321,13 +426,15 @@ async def main(dry_run: bool) -> None:
                     text(
                         "UPDATE data_sources "
                         "SET health_status = :s, health_checked_at = :t, "
-                        "    health_detail = :d, unreachable_since = :u "
+                        "    health_detail = :d, health_confidence = :f, "
+                        "    unreachable_since = :u "
                         "WHERE code = :c AND is_active = true"
                     ),
                     {
                         "s": r["status"],
                         "t": checked_at,
                         "d": r["detail"],
+                        "f": r["confidence"],
                         "u": unreachable_since,
                         "c": r["code"],
                     },

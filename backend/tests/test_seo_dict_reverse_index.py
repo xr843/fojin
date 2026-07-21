@@ -27,13 +27,41 @@ async def test_skips_single_char_and_overlong_headwords():
 
 
 @pytest.mark.anyio
+async def test_skips_two_char_headwords_the_trgm_index_cannot_serve():
+    """A 2-char headword can NEVER be served by the trgm index, so running it
+    is pure waste — it always burns the full timeout budget and returns nothing.
+
+    pg_trgm can only use the index for a ``LIKE '%x%'`` pattern when the pattern
+    contains at least one *complete* trigram, i.e. 3+ characters. An unanchored
+    2-char pattern yields zero extractable trigrams, so the planner falls back to
+    a Seq Scan over ``text_contents`` — 276MB of TOASTed content that must be
+    detoasted and ILIKE-rechecked row by row.
+
+    Measured on prod (2026-07-21), 8 random 2-char headwords: 11.8s / 13.5s /
+    14.0s / 14.8s and 4 more that did not finish within 20s — against a 3s
+    budget. Success rate is therefore 0%: every such lookup times out, rolls
+    back, and renders the page without the block. It also touches ~795MB of
+    shared buffers (shared_buffers is 640MB), flushing the cache that the
+    *fast* 3+-char lookups depend on — which is why they time out too.
+
+    So this is not a tradeoff: skipping 2-char lookups loses no functionality
+    that exists today, and stops the collateral damage.
+    """
+    db = AsyncMock()
+    assert await _fetch_reverse_index(db, "般若") == []
+    assert await _fetch_reverse_index(db, "菩提") == []
+    db.execute.assert_not_awaited()
+
+
+@pytest.mark.anyio
 async def test_caps_statement_timeout_before_the_ilike():
     db = AsyncMock()
     res = MagicMock()
     res.all.return_value = []
     db.execute.return_value = res
 
-    await _fetch_reverse_index(db, "般若")
+    # 3+ chars: the trgm index can serve this, so it is allowed through to the DB.
+    await _fetch_reverse_index(db, "波羅蜜")
 
     first_sql = str(db.execute.await_args_list[0].args[0]).lower()
     assert "statement_timeout" in first_sql, (
@@ -56,7 +84,7 @@ async def test_best_effort_empty_and_rollback_on_db_error():
 
     db.execute.side_effect = _exec
 
-    out = await _fetch_reverse_index(db, "般若")
+    out = await _fetch_reverse_index(db, "波羅蜜")
     assert out == []
     db.rollback.assert_awaited()  # aborted txn cleaned so the session is reusable
 

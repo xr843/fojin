@@ -3,16 +3,30 @@
 数据源健康状态分类的单元测试。Pure logic, no DB / network."""
 
 import importlib.util
+import socket
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
 
 from app.services.source_health import (
+    CERT_EXPIRED,
+    CERT_HOSTNAME_MISMATCH,
+    CERT_LOOKS_VALID,
+    CERT_UNKNOWN,
+    CONFIDENCE_HIGH,
+    CONFIDENCE_LOW,
+    HOST_DNS_UNRESOLVED,
+    HOST_NON_PUBLIC,
+    HOST_PUBLIC,
+    SSL_ERROR,
     _ip_is_blocked,
+    classify_cert,
     classify_health,
+    classify_host,
     host_is_public,
     is_incomplete_chain_error,
+    probe_confidence,
     resolve_unreachable_since,
 )
 
@@ -304,3 +318,167 @@ def test_0166_migration_keeps_source_health_update_narrow():
     assert "not a hard dependency for scripts/archive/imports/import_gretil.py" in (
         migration.GRETIL_DISTRIBUTION_UPDATE["license_note"]
     )
+
+
+# --- classify_host: DNS 查不到 ≠ 非公网地址 --------------------------------
+# 生产上 42 条非 ok 里有 8 条是「unresolvable or non-public host」，把「探测机
+# 解析不了」和「解析到内网地址」混成了一类。前者往往是探测点的网络问题
+# （VPS 的 DNS 到不了某些院校域名），后者才是真要拦的 SSRF 目标。
+
+
+def test_classify_host_non_public_address():
+    assert classify_host("127.0.0.1") == HOST_NON_PUBLIC
+    assert classify_host("169.254.169.254") == HOST_NON_PUBLIC
+
+
+def test_classify_host_public_address():
+    assert classify_host("8.8.8.8") == HOST_PUBLIC
+
+
+def test_classify_host_unresolvable_is_its_own_bucket(monkeypatch):
+    # 解析失败 ≠ 解析到内网地址。这里必须打桩 getaddrinfo：开发机上的
+    # DNS 代理（fake-IP）会把连不存在的域名都答成 198.18.x.x，真去查会
+    # 让这条测试在不同机器上给出不同结果。
+    def boom(*_args, **_kwargs):
+        raise socket.gaierror("Name or service not known")
+
+    monkeypatch.setattr(socket, "getaddrinfo", boom)
+    assert classify_host("anything.example") == HOST_DNS_UNRESOLVED
+
+
+def test_classify_host_empty_is_non_public_fail_closed():
+    # 空主机名没有可探测的目标，按 SSRF 防线的「fail closed」归到非公网。
+    assert classify_host(None) == HOST_NON_PUBLIC
+    assert classify_host("") == HOST_NON_PUBLIC
+
+
+def test_host_is_public_still_fails_closed_for_both_buckets(monkeypatch):
+    # SSRF 防线的语义不能松：只有 public 放行，dns_unresolved 也照样拦。
+    assert host_is_public("8.8.8.8") is True
+    assert host_is_public("127.0.0.1") is False
+
+    def boom(*_args, **_kwargs):
+        raise socket.gaierror("Name or service not known")
+
+    monkeypatch.setattr(socket, "getaddrinfo", boom)
+    assert host_is_public("anything.example") is False
+
+
+# --- classify_cert: 独立复核证书，别把环境问题当成站点问题 ------------------
+# 生产实测：www.cnki.net 的证书是 *.cnki.net、2027 年才到期，探测器却记成
+# "Hostname mismatch"；遊方站证书 2026-08 到期，探测器记成 "has expired"。
+# 两条都是探测点看到的东西和全网不一致，不该当作站点的毛病报出去。
+
+NOW = datetime(2026, 7, 21, tzinfo=UTC)
+
+
+def test_classify_cert_expired():
+    assert (
+        classify_cert(
+            host="buddhism.lib.ntu.edu.tw",
+            not_after=datetime(2026, 7, 15, tzinfo=UTC),
+            san_dns=["buddhism.lib.ntu.edu.tw"],
+            now=NOW,
+        )
+        == CERT_EXPIRED
+    )
+
+
+def test_classify_cert_hostname_mismatch():
+    # PTS 巴英辞典实测：证书是 *.stackcp.com，压根不含 palitext.com。
+    assert (
+        classify_cert(
+            host="www.palitext.com",
+            not_after=datetime(2027, 1, 4, tzinfo=UTC),
+            san_dns=["*.stackcp.com", "stackcp.com"],
+            now=NOW,
+        )
+        == CERT_HOSTNAME_MISMATCH
+    )
+
+
+def test_classify_cert_wildcard_covers_one_label():
+    # CNKI 的真实情况：*.cnki.net 覆盖 www.cnki.net，不是 mismatch。
+    assert (
+        classify_cert(
+            host="www.cnki.net",
+            not_after=datetime(2027, 3, 9, tzinfo=UTC),
+            san_dns=["*.cnki.net", "caj.d.cnki.net"],
+            now=NOW,
+        )
+        == CERT_LOOKS_VALID
+    )
+
+
+def test_classify_cert_wildcard_does_not_span_dots_or_bare_domain():
+    # *.cnki.net 既不覆盖 cnki.net 本身，也不覆盖 a.b.cnki.net。
+    assert (
+        classify_cert(host="cnki.net", not_after=datetime(2027, 3, 9, tzinfo=UTC), san_dns=["*.cnki.net"], now=NOW)
+        == CERT_HOSTNAME_MISMATCH
+    )
+    assert (
+        classify_cert(host="a.b.cnki.net", not_after=datetime(2027, 3, 9, tzinfo=UTC), san_dns=["*.cnki.net"], now=NOW)
+        == CERT_HOSTNAME_MISMATCH
+    )
+
+
+def test_classify_cert_expiry_wins_over_hostname():
+    # 两个毛病都占时，报更硬的那个：过期是全网一致的事实。
+    assert (
+        classify_cert(host="x.example", not_after=datetime(2020, 1, 1, tzinfo=UTC), san_dns=["other.example"], now=NOW)
+        == CERT_EXPIRED
+    )
+
+
+def test_classify_cert_unknown_when_leaf_unavailable():
+    # 连证书都取不到（TLSV1_ALERT_INTERNAL_ERROR 那两条），无从复核。
+    assert classify_cert(host="x.example", not_after=None, san_dns=[], now=NOW) == CERT_UNKNOWN
+
+
+# --- probe_confidence: 哪些判定敢放到用户面前 -------------------------------
+
+
+def test_confidence_high_for_http_status_verdicts():
+    # 服务器真的答了一个码，全网一致。
+    assert probe_confidence(status="degraded", error=None, cert=None) == CONFIDENCE_HIGH
+    assert probe_confidence(status="unreachable", error=None, cert=None) == CONFIDENCE_HIGH
+
+
+def test_confidence_high_for_independently_confirmed_cert_faults():
+    assert probe_confidence(status="cert_invalid", error=SSL_ERROR, cert=CERT_EXPIRED) == CONFIDENCE_HIGH
+    assert probe_confidence(status="cert_invalid", error=SSL_ERROR, cert=CERT_HOSTNAME_MISMATCH) == CONFIDENCE_HIGH
+
+
+def test_confidence_low_when_cert_looks_fine_but_handshake_failed():
+    # CNKI / 遊方：OpenSSL 拒了，但独立复核证书是好的 → 是探测点的问题。
+    assert probe_confidence(status="cert_invalid", error=SSL_ERROR, cert=CERT_LOOKS_VALID) == CONFIDENCE_LOW
+
+
+def test_confidence_low_for_cert_we_could_not_recheck():
+    assert probe_confidence(status="cert_invalid", error=SSL_ERROR, cert=CERT_UNKNOWN) == CONFIDENCE_LOW
+
+
+def test_confidence_low_for_timeout_and_dns():
+    assert probe_confidence(status="unreachable", error="timeout", cert=None) == CONFIDENCE_LOW
+    assert probe_confidence(status="unreachable", error="connect", cert=None) == CONFIDENCE_LOW
+    assert probe_confidence(status="unreachable", error=HOST_DNS_UNRESOLVED, cert=None) == CONFIDENCE_LOW
+
+
+def test_confidence_high_for_non_public_host():
+    # 解析到内网地址是探测机能确定的事实，也是真该拦的。
+    assert probe_confidence(status="unreachable", error=HOST_NON_PUBLIC, cert=None) == CONFIDENCE_HIGH
+
+
+def test_confidence_high_for_ok():
+    assert probe_confidence(status="ok", error=None, cert=None) == CONFIDENCE_HIGH
+
+
+def test_0172_migration_adds_health_confidence():
+    migration_path = (
+        Path(__file__).resolve().parents[1] / "alembic" / "versions" / "0172_add_source_health_confidence.py"
+    )
+    assert migration_path.exists()
+    migration = _load_migration(migration_path)
+
+    assert migration.revision == "0172"
+    assert migration.down_revision == "0171"
