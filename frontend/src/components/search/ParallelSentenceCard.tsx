@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Tag, Button } from "antd";
 import { ReadOutlined } from "@ant-design/icons";
 import { Link } from "react-router-dom";
+import { buildReaderUrl } from "../../utils/sourceUrls";
 import type { ParallelSentenceHit } from "../../api/client";
 
 // Mirror CrossLangCard's language tag palette so lang badges stay consistent
@@ -97,7 +98,7 @@ export default function ParallelSentenceCard({
 
         <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}>
           {canRead && (
-            <Link to={`/read/${hit.text_id}/${hit.juan_num}`}>
+            <Link to={buildReaderUrl(hit.text_id, hit.juan_num)}>
               <Button size="small" icon={<ReadOutlined />}>
                 {t("search.read")}
               </Button>

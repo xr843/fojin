@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Tag, Button, Progress } from "antd";
 import { LinkOutlined, ReadOutlined } from "@ant-design/icons";
 import { Link } from "react-router-dom";
-import { buildCbetaReadUrl } from "../../utils/sourceUrls";
+import { buildCbetaReadUrl, buildReaderUrl } from "../../utils/sourceUrls";
 import type { SemanticSearchHit } from "../../api/client";
 
 /** 语义搜索结果卡片：展示向量匹配的经文片段和相似度分数 */
@@ -67,7 +67,7 @@ export default function SemanticCard({ hit, rank }: { hit: SemanticSearchHit; ra
 
         <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
           {hit.has_content && (
-            <Link to={`/read/${hit.text_id}/${hit.juan_num}`}>
+            <Link to={buildReaderUrl(hit.text_id, hit.juan_num)}>
               <Button size="small" icon={<ReadOutlined />}>
                 {t("search.read")}
               </Button>

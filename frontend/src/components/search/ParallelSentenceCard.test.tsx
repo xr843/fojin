@@ -74,10 +74,11 @@ describe("ParallelSentenceCard 组件", () => {
     expect(screen.queryByText(/对齐质量/)).not.toBeInTheDocument();
   });
 
-  it("text_id 有效时阅读按钮链接到 /read/{text_id}/{juan_num}", () => {
+  // /read/:id/:juan 从来就不是一条路由（App.tsx 只有 /texts/:id/read），点进去必然 404。
+  it("text_id 有效时阅读按钮链接到站内阅读器 /texts/{text_id}/read?juan={juan_num}", () => {
     renderCard(makeHit({ text_id: 99 as TextId, juan_num: 2 }));
     const readLink = screen.getByText("阅读").closest("a");
-    expect(readLink).toHaveAttribute("href", "/read/99/2");
+    expect(readLink).toHaveAttribute("href", "/texts/99/read?juan=2");
   });
 
   it("text_id 为 0 时不渲染阅读按钮", () => {

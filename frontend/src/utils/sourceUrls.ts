@@ -40,6 +40,18 @@ export function buildCbetaReadUrl(cbetaId: string): string | null {
   return null;
 }
 
+/**
+ * 站内阅读器的 URL。路由是 /texts/:id/read，卷号走 ?juan= 查询参数
+ * （TextReaderPage 读 searchParams.get("juan")）。
+ *
+ * 所有指向站内阅读器的链接都应经过这里：曾经有卡片手写 `/read/:id/:juan`，
+ * 那条路由从不存在，点进去一律 404。
+ */
+export function buildReaderUrl(textId: number, juanNum?: number | null): string {
+  const base = `/texts/${textId}/read`;
+  return juanNum == null ? base : `${base}?juan=${juanNum}`;
+}
+
 const SOURCE_LABEL_KEYS: Record<string, string> = {
   cbeta: "sourceLabel.cbeta",
   "cbeta-org": "sourceLabel.cbeta",
