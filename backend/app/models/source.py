@@ -35,6 +35,11 @@ class DataSource(Base):
     # Actionable context for the latest probe: redirect target for moved,
     # failure reason otherwise, NULL when ok.
     health_detail: Mapped[str | None] = mapped_column(String(500))
+    # Whether health_status holds beyond the prober's own vantage: high|low.
+    # The cron runs from one VPS, where a timeout or a DNS miss often says more
+    # about the probe environment than about the site — only "high" verdicts may
+    # be presented to a reader as a fault of the source.
+    health_confidence: Mapped[str] = mapped_column(String(10), server_default="high")
     # When the source first entered its current continuous unreachable streak;
     # NULL when not unreachable. now() - unreachable_since is the streak length.
     unreachable_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

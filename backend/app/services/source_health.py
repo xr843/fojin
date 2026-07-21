@@ -12,7 +12,7 @@ Valid statuses: ok | degraded | cert_invalid | unreachable | moved
 
 import ipaddress
 import socket
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from urllib.parse import urlsplit
 
@@ -70,6 +70,42 @@ def _ip_is_blocked(ip: str) -> bool:
     )
 
 
+HOST_PUBLIC = "public"
+HOST_DNS_UNRESOLVED = "dns_unresolved"
+HOST_NON_PUBLIC = "non_public"
+
+
+def classify_host(host: str | None) -> str:
+    """Why (or whether) ``host`` may be probed: public / dns_unresolved / non_public.
+
+    These two failure modes were previously collapsed into one verdict
+    ("unresolvable or non-public host"), which is wrong in both directions:
+
+    - **dns_unresolved** usually says more about the *prober* than the site. The
+      cron runs from a single VPS; several curated academic domains that resolve
+      fine elsewhere fail ``getaddrinfo`` there. Reporting those as a fault of
+      the source puts a wrong badge on a live institution.
+    - **non_public** is a fact the prober can establish on its own — the name
+      resolves to RFC1918 / loopback / metadata space — and is exactly the SSRF
+      target the guard exists to refuse.
+
+    Only the latter deserves editorial confidence; see :func:`probe_confidence`.
+    A host with no name to look up is ``non_public`` (fail closed), keeping the
+    SSRF guard's original semantics.
+    """
+    if not host:
+        return HOST_NON_PUBLIC
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except (socket.gaierror, UnicodeError, OSError):
+        return HOST_DNS_UNRESOLVED
+    if not infos:
+        return HOST_DNS_UNRESOLVED
+    if any(_ip_is_blocked(info[4][0]) for info in infos):
+        return HOST_NON_PUBLIC
+    return HOST_PUBLIC
+
+
 def host_is_public(host: str | None) -> bool:
     """True only when *every* address ``host`` resolves to is publicly routable.
 
@@ -78,14 +114,97 @@ def host_is_public(host: str | None) -> bool:
     redirect the probe at ``169.254.169.254`` (cloud metadata) or an RFC1918
     host — an SSRF. A residual DNS-rebinding window remains between this check
     and httpx's own connect-time resolution; acceptable for a cron over curated
-    academic sites, but noted deliberately."""
-    if not host:
+    academic sites, but noted deliberately.
+
+    Stays a strict allow-list over :func:`classify_host`: anything that is not
+    provably public — including a name that would not resolve — is refused."""
+    return classify_host(host) == HOST_PUBLIC
+
+
+CERT_EXPIRED = "expired"
+CERT_HOSTNAME_MISMATCH = "hostname_mismatch"
+CERT_LOOKS_VALID = "looks_valid"
+CERT_UNKNOWN = "unknown"
+
+
+def _san_matches(host: str, pattern: str) -> bool:
+    """RFC 6125 hostname matching for a single dNSName entry.
+
+    A wildcard is only valid in the left-most label and only spans one label:
+    ``*.cnki.net`` matches ``www.cnki.net`` but neither ``cnki.net`` itself nor
+    ``a.b.cnki.net``."""
+    host = host.lower().rstrip(".")
+    pattern = pattern.lower().rstrip(".")
+    if not pattern:
         return False
-    try:
-        infos = socket.getaddrinfo(host, None)
-    except (socket.gaierror, UnicodeError, OSError):
+    if not pattern.startswith("*."):
+        return host == pattern
+    suffix = pattern[1:]  # ".cnki.net"
+    if not host.endswith(suffix):
         return False
-    return bool(infos) and all(not _ip_is_blocked(info[4][0]) for info in infos)
+    leftmost = host[: -len(suffix)]
+    return bool(leftmost) and "." not in leftmost
+
+
+def classify_cert(
+    *,
+    host: str,
+    not_after: datetime | None,
+    san_dns: Sequence[str],
+    now: datetime,
+) -> str:
+    """Re-derive a cert verdict from the leaf itself, independent of the handshake.
+
+    A TLS handshake failure is not by itself evidence that the *site* is broken.
+    Two production examples: ``www.cnki.net`` was recorded as "Hostname
+    mismatch" though its leaf carries ``*.cnki.net`` (which covers it) and runs
+    to 2027; a Sinica site was recorded as "has expired" with a leaf valid for
+    another month. In both, what the prober saw differs from what the rest of
+    the world sees — interception, a stale trust store, a geo-routed edge — and
+    the source is fine.
+
+    Expiry is checked before hostname because it is the harder, wholly
+    vantage-independent fact. ``CERT_UNKNOWN`` means the leaf could not be read
+    at all (e.g. the server aborts the handshake before sending one), so nothing
+    was re-verified and nothing may be claimed.
+    """
+    if not_after is None:
+        return CERT_UNKNOWN
+    if not_after <= now:
+        return CERT_EXPIRED
+    if not san_dns:
+        return CERT_UNKNOWN
+    if any(_san_matches(host, pattern) for pattern in san_dns):
+        return CERT_LOOKS_VALID
+    return CERT_HOSTNAME_MISMATCH
+
+
+CONFIDENCE_HIGH = "high"
+CONFIDENCE_LOW = "low"
+
+
+def probe_confidence(*, status: str, error: str | None, cert: str | None) -> str:
+    """How much a verdict may be trusted outside the prober's own vantage.
+
+    Only ``high`` verdicts are safe to show a reader as a fault of the *source*;
+    ``low`` ones are recorded for operators but say as much about the probe
+    environment as about the site.
+
+    high — the server answered with an HTTP status (same everywhere), the leaf
+    cert was independently re-checked and is genuinely expired or genuinely
+    issued for another name, or the host resolves into non-public space.
+
+    low — timeouts, dropped connections and DNS failures (all routinely caused
+    by a datacenter IP being blocked or by the VPS's resolver), plus any cert
+    rejection the re-check could not corroborate.
+    """
+    if error is None:
+        return CONFIDENCE_HIGH
+    if error == SSL_ERROR:
+        return CONFIDENCE_HIGH if cert in (CERT_EXPIRED, CERT_HOSTNAME_MISMATCH) else CONFIDENCE_LOW
+    if error == HOST_NON_PUBLIC:
+        return CONFIDENCE_HIGH
+    return CONFIDENCE_LOW
 
 
 def _registrable_host(url: str | None) -> str:
