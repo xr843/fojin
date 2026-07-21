@@ -15,6 +15,8 @@ import {
   RobotOutlined,
   GithubOutlined,
   GlobalOutlined,
+  TranslationOutlined,
+  DownloadOutlined,
   // ExperimentOutlined,  // research nav hidden (研究助手 待重构后再上线)
   // BarChartOutlined,   // dashboard nav hidden (数据总览 暂不对外公开)
   // FieldTimeOutlined,  // timeline nav deferred (pending polish)
@@ -79,6 +81,10 @@ export default function Layout() {
   }> = [
     { icon: <DatabaseOutlined />, label: t("nav.sources"), path: "/sources" },
     { icon: <RobotOutlined />, label: t("nav.chat"), path: "/chat" },
+    // 跨藏对照(/cross-canon)：1,016 部经 · 91 万组逐段跨语对照，是相对 CBETA /
+    // SuttaCentral 最硬的差异化。此前页面早就跑在生产上，导航里却没有入口，
+    // 只能靠 /collections 里的对照表或手敲 URL 到达。
+    { icon: <TranslationOutlined />, label: t("nav.cross_canon"), path: "/cross-canon" },
     // 研究助手(/research)暂从导航撤下：当前输出偏"更长的问答"，未凸显跨藏对比这一
     // 差异化，等重构(跨藏对比表 + 内联可点证据 + 流式)后再上线。后端 API 与
     // fojin-mcp 保留，/research 路由仍可直达。
@@ -87,6 +93,9 @@ export default function Layout() {
     { icon: <ApartmentOutlined />, label: t("nav.kg"), path: "/kg" },
     { icon: <GlobalOutlined />, label: t("nav.geo"), path: "/map" },
     { icon: <BookOutlined />, label: t("nav.collections"), path: "/collections" },
+    // 开放数据(/exports)：CSV / JSON / JSON-LD 批量导出，对应 README 里
+    // 「corpus other tools can call」的定位。同样是建好了但导航没入口。
+    { icon: <DownloadOutlined />, label: t("nav.exports"), path: "/exports" },
     // 数据总览(/dashboard)暂不对外公开：从导航撤下，路由仍可直达 /dashboard。
     // { icon: <BarChartOutlined />, label: t("nav.dashboard"), path: "/dashboard" },
     // 历史时间线(/timeline)暂不放导航：待打磨后再上线（路由仍可直达 /timeline）。
