@@ -19,12 +19,13 @@ navigation from github.com/accounts.google.com, and Strict would withhold
 the cookie there and break every login.
 """
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 from urllib.parse import parse_qs, urlparse
 
 import pytest
 
-from app.api.auth import OAUTH_STATE_COOKIE
+from app.api.auth import _state_cookie_name
 
 
 @pytest.fixture(autouse=True)
@@ -70,7 +71,7 @@ async def test_login_sets_httponly_state_cookie_matching_the_url(client, provide
     resp = await client.get(f"/api/auth/{provider}/login")
 
     assert resp.status_code == 200
-    cookie = resp.cookies.get(OAUTH_STATE_COOKIE)
+    cookie = resp.cookies.get(_state_cookie_name(provider))
     assert cookie is not None, "no state cookie was set"
     assert cookie == _state_from_authorize_url(resp.json()["url"])
 
@@ -104,7 +105,7 @@ async def test_callback_with_a_mismatched_cookie_is_rejected(client, provider):
     resp = await client.get(
         f"/api/auth/{provider}/callback",
         params={"code": "c", "state": "state-from-attacker"},
-        cookies={OAUTH_STATE_COOKIE: "state-of-this-browser"},
+        cookies={_state_cookie_name(provider): "state-of-this-browser"},
         follow_redirects=False,
     )
 
@@ -125,9 +126,42 @@ async def test_callback_with_matching_cookie_passes_the_state_check(client, prov
     resp = await client.get(
         f"/api/auth/{provider}/callback",
         params={"code": "c", "state": "agreed-state"},
-        cookies={OAUTH_STATE_COOKIE: "agreed-state"},
+        cookies={_state_cookie_name(provider): "agreed-state"},
         follow_redirects=False,
     )
 
     assert resp.status_code in (302, 307)
     assert "error=invalid_state" not in resp.headers["location"]
+
+
+class TestStateComparisonRobustness:
+    """Edge cases that must not 500 or break concurrent logins."""
+
+    @pytest.mark.parametrize("provider", ["github", "google"])
+    def test_non_ascii_cookie_is_rejected_not_raised(self, provider):
+        """`secrets.compare_digest` raises TypeError on non-ASCII *str*.
+
+        Starlette decodes request headers as latin-1, so raw bytes 128-255 in
+        a Cookie header surface as a non-ASCII str even though httpx refuses
+        to send one — hence this drives the predicate directly rather than
+        going through the test client. It must return False, not raise, or the
+        auth callback 500s instead of redirecting to invalid_state.
+        """
+        from app.api.auth import _state_is_valid
+
+        request = SimpleNamespace(cookies={_state_cookie_name(provider): "caf\xe9-not-ascii"})
+
+        assert _state_is_valid(request, "ascii-state", provider, provider) is False
+
+    @pytest.mark.anyio
+    async def test_two_providers_do_not_clobber_each_other(self, client):
+        """Starting a GitHub flow must not invalidate an in-flight Google one."""
+        _install_redis()
+        gh = await client.get("/api/auth/github/login")
+        goog = await client.get("/api/auth/google/login")
+
+        gh_cookie = gh.cookies.get(_state_cookie_name("github"))
+        goog_cookie = goog.cookies.get(_state_cookie_name("google"))
+
+        assert gh_cookie and goog_cookie
+        assert gh_cookie != goog_cookie, "both providers share one cookie slot"

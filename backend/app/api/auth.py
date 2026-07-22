@@ -51,7 +51,18 @@ OAUTH_STATE_COOKIE = "fojin_oauth_state"
 OAUTH_STATE_TTL = 600
 
 
-def _set_oauth_state_cookie(response, state: str) -> None:
+def _state_cookie_name(provider: str) -> str:
+    """Per-provider cookie so concurrent flows don't clobber each other.
+
+    With a single shared name, starting a GitHub login would overwrite the
+    cookie of an in-flight Google login and the older tab would fail its
+    state check — a regression, since before the cookie existed both flows
+    completed fine.
+    """
+    return f"{OAUTH_STATE_COOKIE}_{provider}"
+
+
+def _set_oauth_state_cookie(response, state: str, provider: str) -> None:
     """Bind the state to this browser.
 
     SameSite must be ``lax``: the callback is a cross-site top-level GET
@@ -63,7 +74,7 @@ def _set_oauth_state_cookie(response, state: str) -> None:
     request on the origin.
     """
     response.set_cookie(
-        OAUTH_STATE_COOKIE,
+        _state_cookie_name(provider),
         state,
         max_age=OAUTH_STATE_TTL,
         httponly=True,
@@ -74,11 +85,19 @@ def _set_oauth_state_cookie(response, state: str) -> None:
 
 
 def _state_is_valid(request: Request, state: str, stored: str | None, provider: str) -> bool:
-    """Both the Redis record and this browser's cookie must agree."""
+    """Both the Redis record and this browser's cookie must agree.
+
+    Compared as bytes: ``secrets.compare_digest`` raises TypeError on
+    non-ASCII *str* input, and a user can set an arbitrary cookie value on
+    this origin. That must yield the normal invalid_state redirect, not an
+    unhandled 500 on the auth callback.
+    """
     if stored != provider:
         return False
-    cookie_state = request.cookies.get(OAUTH_STATE_COOKIE)
-    return bool(cookie_state) and secrets.compare_digest(cookie_state, state)
+    cookie_state = request.cookies.get(_state_cookie_name(provider))
+    if not cookie_state:
+        return False
+    return secrets.compare_digest(cookie_state.encode("utf-8"), state.encode("utf-8"))
 
 
 async def _store_oauth_exchange(redis_client, token_resp: TokenResponse, provider: str) -> str:
@@ -276,7 +295,7 @@ async def github_login(request: Request, response: Response):
     state = secrets.token_urlsafe(16)
     redis_client = request.app.state.redis
     await redis_client.set(f"oauth_state:{state}", "github", ex=OAUTH_STATE_TTL)
-    _set_oauth_state_cookie(response, state)
+    _set_oauth_state_cookie(response, state, "github")
     return {"url": github_authorize_url(state)}
 
 
@@ -300,7 +319,7 @@ async def github_oauth_callback(
         redirect = RedirectResponse(url=f"{settings.oauth_redirect_base}/login?provider=github&code={exchange_code}")
     except Exception:
         redirect = RedirectResponse(url=f"{settings.oauth_redirect_base}/login?error=github_failed")
-    redirect.delete_cookie(OAUTH_STATE_COOKIE, path="/api/auth")
+    redirect.delete_cookie(_state_cookie_name("github"), path="/api/auth")
     return redirect
 
 
@@ -313,7 +332,7 @@ async def google_login(request: Request, response: Response):
     state = secrets.token_urlsafe(16)
     redis_client = request.app.state.redis
     await redis_client.set(f"oauth_state:{state}", "google", ex=OAUTH_STATE_TTL)
-    _set_oauth_state_cookie(response, state)
+    _set_oauth_state_cookie(response, state, "google")
     return {"url": google_authorize_url(state)}
 
 
@@ -337,7 +356,7 @@ async def google_oauth_callback(
         redirect = RedirectResponse(url=f"{settings.oauth_redirect_base}/login?provider=google&code={exchange_code}")
     except Exception:
         redirect = RedirectResponse(url=f"{settings.oauth_redirect_base}/login?error=google_failed")
-    redirect.delete_cookie(OAUTH_STATE_COOKIE, path="/api/auth")
+    redirect.delete_cookie(_state_cookie_name("google"), path="/api/auth")
     return redirect
 
 

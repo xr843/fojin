@@ -227,7 +227,7 @@ async def test_github_callback_no_longer_leaks_token_in_url(client):
             # without it the callback short-circuits to invalid_state and this
             # test would never reach the redirect it is actually about.
             # See tests/test_oauth_state_binding.py.
-            cookies={auth_module.OAUTH_STATE_COOKIE: "abc123"},
+            cookies={auth_module._state_cookie_name("github"): "abc123"},
             follow_redirects=False,
         )
     finally:
