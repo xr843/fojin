@@ -245,6 +245,21 @@ def _estimate_tokens(text: str) -> int:
 # Reserve tokens for system prompt + output (max_tokens=2000)
 _MAX_INPUT_TOKENS = 6000
 
+# Share of the remaining budget the user turn may take, leaving room for RAG
+# context and recent history. Attachment-bearing turns routinely exceed this.
+_USER_TURN_BUDGET_SHARE = 0.6
+_TRUNCATION_NOTE = "\n…（附件内容过长，已截断）"
+
+
+def _clamp_user_turn(text: str, budget: int) -> str:
+    """Trim the final user turn so it cannot consume the whole input budget."""
+    cap = max(1, int(budget * _USER_TURN_BUDGET_SHARE))
+    if _estimate_tokens(text) <= cap:
+        return text
+    # _estimate_tokens is len * 2 // 3, so `cap` tokens ≈ cap * 3 // 2 chars.
+    max_chars = max(1, cap * 3 // 2 - len(_TRUNCATION_NOTE))
+    return text[:max_chars].rstrip() + _TRUNCATION_NOTE
+
 
 def _build_llm_messages(
     history: list[ChatMessage], context_text: str, message: str,
@@ -281,12 +296,16 @@ def _build_llm_messages(
             reading_context.get("page_content"),
         )
     llm_messages: list[dict[str, str]] = [{"role": "system", "content": enhanced_prompt}]
-    budget = (
-        _MAX_INPUT_TOKENS
-        - _estimate_tokens(enhanced_prompt)
-        - _estimate_tokens(message)
-        - _estimate_tokens(reader_data_block)
-    )
+    budget = _MAX_INPUT_TOKENS - _estimate_tokens(enhanced_prompt) - _estimate_tokens(reader_data_block)
+
+    # The final user turn is the override when one is given, and attachment
+    # text rides in that way — up to 80k chars per file. Budgeting against
+    # ``message`` (the short visible question) while sending the override
+    # whole meant the cap below governed only RAG and history, and a single
+    # request could bill many times _MAX_INPUT_TOKENS. Clamp it here, before
+    # anything else spends from the budget.
+    final_user_message = _clamp_user_turn(llm_message_override or message, budget)
+    budget -= _estimate_tokens(final_user_message)
 
     # RAG context gets priority over history
     if context_text:
@@ -311,7 +330,6 @@ def _build_llm_messages(
     for msg in trimmed_history:
         llm_messages.append({"role": msg.role, "content": msg.content})
 
-    final_user_message = llm_message_override or message
     if context_text:
         llm_messages.append({
             "role": "user",

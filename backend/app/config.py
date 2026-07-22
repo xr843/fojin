@@ -141,6 +141,10 @@ class Settings(BaseSettings):
     # call and a DB pool slot. 30/min/IP is generous for real use (a stream
     # takes seconds) while capping abuse far below the 200 default.
     rate_limit_chat: int = 30
+    # Attachment upload — anonymous, 10 MB/file, written to host disk with no
+    # GC. Real use is a handful of files before one chat turn, so this can be
+    # much tighter than the chat limit itself.
+    rate_limit_attachment_upload: int = 10
 
     @property
     def database_url(self) -> str:
