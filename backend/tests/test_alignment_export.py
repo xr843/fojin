@@ -332,7 +332,7 @@ async def _fake_iter_records(**kwargs):
 
 
 @pytest.mark.asyncio
-async def test_endpoint_streams_card_then_records(open_data_exports_enabled, client):
+async def test_endpoint_streams_card_then_records(exports_client):
     facts = AsyncMock(
         return_value=(2, [{"source": "CBETA", "spdx": "CC-BY-NC-SA-4.0", "url": "x", "attribution_required": True}])
     )
@@ -340,7 +340,7 @@ async def test_endpoint_streams_card_then_records(open_data_exports_enabled, cli
         patch("app.services.alignment_export.collect_card_facts", facts),
         patch("app.services.alignment_export.iter_records", _fake_iter_records),
     ):
-        resp = await client.get("/api/exports/alignments.jsonl?granularity=chunk&methods=manual,expert")
+        resp = await exports_client.get("/api/exports/alignments.jsonl?granularity=chunk&methods=manual,expert")
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("application/x-ndjson")
     assert "fojin_alignments_chunk.jsonl" in resp.headers["content-disposition"]
@@ -360,12 +360,12 @@ async def _empty_iter_records(**kwargs):
 
 
 @pytest.mark.asyncio
-async def test_endpoint_empty_sentence_table_yields_card_count_zero(open_data_exports_enabled, client):
+async def test_endpoint_empty_sentence_table_yields_card_count_zero(exports_client):
     with (
         patch("app.services.alignment_export.collect_card_facts", AsyncMock(return_value=(0, []))),
         patch("app.services.alignment_export.iter_records", _empty_iter_records),
     ):
-        resp = await client.get("/api/exports/alignments.jsonl?granularity=sentence")
+        resp = await exports_client.get("/api/exports/alignments.jsonl?granularity=sentence")
     assert resp.status_code == 200
     lines = resp.text.strip().split("\n")
     assert len(lines) == 1  # only the card, no records
@@ -376,6 +376,6 @@ async def test_endpoint_empty_sentence_table_yields_card_count_zero(open_data_ex
 
 
 @pytest.mark.asyncio
-async def test_endpoint_rejects_bad_granularity(open_data_exports_enabled, client):
-    resp = await client.get("/api/exports/alignments.jsonl?granularity=paragraph")
+async def test_endpoint_rejects_bad_granularity(exports_client):
+    resp = await exports_client.get("/api/exports/alignments.jsonl?granularity=paragraph")
     assert resp.status_code == 422

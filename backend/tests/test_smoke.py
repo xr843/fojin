@@ -262,9 +262,13 @@ async def test_chat_anonymous_allowed_without_session(client):
 # Test 8: /api/exports/stats returns counts
 # ---------------------------------------------------------------------------
 @pytest.mark.anyio
-async def test_exports_stats(open_data_exports_enabled, client):
-    """Exports stats endpoint should return entity/text counts."""
-    from app.main import app
+async def test_exports_stats(exports_app, exports_client):
+    """Exports stats endpoint should return entity/text counts.
+
+    Uses the dedicated export app: the routes are unmounted on the real app
+    (ENABLE_OPEN_DATA_EXPORTS is off), and mounting them onto the shared
+    singleton just for this test leaks into the gate tests.
+    """
     from app.database import get_db as real_get_db
 
     mock_session = AsyncMock()
@@ -277,16 +281,14 @@ async def test_exports_stats(open_data_exports_enabled, client):
         ]
     )
 
-    app.dependency_overrides[real_get_db] = lambda: mock_session
-    try:
-        resp = await client.get("/api/exports/stats")
-        assert resp.status_code == 200
-        data = resp.json()
-        assert "texts" in data
-        assert "kg_entities" in data
-        assert "kg_relations" in data
-    finally:
-        app.dependency_overrides.pop(real_get_db, None)
+    exports_app.dependency_overrides[real_get_db] = lambda: mock_session
+
+    resp = await exports_client.get("/api/exports/stats")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "texts" in data
+    assert "kg_entities" in data
+    assert "kg_relations" in data
 
 
 # ===========================================================================

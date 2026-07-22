@@ -86,22 +86,37 @@ async def client(mock_es):
 
 
 @pytest.fixture
-def open_data_exports_enabled():
-    """Mount /api/exports/* for tests that exercise the export logic.
+def exports_app():
+    """A dedicated app carrying only the open-data export routes.
 
     The routes ship unmounted (settings.enable_open_data_exports is False —
     see tests/test_open_data_exports_gate.py for why), but the code behind
-    them is still live and worth covering. Monkeypatching the setting is not
-    enough: routers are attached at import time, so the router has to be
-    added to the app and removed again around the test.
-    """
-    from app.api import exports
-    from app.main import app
+    them is still live and worth covering.
 
-    app.include_router(exports.router, prefix="/api")
-    app.openapi_schema = None
-    try:
-        yield
-    finally:
-        app.router.routes = [r for r in app.router.routes if not getattr(r, "path", "").startswith("/api/exports")]
-        app.openapi_schema = None
+    Deliberately NOT mounted onto the shared `app.main.app` singleton and
+    unmounted afterwards: that is order-dependent, and a teardown that does
+    not run leaks the routes into the gate tests, which then hit the real
+    handlers with the suite's `get_db` override (which yields None) or fall
+    through to a real database connection. Giving the exports their own app
+    makes that class of bug impossible rather than merely unlikely.
+    """
+    from fastapi import FastAPI
+
+    from app.api import exports
+    from app.database import get_db
+
+    async def mock_get_db():
+        yield None
+
+    test_app = FastAPI()
+    test_app.include_router(exports.router, prefix="/api")
+    test_app.dependency_overrides[get_db] = mock_get_db
+    return test_app
+
+
+@pytest_asyncio.fixture
+async def exports_client(exports_app):
+    """HTTP client bound to `exports_app`."""
+    transport = ASGITransport(app=exports_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
