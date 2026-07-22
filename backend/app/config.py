@@ -92,6 +92,17 @@ class Settings(BaseSettings):
     # payload — never an error).
     enable_sentence_parallels: bool = False
 
+    # Open-data bulk exports (/api/exports/*). Ships OFF: the endpoints are
+    # unauthenticated and stream whole datasets with no overall cap — a single
+    # /exports/kg.json is 50.7 MB / 62 s against production data — and they sit
+    # outside STRICT_PATHS, so one IP could hold hundreds of concurrent
+    # long-running streams and exhaust the connection pool. The feature is
+    # intended (versioned, licensed datasets), just not ready to be public.
+    # When off the routes are not registered at all: 404, absent from OpenAPI.
+    # Before turning this on, give the heavy paths their own STRICT_PATHS
+    # entries.
+    enable_open_data_exports: bool = False
+
     # Observability — expose Prometheus metrics at /metrics (app root, not
     # /api; not proxied by nginx, so network-internal only). Set false to
     # not mount the endpoint at all. See app/core/metrics.py.
@@ -108,6 +119,16 @@ class Settings(BaseSettings):
     # OAuth: Google
     google_client_id: str = ""
     google_client_secret: str = ""
+
+    # Phone/SMS login. Ships OFF: nothing in the frontend calls
+    # /auth/sms/send-code or /auth/sms/login, but they were mounted in
+    # production anyway — and /sms/login auto-registers an unknown number
+    # into a JWT, so it was an unauthenticated auth surface with no users
+    # and no monitoring. When off the routes are not registered at all.
+    # Turning it on in production requires the full credential set below
+    # (enforced at boot); an enabled-but-unconfigured SMS login is exactly
+    # the state that used to print live login codes to the app log.
+    enable_sms_login: bool = False
 
     # SMS: Alibaba Cloud
     aliyun_sms_access_key_id: str = ""
@@ -141,6 +162,10 @@ class Settings(BaseSettings):
     # call and a DB pool slot. 30/min/IP is generous for real use (a stream
     # takes seconds) while capping abuse far below the 200 default.
     rate_limit_chat: int = 30
+    # Attachment upload — anonymous, 10 MB/file, written to host disk with no
+    # GC. Real use is a handful of files before one chat turn, so this can be
+    # much tighter than the chat limit itself.
+    rate_limit_attachment_upload: int = 10
 
     @property
     def database_url(self) -> str:
@@ -188,6 +213,27 @@ if _fojin_env != "development":
             "Generate one with: "
             "python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
         )
+    # SMS login is off by default and its routes aren't mounted, so an unset
+    # credential set is the normal state and must not block boot. But turning
+    # it ON without credentials is the exact configuration that used to make
+    # send_sms_code fall into "dev mode" and log live login codes, so an
+    # enabled-but-incomplete config fails fast instead.
+    if settings.enable_sms_login:
+        _sms_missing = [
+            name
+            for name, value in (
+                ("ALIYUN_SMS_ACCESS_KEY_ID", settings.aliyun_sms_access_key_id),
+                ("ALIYUN_SMS_ACCESS_KEY_SECRET", settings.aliyun_sms_access_key_secret),
+                ("ALIYUN_SMS_TEMPLATE_CODE", settings.aliyun_sms_template_code),
+            )
+            if not value
+        ]
+        if _sms_missing:
+            raise RuntimeError(
+                "FATAL: ENABLE_SMS_LOGIN is on but SMS is not fully configured. "
+                f"Missing: {', '.join(_sms_missing)}. "
+                "Set them, or unset ENABLE_SMS_LOGIN to disable phone login."
+            )
     try:
         from cryptography.fernet import Fernet as _Fernet  # local import keeps tooling import paths clean
 

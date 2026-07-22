@@ -32,6 +32,10 @@ STRICT_PATHS: dict[str, int] = {
     # traffic is effectively all /stream).
     "/api/chat": settings.rate_limit_chat,
     "/api/chat/stream": settings.rate_limit_chat,
+    # Unauthenticated 10 MB upload that lands on host disk and is never
+    # garbage-collected. At the loose default this was ~2 GB/min/IP of
+    # permanent writes, plus the CPU of parsing each one.
+    "/api/chat/attachments": settings.rate_limit_attachment_upload,
 }
 
 

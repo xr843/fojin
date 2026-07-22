@@ -469,7 +469,15 @@ class SmsLoginRequest(BaseModel):
     code: str
 
 
-@router.post("/sms/send-code")
+# Mounted only when settings.enable_sms_login is on (see the include below).
+# Phone login is not a shipped feature — nothing in the frontend calls either
+# route — but it was reachable in production regardless, and /sms/login
+# auto-registers unknown numbers into a JWT. An auth surface with no users and
+# no monitoring is all risk, so it ships off.
+sms_router = APIRouter()
+
+
+@sms_router.post("/sms/send-code")
 async def send_sms_verification(data: SmsCodeRequest, request: Request):
     """Send SMS verification code to the given phone number."""
     phone = data.phone.strip()
@@ -483,7 +491,7 @@ async def send_sms_verification(data: SmsCodeRequest, request: Request):
     return {"ok": True, "message": "验证码已发送"}
 
 
-@router.post("/sms/login", response_model=TokenResponse)
+@sms_router.post("/sms/login", response_model=TokenResponse)
 async def sms_verification_login(
     data: SmsLoginRequest,
     request: Request,
@@ -498,3 +506,7 @@ async def sms_verification_login(
 
         raise HTTPException(status_code=400, detail="验证码错误或已过期")
     return await sms_login(phone, db)
+
+
+if settings.enable_sms_login:
+    router.include_router(sms_router)

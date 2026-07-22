@@ -16,7 +16,7 @@ import {
   GithubOutlined,
   GlobalOutlined,
   TranslationOutlined,
-  DownloadOutlined,
+  // DownloadOutlined,   // exports nav hidden (开放数据 暂不对外公开)
   // ExperimentOutlined,  // research nav hidden (研究助手 待重构后再上线)
   // BarChartOutlined,   // dashboard nav hidden (数据总览 暂不对外公开)
   // FieldTimeOutlined,  // timeline nav deferred (pending polish)
@@ -93,9 +93,10 @@ export default function Layout() {
     { icon: <ApartmentOutlined />, label: t("nav.kg"), path: "/kg" },
     { icon: <GlobalOutlined />, label: t("nav.geo"), path: "/map" },
     { icon: <BookOutlined />, label: t("nav.collections"), path: "/collections" },
-    // 开放数据(/exports)：CSV / JSON / JSON-LD 批量导出，对应 README 里
-    // 「corpus other tools can call」的定位。同样是建好了但导航没入口。
-    { icon: <DownloadOutlined />, label: t("nav.exports"), path: "/exports" },
+    // 开放数据(/exports)暂不对外公开：后端路由由 ENABLE_OPEN_DATA_EXPORTS 控制，
+    // 默认关闭（未鉴权、无限流，单次 kg.json 达 50MB/60s）。前端入口与路由一并撤下，
+    // 重新放出时需同时打开后端开关并恢复 App.tsx 里的 /exports 路由。
+    // { icon: <DownloadOutlined />, label: t("nav.exports"), path: "/exports" },
     // 数据总览(/dashboard)暂不对外公开：从导航撤下，路由仍可直达 /dashboard。
     // { icon: <BarChartOutlined />, label: t("nav.dashboard"), path: "/dashboard" },
     // 历史时间线(/timeline)暂不放导航：待打磨后再上线（路由仍可直达 /timeline）。

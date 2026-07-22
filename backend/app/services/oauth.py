@@ -5,6 +5,7 @@ Handles third-party user creation/linking and token issuance.
 
 import json
 import logging
+import os
 import secrets
 import string
 from datetime import UTC, datetime
@@ -222,6 +223,12 @@ async def google_callback(code: str, db: AsyncSession) -> TokenResponse:
 _SMS_MAX_ATTEMPTS = 5
 _SMS_CODE_TTL = 300  # seconds
 
+# Only a local developer may skip the provider call. This used to key off
+# "are the Aliyun credentials empty?", which is also true in production —
+# so production printed a live login credential to the app log and told the
+# caller the message had been sent.
+_SMS_DEV_MODE = os.environ.get("FOJIN_ENV", "production").lower() == "development"
+
 
 async def send_sms_code(phone: str, redis_client) -> bool:
     """Send a 6-digit verification code via Alibaba Cloud SMS."""
@@ -238,8 +245,18 @@ async def send_sms_code(phone: str, redis_client) -> bool:
     await redis_client.delete(f"sms_attempt:{phone}")
 
     if not settings.aliyun_sms_access_key_id:
-        # Development mode: log the code instead of sending
-        logger.warning("SMS dev mode: phone=%s code=%s", phone, code)
+        if not _SMS_DEV_MODE:
+            # Production with no provider configured: nothing can be sent, so
+            # say so instead of returning True and having the endpoint answer
+            # "验证码已发送". Never log the code — it is a live credential and
+            # /auth/sms/login auto-registers unknown numbers, so anyone able to
+            # read the app log could mint a JWT for any phone identity.
+            logger.error("SMS requested but ALIYUN_SMS_ACCESS_KEY_ID is not configured; refusing to send")
+            return False
+        # Local development: the code is retrievable from Redis
+        # (`GET sms_code:<phone>`), which needs shell access to the dev
+        # machine — unlike the log stream, which gets shipped and read.
+        logger.warning("SMS dev mode: no provider configured, code stored in Redis for %s", phone)
         return True
 
     # Call Alibaba Cloud SMS API
