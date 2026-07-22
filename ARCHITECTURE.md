@@ -261,6 +261,16 @@ app/services/*.py     业务层：核心逻辑都在这（RAG、检索、对齐�
 
 **部署走 `./deploy.sh`**（不要手动 `docker rm` + force-recreate，会竞态停服）。内部服务（PG/Redis/ES/backend/umami）只绑 `127.0.0.1`；nginx 负责 gzip、安全响应头、SSE 不压缩。前端容器对 docker host 网络可达，多用户环境需加认证反代。
 
+**请求链路——注意 compose 之上还有一层宿主机 nginx**：
+
+```
+client → Cloudflare → 宿主 nginx(:80) ─┬─ /api/、/docs、/openapi.json → backend 双副本(127.0.0.1:8000/:8001)
+                                       └─ 其余                        → fojin-frontend 容器(127.0.0.1:3000)
+                                                                          └─ /share/qa/…、sitemap、SEO SSR → backend
+```
+
+`/api/` **不经过前端容器**，由宿主 nginx 直连后端；`frontend/nginx.conf` 里的 `location /api/` 对 fojin.app 流量而言是死代码。宿主层配置（含 Cloudflare 真实 IP 还原）现已纳入版本管理：`deploy/host-nginx/`——但**它不由 `deploy.sh` 部署**，改动需手工同步。该目录的 README 记录了它与 `frontend/security-headers.conf` 之间已知的响应头冲突。
+
 **指标**：backend 在根路径暴露 `/metrics`（Prometheus 格式，nginx 不代理 → 仅内网；实现在 `app/core/metrics.py`）。HTTP 按路由模板计数/延迟 + RAG 检索耗时 + 引用护栏改写计数。抓取栈是可选 overlay（`docker-compose.observability.yml`），详见 `docs/OBSERVABILITY.md`。
 
 **本地开发**（详见 README "Development"）：
