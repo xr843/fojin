@@ -92,6 +92,17 @@ class Settings(BaseSettings):
     # payload — never an error).
     enable_sentence_parallels: bool = False
 
+    # Open-data bulk exports (/api/exports/*). Ships OFF: the endpoints are
+    # unauthenticated and stream whole datasets with no overall cap — a single
+    # /exports/kg.json is 50.7 MB / 62 s against production data — and they sit
+    # outside STRICT_PATHS, so one IP could hold hundreds of concurrent
+    # long-running streams and exhaust the connection pool. The feature is
+    # intended (versioned, licensed datasets), just not ready to be public.
+    # When off the routes are not registered at all: 404, absent from OpenAPI.
+    # Before turning this on, give the heavy paths their own STRICT_PATHS
+    # entries.
+    enable_open_data_exports: bool = False
+
     # Observability — expose Prometheus metrics at /metrics (app root, not
     # /api; not proxied by nginx, so network-internal only). Set false to
     # not mount the endpoint at all. See app/core/metrics.py.

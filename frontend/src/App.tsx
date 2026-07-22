@@ -30,7 +30,6 @@ const ResearchPage = lazy(() => import("./pages/ResearchPage"));
 const DictionaryPage = lazy(() => import("./pages/DictionaryPage"));
 const SutraLandingPage = lazy(() => import("./pages/SutraLandingPage"));
 const WorkDetailPage = lazy(() => import("./pages/WorkDetailPage"));
-const ExportsPage = lazy(() => import("./pages/ExportsPage"));
 const CollectionsPage = lazy(() => import("./pages/CollectionsPage"));
 const CrossCanonPage = lazy(() => import("./pages/CrossCanonPage"));
 const TopicsPage = lazy(() => import("./pages/TopicsPage"));
@@ -106,7 +105,7 @@ function App() {
             <Route path="/parallel/:textId" element={<ParallelReaderPage />} />
             <Route path="/kg" element={<RouteErrorBoundary><KnowledgeGraphPage /></RouteErrorBoundary>} />
             <Route path="/person/:id" element={<RouteErrorBoundary><PersonPage /></RouteErrorBoundary>} />
-            <Route path="/exports" element={<ExportsPage />} />
+            {/* /exports 暂不对外公开 — 见 Layout.tsx 导航项注释与 ENABLE_OPEN_DATA_EXPORTS */}
             <Route path="/timeline" element={<TimelinePage />} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/map" element={<RouteErrorBoundary><KGMapPage /></RouteErrorBoundary>} />
