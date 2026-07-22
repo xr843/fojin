@@ -262,7 +262,7 @@ async def test_chat_anonymous_allowed_without_session(client):
 # Test 8: /api/exports/stats returns counts
 # ---------------------------------------------------------------------------
 @pytest.mark.anyio
-async def test_exports_stats(client):
+async def test_exports_stats(open_data_exports_enabled, client):
     """Exports stats endpoint should return entity/text counts."""
     from app.main import app
     from app.database import get_db as real_get_db

@@ -332,7 +332,7 @@ async def _fake_iter_records(**kwargs):
 
 
 @pytest.mark.asyncio
-async def test_endpoint_streams_card_then_records(client):
+async def test_endpoint_streams_card_then_records(open_data_exports_enabled, client):
     facts = AsyncMock(
         return_value=(2, [{"source": "CBETA", "spdx": "CC-BY-NC-SA-4.0", "url": "x", "attribution_required": True}])
     )
@@ -360,7 +360,7 @@ async def _empty_iter_records(**kwargs):
 
 
 @pytest.mark.asyncio
-async def test_endpoint_empty_sentence_table_yields_card_count_zero(client):
+async def test_endpoint_empty_sentence_table_yields_card_count_zero(open_data_exports_enabled, client):
     with (
         patch("app.services.alignment_export.collect_card_facts", AsyncMock(return_value=(0, []))),
         patch("app.services.alignment_export.iter_records", _empty_iter_records),
@@ -376,6 +376,6 @@ async def test_endpoint_empty_sentence_table_yields_card_count_zero(client):
 
 
 @pytest.mark.asyncio
-async def test_endpoint_rejects_bad_granularity(client):
+async def test_endpoint_rejects_bad_granularity(open_data_exports_enabled, client):
     resp = await client.get("/api/exports/alignments.jsonl?granularity=paragraph")
     assert resp.status_code == 422

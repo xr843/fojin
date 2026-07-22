@@ -492,7 +492,9 @@ app.include_router(citations.router, prefix="/api")
 app.include_router(urn.router, prefix="/api")
 
 # Phase 4 routers
-app.include_router(exports.router, prefix="/api")
+# Off by default — see settings.enable_open_data_exports.
+if settings.enable_open_data_exports:
+    app.include_router(exports.router, prefix="/api")
 
 # Dianjin (典津) cross-platform search — optional module
 if dianjin is not None:

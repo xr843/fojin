@@ -83,3 +83,25 @@ async def client(mock_es):
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             yield ac
         app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.fixture
+def open_data_exports_enabled():
+    """Mount /api/exports/* for tests that exercise the export logic.
+
+    The routes ship unmounted (settings.enable_open_data_exports is False —
+    see tests/test_open_data_exports_gate.py for why), but the code behind
+    them is still live and worth covering. Monkeypatching the setting is not
+    enough: routers are attached at import time, so the router has to be
+    added to the app and removed again around the test.
+    """
+    from app.api import exports
+    from app.main import app
+
+    app.include_router(exports.router, prefix="/api")
+    app.openapi_schema = None
+    try:
+        yield
+    finally:
+        app.router.routes = [r for r in app.router.routes if not getattr(r, "path", "").startswith("/api/exports")]
+        app.openapi_schema = None
