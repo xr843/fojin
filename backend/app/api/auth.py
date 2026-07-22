@@ -2,7 +2,7 @@ import json
 import logging
 import secrets
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,6 +41,90 @@ logger = logging.getLogger(__name__)
 # frontend should redeem the code immediately after redirect.
 OAUTH_EXCHANGE_TTL = 5
 OAUTH_EXCHANGE_PREFIX = "oauth:exchange:"
+
+# The OAuth `state` is mirrored into this cookie so the callback can prove the
+# flow was started by *this* browser. Redis alone can't: its stored value is
+# just the provider name, so any state an attacker minted for themselves
+# validates for everyone — login CSRF, where the victim ends up silently
+# signed into the attacker's account.
+OAUTH_STATE_TTL = 600
+
+# https origins get the `__Host-` prefix, which browsers only accept on a
+# cookie that is Secure, Path=/ and carries **no Domain**. That last part is
+# the point: without it a sibling host under the same registrable domain
+# (analytics.fojin.app runs umami) could set `Domain=.fojin.app; Path=/` with
+# this name and win, because Starlette's cookie parser keeps the LAST
+# duplicate and RFC 6265 orders cookies by decreasing path length — so the
+# tossed Path=/ cookie sorts after the real one. That would restore the exact
+# login-CSRF this binding exists to stop. Plain http (local dev) can't use the
+# prefix, since it requires Secure.
+# `__Host-` also forces Path=/, so the cookie can no longer be scoped to
+# /api/auth. It lives ~10 minutes and is a few dozen bytes.
+_STATE_COOKIE_PATH = "/"
+
+
+def _state_cookie_secure() -> bool:
+    """Read at call time, not import time — otherwise the attribute that makes
+    the prefix valid is frozen before settings are known, and untestable."""
+    return settings.oauth_redirect_base.startswith("https://")
+
+
+def _state_cookie_name(provider: str) -> str:
+    """Per-provider cookie so concurrent flows don't clobber each other.
+
+    With a single shared name, starting a GitHub login would overwrite the
+    cookie of an in-flight Google login and the older tab would fail its
+    state check — a regression, since before the cookie existed both flows
+    completed fine.
+    """
+    prefix = "__Host-" if _state_cookie_secure() else ""
+    return f"{prefix}fojin_oauth_state_{provider}"
+
+
+def _set_oauth_state_cookie(response, state: str, provider: str) -> None:
+    """Bind the state to this browser.
+
+    SameSite must be ``lax``: the callback is a cross-site top-level GET
+    navigation back from github.com / accounts.google.com, and ``strict``
+    would withhold the cookie there and break every login. ``lax`` still
+    blocks the cross-site POST/subresource cases that matter here.
+    """
+    response.set_cookie(
+        _state_cookie_name(provider),
+        state,
+        max_age=OAUTH_STATE_TTL,
+        httponly=True,
+        samesite="lax",
+        secure=_state_cookie_secure(),
+        path=_STATE_COOKIE_PATH,
+    )
+
+
+def _clear_oauth_state_cookie(response, provider: str) -> None:
+    """Same attributes as the set — browsers match on name/domain/path."""
+    response.delete_cookie(
+        _state_cookie_name(provider),
+        path=_STATE_COOKIE_PATH,
+        httponly=True,
+        samesite="lax",
+        secure=_state_cookie_secure(),
+    )
+
+
+def _state_is_valid(request: Request, state: str, stored: str | None, provider: str) -> bool:
+    """Both the Redis record and this browser's cookie must agree.
+
+    Compared as bytes: ``secrets.compare_digest`` raises TypeError on
+    non-ASCII *str* input, and a user can set an arbitrary cookie value on
+    this origin. That must yield the normal invalid_state redirect, not an
+    unhandled 500 on the auth callback.
+    """
+    if stored != provider:
+        return False
+    cookie_state = request.cookies.get(_state_cookie_name(provider))
+    if not cookie_state:
+        return False
+    return secrets.compare_digest(cookie_state.encode("utf-8"), state.encode("utf-8"))
 
 
 async def _store_oauth_exchange(redis_client, token_resp: TokenResponse, provider: str) -> str:
@@ -233,11 +317,12 @@ async def rotate_api_key_encryption(
 
 
 @router.get("/github/login")
-async def github_login(request: Request):
+async def github_login(request: Request, response: Response):
     """Return GitHub OAuth authorization URL as JSON."""
     state = secrets.token_urlsafe(16)
     redis_client = request.app.state.redis
-    await redis_client.set(f"oauth_state:{state}", "github", ex=600)
+    await redis_client.set(f"oauth_state:{state}", "github", ex=OAUTH_STATE_TTL)
+    _set_oauth_state_cookie(response, state, "github")
     return {"url": github_authorize_url(state)}
 
 
@@ -251,27 +336,30 @@ async def github_oauth_callback(
     """GitHub OAuth callback — exchange code for JWT, redirect to frontend."""
     redis_client = request.app.state.redis
     stored = await redis_client.get(f"oauth_state:{state}")
-    if stored != "github":
+    if not _state_is_valid(request, state, stored, "github"):
         return RedirectResponse(url=f"{settings.oauth_redirect_base}/login?error=invalid_state")
     await redis_client.delete(f"oauth_state:{state}")
 
     try:
         token_resp = await github_callback(code, db)
         exchange_code = await _store_oauth_exchange(redis_client, token_resp, "github")
-        return RedirectResponse(url=f"{settings.oauth_redirect_base}/login?provider=github&code={exchange_code}")
+        redirect = RedirectResponse(url=f"{settings.oauth_redirect_base}/login?provider=github&code={exchange_code}")
     except Exception:
-        return RedirectResponse(url=f"{settings.oauth_redirect_base}/login?error=github_failed")
+        redirect = RedirectResponse(url=f"{settings.oauth_redirect_base}/login?error=github_failed")
+    _clear_oauth_state_cookie(redirect, "github")
+    return redirect
 
 
 # ── OAuth: Google ────────────────────────────────────────────
 
 
 @router.get("/google/login")
-async def google_login(request: Request):
+async def google_login(request: Request, response: Response):
     """Return Google OAuth authorization URL as JSON."""
     state = secrets.token_urlsafe(16)
     redis_client = request.app.state.redis
-    await redis_client.set(f"oauth_state:{state}", "google", ex=600)
+    await redis_client.set(f"oauth_state:{state}", "google", ex=OAUTH_STATE_TTL)
+    _set_oauth_state_cookie(response, state, "google")
     return {"url": google_authorize_url(state)}
 
 
@@ -285,16 +373,18 @@ async def google_oauth_callback(
     """Google OAuth callback — exchange code for JWT, redirect to frontend."""
     redis_client = request.app.state.redis
     stored = await redis_client.get(f"oauth_state:{state}")
-    if stored != "google":
+    if not _state_is_valid(request, state, stored, "google"):
         return RedirectResponse(url=f"{settings.oauth_redirect_base}/login?error=invalid_state")
     await redis_client.delete(f"oauth_state:{state}")
 
     try:
         token_resp = await google_callback(code, db)
         exchange_code = await _store_oauth_exchange(redis_client, token_resp, "google")
-        return RedirectResponse(url=f"{settings.oauth_redirect_base}/login?provider=google&code={exchange_code}")
+        redirect = RedirectResponse(url=f"{settings.oauth_redirect_base}/login?provider=google&code={exchange_code}")
     except Exception:
-        return RedirectResponse(url=f"{settings.oauth_redirect_base}/login?error=google_failed")
+        redirect = RedirectResponse(url=f"{settings.oauth_redirect_base}/login?error=google_failed")
+    _clear_oauth_state_cookie(redirect, "google")
+    return redirect
 
 
 # ── OAuth: one-time code exchange ────────────────────────────
