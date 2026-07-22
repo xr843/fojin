@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.core.auth import create_access_token, hash_password
 from app.models.user import SocialAccount, User
-from app.schemas.user import TokenResponse
+from app.schemas.user import RESERVED_EMAIL_DOMAIN, TokenResponse
 
 logger = logging.getLogger(__name__)
 
@@ -48,11 +48,33 @@ async def _find_or_create_user(
         await db.commit()
         return user
 
-    # If we have an email, check if a user with that email already exists
+    # If we have an email, check if a user with that *verified* email exists.
+    #
+    # The verified check is what stops account pre-hijacking: registration
+    # takes a self-asserted address and there is no confirmation flow, so an
+    # attacker could sign up as victim@example.com and silently inherit the
+    # account the first time the real owner used social login. Only addresses
+    # an IdP vouched for are merge targets; an unverified row is left alone and
+    # a separate account is created below.
     user = None
+    email_taken_by_unverified = False
     if email:
-        result = await db.execute(select(User).where(User.email == email))
+        result = await db.execute(select(User).where(User.email == email, User.email_verified.is_(True)))
         user = result.scalar_one_or_none()
+        if user is None:
+            # An unverified row may still hold this address. We must not merge
+            # into it, but `users.email` is unique, so we can't reuse the
+            # address either — doing so raises IntegrityError and turns the
+            # pre-hijack into a lockout the attacker controls. Fall back to the
+            # same synthetic placeholder used for providers that hide the email.
+            email_taken_by_unverified = await db.scalar(select(User.id).where(User.email == email)) is not None
+            if email_taken_by_unverified:
+                logger.warning(
+                    "OAuth email %s is held by an unverified account; creating a separate account for %s:%s",
+                    email,
+                    provider,
+                    provider_user_id,
+                )
 
     if user is None:
         # Create a new user with a random password
@@ -67,9 +89,34 @@ async def _find_or_create_user(
                 break
             username = f"{base_username}_{secrets.token_hex(3)}"
 
+        usable_email = email if (email and not email_taken_by_unverified) else None
+
+        # The placeholder needs the same uniqueness retry the username gets.
+        # UserRegister now reserves this domain, but that only stops *new*
+        # squatting — a row registered before that landed, or written by a
+        # script or migration, would still collide. `users.email` is unique,
+        # so a collision raises IntegrityError, which the callback swallows
+        # into `?error=<provider>_failed`: the user is permanently locked out
+        # of social login with no self-service or admin way back. Degrade to a
+        # suffixed placeholder instead.
+        account_email = usable_email
+        if account_email is None:
+            base_placeholder = f"{provider}_{provider_user_id}"
+            account_email = f"{base_placeholder}{RESERVED_EMAIL_DOMAIN}"
+            for _i in range(10):
+                taken = await db.scalar(select(User.id).where(User.email == account_email))
+                if taken is None:
+                    break
+                account_email = f"{base_placeholder}_{secrets.token_hex(3)}{RESERVED_EMAIL_DOMAIN}"
+
         user = User(
             username=username,
-            email=email or f"{provider}_{provider_user_id}@noreply.fojin.app",
+            email=account_email,
+            # Callers only pass an email once the provider has confirmed it
+            # (Google: email_verified; GitHub: primary AND verified), so a real
+            # address here is verified by construction. A synthetic @noreply
+            # placeholder is not, and must never become a merge target.
+            email_verified=usable_email is not None,
             hashed_password=hash_password(random_pw),
             display_name=display_name or username,
             last_active_at=datetime.now(UTC),
