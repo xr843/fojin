@@ -248,12 +248,24 @@ _MAX_INPUT_TOKENS = 6000
 # Share of the remaining budget the user turn may take, leaving room for RAG
 # context and recent history. Attachment-bearing turns routinely exceed this.
 _USER_TURN_BUDGET_SHARE = 0.6
+
+# Floor on the user turn, applied regardless of what the system prompt and
+# reader block already consumed. Reader mode alone feeds up to 10k chars of
+# page text into the data block — more than _MAX_INPUT_TOKENS by itself — so
+# the residual budget goes negative on an ordinary "explain this passage"
+# request. Scaling the cap off that negative budget truncated the question
+# down to its first character plus the notice, leaving the model the page and
+# no question. The turn used to be sent whole, so starving it is a worse
+# failure than overrunning the budget: keep a floor that any typed question
+# fits inside, and let the clamp bite only on the 80k-char attachment payloads
+# it exists for.
+_MIN_USER_TURN_TOKENS = 2000
 _TRUNCATION_NOTE = "\n…（附件内容过长，已截断）"
 
 
 def _clamp_user_turn(text: str, budget: int) -> str:
     """Trim the final user turn so it cannot consume the whole input budget."""
-    cap = max(1, int(budget * _USER_TURN_BUDGET_SHARE))
+    cap = max(_MIN_USER_TURN_TOKENS, int(budget * _USER_TURN_BUDGET_SHARE))
     if _estimate_tokens(text) <= cap:
         return text
     # _estimate_tokens is len * 2 // 3, so `cap` tokens ≈ cap * 3 // 2 chars.

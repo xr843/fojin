@@ -83,3 +83,55 @@ class TestOverrideTokenBudget:
             llm_message_override=override,
         )
         assert override in messages[-1]["content"]
+
+
+class TestUserTurnIsNeverStarved:
+    """A large system prompt must not consume the user's own question.
+
+    Reader mode feeds up to 10k chars of page text into the data block, which
+    alone exceeds _MAX_INPUT_TOKENS. That drives the residual budget negative,
+    and clamping the user turn against a negative budget truncated the actual
+    question down to the truncation notice. Before the clamp existed the turn
+    was always sent whole, so this would have been a regression: the model
+    would receive the page and no question at all.
+    """
+
+    def test_reader_mode_keeps_the_question(self):
+        messages = _build_llm_messages(
+            history=[],
+            context_text="",
+            message="请解释这一段的含义",
+            reading_context={
+                "title": "妙法蓮華經",
+                "juan_num": 1,
+                "page_content": "頁" * 10000,
+                "selected_text": "選" * 500,
+            },
+        )
+        assert "请解释这一段的含义" in messages[-1]["content"]
+
+    def test_reader_mode_with_a_master_keeps_the_question(self):
+        messages = _build_llm_messages(
+            history=[],
+            context_text="",
+            message="请解释这一段的含义",
+            master_id="mahasi-sayadaw",
+            reading_context={
+                "title": "妙法蓮華經",
+                "juan_num": 1,
+                "page_content": "頁" * 10000,
+                "selected_text": "選" * 500,
+            },
+        )
+        assert "请解释这一段的含义" in messages[-1]["content"]
+
+    def test_attachment_payload_is_still_clamped_in_reader_mode(self):
+        """The floor must not become a loophole for the 80k-char attachments."""
+        messages = _build_llm_messages(
+            history=[],
+            context_text="",
+            message="请总结附件",
+            llm_message_override="佛" * 200_000,
+            reading_context={"title": "妙法蓮華經", "juan_num": 1, "page_content": "頁" * 10000},
+        )
+        assert _estimate_tokens(messages[-1]["content"]) < 20_000
