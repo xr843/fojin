@@ -390,5 +390,16 @@ async def get_distinct_headwords(
 
 
 async def count_distinct_headwords(db: AsyncSession) -> int:
-    stmt = select(func.count(func.distinct(DictionaryEntry.headword)))
-    return (await db.execute(stmt)).scalar() or 0
+    """Number of distinct headwords — decides how many sitemap-dict batches exist.
+
+    Deliberately ``GROUP BY`` rather than the obvious
+    ``count(distinct headword)``. PostgreSQL cannot use an index for
+    ``count(DISTINCT ...)`` — it sorts or hash-aggregates every row — whereas
+    the grouped subquery reduces over ``ix_dictionary_entries_headword``.
+    Measured on production (747,539 rows / 553,678 distinct headwords):
+    13,691 ms before, 1,514 ms after, identical result. That single query was
+    essentially the whole ~20s ``/sitemap.xml`` response, which is the
+    crawler's entry point to the entire site.
+    """
+    subq = select(DictionaryEntry.headword).group_by(DictionaryEntry.headword).subquery()
+    return (await db.execute(select(func.count()).select_from(subq))).scalar() or 0
