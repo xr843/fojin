@@ -44,7 +44,13 @@ class ChatRequest(BaseModel):
     # the LLM call. Ownership is enforced server-side: a logged-in user
     # may only reference their own rows or anonymous (user_id IS NULL)
     # rows; an anonymous request may only reference anonymous rows.
-    attachment_ids: list[int] | None = None
+    #
+    # The cap matters for more than ergonomics: anonymous rows are readable
+    # by any anonymous caller, and the single-use `consumed_at` guard only
+    # holds if an attacker has to probe sequential ids one at a time. An
+    # uncapped list let one request sweep every unconsumed upload — and bill
+    # the platform LLM key for all of their parsed text at once.
+    attachment_ids: list[int] | None = Field(None, max_length=5)
 
 
 class HotQuestionCard(BaseModel):
