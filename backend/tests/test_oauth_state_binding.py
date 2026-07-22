@@ -165,3 +165,52 @@ class TestStateComparisonRobustness:
 
         assert gh_cookie and goog_cookie
         assert gh_cookie != goog_cookie, "both providers share one cookie slot"
+
+
+class TestCookieHardening:
+    """Attributes that decide whether the binding actually holds."""
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider", ["github", "google"])
+    async def test_cookie_is_scoped_and_secure_in_production(self, client, provider, monkeypatch):
+        """Path is the attribute most likely to silently break every login.
+
+        Under an https base the name must also carry the `__Host-` prefix,
+        which browsers only accept with Secure + Path=/ + no Domain — that is
+        what stops a sibling host (e.g. analytics.fojin.app) from tossing in a
+        same-named cookie. Starlette's cookie parser takes the LAST duplicate,
+        and RFC 6265 orders by decreasing path length, so a tossed `Path=/`
+        cookie would otherwise beat the real one.
+        """
+        from app.api import auth as auth_module
+
+        monkeypatch.setattr(auth_module.settings, "oauth_redirect_base", "https://fojin.app")
+        _install_redis()
+
+        resp = await client.get(f"/api/auth/{provider}/login")
+        raw = resp.headers["set-cookie"].lower()
+
+        assert "__host-" in raw
+        assert "path=/;" in raw or raw.rstrip().endswith("path=/")
+        assert "secure" in raw
+        assert "domain=" not in raw
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider", ["github", "google"])
+    async def test_consumed_state_is_rejected_even_with_a_matching_cookie(self, client, provider):
+        """Replay guard: Redis is the one-shot half of the pair.
+
+        After a successful callback the key is deleted, but the browser may
+        still hold the cookie (back button, retried redirect). The stale
+        cookie alone must not authenticate anything.
+        """
+        _install_redis(get_return=None)  # key already consumed
+
+        resp = await client.get(
+            f"/api/auth/{provider}/callback",
+            params={"code": "c", "state": "replayed-state"},
+            cookies={_state_cookie_name(provider): "replayed-state"},
+            follow_redirects=False,
+        )
+
+        assert "error=invalid_state" in resp.headers["location"]

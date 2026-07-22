@@ -47,8 +47,26 @@ OAUTH_EXCHANGE_PREFIX = "oauth:exchange:"
 # just the provider name, so any state an attacker minted for themselves
 # validates for everyone — login CSRF, where the victim ends up silently
 # signed into the attacker's account.
-OAUTH_STATE_COOKIE = "fojin_oauth_state"
 OAUTH_STATE_TTL = 600
+
+# https origins get the `__Host-` prefix, which browsers only accept on a
+# cookie that is Secure, Path=/ and carries **no Domain**. That last part is
+# the point: without it a sibling host under the same registrable domain
+# (analytics.fojin.app runs umami) could set `Domain=.fojin.app; Path=/` with
+# this name and win, because Starlette's cookie parser keeps the LAST
+# duplicate and RFC 6265 orders cookies by decreasing path length — so the
+# tossed Path=/ cookie sorts after the real one. That would restore the exact
+# login-CSRF this binding exists to stop. Plain http (local dev) can't use the
+# prefix, since it requires Secure.
+# `__Host-` also forces Path=/, so the cookie can no longer be scoped to
+# /api/auth. It lives ~10 minutes and is a few dozen bytes.
+_STATE_COOKIE_PATH = "/"
+
+
+def _state_cookie_secure() -> bool:
+    """Read at call time, not import time — otherwise the attribute that makes
+    the prefix valid is frozen before settings are known, and untestable."""
+    return settings.oauth_redirect_base.startswith("https://")
 
 
 def _state_cookie_name(provider: str) -> str:
@@ -59,7 +77,8 @@ def _state_cookie_name(provider: str) -> str:
     state check — a regression, since before the cookie existed both flows
     completed fine.
     """
-    return f"{OAUTH_STATE_COOKIE}_{provider}"
+    prefix = "__Host-" if _state_cookie_secure() else ""
+    return f"{prefix}fojin_oauth_state_{provider}"
 
 
 def _set_oauth_state_cookie(response, state: str, provider: str) -> None:
@@ -69,9 +88,6 @@ def _set_oauth_state_cookie(response, state: str, provider: str) -> None:
     navigation back from github.com / accounts.google.com, and ``strict``
     would withhold the cookie there and break every login. ``lax`` still
     blocks the cross-site POST/subresource cases that matter here.
-
-    Path is scoped to the auth routes so the cookie isn't attached to every
-    request on the origin.
     """
     response.set_cookie(
         _state_cookie_name(provider),
@@ -79,8 +95,19 @@ def _set_oauth_state_cookie(response, state: str, provider: str) -> None:
         max_age=OAUTH_STATE_TTL,
         httponly=True,
         samesite="lax",
-        secure=settings.oauth_redirect_base.startswith("https://"),
-        path="/api/auth",
+        secure=_state_cookie_secure(),
+        path=_STATE_COOKIE_PATH,
+    )
+
+
+def _clear_oauth_state_cookie(response, provider: str) -> None:
+    """Same attributes as the set — browsers match on name/domain/path."""
+    response.delete_cookie(
+        _state_cookie_name(provider),
+        path=_STATE_COOKIE_PATH,
+        httponly=True,
+        samesite="lax",
+        secure=_state_cookie_secure(),
     )
 
 
@@ -319,7 +346,7 @@ async def github_oauth_callback(
         redirect = RedirectResponse(url=f"{settings.oauth_redirect_base}/login?provider=github&code={exchange_code}")
     except Exception:
         redirect = RedirectResponse(url=f"{settings.oauth_redirect_base}/login?error=github_failed")
-    redirect.delete_cookie(_state_cookie_name("github"), path="/api/auth")
+    _clear_oauth_state_cookie(redirect, "github")
     return redirect
 
 
@@ -356,7 +383,7 @@ async def google_oauth_callback(
         redirect = RedirectResponse(url=f"{settings.oauth_redirect_base}/login?provider=google&code={exchange_code}")
     except Exception:
         redirect = RedirectResponse(url=f"{settings.oauth_redirect_base}/login?error=google_failed")
-    redirect.delete_cookie(_state_cookie_name("google"), path="/api/auth")
+    _clear_oauth_state_cookie(redirect, "google")
     return redirect
 
 
