@@ -223,6 +223,11 @@ async def test_github_callback_no_longer_leaks_token_in_url(client):
         resp = await client.get(
             "/api/auth/github/callback",
             params={"code": "gh-oauth-code", "state": "abc123"},
+            # A valid flow now also carries the state cookie set at /login;
+            # without it the callback short-circuits to invalid_state and this
+            # test would never reach the redirect it is actually about.
+            # See tests/test_oauth_state_binding.py.
+            cookies={auth_module.OAUTH_STATE_COOKIE: "abc123"},
             follow_redirects=False,
         )
     finally:
