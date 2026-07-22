@@ -12,6 +12,12 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     username: Mapped[str] = mapped_column(String(50), unique=True, index=True)
     email: Mapped[str] = mapped_column(String(200), unique=True, index=True)
+    # True only when an identity provider vouched for this address. Self-service
+    # registration cannot set it — there is no email confirmation flow — so it
+    # stays false for password signups. OAuth uses it to decide whether an
+    # existing row is a safe merge target; without it, anyone could pre-claim a
+    # stranger's address and inherit their account on first social login.
+    email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     hashed_password: Mapped[str] = mapped_column(String(200))
     password_version: Mapped[int] = mapped_column(Integer, server_default="0")
     password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

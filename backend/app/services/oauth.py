@@ -47,11 +47,33 @@ async def _find_or_create_user(
         await db.commit()
         return user
 
-    # If we have an email, check if a user with that email already exists
+    # If we have an email, check if a user with that *verified* email exists.
+    #
+    # The verified check is what stops account pre-hijacking: registration
+    # takes a self-asserted address and there is no confirmation flow, so an
+    # attacker could sign up as victim@example.com and silently inherit the
+    # account the first time the real owner used social login. Only addresses
+    # an IdP vouched for are merge targets; an unverified row is left alone and
+    # a separate account is created below.
     user = None
+    email_taken_by_unverified = False
     if email:
-        result = await db.execute(select(User).where(User.email == email))
+        result = await db.execute(select(User).where(User.email == email, User.email_verified.is_(True)))
         user = result.scalar_one_or_none()
+        if user is None:
+            # An unverified row may still hold this address. We must not merge
+            # into it, but `users.email` is unique, so we can't reuse the
+            # address either — doing so raises IntegrityError and turns the
+            # pre-hijack into a lockout the attacker controls. Fall back to the
+            # same synthetic placeholder used for providers that hide the email.
+            email_taken_by_unverified = await db.scalar(select(User.id).where(User.email == email)) is not None
+            if email_taken_by_unverified:
+                logger.warning(
+                    "OAuth email %s is held by an unverified account; creating a separate account for %s:%s",
+                    email,
+                    provider,
+                    provider_user_id,
+                )
 
     if user is None:
         # Create a new user with a random password
@@ -66,9 +88,15 @@ async def _find_or_create_user(
                 break
             username = f"{base_username}_{secrets.token_hex(3)}"
 
+        usable_email = email if (email and not email_taken_by_unverified) else None
         user = User(
             username=username,
-            email=email or f"{provider}_{provider_user_id}@noreply.fojin.app",
+            email=usable_email or f"{provider}_{provider_user_id}@noreply.fojin.app",
+            # Callers only pass an email once the provider has confirmed it
+            # (Google: email_verified; GitHub: primary AND verified), so a real
+            # address here is verified by construction. A synthetic @noreply
+            # placeholder is not, and must never become a merge target.
+            email_verified=usable_email is not None,
             hashed_password=hash_password(random_pw),
             display_name=display_name or username,
             last_active_at=datetime.now(UTC),
