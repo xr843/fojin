@@ -13,13 +13,27 @@ account — password included.
 
 The merge is now gated on this column.
 
-Backfill rationale: an address is treated as verified only if an identity
-provider already vouched for it, which is exactly the set of users who have a
-row in `social_accounts` with a real (non-placeholder) email. Those merges
-already happened under the old code and are legitimate, so keeping them
-verified preserves existing logins. Everything else — including every
-password-only registration — defaults to false, which is what makes pre-claimed
-addresses unusable as merge targets.
+Backfill rationale: an address counts as verified only where an identity
+provider actually vouched for it. The obvious predicate — "has a github/google
+social_accounts row" — is too loose, because a *successful* pre-hijack looks
+exactly like that: the attacker's password row acquires the victim's social
+link. Marking those verified would bless the compromise permanently and make
+that row a valid merge target for every future provider. `provider_data` stores
+only login/avatar, never the email, so the address itself can't be re-checked.
+
+The discriminator is timing. `_find_or_create_user` inserts the user and its
+social row in one transaction, so an OAuth-created account has effectively
+identical `created_at` values; a password account that later absorbed a social
+identity has a visible gap. On production the split is clean: 113 of 120
+candidate rows have a sub-5-second gap, and the 7 with a gap span 50 seconds to
+41 days.
+
+Those 7 stay `false`. That does not break them — an existing social link
+short-circuits on the `social_accounts` lookup before email is ever consulted,
+so they sign in exactly as before. They only lose auto-merge of a *future,
+not-yet-linked* provider, which would give them a second account. That is the
+right side to err on for a fix whose whole purpose is to stop unverified
+addresses being merge targets.
 
 Placeholder `@noreply.fojin.app` addresses are excluded: they are synthetic
 identifiers minted when a provider hides the user's email, never proven.
@@ -51,6 +65,7 @@ def upgrade() -> None:
                    FROM social_accounts sa
                   WHERE sa.user_id = users.id
                     AND sa.provider IN ('github', 'google')
+                    AND sa.created_at <= users.created_at + interval '5 seconds'
                )
         """
     )

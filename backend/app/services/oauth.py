@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.core.auth import create_access_token, hash_password
 from app.models.user import SocialAccount, User
-from app.schemas.user import TokenResponse
+from app.schemas.user import RESERVED_EMAIL_DOMAIN, TokenResponse
 
 logger = logging.getLogger(__name__)
 
@@ -89,9 +89,28 @@ async def _find_or_create_user(
             username = f"{base_username}_{secrets.token_hex(3)}"
 
         usable_email = email if (email and not email_taken_by_unverified) else None
+
+        # The placeholder needs the same uniqueness retry the username gets.
+        # UserRegister now reserves this domain, but that only stops *new*
+        # squatting — a row registered before that landed, or written by a
+        # script or migration, would still collide. `users.email` is unique,
+        # so a collision raises IntegrityError, which the callback swallows
+        # into `?error=<provider>_failed`: the user is permanently locked out
+        # of social login with no self-service or admin way back. Degrade to a
+        # suffixed placeholder instead.
+        account_email = usable_email
+        if account_email is None:
+            base_placeholder = f"{provider}_{provider_user_id}"
+            account_email = f"{base_placeholder}{RESERVED_EMAIL_DOMAIN}"
+            for _i in range(10):
+                taken = await db.scalar(select(User.id).where(User.email == account_email))
+                if taken is None:
+                    break
+                account_email = f"{base_placeholder}_{secrets.token_hex(3)}{RESERVED_EMAIL_DOMAIN}"
+
         user = User(
             username=username,
-            email=usable_email or f"{provider}_{provider_user_id}@noreply.fojin.app",
+            email=account_email,
             # Callers only pass an email once the provider has confirmed it
             # (Google: email_verified; GitHub: primary AND verified), so a real
             # address here is verified by construction. A synthetic @noreply

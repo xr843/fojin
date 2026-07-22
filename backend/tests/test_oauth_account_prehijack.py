@@ -136,7 +136,56 @@ async def test_existing_social_link_still_short_circuits(db):
 
 @pytest.mark.asyncio
 async def test_password_registration_defaults_to_unverified(db):
-    """Nothing in the app can set email_verified via self-service signup."""
-    user = await _add_user(db, email="self@example.com", verified=False)
+    """Must go through register_user — the column default is the invariant.
+
+    Asserting on a hand-built User with email_verified=False proves nothing:
+    it tests the literal we passed in. The thing that has to hold is that the
+    *registration path*, which never sets the flag, produces an unverified
+    row. (A bare `server_default="false"` string compiles to DDL `DEFAULT
+    'false'`, which SQLite stores as text and reads back as True — so this
+    test failing is exactly how that class of bug surfaces.)
+    """
+    from app.schemas.user import UserRegister
+    from app.services.auth import register_user
+
+    user = await register_user(
+        db, UserRegister(username="selfsignup", email="self@example.com", password="Passw0rd1")
+    )
+
+    assert user.email_verified is False
+
     row = await db.scalar(select(User).where(User.id == user.id))
     assert row.email_verified is False
+
+
+@pytest.mark.asyncio
+async def test_a_registration_cannot_claim_the_placeholder_namespace(db):
+    """Reserving @noreply.fojin.app is what makes the anti-lockout path work.
+
+    Without it: attacker registers victim@gmail.com AND
+    github_<id>@noreply.fojin.app (the id is public), the victim's first
+    GitHub sign-in falls back to that placeholder, hits the unique constraint
+    on users.email, and the callback's blanket `except Exception` turns it
+    into ?error=github_failed forever. Two free registrations, no
+    verification step, permanent lockout of a named GitHub user.
+    """
+    from pydantic import ValidationError
+
+    from app.schemas.user import UserRegister
+
+    with pytest.raises(ValidationError):
+        UserRegister(username="squatter", email="github_12345@noreply.fojin.app", password="Passw0rd1")
+
+
+@pytest.mark.asyncio
+async def test_victim_still_signs_in_when_placeholder_is_squatted(db):
+    """End-to-end version of the above, at the service layer."""
+    await _add_user(db, email="victim@gmail.com", verified=False, username="attacker")
+    await _add_user(db, email="github_12345@noreply.fojin.app", verified=False, username="squat")
+
+    linked = await _find_or_create_user(
+        db, provider="github", provider_user_id="12345", email="victim@gmail.com", display_name="Victim"
+    )
+
+    assert linked.id is not None
+    assert linked.email_verified is False

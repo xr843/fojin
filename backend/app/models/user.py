@@ -1,6 +1,18 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, SmallInteger, String, Text, UniqueConstraint, func
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    SmallInteger,
+    String,
+    Text,
+    UniqueConstraint,
+    false,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -17,7 +29,15 @@ class User(Base):
     # stays false for password signups. OAuth uses it to decide whether an
     # existing row is a safe merge target; without it, anyone could pre-claim a
     # stranger's address and inherit their account on first social login.
-    email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    # `default=False` (ORM-side, emitted on every INSERT) is what actually
+    # holds the invariant. A bare `server_default="false"` string compiles to
+    # DDL `DEFAULT 'false'`: Postgres coerces the literal to boolean false,
+    # but SQLite stores the *text* and reads it back as True — so under the
+    # test suite every row created without an explicit value would come back
+    # verified, and the guard this column exists for would be untested.
+    email_verified: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
     hashed_password: Mapped[str] = mapped_column(String(200))
     password_version: Mapped[int] = mapped_column(Integer, server_default="0")
     password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
