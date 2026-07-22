@@ -69,8 +69,38 @@ _SEO_JUAN_LIST_LIMIT = 50
 
 
 def _escape_meta_value(value: str) -> str:
-    """Escape characters that would break out of an HTML attribute value."""
-    return value.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
+    """Escape characters that would break out of an HTML attribute value.
+
+    The backslash is escaped for a second, non-obvious reason: these values are
+    spliced into the shell via ``re.sub``, whose *replacement template* itself
+    interprets escape sequences. Without this, ``\\074`` would survive this
+    function untouched and re-materialise as ``<`` after substitution. The
+    call sites now use callable replacements (which disable template parsing
+    entirely), so this is defence in depth against that being undone.
+
+    ``&`` must stay first so the entities emitted below aren't double-escaped.
+    """
+    return (
+        value.replace("&", "&amp;")
+        .replace("\\", "&#92;")
+        .replace('"', "&quot;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("'", "&#39;")
+    )
+
+
+def _sub_literal(pattern: re.Pattern[str], replacement: str, html: str, *, count: int = 1) -> str:
+    """``pattern.sub`` that treats ``replacement`` as a literal string.
+
+    Passing a plain string to ``re.sub`` makes it a *replacement template*:
+    ``\\1`` is a group reference (and raises ``re.error`` when the pattern has
+    no such group), and ``\\074`` is an octal character escape that runs
+    *after* our HTML escaping. Since every replacement here embeds
+    user-controlled text, a callable — which ``re`` never parses — is the
+    only safe form.
+    """
+    return pattern.sub(lambda _match: replacement, html, count=count)
 
 
 async def _fetch_index_html() -> str:
@@ -108,22 +138,22 @@ def _inject_meta(
     safe_canonical = _escape_meta_value(canonical_url)
     safe_robots = _escape_meta_value(robots)
 
-    new_html = _TITLE_RE.sub(f"<title>{safe_title}</title>", html, count=1)
-    new_html = _DESCRIPTION_RE.sub(
+    new_html = _sub_literal(_TITLE_RE, f"<title>{safe_title}</title>", html)
+    new_html = _sub_literal(
+        _DESCRIPTION_RE,
         f'<meta name="description" content="{safe_desc}" />',
         new_html,
-        count=1,
     )
-    new_html = _ROBOTS_RE.sub(
+    new_html = _sub_literal(
+        _ROBOTS_RE,
         f'<meta name="robots" content="{safe_robots}" />',
         new_html,
-        count=1,
     )
     canonical_tag = f'<link rel="canonical" href="{safe_canonical}" />'
     if _CANONICAL_RE.search(new_html):
-        new_html = _CANONICAL_RE.sub(canonical_tag, new_html, count=1)
+        new_html = _sub_literal(_CANONICAL_RE, canonical_tag, new_html)
     else:
-        new_html = _HEAD_CLOSE_RE.sub(f"  {canonical_tag}\n  </head>", new_html, count=1)
+        new_html = _sub_literal(_HEAD_CLOSE_RE, f"  {canonical_tag}\n  </head>", new_html)
     return new_html
 
 
@@ -222,7 +252,7 @@ async def _serve_text_seo_html(
             body = {"excerpt": "", "juans": [], "total_juans": 0}
         seo_block = _render_text_seo_body(text, body, base_url=base_url)
         if _ROOT_DIV_RE.search(patched):
-            patched = _ROOT_DIV_RE.sub(f'<div id="root"></div>\n{seo_block}', patched, count=1)
+            patched = _sub_literal(_ROOT_DIV_RE, f'<div id="root"></div>\n{seo_block}', patched)
         else:
             patched = patched.replace("</body>", f"{seo_block}\n</body>", 1)
     return HTMLResponse(content=patched)
@@ -333,11 +363,7 @@ async def _fetch_text_seo_body(db: AsyncSession, text_id: int) -> dict:
     if len(cleaned) > _SEO_BODY_CHAR_LIMIT:
         cleaned = cleaned[: _SEO_BODY_CHAR_LIMIT - 1].rstrip() + "…"
 
-    count_row = await db.execute(
-        select(TextContent.juan_num)
-        .where(TextContent.text_id == text_id)
-        .distinct()
-    )
+    count_row = await db.execute(select(TextContent.juan_num).where(TextContent.text_id == text_id).distinct())
     juans = sorted({r[0] for r in count_row.all() if r[0] is not None})
     return {"excerpt": cleaned, "juans": juans[:_SEO_JUAN_LIST_LIMIT], "total_juans": len(juans)}
 
@@ -375,9 +401,7 @@ def _render_text_seo_body(text, body: dict, *, base_url: str) -> str:
     if len(juans) > 1:
         parts.append("<h2>卷目录</h2><ul>")
         for j in juans:
-            parts.append(
-                f'<li><a href="{base_url}/texts/{text.id}/read?juan={int(j)}">第 {int(j)} 卷</a></li>'
-            )
+            parts.append(f'<li><a href="{base_url}/texts/{text.id}/read?juan={int(j)}">第 {int(j)} 卷</a></li>')
         if body.get("total_juans", 0) > _SEO_JUAN_LIST_LIMIT:
             parts.append(f"<li>…共 {body['total_juans']} 卷</li>")
         parts.append("</ul>")
@@ -399,7 +423,7 @@ def _inject_text_jsonld(html: str, payload: dict) -> str:
     """
     blob = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
     tag = f'<script type="application/ld+json">{blob}</script>'
-    return _HEAD_CLOSE_RE.sub(f"  {tag}\n  </head>", html, count=1)
+    return _sub_literal(_HEAD_CLOSE_RE, f"  {tag}\n  </head>", html)
 
 
 @router.get("/texts/{text_id}", response_class=HTMLResponse, include_in_schema=False)
@@ -523,7 +547,7 @@ def _inject_share_qa_meta(html: str, meta: dict[str, str]) -> str:
         f'  <meta property="og:url" content="{_escape_meta_value(meta["canonical"])}" />\n'
         f'  <meta name="twitter:card" content="summary_large_image" />\n  '
     )
-    return _HEAD_CLOSE_RE.sub(f"  {og_tags}</head>", new_html, count=1)
+    return _sub_literal(_HEAD_CLOSE_RE, f"  {og_tags}</head>", new_html)
 
 
 @router.get("/share/qa/{share_id}", response_class=HTMLResponse, include_in_schema=False)
