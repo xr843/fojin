@@ -377,7 +377,7 @@
   padding: 6px 8px;
   border: 1px solid #eee5d8;
   border-radius: 6px;
-  background: #fcfaf6;
+  background: var(--fj-surface-alt);
   color: var(--fj-ink-light);
   text-decoration: none;
   transition: all 0.15s;
@@ -391,7 +391,7 @@
 
 .source-dist-link.is-primary {
   border-color: #d4a574;
-  background: #fdf6ee;
+  background: var(--fj-surface-alt);
 }
 
 .source-dist-name {
@@ -435,7 +435,7 @@
   padding: 4px 10px;
   border: 1px solid var(--fj-border);
   border-radius: 4px;
-  background: #faf8f3;
+  background: var(--fj-surface-alt);
   text-decoration: none;
   transition: all 0.15s;
   white-space: nowrap;
@@ -450,7 +450,7 @@
 .source-btn-search {
   color: var(--fj-accent);
   border-color: #d4a574;
-  background: #fdf6ee;
+  background: var(--fj-surface-alt);
 }
 
 .source-btn-search:hover {

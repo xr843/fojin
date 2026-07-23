@@ -16,6 +16,9 @@
   /* Solid surface (opaque cards/panels/inputs). Light = pure white, matching
      the many bare white-background rules; dark = elevated warm surface. */
   --fj-surface:   #ffffff;
+  /* Subtle raised surface (hover rows, tinted panels). Light folds the many
+     near-white cream variants (#faf8f4/#fdf6ee/#f5f0e8…) into one; dark = base-alt. */
+  --fj-surface-alt: #faf8f4;
 }
 
 :root[data-theme="dark"] {
@@ -29,6 +32,7 @@
   --fj-border:    #39312a;
   --fj-card-bg:   #201b15;
   --fj-surface:   #201b15;
+  --fj-surface-alt: #221d17;
   color-scheme: dark;
 }
 

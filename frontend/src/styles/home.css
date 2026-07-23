@@ -548,7 +548,7 @@
   padding: 4px 12px;
   border: 1px solid #e8e0d4;
   border-radius: 4px;
-  background: #faf8f3;
+  background: var(--fj-surface-alt);
   text-decoration: none;
   transition: all 0.15s;
   white-space: nowrap;
@@ -576,7 +576,7 @@
 }
 
 .ext-toggle:hover {
-  background: #faf8f3;
+  background: var(--fj-surface-alt);
   border-color: var(--fj-gold);
 }
 

@@ -77,7 +77,7 @@
   text-align: left;
   font: inherit;
   color: inherit;
-  background: #fffdfa;
+  background: var(--fj-surface-alt);
   border: 1px solid var(--fj-border, var(--fj-border));
   border-radius: 3px;
   cursor: pointer;
@@ -258,7 +258,7 @@
   align-items: center;
   gap: 11px;
   padding: 10px 14px;
-  background: #fffdfa;
+  background: var(--fj-surface-alt);
   border: 1px solid var(--fj-border, var(--fj-border));
   border-radius: 3px;
 }

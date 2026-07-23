@@ -48,7 +48,7 @@
   display: flex;
   gap: 32px;
   flex-wrap: wrap;
-  background: #faf8f4;
+  background: var(--fj-surface-alt);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   padding: 12px 20px;
@@ -107,7 +107,7 @@
 .kg-toolbar-main .ant-input-affix-wrapper {
   border-color: var(--fj-border);
   border-radius: 6px;
-  background: #faf8f5;
+  background: var(--fj-surface-alt);
 }
 
 .kg-toolbar-main .ant-input-affix-wrapper:hover,
@@ -118,7 +118,7 @@
 .kg-toolbar-main .ant-select .ant-select-selector {
   border-color: var(--fj-border) !important;
   border-radius: 6px !important;
-  background: #faf8f5 !important;
+  background: var(--fj-surface-alt) !important;
 }
 
 .kg-depth-control {
@@ -176,7 +176,7 @@
 
 /* ---------- 推荐探索 ---------- */
 .kg-curated {
-  background: #faf8f4;
+  background: var(--fj-surface-alt);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   margin-bottom: 12px;
@@ -324,7 +324,7 @@
 }
 
 .kg-result-item:hover {
-  background: #faf6f0;
+  background: var(--fj-surface-alt);
 }
 
 .kg-result-item.active {
@@ -446,7 +446,7 @@
   gap: 16px;
   padding: 8px 14px;
   border-top: 1px solid var(--fj-bg-alt);
-  background: #faf8f5;
+  background: var(--fj-surface-alt);
   flex-wrap: wrap;
 }
 
@@ -538,7 +538,7 @@
   justify-content: space-between;
   padding: 8px 14px;
   border-bottom: 1px solid var(--fj-bg-alt);
-  background: #faf8f4;
+  background: var(--fj-surface-alt);
 }
 
 .kg-timeline-title {
@@ -654,7 +654,7 @@
 
 /* 古典水墨风：覆盖 antd Segmented 默认蓝色高亮 */
 .kg-mobile-tabs .ant-segmented {
-  background: #f5f0e8;
+  background: var(--fj-surface-alt);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   padding: 3px;

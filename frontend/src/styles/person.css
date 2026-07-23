@@ -89,7 +89,7 @@
 .person-meta-chip {
   font-family: "Noto Serif SC", serif;
   font-size: 12px;
-  background: #faf6ef;
+  background: var(--fj-surface-alt);
   border: 1px solid #e8e0d0;
   border-radius: 12px;
   padding: 2px 10px;
@@ -98,7 +98,7 @@
 
 /* ---------- 多语言名称 ---------- */
 .person-altnames {
-  background: #faf8f5;
+  background: var(--fj-surface-alt);
   border: 1px solid var(--fj-bg-alt);
   border-radius: 6px;
   padding: 10px 14px;
@@ -161,14 +161,14 @@
   font-size: 13px;
   border-color: var(--fj-border);
   color: var(--fj-ink-light);
-  background: #faf8f5;
+  background: var(--fj-surface-alt);
   border-radius: 6px;
   transition: all 0.15s;
 }
 .person-kg-btn:hover {
   border-color: #b5a890 !important;
   color: var(--fj-ink) !important;
-  background: #f5f0e8 !important;
+  background: var(--fj-surface-alt) !important;
 }
 
 /* ---------- 关系网络面板 ---------- */
@@ -229,7 +229,7 @@
   transition: background 0.12s, color 0.12s;
 }
 .person-rel-item:hover {
-  background: #faf6ef;
+  background: var(--fj-surface-alt);
   color: var(--fj-accent);
 }
 
