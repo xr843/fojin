@@ -102,7 +102,7 @@ export default function SharedQAPage() {
         >
           {t("shareCard.brand")}
         </Link>
-        <div style={{ fontSize: 12, color: "var(--fj-ink-muted, #9a8e7a)", marginTop: 4 }}>
+        <div style={{ fontSize: 12, color: "var(--fj-ink-muted, var(--fj-ink-muted))", marginTop: 4 }}>
           {t("shareCard.subtitle")} · {formatDate(data.created_at, i18n.language)}
         </div>
       </div>
@@ -177,7 +177,7 @@ export default function SharedQAPage() {
           <div
             style={{
               fontSize: 12,
-              color: "var(--fj-ink-muted, #9a8e7a)",
+              color: "var(--fj-ink-muted, var(--fj-ink-muted))",
               marginBottom: 10,
               letterSpacing: 2,
             }}
@@ -234,7 +234,7 @@ export default function SharedQAPage() {
         >
           {t("sharedQA.askOwnQuestion")}
         </div>
-        <div style={{ fontSize: 13, color: "var(--fj-ink-muted, #9a8e7a)", marginBottom: 18 }}>
+        <div style={{ fontSize: 13, color: "var(--fj-ink-muted, var(--fj-ink-muted))", marginBottom: 18 }}>
           {t("sharedQA.ctaDescription")}
         </div>
         <Button
@@ -256,7 +256,7 @@ export default function SharedQAPage() {
           marginTop: 24,
           textAlign: "center",
           fontSize: 12,
-          color: "var(--fj-ink-muted, #9a8e7a)",
+          color: "var(--fj-ink-muted, var(--fj-ink-muted))",
         }}
       >
         <ShareAltOutlined /> {t("sharedQA.viewed", { count: data.view_count })}

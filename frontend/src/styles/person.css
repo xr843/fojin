@@ -18,13 +18,13 @@
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   margin-bottom: 18px;
   font-family: "Noto Serif SC", serif;
 }
 
 .person-breadcrumb-link {
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   cursor: pointer;
   transition: color 0.15s;
 }
@@ -73,7 +73,7 @@
 .person-dates {
   font-size: 16px;
   font-weight: 400;
-  color: #7a6e5c;
+  color: var(--fj-ink-muted);
   margin-left: 4px;
   letter-spacing: 0;
 }
@@ -93,7 +93,7 @@
   border: 1px solid #e8e0d0;
   border-radius: 12px;
   padding: 2px 10px;
-  color: #7a6e5c;
+  color: var(--fj-ink-muted);
 }
 
 /* ---------- 多语言名称 ---------- */
@@ -116,7 +116,7 @@
 .person-altname-row:last-child { margin-bottom: 0; }
 
 .person-altname-lang {
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   font-size: 11px;
   width: 36px;
   flex-shrink: 0;
@@ -206,7 +206,7 @@
   background: var(--fj-bg-alt);
   border-radius: 8px;
   padding: 0 6px;
-  color: #7a6e5c;
+  color: var(--fj-ink-muted);
   line-height: 18px;
 }
 

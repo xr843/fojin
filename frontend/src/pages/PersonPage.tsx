@@ -262,7 +262,7 @@ export default function PersonPage() {
       <div className="person-page">
         <Empty
           description={
-            <span style={{ fontFamily: '"Noto Serif SC", serif', color: "#7a6e5c" }}>
+            <span style={{ fontFamily: '"Noto Serif SC", serif', color: "var(--fj-ink-muted)" }}>
               {t("person.not_found")}
             </span>
           }
@@ -499,7 +499,7 @@ export default function PersonPage() {
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
             description={
-              <span style={{ color: "#9a8e7a", fontFamily: '"Noto Serif SC", serif' }}>
+              <span style={{ color: "var(--fj-ink-muted)", fontFamily: '"Noto Serif SC", serif' }}>
                 {t("person.no_relations")}
               </span>
             }

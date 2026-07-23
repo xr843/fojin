@@ -355,7 +355,7 @@ export default function SearchPage() {
       {/* 已选数据源标签 */}
       {selectedSources && (
         <div style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 8 }}>
-          <span style={{ fontSize: 12, color: "#9a8e7a", lineHeight: "24px" }}>{t("search.filter_sources_label")}</span>
+          <span style={{ fontSize: 12, color: "var(--fj-ink-muted)", lineHeight: "24px" }}>{t("search.filter_sources_label")}</span>
           {selectedSources.split(",").filter(Boolean).map((code) => (
             <Tag key={code} closable onClose={() => clearSource(code)} color="volcano" style={{ fontSize: 11 }}>
               {code}
@@ -696,12 +696,12 @@ export default function SearchPage() {
             )}
 
             {/* 语义搜索结果 */}
-            {!loading && tab === "content" && semanticData && semanticData.results.length > 0 && (<><div style={{margin: "16px 0 8px", fontSize: 13, color: "#9a8e7a"}}>⚡ {t("search.semantic_match")}</div>{semanticData.results.map((hit, i) => (
+            {!loading && tab === "content" && semanticData && semanticData.results.length > 0 && (<><div style={{margin: "16px 0 8px", fontSize: 13, color: "var(--fj-ink-muted)"}}>⚡ {t("search.semantic_match")}</div>{semanticData.results.map((hit, i) => (
               <SemanticCard key={`${hit.text_id}_${hit.juan_num}`} hit={hit} rank={i + 1} />
             ))}</>)}
 
             {/* 跨语言结果 */}
-            {!loading && tab === "catalog" && crossLangData && crossLangData.results.length > 0 && (<><div style={{margin: "16px 0 8px", fontSize: 13, color: "#9a8e7a", borderTop: "1px solid #e8e0d4", paddingTop: 12}}>🌐 {t("search.crosslang_match")}</div>{crossLangData.results.map((hit, i) => (
+            {!loading && tab === "catalog" && crossLangData && crossLangData.results.length > 0 && (<><div style={{margin: "16px 0 8px", fontSize: 13, color: "var(--fj-ink-muted)", borderTop: "1px solid #e8e0d4", paddingTop: 12}}>🌐 {t("search.crosslang_match")}</div>{crossLangData.results.map((hit, i) => (
               <CrossLangCard key={hit.id} hit={hit} rank={i + 1 + (page - 1) * 20} />
             ))}</>)}
 

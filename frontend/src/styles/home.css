@@ -527,7 +527,7 @@
 .ext-region-count {
   font-size: 10px;
   font-weight: 400;
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   background: var(--fj-bg-alt);
   padding: 0 6px;
   border-radius: 8px;

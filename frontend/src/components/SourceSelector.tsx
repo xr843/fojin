@@ -80,7 +80,7 @@ export default function SourceSelector({ sources, selected, onChange }: SourceSe
         </div>
         <div className="src-panel-filters">
           <Input
-            prefix={<SearchOutlined style={{ color: "#9a8e7a" }} />}
+            prefix={<SearchOutlined style={{ color: "var(--fj-ink-muted)" }} />}
             placeholder={t("sources.selector_search_placeholder")}
             allowClear
             size="small"

@@ -105,7 +105,7 @@ export default function ParallelSentenceCard({
             </Link>
           )}
           {/* 来源与授权：低调标注，保持 CC BY-SA 4.0 可追溯 */}
-          <span style={{ fontSize: 11, color: "#9a8e7a" }}>
+          <span style={{ fontSize: 11, color: "var(--fj-ink-muted)" }}>
             {t("search.parallel_provenance")}
           </span>
         </div>
