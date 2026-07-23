@@ -639,3 +639,10 @@
     gap: 0;
   }
 }
+
+/* ---- Dark mode: brighten capability-chip accent borders (light unchanged) ---- */
+:root[data-theme="dark"] .sources-cap-chip-direct { border-left-color: #69a9e0; }
+:root[data-theme="dark"] .sources-cap-chip-local  { border-left-color: #95de64; }
+:root[data-theme="dark"] .sources-cap-chip-remote { border-left-color: #5cdbd3; }
+:root[data-theme="dark"] .sources-cap-chip-iiif   { border-left-color: #b37feb; }
+:root[data-theme="dark"] .sources-cap-chip-api    { border-left-color: #ffb266; }

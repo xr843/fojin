@@ -871,3 +871,11 @@
   display: flex;
   flex-direction: column;
 }
+
+/* ---- Dark mode: entity-type tags → hue-tinted dark chips (light unchanged) ---- */
+:root[data-theme="dark"] .kg-type-tag--person    { background: rgba(245, 34, 45, 0.16);  color: #ff7875; border-color: rgba(245, 34, 45, 0.38); }
+:root[data-theme="dark"] .kg-type-tag--text      { background: rgba(47, 84, 235, 0.20);  color: #85a5ff; border-color: rgba(47, 84, 235, 0.42); }
+:root[data-theme="dark"] .kg-type-tag--monastery { background: rgba(82, 196, 26, 0.16);  color: #95de64; border-color: rgba(82, 196, 26, 0.38); }
+:root[data-theme="dark"] .kg-type-tag--school    { background: rgba(114, 46, 209, 0.22); color: #b37feb; border-color: rgba(114, 46, 209, 0.42); }
+:root[data-theme="dark"] .kg-type-tag--place     { background: rgba(250, 140, 22, 0.16); color: #ffc069; border-color: rgba(250, 140, 22, 0.38); }
+:root[data-theme="dark"] .kg-type-tag--concept   { background: rgba(19, 194, 194, 0.16); color: #5cdbd3; border-color: rgba(19, 194, 194, 0.38); }
