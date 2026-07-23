@@ -22,15 +22,15 @@
 }
 
 .dashboard-card {
-  background: var(--fj-bg, #f8f5ef);
-  border: 1px solid var(--fj-border, #d9d0c1);
+  background: var(--fj-bg, var(--fj-bg));
+  border: 1px solid var(--fj-border, var(--fj-border));
   border-radius: 8px;
   padding: 20px;
 }
 
 .dashboard-card h3 {
   font-family: "Noto Serif SC", serif;
-  color: var(--fj-ink, #2b2318);
+  color: var(--fj-ink, var(--fj-ink));
   margin-bottom: 16px;
   font-size: 16px;
 }
@@ -44,28 +44,28 @@
 .summary-card {
   text-align: center;
   padding: 16px 8px;
-  background: var(--fj-bg, #f8f5ef);
-  border: 1px solid var(--fj-border, #d9d0c1);
+  background: var(--fj-bg, var(--fj-bg));
+  border: 1px solid var(--fj-border, var(--fj-border));
   border-radius: 8px;
 }
 
 .summary-card .value {
   font-size: 28px;
   font-weight: 700;
-  color: var(--fj-accent, #8b2500);
+  color: var(--fj-accent, var(--fj-accent));
   font-family: "Noto Serif SC", serif;
 }
 
 .summary-card .label {
   font-size: 13px;
-  color: var(--fj-ink, #2b2318);
+  color: var(--fj-ink, var(--fj-ink));
   opacity: 0.7;
   margin-top: 4px;
 }
 
 .scholarly-label {
   font-size: 11px;
-  color: var(--fj-ink, #2b2318);
+  color: var(--fj-ink, var(--fj-ink));
   opacity: 0.5;
 }
 

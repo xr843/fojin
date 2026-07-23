@@ -325,7 +325,7 @@ em {
   transform: translate(-50%, -50%);
   width: 4px;
   height: 32px;
-  background: var(--fj-border, #d9d0c1);
+  background: var(--fj-border, var(--fj-border));
   border-radius: 2px;
   transition: background 0.15s;
 }

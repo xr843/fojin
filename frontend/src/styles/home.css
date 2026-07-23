@@ -34,7 +34,7 @@
   pointer-events: none;
   /* Placeholder tint matching the ink-wash image's tones (warm sky → misty
      water) so the split-second before the WebP paints shows a soft gradient
-     instead of a stark #f8f5ef flash. The <img> (object-fit: cover) fully
+     instead of a stark var(--fj-bg) flash. The <img> (object-fit: cover) fully
      covers this once loaded. */
   background: linear-gradient(180deg, #f4e8d6 0%, #ece0cb 40%, #d3dad0 75%, #c6cec5 100%);
 }
@@ -499,7 +499,7 @@
 .ext-sources {
   margin-top: 24px;
   background: #fff;
-  border: 1px solid #d9d0c1;
+  border: 1px solid var(--fj-border);
   border-radius: 8px;
   padding: 20px;
 }
@@ -507,7 +507,7 @@
 .ext-sources-header {
   margin-bottom: 16px;
   padding-bottom: 12px;
-  border-bottom: 1px solid #f0ebe2;
+  border-bottom: 1px solid var(--fj-bg-alt);
 }
 
 .ext-region {
@@ -517,7 +517,7 @@
 .ext-region-label {
   font-size: 12px;
   font-weight: 600;
-  color: #5c4f3d;
+  color: var(--fj-ink-light);
   margin-bottom: 8px;
   display: flex;
   align-items: center;
@@ -528,7 +528,7 @@
   font-size: 10px;
   font-weight: 400;
   color: #9a8e7a;
-  background: #f0ebe2;
+  background: var(--fj-bg-alt);
   padding: 0 6px;
   border-radius: 8px;
 }
@@ -544,7 +544,7 @@
   align-items: center;
   gap: 4px;
   font-size: 12px;
-  color: #5c4f3d;
+  color: var(--fj-ink-light);
   padding: 4px 12px;
   border: 1px solid #e8e0d4;
   border-radius: 4px;
@@ -555,8 +555,8 @@
 }
 
 .ext-link:hover {
-  color: #8b2500;
-  border-color: #b08d57;
+  color: var(--fj-accent);
+  border-color: var(--fj-gold);
   background: #fff;
 }
 
@@ -567,7 +567,7 @@
   margin-top: 12px;
   padding: 6px 12px;
   font-size: 12px;
-  color: #8b2500;
+  color: var(--fj-accent);
   background: none;
   border: 1px solid #e8e0d4;
   border-radius: 4px;
@@ -577,7 +577,7 @@
 
 .ext-toggle:hover {
   background: #faf8f3;
-  border-color: #b08d57;
+  border-color: var(--fj-gold);
 }
 
 /* ---------- 功能导航卡片 ---------- */

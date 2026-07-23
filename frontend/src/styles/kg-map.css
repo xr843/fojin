@@ -133,16 +133,16 @@
 
 .kg-map-tooltip .tooltip-year {
   font-size: 10px;
-  color: #b08d57;
+  color: var(--fj-gold);
   margin-top: 2px;
 }
 
 .kg-map-tooltip .tooltip-desc {
   font-size: 11px;
-  color: #5c4f3d;
+  color: var(--fj-ink-light);
   margin-top: 6px;
   padding-top: 6px;
-  border-top: 1px solid #f0ebe2;
+  border-top: 1px solid var(--fj-bg-alt);
   line-height: 1.5;
   max-width: 260px;
 }
@@ -162,14 +162,14 @@
 .kg-map-tooltip .tooltip-header .tooltip-type {
   font-size: 10px;
   color: var(--fj-ink-light);
-  background: #f0ebe2;
+  background: var(--fj-bg-alt);
   padding: 1px 6px;
   border-radius: 3px;
 }
 
 .kg-map-tooltip .tooltip-meta {
   font-size: 10px;
-  color: #b08d57;
+  color: var(--fj-gold);
   margin-top: 3px;
 }
 
@@ -178,7 +178,7 @@
   color: var(--fj-ink-light);
   margin-top: 6px;
   padding-top: 4px;
-  border-top: 1px dashed #f0ebe2;
+  border-top: 1px dashed var(--fj-bg-alt);
   opacity: 0.75;
 }
 
@@ -247,7 +247,7 @@
 
 .kg-map-popup-year {
   font-size: 11px;
-  color: #b08d57;
+  color: var(--fj-gold);
   padding: 0 14px 8px;
 }
 

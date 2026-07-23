@@ -58,19 +58,19 @@
 }
 
 .sources-cap-chip:hover {
-  border-color: var(--fj-gold, #b08d57);
+  border-color: var(--fj-gold, var(--fj-gold));
   color: var(--fj-ink);
 }
 
 .sources-cap-chip:focus-visible,
 .sources-cap-chip-clear:focus-visible {
-  outline: 2px solid var(--fj-gold, #b08d57);
+  outline: 2px solid var(--fj-gold, var(--fj-gold));
   outline-offset: 2px;
 }
 
 .sources-cap-chip.is-active {
-  background: var(--fj-gold, #b08d57);
-  border-color: var(--fj-gold, #b08d57);
+  background: var(--fj-gold, var(--fj-gold));
+  border-color: var(--fj-gold, var(--fj-gold));
   color: #fff;
 }
 
@@ -104,7 +104,7 @@
 }
 
 .sources-cap-chip-clear:hover {
-  color: var(--fj-gold, #b08d57);
+  color: var(--fj-gold, var(--fj-gold));
 }
 
 /* ---------- 跨源搜索 Hero ---------- */
@@ -125,7 +125,7 @@
 
 .sources-hero-search-icon {
   font-size: 22px;
-  color: var(--fj-gold, #b08d57);
+  color: var(--fj-gold, var(--fj-gold));
   flex-shrink: 0;
   margin-top: 2px;
 }
@@ -231,7 +231,7 @@
 }
 
 .sources-group-toggle:hover {
-  border-color: var(--fj-gold, #b08d57);
+  border-color: var(--fj-gold, var(--fj-gold));
   color: var(--fj-accent, #8a6b3a);
   background: #fdf8ec;
 }
@@ -455,7 +455,7 @@
 
 .source-btn-search:hover {
   background: #fff;
-  border-color: #8b2500;
+  border-color: var(--fj-accent);
 }
 
 /* ---------- 数据可信度说明 ---------- */

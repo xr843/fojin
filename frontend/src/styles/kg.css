@@ -105,7 +105,7 @@
 }
 
 .kg-toolbar-main .ant-input-affix-wrapper {
-  border-color: #d9d0c1;
+  border-color: var(--fj-border);
   border-radius: 6px;
   background: #faf8f5;
 }
@@ -116,7 +116,7 @@
 }
 
 .kg-toolbar-main .ant-select .ant-select-selector {
-  border-color: #d9d0c1 !important;
+  border-color: var(--fj-border) !important;
   border-radius: 6px !important;
   background: #faf8f5 !important;
 }
@@ -307,7 +307,7 @@
 }
 
 .kg-sidebar-body::-webkit-scrollbar-thumb {
-  background: #d9d0c1;
+  background: var(--fj-border);
   border-radius: 2px;
 }
 
@@ -505,7 +505,7 @@
 }
 
 .kg-detail-card::-webkit-scrollbar-thumb {
-  background: #d9d0c1;
+  background: var(--fj-border);
   border-radius: 2px;
 }
 

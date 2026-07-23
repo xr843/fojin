@@ -203,7 +203,7 @@
   width: 300px;
   max-width: calc(100vw - 16px);
   background: #fffef8;
-  border: 1px solid #d9d0c1;
+  border: 1px solid var(--fj-border);
   border-radius: 6px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
   font-family: "Noto Serif SC", "Source Han Serif SC", serif;
@@ -397,7 +397,7 @@
   transform: translate(-50%, -50%);
   width: 4px;
   height: 32px;
-  background: var(--fj-border, #d9d0c1);
+  background: var(--fj-border, var(--fj-border));
   border-radius: 2px;
   transition: background 0.15s;
 }
