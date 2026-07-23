@@ -129,7 +129,7 @@
 .search-combo-bar {
   display: flex;
   align-items: center;
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   height: 56px;
@@ -276,7 +276,7 @@
 .home-hot-tag:hover {
   color: var(--fj-accent);
   border-color: var(--fj-gold);
-  background: #fff;
+  background: var(--fj-surface);
 }
 
 /* ---------- 热门经典标签 ---------- */
@@ -384,7 +384,7 @@
 /* ---------- 数据源面板（搜索栏下拉） ---------- */
 .src-panel {
   margin-top: 4px;
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   overflow: hidden;
@@ -498,7 +498,7 @@
 /* ---------- 外部数据源搜索链接 ---------- */
 .ext-sources {
   margin-top: 24px;
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   padding: 20px;
@@ -557,7 +557,7 @@
 .ext-link:hover {
   color: var(--fj-accent);
   border-color: var(--fj-gold);
-  background: #fff;
+  background: var(--fj-surface);
 }
 
 .ext-toggle {
@@ -602,7 +602,7 @@
 }
 
 .home-feature-card:hover {
-  background: #fff;
+  background: var(--fj-surface);
   border-color: var(--fj-gold);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);

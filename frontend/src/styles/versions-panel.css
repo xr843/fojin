@@ -3,7 +3,7 @@
   margin-top: 16px;
   border: 1px solid var(--fj-border, #e8e0d4);
   border-radius: 8px;
-  background: #fff;
+  background: var(--fj-surface);
   overflow: hidden;
 }
 

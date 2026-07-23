@@ -13,6 +13,9 @@
   --fj-gold:      #b08d57;
   --fj-border:    #d9d0c1;
   --fj-card-bg:   rgba(255,255,255,0.6);
+  /* Solid surface (opaque cards/panels/inputs). Light = pure white, matching
+     the many bare white-background rules; dark = elevated warm surface. */
+  --fj-surface:   #ffffff;
 }
 
 :root[data-theme="dark"] {
@@ -25,6 +28,7 @@
   --fj-gold:      #c9a86a;
   --fj-border:    #39312a;
   --fj-card-bg:   #201b15;
+  --fj-surface:   #201b15;
   color-scheme: dark;
 }
 
@@ -140,7 +144,7 @@ em {
   border: 1px solid #d9d9d9;
   border-radius: 12px;
   padding: 8px 12px;
-  background: #fff;
+  background: var(--fj-surface);
   transition: border-color 0.2s;
   display: flex;
   flex-direction: column;
@@ -339,7 +343,7 @@ em {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #fff;
+  background: var(--fj-surface);
   overflow: hidden;
 }
 

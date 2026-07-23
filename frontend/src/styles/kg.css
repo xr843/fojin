@@ -86,7 +86,7 @@
 
 /* ---------- 工具栏 ---------- */
 .kg-toolbar {
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   padding: 12px 16px;
@@ -234,7 +234,7 @@
   padding: 3px 11px;
   border-radius: 12px;
   border: 1px solid var(--fj-border);
-  background: #fff;
+  background: var(--fj-surface);
   color: var(--fj-ink-light);
   cursor: pointer;
   transition: all 0.15s;
@@ -281,7 +281,7 @@
 }
 
 .kg-sidebar-card {
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   overflow: hidden;
@@ -395,7 +395,7 @@
 }
 
 .kg-graph-container {
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   overflow: hidden;
@@ -407,7 +407,7 @@
 }
 
 .kg-graph-empty {
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   display: flex;
@@ -493,7 +493,7 @@
 }
 
 .kg-detail-card {
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   max-height: calc(100vh - 200px);
@@ -510,7 +510,7 @@
 }
 
 .kg-detail-empty {
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   padding: 40px 16px;
@@ -525,7 +525,7 @@
 
 /* ---------- 时间轴面板 ---------- */
 .kg-timeline-panel {
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   margin-bottom: 16px;

@@ -160,7 +160,7 @@
   gap: 12px;
   flex-wrap: wrap;
   padding: 12px 16px;
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   margin-bottom: 16px;

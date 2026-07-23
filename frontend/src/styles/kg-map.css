@@ -45,7 +45,7 @@
 
 /* ---------- 工具栏 ---------- */
 .kg-map-toolbar {
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px 8px 0 0;
   padding: 12px 16px;
@@ -202,7 +202,7 @@
 
 .kg-map-popup {
   width: 260px;
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);

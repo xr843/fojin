@@ -342,7 +342,7 @@
   z-index: 100;
   width: 48px !important;
   height: 48px !important;
-  background: #fff !important;
+  background: var(--fj-surface) !important;
   border-color: var(--fj-accent, #8b6914) !important;
   color: var(--fj-accent, #8b6914) !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -367,7 +367,7 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #fff;
+  background: var(--fj-surface);
   overflow: hidden;
 }
 

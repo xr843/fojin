@@ -43,7 +43,7 @@
   padding: 6px 12px;
   border-radius: 999px;
   border: 1px solid #e5dccb;
-  background: #fff;
+  background: var(--fj-surface);
   cursor: pointer;
   font-size: 13px;
   color: #595959;
@@ -187,7 +187,7 @@
   gap: 12px;
   flex-wrap: wrap;
   padding: 16px 20px;
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   margin-bottom: 16px;
@@ -279,7 +279,7 @@
 }
 
 .source-card {
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   padding: 16px 18px;
@@ -385,7 +385,7 @@
 
 .source-dist-link:hover {
   border-color: #d4a574;
-  background: #fff;
+  background: var(--fj-surface);
   color: var(--fj-accent);
 }
 
@@ -444,7 +444,7 @@
 .source-btn:hover {
   color: var(--fj-accent);
   border-color: var(--fj-gold);
-  background: #fff;
+  background: var(--fj-surface);
 }
 
 .source-btn-search {
@@ -454,7 +454,7 @@
 }
 
 .source-btn-search:hover {
-  background: #fff;
+  background: var(--fj-surface);
   border-color: var(--fj-accent);
 }
 
@@ -587,7 +587,7 @@
   padding: 0 14px;
   border: 1px solid #d9d9d9;
   border-radius: 6px;
-  background: #fff;
+  background: var(--fj-surface);
   font-size: 13px;
   color: #595959;
   cursor: pointer;

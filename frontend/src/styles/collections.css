@@ -8,7 +8,7 @@
 }
 
 .coll-card {
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid rgba(217, 208, 193, 0.5);
   border-radius: 8px;
   overflow: hidden;

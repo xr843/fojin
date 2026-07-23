@@ -39,7 +39,7 @@
 
 /* ---------- 通用卡片 ---------- */
 .person-card {
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid #e8e0d0;
   border-radius: 10px;
   padding: 24px 28px;
