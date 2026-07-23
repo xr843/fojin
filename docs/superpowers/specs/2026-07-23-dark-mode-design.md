@@ -70,9 +70,18 @@ The `<meta name="theme-color">` in `index.html` (`#8b2500`) flips to the dark bg
 
 | Layer | Change | Coverage |
 |---|---|---|
-| **antd** | `ConfigProvider` in `src/App.tsx`: conditionally add `algorithm: theme.darkAlgorithm`; swap `colorPrimary` to `#d9693c` in dark. | All antd components flip at once. |
+| **antd** | `ConfigProvider` in `src/App.tsx` (the app's **only** ConfigProvider): conditionally add `algorithm: theme.darkAlgorithm`; swap `colorPrimary` to `#d9693c` in dark; **and warm antd's dark neutral tokens** (see note). | All antd components flip at once. |
 | **`--fj-*` variables** | Redefine the full token set under `:root[data-theme="dark"]` in `global.css`. | The 471 `var(--fj-*)` usages + every `var(--fj-*, #hex)` fallback flip automatically. |
 | **Hardcoded-color sweep** | Convert bare hex in CSS / inline component styles to `--fj-*` vars (or add dark overrides). | The remaining manual work. |
+
+> **antd dark neutrals must be warmed to match the `--fj-*` palette.** `theme.darkAlgorithm`
+> alone produces a cool neutral-gray dark (~`#141414`); left as-is, antd surfaces (modals,
+> dropdowns, cards, inputs, tables) would read cool-gray floating in the warm-brown custom UI —
+> a visible clash. In dark mode, override antd's neutral tokens to warm values aligned with the
+> palette, e.g. `colorBgBase: #181410`, `colorBgContainer: #201b15`, `colorBgElevated: #221d17`,
+> `colorBorder: #39312a`, `colorText: #ece4d6`, `colorTextSecondary: #a99d89`. Tune the exact
+> set during P1 by inspecting real antd surfaces (Modal, Dropdown, Select, Table) side by side
+> with custom ones.
 
 ### State & switching
 
@@ -81,7 +90,9 @@ The `<meta name="theme-color">` in `index.html` (`#8b2500`) flips to the dark bg
 - Subscribe to `window.matchMedia('(prefers-color-scheme: dark)')` so `system` mode
   tracks the OS live.
 - The store writes `data-theme="light"|"dark"` onto `document.documentElement`.
-- A three-state switch control in the app header (near the language / user menu).
+- A three-state switch control in the header's **right-side `<Space>` in `src/components/Layout.tsx`**
+  (the `antd` `Header`, `justify-content: space-between`), alongside the existing user-menu /
+  language actions.
 - **FOUC prevention:** a tiny inline script in `index.html` `<head>` reads `localStorage`
   + `prefers-color-scheme` and sets `data-theme` on `<html>` before first paint, so a
   reload never flashes the wrong theme.
@@ -132,3 +143,11 @@ These are NOT all theme chrome. Classification:
 - **Sweep completeness:** a missed bare-hex on a low-traffic page = one white gash in
   dark mode. The P4 walkthrough is the guard; log any page deliberately deferred.
 - **Third-party embeds** (if any) that render their own light chrome inside dark pages.
+- **FOUC script ↔ store duplication:** the inline `index.html` resolver and `themeStore`
+  both compute the active theme from `localStorage` + `prefers-color-scheme`. Keep the
+  resolution logic tiny and identical in both, or they drift and the flash returns.
+- **Accent as button background:** white text on `#d9693c` is ~3.5:1 — fine for bold /
+  large button labels (WCAG large-text ≥3:1) but marginal for small text on the accent.
+  antd primary buttons pick their own label color; verify custom accent buttons use
+  bold/large labels or a deeper accent shade. (Body/secondary text ramp is clear: ink
+  14.5:1, muted `#a99d89` 6.6:1 on `--fj-bg` — reading is not the concern here.)
