@@ -1,4 +1,8 @@
 import "@testing-library/jest-dom/vitest";
+// Mirror main.tsx: bridge antd v5's static message/Modal/notification methods
+// to React 19's render API. Without it these render nothing (see
+// src/test/antdStaticMethods.test.tsx and main.tsx).
+import "@ant-design/v5-patch-for-react-19";
 // Initialize i18n for component tests — zh resources are bundled inline, so
 // t() resolves synchronously. Pin the language so jsdom's navigator locale
 // (en-US) can't flip tests to a backend-loaded locale.

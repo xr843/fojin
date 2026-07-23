@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@ant-design/charts": "^2.6.7",
+    "@ant-design/v5-patch-for-react-19": "^1.0.3",
     "@deck.gl/core": "^9.3.6",
     "@deck.gl/layers": "^9.3.6",
     "@deck.gl/react": "^9.3.6",
