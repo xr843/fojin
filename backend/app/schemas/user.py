@@ -3,12 +3,35 @@ from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, field_validator
 
+# Synthetic domain minted by services.oauth for accounts with no usable
+# provider email. Reserved so no self-service registration can squat it.
+RESERVED_EMAIL_DOMAIN = "@noreply.fojin.app"
+
 
 class UserRegister(BaseModel):
     username: str
     email: EmailStr
     password: str
     display_name: str | None = None
+
+    @field_validator("email")
+    @classmethod
+    def not_reserved_placeholder(cls, v: str) -> str:
+        """Keep the synthetic OAuth namespace un-registerable.
+
+        ``_find_or_create_user`` falls back to
+        ``{provider}_{provider_user_id}@noreply.fojin.app`` whenever it can't
+        use the real address — either the provider hid it, or an unverified
+        row already holds it. ``users.email`` is unique, so anyone able to
+        register that placeholder makes the fallback raise IntegrityError,
+        which the callback swallows into ``?error=<provider>_failed``. Since
+        a GitHub account id is public, two free registrations would otherwise
+        lock a named user out of social login permanently, with no
+        self-service or admin way back.
+        """
+        if v.lower().endswith(RESERVED_EMAIL_DOMAIN):
+            raise ValueError("该邮箱域名不可用")
+        return v
 
     @field_validator("password")
     @classmethod
