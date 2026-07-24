@@ -78,14 +78,13 @@
   background:
     radial-gradient(64% 46% at 50% 9%, rgba(242, 180, 114, 0.26), rgba(232, 152, 92, 0.1) 44%, transparent 72%),
     radial-gradient(150% 120% at 50% 30%, rgba(214, 152, 98, 0.09), transparent 60%),
-    radial-gradient(125% 130% at 50% 42%, transparent 52%, rgba(12, 8, 5, 0.32) 100%),
+    radial-gradient(125% 130% at 50% 42%, transparent 52%, rgba(12, 8, 5, 0.3) 100%),
     linear-gradient(
       180deg,
       rgba(26, 18, 11, 0.42) 0%,
-      rgba(26, 18, 11, 0.1) 38%,
-      rgba(18, 13, 8, 0.42) 60%,
-      rgba(11, 8, 5, 0.66) 80%,
-      rgba(8, 6, 4, 0.76) 100%
+      rgba(26, 18, 11, 0.1) 40%,
+      rgba(16, 12, 8, 0.2) 66%,
+      rgba(12, 9, 6, 0.4) 100%
     );
 }
 
@@ -674,11 +673,22 @@
      "lift" off the misty hero rather than sit flat on it. */
   background: #5f5440;
   border-color: #776849;
-  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 244, 224, 0.12);
+  /* Layered shadow: a tight dark contact shadow (reads as "lift" on any bg, even
+     the bright misty landscape) + a wider ambient shadow for depth — so the card
+     floats without needing a darkened backdrop that would kill the ink-wash. */
+  box-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.45),
+    0 8px 18px rgba(0, 0, 0, 0.4),
+    0 20px 44px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 244, 224, 0.12);
 }
 :root[data-theme="dark"] .home-feature-card:hover {
   background: #6b5e47;
-  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.66), inset 0 1px 0 rgba(255, 244, 224, 0.15);
+  box-shadow:
+    0 3px 7px rgba(0, 0, 0, 0.5),
+    0 12px 26px rgba(0, 0, 0, 0.46),
+    0 28px 56px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 244, 224, 0.15);
 }
 
 .home-feature-icon {
