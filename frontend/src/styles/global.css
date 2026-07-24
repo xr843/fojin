@@ -25,19 +25,21 @@
 }
 
 :root[data-theme="dark"] {
-  --fj-bg:        #181410;
-  --fj-bg-alt:    #221d17;
+  /* Warm dark, lifted off pure-black so large chrome areas (header, footer,
+     search bar, cards) feel soft rather than oppressive. */
+  --fj-bg:        #221c14;
+  --fj-bg-alt:    #2c261d;
   --fj-ink:       #ece4d6;
   --fj-ink-light: #c4b8a4;
   --fj-ink-muted: #a99d89;
   --fj-accent:    #d9693c;
   --fj-gold:      #c9a86a;
-  --fj-border:    #39312a;
-  --fj-card-bg:   #201b15;
-  --fj-surface:   #201b15;
-  --fj-surface-alt: #221d17;
-  --fj-timeline-band-a: #221d17;
-  --fj-timeline-band-b: #2b241c;
+  --fj-border:    #423931;
+  --fj-card-bg:   #2b241b;
+  --fj-surface:   #2b241b;
+  --fj-surface-alt: #302921;
+  --fj-timeline-band-a: #2c261d;
+  --fj-timeline-band-b: #352d24;
   color-scheme: dark;
 }
 

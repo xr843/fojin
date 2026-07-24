@@ -328,7 +328,7 @@
 /* Dark mode: the translucent-white pill turns dark so the (now light) label
    reads over the night hero. */
 :root[data-theme="dark"] .home-hot-tag {
-  background: rgba(28, 23, 18, 0.5);
+  background: rgba(46, 38, 28, 0.55);
 }
 
 /* ---------- 热门经典标签 ---------- */
@@ -663,7 +663,7 @@
 /* Dark mode: the frosted-white card turns to a dark translucent panel so the
    (now light) title/description read over the night hero. */
 :root[data-theme="dark"] .home-feature-card {
-  background: rgba(28, 23, 18, 0.62);
+  background: rgba(46, 38, 28, 0.66);
   border-color: var(--fj-border);
 }
 
