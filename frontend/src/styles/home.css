@@ -82,9 +82,10 @@
     linear-gradient(
       180deg,
       rgba(26, 18, 11, 0.42) 0%,
-      rgba(26, 18, 11, 0.12) 40%,
-      rgba(18, 13, 8, 0.3) 64%,
-      rgba(12, 9, 6, 0.54) 100%
+      rgba(26, 18, 11, 0.1) 38%,
+      rgba(18, 13, 8, 0.42) 60%,
+      rgba(11, 8, 5, 0.66) 80%,
+      rgba(8, 6, 4, 0.76) 100%
     );
 }
 
@@ -671,13 +672,13 @@
   /* Cards are the top elevation tier: lighter + near-opaque than the surrounding
      chrome, with a deep drop shadow + hairline top highlight so they clearly
      "lift" off the misty hero rather than sit flat on it. */
-  background: rgba(92, 81, 62, 0.96);
-  border-color: #6a5d46;
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 244, 224, 0.1);
+  background: #5f5440;
+  border-color: #776849;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 244, 224, 0.12);
 }
 :root[data-theme="dark"] .home-feature-card:hover {
-  background: rgba(102, 90, 69, 0.97);
-  box-shadow: 0 20px 46px rgba(0, 0, 0, 0.56), inset 0 1px 0 rgba(255, 244, 224, 0.13);
+  background: #6b5e47;
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.66), inset 0 1px 0 rgba(255, 244, 224, 0.15);
 }
 
 .home-feature-icon {
