@@ -69,6 +69,14 @@
   background: var(--fj-surface) !important;
 }
 
+/* antd's dark purple preset is the one Tag colour that misses AA against its own
+   tag background (3.39:1 — the other presets land between 4.9:1 and 8.2:1), and
+   /sources paints every 影像 source with it. Lift the text to antd's purple-4,
+   which clears AA at 6.15:1 and sits in the same brightness band as its siblings. */
+:root[data-theme="dark"] .ant-tag-purple {
+  color: #b37feb;
+}
+
 * {
   margin: 0;
   padding: 0;
