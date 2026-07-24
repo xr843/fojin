@@ -98,7 +98,7 @@
 /* antd derives the dark primary as a duller #c16642, which leaves the active tab
    label at 3.63:1 against the page. Pin it to the accent itself (4.86:1). */
 :root[data-theme="dark"] .ant-tabs-tab-active .ant-tabs-tab-btn {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
 }
 
 /* The same problem, mirrored, in the DEFAULT theme: antd's light preset Tags put
