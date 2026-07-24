@@ -141,20 +141,10 @@ jobs:
         run: npm ci
 
       - name: Run npm audit
-        # --audit-level=high: block on high/critical; treat moderate/low as
-        # informational (still visible in the JSON report + full audit below).
-        # Waiver reason — react-router GHSA-wrjc-x8rr-h8h6 (open redirect via
-        #   backslash in <Link>/useNavigate) and GHSA-337j-9hxr-rhxg (constructor
-        #   injection in SSR-hydration deserializeErrors) are both *moderate* and
-        #   fixed only by react-router-dom 7.x, a breaking major upgrade. FoJin's
-        #   frontend is a client-side Vite SPA (no react-router SSR hydration), so
-        #   GHSA-337j does not apply; GHSA-wrjc is low-relevance (no user-controlled
-        #   URLs passed to Link/navigate). Tracked for a proper v7 migration; until
-        #   then don't fail CI on these moderates or block unrelated PRs.
-        run: |
-          npm audit --omit=dev --audit-level=high
-          echo "--- full prod advisories (informational, does not gate) ---"
-          npm audit --omit=dev || true
+        # Strict gate restored: the react-router moderates that #1038 waived
+        # (GHSA-wrjc-x8rr-h8h6 / GHSA-337j-9hxr-rhxg) are fixed by the v7 upgrade
+        # (react-router-dom 7.18.1), so `npm audit --omit=dev` is clean again.
+        run: npm audit --omit=dev
 
       - name: Run npm audit (JSON report)
         if: always()
