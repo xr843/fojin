@@ -671,24 +671,55 @@
   /* Cards are the top elevation tier: lighter + near-opaque than the surrounding
      chrome, with a deep drop shadow + hairline top highlight so they clearly
      "lift" off the misty hero rather than sit flat on it. */
-  background: #5f5440;
-  border-color: #776849;
+  background: #625742;
+  border-color: #7d6e4d;
   /* Layered shadow: a tight dark contact shadow (reads as "lift" on any bg, even
-     the bright misty landscape) + a wider ambient shadow for depth — so the card
+     the bright misty landscape) + wider ambient shadows for depth — so the card
      floats without needing a darkened backdrop that would kill the ink-wash. */
   box-shadow:
-    0 2px 5px rgba(0, 0, 0, 0.45),
-    0 8px 18px rgba(0, 0, 0, 0.4),
-    0 20px 44px rgba(0, 0, 0, 0.34),
-    inset 0 1px 0 rgba(255, 244, 224, 0.12);
+    0 3px 7px rgba(0, 0, 0, 0.52),
+    0 10px 22px rgba(0, 0, 0, 0.46),
+    0 26px 54px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 246, 228, 0.16);
 }
 :root[data-theme="dark"] .home-feature-card:hover {
-  background: #6b5e47;
+  background: #6e6249;
+  transform: translateY(-6px);
   box-shadow:
-    0 3px 7px rgba(0, 0, 0, 0.5),
-    0 12px 26px rgba(0, 0, 0, 0.46),
-    0 28px 56px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 244, 224, 0.15);
+    0 6px 12px rgba(0, 0, 0, 0.54),
+    0 18px 34px rgba(0, 0, 0, 0.5),
+    0 40px 72px rgba(0, 0, 0, 0.46),
+    inset 0 1px 0 rgba(255, 246, 228, 0.2);
+}
+
+/* Feature cards — motion: a calm staggered "settle into place" on load, and a
+   tactile lift + icon nudge on hover. backwards fill so the held keyframe never
+   blocks the hover transform. Honors prefers-reduced-motion. */
+@keyframes fj-card-rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.home-feature-card {
+  animation: fj-card-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.home-feature-card:nth-child(1) { animation-delay: 0.04s; }
+.home-feature-card:nth-child(2) { animation-delay: 0.10s; }
+.home-feature-card:nth-child(3) { animation-delay: 0.16s; }
+.home-feature-card:nth-child(4) { animation-delay: 0.22s; }
+.home-feature-card:nth-child(5) { animation-delay: 0.28s; }
+.home-feature-card:nth-child(6) { animation-delay: 0.34s; }
+
+.home-feature-icon {
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.home-feature-card:hover .home-feature-icon {
+  transform: scale(1.14);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-feature-card { animation: none; }
+  .home-feature-card:hover { transform: none; }
+  .home-feature-card:hover .home-feature-icon { transform: none; }
 }
 
 .home-feature-icon {
