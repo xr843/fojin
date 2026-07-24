@@ -12,8 +12,8 @@ describe("buildAntdTheme", () => {
     const t = buildAntdTheme(true);
     expect(t.algorithm).toBe(antdTheme.darkAlgorithm);
     expect(t.token?.colorPrimary).toBe("#e0754a");
-    expect(t.token?.colorBgBase).toBe("#322920");
-    expect(t.token?.colorBgContainer).toBe("#423729");
+    expect(t.token?.colorBgBase).toBe("#3a3126");
+    expect(t.token?.colorBgContainer).toBe("#4c4030");
     expect(t.token?.colorText).toBe("#ece4d6");
   });
 });
