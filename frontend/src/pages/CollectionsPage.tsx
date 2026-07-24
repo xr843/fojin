@@ -370,13 +370,15 @@ function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useN
             </tbody>
           </table>
         </div>
+        {/* 「查看全部」原跳转独立跨藏对照浏览页(/cross-canon)；该板块暂从对外入口
+            撤下(待打磨)，故隐藏此链接。上方表格各行仍跳阅读器逐段对照(集成功能，保留)。
         {groups.length > TOP_N && (
           <p style={{ fontSize: 12, margin: "12px 0 0" }}>
             <a onClick={() => navigate("/cross-canon")} style={{ cursor: "pointer", color: "var(--fj-accent)" }}>
               {t("collections.alignment_more", { n: TOP_N, total: groups.length })} →
             </a>
           </p>
-        )}
+        )} */}
       </div>
     </div>
   );

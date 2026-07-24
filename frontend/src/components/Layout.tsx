@@ -15,7 +15,7 @@ import {
   RobotOutlined,
   GithubOutlined,
   GlobalOutlined,
-  TranslationOutlined,
+  // TranslationOutlined,  // cross-canon nav hidden (板块待打磨；路由仍可直达 /cross-canon)
   // DownloadOutlined,   // exports nav hidden (开放数据 暂不对外公开)
   // ExperimentOutlined,  // research nav hidden (研究助手 待重构后再上线)
   // BarChartOutlined,   // dashboard nav hidden (数据总览 暂不对外公开)
@@ -82,10 +82,10 @@ export default function Layout() {
   }> = [
     { icon: <DatabaseOutlined />, label: t("nav.sources"), path: "/sources" },
     { icon: <RobotOutlined />, label: t("nav.chat"), path: "/chat" },
-    // 跨藏对照(/cross-canon)：1,016 部经 · 91 万组逐段跨语对照，是相对 CBETA /
-    // SuttaCentral 最硬的差异化。此前页面早就跑在生产上，导航里却没有入口，
-    // 只能靠 /collections 里的对照表或手敲 URL 到达。
-    { icon: <TranslationOutlined />, label: t("nav.cross_canon"), path: "/cross-canon" },
+    // 跨藏对照(/cross-canon)专属浏览页暂从导航撤下：独立板块当前呈现效果不佳，
+    // 打磨后再对外公开。路由仍可直达 /cross-canon（供直达/测试），阅读器内的
+    // 跨藏对照面板、文本详情段级入口、搜索藏/梵徽章等集成功能不受影响。
+    // { icon: <TranslationOutlined />, label: t("nav.cross_canon"), path: "/cross-canon" },
     // 研究助手(/research)暂从导航撤下：当前输出偏"更长的问答"，未凸显跨藏对比这一
     // 差异化，等重构(跨藏对比表 + 内联可点证据 + 流式)后再上线。后端 API 与
     // fojin-mcp 保留，/research 路由仍可直达。
