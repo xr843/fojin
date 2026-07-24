@@ -65,20 +65,20 @@ const MIN_DENSE_BAR_HEIGHT = 6;
 // 颜色用交错的两种暖色调，与正文柱条主色（#b85450 person）拉开。
 // 朝代名是史学专名（与底层数据一致，繁体书写），不随 UI 语言切换。
 const DYNASTIES: { name: string; startYear: number; endYear: number; fill: string }[] = [
-  { name: "西晉", startYear: 265, endYear: 317, fill: "#e8dccc" }, // i18n-exempt
-  { name: "東晉", startYear: 317, endYear: 420, fill: "#d6c9b3" }, // i18n-exempt
-  { name: "南北朝", startYear: 420, endYear: 589, fill: "#e8dccc" }, // i18n-exempt
-  { name: "隋", startYear: 589, endYear: 618, fill: "#d6c9b3" }, // i18n-exempt
-  { name: "唐", startYear: 618, endYear: 907, fill: "#e8dccc" }, // i18n-exempt
-  { name: "五代", startYear: 907, endYear: 960, fill: "#d6c9b3" }, // i18n-exempt
-  { name: "北宋", startYear: 960, endYear: 1127, fill: "#e8dccc" }, // i18n-exempt
-  { name: "南宋", startYear: 1127, endYear: 1279, fill: "#d6c9b3" }, // i18n-exempt
-  { name: "元", startYear: 1279, endYear: 1368, fill: "#e8dccc" }, // i18n-exempt
-  { name: "明", startYear: 1368, endYear: 1644, fill: "#d6c9b3" }, // i18n-exempt
-  { name: "清", startYear: 1644, endYear: 1912, fill: "#e8dccc" }, // i18n-exempt
-  { name: "民國", startYear: 1912, endYear: 1949, fill: "#d6c9b3" }, // i18n-exempt
+  { name: "西晉", startYear: 265, endYear: 317, fill: "var(--fj-timeline-band-a)" }, // i18n-exempt
+  { name: "東晉", startYear: 317, endYear: 420, fill: "var(--fj-timeline-band-b)" }, // i18n-exempt
+  { name: "南北朝", startYear: 420, endYear: 589, fill: "var(--fj-timeline-band-a)" }, // i18n-exempt
+  { name: "隋", startYear: 589, endYear: 618, fill: "var(--fj-timeline-band-b)" }, // i18n-exempt
+  { name: "唐", startYear: 618, endYear: 907, fill: "var(--fj-timeline-band-a)" }, // i18n-exempt
+  { name: "五代", startYear: 907, endYear: 960, fill: "var(--fj-timeline-band-b)" }, // i18n-exempt
+  { name: "北宋", startYear: 960, endYear: 1127, fill: "var(--fj-timeline-band-a)" }, // i18n-exempt
+  { name: "南宋", startYear: 1127, endYear: 1279, fill: "var(--fj-timeline-band-b)" }, // i18n-exempt
+  { name: "元", startYear: 1279, endYear: 1368, fill: "var(--fj-timeline-band-a)" }, // i18n-exempt
+  { name: "明", startYear: 1368, endYear: 1644, fill: "var(--fj-timeline-band-b)" }, // i18n-exempt
+  { name: "清", startYear: 1644, endYear: 1912, fill: "var(--fj-timeline-band-a)" }, // i18n-exempt
+  { name: "民國", startYear: 1912, endYear: 1949, fill: "var(--fj-timeline-band-b)" }, // i18n-exempt
   // 現代 endYear 用当前年份动态求值，tooltip 显示「至今」。
-  { name: "現代", startYear: 1949, endYear: new Date().getFullYear(), fill: "#e8dccc" }, // i18n-exempt
+  { name: "現代", startYear: 1949, endYear: new Date().getFullYear(), fill: "var(--fj-timeline-band-a)" }, // i18n-exempt
 ];
 const DYNASTY_LABEL_MIN_W = 8;    // 段宽 < 8px 才完全省略；其余靠 textLength 压缩
 
@@ -247,7 +247,7 @@ export default function KGTimeline({
           y1={svgHeight - PADDING.bottom}
           x2={width - PADDING.right}
           y2={svgHeight - PADDING.bottom}
-          stroke="#c8bfb0"
+          stroke="var(--fj-border)"
           strokeWidth={1}
         />
 
@@ -259,7 +259,7 @@ export default function KGTimeline({
               <line
                 x1={x} y1={svgHeight - PADDING.bottom}
                 x2={x} y2={svgHeight - PADDING.bottom + 5}
-                stroke="#c8bfb0"
+                stroke="var(--fj-border)"
                 strokeWidth={1}
               />
               <text
@@ -267,7 +267,7 @@ export default function KGTimeline({
                 y={svgHeight - PADDING.bottom + 16}
                 textAnchor="middle"
                 fontSize={10}
-                fill="#9a8e7a"
+                fill="var(--fj-ink-muted)"
                 fontFamily="'Noto Serif SC', serif"
               >
                 {y < 0 ? t("kg.year_bce_short", { n: Math.abs(y) }) : y}
@@ -325,7 +325,7 @@ export default function KGTimeline({
                     textAnchor="middle"
                     dominantBaseline="middle"
                     fontSize={11}
-                    fill="#6b5d47"
+                    fill="var(--fj-ink-light)"
                     fontFamily="'Noto Serif SC', serif"
                     style={{ pointerEvents: "none" }}
                     {...(useTextLength
@@ -359,7 +359,7 @@ export default function KGTimeline({
                 y1={baselineY}
                 x2={width - PADDING.right}
                 y2={baselineY}
-                stroke="#f0ebe3"
+                stroke="var(--fj-border)"
                 strokeWidth={1}
               />
 
@@ -478,7 +478,7 @@ export default function KGTimeline({
                         r={isSelected ? POINT_R + 2 : POINT_R}
                         fill={color}
                         fillOpacity={isSelected ? 1 : 0.78}
-                        stroke={isSelected ? "#fff" : "rgba(0,0,0,0.12)"}
+                        stroke={isSelected ? "#fff" : "var(--fj-border)"}
                         strokeWidth={isSelected ? 2 : 1}
                         style={{ cursor: "pointer" }}
                         onClick={() => onEntityClick(e.id)}
@@ -565,7 +565,7 @@ export default function KGTimeline({
                   }}
                 >
                   <span style={{ fontWeight: 500 }}>{e.name_zh}</span>
-                  <span style={{ color: "#9a8e7a", fontSize: 12 }}>
+                  <span style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}>
                     {yearLabel}
                   </span>
                 </List.Item>
