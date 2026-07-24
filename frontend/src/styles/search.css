@@ -185,7 +185,7 @@
 }
 
 .s-card-title em {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   font-style: normal;
   font-weight: 700;
 }
@@ -204,7 +204,7 @@
 }
 
 .s-card-meta em {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   font-style: normal;
   font-weight: 600;
 }
@@ -217,7 +217,7 @@
 }
 
 .s-card-preview em {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   font-style: normal;
   font-weight: 600;
 }
