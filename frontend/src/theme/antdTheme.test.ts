@@ -14,6 +14,6 @@ describe("buildAntdTheme", () => {
     expect(t.token?.colorPrimary).toBe("#e0754a");
     expect(t.token?.colorBgBase).toBe("#2f2820");
     expect(t.token?.colorBgContainer).toBe("#4a4133");
-    expect(t.token?.colorText).toBe("#ece4d6");
+    expect(t.token?.colorText).toBe("#efe8db");
   });
 });
