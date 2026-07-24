@@ -25,7 +25,7 @@
   /* Previously-undefined tokens that only ever hit their light fallback (so they
      never adapted to dark). Light values = the old fallbacks (byte-identical). */
   --fj-sand-light:      #faf7f2;  /* search result/empty-state panels */
-  --fj-text-secondary:  #999999;  /* reader secondary text */
+  --fj-text-secondary:  #767676;  /* reader secondary text — #999 was 2.85:1 on white, under AA */
   --fj-accent-hover:    #a03000;  /* dictionary/search button hover (darker maroon) */
   /* Text/icon placed ON a solid accent or gold background. Light: the accent is a
      deep maroon, so white reads (8.9:1). Dark: the accent/gold are BRIGHT, so white
@@ -34,6 +34,12 @@
   /* Text ON a solid GOLD background. Gold is light in BOTH themes, so white never
      works there (3.09:1 light / 1.95:1 dark) — both sides take a deep warm ink. */
   --fj-on-gold:         #2e2415;
+  /* Status text. The antd defaults (#52c41a / #ff4d4f) are tuned for solid fills,
+     not for text: on white they are 2.27:1 and 3.27:1, and on the dark card they
+     are 4.42:1 and 3.07:1. Each theme gets the shade that actually reads. */
+  --fj-success:         #237804;
+  --fj-danger:          #cf1322;
+  --fj-warning:         #ad4e00;
 }
 
 :root[data-theme="dark"] {
@@ -57,6 +63,9 @@
   --fj-accent-hover:    #ef8a5f;
   --fj-on-accent:       #17120d;
   --fj-on-gold:         #17120d;
+  --fj-success:         #73d13d;
+  --fj-danger:          #ffa39e;
+  --fj-warning:         #ffc069;
   color-scheme: dark;
 }
 
@@ -94,6 +103,15 @@
 }
 :root[data-theme="light"] .ant-tag-gold {
   color: #874d00; /* gold-9   2.76 -> 6.53 */
+}
+
+/* antd's Typography success/danger colours are the same fill-tuned greens and reds
+   as above (2.27:1 on white, 3.36:1 on the dark card). Point them at the tokens. */
+.ant-typography-success {
+  color: var(--fj-success) !important;
+}
+.ant-typography-danger {
+  color: var(--fj-danger) !important;
 }
 
 * {

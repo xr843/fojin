@@ -87,7 +87,7 @@ function SentencePairCard({
           gap: 6,
           flexWrap: "wrap",
           fontSize: 12,
-          color: "#999",
+          color: "var(--fj-text-secondary)",
         }}
       >
         <Tag color={LANG_COLOR[pair.side_b.lang] || "default"} style={{ margin: 0 }}>
