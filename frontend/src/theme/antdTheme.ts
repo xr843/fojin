@@ -13,12 +13,12 @@ export function buildAntdTheme(isDark: boolean): ThemeConfig {
       colorPrimary: "#d9693c",
       borderRadius: 2,
       // warm antd's dark neutrals to match the --fj-* palette (spec: antd dark neutrals note)
-      colorBgBase: "#221c14",
-      colorBgContainer: "#2b241b",
-      colorBgElevated: "#302921",
-      colorBorder: "#423931",
+      colorBgBase: "#2b2318",
+      colorBgContainer: "#3a3126",
+      colorBgElevated: "#40372a",
+      colorBorder: "#504636",
       colorText: "#ece4d6",
-      colorTextSecondary: "#a99d89",
+      colorTextSecondary: "#b1a68f",
     },
   };
 }
