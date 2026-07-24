@@ -19,6 +19,10 @@ export function buildAntdTheme(isDark: boolean): ThemeConfig {
       colorBorder: "#60553f",
       colorText: "#efe8db",
       colorTextSecondary: "#c6bca6",
+      // Text on SOLID primary (buttons): the dark accent is bright, so antd's
+      // default white label only reaches 2.99:1. A deep warm ink gives 6.2:1 — and
+      // still 4.6:1 on the duller #c16642 the dark algorithm derives for Search.
+      colorTextLightSolid: "#17120d",
     },
     components: {
       // antd's Layout Header/Footer do NOT follow colorBgBase — they need their

@@ -28,7 +28,7 @@
   align-items: center;
   gap: 6px;
   background: var(--fj-gold);
-  color: #fff;
+  color: var(--fj-on-gold);
   border: none;
   border-radius: 8px;
   padding: 10px 18px;

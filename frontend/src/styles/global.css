@@ -27,6 +27,13 @@
   --fj-sand-light:      #faf7f2;  /* search result/empty-state panels */
   --fj-text-secondary:  #999999;  /* reader secondary text */
   --fj-accent-hover:    #a03000;  /* dictionary/search button hover (darker maroon) */
+  /* Text/icon placed ON a solid accent or gold background. Light: the accent is a
+     deep maroon, so white reads (8.9:1). Dark: the accent/gold are BRIGHT, so white
+     would fail (2.99:1 / 1.95:1) — use a deep warm ink instead (5.6:1 / 8.5:1). */
+  --fj-on-accent:       #ffffff;
+  /* Text ON a solid GOLD background. Gold is light in BOTH themes, so white never
+     works there (3.09:1 light / 1.95:1 dark) — both sides take a deep warm ink. */
+  --fj-on-gold:         #2e2415;
 }
 
 :root[data-theme="dark"] {
@@ -48,6 +55,8 @@
   --fj-sand-light:      #3d342a;
   --fj-text-secondary:  #c6bca6;
   --fj-accent-hover:    #ef8a5f;
+  --fj-on-accent:       #17120d;
+  --fj-on-gold:         #17120d;
   color-scheme: dark;
 }
 
