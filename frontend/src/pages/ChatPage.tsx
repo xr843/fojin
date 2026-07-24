@@ -785,7 +785,7 @@ export default function ChatPage() {
                 border: 0,
                 padding: 0,
                 font: "inherit",
-                color: "var(--fj-accent)",
+                color: "var(--fj-highlight)",
                 borderBottom: "1px dashed var(--fj-accent)",
                 fontWeight: 500,
                 cursor: "pointer",
@@ -801,7 +801,7 @@ export default function ChatPage() {
           <Link
             to={href}
             style={{
-              color: "var(--fj-accent)",
+              color: "var(--fj-highlight)",
               textDecoration: "none",
               borderBottom: "1px dashed var(--fj-accent)",
               fontWeight: 500,
@@ -1447,7 +1447,7 @@ export default function ChatPage() {
                         padding: "2px 8px",
                         borderRadius: 10,
                         background: "rgba(176,141,87,0.1)",
-                        color: "var(--fj-accent)",
+                        color: "var(--fj-highlight)",
                         fontFamily: '"Noto Serif SC", serif',
                         letterSpacing: "0.02em",
                       }}>

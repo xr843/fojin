@@ -112,7 +112,7 @@ export default function UnifiedResults({ data }: Props) {
           {dictionary.length > 2 && (
             <Link
               to={`/dictionary?q=${encodeURIComponent(data.query)}`}
-              style={{ display: "inline-block", marginTop: 8, fontSize: 13, color: "var(--fj-accent)" }}
+              style={{ display: "inline-block", marginTop: 8, fontSize: 13, color: "var(--fj-highlight)" }}
             >
               {t("search.view_all_dict_count", { n: dictionary.length })}
             </Link>

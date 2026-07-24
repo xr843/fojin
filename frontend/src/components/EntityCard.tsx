@@ -151,7 +151,7 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
           type="link"
           size="small"
           icon={<BookOutlined />}
-          style={{ padding: 0, marginBottom: 10, color: "var(--fj-accent)", fontSize: 12 }}
+          style={{ padding: 0, marginBottom: 10, color: "var(--fj-highlight)", fontSize: 12 }}
           onClick={() => navigate(`/texts/${entity.text_id}`)}
         >
           {t("entity.view_linked_text")}
@@ -162,7 +162,7 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
           type="link"
           size="small"
           icon={<ReadOutlined />}
-          style={{ padding: 0, marginBottom: 10, color: "var(--fj-accent)", fontSize: 12 }}
+          style={{ padding: 0, marginBottom: 10, color: "var(--fj-highlight)", fontSize: 12 }}
           onClick={() =>
             navigate(`/dict/${encodeURIComponent(entity.name_zh)}`)
           }
@@ -175,7 +175,7 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
           type="link"
           size="small"
           icon={<UserOutlined />}
-          style={{ padding: 0, marginBottom: 10, color: "var(--fj-accent)", fontSize: 12 }}
+          style={{ padding: 0, marginBottom: 10, color: "var(--fj-highlight)", fontSize: 12 }}
           onClick={() => navigate(`/person/${entity.id}`)}
         >
           {t("entity.person_page")}
@@ -254,7 +254,7 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
                   href={value}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ color: "var(--fj-accent)" }}
+                  style={{ color: "var(--fj-highlight)" }}
                 >
                   {value}
                 </a>
