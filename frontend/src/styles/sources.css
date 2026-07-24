@@ -116,6 +116,13 @@
   margin: 0 0 18px;
 }
 
+/* Dark mode: the light cream gradient (a background-image, so it doesn't follow
+   surface tokens) needs an explicit warm-dark gradient override. */
+:root[data-theme="dark"] .sources-hero-search {
+  background: linear-gradient(135deg, #3a3226 0%, #302820 100%);
+  border-color: var(--fj-gold);
+}
+
 .sources-hero-search-head {
   display: flex;
   gap: 12px;
