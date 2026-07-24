@@ -829,3 +829,9 @@
   cursor: pointer;
 }
 .cbeta-line-locator button:hover { background: rgba(255, 255, 255, 0.12); }
+
+/* Dark mode: dictionary popover was pinned to paper-white while its controls use
+   ink tokens (light in dark) → unreadable. Flip the surface. */
+:root[data-theme="dark"] .reader-dict-popover {
+  background: var(--fj-surface);
+}

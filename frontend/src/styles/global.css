@@ -22,6 +22,11 @@
   /* KGTimeline dynasty zebra bands (alternating). */
   --fj-timeline-band-a: #e8dccc;
   --fj-timeline-band-b: #d6c9b3;
+  /* Previously-undefined tokens that only ever hit their light fallback (so they
+     never adapted to dark). Light values = the old fallbacks (byte-identical). */
+  --fj-sand-light:      #faf7f2;  /* search result/empty-state panels */
+  --fj-text-secondary:  #999999;  /* reader secondary text */
+  --fj-accent-hover:    #a03000;  /* dictionary/search button hover (darker maroon) */
 }
 
 :root[data-theme="dark"] {
@@ -40,6 +45,9 @@
   --fj-surface-alt: #544a3a;
   --fj-timeline-band-a: #3c342a;
   --fj-timeline-band-b: #544a3a;
+  --fj-sand-light:      #3d342a;
+  --fj-text-secondary:  #bdb29b;
+  --fj-accent-hover:    #ef8a5f;
   color-scheme: dark;
 }
 

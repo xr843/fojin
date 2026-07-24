@@ -230,3 +230,8 @@
     justify-content: center;
   }
 }
+
+/* Dark mode: URN chip cream bg didn't flip. */
+:root[data-theme="dark"] .rp-urn {
+  background: var(--fj-surface-alt);
+}

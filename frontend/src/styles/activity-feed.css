@@ -68,6 +68,9 @@
 }
 
 .feed-item:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+:root[data-theme="dark"] .feed-item:hover {
   background: var(--fj-surface);
 }
 

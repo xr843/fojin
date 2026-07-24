@@ -218,6 +218,9 @@
 }
 
 .dict-entry-item:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+:root[data-theme="dark"] .dict-entry-item:hover {
   background: var(--fj-surface);
 }
 

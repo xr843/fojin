@@ -2,20 +2,11 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <script>
-      // Set data-theme before first paint so a reload never flashes the wrong theme.
-      // Reads the zustand-persist shape {"state":{"mode":"…"}}; MUST match resolveTheme().
-      (function () {
-        try {
-          var raw = localStorage.getItem("fojin-theme");
-          var mode = raw ? (JSON.parse(raw).state || {}).mode : "system";
-          if (mode !== "light" && mode !== "dark" && mode !== "system") mode = "system";
-          var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-          var effective = mode === "system" ? (prefersDark ? "dark" : "light") : mode;
-          document.documentElement.setAttribute("data-theme", effective);
-        } catch (e) {}
-      })();
-    </script>
+    <!-- Pre-paint theme init. External (not inline) + render-blocking (no defer):
+         the prod CSP is `script-src 'self'` with no 'unsafe-inline', so an inline
+         block is silently dropped in production → dark users flash light on every
+         load. Kept first in <head> so data-theme is set before first paint. -->
+    <script src="/theme-init.js"></script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#8b2500" />

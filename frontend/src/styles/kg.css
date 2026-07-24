@@ -879,3 +879,19 @@
 :root[data-theme="dark"] .kg-type-tag--school    { background: rgba(114, 46, 209, 0.22); color: #b37feb; border-color: rgba(114, 46, 209, 0.42); }
 :root[data-theme="dark"] .kg-type-tag--place     { background: rgba(250, 140, 22, 0.16); color: #ffc069; border-color: rgba(250, 140, 22, 0.38); }
 :root[data-theme="dark"] .kg-type-tag--concept   { background: rgba(19, 194, 194, 0.16); color: #5cdbd3; border-color: rgba(19, 194, 194, 0.38); }
+
+/* ---- Dark mode: fixes for stateful cream backgrounds the sweep missed ---- */
+/* Selected KG result: cream bg didn't flip while the name/desc use ink tokens
+   (light in dark) → invisible. Give it a dark elevated bg + accent tint. */
+:root[data-theme="dark"] .kg-result-item.active {
+  background: rgba(229, 118, 74, 0.14);
+}
+/* 7th entity-type tag (dynasty) was omitted from the dark override set. */
+:root[data-theme="dark"] .kg-type-tag--dynasty {
+  background: rgba(235, 47, 150, 0.16); color: #ff85c0; border-color: rgba(235, 47, 150, 0.4);
+}
+/* "results truncated" alert: near-white amber box glowing in the dark graph. */
+:root[data-theme="dark"] .kg-truncated-bar .ant-alert {
+  background: rgba(214, 152, 60, 0.16);
+  border-color: var(--fj-gold);
+}

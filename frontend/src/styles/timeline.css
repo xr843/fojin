@@ -50,7 +50,7 @@
   position: absolute;
   pointer-events: none;
   background: rgba(43, 35, 24, 0.9);
-  color: var(--fj-bg);
+  color: #f8f5ef; /* fixed light: tooltip bg is always dark, in both themes */
   padding: 8px 12px;
   border-radius: 6px;
   font-size: 13px;

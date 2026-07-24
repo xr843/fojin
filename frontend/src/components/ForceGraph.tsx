@@ -352,7 +352,7 @@ export default function ForceGraph({
       .attr("dy", "0.35em")
       .attr("font-size", (d) => Math.max(10, nodeRadius(d) * 0.62))
       .attr("font-weight", 600)
-      .attr("fill", "var(--fj-surface)")
+      .attr("fill", "#fff") /* count label sits inside a saturated colored node — stays white in both themes */
       .attr("pointer-events", "none");
 
     // Full name label below node — offset by the node's own radius
