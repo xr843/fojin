@@ -36,7 +36,7 @@
   --fj-bg-alt:    #3c342a;
   --fj-ink:       #efe8db;
   --fj-ink-light: #d2c7b1;
-  --fj-ink-muted: #bdb29b;
+  --fj-ink-muted: #c6bca6;
   --fj-accent:    #e5764a;
   --fj-gold:      #d6b579;
   --fj-border:    #60553f;
@@ -46,7 +46,7 @@
   --fj-timeline-band-a: #3c342a;
   --fj-timeline-band-b: #544a3a;
   --fj-sand-light:      #3d342a;
-  --fj-text-secondary:  #bdb29b;
+  --fj-text-secondary:  #c6bca6;
   --fj-accent-hover:    #ef8a5f;
   color-scheme: dark;
 }
