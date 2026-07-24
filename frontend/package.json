@@ -40,7 +40,7 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-helmet-async": "^3.0.0",
-    "react-i18next": "^17.0.10",
+    "react-i18next": "^17.0.11",
     "react-map-gl": "^8.1.0",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.18.1",
