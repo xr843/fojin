@@ -189,7 +189,7 @@
 
 /* Dark mode: give the search bar the same crafted lift as the feature cards. */
 :root[data-theme="dark"] .search-combo-bar {
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 244, 224, 0.06);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 244, 224, 0.08);
 }
 
 /* 左侧数据源按钮 */
@@ -668,15 +668,16 @@
 /* Dark mode: the frosted-white card turns to a dark translucent panel so the
    (now light) title/description read over the night hero. */
 :root[data-theme="dark"] .home-feature-card {
-  /* More opaque so the busy landscape doesn't muddy the card; a soft drop
-     shadow + a hairline top highlight make it read as a crafted lifted panel
-     rather than a flat rectangle. */
-  background: rgba(74, 65, 51, 0.92);
-  border-color: var(--fj-border);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 244, 224, 0.06);
+  /* Cards are the top elevation tier: lighter + near-opaque than the surrounding
+     chrome, with a deep drop shadow + hairline top highlight so they clearly
+     "lift" off the misty hero rather than sit flat on it. */
+  background: rgba(92, 81, 62, 0.96);
+  border-color: #6a5d46;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 244, 224, 0.1);
 }
 :root[data-theme="dark"] .home-feature-card:hover {
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 244, 224, 0.08);
+  background: rgba(102, 90, 69, 0.97);
+  box-shadow: 0 20px 46px rgba(0, 0, 0, 0.56), inset 0 1px 0 rgba(255, 244, 224, 0.13);
 }
 
 .home-feature-icon {
