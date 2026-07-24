@@ -538,7 +538,7 @@ export default function ForceGraph({
             fontSize: 12,
             fontFamily: '"Noto Serif SC", serif',
             color: "var(--fj-ink-light)",
-            background: "rgba(255,255,255,0.92)",
+            background: "var(--fj-surface)",
             border: "1px solid var(--fj-border)",
             borderRadius: 6,
             cursor: "pointer",
@@ -556,7 +556,7 @@ export default function ForceGraph({
         style={{
           position: "absolute",
           pointerEvents: "none",
-          background: "rgba(255,255,255,0.96)",
+          background: "var(--fj-surface)",
           border: "1px solid var(--fj-border)",
           borderRadius: 6,
           padding: "6px 10px",
