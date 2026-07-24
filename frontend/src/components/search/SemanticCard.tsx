@@ -11,8 +11,10 @@ export default function SemanticCard({ hit, rank }: { hit: SemanticSearchHit; ra
   const cbetaUrl = hit.cbeta_id ? buildCbetaReadUrl(hit.cbeta_id) : null;
   const scorePercent = Math.round(hit.similarity_score * 100);
 
-  // 相似度颜色：>70% 绿色，>50% 蓝色，其余橙色
-  const scoreColor = scorePercent >= 70 ? "#52c41a" : scorePercent >= 50 ? "#1890ff" : "#fa8c16";
+  // 相似度颜色：>70% 绿色，>50% 蓝色，其余橙色。用语义 token 而非 antd 的填充色——
+  // 后者是给色块调的，画成 40px 圆环压在浅色卡片上只有 2.27:1 / 2.2:1（图形元素需 3:1）。
+  const scoreColor =
+    scorePercent >= 70 ? "var(--fj-success)" : scorePercent >= 50 ? "var(--fj-info)" : "var(--fj-warning)";
 
   return (
     <div className="s-card">

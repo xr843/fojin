@@ -4,7 +4,8 @@ export function buildAntdTheme(isDark: boolean): ThemeConfig {
   if (!isDark) {
     return {
       algorithm: antdTheme.defaultAlgorithm,
-      token: { colorPrimary: "#8b2500", borderRadius: 2 },
+      // colorLink: antd's default #1677ff is 4.10:1 on white — just under AA.
+      token: { colorPrimary: "#8b2500", borderRadius: 2, colorLink: "#0958d9" },
     };
   }
   return {
@@ -23,6 +24,8 @@ export function buildAntdTheme(isDark: boolean): ThemeConfig {
       // default white label only reaches 2.99:1. A deep warm ink gives 6.2:1 — and
       // still 4.6:1 on the duller #c16642 the dark algorithm derives for Search.
       colorTextLightSolid: "#17120d",
+      // antd's dark link blue lands at 1.93:1 on the card — unreadable.
+      colorLink: "#91caff",
     },
     components: {
       // antd's Layout Header/Footer do NOT follow colorBgBase — they need their
