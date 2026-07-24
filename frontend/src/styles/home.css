@@ -276,7 +276,7 @@
   height: 100%;
   padding: 0 24px;
   background: var(--fj-accent);
-  color: #fff;
+  color: var(--fj-on-accent);
   border: none;
   cursor: pointer;
   font-family: "Noto Serif SC", serif;

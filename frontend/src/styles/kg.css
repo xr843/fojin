@@ -246,7 +246,7 @@
 .kg-chip.active {
   background: var(--fj-gold);
   border-color: var(--fj-gold);
-  color: #fff;
+  color: var(--fj-on-gold);
 }
 
 @media (max-width: 768px) {

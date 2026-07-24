@@ -48,7 +48,7 @@
 .mg-chip[aria-pressed="true"] {
   background: var(--fj-accent, var(--fj-accent));
   border-color: var(--fj-accent, var(--fj-accent));
-  color: #fff;
+  color: var(--fj-on-accent);
 }
 
 .mg-chip-n {

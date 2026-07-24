@@ -258,7 +258,7 @@
 
 .s-card-btn-primary {
   background: var(--fj-accent);
-  color: #fff;
+  color: var(--fj-on-accent);
   border: 1px solid var(--fj-accent);
 }
 

@@ -168,7 +168,9 @@ export default function Layout() {
           e.currentTarget.style.width = "auto";
           e.currentTarget.style.height = "auto";
           e.currentTarget.style.overflow = "visible";
-          e.currentTarget.style.background = "#fff";
+          e.currentTarget.style.background = "var(--fj-surface)";
+          e.currentTarget.style.color = "var(--fj-ink)";
+          e.currentTarget.style.border = "1px solid var(--fj-gold)";
           e.currentTarget.style.padding = "8px 16px";
           e.currentTarget.style.borderRadius = "4px";
           e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
@@ -358,7 +360,7 @@ export default function Layout() {
               type="text"
               icon={<LoginOutlined />}
               style={{
-                color: "#fff",
+                color: "var(--fj-on-accent)",
                 background: accent,
                 borderRadius: 4,
                 fontSize: 12,
