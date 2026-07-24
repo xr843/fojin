@@ -244,7 +244,7 @@
 }
 
 .sources-stats-bar strong {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
 }
 
 /* ---------- 分组 ---------- */
@@ -393,7 +393,7 @@
 .source-dist-link:hover {
   border-color: #d4a574;
   background: var(--fj-surface);
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
 }
 
 .source-dist-link.is-primary {
@@ -449,13 +449,13 @@
 }
 
 .source-btn:hover {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   border-color: var(--fj-gold);
   background: var(--fj-surface);
 }
 
 .source-btn-search {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   border-color: #d4a574;
   background: var(--fj-surface-alt);
 }
@@ -548,7 +548,7 @@
 .sources-suggest-success {
   font-family: "Noto Serif SC", serif;
   font-size: 15px;
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   text-align: center;
   padding: 24px 0;
   letter-spacing: 1px;
@@ -579,7 +579,7 @@
 }
 
 .sources-back-top:hover {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   border-color: var(--fj-gold);
   box-shadow: 0 2px 12px rgba(176, 141, 87, 0.15);
 }

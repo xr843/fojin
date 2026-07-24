@@ -570,7 +570,7 @@
 
 .reader-ai-suggestion:hover {
   background: rgba(139, 105, 20, 0.12);
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
 }
 
 .reader-ai-input-area {

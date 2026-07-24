@@ -121,7 +121,7 @@
 }
 
 .feed-item-title a:hover {
-  color: var(--fj-accent, var(--fj-accent));
+  color: var(--fj-highlight);
   text-decoration: underline;
 }
 
@@ -230,7 +230,7 @@
 
 .platform-stat-card .stat-row .stat-value {
   font-weight: 600;
-  color: var(--fj-accent, var(--fj-accent));
+  color: var(--fj-highlight);
   font-family: "Noto Serif SC", serif;
 }
 
@@ -258,7 +258,7 @@
 }
 
 .top-text-item a:hover {
-  color: var(--fj-accent, var(--fj-accent));
+  color: var(--fj-highlight);
   text-decoration: underline;
 }
 
