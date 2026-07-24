@@ -77,6 +77,25 @@
   color: #b37feb;
 }
 
+/* The same problem, mirrored, in the DEFAULT theme: antd's light preset Tags put
+   colour-7 text on a colour-1 tint, which lands at 2.8–3.4:1 — under AA for the
+   10px badges /sources paints on all 617 source cards. Drop the four failing hues
+   one step down antd's own ramp (gold needs two; colour-8 only gets it to 3.1:1).
+   Blue (5.5:1), purple (8.9:1) and default (20:1) already clear AA — left alone so
+   the badges keep as much of antd's palette as legibility allows. */
+:root[data-theme="light"] .ant-tag-cyan {
+  color: #006d75; /* cyan-8   3.39 -> 5.82 */
+}
+:root[data-theme="light"] .ant-tag-orange {
+  color: #ad4e00; /* orange-8 3.34 -> 5.09 */
+}
+:root[data-theme="light"] .ant-tag-green {
+  color: #237804; /* green-8  3.37 -> 5.44 */
+}
+:root[data-theme="light"] .ant-tag-gold {
+  color: #874d00; /* gold-9   2.76 -> 6.53 */
+}
+
 * {
   margin: 0;
   padding: 0;
