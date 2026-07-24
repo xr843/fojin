@@ -10,15 +10,25 @@ export function buildAntdTheme(isDark: boolean): ThemeConfig {
   return {
     algorithm: antdTheme.darkAlgorithm,
     token: {
-      colorPrimary: "#d9693c",
+      colorPrimary: "#e0754a",
       borderRadius: 2,
       // warm antd's dark neutrals to match the --fj-* palette (spec: antd dark neutrals note)
-      colorBgBase: "#2b2318",
-      colorBgContainer: "#3a3126",
-      colorBgElevated: "#40372a",
-      colorBorder: "#504636",
+      colorBgBase: "#322920",
+      colorBgContainer: "#423729",
+      colorBgElevated: "#4a3f30",
+      colorBorder: "#574c3a",
       colorText: "#ece4d6",
-      colorTextSecondary: "#b1a68f",
+      colorTextSecondary: "#b8ad96",
+    },
+    components: {
+      // antd's Layout Header/Footer do NOT follow colorBgBase — they need their
+      // own tokens, or the top/bottom bars stay near-black. Give them a warm
+      // elevated tone so the large chrome bars read soft, not oppressive.
+      Layout: {
+        headerBg: "#423729",
+        footerBg: "#423729",
+        bodyBg: "#322920",
+      },
     },
   };
 }

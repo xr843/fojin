@@ -33,7 +33,7 @@ describe("useApplyTheme", () => {
     mockMatchMedia(true);
     renderHook(() => useApplyTheme());
     expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
-    expect(document.querySelector('meta[name="theme-color"]')!.getAttribute("content")).toBe("#2b2318");
+    expect(document.querySelector('meta[name="theme-color"]')!.getAttribute("content")).toBe("#322920");
   });
 
   it("explicit light beats OS dark", () => {

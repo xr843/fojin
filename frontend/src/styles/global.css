@@ -27,20 +27,29 @@
 :root[data-theme="dark"] {
   /* Warm dark, lifted off pure-black so large chrome areas (header, footer,
      search bar, cards) feel soft rather than oppressive. */
-  --fj-bg:        #2b2318;
-  --fj-bg-alt:    #362e22;
+  --fj-bg:        #322920;
+  --fj-bg-alt:    #3d3427;
   --fj-ink:       #ece4d6;
-  --fj-ink-light: #c8bda6;
-  --fj-ink-muted: #b1a68f;
-  --fj-accent:    #dd6f3f;
-  --fj-gold:      #cdac6e;
-  --fj-border:    #504636;
-  --fj-card-bg:   #3a3126;
-  --fj-surface:   #3a3126;
-  --fj-surface-alt: #40372a;
-  --fj-timeline-band-a: #362e22;
-  --fj-timeline-band-b: #40372a;
+  --fj-ink-light: #ccc1aa;
+  --fj-ink-muted: #b8ad96;
+  --fj-accent:    #e0754a;
+  --fj-gold:      #d0b073;
+  --fj-border:    #574c3a;
+  --fj-card-bg:   #423729;
+  --fj-surface:   #423729;
+  --fj-surface-alt: #4a3f30;
+  --fj-timeline-band-a: #3d3427;
+  --fj-timeline-band-b: #4a3f30;
   color-scheme: dark;
+}
+
+/* antd's Layout Header/Footer fall back to colorBgBase and ignore the Layout
+   headerBg/footerBg tokens in this setup, leaving the big top/bottom bars a
+   near-black. Pin them to the elevated warm surface in dark mode so the large
+   chrome reads clearly lifted, not oppressive. */
+:root[data-theme="dark"] .ant-layout-header,
+:root[data-theme="dark"] .ant-layout-footer {
+  background: var(--fj-surface) !important;
 }
 
 * {
