@@ -68,35 +68,40 @@
    and the hero reads as genuinely dark. Stronger at top (over the bright sky
    where the title sits) and bottom (under the feature cards). */
 :root[data-theme="dark"] .home-hero-bg {
-  background: linear-gradient(180deg, #2a2018 0%, #1c1610 55%, #12100c 100%);
+  background: linear-gradient(180deg, #3a2c1d 0%, #241c13 55%, #17120c 100%);
 }
-/* Atmospheric twilight ink-wash: let the mountains breathe in the middle,
-   darken only the text zones (title top, labels+cards bottom), add an edge
-   vignette for depth, and a faint high dusk-glow for a focal point. */
+/* Warm, airy dusk ink-wash: a large warm sun-glow high in the sky, a broad
+   warm wash lifting the whole scene, only a light edge vignette and a gentle
+   legibility ramp — kept airy on purpose; text stays crisp via its own
+   shadow/halo rather than by darkening the landscape. */
 :root[data-theme="dark"] .home-hero-bg::after {
   background:
-    radial-gradient(58% 40% at 50% 11%, rgba(224, 158, 96, 0.11), rgba(224, 140, 80, 0.04) 46%, transparent 70%),
-    radial-gradient(120% 125% at 50% 40%, transparent 44%, rgba(9, 6, 4, 0.5) 100%),
+    radial-gradient(64% 46% at 50% 9%, rgba(242, 180, 114, 0.26), rgba(232, 152, 92, 0.1) 44%, transparent 72%),
+    radial-gradient(150% 120% at 50% 30%, rgba(214, 152, 98, 0.09), transparent 60%),
+    radial-gradient(125% 130% at 50% 42%, transparent 52%, rgba(12, 8, 5, 0.32) 100%),
     linear-gradient(
       180deg,
-      rgba(20, 14, 9, 0.62) 0%,
-      rgba(20, 14, 9, 0.26) 38%,
-      rgba(16, 11, 7, 0.5) 62%,
-      rgba(11, 8, 5, 0.72) 100%
+      rgba(26, 18, 11, 0.42) 0%,
+      rgba(26, 18, 11, 0.12) 40%,
+      rgba(18, 13, 8, 0.3) 64%,
+      rgba(12, 9, 6, 0.54) 100%
     );
 }
 
 /* Keep the hero text crisp over the lightened, atmospheric landscape without
    over-darkening it — a soft shadow lets light type read on any mist tone. */
 :root[data-theme="dark"] .home-title,
-:root[data-theme="dark"] .home-subtitle,
 :root[data-theme="dark"] .home-stat-num {
   text-shadow: 0 1px 10px rgba(0, 0, 0, 0.7), 0 0 3px rgba(0, 0, 0, 0.55);
 }
 
-/* The eyebrow labels (热门检索 / 继续阅读 / 收录典籍…) sit over the brightest
-   part of the misty valley, where a muted grey washes out. Brighten them and
-   give a tight dark halo so they read crisply without darkening the scene. */
+/* Subtitle + eyebrow labels sit over the brightest zone (the warm sun-glow and
+   the misty valley), where light-grey type washes out. Brighten them and give a
+   tight dark halo so they read crisply without darkening the scene. */
+:root[data-theme="dark"] .home-subtitle {
+  color: #ded4c1;
+  text-shadow: 0 0 5px rgba(0, 0, 0, 0.85), 0 1px 3px rgba(0, 0, 0, 0.8);
+}
 :root[data-theme="dark"] .home-hot-label,
 :root[data-theme="dark"] .home-stat-lbl {
   color: #d8cdb8;
