@@ -56,7 +56,7 @@
   font-family: inherit;
   line-height: 1.6;
   color: var(--fj-ink);
-  background: #fff;
+  background: var(--fj-surface);
   resize: vertical;
 }
 .rp-input:focus {
@@ -114,7 +114,7 @@
   gap: 10px;
   font-size: 13px;
   color: var(--fj-ink);
-  background: #fbf9f4;
+  background: var(--fj-surface-alt);
   border: 1px solid #ede5d6;
   border-radius: 8px;
   padding: 8px 12px;
@@ -229,4 +229,9 @@
     align-self: stretch;
     justify-content: center;
   }
+}
+
+/* Dark mode: URN chip cream bg didn't flip. */
+:root[data-theme="dark"] .rp-urn {
+  background: var(--fj-surface-alt);
 }

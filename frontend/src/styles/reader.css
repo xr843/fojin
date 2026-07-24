@@ -203,7 +203,7 @@
   width: 300px;
   max-width: calc(100vw - 16px);
   background: #fffef8;
-  border: 1px solid #d9d0c1;
+  border: 1px solid var(--fj-border);
   border-radius: 6px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
   font-family: "Noto Serif SC", "Source Han Serif SC", serif;
@@ -342,7 +342,7 @@
   z-index: 100;
   width: 48px !important;
   height: 48px !important;
-  background: #fff !important;
+  background: var(--fj-surface) !important;
   border-color: var(--fj-accent, #8b6914) !important;
   color: var(--fj-accent, #8b6914) !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -367,7 +367,7 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #fff;
+  background: var(--fj-surface);
   overflow: hidden;
 }
 
@@ -397,7 +397,7 @@
   transform: translate(-50%, -50%);
   width: 4px;
   height: 32px;
-  background: var(--fj-border, #d9d0c1);
+  background: var(--fj-border, var(--fj-border));
   border-radius: 2px;
   transition: background 0.15s;
 }
@@ -559,7 +559,7 @@
 .reader-ai-suggestion {
   display: inline-block;
   padding: 3px 10px;
-  background: #f5f0e8;
+  background: var(--fj-surface-alt);
   border: 1px solid rgba(139, 105, 20, 0.15);
   border-radius: 12px;
   font-size: 12px;
@@ -757,7 +757,7 @@
 }
 .reader-parallel-panel .parallel-full-scroll::-webkit-scrollbar-track,
 .reader-parallel-panel::-webkit-scrollbar-track {
-  background: #f5f5f5;
+  background: var(--fj-surface-alt);
   border-radius: 5px;
 }
 .reader-parallel-panel .parallel-full-scroll::-webkit-scrollbar-thumb,
@@ -829,3 +829,9 @@
   cursor: pointer;
 }
 .cbeta-line-locator button:hover { background: rgba(255, 255, 255, 0.12); }
+
+/* Dark mode: dictionary popover was pinned to paper-white while its controls use
+   ink tokens (light in dark) → unreadable. Flip the surface. */
+:root[data-theme="dark"] .reader-dict-popover {
+  background: var(--fj-surface);
+}

@@ -1,7 +1,7 @@
 /* 祖师长廊 — master picker.
    No portraits by design: a cinnabar name-seal stands in for the avatar.
    Every colour below comes from the existing FoJin token set; --fj-accent
-   (#8b2500) already *is* seal-ink red, so the seal needs no new colour. */
+   (var(--fj-accent)) already *is* seal-ink red, so the seal needs no new colour. */
 
 .mg {
   display: flex;
@@ -28,26 +28,26 @@
   font-size: 13px;
   padding: 4px 13px;
   border-radius: 999px;
-  border: 1px solid var(--fj-border, #d9d0c1);
+  border: 1px solid var(--fj-border, var(--fj-border));
   background: transparent;
-  color: var(--fj-ink-light, #5c4f3d);
+  color: var(--fj-ink-light, var(--fj-ink-light));
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
 .mg-chip:hover {
-  border-color: var(--fj-accent, #8b2500);
-  color: var(--fj-accent, #8b2500);
+  border-color: var(--fj-accent, var(--fj-accent));
+  color: var(--fj-accent, var(--fj-accent));
 }
 
 .mg-chip:focus-visible {
-  outline: 2px solid var(--fj-accent, #8b2500);
+  outline: 2px solid var(--fj-accent, var(--fj-accent));
   outline-offset: 2px;
 }
 
 .mg-chip[aria-pressed="true"] {
-  background: var(--fj-accent, #8b2500);
-  border-color: var(--fj-accent, #8b2500);
+  background: var(--fj-accent, var(--fj-accent));
+  border-color: var(--fj-accent, var(--fj-accent));
   color: #fff;
 }
 
@@ -77,27 +77,27 @@
   text-align: left;
   font: inherit;
   color: inherit;
-  background: #fffdfa;
-  border: 1px solid var(--fj-border, #d9d0c1);
+  background: var(--fj-surface-alt);
+  border: 1px solid var(--fj-border, var(--fj-border));
   border-radius: 3px;
   cursor: pointer;
   transition: border-color 0.16s, box-shadow 0.16s, transform 0.16s;
 }
 
 .mg-card:hover {
-  border-color: var(--fj-accent, #8b2500);
+  border-color: var(--fj-accent, var(--fj-accent));
   box-shadow: 0 4px 14px -6px rgba(139, 37, 0, 0.28);
   transform: translateY(-1px);
 }
 
 .mg-card:focus-visible {
-  outline: 2px solid var(--fj-accent, #8b2500);
+  outline: 2px solid var(--fj-accent, var(--fj-accent));
   outline-offset: 2px;
 }
 
 .mg-card.is-selected {
-  border-color: var(--fj-accent, #8b2500);
-  box-shadow: inset 0 0 0 1px var(--fj-accent, #8b2500);
+  border-color: var(--fj-accent, var(--fj-accent));
+  box-shadow: inset 0 0 0 1px var(--fj-accent, var(--fj-accent));
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -119,7 +119,7 @@
 /* ── The seal (白文印: name reversed out of cinnabar) ── */
 .mg-seal {
   flex-shrink: 0;
-  background: var(--fj-accent, #8b2500);
+  background: var(--fj-accent, var(--fj-accent));
   border-radius: 2px;
   display: grid;
   place-items: center;
@@ -148,23 +148,23 @@
   font-family: "Noto Serif SC", "Source Han Serif SC", serif;
   font-size: 16px;
   font-weight: 700;
-  color: var(--fj-ink, #2b2318);
+  color: var(--fj-ink, var(--fj-ink));
   letter-spacing: 0.02em;
 }
 
 .mg-meta {
   font-size: 12px;
-  color: var(--fj-ink-muted, #9a8e7a);
+  color: var(--fj-ink-muted, var(--fj-ink-muted));
   font-variant-numeric: tabular-nums;
 }
 
 .mg-school {
-  color: var(--fj-ink-light, #5c4f3d);
+  color: var(--fj-ink-light, var(--fj-ink-light));
 }
 
 .mg-rule {
   height: 1px;
-  background: var(--fj-border, #d9d0c1);
+  background: var(--fj-border, var(--fj-border));
 }
 
 /* ── The description: the spine. Every card has one, because it answers the
@@ -176,7 +176,7 @@
   font-family: "Noto Serif SC", "Source Han Serif SC", serif;
   font-size: 13.5px;
   line-height: 1.8;
-  color: var(--fj-ink-light, #5c4f3d);
+  color: var(--fj-ink-light, var(--fj-ink-light));
   min-height: 2.8em; /* ~2 lines, so a short description doesn't collapse the card */
 }
 
@@ -188,11 +188,11 @@
   display: block;
   margin-top: 2px;
   padding-top: 10px;
-  border-top: 1px dashed var(--fj-border, #d9d0c1);
+  border-top: 1px dashed var(--fj-border, var(--fj-border));
   font-family: "Noto Serif SC", "Source Han Serif SC", serif;
   font-size: 14.5px;
   line-height: 1.8;
-  color: var(--fj-ink, #2b2318);
+  color: var(--fj-ink, var(--fj-ink));
 }
 
 /* ── Source line: every quote carries its citation and its verified state,
@@ -208,12 +208,12 @@
   flex-wrap: nowrap;
   min-width: 0;
   font-size: 11.5px;
-  color: var(--fj-ink-muted, #9a8e7a);
+  color: var(--fj-ink-muted, var(--fj-ink-muted));
 }
 
 .mg-ref {
   font-family: "Noto Serif SC", "Source Han Serif SC", serif;
-  color: var(--fj-ink-light, #5c4f3d);
+  color: var(--fj-ink-light, var(--fj-ink-light));
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -240,14 +240,14 @@
 
 .mg-open {
   margin-left: auto;
-  color: var(--fj-accent, #8b2500);
+  color: var(--fj-accent, var(--fj-accent));
   font-size: 12px;
   cursor: pointer;
   padding: 0 2px;
 }
 
 .mg-open:focus-visible {
-  outline: 2px solid var(--fj-accent, #8b2500);
+  outline: 2px solid var(--fj-accent, var(--fj-accent));
   outline-offset: 1px;
   border-radius: 2px;
 }
@@ -258,8 +258,8 @@
   align-items: center;
   gap: 11px;
   padding: 10px 14px;
-  background: #fffdfa;
-  border: 1px solid var(--fj-border, #d9d0c1);
+  background: var(--fj-surface-alt);
+  border: 1px solid var(--fj-border, var(--fj-border));
   border-radius: 3px;
 }
 
@@ -274,12 +274,12 @@
   font-family: "Noto Serif SC", "Source Han Serif SC", serif;
   font-weight: 700;
   font-size: 15px;
-  color: var(--fj-ink, #2b2318);
+  color: var(--fj-ink, var(--fj-ink));
 }
 
 .mg-head-sub {
   font-size: 11.5px;
-  color: var(--fj-ink-muted, #9a8e7a);
+  color: var(--fj-ink-muted, var(--fj-ink-muted));
 }
 
 .mg-head-swap {
@@ -292,9 +292,9 @@
   margin-top: 8px;
   font-size: 11.5px;
   line-height: 1.7;
-  color: var(--fj-ink-muted, #9a8e7a);
+  color: var(--fj-ink-muted, var(--fj-ink-muted));
   padding: 8px 12px;
-  background: var(--fj-bg-alt, #f0ebe2);
-  border-left: 2px solid var(--fj-border, #d9d0c1);
+  background: var(--fj-bg-alt, var(--fj-bg-alt));
+  border-left: 2px solid var(--fj-border, var(--fj-border));
   border-radius: 3px;
 }

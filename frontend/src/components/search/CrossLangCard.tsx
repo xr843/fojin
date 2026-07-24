@@ -89,8 +89,8 @@ export default function CrossLangCard({ hit, rank }: { hit: CrossLanguageSearchH
         </div>
         {relatedTranslations.length > 0 && (
           <div className="s-card-translations">
-            <TranslationOutlined style={{ fontSize: 12, color: "#9a8e7a", marginRight: 4 }} />
-            <span style={{ fontSize: 12, color: "#9a8e7a", marginRight: 6 }}>{t("search.related_translations")}</span>
+            <TranslationOutlined style={{ fontSize: 12, color: "var(--fj-ink-muted)", marginRight: 4 }} />
+            <span style={{ fontSize: 12, color: "var(--fj-ink-muted)", marginRight: 6 }}>{t("search.related_translations")}</span>
             {relatedTranslations.map((rt) => (
               <Tag
                 key={rt.id}

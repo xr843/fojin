@@ -45,7 +45,7 @@
 
 /* ---------- 工具栏 ---------- */
 .kg-map-toolbar {
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px 8px 0 0;
   padding: 12px 16px;
@@ -85,7 +85,7 @@
   border: 1px solid var(--fj-border);
   border-top: none;
   border-radius: 0 0 8px 8px;
-  background: #f5f3ef;
+  background: var(--fj-surface-alt);
 }
 
 .kg-map-loading {
@@ -99,7 +99,7 @@
 .kg-map-tooltip {
   position: absolute;
   pointer-events: none;
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 6px;
   padding: 8px 12px;
@@ -133,16 +133,16 @@
 
 .kg-map-tooltip .tooltip-year {
   font-size: 10px;
-  color: #b08d57;
+  color: var(--fj-gold);
   margin-top: 2px;
 }
 
 .kg-map-tooltip .tooltip-desc {
   font-size: 11px;
-  color: #5c4f3d;
+  color: var(--fj-ink-light);
   margin-top: 6px;
   padding-top: 6px;
-  border-top: 1px solid #f0ebe2;
+  border-top: 1px solid var(--fj-bg-alt);
   line-height: 1.5;
   max-width: 260px;
 }
@@ -162,14 +162,14 @@
 .kg-map-tooltip .tooltip-header .tooltip-type {
   font-size: 10px;
   color: var(--fj-ink-light);
-  background: #f0ebe2;
+  background: var(--fj-bg-alt);
   padding: 1px 6px;
   border-radius: 3px;
 }
 
 .kg-map-tooltip .tooltip-meta {
   font-size: 10px;
-  color: #b08d57;
+  color: var(--fj-gold);
   margin-top: 3px;
 }
 
@@ -178,14 +178,14 @@
   color: var(--fj-ink-light);
   margin-top: 6px;
   padding-top: 4px;
-  border-top: 1px dashed #f0ebe2;
+  border-top: 1px dashed var(--fj-bg-alt);
   opacity: 0.75;
 }
 
 .kg-map-tooltip .tooltip-local-notice {
   font-size: 10px;
   color: #8a7355;
-  background: #faf6ee;
+  background: var(--fj-surface-alt);
   padding: 2px 6px;
   border-radius: 3px;
   margin-top: 3px;
@@ -202,7 +202,7 @@
 
 .kg-map-popup {
   width: 260px;
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
@@ -238,7 +238,7 @@
 
 .kg-map-popup-desc {
   font-size: 12px;
-  color: #7a6e5c;
+  color: var(--fj-ink-muted);
   padding: 8px 14px;
   line-height: 1.5;
   overflow-y: auto;
@@ -247,7 +247,7 @@
 
 .kg-map-popup-year {
   font-size: 11px;
-  color: #b08d57;
+  color: var(--fj-gold);
   padding: 0 14px 8px;
 }
 
@@ -268,7 +268,7 @@
 }
 
 .kg-time-slider {
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--fj-surface);
   backdrop-filter: blur(8px);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
@@ -325,7 +325,7 @@
   z-index: 15;
   display: flex;
   gap: 14px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 6px;
   padding: 6px 14px;

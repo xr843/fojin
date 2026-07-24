@@ -24,6 +24,7 @@ import {
 } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { currentUILang } from "../i18n";
+import ThemeToggle from "./ThemeToggle";
 import { useAuthStore } from "../stores/authStore";
 import { getAdminPendingSummary, type AdminPendingSummary } from "../api/client";
 import FeedbackButton from "./FeedbackButton";
@@ -295,6 +296,7 @@ export default function Layout() {
           />
         </Space>
         <Space>
+          <ThemeToggle />
           <NotificationBell />
           <Dropdown
             menu={{

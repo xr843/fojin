@@ -507,7 +507,7 @@ export default function SourcesPage() {
 
       <div className="sources-toolbar">
         <Input
-          prefix={<SearchOutlined style={{ color: "#9a8e7a" }} />}
+          prefix={<SearchOutlined style={{ color: "var(--fj-ink-muted)" }} />}
           placeholder={t("sources.search_placeholder")}
           allowClear
           value={searchInput}

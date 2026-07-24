@@ -21,8 +21,8 @@
 .timeline-filters {
   width: 220px;
   flex-shrink: 0;
-  background: var(--fj-bg, #f8f5ef);
-  border: 1px solid var(--fj-border, #d9d0c1);
+  background: var(--fj-bg, var(--fj-bg));
+  border: 1px solid var(--fj-border, var(--fj-border));
   border-radius: 8px;
   padding: 16px;
   max-height: calc(100vh - 200px);
@@ -33,15 +33,15 @@
   font-family: "Noto Serif SC", serif;
   font-size: 14px;
   margin-bottom: 8px;
-  color: var(--fj-ink, #2b2318);
+  color: var(--fj-ink, var(--fj-ink));
 }
 
 .timeline-main {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  background: var(--fj-bg, #f8f5ef);
-  border: 1px solid var(--fj-border, #d9d0c1);
+  background: var(--fj-bg, var(--fj-bg));
+  border: 1px solid var(--fj-border, var(--fj-border));
   border-radius: 8px;
   padding: 8px;
 }
@@ -50,7 +50,7 @@
   position: absolute;
   pointer-events: none;
   background: rgba(43, 35, 24, 0.9);
-  color: #f8f5ef;
+  color: #f8f5ef; /* fixed light: tooltip bg is always dark, in both themes */
   padding: 8px 12px;
   border-radius: 6px;
   font-size: 13px;

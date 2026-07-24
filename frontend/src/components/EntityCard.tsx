@@ -125,7 +125,7 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
             fontFamily: '"Noto Serif SC", serif',
             fontSize: 18,
             fontWeight: 600,
-            color: "#2b2318",
+            color: "var(--fj-ink)",
           }}
         >
           {entity.name_zh}
@@ -138,7 +138,7 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
       {/* Description */}
       {entity.description && (
         <Typography.Paragraph
-          style={{ color: "#7a6e5c", fontSize: 13, marginBottom: 10, lineHeight: 1.6 }}
+          style={{ color: "var(--fj-ink-muted)", fontSize: 13, marginBottom: 10, lineHeight: 1.6 }}
         >
           {entity.description}
         </Typography.Paragraph>
@@ -151,7 +151,7 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
           type="link"
           size="small"
           icon={<BookOutlined />}
-          style={{ padding: 0, marginBottom: 10, color: "#8b2500", fontSize: 12 }}
+          style={{ padding: 0, marginBottom: 10, color: "var(--fj-accent)", fontSize: 12 }}
           onClick={() => navigate(`/texts/${entity.text_id}`)}
         >
           {t("entity.view_linked_text")}
@@ -162,7 +162,7 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
           type="link"
           size="small"
           icon={<ReadOutlined />}
-          style={{ padding: 0, marginBottom: 10, color: "#8b2500", fontSize: 12 }}
+          style={{ padding: 0, marginBottom: 10, color: "var(--fj-accent)", fontSize: 12 }}
           onClick={() =>
             navigate(`/dict/${encodeURIComponent(entity.name_zh)}`)
           }
@@ -175,7 +175,7 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
           type="link"
           size="small"
           icon={<UserOutlined />}
-          style={{ padding: 0, marginBottom: 10, color: "#8b2500", fontSize: 12 }}
+          style={{ padding: 0, marginBottom: 10, color: "var(--fj-accent)", fontSize: 12 }}
           onClick={() => navigate(`/person/${entity.id}`)}
         >
           {t("entity.person_page")}
@@ -185,26 +185,26 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
       {/* Multi-language names */}
       <div style={{ marginBottom: 10 }}>
         {entity.name_sa && (
-          <div style={{ fontSize: 12, color: "#5c4f3d", marginBottom: 2 }}>
-            <span style={{ color: "#9a8e7a", display: "inline-block", width: 48 }}>{t("lang.sa")}</span>
+          <div style={{ fontSize: 12, color: "var(--fj-ink-light)", marginBottom: 2 }}>
+            <span style={{ color: "var(--fj-ink-muted)", display: "inline-block", width: 48 }}>{t("lang.sa")}</span>
             {entity.name_sa}
           </div>
         )}
         {entity.name_pi && (
-          <div style={{ fontSize: 12, color: "#5c4f3d", marginBottom: 2 }}>
-            <span style={{ color: "#9a8e7a", display: "inline-block", width: 48 }}>{t("lang.pi")}</span>
+          <div style={{ fontSize: 12, color: "var(--fj-ink-light)", marginBottom: 2 }}>
+            <span style={{ color: "var(--fj-ink-muted)", display: "inline-block", width: 48 }}>{t("lang.pi")}</span>
             {entity.name_pi}
           </div>
         )}
         {entity.name_bo && (
-          <div style={{ fontSize: 12, color: "#5c4f3d", marginBottom: 2 }}>
-            <span style={{ color: "#9a8e7a", display: "inline-block", width: 48 }}>{t("lang.bo")}</span>
+          <div style={{ fontSize: 12, color: "var(--fj-ink-light)", marginBottom: 2 }}>
+            <span style={{ color: "var(--fj-ink-muted)", display: "inline-block", width: 48 }}>{t("lang.bo")}</span>
             {entity.name_bo}
           </div>
         )}
         {entity.name_en && (
-          <div style={{ fontSize: 12, color: "#5c4f3d", marginBottom: 2 }}>
-            <span style={{ color: "#9a8e7a", display: "inline-block", width: 48 }}>{t("lang.en")}</span>
+          <div style={{ fontSize: 12, color: "var(--fj-ink-light)", marginBottom: 2 }}>
+            <span style={{ color: "var(--fj-ink-muted)", display: "inline-block", width: 48 }}>{t("lang.en")}</span>
             {entity.name_en}
           </div>
         )}
@@ -214,8 +214,8 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
       {entity.properties && Object.keys(entity.properties).length > 0 && (
         <div
           style={{
-            background: "#faf8f5",
-            border: "1px solid #f0ebe2",
+            background: "var(--fj-surface-alt)",
+            border: "1px solid var(--fj-bg-alt)",
             borderRadius: 6,
             padding: "8px 10px",
             marginBottom: 10,
@@ -227,9 +227,9 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
             .map(([key, value]) => (
             <div
               key={key}
-              style={{ fontSize: 12, color: "#5c4f3d", marginBottom: 2 }}
+              style={{ fontSize: 12, color: "var(--fj-ink-light)", marginBottom: 2 }}
             >
-              <span style={{ color: "#9a8e7a", display: "inline-block", width: 48 }}>
+              <span style={{ color: "var(--fj-ink-muted)", display: "inline-block", width: 48 }}>
                 {PROPERTY_LABEL_KEYS[key] ? t(PROPERTY_LABEL_KEYS[key]) : key}
               </span>
               {String(value)}
@@ -244,7 +244,7 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
           {Object.entries(entity.external_ids).map(([key, value]) => (
             <div
               key={`ext-${key}`}
-              style={{ fontSize: 11, color: "#9a8e7a", marginBottom: 2 }}
+              style={{ fontSize: 11, color: "var(--fj-ink-muted)", marginBottom: 2 }}
             >
               <span style={{ textTransform: "uppercase", marginRight: 4 }}>
                 {key}:
@@ -254,7 +254,7 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
                   href={value}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ color: "#8b2500" }}
+                  style={{ color: "var(--fj-accent)" }}
                 >
                   {value}
                 </a>
@@ -270,14 +270,14 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
       {Object.keys(relationsByPredicate).length > 0 && (
         <>
           <Divider
-            style={{ margin: "10px 0 8px", borderColor: "#f0ebe2" }}
+            style={{ margin: "10px 0 8px", borderColor: "var(--fj-bg-alt)" }}
           />
           <div
             style={{
               fontFamily: '"Noto Serif SC", serif',
               fontSize: 13,
               fontWeight: 600,
-              color: "#2b2318",
+              color: "var(--fj-ink)",
               marginBottom: 8,
             }}
           >
@@ -289,7 +289,7 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
                 <div
                   style={{
                     fontSize: 12,
-                    color: "#9a8e7a",
+                    color: "var(--fj-ink-muted)",
                     marginBottom: 4,
                     display: "flex",
                     alignItems: "center",
@@ -299,11 +299,11 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
                   {PREDICATE_LABEL_KEYS[predicate] ? t(PREDICATE_LABEL_KEYS[predicate]) : predicate}
                   <span
                     style={{
-                      background: "#f0ebe2",
+                      background: "var(--fj-bg-alt)",
                       borderRadius: 8,
                       padding: "0 5px",
                       fontSize: 10,
-                      color: "#7a6e5c",
+                      color: "var(--fj-ink-muted)",
                     }}
                   >
                     {rels.length}
@@ -320,7 +320,7 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
                         padding: "3px 0",
                         cursor: onEntityClick ? "pointer" : undefined,
                         fontSize: 12,
-                        color: "#5c4f3d",
+                        color: "var(--fj-ink-light)",
                         display: "flex",
                         alignItems: "center",
                         gap: 4,
@@ -328,19 +328,19 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
                       onClick={() => onEntityClick?.(rel.target_id)}
                       onMouseEnter={(e) => {
                         if (onEntityClick)
-                          (e.currentTarget as HTMLElement).style.color = "#8b2500";
+                          (e.currentTarget as HTMLElement).style.color = "var(--fj-accent)";
                       }}
                       onMouseLeave={(e) => {
-                        (e.currentTarget as HTMLElement).style.color = "#5c4f3d";
+                        (e.currentTarget as HTMLElement).style.color = "var(--fj-ink-light)";
                       }}
                     >
                       {rel.direction === "outgoing" ? (
                         <ArrowRightOutlined
-                          style={{ color: "#d9d0c1", fontSize: 9 }}
+                          style={{ color: "var(--fj-border)", fontSize: 9 }}
                         />
                       ) : (
                         <ArrowLeftOutlined
-                          style={{ color: "#d9d0c1", fontSize: 9 }}
+                          style={{ color: "var(--fj-border)", fontSize: 9 }}
                         />
                       )}
                       <span className={targetClassName} style={{ fontSize: 9, lineHeight: "16px", padding: "0 4px" }}>
@@ -352,7 +352,7 @@ export default function EntityCard({ entity, onEntityClick }: EntityCardProps) {
                           <span
                             style={{
                               fontSize: 10,
-                              color: "#b3a98f",
+                              color: "var(--fj-ink-muted)",
                               marginLeft: "auto",
                               flexShrink: 0,
                             }}

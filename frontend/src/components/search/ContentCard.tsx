@@ -46,7 +46,7 @@ export default function ContentCard({ hit, rank }: { hit: ContentSearchHit; rank
           <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
             <Link to={buildReaderUrl(hit.text_id, hit.juan_num)}>
               <Button type="primary" size="small" icon={<ReadOutlined />}
-                style={{ background: "#8b2500", borderColor: "#8b2500" }}>
+                style={{ background: "var(--fj-accent)", borderColor: "var(--fj-accent)" }}>
                 {t("search.read")}
               </Button>
             </Link>

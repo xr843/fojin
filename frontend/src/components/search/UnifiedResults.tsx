@@ -91,7 +91,7 @@ export default function UnifiedResults({ data }: Props) {
                 <div style={{ fontSize: 15, fontWeight: 600, color: "#3d2f1a" }}>
                   {entry.headword}
                   {entry.reading && (
-                    <span style={{ fontSize: 13, color: "#9a8e7a", fontWeight: 400, marginLeft: 8 }}>
+                    <span style={{ fontSize: 13, color: "var(--fj-ink-muted)", fontWeight: 400, marginLeft: 8 }}>
                       [{entry.reading}]
                     </span>
                   )}
@@ -102,7 +102,7 @@ export default function UnifiedResults({ data }: Props) {
                     : entry.definition}
                 </div>
                 {entry.source && (
-                  <div style={{ fontSize: 12, color: "#9a8e7a", marginTop: 4 }}>
+                  <div style={{ fontSize: 12, color: "var(--fj-ink-muted)", marginTop: 4 }}>
                     {t("search.dict_source_label", { source: entry.source })}
                   </div>
                 )}

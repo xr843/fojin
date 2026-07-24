@@ -290,7 +290,7 @@ export default function SutraLandingPage() {
           style={{
             textAlign: "center",
             padding: "16px 0",
-            color: "var(--fj-ink-muted, #9a8e7a)",
+            color: "var(--fj-ink-muted, var(--fj-ink-muted))",
             fontSize: 13,
           }}
         >
