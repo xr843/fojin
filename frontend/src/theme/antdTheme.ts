@@ -18,7 +18,7 @@ export function buildAntdTheme(isDark: boolean): ThemeConfig {
       colorBgElevated: "#544a3a",
       colorBorder: "#60553f",
       colorText: "#efe8db",
-      colorTextSecondary: "#bdb29b",
+      colorTextSecondary: "#c6bca6",
     },
     components: {
       // antd's Layout Header/Footer do NOT follow colorBgBase — they need their
