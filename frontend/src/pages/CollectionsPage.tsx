@@ -374,7 +374,7 @@ function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useN
             撤下(待打磨)，故隐藏此链接。上方表格各行仍跳阅读器逐段对照(集成功能，保留)。
         {groups.length > TOP_N && (
           <p style={{ fontSize: 12, margin: "12px 0 0" }}>
-            <a onClick={() => navigate("/cross-canon")} style={{ cursor: "pointer", color: "var(--fj-accent)" }}>
+            <a onClick={() => navigate("/cross-canon")} style={{ cursor: "pointer", color: "var(--fj-highlight)" }}>
               {t("collections.alignment_more", { n: TOP_N, total: groups.length })} →
             </a>
           </p>
