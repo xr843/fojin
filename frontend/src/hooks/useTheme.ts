@@ -20,7 +20,7 @@ export function useApplyTheme(): "light" | "dark" {
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", effective);
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", effective === "dark" ? "#3a3126" : "#8b2500");
+    if (meta) meta.setAttribute("content", effective === "dark" ? "#2f2820" : "#8b2500");
   }, [effective]);
   return effective;
 }

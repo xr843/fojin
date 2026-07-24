@@ -27,19 +27,19 @@
 :root[data-theme="dark"] {
   /* Warm dark, lifted off pure-black so large chrome areas (header, footer,
      search bar, cards) feel soft rather than oppressive. */
-  --fj-bg:        #3a3126;
-  --fj-bg-alt:    #453a2c;
-  --fj-ink:       #ece4d6;
-  --fj-ink-light: #ccc1aa;
-  --fj-ink-muted: #c0b6a0;
-  --fj-accent:    #e0754a;
-  --fj-gold:      #d0b073;
-  --fj-border:    #635641;
-  --fj-card-bg:   #4c4030;
-  --fj-surface:   #4c4030;
-  --fj-surface-alt: #554837;
-  --fj-timeline-band-a: #453a2c;
-  --fj-timeline-band-b: #554837;
+  --fj-bg:        #2f2820;
+  --fj-bg-alt:    #3c342a;
+  --fj-ink:       #efe8db;
+  --fj-ink-light: #d2c7b1;
+  --fj-ink-muted: #bdb29b;
+  --fj-accent:    #e5764a;
+  --fj-gold:      #d6b579;
+  --fj-border:    #60553f;
+  --fj-card-bg:   #4a4133;
+  --fj-surface:   #4a4133;
+  --fj-surface-alt: #544a3a;
+  --fj-timeline-band-a: #3c342a;
+  --fj-timeline-band-b: #544a3a;
   color-scheme: dark;
 }
 

@@ -13,21 +13,21 @@ export function buildAntdTheme(isDark: boolean): ThemeConfig {
       colorPrimary: "#e0754a",
       borderRadius: 2,
       // warm antd's dark neutrals to match the --fj-* palette (spec: antd dark neutrals note)
-      colorBgBase: "#3a3126",
-      colorBgContainer: "#4c4030",
-      colorBgElevated: "#554837",
-      colorBorder: "#635641",
-      colorText: "#ece4d6",
-      colorTextSecondary: "#c0b6a0",
+      colorBgBase: "#2f2820",
+      colorBgContainer: "#4a4133",
+      colorBgElevated: "#544a3a",
+      colorBorder: "#60553f",
+      colorText: "#efe8db",
+      colorTextSecondary: "#bdb29b",
     },
     components: {
       // antd's Layout Header/Footer do NOT follow colorBgBase — they need their
       // own tokens, or the top/bottom bars stay near-black. Give them a warm
       // elevated tone so the large chrome bars read soft, not oppressive.
       Layout: {
-        headerBg: "#4c4030",
-        footerBg: "#4c4030",
-        bodyBg: "#3a3126",
+        headerBg: "#4a4133",
+        footerBg: "#4a4133",
+        bodyBg: "#2f2820",
       },
     },
   };
