@@ -68,15 +68,32 @@
    and the hero reads as genuinely dark. Stronger at top (over the bright sky
    where the title sits) and bottom (under the feature cards). */
 :root[data-theme="dark"] .home-hero-bg {
-  background: linear-gradient(180deg, #241d15 0%, #1b1610 50%, #14100c 100%);
+  background: linear-gradient(180deg, #2a2018 0%, #1c1610 55%, #12100c 100%);
 }
+/* Atmospheric twilight ink-wash: let the mountains breathe in the middle,
+   darken only the text zones (title top, labels+cards bottom), add an edge
+   vignette for depth, and a faint high dusk-glow for a focal point. */
 :root[data-theme="dark"] .home-hero-bg::after {
-  background: linear-gradient(
-    180deg,
-    rgba(18, 14, 10, 0.68) 0%,
-    rgba(18, 14, 10, 0.55) 45%,
-    rgba(18, 14, 10, 0.78) 100%
-  );
+  background:
+    radial-gradient(58% 40% at 50% 11%, rgba(224, 158, 96, 0.11), rgba(224, 140, 80, 0.04) 46%, transparent 70%),
+    radial-gradient(120% 125% at 50% 40%, transparent 44%, rgba(9, 6, 4, 0.5) 100%),
+    linear-gradient(
+      180deg,
+      rgba(20, 14, 9, 0.62) 0%,
+      rgba(20, 14, 9, 0.26) 38%,
+      rgba(16, 11, 7, 0.5) 62%,
+      rgba(11, 8, 5, 0.72) 100%
+    );
+}
+
+/* Keep the hero text crisp over the lightened, atmospheric landscape without
+   over-darkening it — a soft shadow lets light type read on any mist tone. */
+:root[data-theme="dark"] .home-title,
+:root[data-theme="dark"] .home-subtitle,
+:root[data-theme="dark"] .home-stat-lbl,
+:root[data-theme="dark"] .home-stat-num,
+:root[data-theme="dark"] .home-hot-label {
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.7), 0 0 3px rgba(0, 0, 0, 0.55);
 }
 
 /* 英雄区内容层 */
