@@ -361,6 +361,10 @@
   color: #8b6914;
   margin-bottom: 4px;
 }
+/* The dark-gold above reads fine on the light panel but only 2.40:1 on the dark one. */
+:root[data-theme="dark"] .s-content-juan-label {
+  color: var(--fj-gold);
+}
 
 /* ---------- 辞典知识卡片 ---------- */
 .s-dict-knowledge {
