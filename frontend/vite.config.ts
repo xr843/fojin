@@ -149,6 +149,29 @@ export default defineConfig({
     include: ["src/**/*.test.{ts,tsx}"],
     css: false,
     testTimeout: 10000,
+    // React 19's scheduler runs on setImmediate under Node. When a render or
+    // unmount lands late, `performWorkUntilDeadline` is still queued as vitest
+    // destroys the file's jsdom environment; the callback then fires with
+    // `window` already gone. Every test passes (251/251) but the run is marked
+    // failed, measured at ~29% of full-suite runs — roughly one CI rerun in
+    // three, for a race that happens strictly after the tests are done.
+    //
+    // Ignore that one signature and nothing else: all three conditions must
+    // hold, so a genuine unhandled error — including any *other* ReferenceError,
+    // or this same message from application code rather than React's scheduler —
+    // still fails the run. Drop this once React/vitest stop racing at teardown.
+    //
+    // Not fixed in test code: draining the setImmediate queue in afterAll was
+    // tried and measured (paired A/B, 14 pairs) — it did not help (baseline 4/14
+    // vs 7/14 with the drain), so the config-level filter is the honest option.
+    onUnhandledError(error) {
+      const isTeardownRace =
+        error.type === "Uncaught Exception" &&
+        error.name === "ReferenceError" &&
+        error.message === "window is not defined" &&
+        (error.stack ?? "").includes("performWorkUntilDeadline");
+      if (isTeardownRace) return false;
+    },
   },
   server: {
     port: 3000,

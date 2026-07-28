@@ -74,7 +74,7 @@ export default function ResearchPage() {
       {!user ? (
         <div className="rp-login">
           <p>{t("research.login_required")}</p>
-          <Link className="rp-login-btn" to="/login">{t("nav.login")}</Link>
+          <Link className="rp-login-btn" to="/login">{t("auth.login")}</Link>
         </div>
       ) : (
         <>

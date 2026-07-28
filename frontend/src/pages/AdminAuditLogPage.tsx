@@ -34,7 +34,7 @@ function renderValue(t: TFunction, v: unknown): string {
 }
 
 function renderDetail(t: TFunction, detail: Record<string, unknown> | null) {
-  if (!detail || Object.keys(detail).length === 0) return <span style={{ color: "#999" }}>—</span>;
+  if (!detail || Object.keys(detail).length === 0) return <span style={{ color: "var(--fj-text-secondary)" }}>—</span>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       {Object.entries(detail).map(([key, value]) => {
@@ -103,7 +103,7 @@ export default function AdminAuditLogPage() {
       title: t("admin_crud.column.actor"),
       dataIndex: "actor_username",
       width: 130,
-      render: (name: string | null) => name || <span style={{ color: "#999" }}>{t("admin_crud.audit.deleted_user")}</span>,
+      render: (name: string | null) => name || <span style={{ color: "var(--fj-text-secondary)" }}>{t("admin_crud.audit.deleted_user")}</span>,
     },
     {
       title: t("admin_crud.column.action"),

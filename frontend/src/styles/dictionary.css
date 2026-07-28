@@ -104,7 +104,7 @@
 }
 
 .dict-hot-terms .ant-tag:hover {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   border-color: var(--fj-accent);
 }
 
@@ -173,7 +173,7 @@
 }
 
 .dict-result-stats strong {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
 }
 
 /* ---------- Grouped results ---------- */
