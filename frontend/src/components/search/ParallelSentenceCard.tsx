@@ -50,7 +50,7 @@ export default function ParallelSentenceCard({
     borderRadius: 4,
     fontSize: 14,
     lineHeight: 1.9,
-    color: "#5a4a3a",
+    color: "var(--fj-ink-light)",
     wordBreak: "break-word",
   });
 

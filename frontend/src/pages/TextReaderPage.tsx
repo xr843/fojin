@@ -293,7 +293,7 @@ function ApparatusMarker({ no, entry, t }: { no: number; entry: ApparatusEntryIt
           ))}
           <span>{r.is_omission ? t("reader.apparatus.omission") : r.reading}</span>
           {r.resp && (
-            <span style={{ color: "#999", fontSize: 12, marginInlineStart: 4 }}>
+            <span style={{ color: "var(--fj-text-secondary)", fontSize: 12, marginInlineStart: 4 }}>
               {t("reader.apparatus.corrector", { resp: r.resp })}
             </span>
           )}

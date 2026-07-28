@@ -222,7 +222,7 @@ export default function AdminFeedbacksPage() {
               {replyModal.content}
             </div>
             {replyModal.contact && (
-              <div style={{ marginTop: 8, fontSize: 12, color: "#999" }}>
+              <div style={{ marginTop: 8, fontSize: 12, color: "var(--fj-text-secondary)" }}>
                 {t("admin_crud.feedback.contact_label", { contact: replyModal.contact })}
               </div>
             )}
@@ -239,7 +239,7 @@ export default function AdminFeedbacksPage() {
           style={{ marginTop: 4 }}
         />
         {replyModal?.replied_at && (
-          <div style={{ marginTop: 8, fontSize: 12, color: "#999" }}>
+          <div style={{ marginTop: 8, fontSize: 12, color: "var(--fj-text-secondary)" }}>
             {t("admin_crud.feedback.last_reply_at", { date: formatAdminDate(replyModal.replied_at, i18n.language) })}
           </div>
         )}

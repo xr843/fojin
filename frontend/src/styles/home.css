@@ -140,7 +140,7 @@
 }
 
 .home-title-accent {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
 }
 
 /* ---------- 副标题 ---------- */
@@ -205,7 +205,7 @@
   font-family: "Noto Serif SC", serif;
   font-size: 13px;
   font-weight: 600;
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   white-space: nowrap;
   transition: background 0.15s;
   flex-shrink: 0;
@@ -276,7 +276,7 @@
   height: 100%;
   padding: 0 24px;
   background: var(--fj-accent);
-  color: #fff;
+  color: var(--fj-on-accent);
   border: none;
   cursor: pointer;
   font-family: "Noto Serif SC", serif;
@@ -325,7 +325,7 @@
 }
 
 .home-hot-tag:hover {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   border-color: var(--fj-gold);
   background: var(--fj-surface);
 }
@@ -362,7 +362,7 @@
   line-height: 1.6;
 }
 .home-tip a {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
 }
 
 /* ---------- 可信度说明 ---------- */
@@ -376,7 +376,7 @@
 }
 
 .home-trust-link {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   cursor: pointer;
   transition: opacity 0.2s;
 }
@@ -541,7 +541,7 @@
 }
 
 .src-item-link:hover {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   background: rgba(139,37,0,0.06);
 }
 
@@ -612,7 +612,7 @@
 }
 
 .ext-link:hover {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   border-color: var(--fj-gold);
   background: var(--fj-surface);
 }
@@ -624,7 +624,7 @@
   margin-top: 12px;
   padding: 6px 12px;
   font-size: 12px;
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   background: none;
   border: 1px solid #e8e0d4;
   border-radius: 4px;
@@ -809,4 +809,10 @@
   .home-feature-card { padding: 12px 8px; }
   .home-feature-icon { font-size: 20px; margin-bottom: 4px; }
   .home-feature-title { font-size: 12px; }
+}
+
+/* 卡片底色为了"跳"出来提亮到 #625742 后，副文案的 --fj-ink-light 被挤到 4.24:1。
+   给它一档更亮的暖白（4.92:1），仍比卡片标题（5.82:1）柔和，层次不变。 */
+:root[data-theme="dark"] .home-feature-desc {
+  color: #e0d6c2;
 }

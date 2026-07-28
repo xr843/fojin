@@ -83,7 +83,7 @@
 .coll-card-toggle {
   display: inline-block;
   font-size: 13px;
-  color: var(--fj-accent, var(--fj-accent));
+  color: var(--fj-highlight);
   margin-top: 4px;
 }
 
@@ -147,7 +147,7 @@
 
 /* Indexed titles are anchors now; keep the previous inline-styled look. */
 .coll-text-title-link {
-  color: var(--fj-accent, var(--fj-accent));
+  color: var(--fj-highlight);
   text-decoration: none;
 }
 
@@ -210,7 +210,7 @@
 }
 
 .coll-res-tab.active {
-  color: var(--fj-accent, var(--fj-accent));
+  color: var(--fj-highlight);
   border-bottom-color: var(--fj-accent, var(--fj-accent));
   font-weight: 500;
 }
@@ -233,7 +233,7 @@
 
 .coll-res-tab.active .coll-res-tab-count {
   background: rgba(139, 37, 0, 0.12);
-  color: var(--fj-accent, var(--fj-accent));
+  color: var(--fj-highlight);
 }
 
 .coll-res-content {
@@ -261,7 +261,7 @@
 .coll-link-name {
   font-size: 13px;
   font-weight: 500;
-  color: var(--fj-accent, var(--fj-accent));
+  color: var(--fj-highlight);
 }
 
 .coll-link-desc {

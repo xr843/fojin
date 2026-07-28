@@ -246,7 +246,7 @@
 .kg-chip.active {
   background: var(--fj-gold);
   border-color: var(--fj-gold);
-  color: #fff;
+  color: var(--fj-on-gold);
 }
 
 @media (max-width: 768px) {
@@ -618,7 +618,7 @@
   transition: color 0.2s;
 }
 .kg-timeline-toggle:hover { color: var(--fj-ink); }
-.kg-timeline-toggle.active { color: var(--fj-accent); }
+.kg-timeline-toggle.active { color: var(--fj-highlight); }
 
 /* ---------- 响应式 ---------- */
 @media (max-width: 1200px) {
@@ -873,12 +873,12 @@
 }
 
 /* ---- Dark mode: entity-type tags → hue-tinted dark chips (light unchanged) ---- */
-:root[data-theme="dark"] .kg-type-tag--person    { background: rgba(245, 34, 45, 0.16);  color: #ff7875; border-color: rgba(245, 34, 45, 0.38); }
-:root[data-theme="dark"] .kg-type-tag--text      { background: rgba(47, 84, 235, 0.20);  color: #85a5ff; border-color: rgba(47, 84, 235, 0.42); }
-:root[data-theme="dark"] .kg-type-tag--monastery { background: rgba(82, 196, 26, 0.16);  color: #95de64; border-color: rgba(82, 196, 26, 0.38); }
-:root[data-theme="dark"] .kg-type-tag--school    { background: rgba(114, 46, 209, 0.22); color: #b37feb; border-color: rgba(114, 46, 209, 0.42); }
-:root[data-theme="dark"] .kg-type-tag--place     { background: rgba(250, 140, 22, 0.16); color: #ffc069; border-color: rgba(250, 140, 22, 0.38); }
-:root[data-theme="dark"] .kg-type-tag--concept   { background: rgba(19, 194, 194, 0.16); color: #5cdbd3; border-color: rgba(19, 194, 194, 0.38); }
+:root[data-theme="dark"] .kg-type-tag--person    { background: rgba(245, 34, 45, 0.16);  color: #ffccc7; border-color: rgba(245, 34, 45, 0.38); }
+:root[data-theme="dark"] .kg-type-tag--text      { background: rgba(47, 84, 235, 0.20);  color: #adc6ff; border-color: rgba(47, 84, 235, 0.42); }
+:root[data-theme="dark"] .kg-type-tag--monastery { background: rgba(82, 196, 26, 0.16);  color: #b7eb8f; border-color: rgba(82, 196, 26, 0.38); }
+:root[data-theme="dark"] .kg-type-tag--school    { background: rgba(114, 46, 209, 0.22); color: #d3adf7; border-color: rgba(114, 46, 209, 0.42); }
+:root[data-theme="dark"] .kg-type-tag--place     { background: rgba(250, 140, 22, 0.16); color: #ffd591; border-color: rgba(250, 140, 22, 0.38); }
+:root[data-theme="dark"] .kg-type-tag--concept   { background: rgba(19, 194, 194, 0.16); color: #87e8de; border-color: rgba(19, 194, 194, 0.38); }
 
 /* ---- Dark mode: fixes for stateful cream backgrounds the sweep missed ---- */
 /* Selected KG result: cream bg didn't flip while the name/desc use ink tokens
@@ -888,10 +888,17 @@
 }
 /* 7th entity-type tag (dynasty) was omitted from the dark override set. */
 :root[data-theme="dark"] .kg-type-tag--dynasty {
-  background: rgba(235, 47, 150, 0.16); color: #ff85c0; border-color: rgba(235, 47, 150, 0.4);
+  background: rgba(235, 47, 150, 0.16); color: #ffadd2; border-color: rgba(235, 47, 150, 0.4);
 }
 /* "results truncated" alert: near-white amber box glowing in the dark graph. */
 :root[data-theme="dark"] .kg-truncated-bar .ant-alert {
   background: rgba(214, 152, 60, 0.16);
   border-color: var(--fj-gold);
+}
+
+/* 类型标签的底是半透明色叠在同样带色的结果行上，合成后文字只有 3.1–4.1:1；
+   上面已把 7 种的暗色文字统一提高一档。结果行的描述与关系数同理。 */
+:root[data-theme="dark"] .kg-result-desc,
+:root[data-theme="dark"] .kg-result-degree {
+  color: var(--fj-ink-light);
 }
