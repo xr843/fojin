@@ -171,7 +171,7 @@ function trustStatusColor(status?: ChatTrustStatus | null): string {
  * the chunk_index field was wired through) we emit chunk_index=-1; the click
  * handler in the renderer falls back to reader-page navigation in that case.
  */
-function injectCitationLinks(content: string, sources: ChatSource[] | null): string {
+export function injectCitationLinks(content: string, sources: ChatSource[] | null): string {
   if (!sources || sources.length === 0) return content;
 
   // Two indexes over the RAG sources, both keyed on the simplified title so
@@ -205,8 +205,19 @@ function injectCitationLinks(content: string, sources: ChatSource[] | null): str
     const candidates = titleSources.get(simplifiedTitle) ?? [];
     const picked = pickSourceForQuote(candidates, quote);
     const source = picked ?? fallback;
-    const chunkIdx = source.chunk_index ?? -1;
     const juan = picked ? picked.juan_num : (juanHint ?? source.juan_num);
+    // chunk_index 只在它确实属于 `juan` 那一卷时才成立。
+    //
+    // 没有 quote 命中时，卷号来自 LLM 写的「第 N 卷」（juanHint），段号却来自
+    // 检索结果——而检索命中的很可能是**另一卷**。把两者拼成一对，就会生成
+    // 「第 2 卷第 25 段」这种组合，可第 2 卷只有 0–22 段。生产日志实测：近 7 天
+    // 119 个去重的引文上下文请求里 33 个落空（27.7%），且同一个段号 25 横跨
+    // 卷 2/4/5/6/7/9/10/11 反复出现——正是同一个检索段号被安到了不同的卷上。
+    //
+    // 与其把读者送去一个不存在的位置（抽屉打开却空白），不如承认这条引文没有
+    // 段级锚点：发 -1，点击处会退回该卷的阅读器页面，那是真实存在的东西。
+    const chunkIdx =
+      source.juan_num === juan ? (source.chunk_index ?? -1) : -1;
     const tail = quote ? `/${encodeURIComponent(quote)}` : "";
     const url = `${CITATION_URL_SCHEME}://${source.text_id}/${juan}/${chunkIdx}/${encodeURIComponent(simplifiedTitle)}${tail}`;
     return { url, juan };

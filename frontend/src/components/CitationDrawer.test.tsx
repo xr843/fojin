@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
+import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -8,6 +8,8 @@ import {
   getChunkAlignment,
   type ChunkContextItem,
 } from "../api/client";
+
+let originalScrollIntoView: typeof Element.prototype.scrollIntoView | undefined;
 
 // jsdom 不实现 matchMedia / scrollIntoView，而 antd Tabs 与 CitationBlocks 用到它们。
 beforeAll(() => {
@@ -24,7 +26,18 @@ beforeAll(() => {
         dispatchEvent: () => false,
       }) as unknown as MediaQueryList;
   }
+  // jsdom 没有 scrollIntoView，而 CitationBlocks 会调它。改原型是全局副作用，
+  // 必须在 afterAll 里还原——否则会漏进同一 worker 后续的测试文件。
+  originalScrollIntoView = Element.prototype.scrollIntoView;
   Element.prototype.scrollIntoView = vi.fn();
+});
+
+afterAll(() => {
+  if (originalScrollIntoView) {
+    Element.prototype.scrollIntoView = originalScrollIntoView;
+  } else {
+    delete (Element.prototype as Partial<Element>).scrollIntoView;
+  }
 });
 
 vi.mock("../api/client", () => ({
