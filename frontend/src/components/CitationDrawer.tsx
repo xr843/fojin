@@ -246,6 +246,39 @@ export default function CitationDrawer({ target, onClose }: Props) {
 
   const hasParallels = availableLangs.length > 1;
 
+  // 汉文 body, shared by the tabbed and untabbed layouts.
+  //
+  // The empty branch matters: a 200 response can still carry zero chunks (the
+  // cited chunk does not exist — unknown juan, index past the end, or a text
+  // with no embeddings). Rendering the boundary hints around an empty body told
+  // the reader「前文（本卷第 0 段之前）」— a claim that content exists just out of
+  // view, when in fact nothing was found. Say so plainly instead.
+  const lzhBody =
+    dedupedChunks.length === 0 ? (
+      <Alert
+        type="warning"
+        showIcon
+        message={t("reader.citation.empty")}
+        description={t("reader.citation.empty_desc")}
+      />
+    ) : (
+      <>
+        {data?.has_more_before && (
+          <div className="chat-citation-boundary-hint">
+            {t("reader.citation.before_context", { n: dedupedChunks[0].chunk_index })}
+          </div>
+        )}
+        <CitationBlocks chunks={dedupedChunks} quote={target?.quote} />
+        {data?.has_more_after && (
+          <div className="chat-citation-boundary-hint">
+            {t("reader.citation.after_context", {
+              n: dedupedChunks[dedupedChunks.length - 1].chunk_index,
+            })}
+          </div>
+        )}
+      </>
+    );
+
   const readerUrl = target
     ? `/texts/${target.textId}/read?juan=${target.juanNum}&highlight_chunk=${target.chunkIndex}`
     : "#";
@@ -308,21 +341,7 @@ export default function CitationDrawer({ target, onClose }: Props) {
                     </span>
                   ),
                   children: lang === "lzh" ? (
-                    <div lang="zh-Hans">
-                      {data.has_more_before && (
-                        <div className="chat-citation-boundary-hint">
-                          {t("reader.citation.before_context", { n: data.chunks[0]?.chunk_index ?? 0 })}
-                        </div>
-                      )}
-                      <CitationBlocks chunks={dedupedChunks} quote={target?.quote} />
-                      {data.has_more_after && (
-                        <div className="chat-citation-boundary-hint">
-                          {t("reader.citation.after_context", {
-                            n: data.chunks[data.chunks.length - 1]?.chunk_index ?? 0,
-                          })}
-                        </div>
-                      )}
-                    </div>
+                    <div lang="zh-Hans">{lzhBody}</div>
                   ) : (
                     <div lang={lang}>
                       {(parallelsByLang[lang] || []).map((p, idx) => (
@@ -363,21 +382,7 @@ export default function CitationDrawer({ target, onClose }: Props) {
                 }))}
               />
             ) : (
-              <div lang="zh-Hans">
-                {data.has_more_before && (
-                  <div className="chat-citation-boundary-hint">
-                    {t("reader.citation.before_context", { n: data.chunks[0]?.chunk_index ?? 0 })}
-                  </div>
-                )}
-                <CitationBlocks chunks={dedupedChunks} quote={target?.quote} />
-                {data.has_more_after && (
-                  <div className="chat-citation-boundary-hint">
-                    {t("reader.citation.after_context", {
-                      n: data.chunks[data.chunks.length - 1]?.chunk_index ?? 0,
-                    })}
-                  </div>
-                )}
-              </div>
+              <div lang="zh-Hans">{lzhBody}</div>
             )}
           </>
         )}

@@ -70,6 +70,11 @@ export function pickSourceForQuote(
   let best: ChatSource | null = null;
   for (const s of candidates) {
     if (s.chunk_index == null) continue;
+    // chunk_text is required by the ChatSource type, but history messages come
+    // back from chat_messages.sources — persisted JSON that no runtime check
+    // validates, and rows written before the field existed simply lack it.
+    // Throwing here would blank the whole message, so skip what we can't match.
+    if (!s.chunk_text) continue;
     if (normalizeForMatch(s.chunk_text).includes(nq)) {
       if (!best || s.score > best.score) best = s;
     }

@@ -1346,6 +1346,8 @@
   "reader.citation.loading": "Loading source passage...",
   "reader.citation.load_failed": "Failed to load source passage",
   "reader.citation.load_failed_desc": "This passage may not be indexed yet. Try opening the full reader.",
+  "reader.citation.empty": "Passage not found in this fascicle",
+  "reader.citation.empty_desc": "The cited passage may not be indexed yet, or the fascicle/passage number may be wrong. Try opening the full fascicle in the reader.",
   "reader.citation.lang_tab.lzh": "Chinese",
   "reader.citation.lang_tab.pi": "Pali",
   "reader.citation.lang_tab.sa": "Sanskrit",

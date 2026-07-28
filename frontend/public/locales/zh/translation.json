@@ -1346,6 +1346,8 @@
   "reader.citation.loading": "正在加载原文…",
   "reader.citation.load_failed": "无法加载原文",
   "reader.citation.load_failed_desc": "可能是该段暂未入库，请尝试在完整阅读器中打开。",
+  "reader.citation.empty": "本卷未找到该段原文",
+  "reader.citation.empty_desc": "所引段落可能尚未入库，或卷次／段号定位有误。可尝试在完整阅读器中打开本卷查找。",
   "reader.citation.lang_tab.lzh": "汉文",
   "reader.citation.lang_tab.pi": "巴利",
   "reader.citation.lang_tab.sa": "梵文",
