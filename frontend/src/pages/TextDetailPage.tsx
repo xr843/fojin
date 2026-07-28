@@ -215,7 +215,7 @@ export default function TextDetailPage() {
               href={cbetaUrl}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ background: "var(--fj-accent)", borderColor: "var(--fj-accent)", color: "#fff" }}
+              style={{ background: "var(--fj-accent)", borderColor: "var(--fj-accent)", color: "var(--fj-on-accent)" }}
             >
               {t("textDetail.readOnCbeta")}
             </Button>

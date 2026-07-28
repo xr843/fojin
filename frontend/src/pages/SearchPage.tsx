@@ -516,7 +516,7 @@ export default function SearchPage() {
                 ))}
 
                 {!parallelLoading && !parallelError && parallelData && parallelData.results.length === 0 && (
-                  <div className="s-empty-state" style={{ margin: "24px 0 12px", padding: "16px 20px", background: "var(--fj-sand-light, #faf7f2)", border: "1px solid #e8e0d4", borderRadius: 6, color: "#6b5d4a", fontSize: 14 }}>
+                  <div className="s-empty-state" style={{ margin: "24px 0 12px", padding: "16px 20px", background: "var(--fj-sand-light, #faf7f2)", border: "1px solid var(--fj-border)", borderRadius: 6, color: "var(--fj-ink-light)", fontSize: 14 }}>
                     {t("search.parallel_empty")}
                   </div>
                 )}
@@ -647,7 +647,7 @@ export default function SearchPage() {
                     <Skeleton.Button active size="small" style={{ width: 60, height: 22, borderRadius: 4 }} />
                   </div>
                   {tab === "content" ? (
-                    <div style={{ padding: "8px 12px", background: "var(--fj-sand-light, #faf7f2)", borderLeft: "3px solid #d4a574", borderRadius: 4, marginTop: 8 }}>
+                    <div style={{ padding: "8px 12px", background: "var(--fj-sand-light, #faf7f2)", borderLeft: "3px solid var(--fj-gold)", borderRadius: 4, marginTop: 8 }}>
                       <Skeleton active paragraph={{ rows: 2 }} title={false} />
                     </div>
                   ) : tab === "dictionary" ? (
@@ -701,7 +701,7 @@ export default function SearchPage() {
             ))}</>)}
 
             {/* 跨语言结果 */}
-            {!loading && tab === "catalog" && crossLangData && crossLangData.results.length > 0 && (<><div style={{margin: "16px 0 8px", fontSize: 13, color: "var(--fj-ink-muted)", borderTop: "1px solid #e8e0d4", paddingTop: 12}}>🌐 {t("search.crosslang_match")}</div>{crossLangData.results.map((hit, i) => (
+            {!loading && tab === "catalog" && crossLangData && crossLangData.results.length > 0 && (<><div style={{margin: "16px 0 8px", fontSize: 13, color: "var(--fj-ink-muted)", borderTop: "1px solid var(--fj-border)", paddingTop: 12}}>🌐 {t("search.crosslang_match")}</div>{crossLangData.results.map((hit, i) => (
               <CrossLangCard key={hit.id} hit={hit} rank={i + 1 + (page - 1) * 20} />
             ))}</>)}
 
@@ -728,7 +728,7 @@ export default function SearchPage() {
 
             {/* 站内 0 结果显式空状态：避免与外部源卡片混淆 */}
             {showEmptyState && tab !== "dictionary" && (
-              <div className="s-empty-state" style={{ margin: "24px 0 12px", padding: "16px 20px", background: "var(--fj-sand-light, #faf7f2)", border: "1px solid #e8e0d4", borderRadius: 6, color: "#6b5d4a", fontSize: 14 }}>
+              <div className="s-empty-state" style={{ margin: "24px 0 12px", padding: "16px 20px", background: "var(--fj-sand-light, #faf7f2)", border: "1px solid var(--fj-border)", borderRadius: 6, color: "var(--fj-ink-light)", fontSize: 14 }}>
                 {t("search.empty_state_external")}
               </div>
             )}

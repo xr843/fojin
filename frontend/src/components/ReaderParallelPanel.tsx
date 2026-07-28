@@ -70,7 +70,7 @@ function ParallelCardBody({ p }: { p: import("../api/client").CanonicalParallel 
           <div style={{ fontSize: 11, color: "#5b8c6b", marginBottom: 4, fontWeight: 500, display: "flex", justifyContent: "space-between" }}>
             <span>{t("reader.parallel.pali_original")}</span>
             {full?.pali_chars ? (
-              <span style={{ color: "#999", fontWeight: 400 }}>
+              <span style={{ color: "var(--fj-text-secondary)", fontWeight: 400 }}>
                 {t("reader.parallel.char_count", { n: full.pali_chars.toLocaleString() })}
               </span>
             ) : null}
@@ -93,7 +93,7 @@ function ParallelCardBody({ p }: { p: import("../api/client").CanonicalParallel 
         <div style={{ marginBottom: 10, padding: "8px 10px", background: "#fafafa", borderRadius: 4 }}>
           <div style={{ fontSize: 11, color: "#666", marginBottom: 4, fontWeight: 500, display: "flex", justifyContent: "space-between" }}>
             <span>English (Sujato)</span>
-            {full?.english_chars ? <span style={{ color: "#999", fontWeight: 400 }}>{full.english_chars.toLocaleString()} chars</span> : null}
+            {full?.english_chars ? <span style={{ color: "var(--fj-text-secondary)", fontWeight: 400 }}>{full.english_chars.toLocaleString()} chars</span> : null}
           </div>
           <div
             lang="en"
@@ -194,7 +194,7 @@ function CanonicalView({ textId }: { textId: number }) {
                   </span>
                 </div>
                 {p.note && (
-                  <div style={{ fontSize: 11, color: "#999" }}>{p.note}</div>
+                  <div style={{ fontSize: 11, color: "var(--fj-text-secondary)" }}>{p.note}</div>
                 )}
               </div>
             ),
@@ -324,7 +324,7 @@ function ChunkView({ textId, juanNum }: Props) {
                           </span>
                         )}
                         {hasDisplayConfidence(p) && (
-                          <span style={{ fontSize: 11, color: "#999", marginLeft: "auto" }}>
+                          <span style={{ fontSize: 11, color: "var(--fj-text-secondary)", marginLeft: "auto" }}>
                             {t("reader.parallel.confidence", { n: (p.confidence * 100).toFixed(0) })}
                           </span>
                         )}
@@ -352,7 +352,7 @@ function ChunkView({ textId, juanNum }: Props) {
                         </div>
                       )}
                       {isMitra ? (
-                        <div style={{ marginTop: 8, fontSize: 11, color: "#999" }}>
+                        <div style={{ marginTop: 8, fontSize: 11, color: "var(--fj-text-secondary)" }}>
                           MITRA · CC BY-SA 4.0
                         </div>
                       ) : (
