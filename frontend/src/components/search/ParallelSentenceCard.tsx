@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Tag, Button } from "antd";
 import { ReadOutlined } from "@ant-design/icons";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { buildReaderUrl } from "../../utils/sourceUrls";
 import type { ParallelSentenceHit } from "../../api/client";
 

@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router";
 import { Helmet } from "react-helmet-async";
 import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";

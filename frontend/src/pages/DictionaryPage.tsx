@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router";
 import { Helmet } from "react-helmet-async";
 import { Input, Tag, Spin, Empty, Badge, Button, Select, Pagination } from "antd";
 import { SearchOutlined, RobotOutlined, DownOutlined, UpOutlined, ArrowLeftOutlined } from "@ant-design/icons";

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router";
 import { Helmet } from "react-helmet-async";
 import { Spin, Button, Result } from "antd";
 import { RobotOutlined, MessageOutlined, ShareAltOutlined } from "@ant-design/icons";

@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, List, Tag, Typography } from "antd";
 import { useTranslation } from "react-i18next";
 import { SwapOutlined } from "@ant-design/icons";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { getWorkByText } from "../api/client";
 import { workLangLabel, workCanonLabel, witnessHref } from "../utils/works";
 

@@ -6,7 +6,7 @@ import {
   ArrowLeftOutlined,
   UserOutlined,
 } from "@ant-design/icons";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import type { EntityRelationItem } from "../api/client";

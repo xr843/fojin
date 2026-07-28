@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route } from "react-router";
 import { ConfigProvider, Spin } from "antd";
 import { useTranslation } from "react-i18next";
 import { useApplyTheme } from "./hooks/useTheme";

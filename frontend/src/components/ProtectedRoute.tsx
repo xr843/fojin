@@ -1,4 +1,4 @@
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet } from "react-router";
 import { useAuthStore } from "../stores/authStore";
 
 export default function ProtectedRoute({ requiredRole }: { requiredRole?: string }) {

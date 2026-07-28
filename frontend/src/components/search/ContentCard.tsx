@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Tag, Button } from "antd";
 import { LinkOutlined, ReadOutlined } from "@ant-design/icons";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { sanitizeHighlight } from "../../utils/sanitize";
 import { buildCbetaReadUrl, buildReaderUrl } from "../../utils/sourceUrls";
 import type { ContentSearchHit } from "../../api/client";

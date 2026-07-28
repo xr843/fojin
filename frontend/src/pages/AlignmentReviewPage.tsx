@@ -2,7 +2,7 @@ import { Button, Card, Popconfirm, Space, Table, Tag, Typography, message } from
 import type { ColumnsType } from "antd/es/table";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import {
   getAlignmentCandidates,
   reviewAlignmentCandidate,

@@ -4,7 +4,7 @@
  * 读取 /api/kg/entities/{id}（已含 relations[]），展示人物档案。
  * 路由：/person/:id（注意是单数，避免与后端 /persons/:id SEO 页冲突）
  */
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";

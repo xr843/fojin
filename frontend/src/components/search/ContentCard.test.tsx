@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import ContentCard from "./ContentCard";
 import type { ContentSearchHit } from "../../api/client";
 import type { TextId } from "../../types/branded";

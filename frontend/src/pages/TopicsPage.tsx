@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { Helmet } from "react-helmet-async";
 import { Empty } from "antd";
 import { SearchOutlined, VerticalAlignTopOutlined } from "@ant-design/icons";

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Badge, Popover, List, Button, Typography, Empty, Space } from "antd";
 import { BellOutlined } from "@ant-design/icons";
-import { useLocation } from "react-router-dom";
+import { useLocation } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../stores/authStore";
 import {

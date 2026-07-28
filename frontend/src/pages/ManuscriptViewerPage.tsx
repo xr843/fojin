@@ -1,8 +1,8 @@
-import { useParams } from "react-router-dom";
+import { useParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Typography, Spin, Card, List, Empty, Button, Space, Tag } from "antd";
 import { ArrowLeftOutlined, FileImageOutlined, EyeOutlined } from "@ant-design/icons";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import IIIFViewer from "../components/IIIFViewer";

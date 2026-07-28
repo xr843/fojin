@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useMemo, useEffect, lazy, Suspense, memo, type ReactNode } from "react";
-import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
 import { Input, Button, message, Alert, Tooltip, Modal, Tag, Spin } from "antd";

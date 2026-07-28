@@ -1,4 +1,4 @@
-import { useParams, useNavigate, Navigate } from "react-router-dom";
+import { useParams, useNavigate, Navigate } from "react-router";
 import { Helmet } from "react-helmet-async";
 import {
   Typography,
