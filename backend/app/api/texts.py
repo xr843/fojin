@@ -401,11 +401,26 @@ async def get_chunk_context(
         for row in chunk_rows
     ]
 
-    # Boundary detection. Chunks within a juan are contiguous (0..max) per
-    # the ingestion pipeline in scripts/archive/misc/generate_embeddings.py, so
-    # has_more_before reduces to low > 0. has_more_after needs one existence
-    # probe because we don't know the juan's max chunk_index up front.
-    has_more_before = low > 0
+    # Boundary detection — both directions need a real existence probe.
+    #
+    # `has_more_before = low > 0` used to be an arithmetic shortcut, justified by
+    # "chunks within a juan are contiguous (0..max)". That premise only holds when
+    # the requested chunk itself exists. When it does not — unknown juan_num, a
+    # chunk_index past the end, or a text with no embeddings — the query above
+    # returns nothing, yet the shortcut still claimed "there is more before" for
+    # any chunk_index > radius. The drawer then rendered the 「前文（本卷第 N 段之前）」
+    # hint above a blank body, telling the reader content exists where none does.
+    # A citation you cannot open is worse than no citation, so this now asks the
+    # database instead of asserting.
+    before_probe = (
+        await raw_conn.exec_driver_sql(
+            "SELECT 1 FROM text_embeddings "
+            "WHERE text_id = $1 AND juan_num = $2 AND chunk_index < $3 "
+            "LIMIT 1",
+            (text_id, juan_num, low),
+        )
+    ).fetchone()
+    has_more_before = before_probe is not None
     after_probe = (
         await raw_conn.exec_driver_sql(
             "SELECT 1 FROM text_embeddings "
