@@ -2,6 +2,11 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
+    <!-- Pre-paint theme init. External (not inline) + render-blocking (no defer):
+         the prod CSP is `script-src 'self'` with no 'unsafe-inline', so an inline
+         block is silently dropped in production → dark users flash light on every
+         load. Kept first in <head> so data-theme is set before first paint. -->
+    <script src="/theme-init.js"></script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#8b2500" />

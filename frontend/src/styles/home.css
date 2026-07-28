@@ -34,7 +34,7 @@
   pointer-events: none;
   /* Placeholder tint matching the ink-wash image's tones (warm sky → misty
      water) so the split-second before the WebP paints shows a soft gradient
-     instead of a stark #f8f5ef flash. The <img> (object-fit: cover) fully
+     instead of a stark var(--fj-bg) flash. The <img> (object-fit: cover) fully
      covers this once loaded. */
   background: linear-gradient(180deg, #f4e8d6 0%, #ece0cb 40%, #d3dad0 75%, #c6cec5 100%);
 }
@@ -60,6 +60,52 @@
     rgba(248, 245, 239, 0.22) 72%,
     rgba(248, 245, 239, 0.45) 100%
   );
+}
+
+/* Dark mode: the ink-wash landscape is a fixed light image, but hero text
+   (title/subtitle/labels) flips to light tokens in dark → invisible on the
+   pale image. Darken the image into a night scene so light text stays legible
+   and the hero reads as genuinely dark. Stronger at top (over the bright sky
+   where the title sits) and bottom (under the feature cards). */
+:root[data-theme="dark"] .home-hero-bg {
+  background: linear-gradient(180deg, #3a2c1d 0%, #241c13 55%, #17120c 100%);
+}
+/* Warm, airy dusk ink-wash: a large warm sun-glow high in the sky, a broad
+   warm wash lifting the whole scene, only a light edge vignette and a gentle
+   legibility ramp — kept airy on purpose; text stays crisp via its own
+   shadow/halo rather than by darkening the landscape. */
+:root[data-theme="dark"] .home-hero-bg::after {
+  background:
+    radial-gradient(64% 46% at 50% 9%, rgba(242, 180, 114, 0.26), rgba(232, 152, 92, 0.1) 44%, transparent 72%),
+    radial-gradient(150% 120% at 50% 30%, rgba(214, 152, 98, 0.09), transparent 60%),
+    radial-gradient(125% 130% at 50% 42%, transparent 52%, rgba(12, 8, 5, 0.3) 100%),
+    linear-gradient(
+      180deg,
+      rgba(26, 18, 11, 0.42) 0%,
+      rgba(26, 18, 11, 0.1) 40%,
+      rgba(16, 12, 8, 0.2) 66%,
+      rgba(12, 9, 6, 0.4) 100%
+    );
+}
+
+/* Keep the hero text crisp over the lightened, atmospheric landscape without
+   over-darkening it — a soft shadow lets light type read on any mist tone. */
+:root[data-theme="dark"] .home-title,
+:root[data-theme="dark"] .home-stat-num {
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.7), 0 0 3px rgba(0, 0, 0, 0.55);
+}
+
+/* Subtitle + eyebrow labels sit over the brightest zone (the warm sun-glow and
+   the misty valley), where light-grey type washes out. Brighten them and give a
+   tight dark halo so they read crisply without darkening the scene. */
+:root[data-theme="dark"] .home-subtitle {
+  color: #ded4c1;
+  text-shadow: 0 0 5px rgba(0, 0, 0, 0.85), 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+:root[data-theme="dark"] .home-hot-label,
+:root[data-theme="dark"] .home-stat-lbl {
+  color: #d8cdb8;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.9), 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 1px rgba(0, 0, 0, 0.95);
 }
 
 /* 英雄区内容层 */
@@ -94,7 +140,7 @@
 }
 
 .home-title-accent {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
 }
 
 /* ---------- 副标题 ---------- */
@@ -129,7 +175,7 @@
 .search-combo-bar {
   display: flex;
   align-items: center;
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   height: 56px;
@@ -139,6 +185,11 @@
 
 .search-combo-bar:focus-within {
   border-color: var(--fj-gold);
+}
+
+/* Dark mode: give the search bar the same crafted lift as the feature cards. */
+:root[data-theme="dark"] .search-combo-bar {
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 244, 224, 0.08);
 }
 
 /* 左侧数据源按钮 */
@@ -154,7 +205,7 @@
   font-family: "Noto Serif SC", serif;
   font-size: 13px;
   font-weight: 600;
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   white-space: nowrap;
   transition: background 0.15s;
   flex-shrink: 0;
@@ -225,7 +276,7 @@
   height: 100%;
   padding: 0 24px;
   background: var(--fj-accent);
-  color: #fff;
+  color: var(--fj-on-accent);
   border: none;
   cursor: pointer;
   font-family: "Noto Serif SC", serif;
@@ -274,9 +325,15 @@
 }
 
 .home-hot-tag:hover {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   border-color: var(--fj-gold);
-  background: #fff;
+  background: var(--fj-surface);
+}
+
+/* Dark mode: the translucent-white pill turns dark so the (now light) label
+   reads over the night hero. */
+:root[data-theme="dark"] .home-hot-tag {
+  background: rgba(74, 65, 51, 0.72);
 }
 
 /* ---------- 热门经典标签 ---------- */
@@ -305,7 +362,7 @@
   line-height: 1.6;
 }
 .home-tip a {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
 }
 
 /* ---------- 可信度说明 ---------- */
@@ -319,7 +376,7 @@
 }
 
 .home-trust-link {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   cursor: pointer;
   transition: opacity 0.2s;
 }
@@ -384,7 +441,7 @@
 /* ---------- 数据源面板（搜索栏下拉） ---------- */
 .src-panel {
   margin-top: 4px;
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   overflow: hidden;
@@ -484,7 +541,7 @@
 }
 
 .src-item-link:hover {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   background: rgba(139,37,0,0.06);
 }
 
@@ -498,8 +555,8 @@
 /* ---------- 外部数据源搜索链接 ---------- */
 .ext-sources {
   margin-top: 24px;
-  background: #fff;
-  border: 1px solid #d9d0c1;
+  background: var(--fj-surface);
+  border: 1px solid var(--fj-border);
   border-radius: 8px;
   padding: 20px;
 }
@@ -507,7 +564,7 @@
 .ext-sources-header {
   margin-bottom: 16px;
   padding-bottom: 12px;
-  border-bottom: 1px solid #f0ebe2;
+  border-bottom: 1px solid var(--fj-bg-alt);
 }
 
 .ext-region {
@@ -517,7 +574,7 @@
 .ext-region-label {
   font-size: 12px;
   font-weight: 600;
-  color: #5c4f3d;
+  color: var(--fj-ink-light);
   margin-bottom: 8px;
   display: flex;
   align-items: center;
@@ -527,8 +584,8 @@
 .ext-region-count {
   font-size: 10px;
   font-weight: 400;
-  color: #9a8e7a;
-  background: #f0ebe2;
+  color: var(--fj-ink-muted);
+  background: var(--fj-bg-alt);
   padding: 0 6px;
   border-radius: 8px;
 }
@@ -544,20 +601,20 @@
   align-items: center;
   gap: 4px;
   font-size: 12px;
-  color: #5c4f3d;
+  color: var(--fj-ink-light);
   padding: 4px 12px;
   border: 1px solid #e8e0d4;
   border-radius: 4px;
-  background: #faf8f3;
+  background: var(--fj-surface-alt);
   text-decoration: none;
   transition: all 0.15s;
   white-space: nowrap;
 }
 
 .ext-link:hover {
-  color: #8b2500;
-  border-color: #b08d57;
-  background: #fff;
+  color: var(--fj-highlight);
+  border-color: var(--fj-gold);
+  background: var(--fj-surface);
 }
 
 .ext-toggle {
@@ -567,7 +624,7 @@
   margin-top: 12px;
   padding: 6px 12px;
   font-size: 12px;
-  color: #8b2500;
+  color: var(--fj-highlight);
   background: none;
   border: 1px solid #e8e0d4;
   border-radius: 4px;
@@ -576,8 +633,8 @@
 }
 
 .ext-toggle:hover {
-  background: #faf8f3;
-  border-color: #b08d57;
+  background: var(--fj-surface-alt);
+  border-color: var(--fj-gold);
 }
 
 /* ---------- 功能导航卡片 ---------- */
@@ -602,10 +659,67 @@
 }
 
 .home-feature-card:hover {
-  background: #fff;
+  background: var(--fj-surface);
   border-color: var(--fj-gold);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+/* Dark mode: the frosted-white card turns to a dark translucent panel so the
+   (now light) title/description read over the night hero. */
+:root[data-theme="dark"] .home-feature-card {
+  /* Cards are the top elevation tier: lighter + near-opaque than the surrounding
+     chrome, with a deep drop shadow + hairline top highlight so they clearly
+     "lift" off the misty hero rather than sit flat on it. */
+  background: #625742;
+  border-color: #7d6e4d;
+  /* Layered shadow: a tight dark contact shadow (reads as "lift" on any bg, even
+     the bright misty landscape) + wider ambient shadows for depth — so the card
+     floats without needing a darkened backdrop that would kill the ink-wash. */
+  box-shadow:
+    0 3px 7px rgba(0, 0, 0, 0.52),
+    0 10px 22px rgba(0, 0, 0, 0.46),
+    0 26px 54px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 246, 228, 0.16);
+}
+:root[data-theme="dark"] .home-feature-card:hover {
+  background: #6e6249;
+  transform: translateY(-6px);
+  box-shadow:
+    0 6px 12px rgba(0, 0, 0, 0.54),
+    0 18px 34px rgba(0, 0, 0, 0.5),
+    0 40px 72px rgba(0, 0, 0, 0.46),
+    inset 0 1px 0 rgba(255, 246, 228, 0.2);
+}
+
+/* Feature cards — motion: a calm staggered "settle into place" on load, and a
+   tactile lift + icon nudge on hover. backwards fill so the held keyframe never
+   blocks the hover transform. Honors prefers-reduced-motion. */
+@keyframes fj-card-rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.home-feature-card {
+  animation: fj-card-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.home-feature-card:nth-child(1) { animation-delay: 0.04s; }
+.home-feature-card:nth-child(2) { animation-delay: 0.10s; }
+.home-feature-card:nth-child(3) { animation-delay: 0.16s; }
+.home-feature-card:nth-child(4) { animation-delay: 0.22s; }
+.home-feature-card:nth-child(5) { animation-delay: 0.28s; }
+.home-feature-card:nth-child(6) { animation-delay: 0.34s; }
+
+.home-feature-icon {
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.home-feature-card:hover .home-feature-icon {
+  transform: scale(1.14);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-feature-card { animation: none; }
+  .home-feature-card:hover { transform: none; }
+  .home-feature-card:hover .home-feature-icon { transform: none; }
 }
 
 .home-feature-icon {
@@ -695,4 +809,10 @@
   .home-feature-card { padding: 12px 8px; }
   .home-feature-icon { font-size: 20px; margin-bottom: 4px; }
   .home-feature-title { font-size: 12px; }
+}
+
+/* 卡片底色为了"跳"出来提亮到 #625742 后，副文案的 --fj-ink-light 被挤到 4.24:1。
+   给它一档更亮的暖白（4.92:1），仍比卡片标题（5.82:1）柔和，层次不变。 */
+:root[data-theme="dark"] .home-feature-desc {
+  color: #e0d6c2;
 }

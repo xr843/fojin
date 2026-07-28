@@ -216,7 +216,7 @@
   gap: 12px;
   padding: 8px 14px;
   margin-bottom: 12px;
-  background: #fafafa;
+  background: var(--fj-surface-alt);
   border-left: 3px solid #5b8c6b;
   border-radius: 4px;
   font-size: 13px;

@@ -37,7 +37,7 @@
   gap: 6px;
   margin-left: auto;
   cursor: pointer;
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   font-size: 13px;
   transition: color 0.2s;
 }
@@ -48,7 +48,7 @@
   display: flex;
   gap: 32px;
   flex-wrap: wrap;
-  background: #faf8f4;
+  background: var(--fj-surface-alt);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   padding: 12px 20px;
@@ -66,7 +66,7 @@
   font-family: "Noto Serif SC", serif;
   font-size: 12px;
   font-weight: 600;
-  color: #7a6e5c;
+  color: var(--fj-ink-muted);
   letter-spacing: 1px;
 }
 
@@ -75,7 +75,7 @@
   align-items: center;
   gap: 4px;
   font-size: 12px;
-  color: #7a6e5c;
+  color: var(--fj-ink-muted);
 }
 
 .kg-stats-count {
@@ -86,7 +86,7 @@
 
 /* ---------- 工具栏 ---------- */
 .kg-toolbar {
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   padding: 12px 16px;
@@ -105,9 +105,9 @@
 }
 
 .kg-toolbar-main .ant-input-affix-wrapper {
-  border-color: #d9d0c1;
+  border-color: var(--fj-border);
   border-radius: 6px;
-  background: #faf8f5;
+  background: var(--fj-surface-alt);
 }
 
 .kg-toolbar-main .ant-input-affix-wrapper:hover,
@@ -116,9 +116,9 @@
 }
 
 .kg-toolbar-main .ant-select .ant-select-selector {
-  border-color: #d9d0c1 !important;
+  border-color: var(--fj-border) !important;
   border-radius: 6px !important;
-  background: #faf8f5 !important;
+  background: var(--fj-surface-alt) !important;
 }
 
 .kg-depth-control {
@@ -176,7 +176,7 @@
 
 /* ---------- 推荐探索 ---------- */
 .kg-curated {
-  background: #faf8f4;
+  background: var(--fj-surface-alt);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   margin-bottom: 12px;
@@ -234,7 +234,7 @@
   padding: 3px 11px;
   border-radius: 12px;
   border: 1px solid var(--fj-border);
-  background: #fff;
+  background: var(--fj-surface);
   color: var(--fj-ink-light);
   cursor: pointer;
   transition: all 0.15s;
@@ -246,7 +246,7 @@
 .kg-chip.active {
   background: var(--fj-gold);
   border-color: var(--fj-gold);
-  color: #fff;
+  color: var(--fj-on-gold);
 }
 
 @media (max-width: 768px) {
@@ -261,7 +261,7 @@
 .kg-result-degree {
   font-size: 10px;
   line-height: 18px;
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   white-space: nowrap;
 }
 
@@ -281,7 +281,7 @@
 }
 
 .kg-sidebar-card {
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   overflow: hidden;
@@ -307,7 +307,7 @@
 }
 
 .kg-sidebar-body::-webkit-scrollbar-thumb {
-  background: #d9d0c1;
+  background: var(--fj-border);
   border-radius: 2px;
 }
 
@@ -324,7 +324,7 @@
 }
 
 .kg-result-item:hover {
-  background: #faf6f0;
+  background: var(--fj-surface-alt);
 }
 
 .kg-result-item.active {
@@ -350,7 +350,7 @@
 
 .kg-result-desc {
   font-size: 12px;
-  color: #7a6e5c;
+  color: var(--fj-ink-muted);
   margin-top: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -395,7 +395,7 @@
 }
 
 .kg-graph-container {
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   overflow: hidden;
@@ -407,7 +407,7 @@
 }
 
 .kg-graph-empty {
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   display: flex;
@@ -446,7 +446,7 @@
   gap: 16px;
   padding: 8px 14px;
   border-top: 1px solid var(--fj-bg-alt);
-  background: #faf8f5;
+  background: var(--fj-surface-alt);
   flex-wrap: wrap;
 }
 
@@ -493,7 +493,7 @@
 }
 
 .kg-detail-card {
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   max-height: calc(100vh - 200px);
@@ -505,12 +505,12 @@
 }
 
 .kg-detail-card::-webkit-scrollbar-thumb {
-  background: #d9d0c1;
+  background: var(--fj-border);
   border-radius: 2px;
 }
 
 .kg-detail-empty {
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   padding: 40px 16px;
@@ -525,7 +525,7 @@
 
 /* ---------- 时间轴面板 ---------- */
 .kg-timeline-panel {
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   margin-bottom: 16px;
@@ -538,7 +538,7 @@
   justify-content: space-between;
   padding: 8px 14px;
   border-bottom: 1px solid var(--fj-bg-alt);
-  background: #faf8f4;
+  background: var(--fj-surface-alt);
 }
 
 .kg-timeline-title {
@@ -594,14 +594,14 @@
 }
 
 .kg-timeline-legend-count {
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   margin-left: 1px;
 }
 
 .kg-timeline-legend-hint {
   margin-left: auto;
   font-size: 11px;
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   font-family: "Noto Serif SC", serif;
   font-style: italic;
 }
@@ -613,12 +613,12 @@
   gap: 6px;
   margin-left: 10px;
   cursor: pointer;
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   font-size: 13px;
   transition: color 0.2s;
 }
 .kg-timeline-toggle:hover { color: var(--fj-ink); }
-.kg-timeline-toggle.active { color: var(--fj-accent); }
+.kg-timeline-toggle.active { color: var(--fj-highlight); }
 
 /* ---------- 响应式 ---------- */
 @media (max-width: 1200px) {
@@ -654,7 +654,7 @@
 
 /* 古典水墨风：覆盖 antd Segmented 默认蓝色高亮 */
 .kg-mobile-tabs .ant-segmented {
-  background: #f5f0e8;
+  background: var(--fj-surface-alt);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   padding: 3px;
@@ -668,7 +668,7 @@
 }
 
 .kg-mobile-tabs .ant-segmented .ant-segmented-item:not(.ant-segmented-item-selected) {
-  color: var(--fj-ink-muted, #7a6e5c);
+  color: var(--fj-ink-muted, var(--fj-ink-muted));
 }
 
 .kg-mobile-tabs .ant-segmented .ant-segmented-item:hover:not(.ant-segmented-item-selected) {
@@ -807,7 +807,7 @@
 
 .kg-mentions-hint {
   font-size: 11px;
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   font-style: italic;
 }
 
@@ -848,7 +848,7 @@
 
 .kg-mentions-snippet {
   flex: 1;
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   font-size: 12px;
   margin-left: 6px;
   overflow: hidden;
@@ -860,7 +860,7 @@
 .kg-mentions-error {
   padding: 20px;
   text-align: center;
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   font-size: 12px;
 }
 
@@ -870,4 +870,35 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+}
+
+/* ---- Dark mode: entity-type tags → hue-tinted dark chips (light unchanged) ---- */
+:root[data-theme="dark"] .kg-type-tag--person    { background: rgba(245, 34, 45, 0.16);  color: #ffccc7; border-color: rgba(245, 34, 45, 0.38); }
+:root[data-theme="dark"] .kg-type-tag--text      { background: rgba(47, 84, 235, 0.20);  color: #adc6ff; border-color: rgba(47, 84, 235, 0.42); }
+:root[data-theme="dark"] .kg-type-tag--monastery { background: rgba(82, 196, 26, 0.16);  color: #b7eb8f; border-color: rgba(82, 196, 26, 0.38); }
+:root[data-theme="dark"] .kg-type-tag--school    { background: rgba(114, 46, 209, 0.22); color: #d3adf7; border-color: rgba(114, 46, 209, 0.42); }
+:root[data-theme="dark"] .kg-type-tag--place     { background: rgba(250, 140, 22, 0.16); color: #ffd591; border-color: rgba(250, 140, 22, 0.38); }
+:root[data-theme="dark"] .kg-type-tag--concept   { background: rgba(19, 194, 194, 0.16); color: #87e8de; border-color: rgba(19, 194, 194, 0.38); }
+
+/* ---- Dark mode: fixes for stateful cream backgrounds the sweep missed ---- */
+/* Selected KG result: cream bg didn't flip while the name/desc use ink tokens
+   (light in dark) → invisible. Give it a dark elevated bg + accent tint. */
+:root[data-theme="dark"] .kg-result-item.active {
+  background: rgba(229, 118, 74, 0.14);
+}
+/* 7th entity-type tag (dynasty) was omitted from the dark override set. */
+:root[data-theme="dark"] .kg-type-tag--dynasty {
+  background: rgba(235, 47, 150, 0.16); color: #ffadd2; border-color: rgba(235, 47, 150, 0.4);
+}
+/* "results truncated" alert: near-white amber box glowing in the dark graph. */
+:root[data-theme="dark"] .kg-truncated-bar .ant-alert {
+  background: rgba(214, 152, 60, 0.16);
+  border-color: var(--fj-gold);
+}
+
+/* 类型标签的底是半透明色叠在同样带色的结果行上，合成后文字只有 3.1–4.1:1；
+   上面已把 7 种的暗色文字统一提高一档。结果行的描述与关系数同理。 */
+:root[data-theme="dark"] .kg-result-desc,
+:root[data-theme="dark"] .kg-result-degree {
+  color: var(--fj-ink-light);
 }

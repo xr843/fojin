@@ -42,11 +42,11 @@
   gap: 6px;
   padding: 6px 12px;
   border-radius: 999px;
-  border: 1px solid #e5dccb;
-  background: #fff;
+  border: 1px solid var(--fj-border);
+  background: var(--fj-surface);
   cursor: pointer;
   font-size: 13px;
-  color: #595959;
+  color: var(--fj-ink-light);
   transition: all 0.18s;
   line-height: 1.2;
 }
@@ -58,24 +58,24 @@
 }
 
 .sources-cap-chip:hover {
-  border-color: var(--fj-gold, #b08d57);
+  border-color: var(--fj-gold, var(--fj-gold));
   color: var(--fj-ink);
 }
 
 .sources-cap-chip:focus-visible,
 .sources-cap-chip-clear:focus-visible {
-  outline: 2px solid var(--fj-gold, #b08d57);
+  outline: 2px solid var(--fj-gold, var(--fj-gold));
   outline-offset: 2px;
 }
 
 .sources-cap-chip.is-active {
-  background: var(--fj-gold, #b08d57);
-  border-color: var(--fj-gold, #b08d57);
-  color: #fff;
+  background: var(--fj-gold, var(--fj-gold));
+  border-color: var(--fj-gold, var(--fj-gold));
+  color: var(--fj-on-gold);
 }
 
 .sources-cap-chip.is-active strong {
-  color: #fff;
+  color: var(--fj-on-gold);
 }
 
 /* color hints (inactive only — left border accent matches the badge color) */
@@ -104,7 +104,7 @@
 }
 
 .sources-cap-chip-clear:hover {
-  color: var(--fj-gold, #b08d57);
+  color: var(--fj-gold, var(--fj-gold));
 }
 
 /* ---------- 跨源搜索 Hero ---------- */
@@ -116,6 +116,13 @@
   margin: 0 0 18px;
 }
 
+/* Dark mode: the light cream gradient (a background-image, so it doesn't follow
+   surface tokens) needs an explicit warm-dark gradient override. */
+:root[data-theme="dark"] .sources-hero-search {
+  background: linear-gradient(135deg, #3a3226 0%, #302820 100%);
+  border-color: var(--fj-gold);
+}
+
 .sources-hero-search-head {
   display: flex;
   gap: 12px;
@@ -125,7 +132,7 @@
 
 .sources-hero-search-icon {
   font-size: 22px;
-  color: var(--fj-gold, #b08d57);
+  color: var(--fj-gold, var(--fj-gold));
   flex-shrink: 0;
   margin-top: 2px;
 }
@@ -187,7 +194,7 @@
   gap: 12px;
   flex-wrap: wrap;
   padding: 16px 20px;
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   margin-bottom: 16px;
@@ -231,13 +238,13 @@
 }
 
 .sources-group-toggle:hover {
-  border-color: var(--fj-gold, #b08d57);
+  border-color: var(--fj-gold, var(--fj-gold));
   color: var(--fj-accent, #8a6b3a);
   background: #fdf8ec;
 }
 
 .sources-stats-bar strong {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
 }
 
 /* ---------- 分组 ---------- */
@@ -279,7 +286,7 @@
 }
 
 .source-card {
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   padding: 16px 18px;
@@ -377,7 +384,7 @@
   padding: 6px 8px;
   border: 1px solid #eee5d8;
   border-radius: 6px;
-  background: #fcfaf6;
+  background: var(--fj-surface-alt);
   color: var(--fj-ink-light);
   text-decoration: none;
   transition: all 0.15s;
@@ -385,13 +392,13 @@
 
 .source-dist-link:hover {
   border-color: #d4a574;
-  background: #fff;
-  color: var(--fj-accent);
+  background: var(--fj-surface);
+  color: var(--fj-highlight);
 }
 
 .source-dist-link.is-primary {
   border-color: #d4a574;
-  background: #fdf6ee;
+  background: var(--fj-surface-alt);
 }
 
 .source-dist-name {
@@ -435,27 +442,27 @@
   padding: 4px 10px;
   border: 1px solid var(--fj-border);
   border-radius: 4px;
-  background: #faf8f3;
+  background: var(--fj-surface-alt);
   text-decoration: none;
   transition: all 0.15s;
   white-space: nowrap;
 }
 
 .source-btn:hover {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   border-color: var(--fj-gold);
-  background: #fff;
+  background: var(--fj-surface);
 }
 
 .source-btn-search {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   border-color: #d4a574;
-  background: #fdf6ee;
+  background: var(--fj-surface-alt);
 }
 
 .source-btn-search:hover {
-  background: #fff;
-  border-color: #8b2500;
+  background: var(--fj-surface);
+  border-color: var(--fj-accent);
 }
 
 /* ---------- 数据可信度说明 ---------- */
@@ -541,7 +548,7 @@
 .sources-suggest-success {
   font-family: "Noto Serif SC", serif;
   font-size: 15px;
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   text-align: center;
   padding: 24px 0;
   letter-spacing: 1px;
@@ -559,7 +566,7 @@
   gap: 2px;
   width: 48px;
   height: 48px;
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   color: var(--fj-ink-light);
@@ -572,7 +579,7 @@
 }
 
 .sources-back-top:hover {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   border-color: var(--fj-gold);
   box-shadow: 0 2px 12px rgba(176, 141, 87, 0.15);
 }
@@ -585,11 +592,11 @@
 .sources-toggle-chip {
   height: 32px;
   padding: 0 14px;
-  border: 1px solid #d9d9d9;
+  border: 1px solid var(--fj-border);
   border-radius: 6px;
-  background: #fff;
+  background: var(--fj-surface);
   font-size: 13px;
-  color: #595959;
+  color: var(--fj-ink-light);
   cursor: pointer;
   transition: all 0.18s;
   white-space: nowrap;
@@ -603,7 +610,7 @@
 .sources-toggle-chip.is-active {
   background: var(--fj-gold);
   border-color: var(--fj-gold);
-  color: #fff;
+  color: var(--fj-on-gold);
   font-weight: 500;
 }
 
@@ -639,3 +646,10 @@
     gap: 0;
   }
 }
+
+/* ---- Dark mode: brighten capability-chip accent borders (light unchanged) ---- */
+:root[data-theme="dark"] .sources-cap-chip-direct { border-left-color: #69a9e0; }
+:root[data-theme="dark"] .sources-cap-chip-local  { border-left-color: #95de64; }
+:root[data-theme="dark"] .sources-cap-chip-remote { border-left-color: #5cdbd3; }
+:root[data-theme="dark"] .sources-cap-chip-iiif   { border-left-color: #b37feb; }
+:root[data-theme="dark"] .sources-cap-chip-api    { border-left-color: #ffb266; }

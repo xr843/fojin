@@ -236,7 +236,7 @@ export default function ReaderAIPanel({
     a: ({ href, children }: { href?: string; children?: ReactNode }) => {
       if (href && href.startsWith("/texts/")) {
         return (
-          <Link to={href} style={{ color: "var(--fj-accent)", textDecoration: "none", borderBottom: "1px dashed var(--fj-accent)", fontWeight: 500 }}>
+          <Link to={href} style={{ color: "var(--fj-highlight)", textDecoration: "none", borderBottom: "1px dashed var(--fj-accent)", fontWeight: 500 }}>
             {children}
           </Link>
         );

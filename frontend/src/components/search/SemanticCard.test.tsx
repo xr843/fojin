@@ -48,26 +48,45 @@ describe("SemanticCard 组件", () => {
     expect(screen.getByText("85%")).toBeInTheDocument();
   });
 
-  it("相似度 > 0.7 时 Progress strokeColor 为绿色", () => {
+  // 分档断言锁的是语义 token，不是具体色值：调色是我们希望能自由做的事，写死
+  // #52c41a 只会让每次调色都误报。反过来，这三条此前只查了百分比文字却顶着
+  // "为绿色/蓝色/橙色" 的名字，结果三档颜色被整体换掉时它们照样全绿。
+  /** 取 antd Progress 环形路径上的 stroke（antd 以内联 style 写入 strokeColor）。 */
+  function strokeOf(container: HTMLElement): string {
+    const path = container.querySelector<SVGElement>(".ant-progress-circle-path");
+    expect(path).toBeTruthy();
+    return path!.style.stroke;
+  }
+
+  it("相似度 > 0.7 归入 success 档", () => {
     const { container } = renderCard(makeHit({ similarity_score: 0.75 }));
 
-    // antd Progress circle 渲染 SVG，strokeColor 会设置在 circle 的 stroke 上
-    const trailPath = container.querySelector(".ant-progress-circle-path");
-    expect(trailPath).toBeTruthy();
-    // 验证百分比正确渲染
+    expect(strokeOf(container)).toBe("var(--fj-success)");
     expect(screen.getByText("75%")).toBeInTheDocument();
   });
 
-  it("相似度 > 0.5 且 <= 0.7 时显示蓝色对应的百分比", () => {
-    renderCard(makeHit({ similarity_score: 0.6 }));
+  it("相似度 > 0.5 且 <= 0.7 归入 info 档", () => {
+    const { container } = renderCard(makeHit({ similarity_score: 0.6 }));
 
+    expect(strokeOf(container)).toBe("var(--fj-info)");
     expect(screen.getByText("60%")).toBeInTheDocument();
   });
 
-  it("相似度 <= 0.5 时显示橙色对应的百分比", () => {
-    renderCard(makeHit({ similarity_score: 0.3 }));
+  it("相似度 <= 0.5 归入 warning 档", () => {
+    const { container } = renderCard(makeHit({ similarity_score: 0.3 }));
 
+    expect(strokeOf(container)).toBe("var(--fj-warning)");
     expect(screen.getByText("30%")).toBeInTheDocument();
+  });
+
+  // 边界取的是闭区间（代码用 >= 70 / >= 50），把它钉住：这类边界一旦被误改成
+  // 严格大于，只有 70% / 50% 这两个点会变，日常几乎看不出来。
+  it("分档边界：正好 70% 归 success，正好 50% 归 info", () => {
+    const { container: at70 } = renderCard(makeHit({ similarity_score: 0.7 }));
+    expect(strokeOf(at70)).toBe("var(--fj-success)");
+
+    const { container: at50 } = renderCard(makeHit({ similarity_score: 0.5 }));
+    expect(strokeOf(at50)).toBe("var(--fj-info)");
   });
 
   it("渲染匹配文本片段 snippet", () => {

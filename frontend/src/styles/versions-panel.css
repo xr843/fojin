@@ -3,7 +3,7 @@
   margin-top: 16px;
   border: 1px solid var(--fj-border, #e8e0d4);
   border-radius: 8px;
-  background: #fff;
+  background: var(--fj-surface);
   overflow: hidden;
 }
 
@@ -124,7 +124,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f5f0e8;
+  background: var(--fj-surface-alt);
 }
 
 .version-iiif-label {
@@ -133,7 +133,7 @@
   padding: 3px 4px;
   text-align: center;
   width: 100%;
-  background: #faf7f2;
+  background: var(--fj-surface-alt);
 }
 
 /* Source links */
@@ -162,4 +162,13 @@
 .version-source-link--disabled {
   color: #ccc;
   cursor: default;
+}
+
+/* Dark mode: hover rows had a cream bg that didn't flip (light text over it → invisible). */
+:root[data-theme="dark"] .version-item--clickable:hover,
+:root[data-theme="dark"] .version-source-link:hover {
+  background: var(--fj-surface-alt);
+}
+:root[data-theme="dark"] .version-source-link:hover {
+  color: var(--fj-ink-light);
 }

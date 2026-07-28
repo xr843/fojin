@@ -70,13 +70,13 @@
 
 .dict-search-box .ant-input-search .ant-input-affix-wrapper:hover,
 .dict-search-box .ant-input-search .ant-input-affix-wrapper:focus-within {
-  border-color: var(--fj-accent, #8b2500) !important;
+  border-color: var(--fj-accent, var(--fj-accent)) !important;
   box-shadow: 0 0 0 2px rgba(139, 37, 0, 0.1) !important;
 }
 
 .dict-search-box .ant-input-search .ant-input-search-button {
-  background: var(--fj-accent, #8b2500) !important;
-  border-color: var(--fj-accent, #8b2500) !important;
+  background: var(--fj-accent, var(--fj-accent)) !important;
+  border-color: var(--fj-accent, var(--fj-accent)) !important;
 }
 
 .dict-search-box .ant-input-search .ant-input-search-button:hover {
@@ -104,7 +104,7 @@
 }
 
 .dict-hot-terms .ant-tag:hover {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   border-color: var(--fj-accent);
 }
 
@@ -160,7 +160,7 @@
   gap: 12px;
   flex-wrap: wrap;
   padding: 12px 16px;
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
   margin-bottom: 16px;
@@ -173,7 +173,7 @@
 }
 
 .dict-result-stats strong {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
 }
 
 /* ---------- Grouped results ---------- */
@@ -219,6 +219,9 @@
 
 .dict-entry-item:hover {
   background: rgba(255, 255, 255, 0.5);
+}
+:root[data-theme="dark"] .dict-entry-item:hover {
+  background: var(--fj-surface);
 }
 
 .dict-entry-headword {
@@ -329,7 +332,7 @@
 }
 
 .dict-concept-form:hover {
-  border-color: var(--fj-accent, #8b2500);
+  border-color: var(--fj-accent, var(--fj-accent));
   box-shadow: 0 0 0 2px rgba(139, 37, 0, 0.08);
 }
 

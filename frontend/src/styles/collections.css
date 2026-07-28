@@ -8,7 +8,7 @@
 }
 
 .coll-card {
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid rgba(217, 208, 193, 0.5);
   border-radius: 8px;
   overflow: hidden;
@@ -42,7 +42,7 @@
 }
 
 .coll-card-header:focus-visible {
-  outline: 2px solid var(--fj-accent, #8b2500);
+  outline: 2px solid var(--fj-accent, var(--fj-accent));
   outline-offset: -2px;
 }
 
@@ -55,7 +55,7 @@
 
 .coll-card-icon {
   font-size: 20px;
-  color: var(--fj-accent, #8b2500);
+  color: var(--fj-accent, var(--fj-accent));
 }
 
 .coll-card-name {
@@ -68,7 +68,7 @@
 
 .coll-card-count {
   font-size: 13px;
-  color: var(--fj-ink-muted, #9a8e7a);
+  color: var(--fj-ink-muted, var(--fj-ink-muted));
   margin-left: auto;
 }
 
@@ -76,14 +76,14 @@
   display: block;
   margin: 8px 0 4px;
   font-size: 14px;
-  color: var(--fj-ink-muted, #9a8e7a);
+  color: var(--fj-ink-muted, var(--fj-ink-muted));
   line-height: 1.7;
 }
 
 .coll-card-toggle {
   display: inline-block;
   font-size: 13px;
-  color: var(--fj-accent, #8b2500);
+  color: var(--fj-highlight);
   margin-top: 4px;
 }
 
@@ -112,7 +112,7 @@
 
 .coll-section-title .anticon {
   margin-right: 6px;
-  color: var(--fj-accent, #8b2500);
+  color: var(--fj-accent, var(--fj-accent));
 }
 
 .coll-text-list {
@@ -147,7 +147,7 @@
 
 /* Indexed titles are anchors now; keep the previous inline-styled look. */
 .coll-text-title-link {
-  color: var(--fj-accent, #8b2500);
+  color: var(--fj-highlight);
   text-decoration: none;
 }
 
@@ -156,7 +156,7 @@
 }
 
 .coll-text-title-link:focus-visible {
-  outline: 2px solid var(--fj-accent, #8b2500);
+  outline: 2px solid var(--fj-accent, var(--fj-accent));
   outline-offset: 2px;
   border-radius: 2px;
 }
@@ -165,13 +165,13 @@
   display: flex;
   gap: 8px;
   font-size: 13px;
-  color: var(--fj-ink-muted, #9a8e7a);
+  color: var(--fj-ink-muted, var(--fj-ink-muted));
   margin-top: 2px;
   flex-wrap: wrap;
 }
 
 .coll-text-note {
-  color: #b08d57;
+  color: var(--fj-gold);
   font-style: italic;
 }
 
@@ -195,7 +195,7 @@
   gap: 4px;
   padding: 6px 12px;
   font-size: 12px;
-  color: var(--fj-ink-muted, #9a8e7a);
+  color: var(--fj-ink-muted, var(--fj-ink-muted));
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
@@ -210,8 +210,8 @@
 }
 
 .coll-res-tab.active {
-  color: var(--fj-accent, #8b2500);
-  border-bottom-color: var(--fj-accent, #8b2500);
+  color: var(--fj-highlight);
+  border-bottom-color: var(--fj-accent, var(--fj-accent));
   font-weight: 500;
 }
 
@@ -233,7 +233,7 @@
 
 .coll-res-tab.active .coll-res-tab-count {
   background: rgba(139, 37, 0, 0.12);
-  color: var(--fj-accent, #8b2500);
+  color: var(--fj-highlight);
 }
 
 .coll-res-content {
@@ -255,18 +255,18 @@
 
 .coll-link-item:hover {
   background: rgba(245, 241, 235, 0.9);
-  border-color: var(--fj-accent, #8b2500);
+  border-color: var(--fj-accent, var(--fj-accent));
 }
 
 .coll-link-name {
   font-size: 13px;
   font-weight: 500;
-  color: var(--fj-accent, #8b2500);
+  color: var(--fj-highlight);
 }
 
 .coll-link-desc {
   font-size: 11px;
-  color: var(--fj-ink-muted, #9a8e7a);
+  color: var(--fj-ink-muted, var(--fj-ink-muted));
   margin-top: 3px;
   line-height: 1.4;
 }
@@ -310,9 +310,9 @@
   text-align: left;
   font-weight: 600;
   font-size: 12px;
-  color: var(--fj-ink-muted, #9a8e7a);
+  color: var(--fj-ink-muted, var(--fj-ink-muted));
   padding: 6px 10px 6px 8px;
-  border-bottom: 1px solid var(--fj-border, #d9d0c1);
+  border-bottom: 1px solid var(--fj-border, var(--fj-border));
   white-space: nowrap;
 }
 .cc-table .cc-num {
@@ -329,30 +329,30 @@
 }
 .cc-row td {
   padding: 7px 10px 7px 8px;
-  border-bottom: 1px solid var(--fj-bg-alt, #f0ebe2);
+  border-bottom: 1px solid var(--fj-bg-alt, var(--fj-bg-alt));
 }
 .cc-row:last-child td {
   border-bottom: none;
 }
 .cc-row:hover {
-  background: var(--fj-bg-alt, #f0ebe2);
+  background: var(--fj-bg-alt, var(--fj-bg-alt));
 }
 .cc-row:focus-visible {
-  outline: 2px solid var(--fj-accent, #8b2500);
+  outline: 2px solid var(--fj-accent, var(--fj-accent));
   outline-offset: -2px;
 }
 .cc-title {
-  color: var(--fj-ink, #2b2318);
+  color: var(--fj-ink, var(--fj-ink));
 }
 .cc-cbeta {
   margin-left: 8px;
   font-size: 11px;
-  color: var(--fj-ink-muted, #9a8e7a);
+  color: var(--fj-ink-muted, var(--fj-ink-muted));
   font-variant-numeric: tabular-nums;
 }
 .cc-num {
-  color: var(--fj-ink, #2b2318);
+  color: var(--fj-ink, var(--fj-ink));
 }
 .cc-empty {
-  color: var(--fj-ink-muted, #9a8e7a);
+  color: var(--fj-ink-muted, var(--fj-ink-muted));
 }

@@ -2,6 +2,8 @@ import { lazy, Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
 import { ConfigProvider, Spin } from "antd";
 import { useTranslation } from "react-i18next";
+import { useApplyTheme } from "./hooks/useTheme";
+import { buildAntdTheme } from "./theme/antdTheme";
 import zhCN from "antd/locale/zh_CN";
 import enUS from "antd/locale/en_US";
 import jaJP from "antd/locale/ja_JP";
@@ -57,16 +59,9 @@ function Loading() {
 function App() {
   const { i18n } = useTranslation();
   const antLocale = antdLocales[i18n.language] || zhCN;
+  const effective = useApplyTheme();
   return (
-    <ConfigProvider
-      locale={antLocale}
-      theme={{
-        token: {
-          colorPrimary: "#8b2500",
-          borderRadius: 2,
-        },
-      }}
-    >
+    <ConfigProvider locale={antLocale} theme={buildAntdTheme(effective === "dark")}>
       <ErrorBoundary>
         <Suspense fallback={<Loading />}>
           <Routes>

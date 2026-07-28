@@ -141,7 +141,14 @@ jobs:
         run: npm ci
 
       - name: Run npm audit
-        run: npm audit --omit=dev
+        # npm audit has no built-in per-advisory ignore, so the gate runs through a
+        # small filter that waives ONE documented advisory and fails on any other.
+        # Waived: GHSA-qwww-vcr4-c8h2 (react-router RSC-mode CSRF, 7.12.0–8.2.0) —
+        # only exploitable in RSC/framework mode; FoJin runs library mode, so it is
+        # not exposed. No patched release exists yet and the only npm "fix" downgrades
+        # to 7.11.0, re-introducing the vulns #1042 fixed. See the script header for
+        # the full rationale; drop the waiver once react-router ships a fix.
+        run: node scripts/npm-audit-waiver.mjs
 
       - name: Run npm audit (JSON report)
         if: always()
