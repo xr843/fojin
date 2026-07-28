@@ -112,7 +112,7 @@ export default function SharedQAPage() {
           style={{
             display: "inline-block",
             fontSize: 12,
-            color: "#fff",
+            color: "var(--fj-on-accent)",
             background: "var(--fj-accent, #8b2500)",
             padding: "3px 12px",
             marginBottom: 12,
@@ -143,7 +143,7 @@ export default function SharedQAPage() {
             alignItems: "center",
             gap: 6,
             fontSize: 12,
-            color: "#fff",
+            color: "var(--fj-on-gold)",
             background: "var(--fj-gold, #b08d57)",
             padding: "3px 12px",
             marginBottom: 12,

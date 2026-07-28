@@ -28,7 +28,7 @@
   cursor: pointer;
   transition: color 0.15s;
 }
-.person-breadcrumb-link:hover { color: var(--fj-accent); }
+.person-breadcrumb-link:hover { color: var(--fj-highlight); }
 
 .person-breadcrumb-sep { color: var(--fj-border); }
 
@@ -142,7 +142,7 @@
 
 .person-extlink {
   font-size: 12px;
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   text-decoration: none;
   display: inline-flex;
   align-items: center;
@@ -230,7 +230,7 @@
 }
 .person-rel-item:hover {
   background: var(--fj-surface-alt);
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
 }
 
 .person-rel-arrow {

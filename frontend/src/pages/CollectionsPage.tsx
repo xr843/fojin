@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
+import { useEffectiveTheme } from "../hooks/useTheme";
 import { Input, Tag, Empty } from "antd";
 import {
   SearchOutlined,
@@ -244,11 +245,15 @@ const LANG_LABELS: Record<string, { labelKey: string; color: string }> = {
 
 // Muted CSS tints for the cross-canon table column headers — a quiet language
 // cue without the 24 saturated antd Tags the old chip grid stacked up.
-const LANG_TINT: Record<string, string> = { bo: "#7c5cbf", sa: "#bd7b3a", pi: "#3f9268" };
+// 语言色作为列头的低调提示。原来只有一套（给浅色调的）值，梵文/巴利在浅色下就已
+// 不达标（3.47 / 3.80），暗色更糟（1.98–2.89）。改为按主题各取达标的一档。
+const LANG_TINT_LIGHT: Record<string, string> = { bo: "#7c5cbf", sa: "#ad4e00", pi: "#237804" };
+const LANG_TINT_DARK: Record<string, string> = { bo: "#d3adf7", sa: "#ffc069", pi: "#95de64" };
 
 /** 跨藏对照专区：哪些经有逐段对照语料（可发现性入口）。
     API 失败/空数据时整块隐身，可与 backend 端点解耦部署。 */
 function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useNavigate> }) {
+  const LANG_TINT = useEffectiveTheme() === "dark" ? LANG_TINT_DARK : LANG_TINT_LIGHT;
   const { t, i18n } = useTranslation();
   const { data } = useQuery({
     queryKey: ["alignmentCatalog"],
@@ -370,13 +375,15 @@ function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useN
             </tbody>
           </table>
         </div>
+        {/* 「查看全部」原跳转独立跨藏对照浏览页(/cross-canon)；该板块暂从对外入口
+            撤下(待打磨)，故隐藏此链接。上方表格各行仍跳阅读器逐段对照(集成功能，保留)。
         {groups.length > TOP_N && (
           <p style={{ fontSize: 12, margin: "12px 0 0" }}>
-            <a onClick={() => navigate("/cross-canon")} style={{ cursor: "pointer", color: "var(--fj-accent)" }}>
+            <a onClick={() => navigate("/cross-canon")} style={{ cursor: "pointer", color: "var(--fj-highlight)" }}>
               {t("collections.alignment_more", { n: TOP_N, total: groups.length })} →
             </a>
           </p>
-        )}
+        )} */}
       </div>
     </div>
   );

@@ -32,6 +32,7 @@ import {
   type ActiveUserDetail,
 } from "../api/client";
 import { getPlatformActivity } from "../api/feed";
+import { useEffectiveTheme } from "../hooks/useTheme";
 import { adminLabel, formatAdminDate } from "./adminI18n";
 
 const { Text } = Typography;
@@ -48,8 +49,9 @@ function DeltaSuffix({ today, yesterday }: { today: number; yesterday: number })
   const { t } = useTranslation();
   const diff = today - yesterday;
   const Arrow = diff >= 0 ? ArrowUpOutlined : ArrowDownOutlined;
-  const todayColor = today > 0 ? "#52c41a" : "#999";
-  const diffColor = diff > 0 ? "#52c41a" : diff < 0 ? "#ff4d4f" : "#999";
+  const todayColor = today > 0 ? "var(--fj-success)" : "var(--fj-text-secondary)";
+  const diffColor =
+    diff > 0 ? "var(--fj-success)" : diff < 0 ? "var(--fj-danger)" : "var(--fj-text-secondary)";
   return (
     <Tooltip title={t("admin_dashboard.delta.tooltip", { today, yesterday })}>
       <span style={{ fontSize: 13, color: todayColor, marginLeft: 4 }}>+{today}</span>
@@ -74,7 +76,7 @@ function PendingCard({ overview }: { overview: AdminOverview }) {
           title={t("admin_dashboard.pending.title")}
           value={total}
           prefix={<WarningOutlined />}
-          valueStyle={{ color: total > 0 ? "#faad14" : undefined }}
+          valueStyle={{ color: total > 0 ? "var(--fj-warning)" : undefined }}
           suffix={
             total > 0 ? (
               <Text type="secondary" style={{ fontSize: 12 }}>
@@ -193,6 +195,7 @@ function ActiveUsersCard({ date, onDateChange }: { date: string | null; onDateCh
 
 export default function AdminDashboardPage() {
   const { t, i18n } = useTranslation();
+  const isDark = useEffectiveTheme() === "dark";
   const [activeDate, setActiveDate] = useState<string | null>(null);
   const overviewQuery = useQuery({
     queryKey: ["adminOverview"],
@@ -269,11 +272,27 @@ export default function AdminDashboardPage() {
     domain: [S_MESSAGES, S_NEW_USERS, S_ACTIVE_USERS],
     range: ["#1677ff", "#fa8c16", "#52c41a"],
   };
+  // G2 draws into a <canvas>, so the --fj-* custom properties never reach it: the
+  // chart kept G2's light theme and painted its axis labels a dark grey that is
+  // unreadable on the dark card. Switch G2's own theme (which also carries the
+  // legend and tooltip, and keeps the plot background transparent) and hand the
+  // axis colours over as literals, warm ones rather than G2's cool blue-grey.
+  const axisStyle = isDark
+    ? {
+        labelFill: "#d2c7b1", // --fj-ink-light, 5.99:1 on the card
+        titleFill: "#d2c7b1",
+        lineStroke: "#60553f", // --fj-border
+        tickStroke: "#60553f",
+        gridStroke: "#3c342a",
+      }
+    : {};
   const chartConfig = {
+    // Light stays on G2's default theme — untouched, byte for byte.
+    ...(isDark ? { theme: "classicDark" } : {}),
     xField: "date",
     height: 360,
     legend: { color: { itemMarker: "round" } },
-    axis: { x: { labelAutoRotate: false } },
+    axis: { x: { labelAutoRotate: false, ...axisStyle } },
     children: [
       {
         data: messagesData,
@@ -281,6 +300,7 @@ export default function AdminDashboardPage() {
         yField: "count",
         colorField: "type",
         smooth: true,
+        axis: { y: { ...axisStyle } },
         scale: { color: seriesColor },
       },
       {
@@ -289,7 +309,7 @@ export default function AdminDashboardPage() {
         yField: "count",
         colorField: "type",
         smooth: true,
-        axis: { y: { position: "right" } },
+        axis: { y: { position: "right", ...axisStyle } },
         scale: { color: seriesColor },
       },
     ],
@@ -482,7 +502,7 @@ function ModuleUsageCard() {
                       title={t("admin_dashboard.answer_quality.retry_rate")}
                       value={data.answer_quality.retry_rate ?? "—"}
                       suffix={data.answer_quality.retry_rate == null ? "" : "%"}
-                      valueStyle={{ color: (data.answer_quality.retry_rate ?? 0) > 5 ? "#e74c3c" : undefined }}
+                      valueStyle={{ color: (data.answer_quality.retry_rate ?? 0) > 5 ? "var(--fj-danger)" : undefined }}
                     />
                   </Tooltip>
                 </Col>
@@ -514,7 +534,7 @@ function ModuleUsageCard() {
                       </Text>
                       {kw.keyword}
                     </span>
-                    <span style={{ color: "#999" }}>{t("admin_dashboard.unit.times", { count: kw.count })}</span>
+                    <span style={{ color: "var(--fj-text-secondary)" }}>{t("admin_dashboard.unit.times", { count: kw.count })}</span>
                   </div>
                 ))}
               </div>
@@ -602,7 +622,7 @@ function PlatformActivityCard() {
             <Statistic
               title={t("admin_dashboard.platform_activity.returning_users")}
               value={data.users.returning_users}
-              valueStyle={{ color: data.users.returning_users > data.users.new_users ? "#52c41a" : undefined }}
+              valueStyle={{ color: data.users.returning_users > data.users.new_users ? "var(--fj-success)" : undefined }}
             />
           </Tooltip>
         </Col>
@@ -649,7 +669,7 @@ function PlatformActivityCard() {
             <Statistic
               title={t("admin_dashboard.platform_activity.positive_rate")}
               value={positiveRate}
-              valueStyle={{ color: ratedCount > 0 && data.chat.positive_feedback >= data.chat.negative_feedback ? "#52c41a" : undefined }}
+              valueStyle={{ color: ratedCount > 0 && data.chat.positive_feedback >= data.chat.negative_feedback ? "var(--fj-success)" : undefined }}
             />
           </Tooltip>
         </Col>
@@ -685,7 +705,7 @@ function PlatformActivityCard() {
               style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}
             >
               <Link to={`/texts/${text.text_id}`}>{text.title_zh}</Link>
-              <span style={{ color: "#999" }}>{t("admin_dashboard.unit.times", { count: text.read_count })}</span>
+              <span style={{ color: "var(--fj-text-secondary)" }}>{t("admin_dashboard.unit.times", { count: text.read_count })}</span>
             </div>
           ))}
         </div>

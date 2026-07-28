@@ -60,8 +60,8 @@ export default function UnifiedResults({ data }: Props) {
     margin: "24px 0 12px",
     fontSize: 15,
     fontWeight: 600,
-    color: "#5b4a32",
-    borderBottom: "1px solid #e8e0d4",
+    color: "var(--fj-ink-light)",
+    borderBottom: "1px solid var(--fj-border)",
     paddingBottom: 6,
   };
 
@@ -82,13 +82,13 @@ export default function UnifiedResults({ data }: Props) {
                   display: "block",
                   padding: "10px 14px",
                   background: "var(--fj-sand-light, #faf7f2)",
-                  border: "1px solid #e8e0d4",
+                  border: "1px solid var(--fj-border)",
                   borderRadius: 6,
                   color: "inherit",
                   textDecoration: "none",
                 }}
               >
-                <div style={{ fontSize: 15, fontWeight: 600, color: "#3d2f1a" }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "var(--fj-ink)" }}>
                   {entry.headword}
                   {entry.reading && (
                     <span style={{ fontSize: 13, color: "var(--fj-ink-muted)", fontWeight: 400, marginLeft: 8 }}>
@@ -96,7 +96,7 @@ export default function UnifiedResults({ data }: Props) {
                     </span>
                   )}
                 </div>
-                <div style={{ fontSize: 13, color: "#5b4a32", marginTop: 4, lineHeight: 1.6 }}>
+                <div style={{ fontSize: 13, color: "var(--fj-ink-light)", marginTop: 4, lineHeight: 1.6 }}>
                   {entry.definition.length > 140
                     ? entry.definition.slice(0, 140) + "…"
                     : entry.definition}
@@ -112,7 +112,7 @@ export default function UnifiedResults({ data }: Props) {
           {dictionary.length > 2 && (
             <Link
               to={`/dictionary?q=${encodeURIComponent(data.query)}`}
-              style={{ display: "inline-block", marginTop: 8, fontSize: 13, color: "var(--fj-accent)" }}
+              style={{ display: "inline-block", marginTop: 8, fontSize: 13, color: "var(--fj-highlight)" }}
             >
               {t("search.view_all_dict_count", { n: dictionary.length })}
             </Link>

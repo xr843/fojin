@@ -359,7 +359,7 @@ export default function KGTimeline({
                 y1={baselineY}
                 x2={width - PADDING.right}
                 y2={baselineY}
-                stroke="var(--fj-border)"
+                stroke="var(--fj-bg-alt)"
                 strokeWidth={1}
               />
 

@@ -66,7 +66,7 @@
 }
 
 .s-filter-item:hover {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
 }
 
 .s-filter-name {
@@ -107,7 +107,7 @@
 
 .s-result-count {
   font-size: 14px;
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
 }
 
 .s-result-count strong {
@@ -132,7 +132,7 @@
 }
 
 .s-did-you-mean-link {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   font-weight: 600;
   cursor: pointer;
   text-decoration: none;
@@ -185,7 +185,7 @@
 }
 
 .s-card-title em {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   font-style: normal;
   font-weight: 700;
 }
@@ -204,7 +204,7 @@
 }
 
 .s-card-meta em {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   font-style: normal;
   font-weight: 600;
 }
@@ -217,7 +217,7 @@
 }
 
 .s-card-preview em {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   font-style: normal;
   font-weight: 600;
 }
@@ -258,7 +258,7 @@
 
 .s-card-btn-primary {
   background: var(--fj-accent);
-  color: #fff;
+  color: var(--fj-on-accent);
   border: 1px solid var(--fj-accent);
 }
 
@@ -361,6 +361,10 @@
   color: #8b6914;
   margin-bottom: 4px;
 }
+/* The dark-gold above reads fine on the light panel but only 2.40:1 on the dark one. */
+:root[data-theme="dark"] .s-content-juan-label {
+  color: var(--fj-gold);
+}
 
 /* ---------- 辞典知识卡片 ---------- */
 .s-dict-knowledge {
@@ -444,7 +448,7 @@
 
 .s-dict-knowledge-footer a {
   font-size: 12px;
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   text-decoration: none;
   font-weight: 500;
 }

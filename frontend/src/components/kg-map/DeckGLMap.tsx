@@ -8,18 +8,9 @@ import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { escapeHtml } from "../../utils/sanitize";
+import { useEffectiveTheme } from "../../hooks/useTheme";
+import { typeColors } from "./typeColors";
 import type { KGGeoEntity, KGLineageArc } from "../../api/client";
-
-/** Bright, highly-distinct palette for light background */
-const TYPE_COLORS: Record<string, [number, number, number]> = {
-  person:    [220, 38, 38],    // 鲜红 (red-600)
-  monastery: [34, 197, 94],    // 鲜绿 (green-500)
-  place:     [124, 58, 237],   // 鲜紫 (violet-600)
-  school:    [37, 99, 235],    // 蓝 (blue-600)
-  text:      [6, 182, 212],    // 青 (cyan-500)
-  concept:   [8, 145, 178],    // 深青
-  dynasty:   [219, 39, 119],   // 洋红 (pink-600)
-};
 
 const INITIAL_VIEW_STATE = {
   longitude: 115,
@@ -29,9 +20,16 @@ const INITIAL_VIEW_STATE = {
   bearing: 0,
 };
 
-/** Light basemap — MapTiler Streets with Chinese labels */
+/** MapTiler Streets with Chinese labels — one basemap per theme.
+ *  The map canvas covers ~65% of the viewport, so a light basemap under the dark
+ *  chrome was the single brightest thing left in dark mode. streets-v2-dark is a
+ *  drop-in: it carries the SAME layer structure as streets-v2 (32 symbol layers,
+ *  25 of them name-based), so the zh-label / Taiwan-name patching below applies
+ *  unchanged. (dataviz-dark and basic-v2-dark are darker still but ship only
+ *  11 / 7 label layers — far fewer place names.) */
 const MAPTILER_KEY = "sBS5GCqJuftwymqkp64I";
-const MAP_STYLE = `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_KEY}&language=zh`;
+const mapStyleUrl = (isDark: boolean) =>
+  `https://api.maptiler.com/maps/streets-v2${isDark ? "-dark" : ""}/style.json?key=${MAPTILER_KEY}&language=zh`;
 
 interface DeckGLMapProps {
   geoEntities: KGGeoEntity[];
@@ -65,6 +63,10 @@ export default function DeckGLMap({
   focusEntity,
 }: DeckGLMapProps) {
   const { t } = useTranslation();
+  const isDark = useEffectiveTheme() === "dark";
+  // useMemo 而非直接调用：typeColors() 每次返回新对象，直接进下面 layers 的
+  // 依赖数组会让图层每帧重建；按 isDark 固定引用后既能随主题重算又不抖动。
+  const TYPE_COLORS = useMemo(() => typeColors(isDark), [isDark]);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [arcTooltip, setArcTooltip] = useState<ArcTooltipState | null>(null);
   const [viewState, setViewState] = useState<typeof INITIAL_VIEW_STATE & { transitionDuration?: number }>(INITIAL_VIEW_STATE);
@@ -106,7 +108,7 @@ export default function DeckGLMap({
 
   useEffect(() => {
     let cancelled = false;
-    fetch(MAP_STYLE)
+    fetch(mapStyleUrl(isDark))
       .then((r) => r.json())
       .then((style: { layers?: Array<{ id: string; type: string; layout?: Record<string, unknown> }> }) => {
         if (cancelled || !style.layers) return;
@@ -156,7 +158,7 @@ export default function DeckGLMap({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isDark]);
 
   const filteredEntities = useMemo(() => {
     return geoEntities.filter((e) => {
@@ -308,7 +310,7 @@ export default function DeckGLMap({
     }
 
     return result;
-  }, [filteredEntities, filteredArcs, showArcs, handleHover, handleClick, focusEntity, pulseScale]);
+  }, [filteredEntities, filteredArcs, showArcs, handleHover, handleClick, focusEntity, pulseScale, TYPE_COLORS]);
 
   return (
     <>

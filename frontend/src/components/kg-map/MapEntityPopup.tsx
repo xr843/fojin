@@ -67,7 +67,7 @@ export default function MapEntityPopup({
         </div>
 
         {address && (
-          <div style={{ fontSize: 12, color: "#999", padding: "4px 14px 0", display: "flex", alignItems: "center", gap: 4 }}>
+          <div style={{ fontSize: 12, color: "var(--fj-text-secondary)", padding: "4px 14px 0", display: "flex", alignItems: "center", gap: 4 }}>
             <EnvironmentOutlined style={{ fontSize: 11 }} />
             {address}
           </div>

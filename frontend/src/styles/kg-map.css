@@ -412,7 +412,7 @@
 }
 
 .kg-map-stats-filter {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   font-weight: 500;
 }
 

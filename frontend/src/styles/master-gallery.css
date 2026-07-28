@@ -37,7 +37,7 @@
 
 .mg-chip:hover {
   border-color: var(--fj-accent, var(--fj-accent));
-  color: var(--fj-accent, var(--fj-accent));
+  color: var(--fj-highlight);
 }
 
 .mg-chip:focus-visible {
@@ -48,7 +48,7 @@
 .mg-chip[aria-pressed="true"] {
   background: var(--fj-accent, var(--fj-accent));
   border-color: var(--fj-accent, var(--fj-accent));
-  color: #fff;
+  color: var(--fj-on-accent);
 }
 
 .mg-chip-n {
@@ -240,7 +240,7 @@
 
 .mg-open {
   margin-left: auto;
-  color: var(--fj-accent, var(--fj-accent));
+  color: var(--fj-highlight);
   font-size: 12px;
   cursor: pointer;
   padding: 0 2px;

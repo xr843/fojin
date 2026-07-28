@@ -345,7 +345,7 @@ export default function ProfilePage() {
                       <Alert
                         message={
                           <Space>
-                            <CheckCircleOutlined style={{ color: "#52c41a" }} />
+                            <CheckCircleOutlined style={{ color: "var(--fj-success)" }} />
                             {t("profile.api_key_configured", {
                               provider: keyStatus.provider,
                               preview: keyStatus.key_preview,

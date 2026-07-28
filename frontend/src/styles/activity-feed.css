@@ -121,7 +121,7 @@
 }
 
 .feed-item-title a:hover {
-  color: var(--fj-accent, var(--fj-accent));
+  color: var(--fj-highlight);
   text-decoration: underline;
 }
 
@@ -230,7 +230,7 @@
 
 .platform-stat-card .stat-row .stat-value {
   font-weight: 600;
-  color: var(--fj-accent, var(--fj-accent));
+  color: var(--fj-highlight);
   font-family: "Noto Serif SC", serif;
 }
 
@@ -258,7 +258,7 @@
 }
 
 .top-text-item a:hover {
-  color: var(--fj-accent, var(--fj-accent));
+  color: var(--fj-highlight);
   text-decoration: underline;
 }
 
@@ -320,7 +320,7 @@
   background: rgba(82, 196, 26, 0.16); color: #95de64; border-color: rgba(82, 196, 26, 0.38);
 }
 :root[data-theme="dark"] .update-type-badge.translation {
-  background: rgba(24, 144, 255, 0.16); color: #69c0ff; border-color: rgba(24, 144, 255, 0.38);
+  background: rgba(24, 144, 255, 0.16); color: #91d5ff; border-color: rgba(24, 144, 255, 0.38);
 }
 :root[data-theme="dark"] .update-type-badge.scan {
   background: rgba(250, 140, 22, 0.16); color: #ffc069; border-color: rgba(250, 140, 22, 0.38);
