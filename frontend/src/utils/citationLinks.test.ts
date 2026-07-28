@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { injectCitationLinks } from "./ChatPage";
+import { injectCitationLinks } from "./citationLinks";
 import type { ChatSource } from "../api/client";
 
 /**
@@ -23,6 +23,7 @@ function src(o: Partial<ChatSource> = {}): ChatSource {
     title_zh: "阿毘達磨俱舍論",
     juan_num: 9,
     chunk_index: 25,
+    chunk_text: "得聖。若非定業，由得聖故，能令無果亦無驚怖",
     score: 0.9,
     ...o,
   } as ChatSource;
@@ -60,20 +61,23 @@ describe("injectCitationLinks — 卷号与段号必须同源", () => {
   });
 
   it("多个候选中若某段确实含引文，锚到那一段，卷号随之改写", () => {
+    // 引文须 ≥6 字：extractPrecedingQuote 的正则下限就是 6，
+    // pickSourceForQuote 归一化后也要求 ≥6。用 5 字的「無學身語業」
+    // 会静默抽取失败、锚定不触发，用例便测不到它想测的东西。
     const out = injectCitationLinks(
-      "论云「無學身語業」者。【《阿毘達磨俱舍論》第2卷】",
+      "论云「無學身語業，即意三牟尼」者。【《阿毘達磨俱舍論》第2卷】",
       [
         src({ juan_num: 9, chunk_index: 25, score: 0.95 }),
-        src({ juan_num: 16, chunk_index: 7, score: 0.5, chunk_text: "無學身語業，即意三牟尼" } as Partial<ChatSource>),
+        src({ juan_num: 16, chunk_index: 7, score: 0.5, chunk_text: "無學身語業，即意三牟尼" }),
       ],
     );
     const url = urlOf(out);
     expect(url).not.toBeNull();
     const [, juan, chunk] = url!.split("/");
-    // 引文命中的那一段来自第 16 卷 —— 卷段同源，段号有效
-    if (chunk !== "-1") {
-      expect(juan).toBe("16");
-      expect(chunk).toBe("7");
-    }
+    // 引文命中的那一段来自第 16 卷 —— 卷段同源，段号有效。
+    // 这里必须硬断言：包一层 `if (chunk !== "-1")` 会让退化成 -1 时整条用例
+    // 空转通过，而它守的恰恰是「引文命中哪段就锚哪段」这个最关键的行为。
+    expect(juan).toBe("16");
+    expect(chunk).toBe("7");
   });
 });
