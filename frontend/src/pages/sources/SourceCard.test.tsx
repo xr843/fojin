@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import SourceCard from "./SourceCard";
 import type { DataSource } from "../../api/client";
 import type { SourceId } from "../../types/branded";

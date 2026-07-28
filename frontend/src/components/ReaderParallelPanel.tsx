@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Empty, Spin, Alert, Collapse, Tag, Progress, Tabs, Button } from "antd";
 import { LinkOutlined, BookOutlined, ExpandAltOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { getJuanAlignment, getCanonicalParallels, getFullParallelContent, getSentenceParallels } from "../api/client";
 import OtherVersions from "./OtherVersions";
 import SentenceParallelView from "./parallel/SentenceParallelView";

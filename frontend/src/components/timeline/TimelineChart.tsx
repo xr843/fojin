@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as d3 from "d3";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import type { TimelineItem } from "../../api/stats";
 import { resolveDynasty } from "../../data/dynasty_years";
 import DynastyBands from "./DynastyBands";

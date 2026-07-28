@@ -3,15 +3,14 @@
 // so we parse its JSON and fail on any advisory NOT in the waiver list below.
 import { execSync } from "node:child_process";
 
-// GHSA-qwww-vcr4-c8h2 — React Router "RSC Mode CSRF" (affects react-router 7.12.0–8.2.0).
-// Only exploitable in React Router's RSC / framework mode. FoJin runs LIBRARY mode
-// (<BrowserRouter> + ReactDOM.createRoot in src/main.tsx; no react-router.config,
-// no @react-router/dev), so the RSC action path does not exist here — not exposed.
-// No patched 7.x/8.x is published yet (latest 7.18.1 is still in-range); npm's only
-// "fix" downgrades to 7.11.0, which re-introduces GHSA-wrjc-x8rr-h8h6 /
-// GHSA-337j-9hxr-rhxg that the v7 upgrade (#1042) fixed. Re-audit and drop this
-// waiver once react-router ships a fixed release (>8.2.0 or a 7.x patch).
-const WAIVED = new Set(["GHSA-qwww-vcr4-c8h2"]);
+// Currently empty: every production advisory is fixed upstream, so the gate is a
+// plain `npm audit --omit=dev`. The waiver mechanism is kept because npm gives us
+// no other way to accept a single advisory — add an entry only with a comment
+// stating why it is not exposed here and what release would let us drop it.
+//
+// Previously waived: GHSA-qwww-vcr4-c8h2 (React Router "RSC Mode CSRF"), dropped
+// when react-router 8.3.0 shipped the fix — see the v8 upgrade PR.
+const WAIVED = new Set([]);
 
 let json;
 try {
@@ -38,6 +37,6 @@ if (unwaived.size) {
 }
 console.log(
   Object.keys(vulns).length
-    ? "npm audit: only the waived advisory (GHSA-qwww-vcr4-c8h2) is present — OK."
+    ? `npm audit: only waived advisories are present (${[...WAIVED].join(", ")}) — OK.`
     : "npm audit: no vulnerabilities — OK.",
 );

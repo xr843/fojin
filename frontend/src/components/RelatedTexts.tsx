@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Card, List, Tag, Typography, Button, Spin, Empty } from "antd";
 import { SwapOutlined, ReadOutlined } from "@ant-design/icons";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { getTextRelations } from "../api/client";
 
 const RELATION_LABELS: Record<string, { labelKey: string; color: string }> = {

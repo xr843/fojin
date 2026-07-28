@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { List, Typography, Tag, Button, Spin, Empty } from "antd";
 import { ReadOutlined } from "@ant-design/icons";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { getSimilarPassages } from "../api/client";
 
 function SimilarPassagesInner({
