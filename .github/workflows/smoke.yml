@@ -119,6 +119,12 @@ jobs:
       - name: Run smoke suite
         env:
           BASE_URL: ${{ github.event.inputs.base_url || 'https://fojin.app' }}
+          # Optional: a dedicated production test account enables the full
+          # logout-flow check in auth-feedback.spec.ts (which exercises
+          # Modal.confirm + real sign-out). Absent → that test skips, the rest
+          # still run. The always-on failed-login check needs no account.
+          SMOKE_USER: ${{ secrets.SMOKE_USER }}
+          SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
         run: npx playwright test
 
       - name: Upload traces on failure
