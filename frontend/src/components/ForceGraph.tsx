@@ -276,11 +276,11 @@ export default function ForceGraph({
           : d.predicate;
         const parts = [`<strong>${escapeHtml(label)}</strong>`];
         if (d.provenance)
-          parts.push(`<span style="color:#9a8e7a">${escapeHtml(t("kg.tooltip_source"))}: ${escapeHtml(d.provenance)}</span>`);
+          parts.push(`<span style="color:var(--fj-ink-muted)">${escapeHtml(t("kg.tooltip_source"))}: ${escapeHtml(d.provenance)}</span>`);
         if (d.evidence)
-          parts.push(`<span style="color:#7a6e5c">${escapeHtml(t("kg.tooltip_evidence"))}: ${escapeHtml(d.evidence)}</span>`);
+          parts.push(`<span style="color:var(--fj-ink-muted)">${escapeHtml(t("kg.tooltip_evidence"))}: ${escapeHtml(d.evidence)}</span>`);
         if (d.confidence < 1)
-          parts.push(`<span style="color:#b08d57">${escapeHtml(t("kg.tooltip_confidence"))}: ${d.confidence}</span>`);
+          parts.push(`<span style="color:var(--fj-gold)">${escapeHtml(t("kg.tooltip_confidence"))}: ${d.confidence}</span>`);
         showTooltip(parts.join("<br>"), event.offsetX, event.offsetY);
       })
       .on("mouseout", function (this: SVGLineElement, _event: MouseEvent, d) {
@@ -325,7 +325,7 @@ export default function ForceGraph({
       .attr("r", (d) => nodeRadius(d) + 5)
       .attr("fill", "none")
       .attr("stroke", (d) =>
-        expandedNodeIds?.has(d.id) ? "none" : (TYPE_COLORS[d.entity_type] || "#888")
+        expandedNodeIds?.has(d.id) ? "none" : (TYPE_COLORS[d.entity_type] || "var(--fj-ink-muted)")
       )
       .attr("stroke-width", 1.5)
       .attr("stroke-opacity", (d) => (expandedNodeIds?.has(d.id) ? 0 : 0.35))
@@ -336,8 +336,8 @@ export default function ForceGraph({
     node
       .append("circle")
       .attr("r", nodeRadius)
-      .attr("fill", (d) => TYPE_COLORS[d.entity_type] || "#888")
-      .attr("stroke", "#fff")
+      .attr("fill", (d) => TYPE_COLORS[d.entity_type] || "var(--fj-ink-muted)")
+      .attr("stroke", "var(--fj-surface)")
       .attr("stroke-width", 2)
       .attr("filter", "drop-shadow(0 1px 2px rgba(0,0,0,0.12))");
 
@@ -352,7 +352,7 @@ export default function ForceGraph({
       .attr("dy", "0.35em")
       .attr("font-size", (d) => Math.max(10, nodeRadius(d) * 0.62))
       .attr("font-weight", 600)
-      .attr("fill", "#fff")
+      .attr("fill", "#fff") /* count label sits inside a saturated colored node — stays white in both themes */
       .attr("pointer-events", "none");
 
     // Full name label below node — offset by the node's own radius
@@ -365,7 +365,7 @@ export default function ForceGraph({
       .attr("dy", (d) => nodeRadius(d) + 14)
       .attr("font-size", 11)
       .attr("font-family", '"Noto Serif SC", serif')
-      .attr("fill", "#2b2318")
+      .attr("fill", "var(--fj-ink)")
       .attr("pointer-events", "none");
 
     // ── Hover highlight: dim everything except neighbors ──
@@ -401,10 +401,10 @@ export default function ForceGraph({
         const typeLabel = TYPE_LABEL_KEYS[d.entity_type]
           ? t(TYPE_LABEL_KEYS[d.entity_type])
           : d.entity_type;
-        let html = `<strong>${escapeHtml(d.name)}</strong> <span style="color:#9a8e7a">${escapeHtml(typeLabel)}</span>`;
-        if (d.description) html += `<br><span style="color:#7a6e5c;font-size:11px">${escapeHtml(d.description)}</span>`;
+        let html = `<strong>${escapeHtml(d.name)}</strong> <span style="color:var(--fj-ink-muted)">${escapeHtml(typeLabel)}</span>`;
+        if (d.description) html += `<br><span style="color:var(--fj-ink-muted);font-size:11px">${escapeHtml(d.description)}</span>`;
         if (onNodeExpand && !expandedNodeIds?.has(d.id)) {
-          html += `<br><span style="color:#b08d57;font-size:10px">${escapeHtml(t("kg.dblclick_expand"))}</span>`;
+          html += `<br><span style="color:var(--fj-gold);font-size:10px">${escapeHtml(t("kg.dblclick_expand"))}</span>`;
         }
         showTooltip(html, _event.offsetX, _event.offsetY);
       })
@@ -519,7 +519,7 @@ export default function ForceGraph({
         ref={svgRef}
         width={width}
         height={height}
-        style={{ background: "#fdfcfa" }}
+        style={{ background: "var(--fj-surface)" }}
       />
       {/* 适应窗口 — on-demand fit-to-view (replaces the old jarring auto-fit) */}
       {nodes.length > 0 && (
@@ -537,9 +537,9 @@ export default function ForceGraph({
             padding: "4px 10px",
             fontSize: 12,
             fontFamily: '"Noto Serif SC", serif',
-            color: "#5b4a32",
-            background: "rgba(255,255,255,0.92)",
-            border: "1px solid #e8e0d4",
+            color: "var(--fj-ink-light)",
+            background: "var(--fj-surface)",
+            border: "1px solid var(--fj-border)",
             borderRadius: 6,
             cursor: "pointer",
             boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
@@ -556,13 +556,13 @@ export default function ForceGraph({
         style={{
           position: "absolute",
           pointerEvents: "none",
-          background: "rgba(255,255,255,0.96)",
-          border: "1px solid #e8e0d4",
+          background: "var(--fj-surface)",
+          border: "1px solid var(--fj-border)",
           borderRadius: 6,
           padding: "6px 10px",
           fontSize: 12,
           lineHeight: 1.5,
-          color: "#2b2318",
+          color: "var(--fj-ink)",
           maxWidth: 260,
           boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           opacity: 0,

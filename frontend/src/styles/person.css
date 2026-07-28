@@ -18,28 +18,28 @@
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   margin-bottom: 18px;
   font-family: "Noto Serif SC", serif;
 }
 
 .person-breadcrumb-link {
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   cursor: pointer;
   transition: color 0.15s;
 }
-.person-breadcrumb-link:hover { color: #8b2500; }
+.person-breadcrumb-link:hover { color: var(--fj-highlight); }
 
-.person-breadcrumb-sep { color: #d9d0c1; }
+.person-breadcrumb-sep { color: var(--fj-border); }
 
 .person-breadcrumb-current {
-  color: #5c4f3d;
+  color: var(--fj-ink-light);
   font-weight: 500;
 }
 
 /* ---------- 通用卡片 ---------- */
 .person-card {
-  background: #fff;
+  background: var(--fj-surface);
   border: 1px solid #e8e0d0;
   border-radius: 10px;
   padding: 24px 28px;
@@ -64,7 +64,7 @@
   font-family: "Noto Serif SC", serif;
   font-size: 26px;
   font-weight: 700;
-  color: #2b2318;
+  color: var(--fj-ink);
   margin: 0;
   letter-spacing: 2px;
   line-height: 1.3;
@@ -73,7 +73,7 @@
 .person-dates {
   font-size: 16px;
   font-weight: 400;
-  color: #7a6e5c;
+  color: var(--fj-ink-muted);
   margin-left: 4px;
   letter-spacing: 0;
 }
@@ -89,17 +89,17 @@
 .person-meta-chip {
   font-family: "Noto Serif SC", serif;
   font-size: 12px;
-  background: #faf6ef;
+  background: var(--fj-surface-alt);
   border: 1px solid #e8e0d0;
   border-radius: 12px;
   padding: 2px 10px;
-  color: #7a6e5c;
+  color: var(--fj-ink-muted);
 }
 
 /* ---------- 多语言名称 ---------- */
 .person-altnames {
-  background: #faf8f5;
-  border: 1px solid #f0ebe2;
+  background: var(--fj-surface-alt);
+  border: 1px solid var(--fj-bg-alt);
   border-radius: 6px;
   padding: 10px 14px;
   margin-bottom: 14px;
@@ -111,12 +111,12 @@
   gap: 8px;
   margin-bottom: 4px;
   font-size: 13px;
-  color: #5c4f3d;
+  color: var(--fj-ink-light);
 }
 .person-altname-row:last-child { margin-bottom: 0; }
 
 .person-altname-lang {
-  color: #9a8e7a;
+  color: var(--fj-ink-muted);
   font-size: 11px;
   width: 36px;
   flex-shrink: 0;
@@ -129,7 +129,7 @@
 
 /* ---------- 简介 ---------- */
 .person-description {
-  color: #5c4f3d !important;
+  color: var(--fj-ink-light) !important;
   font-size: 14px !important;
   line-height: 1.8 !important;
   margin-bottom: 14px !important;
@@ -142,7 +142,7 @@
 
 .person-extlink {
   font-size: 12px;
-  color: #8b2500;
+  color: var(--fj-highlight);
   text-decoration: none;
   display: inline-flex;
   align-items: center;
@@ -159,16 +159,16 @@
 .person-kg-btn {
   font-family: "Noto Serif SC", serif;
   font-size: 13px;
-  border-color: #d9d0c1;
-  color: #5c4f3d;
-  background: #faf8f5;
+  border-color: var(--fj-border);
+  color: var(--fj-ink-light);
+  background: var(--fj-surface-alt);
   border-radius: 6px;
   transition: all 0.15s;
 }
 .person-kg-btn:hover {
   border-color: #b5a890 !important;
-  color: #2b2318 !important;
-  background: #f5f0e8 !important;
+  color: var(--fj-ink) !important;
+  background: var(--fj-surface-alt) !important;
 }
 
 /* ---------- 关系网络面板 ---------- */
@@ -178,7 +178,7 @@
   font-family: "Noto Serif SC", serif;
   font-size: 16px;
   font-weight: 600;
-  color: #2b2318;
+  color: var(--fj-ink);
   margin: 0 0 16px;
   letter-spacing: 1px;
 }
@@ -198,15 +198,15 @@
   font-family: "Noto Serif SC", serif;
   font-size: 13px;
   font-weight: 600;
-  color: #5c4f3d;
+  color: var(--fj-ink-light);
 }
 
 .person-rel-count {
   font-size: 10px;
-  background: #f0ebe2;
+  background: var(--fj-bg-alt);
   border-radius: 8px;
   padding: 0 6px;
-  color: #7a6e5c;
+  color: var(--fj-ink-muted);
   line-height: 18px;
 }
 
@@ -224,17 +224,17 @@
   padding: 4px 6px;
   border-radius: 4px;
   text-decoration: none;
-  color: #5c4f3d;
+  color: var(--fj-ink-light);
   font-size: 13px;
   transition: background 0.12s, color 0.12s;
 }
 .person-rel-item:hover {
-  background: #faf6ef;
-  color: #8b2500;
+  background: var(--fj-surface-alt);
+  color: var(--fj-highlight);
 }
 
 .person-rel-arrow {
-  color: #d9d0c1;
+  color: var(--fj-border);
   font-size: 9px;
   flex-shrink: 0;
 }
@@ -253,7 +253,7 @@
 
 .person-rel-divider {
   margin: 12px 0 10px !important;
-  border-color: #f0ebe2 !important;
+  border-color: var(--fj-bg-alt) !important;
 }
 .person-rel-group:last-child .person-rel-divider {
   display: none;

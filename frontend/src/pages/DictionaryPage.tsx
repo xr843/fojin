@@ -124,7 +124,7 @@ function DictGroup({ group, defaultExpanded = false }: { group: DictGroupedResul
             size="small"
             icon={expanded ? <UpOutlined /> : <DownOutlined />}
             onClick={() => setExpanded(!expanded)}
-            style={{ color: "var(--fj-accent)", fontSize: 13 }}
+            style={{ color: "var(--fj-highlight)", fontSize: 13 }}
           >
             {expanded ? t("dict.collapse") : t("dict.expand_all", { n: group.entries.length })}
           </Button>
@@ -316,7 +316,7 @@ export default function DictionaryPage() {
                 setSourceFilter("");
                 setSearchParams({});
               }}
-              style={{ color: "var(--fj-accent)", fontSize: 13, padding: 0, marginRight: 16 }}
+              style={{ color: "var(--fj-highlight)", fontSize: 13, padding: 0, marginRight: 16 }}
             >
               {t("dict.back_to_list")}
             </Button>

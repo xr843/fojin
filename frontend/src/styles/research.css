@@ -28,7 +28,7 @@
   align-items: center;
   gap: 6px;
   background: var(--fj-gold);
-  color: #fff;
+  color: var(--fj-on-gold);
   border: none;
   border-radius: 8px;
   padding: 10px 18px;
@@ -56,7 +56,7 @@
   font-family: inherit;
   line-height: 1.6;
   color: var(--fj-ink);
-  background: #fff;
+  background: var(--fj-surface);
   resize: vertical;
 }
 .rp-input:focus {
@@ -114,7 +114,7 @@
   gap: 10px;
   font-size: 13px;
   color: var(--fj-ink);
-  background: #fbf9f4;
+  background: var(--fj-surface-alt);
   border: 1px solid #ede5d6;
   border-radius: 8px;
   padding: 8px 12px;
@@ -152,7 +152,7 @@
 .rp-trust {
   margin-top: 10px;
   font-size: 12px;
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
 }
 
 /* Sources */
@@ -173,7 +173,7 @@
   font-size: 14px;
 }
 .rp-source-link {
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   font-weight: 600;
   text-decoration: none;
 }
@@ -209,7 +209,7 @@
   background: none;
   border: none;
   padding: 0;
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   font-weight: 600;
   cursor: pointer;
   font-size: 13px;
@@ -229,4 +229,9 @@
     align-self: stretch;
     justify-content: center;
   }
+}
+
+/* Dark mode: URN chip cream bg didn't flip. */
+:root[data-theme="dark"] .rp-urn {
+  background: var(--fj-surface-alt);
 }

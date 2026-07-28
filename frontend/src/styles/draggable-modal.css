@@ -62,9 +62,9 @@
   background: linear-gradient(
     135deg,
     transparent 0 45%,
-    var(--fj-border, #d9d0c1) 45% 55%,
+    var(--fj-border, var(--fj-border)) 45% 55%,
     transparent 55% 70%,
-    var(--fj-border, #d9d0c1) 70% 80%,
+    var(--fj-border, var(--fj-border)) 70% 80%,
     transparent 80%
   );
 }

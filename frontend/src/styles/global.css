@@ -13,6 +13,132 @@
   --fj-gold:      #b08d57;
   --fj-border:    #d9d0c1;
   --fj-card-bg:   rgba(255,255,255,0.6);
+  /* Solid surface (opaque cards/panels/inputs). Light = pure white, matching
+     the many bare white-background rules; dark = elevated warm surface. */
+  --fj-surface:   #ffffff;
+  /* Subtle raised surface (hover rows, tinted panels). Light folds the many
+     near-white cream variants (#faf8f4/#fdf6ee/#f5f0e8…) into one; dark = base-alt. */
+  --fj-surface-alt: #faf8f4;
+  /* KGTimeline dynasty zebra bands (alternating). */
+  --fj-timeline-band-a: #e8dccc;
+  --fj-timeline-band-b: #d6c9b3;
+  /* Previously-undefined tokens that only ever hit their light fallback (so they
+     never adapted to dark). Light values = the old fallbacks (byte-identical). */
+  --fj-sand-light:      #faf7f2;  /* search result/empty-state panels */
+  --fj-text-secondary:  #767676;  /* reader secondary text — #999 was 2.85:1 on white, under AA */
+  --fj-accent-hover:    #a03000;  /* dictionary/search button hover (darker maroon) */
+  /* Text/icon placed ON a solid accent or gold background. Light: the accent is a
+     deep maroon, so white reads (8.9:1). Dark: the accent/gold are BRIGHT, so white
+     would fail (2.99:1 / 1.95:1) — use a deep warm ink instead (5.6:1 / 8.5:1). */
+  --fj-on-accent:       #ffffff;
+  /* Text ON a solid GOLD background. Gold is light in BOTH themes, so white never
+     works there (3.09:1 light / 1.95:1 dark) — both sides take a deep warm ink. */
+  --fj-on-gold:         #2e2415;
+  /* Status text. The antd defaults (#52c41a / #ff4d4f) are tuned for solid fills,
+     not for text: on white they are 2.27:1 and 3.27:1, and on the dark card they
+     are 4.42:1 and 3.07:1. Each theme gets the shade that actually reads. */
+  --fj-success:         #237804;
+  --fj-danger:          #cf1322;
+  --fj-warning:         #ad4e00;
+  --fj-info:            #0958d9;
+  /* Search-result keyword highlight. It sits as bold 18px body text on the card,
+     which the brand accent is not tuned for: in dark it only reaches 3.35:1. */
+  --fj-highlight:       #8b2500;
+}
+
+:root[data-theme="dark"] {
+  /* Warm dark, lifted off pure-black so large chrome areas (header, footer,
+     search bar, cards) feel soft rather than oppressive. */
+  --fj-bg:        #2f2820;
+  --fj-bg-alt:    #3c342a;
+  --fj-ink:       #efe8db;
+  --fj-ink-light: #d2c7b1;
+  --fj-ink-muted: #c6bca6;
+  --fj-accent:    #e5764a;
+  --fj-gold:      #d6b579;
+  --fj-border:    #60553f;
+  --fj-card-bg:   #4a4133;
+  --fj-surface:   #4a4133;
+  --fj-surface-alt: #544a3a;
+  --fj-timeline-band-a: #3c342a;
+  --fj-timeline-band-b: #544a3a;
+  --fj-sand-light:      #3d342a;
+  --fj-text-secondary:  #c6bca6;
+  --fj-accent-hover:    #ef8a5f;
+  --fj-on-accent:       #17120d;
+  --fj-on-gold:         #17120d;
+  --fj-success:         #73d13d;
+  --fj-danger:          #ffa39e;
+  --fj-warning:         #ffc069;
+  --fj-info:            #91caff;
+  --fj-highlight:       #f2a07a;
+  color-scheme: dark;
+}
+
+/* antd's Layout Header/Footer fall back to colorBgBase and ignore the Layout
+   headerBg/footerBg tokens in this setup, leaving the big top/bottom bars a
+   near-black. Pin them to the elevated warm surface in dark mode so the large
+   chrome reads clearly lifted, not oppressive. */
+:root[data-theme="dark"] .ant-layout-header,
+:root[data-theme="dark"] .ant-layout-footer {
+  background: var(--fj-surface) !important;
+}
+
+/* antd's dark purple preset is the one Tag colour that misses AA against its own
+   tag background (3.39:1 — the other presets land between 4.9:1 and 8.2:1), and
+   /sources paints every 影像 source with it. Lift the text to antd's purple-4,
+   which clears AA at 6.15:1 and sits in the same brightness band as its siblings. */
+:root[data-theme="dark"] .ant-tag-purple {
+  color: #b37feb;
+}
+:root[data-theme="dark"] .ant-tag-geekblue {
+  color: #85a5ff; /* geekblue-4  4.16 -> 7.51 */
+}
+
+/* antd derives the dark primary as a duller #c16642, which leaves the active tab
+   label at 3.63:1 against the page. Pin it to the accent itself (4.86:1). */
+:root[data-theme="dark"] .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--fj-highlight);
+}
+
+/* The same problem, mirrored, in the DEFAULT theme: antd's light preset Tags put
+   colour-7 text on a colour-1 tint, which lands at 2.8–3.4:1 — under AA for the
+   10px badges /sources paints on all 617 source cards. Drop the four failing hues
+   one step down antd's own ramp (gold needs two; colour-8 only gets it to 3.1:1).
+   Blue (5.5:1), purple (8.9:1) and default (20:1) already clear AA — left alone so
+   the badges keep as much of antd's palette as legibility allows. */
+:root[data-theme="light"] .ant-tag-cyan {
+  color: #006d75; /* cyan-8   3.39 -> 5.82 */
+}
+:root[data-theme="light"] .ant-tag-orange {
+  color: #ad4e00; /* orange-8 3.34 -> 5.09 */
+}
+:root[data-theme="light"] .ant-tag-green {
+  color: #237804; /* green-8  3.37 -> 5.44 */
+}
+:root[data-theme="light"] .ant-tag-gold {
+  color: #874d00; /* gold-9   2.76 -> 6.53 */
+}
+/* Completing the sweep: every preset was measured in both themes, and these are
+   the rest of the ones that miss AA. yellow/lime are unused today — fixed so the
+   next person who reaches for them doesn't inherit a 2:1 tag. */
+:root[data-theme="light"] .ant-tag-volcano {
+  color: #ad2102; /* volcano-8  4.37 -> 6.38 */
+}
+:root[data-theme="light"] .ant-tag-yellow {
+  color: #876800; /* yellow-9   2.05 -> 5.15 */
+}
+:root[data-theme="light"] .ant-tag-lime {
+  color: #3f6600; /* lime-9     2.48 -> 6.62 */
+}
+
+/* antd's Typography success/danger colours are the same fill-tuned greens and reds
+   as above (2.27:1 on white, 3.36:1 on the dark card). Point them at the tokens. */
+.ant-typography-success {
+  color: var(--fj-success) !important;
+}
+.ant-typography-danger {
+  color: var(--fj-danger) !important;
 }
 
 * {
@@ -58,7 +184,7 @@ body {
 /* Search highlight */
 em {
   font-style: normal;
-  color: var(--fj-accent);
+  color: var(--fj-highlight);
   font-weight: 600;
 }
 
@@ -127,7 +253,7 @@ em {
   border: 1px solid #d9d9d9;
   border-radius: 12px;
   padding: 8px 12px;
-  background: #fff;
+  background: var(--fj-surface);
   transition: border-color 0.2s;
   display: flex;
   flex-direction: column;
@@ -312,7 +438,7 @@ em {
   transform: translate(-50%, -50%);
   width: 4px;
   height: 32px;
-  background: var(--fj-border, #d9d0c1);
+  background: var(--fj-border, var(--fj-border));
   border-radius: 2px;
   transition: background 0.15s;
 }
@@ -326,7 +452,7 @@ em {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #fff;
+  background: var(--fj-surface);
   overflow: hidden;
 }
 

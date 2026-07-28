@@ -5,6 +5,8 @@ import { GlobalOutlined, BarChartOutlined, SearchOutlined } from "@ant-design/ic
 import { useTranslation } from "react-i18next";
 import * as OpenCC from "opencc-js";
 import DeckGLMap from "../components/kg-map/DeckGLMap";
+import { typeColorCss } from "../components/kg-map/typeColors";
+import { useEffectiveTheme } from "../hooks/useTheme";
 import MapEntityPopup from "../components/kg-map/MapEntityPopup";
 import { getKGGeoEntities, getKGLineageArcs } from "../api/client";
 import type { KGGeoEntity } from "../api/client";
@@ -20,15 +22,12 @@ const ENTITY_TYPE_OPTIONS = [
 const s2t = OpenCC.Converter({ from: "cn", to: "tw" });
 const t2s = OpenCC.Converter({ from: "tw", to: "cn" });
 
-const TYPE_CSS_COLORS: Record<string, string> = {
-  person: "#dc2626",
-  monastery: "#22c55e",
-  place: "#7c3aed",
-  school: "#2563eb",
-};
+
 
 export default function KGMapPage() {
   const { t } = useTranslation();
+  // 图例色与地图点色同源（见 DeckGLMap 的 typeColors）
+  const TYPE_CSS_COLORS = typeColorCss(useEffectiveTheme() === "dark");
 
   const [entityTypes, setEntityTypes] = useState<string[]>([
     "monastery",
@@ -110,7 +109,7 @@ export default function KGMapPage() {
         <div style={{ display: "flex", alignItems: "baseline", gap: 6, padding: "2px 0" }}>
           <SearchOutlined style={{ color: "#bbb", fontSize: 12, flexShrink: 0, position: "relative", top: 2 }} />
           <span style={{ fontWeight: 600, color: "#1677ff", flexShrink: 0 }}>{e.name_zh}</span>
-          <span style={{ color: "#999", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <span style={{ color: "var(--fj-text-secondary)", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {addr(e) || e.name_en || ""}
           </span>
         </div>
@@ -187,7 +186,7 @@ export default function KGMapPage() {
             allowClear
             style={{ width: 280, marginLeft: "auto" }}
             popupMatchSelectWidth={380}
-            suffixIcon={<SearchOutlined style={{ color: "#999" }} />}
+            suffixIcon={<SearchOutlined style={{ color: "var(--fj-text-secondary)" }} />}
           />
         </div>
       </div>

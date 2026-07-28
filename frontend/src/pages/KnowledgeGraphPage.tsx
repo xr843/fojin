@@ -457,7 +457,7 @@ export default function KnowledgeGraphPage() {
               <FieldTimeOutlined style={{ marginRight: 6 }} />
               {t("kg.timeline_title")}
             </span>
-            <span style={{ fontSize: 11, color: "#9a8e7a" }}>
+            <span style={{ fontSize: 11, color: "var(--fj-ink-muted)" }}>
               {t("kg.timeline_hint")}
             </span>
           </div>
@@ -633,7 +633,7 @@ export default function KnowledgeGraphPage() {
               <div className="kg-sidebar-title">
                 {t("kg.search_results")}
                 {searchResults && (
-                  <span style={{ fontWeight: 400, color: "#9a8e7a", marginLeft: 6, fontSize: 11 }}>
+                  <span style={{ fontWeight: 400, color: "var(--fj-ink-muted)", marginLeft: 6, fontSize: 11 }}>
                     {t("kg.result_count", { n: searchResults.total })}
                   </span>
                 )}

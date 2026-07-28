@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
 import Layout from "./Layout";
 
@@ -21,14 +21,13 @@ function renderLayout() {
 }
 
 describe("Layout 顶部导航", () => {
-  // 跨藏对照（1,016 部经 · 91 万组逐段对照）此前只能靠猜 URL 到达：
-  // 页面早就建好并跑在生产上，但导航里没有任何入口。
-  it("跨藏对照有导航入口，点击进入 /cross-canon", () => {
+  // 跨藏对照独立浏览页(/cross-canon)暂从导航撤下：板块呈现效果待打磨，打磨后再
+  // 对外公开。路由仍可 URL 直达，但顶部导航不应出现入口(与 dashboard/research 等
+  // 隐藏项一致)。取消 Layout 中对应注释即可恢复本入口——届时把此断言改回点击导航。
+  it("跨藏对照暂不在顶部导航出现（板块待打磨）", () => {
     renderLayout();
 
-    fireEvent.click(screen.getByText("跨藏对照"));
-
-    expect(screen.getByTestId("pathname")).toHaveTextContent("/cross-canon");
+    expect(screen.queryByText("跨藏对照")).not.toBeInTheDocument();
   });
 
   // 开放数据(/exports)已从导航撤下：后端 /api/exports/* 由 ENABLE_OPEN_DATA_EXPORTS

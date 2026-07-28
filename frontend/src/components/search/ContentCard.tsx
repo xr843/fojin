@@ -46,7 +46,7 @@ export default function ContentCard({ hit, rank }: { hit: ContentSearchHit; rank
           <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
             <Link to={buildReaderUrl(hit.text_id, hit.juan_num)}>
               <Button type="primary" size="small" icon={<ReadOutlined />}
-                style={{ background: "#8b2500", borderColor: "#8b2500" }}>
+                style={{ background: "var(--fj-accent)", borderColor: "var(--fj-accent)" }}>
                 {t("search.read")}
               </Button>
             </Link>
@@ -77,7 +77,9 @@ export default function ContentCard({ hit, rank }: { hit: ContentSearchHit; rank
           ))}
         {hasMore && (
           <Button type="link" size="small" onClick={() => setExpanded(!expanded)}
-            style={{ padding: 0, fontSize: 12, marginTop: 4 }}>
+            // antd 会把 colorLink 当种子色再派生一遍，给什么值都不是最终色（暗色下
+            // 派生成 #7eafdc，只有 4.32:1）。内联指定，跳过派生。
+            style={{ padding: 0, fontSize: 12, marginTop: 4, color: "var(--fj-info)" }}>
             {expanded ? t("search.collapse") : t("search.expand_juans", { n: hit.matched_juan_count - 1 })}
           </Button>
         )}

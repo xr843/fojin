@@ -56,7 +56,7 @@ export default function CrossLangCard({ hit, rank }: { hit: CrossLanguageSearchH
         {titles.length > 0 && (
           <div className="s-card-alt-titles" style={{ marginBottom: 6 }}>
             {titles.map((entry) => (
-              <div key={entry.lang} style={{ fontSize: 12, color: "#6b5e4d", lineHeight: 1.6 }}>
+              <div key={entry.lang} style={{ fontSize: 12, color: "var(--fj-ink-light)", lineHeight: 1.6 }}>
                 <Tag color={LANG_COLORS[entry.lang] || "default"} style={{ fontSize: 10, padding: "0 4px", lineHeight: "18px" }}>
                   {langLabel(entry.lang)}
                 </Tag>
@@ -89,8 +89,8 @@ export default function CrossLangCard({ hit, rank }: { hit: CrossLanguageSearchH
         </div>
         {relatedTranslations.length > 0 && (
           <div className="s-card-translations">
-            <TranslationOutlined style={{ fontSize: 12, color: "#9a8e7a", marginRight: 4 }} />
-            <span style={{ fontSize: 12, color: "#9a8e7a", marginRight: 6 }}>{t("search.related_translations")}</span>
+            <TranslationOutlined style={{ fontSize: 12, color: "var(--fj-ink-muted)", marginRight: 4 }} />
+            <span style={{ fontSize: 12, color: "var(--fj-ink-muted)", marginRight: 6 }}>{t("search.related_translations")}</span>
             {relatedTranslations.map((rt) => (
               <Tag
                 key={rt.id}
