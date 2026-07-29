@@ -469,6 +469,46 @@ def verify_quoted_content(
     return corrected, mutations
 
 
+@dataclass(frozen=True)
+class QuoteCitation:
+    """One (quoted passage, cited title, cited fascicle) triple in an answer."""
+
+    quote: str
+    title: str
+    juan: int | None
+
+
+def iter_quote_citations(answer: str) -> list[QuoteCitation]:
+    """Every quoted passage the verifier examines, paired with its citation.
+
+    The candidate predicate (paired marks / blockquote block, ``MIN_QUOTE_CHARS``)
+    is the one both scanners apply before verifying anything. Exposed so callers
+    that need to know *which* passages were checked — the eval's fascicle-accuracy
+    metric, for one — derive them from the same pass that counts them, instead of
+    re-implementing the pairing and drifting away from it.
+    """
+    if not answer or "\u3010\u300a" not in answer:
+        return []
+    out: list[QuoteCitation] = []
+    for m in _QUOTE_CITATION_RE.finditer(answer):
+        quote = _matched_quote(m).strip()
+        if len(quote) >= MIN_QUOTE_CHARS:
+            out.append(QuoteCitation(
+                quote=quote,
+                title=m.group("title"),
+                juan=int(m.group("juan")) if m.group("juan") else None,
+            ))
+    for m in _BLOCKQUOTE_CITATION_RE.finditer(answer):
+        block = _strip_blockquote_markers(m.group("block"))
+        if len(block) >= MIN_QUOTE_CHARS:
+            out.append(QuoteCitation(
+                quote=block.strip(),
+                title=m.group("title"),
+                juan=int(m.group("juan")) if m.group("juan") else None,
+            ))
+    return out
+
+
 def count_checked_quotes(answer: str, sources: list[ChatSource]) -> int:
     """How many quoted passages :func:`verify_quoted_content` actually examines.
 
@@ -479,24 +519,11 @@ def count_checked_quotes(answer: str, sources: list[ChatSource]) -> int:
     "no evidence" scored as "evidence checked out", and the metric rewarded a
     model for quoting the canon *less*.
 
-    Counted here, not returned from ``verify_quoted_content``, so the existing
-    two-tuple contract and its call sites stay untouched. The candidate
-    predicate (paired marks, ``MIN_QUOTE_CHARS``) is the one both scanners
-    apply before they verify anything, and ``test_count_checked_quotes_matches``
-    pins the two together."""
-    if not answer or "【《" not in answer:
-        return 0
-    inline = sum(
-        1
-        for m in _QUOTE_CITATION_RE.finditer(answer)
-        if len(_matched_quote(m).strip()) >= MIN_QUOTE_CHARS
-    )
-    blocks = sum(
-        1
-        for m in _BLOCKQUOTE_CITATION_RE.finditer(answer)
-        if len(_strip_blockquote_markers(m.group("block"))) >= MIN_QUOTE_CHARS
-    )
-    return inline + blocks
+    Delegates to :func:`iter_quote_citations` so the count and the list of what
+    was counted can never disagree; ``test_count_checked_quotes_matches`` pins
+    both to the verifier's own scanners.
+    """
+    return len(iter_quote_citations(answer))
 
 
 def _strip_blockquote_markers(block: str) -> str:
