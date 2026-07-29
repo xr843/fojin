@@ -5,7 +5,8 @@ import { BookOutlined, ArrowRightOutlined, CloseOutlined, GlobalOutlined } from 
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { getChunkContext, getChunkAlignment, type ChunkContextItem, type ParallelPair } from "../api/client";
-import { mapQuoteToBlocks } from "../utils/citationMatch";
+import { findQuoteSpan } from "../utils/citationMatch";
+import { reflowText } from "../utils/textReflow";
 import { hasDisplayConfidence } from "../utils/parallelDisplay";
 
 export interface CitationTarget {
@@ -100,42 +101,49 @@ function snapSentenceBoundaries(
 }
 
 
-interface CitationBlock {
-  key: string;
+interface StitchedPassage {
   text: string;
-  isCenter: boolean;
+  /** Char range of the cited chunk within `text`; [0,0) when there is none. */
+  centerStart: number;
+  centerEnd: number;
 }
 
 /**
- * Collapse consecutive non-center chunks into a single block so continuous
- * text flows without the per-chunk padding/margin gap. At most 3 blocks
- * are produced: leading context, the highlighted center, trailing context.
+ * Join the chunks into ONE continuous string, remembering where the cited
+ * chunk sits inside it.
+ *
+ * The panel used to render one padded <div> per block (leading context /
+ * center / trailing). Chunk boundaries fall every ~500 chars wherever the
+ * ingestion pipeline happened to cut, so that put a visible gap in the middle
+ * of whatever sentence straddled the seam — prod 2026-07-29 split
+ * 「相各云何？頌曰：」 across two boxes and it read as truncated text. The
+ * boundary is an implementation detail of chunking; it has no business being
+ * visible to a reader checking a citation.
  */
-function groupByCenter(chunks: ChunkContextItem[]): CitationBlock[] {
-  const out: CitationBlock[] = [];
+function stitchChunks(chunks: ChunkContextItem[]): StitchedPassage {
+  let text = "";
+  let centerStart = 0;
+  let centerEnd = 0;
   for (const c of chunks) {
-    const last = out[out.length - 1];
-    if (last && last.isCenter === c.is_center) {
-      last.text += c.chunk_text;
-      last.key += "-" + String(c.chunk_index);
-    } else {
-      out.push({
-        key: String(c.chunk_index),
-        text: c.chunk_text,
-        isCenter: c.is_center,
-      });
+    if (c.is_center && centerEnd === centerStart) {
+      centerStart = text.length;
+      centerEnd = text.length + c.chunk_text.length;
+    } else if (c.is_center) {
+      centerEnd = text.length + c.chunk_text.length;
     }
+    text += c.chunk_text;
   }
-  return out;
+  return { text, centerStart, centerEnd };
 }
 
 /**
- * Render the 汉文 passage blocks with the quoted sentence wrapped in <mark>
- * and scrolled into view, so a citation lands on the exact passage rather
- * than a ~500-char chunk the reader must scan. The quote is matched across
- * the whole passage — chunks overlap by 50 chars, so a boundary-spanning
- * sentence is split across the leading-context and center blocks and must
- * be highlighted in both halves.
+ * Render the 汉文 passage as one continuous text with the quoted sentence
+ * wrapped in <mark> and scrolled into view, so a citation lands on the exact
+ * passage rather than a ~500-char chunk the reader must scan.
+ *
+ * Matching runs over the stitched passage, which also removes the old
+ * split-quote problem for free: a sentence straddling a chunk seam used to be
+ * highlighted in two halves because each block was matched separately.
  */
 function CitationBlocks({ chunks, quote }: { chunks: ChunkContextItem[]; quote?: string }) {
   const markRef = useRef<HTMLElement | null>(null);
@@ -144,13 +152,52 @@ function CitationBlocks({ chunks, quote }: { chunks: ChunkContextItem[]; quote?:
     markRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [chunks, quote]);
 
-  const blocks = groupByCenter(chunks);
-  const blockSpans = mapQuoteToBlocks(blocks.map((b) => b.text), quote);
-  // The first highlighted block carries markRef — that is where we scroll to.
-  const firstHighlighted = blockSpans.findIndex((s) => s !== null);
+  const { text, centerStart, centerEnd } = stitchChunks(chunks);
+
+  // Prefer the exact quoted sentence. Falling back to marking the whole cited
+  // chunk only makes sense when we could not locate the quote — when we can,
+  // the chunk tint marks a ~500-char window the reader still has to scan, and
+  // its edges land on arbitrary cut points.
+  //
+  // Both spans are in RAW coordinates (newlines included). findQuoteSpan's
+  // punctuation-tolerant pass strips \s and maps hits back to raw indices, so
+  // a quote whose CBETA original is hard-wrapped mid-word still resolves.
+  const quoteSpan = findQuoteSpan(text, quote ?? "");
+  const span: [number, number] | null =
+    quoteSpan ?? (centerEnd > centerStart ? [centerStart, centerEnd] : null);
+  const markClass = quoteSpan
+    ? "chat-citation-quote-mark"
+    : "chat-citation-chunk-mark";
+
+  // Same reflow the reader uses, so the passage reads as prose and verse
+  // instead of CBETA's ~18-char source lines. Each segment carries the raw
+  // offset of every character, which is what lets the highlight survive
+  // re-segmentation — the marked range is expressed in raw coordinates and
+  // simply re-found per segment.
+  const segments = reflowText(text);
+
+  // Per-segment highlight range, resolved before render: mutating a flag while
+  // mapping would be a render-time side effect (react-hooks/immutability), and
+  // the first highlighted segment has to be known up front anyway — that is
+  // where the scroll anchor goes.
+  const ranges = segments.map((seg) => {
+    if (span === null || seg.type === "break") return null;
+    let from = -1;
+    let to = -1;
+    for (let k = 0; k < seg.offsets.length; k++) {
+      const o = seg.offsets[k];
+      if (o >= span[0] && o < span[1]) {
+        if (from < 0) from = k;
+        to = k + 1;
+      }
+    }
+    return from < 0 ? null : ([from, to] as [number, number]);
+  });
+  const anchorIdx = ranges.findIndex((r) => r !== null);
 
   return (
     <div
+      className="chat-citation-body"
       style={{
         fontFamily: '"Noto Serif SC", "Source Han Serif", serif',
         fontSize: 15,
@@ -158,23 +205,23 @@ function CitationBlocks({ chunks, quote }: { chunks: ChunkContextItem[]; quote?:
         color: "var(--fj-ink)",
       }}
     >
-      {blocks.map((b, i) => {
-        const cls = `chat-citation-chunk${b.isCenter ? " chat-citation-chunk-center" : ""}`;
-        const span = blockSpans[i];
-        if (!span) {
-          return <div key={b.key} className={cls}>{b.text}</div>;
+      {segments.map((seg, i) => {
+        if (seg.type === "break") return <br key={i} />;
+        const range = ranges[i];
+        if (!range) {
+          return <p key={i} className={`text-${seg.type}`}>{seg.text}</p>;
         }
         return (
-          <div key={b.key} className={cls}>
-            {b.text.slice(0, span[0])}
+          <p key={i} className={`text-${seg.type}`}>
+            {seg.text.slice(0, range[0])}
             <mark
-              className="chat-citation-quote-mark"
-              ref={i === firstHighlighted ? markRef : undefined}
+              className={markClass}
+              ref={i === anchorIdx ? markRef : undefined}
             >
-              {b.text.slice(span[0], span[1])}
+              {seg.text.slice(range[0], range[1])}
             </mark>
-            {b.text.slice(span[1])}
-          </div>
+            {seg.text.slice(range[1])}
+          </p>
         );
       })}
     </div>

@@ -117,32 +117,3 @@ export function findQuoteSpan(
   return [map[sIdx], map[sIdx + qStripped.length - 1] + 1];
 }
 
-/**
- * Locate the quote across a sequence of rendered blocks and return, per block,
- * the [start, end) slice to highlight (or null).
- *
- * The citation drawer splits the passage into leading-context / center /
- * trailing blocks, and chunks overlap by 50 chars — so a sentence sitting on
- * a chunk boundary ends up straddling two blocks after de-overlap. Searching
- * the concatenated text and mapping the hit back per block highlights the
- * whole sentence even when it crosses a block boundary.
- */
-export function mapQuoteToBlocks(
-  blockTexts: string[],
-  quote: string | undefined,
-): ([number, number] | null)[] {
-  const result: ([number, number] | null)[] = blockTexts.map(() => null);
-  if (!quote) return result;
-  const span = findQuoteSpan(blockTexts.join(""), quote);
-  if (!span) return result;
-  let offset = 0;
-  for (let i = 0; i < blockTexts.length; i++) {
-    const blockStart = offset;
-    const blockEnd = offset + blockTexts[i].length;
-    offset = blockEnd;
-    const s = Math.max(span[0], blockStart);
-    const e = Math.min(span[1], blockEnd);
-    if (s < e) result[i] = [s - blockStart, e - blockStart];
-  }
-  return result;
-}
