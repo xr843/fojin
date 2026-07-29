@@ -1503,5 +1503,6 @@
   "chat.epigraph_unset": "Not set",
   "chat.master_lens": "Reading through this lineage",
   "chat.change_master": "Change school",
-  "chat.master_disclaimer": "What follows is an AI interpretation generated from the canon — not the master's own teaching. Every citation carries its text and fascicle number; open it to check the original."
+  "chat.master_disclaimer": "What follows is an AI interpretation generated from the canon — not the master's own teaching. Every citation carries its text and fascicle number; open it to check the original.",
+  "reader.citation.quote_not_here": "The quoted passage was not found in this fascicle"
 }

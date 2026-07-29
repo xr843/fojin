@@ -1503,5 +1503,6 @@
   "chat.epigraph_unset": "未設",
   "chat.master_lens": "依此宗風解經",
   "chat.change_master": "更換宗派",
-  "chat.master_disclaimer": "以下為 AI 依據典籍生成的詮釋，非祖師本人開示。每處引證均標註經號與卷次，可點開核對原文。"
+  "chat.master_disclaimer": "以下為 AI 依據典籍生成的詮釋，非祖師本人開示。每處引證均標註經號與卷次，可點開核對原文。",
+  "reader.citation.quote_not_here": "本卷未找到被引的這段原文"
 }

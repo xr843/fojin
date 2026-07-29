@@ -5,7 +5,7 @@ import { BookOutlined, ArrowRightOutlined, CloseOutlined, GlobalOutlined } from 
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { getChunkContext, getChunkAlignment, type ChunkContextItem, type ParallelPair } from "../api/client";
-import { findQuoteSpan } from "../utils/citationMatch";
+import { findQuoteSpans } from "../utils/citationMatch";
 import { reflowText } from "../utils/textReflow";
 import { hasDisplayConfidence } from "../utils/parallelDisplay";
 
@@ -120,6 +120,23 @@ interface StitchedPassage {
  * boundary is an implementation detail of chunking; it has no business being
  * visible to a reader checking a citation.
  */
+/**
+ * Widen a raw-coordinate range outward to the nearest sentence boundaries.
+ *
+ * Only used for the fallback highlight (the cited chunk), whose edges are
+ * 500-char ingestion cut points. Left as-is they open and close mid-word, which
+ * a reader reads as a broken highlight rather than "the passage is around here".
+ * Widening, not narrowing: the cited chunk must stay fully covered.
+ */
+function snapToSentence(text: string, start: number, end: number): [number, number] {
+  const BOUNDARY = /[。！？；]/;
+  let lo = start;
+  while (lo > 0 && !BOUNDARY.test(text[lo - 1])) lo--;
+  let hi = end;
+  while (hi < text.length && !BOUNDARY.test(text[hi - 1])) hi++;
+  return [lo, hi];
+}
+
 function stitchChunks(chunks: ChunkContextItem[]): StitchedPassage {
   let text = "";
   let centerStart = 0;
@@ -146,6 +163,7 @@ function stitchChunks(chunks: ChunkContextItem[]): StitchedPassage {
  * highlighted in two halves because each block was matched separately.
  */
 function CitationBlocks({ chunks, quote }: { chunks: ChunkContextItem[]; quote?: string }) {
+  const { t } = useTranslation();
   const markRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -162,12 +180,30 @@ function CitationBlocks({ chunks, quote }: { chunks: ChunkContextItem[]; quote?:
   // Both spans are in RAW coordinates (newlines included). findQuoteSpan's
   // punctuation-tolerant pass strips \s and maps hits back to raw indices, so
   // a quote whose CBETA original is hard-wrapped mid-word still resolves.
-  const quoteSpan = findQuoteSpan(text, quote ?? "");
-  const span: [number, number] | null =
-    quoteSpan ?? (centerEnd > centerStart ? [centerStart, centerEnd] : null);
-  const markClass = quoteSpan
-    ? "chat-citation-quote-mark"
-    : "chat-citation-chunk-mark";
+  const quoteSpans = findQuoteSpans(text, quote);
+  // Fallback: the quote could not be located even fragment-by-fragment, so mark
+  // the cited chunk. Its edges are ingestion cut points, not sentence ends, so
+  // snap them outward to the nearest boundary — a highlight that opens mid-word
+  // reads as a rendering fault rather than "roughly here".
+  // 定位不到时的处置分两种，取决于我们究竟知不知道要找什么：
+  //
+  // 有引文却找不到 —— 说明这段话不在本卷里。实测最近 810 条可判定引文，
+  // 15.7% 属于此类（引文在该经的另一卷）。此时给整块涂黄是在撒谎：那 500 字
+  // 里根本没有被引的那句话，读者却会以为「就在这一带」。改为不标、并明说没找到。
+  //
+  // 压根没有引文（裸引用，无「」段落可锚）—— 整块底色仍是有用的方位提示，
+  // 它没有承诺"这里面有某句话"。
+  const quoteUnlocatable = Boolean(quote) && quoteSpans.length === 0;
+  const spans: [number, number][] =
+    quoteSpans.length > 0
+      ? quoteSpans
+      : !quoteUnlocatable && centerEnd > centerStart
+        ? [snapToSentence(text, centerStart, centerEnd)]
+        : [];
+  const markClass =
+    quoteSpans.length > 0
+      ? "chat-citation-quote-mark"
+      : "chat-citation-chunk-mark";
 
   // Same reflow the reader uses, so the passage reads as prose and verse
   // instead of CBETA's ~18-char source lines. Each segment carries the raw
@@ -180,20 +216,25 @@ function CitationBlocks({ chunks, quote }: { chunks: ChunkContextItem[]; quote?:
   // mapping would be a render-time side effect (react-hooks/immutability), and
   // the first highlighted segment has to be known up front anyway — that is
   // where the scroll anchor goes.
+  // 每个 segment 内被高亮的字符区间（可能不止一段——省略号缩写的引文会命中多处）。
   const ranges = segments.map((seg) => {
-    if (span === null || seg.type === "break") return null;
-    let from = -1;
-    let to = -1;
-    for (let k = 0; k < seg.offsets.length; k++) {
-      const o = seg.offsets[k];
-      if (o >= span[0] && o < span[1]) {
-        if (from < 0) from = k;
-        to = k + 1;
+    if (spans.length === 0 || seg.type === "break") return [];
+    const out: [number, number][] = [];
+    for (const [lo, hi] of spans) {
+      let from = -1;
+      let to = -1;
+      for (let k = 0; k < seg.offsets.length; k++) {
+        const o = seg.offsets[k];
+        if (o >= lo && o < hi) {
+          if (from < 0) from = k;
+          to = k + 1;
+        }
       }
+      if (from >= 0) out.push([from, to]);
     }
-    return from < 0 ? null : ([from, to] as [number, number]);
+    return out;
   });
-  const anchorIdx = ranges.findIndex((r) => r !== null);
+  const anchorIdx = ranges.findIndex((r) => r.length > 0);
 
   return (
     <div
@@ -205,23 +246,38 @@ function CitationBlocks({ chunks, quote }: { chunks: ChunkContextItem[]; quote?:
         color: "var(--fj-ink)",
       }}
     >
+      {quoteUnlocatable && (
+        <Alert
+          type="warning"
+          showIcon
+          message={t("reader.citation.quote_not_here")}
+          style={{ marginBottom: 12 }}
+        />
+      )}
       {segments.map((seg, i) => {
         if (seg.type === "break") return <br key={i} />;
-        const range = ranges[i];
-        if (!range) {
+        const segRanges = ranges[i];
+        if (segRanges.length === 0) {
           return <p key={i} className={`text-${seg.type}`}>{seg.text}</p>;
         }
-        return (
-          <p key={i} className={`text-${seg.type}`}>
-            {seg.text.slice(0, range[0])}
+        const parts: React.ReactNode[] = [];
+        let cursor = 0;
+        segRanges.forEach(([from, to], n) => {
+          if (from > cursor) parts.push(seg.text.slice(cursor, from));
+          parts.push(
             <mark
+              key={`m${n}`}
               className={markClass}
-              ref={i === anchorIdx ? markRef : undefined}
+              ref={i === anchorIdx && n === 0 ? markRef : undefined}
             >
-              {seg.text.slice(range[0], range[1])}
-            </mark>
-            {seg.text.slice(range[1])}
-          </p>
+              {seg.text.slice(from, to)}
+            </mark>,
+          );
+          cursor = to;
+        });
+        if (cursor < seg.text.length) parts.push(seg.text.slice(cursor));
+        return (
+          <p key={i} className={`text-${seg.type}`}>{parts}</p>
         );
       })}
     </div>
