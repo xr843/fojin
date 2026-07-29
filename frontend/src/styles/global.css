@@ -512,13 +512,22 @@ em {
   transition: all 0.2s;
 }
 
-.chat-citation-chunk-center {
-  border-left-color: var(--fj-accent, #8b6914);
-  background: rgba(255, 220, 90, 0.15);
+/* Fallback highlight for the cited chunk, used ONLY when the quoted sentence
+   could not be located. Inline (not a block) with box-decoration-break so the
+   surrounding passage keeps flowing as one continuous text: the chunk boundary
+   is an artefact of 500-char ingestion and must never look like a paragraph
+   break — rendering it as a padded block split 「相各云何？頌曰：」 in half and
+   read as truncated text (prod 2026-07-29). Deliberately fainter than
+   .chat-citation-quote-mark: this marks a window to scan, not the sentence. */
+.chat-citation-chunk-mark {
+  background: rgba(255, 220, 90, 0.22);
+  color: inherit;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 
-/* The exact quoted sentence inside the cited chunk — distinct from the
-   chunk-level tint so the reader's eye lands on the sentence itself. */
+/* The exact quoted sentence — the precise answer to "which passage was cited".
+   When this is present the chunk-level tint is suppressed entirely. */
 .chat-citation-quote-mark {
   background: rgba(255, 196, 0, 0.5);
   border-radius: 2px;

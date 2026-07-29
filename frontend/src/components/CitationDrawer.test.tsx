@@ -146,4 +146,76 @@ describe("CitationDrawer", () => {
     expect(screen.queryByText(/前文（本卷第/)).not.toBeInTheDocument();
     expect(screen.queryByText(/后文（本卷第/)).not.toBeInTheDocument();
   });
+
+  it("跨 chunk 边界的句子必须连成一段，不被切块分隔开", async () => {
+    // 线上截图（2026-07-29）：抽屉把「相各云何？頌曰：」劈成两半——「相各云何」
+    // 落在前文块末尾，「？頌曰」落在被引块开头，中间隔着 padding + margin 的
+    // 块间距，读起来像是正文被截断了。数据其实是连续的（拼接后一字不差），
+    // 断的是渲染：500 字的切块边界被当成了视觉单元。
+    //
+    // 切块边界是 ingestion 的实现细节，落在哪里纯属偶然，绝不该出现在读者眼里。
+    mockContext.mockResolvedValue({
+      text_id: 1558,
+      juan_num: 16,
+      title_zh: "阿毘達磨俱舍論",
+      center_chunk_index: 7,
+      radius: 2,
+      chunks: [
+        chunk(6, "又經中說有三牟尼，又經中言有三清淨，俱身語意。相各云何"),
+        chunk(7, "？頌曰：無學身語業，即意三牟尼，三清淨應知，即諸三妙行。", true),
+        chunk(8, "論曰：無學身語業，名身語牟尼。"),
+      ],
+      has_more_before: false,
+      has_more_after: false,
+    } as never);
+
+    const { container } = renderDrawer();
+
+    await waitFor(() => {
+      expect(screen.getByText(/相各云何/)).toBeInTheDocument();
+    });
+
+    // 整段正文的文字内容必须连续——句子横跨原本的块边界也不例外。
+    const body = container.querySelector(".chat-citation-body");
+    expect(body).not.toBeNull();
+    expect(body!.textContent).toContain("俱身語意。相各云何？頌曰：無學身語業");
+  });
+
+  it("有可定位的引文时，只高亮那句话，不再整块染色", async () => {
+    // 整块 500 字染色与精确的引文高亮同时存在时，前者只是噪声：它既不指向
+    // 被引的那句话，又把任意的切块边界画成了可见的分隔。
+    mockContext.mockResolvedValue({
+      text_id: 1558,
+      juan_num: 16,
+      title_zh: "阿毘達磨俱舍論",
+      center_chunk_index: 7,
+      radius: 2,
+      chunks: [
+        chunk(6, "又經中說有三牟尼，俱身語意。相各云何"),
+        chunk(7, "？頌曰：無學身語業，即意三牟尼，三清淨應知。", true),
+      ],
+      has_more_before: false,
+      has_more_after: false,
+    } as never);
+
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <CitationDrawer
+            target={{ ...TARGET, quote: "無學身語業，即意三牟尼" }}
+            onClose={() => {}}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const mark = await waitFor(() => {
+      const m = document.querySelector("mark.chat-citation-quote-mark");
+      expect(m).not.toBeNull();
+      return m!;
+    });
+    expect(mark.textContent).toContain("無學身語業，即意三牟尼");
+    // 引文已被精确标出，就不该再有整块染色。
+    expect(document.querySelector(".chat-citation-chunk-center")).toBeNull();
+  });
 });
