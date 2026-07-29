@@ -242,6 +242,54 @@ def _normalise(s: str) -> str:
     return s.lower()
 
 
+# A 「…」/『…』/“…”/‘…’/"…" pair sitting within the usual gap window before a
+# citation marker — the passage the LLM is attributing. Mirrors the frontend's
+# PRECEDING_QUOTE_RE (utils/citationMatch.ts) so client and server anchor a
+# citation to the same passage.
+_PRECEDING_QUOTE_RE = re.compile(
+    r"[「『“‘\"]"
+    r"([^「『“‘\"」』”’]{" + str(MIN_QUOTE_CHARS) + r",400})"
+    r"[」』”’\"]"
+    r"[^【】「『“‘\"」』”’]{0," + str(MAX_QUOTE_CITATION_GAP_CHARS) + r"}$"
+)
+
+
+# A Markdown blockquote block sitting just before a citation. The LLM uses this
+# form as readily as 「…」 — the 2026-07-29 prod report was a blockquote — and a
+# quote-aware fascicle pass that only understood 「…」 would leave exactly the
+# reported shape uncorrected.
+_PRECEDING_BLOCKQUOTE_RE = re.compile(
+    r"(?P<block>(?:^>[^\n]*(?:\n|$))+)"
+    r"(?:(?:[^\n]*\n){0,2}[^\n]{0," + str(MAX_QUOTE_CITATION_GAP_CHARS) + r"}?)$",
+    re.MULTILINE,
+)
+
+
+def preceding_quote(text_before: str) -> str | None:
+    """The quoted passage immediately preceding a citation marker, if any.
+
+    Recognises both forms the LLM produces: an inline 「…」 pair and a Markdown
+    blockquote block. Shared with citation_guard — the fascicle it picks must be
+    the one that actually holds this passage, so both modules have to agree on
+    what "this passage" is.
+    """
+    m = _PRECEDING_QUOTE_RE.search(text_before)
+    if m:
+        return m.group(1).strip()
+    m = _PRECEDING_BLOCKQUOTE_RE.search(text_before)
+    if m:
+        body = _strip_blockquote_markers(m.group("block")).strip()
+        return body or None
+    return None
+
+
+def normalise_for_match(s: str) -> str:
+    """Public alias of the substring-test normaliser (NFKC + 繁→简 + strip
+    punctuation + lowercase). Exported so citation_guard compares quotes to
+    chunk text exactly the way the verifier will."""
+    return _normalise(s)
+
+
 def _find_sources(
     sources: Iterable[ChatSource], title: str, juan: int | None
 ) -> list[ChatSource]:

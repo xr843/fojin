@@ -140,3 +140,30 @@ async def test_over_ratio_gates_the_containment_check(conn):
     tried — raising it past the spill's size must let the spilled juan through
     untouched, so operators can narrow a run to the worst offenders."""
     assert (3, 13) not in await _keys(conn, over_ratio=50.0)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# The integrity gate reuses this same candidate query on purpose — two
+# hand-written copies of the predicate would drift, and a gate that reports a
+# different set from what the repair fixes is worse than no gate.
+# ──────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_gate_settings_select_only_the_spilled_juans(conn):
+    """check_embedding_juan_integrity turns the under-embedded side off with
+    ratio=0 (`e < 0` is never true), so the gate reports exactly the
+    invariant it is named for: chunks that left their own juan."""
+    from scripts.check_embedding_juan_integrity import (
+        _MIN_CONTENT,
+        _OVER_RATIO,
+        _UNDER_SIDE_OFF,
+    )
+
+    rows = await _find_candidates(conn, _UNDER_SIDE_OFF, _MIN_CONTENT, _OVER_RATIO)
+    keys = {(t, j) for t, j, _c, _e in rows}
+    assert (3, 13) in keys      # spilled — the whole point of the gate
+    assert (2, 1) not in keys   # under-embedded — a different defect, not this gate's
+    assert (5, 1) not in keys   # dense but intact
+    assert (1, 1) not in keys   # healthy
+    assert (4, 1) not in keys   # content stub

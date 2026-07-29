@@ -46,6 +46,11 @@ from opencc import OpenCC
 
 from app.core.metrics import CITATION_GUARD_MUTATIONS_TOTAL
 from app.schemas.chat import ChatSource
+from app.services.quote_verifier import (
+    MIN_QUOTE_CHARS,
+    normalise_for_match,
+    preceding_quote,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +102,53 @@ class CitationMutation:
     title: str
     original_juan: int | None
     corrected_juan: int | None
+
+
+def _build_chunk_index(sources: Iterable[ChatSource]) -> dict[str, list[tuple[int, str]]]:
+    """{title -> [(juan_num, normalised chunk_text), ...]} for quote lookup.
+
+    Parallels are included on the same footing as primary hits, mirroring
+    ``_build_whitelist`` — a legitimately cited Pali/Tibetan parallel must be
+    able to anchor its own fascicle too.
+    """
+    idx: dict[str, list[tuple[int, str]]] = {}
+    for s in sources:
+        if s.text_id <= 0 or not s.title_zh:
+            continue
+        idx.setdefault(_norm_title(s.title_zh), []).append(
+            (s.juan_num, normalise_for_match(s.chunk_text or ""))
+        )
+        for p in s.parallel_chunks:
+            if p.text_id <= 0 or not p.title:
+                continue
+            idx.setdefault(_norm_title(p.title), []).append(
+                (p.juan_num, normalise_for_match(p.chunk_text or ""))
+            )
+    return idx
+
+
+def _juan_holding_quote(
+    chunk_index: dict[str, list[tuple[int, str]]], norm_title: str, quote: str | None
+) -> int | None:
+    """The fascicle whose retrieved chunk contains ``quote`` verbatim, if one does.
+
+    This is the whole point of the quote-aware pass: ``min(valid_juans)`` is
+    deterministic but arbitrary, and a citation whose fascicle was picked
+    arbitrarily is a citation that sends the reader to the wrong place while
+    looking checked. When the answer quotes a passage we can locate, the
+    fascicle must follow the passage.
+
+    Ambiguity is resolved by preferring the lowest juan among those that hold
+    the quote, so the result stays stable across runs when a passage genuinely
+    repeats across fascicles.
+    """
+    if not quote:
+        return None
+    needle = normalise_for_match(quote)
+    if len(needle) < MIN_QUOTE_CHARS:
+        return None
+    holders = [j for j, text in chunk_index.get(norm_title, []) if needle in text]
+    return min(holders) if holders else None
 
 
 def _build_whitelist(sources: Iterable[ChatSource]) -> dict[str, set[int]]:
@@ -157,6 +209,7 @@ def enforce_citation_whitelist(
         return _CITATION_RE.sub(_strip, answer), mutations
 
     mutations = []
+    chunk_index = _build_chunk_index(sources)
 
     def _rewrite(match: re.Match[str]) -> str:
         original = match.group(0)
@@ -183,14 +236,38 @@ def enforce_citation_whitelist(
         # allowed when the title is real — it points at the text as a whole.
         if original_juan is None and not juan_is_placeholder:
             return original
+
+        # A fascicle the retrieval actually returned is left alone, even when a
+        # chunk of some *other* fascicle also contains the quote.
+        #
+        # An earlier revision overrode this — "the fascicle must follow the
+        # quote" — and replaying 400 served answers showed why that is wrong:
+        # 18 correct citations were rewritten to a wrong fascicle against only 2
+        # genuine fixes. Every bad rewrite pointed at a LOWER juan, the signature
+        # of a mislabelled chunk (a low juan_num holding several later fascicles'
+        # text). Trusting chunk labels over the model's own fascicle turns one
+        # corrupt label into an actively wrong citation, whereas leaving a
+        # retrieved fascicle alone degrades gracefully when labels drift.
+        #
+        # The reported 俱舍論 case is fixed upstream instead: with the index
+        # repaired, that juan-16 passage is no longer filed under 13, so the
+        # model sees — and copies — the right fascicle to begin with.
         if original_juan is not None and original_juan in valid_juans:
             return original
 
-        # Either a numeric fascicle that doesn't match any source, or an
-        # unsubstituted "第N卷" placeholder. Both must be rewritten to a
-        # real retrieved fascicle. Pick the smallest — deterministic and
-        # stable across runs — or drop the fascicle if none was retrieved.
-        if not valid_juans:
+        # The fascicle matches no retrieved source, or is an unsubstituted
+        # "第N卷" placeholder — we must replace it either way. Prefer the
+        # fascicle whose chunk actually holds the quoted passage; that is a
+        # reason, where the smallest retrieved juan is merely a tiebreak. Fall
+        # back to that tiebreak when nothing is quoted, or drop the fascicle
+        # entirely if none was retrieved.
+        quote_juan = _juan_holding_quote(
+            chunk_index, norm_title, preceding_quote(match.string[: match.start()])
+        )
+        if quote_juan is not None:
+            corrected_juan = quote_juan
+            replacement = f"【《{title}》第{corrected_juan}卷】"
+        elif not valid_juans:
             replacement = f"【《{title}》】"
             corrected_juan = None
         else:
