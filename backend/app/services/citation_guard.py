@@ -237,26 +237,33 @@ def enforce_citation_whitelist(
         if original_juan is None and not juan_is_placeholder:
             return original
 
-        # Where the quoted passage actually lives, when the answer quotes one.
-        # Checked BEFORE the whitelist shortcut below: a fascicle can be
-        # "retrieved" and still be the wrong one for this passage — the prod
-        # case that motivated this was 俱舍論 with both 卷13 and 卷16 retrieved,
-        # the quote in 16, the citation saying 13, and every guard waving it
-        # through because 13 was in the whitelist.
+        # A fascicle the retrieval actually returned is left alone, even when a
+        # chunk of some *other* fascicle also contains the quote.
+        #
+        # An earlier revision overrode this — "the fascicle must follow the
+        # quote" — and replaying 400 served answers showed why that is wrong:
+        # 18 correct citations were rewritten to a wrong fascicle against only 2
+        # genuine fixes. Every bad rewrite pointed at a LOWER juan, the signature
+        # of a mislabelled chunk (a low juan_num holding several later fascicles'
+        # text). Trusting chunk labels over the model's own fascicle turns one
+        # corrupt label into an actively wrong citation, whereas leaving a
+        # retrieved fascicle alone degrades gracefully when labels drift.
+        #
+        # The reported 俱舍論 case is fixed upstream instead: with the index
+        # repaired, that juan-16 passage is no longer filed under 13, so the
+        # model sees — and copies — the right fascicle to begin with.
+        if original_juan is not None and original_juan in valid_juans:
+            return original
+
+        # The fascicle matches no retrieved source, or is an unsubstituted
+        # "第N卷" placeholder — we must replace it either way. Prefer the
+        # fascicle whose chunk actually holds the quoted passage; that is a
+        # reason, where the smallest retrieved juan is merely a tiebreak. Fall
+        # back to that tiebreak when nothing is quoted, or drop the fascicle
+        # entirely if none was retrieved.
         quote_juan = _juan_holding_quote(
             chunk_index, norm_title, preceding_quote(match.string[: match.start()])
         )
-        if quote_juan is not None:
-            if quote_juan == original_juan:
-                return original
-        elif original_juan is not None and original_juan in valid_juans:
-            return original
-
-        # Either a fascicle contradicted by the quote, one that matches no
-        # source, or an unsubstituted "第N卷" placeholder. Prefer the fascicle
-        # that holds the quote; fall back to the smallest retrieved one —
-        # deterministic and stable across runs — or drop the fascicle entirely
-        # if none was retrieved.
         if quote_juan is not None:
             corrected_juan = quote_juan
             replacement = f"【《{title}》第{corrected_juan}卷】"
