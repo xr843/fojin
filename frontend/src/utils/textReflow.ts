@@ -215,3 +215,32 @@ export function reflowText(raw: string): TextSegment[] {
   flushProse();
   return segments;
 }
+
+/**
+ * Collapse CBETA hard wraps for excerpt / card contexts.
+ *
+ * `reflowText` is the right tool when a passage is displayed in full — it
+ * produces prose and verse segments matching the reader. Excerpts (similar-
+ * passage cards, the parallel panel's clamped previews) only need the wraps
+ * gone: rendering raw text lets HTML collapse every ~18-char newline into a
+ * space, which is what put 「三清 淨」 in the citation drawer before 2026-07-29.
+ * The same defect is present anywhere chunk_text reaches the DOM untreated.
+ *
+ * Lines inside a paragraph are joined with NO separator — Chinese sets no
+ * inter-word space, so any separator IS the bug. Blank lines are real
+ * paragraph boundaries and survive as "\n\n", which callers render with
+ * `white-space: pre-line`.
+ */
+export function unwrapCbetaLines(raw: string): string {
+  return raw
+    .split(/\n\s*\n/)
+    .map((para) =>
+      para
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .join(""),
+    )
+    .filter(Boolean)
+    .join("\n\n");
+}

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { unwrapCbetaLines } from "../utils/textReflow";
 import { useTranslation } from "react-i18next";
 import { Empty, Spin, Alert, Collapse, Tag, Progress, Tabs, Button } from "antd";
 import { LinkOutlined, BookOutlined, ExpandAltOutlined } from "@ant-design/icons";
@@ -286,7 +287,7 @@ function ChunkView({ textId, juanNum }: Props) {
                     display: "-webkit-box", WebkitLineClamp: 2,
                     WebkitBoxOrient: "vertical", overflow: "hidden",
                   }}>
-                    {entry.chunk_text}
+                    {unwrapCbetaLines(entry.chunk_text)}
                   </div>
                 </div>
               ),
@@ -298,7 +299,7 @@ function ChunkView({ textId, juanNum }: Props) {
                     padding: "8px 12px", background: "#fafafa",
                     borderRadius: 4, marginBottom: 12,
                   }}>
-                    {entry.chunk_text}
+                    {unwrapCbetaLines(entry.chunk_text)}
                   </div>
                   {entry.parallels.map((p, idx) => {
                     const isMitra = p.source === "mitra-parallel";
@@ -334,7 +335,7 @@ function ChunkView({ textId, juanNum }: Props) {
                         lineHeight: p.lang === "bo" ? 2.1 : 1.85,
                         color: "#333",
                       }}>
-                        …{p.chunk_text}…
+                        …{unwrapCbetaLines(p.chunk_text)}…
                       </div>
                       {p.original_preview && p.original_lang && (
                         <div lang={p.original_lang} style={{
