@@ -1426,24 +1426,6 @@ export interface SimilarPassageItem {
   dynasty: string | null;
 }
 
-export interface SimilarPassagesResponse {
-  text_id: TextId;
-  juan_num: number;
-  passages: SimilarPassageItem[];
-}
-
-export async function getSimilarPassages(
-  textId: number,
-  juanNum: number,
-  limit: number = 5,
-  minScore: number = 0.7,
-): Promise<SimilarPassagesResponse> {
-  const { data } = await api.get<SimilarPassagesResponse>(
-    `/texts/${textId}/juans/${juanNum}/similar`,
-    { params: { limit, min_score: minScore } },
-  );
-  return data;
-}
 
 // --- Chat (AI Q&A) ---
 
