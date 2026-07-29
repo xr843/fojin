@@ -350,4 +350,56 @@ describe("CitationDrawer", () => {
     // 且不得退化成整块染色
     expect(document.querySelector("mark.chat-citation-chunk-mark")).toBeNull();
   });
+  it("引文不在本卷时不涂黄，明说没找到", async () => {
+    // 实测最近 810 条可判定引文，15.7% 属于此类：引文确实在该经里，但不在所标
+    // 的那一卷（卷号引错）。此时给整块涂黄是在撒谎——那 500 字里根本没有被引的
+    // 那句话，读者却会以为「就在这一带」。
+    mockContext.mockResolvedValue({
+      text_id: 7748,
+      juan_num: 41,
+      title_zh: "阿毘達磨順正理論",
+      center_chunk_index: 3,
+      radius: 2,
+      chunks: [chunk(3, "或無學法，於超一切染身中可得故，立純白名。", true)],
+      has_more_before: false,
+      has_more_after: false,
+    } as never);
+
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <CitationDrawer
+            target={{ ...TARGET, quote: "這段話並不在本卷之中無論如何都找不到" }}
+            onClose={() => {}}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("本卷未找到被引的这段原文")).toBeInTheDocument();
+    });
+    // 关键：不得退化成整块涂黄
+    expect(document.querySelector("mark.chat-citation-chunk-mark")).toBeNull();
+    expect(document.querySelector("mark.chat-citation-quote-mark")).toBeNull();
+  });
+
+  it("没有引文可锚时，整块底色仍保留——它没承诺「这里面有某句话」", async () => {
+    mockContext.mockResolvedValue({
+      text_id: 7748,
+      juan_num: 41,
+      title_zh: "阿毘達磨順正理論",
+      center_chunk_index: 3,
+      radius: 2,
+      chunks: [chunk(3, "或無學法，於超一切染身中可得故，立純白名。", true)],
+      has_more_before: false,
+      has_more_after: false,
+    } as never);
+
+    renderDrawer();   // target 不带 quote
+    await waitFor(() => {
+      expect(document.querySelector("mark.chat-citation-chunk-mark")).not.toBeNull();
+    });
+    expect(screen.queryByText("本卷未找到被引的这段原文")).not.toBeInTheDocument();
+  });
 });

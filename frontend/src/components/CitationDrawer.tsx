@@ -163,6 +163,7 @@ function stitchChunks(chunks: ChunkContextItem[]): StitchedPassage {
  * highlighted in two halves because each block was matched separately.
  */
 function CitationBlocks({ chunks, quote }: { chunks: ChunkContextItem[]; quote?: string }) {
+  const { t } = useTranslation();
   const markRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -184,10 +185,19 @@ function CitationBlocks({ chunks, quote }: { chunks: ChunkContextItem[]; quote?:
   // the cited chunk. Its edges are ingestion cut points, not sentence ends, so
   // snap them outward to the nearest boundary — a highlight that opens mid-word
   // reads as a rendering fault rather than "roughly here".
+  // 定位不到时的处置分两种，取决于我们究竟知不知道要找什么：
+  //
+  // 有引文却找不到 —— 说明这段话不在本卷里。实测最近 810 条可判定引文，
+  // 15.7% 属于此类（引文在该经的另一卷）。此时给整块涂黄是在撒谎：那 500 字
+  // 里根本没有被引的那句话，读者却会以为「就在这一带」。改为不标、并明说没找到。
+  //
+  // 压根没有引文（裸引用，无「」段落可锚）—— 整块底色仍是有用的方位提示，
+  // 它没有承诺"这里面有某句话"。
+  const quoteUnlocatable = Boolean(quote) && quoteSpans.length === 0;
   const spans: [number, number][] =
     quoteSpans.length > 0
       ? quoteSpans
-      : centerEnd > centerStart
+      : !quoteUnlocatable && centerEnd > centerStart
         ? [snapToSentence(text, centerStart, centerEnd)]
         : [];
   const markClass =
@@ -236,6 +246,14 @@ function CitationBlocks({ chunks, quote }: { chunks: ChunkContextItem[]; quote?:
         color: "var(--fj-ink)",
       }}
     >
+      {quoteUnlocatable && (
+        <Alert
+          type="warning"
+          showIcon
+          message={t("reader.citation.quote_not_here")}
+          style={{ marginBottom: 12 }}
+        />
+      )}
       {segments.map((seg, i) => {
         if (seg.type === "break") return <br key={i} />;
         const segRanges = ranges[i];
