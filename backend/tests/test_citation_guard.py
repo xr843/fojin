@@ -245,3 +245,76 @@ def test_log_mutations_emits_clean_warning(caplog):
         "orig='【《心经》第99卷】' repl='【《心经》第1卷】' "
         "orig_juan=99 corrected_juan=1"
     )
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Quote-aware fascicle selection
+#
+# 2026-07-29 prod: a user asked a 俱舍論 question and got a verbatim-correct
+# quote from 卷16 labelled 第13卷. Both juan were retrieved, so the cited 13
+# was "in the whitelist" and passed untouched — and when the guard DOES have
+# to correct a fascicle it picks ``min(valid_juans)``, a number chosen for
+# determinism with no relation to where the quoted passage actually lives.
+# Either way the reader is sent to the wrong fascicle by a citation that looks
+# checked. The fascicle must follow the quote.
+# ──────────────────────────────────────────────────────────────────────
+
+
+def _kosa(juan: int, chunk_text: str) -> ChatSource:
+    return ChatSource(
+        text_id=38, juan_num=juan, chunk_index=0, chunk_text=chunk_text,
+        score=0.9, title_zh="阿毘達磨俱舍論", lang="lzh",
+    )
+
+
+_J13 = "分別業品第四之一如前所說有情世間及器世間各多差別"
+_J16 = "無學身語業，名身語牟尼，意牟尼即無學意非意業。"
+
+
+def test_fascicle_follows_the_quote_when_cited_juan_is_whitelisted():
+    """The exact prod bug: 13 and 16 are both retrieved, so 第13卷 is
+    'valid' and survives — while the quoted passage is only in 16."""
+    answer = "论云「無學身語業，名身語牟尼，意牟尼即無學意非意業」【《阿毘達磨俱舍論》第13卷】"
+    out, muts = enforce_citation_whitelist(answer, [_kosa(13, _J13), _kosa(16, _J16)])
+    assert "第16卷" in out
+    assert "第13卷" not in out
+    assert [m.corrected_juan for m in muts] == [16]
+
+
+def test_quote_aware_pick_beats_min_when_cited_juan_is_absent():
+    """When the guard must correct, it must not fall back to min() if a
+    retrieved chunk actually holds the quote."""
+    answer = "论云「無學身語業，名身語牟尼，意牟尼即無學意非意業」【《阿毘達磨俱舍論》第99卷】"
+    out, _ = enforce_citation_whitelist(answer, [_kosa(13, _J13), _kosa(16, _J16)])
+    assert "第16卷" in out
+
+
+def test_min_fallback_survives_when_no_quote_precedes_the_citation():
+    """No quote to anchor on — the deterministic min() choice is still the
+    best available and must not regress."""
+    answer = "详见【《阿毘達磨俱舍論》第99卷】所述。"
+    out, _ = enforce_citation_whitelist(answer, [_kosa(13, _J13), _kosa(16, _J16)])
+    assert "第13卷" in out
+
+
+def test_correct_citation_with_quote_is_left_alone():
+    """A citation that already points at the quote's fascicle must not be
+    rewritten — no mutation, no churn."""
+    answer = "论云「無學身語業，名身語牟尼，意牟尼即無學意非意業」【《阿毘達磨俱舍論》第16卷】"
+    out, muts = enforce_citation_whitelist(answer, [_kosa(13, _J13), _kosa(16, _J16)])
+    assert out == answer
+    assert muts == []
+
+
+def test_fascicle_follows_a_markdown_blockquote_too():
+    """The 2026-07-29 report was a blockquote, not a 「…」 pair. A quote-aware
+    pass that only understood 「…」 would leave the reported shape uncorrected."""
+    answer = (
+        "论文明确言：\n"
+        "> 無學身語業，名身語牟尼，意牟尼即無學意非意業。\n"
+        "\n"
+        "【《阿毘達磨俱舍論》第13卷】"
+    )
+    out, muts = enforce_citation_whitelist(answer, [_kosa(13, _J13), _kosa(16, _J16)])
+    assert "第16卷" in out
+    assert [m.corrected_juan for m in muts] == [16]
