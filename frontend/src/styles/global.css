@@ -625,3 +625,33 @@ em {
     scroll-behavior: auto !important;
   }
 }
+
+/* 引文抽屉正文排版 —— 与阅读器 (.reader-body) 同源。
+   CBETA 原文每 ~18 字一个硬换行，直接塞进 DOM 会被 HTML 折叠成空格，
+   于是「又經中言有三清 淨」这样的句中断裂遍布全文（线上 2026-07-29 反馈）。
+   抽屉现在跑与阅读器相同的 reflowText，因此也要有相同的段落/偈颂样式，
+   否则重排出的 <p> 会退化成默认块级间距。 */
+.chat-citation-body .text-prose {
+  text-indent: 2em;
+  margin: 0 0 1em;
+}
+
+.chat-citation-body .text-verse {
+  margin: 0;
+  padding-left: 4em;
+  text-indent: 0;
+}
+
+.chat-citation-body .text-juan,
+.chat-citation-body .text-head,
+.chat-citation-body .text-section {
+  text-align: center;
+  margin: 1.2em 0 0.8em;
+  font-weight: 600;
+}
+
+.chat-citation-body .text-byline {
+  text-align: right;
+  margin: 0 0 0.8em;
+  color: var(--fj-ink-muted);
+}

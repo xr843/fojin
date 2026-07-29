@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { getChunkContext, getChunkAlignment, type ChunkContextItem, type ParallelPair } from "../api/client";
 import { findQuoteSpan } from "../utils/citationMatch";
+import { reflowText } from "../utils/textReflow";
 import { hasDisplayConfidence } from "../utils/parallelDisplay";
 
 export interface CitationTarget {
@@ -153,14 +154,46 @@ function CitationBlocks({ chunks, quote }: { chunks: ChunkContextItem[]; quote?:
 
   const { text, centerStart, centerEnd } = stitchChunks(chunks);
 
-  // Prefer the exact quoted sentence. Falling back to tinting the whole cited
+  // Prefer the exact quoted sentence. Falling back to marking the whole cited
   // chunk only makes sense when we could not locate the quote — when we can,
   // the chunk tint marks a ~500-char window the reader still has to scan, and
   // its edges land on arbitrary cut points.
+  //
+  // Both spans are in RAW coordinates (newlines included). findQuoteSpan's
+  // punctuation-tolerant pass strips \s and maps hits back to raw indices, so
+  // a quote whose CBETA original is hard-wrapped mid-word still resolves.
   const quoteSpan = findQuoteSpan(text, quote ?? "");
   const span: [number, number] | null =
     quoteSpan ?? (centerEnd > centerStart ? [centerStart, centerEnd] : null);
-  const isExact = quoteSpan !== null;
+  const markClass = quoteSpan
+    ? "chat-citation-quote-mark"
+    : "chat-citation-chunk-mark";
+
+  // Same reflow the reader uses, so the passage reads as prose and verse
+  // instead of CBETA's ~18-char source lines. Each segment carries the raw
+  // offset of every character, which is what lets the highlight survive
+  // re-segmentation — the marked range is expressed in raw coordinates and
+  // simply re-found per segment.
+  const segments = reflowText(text);
+
+  // Per-segment highlight range, resolved before render: mutating a flag while
+  // mapping would be a render-time side effect (react-hooks/immutability), and
+  // the first highlighted segment has to be known up front anyway — that is
+  // where the scroll anchor goes.
+  const ranges = segments.map((seg) => {
+    if (span === null || seg.type === "break") return null;
+    let from = -1;
+    let to = -1;
+    for (let k = 0; k < seg.offsets.length; k++) {
+      const o = seg.offsets[k];
+      if (o >= span[0] && o < span[1]) {
+        if (from < 0) from = k;
+        to = k + 1;
+      }
+    }
+    return from < 0 ? null : ([from, to] as [number, number]);
+  });
+  const anchorIdx = ranges.findIndex((r) => r !== null);
 
   return (
     <div
@@ -172,22 +205,25 @@ function CitationBlocks({ chunks, quote }: { chunks: ChunkContextItem[]; quote?:
         color: "var(--fj-ink)",
       }}
     >
-      {span === null ? (
-        text
-      ) : (
-        <>
-          {text.slice(0, span[0])}
-          <mark
-            className={
-              isExact ? "chat-citation-quote-mark" : "chat-citation-chunk-mark"
-            }
-            ref={markRef}
-          >
-            {text.slice(span[0], span[1])}
-          </mark>
-          {text.slice(span[1])}
-        </>
-      )}
+      {segments.map((seg, i) => {
+        if (seg.type === "break") return <br key={i} />;
+        const range = ranges[i];
+        if (!range) {
+          return <p key={i} className={`text-${seg.type}`}>{seg.text}</p>;
+        }
+        return (
+          <p key={i} className={`text-${seg.type}`}>
+            {seg.text.slice(0, range[0])}
+            <mark
+              className={markClass}
+              ref={i === anchorIdx ? markRef : undefined}
+            >
+              {seg.text.slice(range[0], range[1])}
+            </mark>
+            {seg.text.slice(range[1])}
+          </p>
+        );
+      })}
     </div>
   );
 }

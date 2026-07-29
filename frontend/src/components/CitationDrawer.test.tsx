@@ -218,4 +218,83 @@ describe("CitationDrawer", () => {
     // 引文已被精确标出，就不该再有整块染色。
     expect(document.querySelector(".chat-citation-chunk-center")).toBeNull();
   });
+  it("CBETA 硬换行不得渲染成句中空格", async () => {
+    // 线上截图（2026-07-29）：正文里满是句中空格——「又經中言有三清 淨」
+    // 「意牟尼即無 學意非意業」。原因是 chunk_text 保留了 CBETA 每 ~18 字一次的
+    // 硬换行（实测这一段有 28 个 \n），而 HTML 会把文本节点里的 \n 折叠成空格。
+    // 阅读器一直跑 reflowText 重排，抽屉却把原始文本直接塞进 DOM。
+    //
+    // 注意：这些换行是版式，不是语义段落——绝不能简单当作段落分隔渲染。
+    mockContext.mockResolvedValue({
+      text_id: 1558,
+      juan_num: 16,
+      title_zh: "阿毘達磨俱舍論",
+      center_chunk_index: 7,
+      radius: 2,
+      chunks: [
+        chunk(
+          7,
+          "又經中說有三牟尼，又經中言有三清\n淨，俱身語意。相各云何？頌曰：\n" +
+            "無學身語業，即意三牟尼，\n三清淨應知，即諸三妙行。\n" +
+            "論曰：無學身語業，名身語牟尼，意牟尼即無\n學意非意業。",
+          true,
+        ),
+      ],
+      has_more_before: false,
+      has_more_after: false,
+    } as never);
+
+    const { container } = renderDrawer();
+    await waitFor(() => {
+      expect(container.querySelector(".chat-citation-body")).not.toBeNull();
+    });
+    const rendered = container.querySelector(".chat-citation-body")!.textContent!;
+
+    // 关键断言：正文里不得残留裸换行。浏览器会把它折叠成空格（那就是截图里
+    // 的句中断裂），而 jsdom 的 textContent 原样保留 \n —— 所以必须直接查
+    // \n 本身，查 "三清 淨" 这种空格形态在 jsdom 下永远为真，等于没测。
+    expect(rendered).not.toContain("\n");
+    expect(rendered).toContain("又經中言有三清淨");
+    expect(rendered).toContain("意牟尼即無學意非意業");
+  });
+
+  it("引文横跨硬换行时仍能整句高亮", async () => {
+    // 被引的这句在原文里正好被硬换行劈开（「即無\n學意非意業」）。
+    // 高亮在原始坐标上计算、再按 offsets 映射回重排后的段落，所以整句都要标上。
+    mockContext.mockResolvedValue({
+      text_id: 1558,
+      juan_num: 16,
+      title_zh: "阿毘達磨俱舍論",
+      center_chunk_index: 7,
+      radius: 2,
+      chunks: [
+        chunk(
+          7,
+          "論曰：無學身語業，名身語牟尼，意牟尼即無\n學意非意業。所以者何？勝義牟尼唯心為\n體。",
+          true,
+        ),
+      ],
+      has_more_before: false,
+      has_more_after: false,
+    } as never);
+
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <CitationDrawer
+            target={{ ...TARGET, quote: "無學身語業，名身語牟尼，意牟尼即無學意非意業" }}
+            onClose={() => {}}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const marks = await waitFor(() => {
+      const m = document.querySelectorAll("mark.chat-citation-quote-mark");
+      expect(m.length).toBeGreaterThan(0);
+      return m;
+    });
+    const marked = Array.from(marks).map((m) => m.textContent).join("");
+    expect(marked).toContain("意牟尼即無學意非意業");
+  });
 });
