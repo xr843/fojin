@@ -25,14 +25,19 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from sqlalchemy import text as sql_text
+
 from app.config import settings
 from app.database import async_session
 from app.services.chat import _build_llm_messages
+from app.services.citation_guard import _norm_title
+from app.services.quote_verifier import iter_quote_citations
 from app.services.rag_retrieval import retrieve_rag_context
 from eval.faithfulness import (
     TRUST_STATES,
     aggregate_faithfulness,
     compute_faithfulness,
+    compute_fascicle_accuracy,
     detect_faithfulness_regressions,
 )
 from eval.retrieval_metrics import (
@@ -55,6 +60,59 @@ REPORTS_DIR = EVAL_DIR / "reports"
 def load_test_set() -> dict:
     with open(TEST_SET_PATH, encoding="utf-8") as f:
         return json.load(f)
+
+
+
+# ── 卷级引文准确率：拿 text_contents 当独立真源 ─────────────────────────
+#
+# 其余忠实度指标重放的是运行时护栏，而护栏看不见「引错卷」——quote_verifier 在
+# 所标卷无匹配时会回退到该经任意卷。所以这里绕开 chunk，直接问该卷正文。
+#
+# 经名 → text_id 沿用护栏的繁简折叠规则，从本题召回的来源里解析：与运行时同源，
+# 也省掉再建一份标题索引。查不到的引用不计入分母（见 compute_fascicle_accuracy）。
+_JUAN_TEXT_CACHE: dict[tuple[int, int], str | None] = {}
+
+
+async def _prefetch_cited_fascicles(session, answer: str, sources: list):
+    """Load the fascicles this answer cites and return a sync lookup over them.
+
+    Prefetched rather than fetched on demand so ``compute_fascicle_accuracy``
+    stays pure and synchronous — the metric is unit-tested in CI, where there is
+    no database, and threading an async callable through it would end that.
+
+    Only the (title, juan) pairs the answer actually cites are loaded, so a run
+    costs a handful of primary-key reads per question, cached across questions.
+    """
+    by_title: dict[str, int] = {}
+    for s in sources:
+        if getattr(s, "title_zh", None) and getattr(s, "text_id", 0) > 0:
+            by_title.setdefault(_norm_title(s.title_zh), s.text_id)
+
+    loaded: dict[tuple[str, int], str | None] = {}
+    for cite in iter_quote_citations(answer):
+        if cite.juan is None or (cite.title, cite.juan) in loaded:
+            continue
+        text_id = by_title.get(_norm_title(cite.title))
+        if text_id is None:
+            # Title outside the retrieved set — citation_guard already strips
+            # those, and we cannot adjudicate a fascicle without knowing which
+            # text it belongs to. Left unresolved → excluded from the denominator.
+            continue
+        key = (text_id, cite.juan)
+        if key not in _JUAN_TEXT_CACHE:
+            row = (
+                await session.execute(
+                    sql_text(
+                        "SELECT content FROM text_contents "
+                        "WHERE text_id = :t AND juan_num = :j AND lang = 'lzh' LIMIT 1"
+                    ),
+                    {"t": text_id, "j": cite.juan},
+                )
+            ).fetchone()
+            _JUAN_TEXT_CACHE[key] = row[0] if row else None
+        loaded[(cite.title, cite.juan)] = _JUAN_TEXT_CACHE[key]
+
+    return lambda title, juan: loaded.get((title, juan))
 
 
 async def run_single_question(
@@ -128,6 +186,11 @@ async def run_single_question(
     # generations (which carry no citations and would drag the rates down).
     if not answer.startswith("[ERROR]"):
         result["faithfulness"] = compute_faithfulness(answer, sources)
+        # 卷级引文准确率：与上面那行不同，它绕开召回的 chunk，直接问 text_contents
+        # 「这段引文在所标的那一卷里吗」——护栏看不见的正是这一类错误。
+        async with async_session() as fascicle_session:
+            juan_text = await _prefetch_cited_fascicles(fascicle_session, answer, sources)
+        result["faithfulness"].update(compute_fascicle_accuracy(answer, juan_text))
 
     # Step 3: Scoring
     if category == "out_of_scope":
@@ -188,12 +251,20 @@ def _faithfulness_section(faith_agg: dict) -> list[str]:
         f"| {faith_agg.get('answers_with_citations', 0)} 条有引用回答 |",
         f"| **逐字引用保真度 (verbatim_quote_rate)** | **{_fmt_rate(faith_agg.get('verbatim_quote_rate'))}** "
         f"| {faith_agg.get('answers_with_quotes', 0)} 条含可核验引文的回答 |",
+        f"| **卷号准确率 (fascicle_accuracy_rate)** | **{_fmt_rate(faith_agg.get('fascicle_accuracy_rate'))}** "
+        f"| {faith_agg.get('fascicle_checked', 0)} 条可判定引文 |",
         f"| 含转述降级引文的回答数 | {faith_agg.get('answers_with_downgraded_quote', 0)} | — |",
         "",
         "> `verified_rate_of_cited` 的分母是**有引用**的回答:引用了来源却一个字都不引原文的",
         "> 回答记 0,不记 1 —— 它什么都没核验。`verbatim_quote_rate` 的分母是**真的引用了",
         "> 原文**的回答,回答「模型把原典放进引号里时,有多少次是逐字的」。两者独立移动,",
         "> 所以一次 run 无法靠少引用来刷分。",
+        "",
+        "> `fascicle_accuracy_rate` 是唯一不查召回 chunk、而是直接问 `text_contents`",
+        "> 「这段引文在所标的那一卷里吗」的指标。其余各项都重放运行时护栏,而护栏看不见",
+        "> 引错卷 —— quote_verifier 在所标卷无匹配时会回退到该经任意卷,于是引文在卷十六",
+        "> 被找到、答案却标第13卷,两道防线一起放行(2026-07-29 线上原形)。分母只计",
+        "> **能判定**的引文:经名不在召回集、或查不到该卷正文的,不计入,不静默记错。",
         "",
         "**可信状态分布**", "",
         "| 状态 | 数量 |", "|------|------|",

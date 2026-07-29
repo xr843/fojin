@@ -26,10 +26,17 @@ remediate at serve time what this metric counts here.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from app.schemas.chat import ChatSource
 from app.services.chat_trust import build_trust_status
 from app.services.citation_guard import enforce_citation_whitelist
-from app.services.quote_verifier import count_checked_quotes, verify_quoted_content
+from app.services.quote_verifier import (
+    count_checked_quotes,
+    iter_quote_citations,
+    normalise_for_match,
+    verify_quoted_content,
+)
 
 # The states build_trust_status can emit, in descending trust order. Kept
 # explicit (rather than imported from the Literal) so the report renders a
@@ -58,6 +65,10 @@ _GATED_RATES = (
     "verified_rate_of_cited",
     "served_trustworthy_rate",
     "verbatim_quote_rate",
+    # Wrong-fascicle citations are invisible to every other gated rate (the
+    # guards resolve quotes against chunks, not against the cited 卷), so this
+    # one has to be watched explicitly or the class regresses unnoticed.
+    "fascicle_accuracy_rate",
 )
 
 
@@ -111,6 +122,37 @@ def compute_faithfulness(answer: str, sources: list[ChatSource]) -> dict:
     }
 
 
+def compute_fascicle_accuracy(
+    answer: str, juan_text: Callable[[str, int], str | None]
+) -> dict:
+    """Is each quoted passage actually in the fascicle the answer cites?
+
+    Deliberately bypasses the retrieved chunks and asks ``text_contents`` — the
+    reader's own source of truth — instead. Everything else in this module
+    replays the runtime guards, and the guards cannot see this class of error:
+    ``quote_verifier._find_sources`` falls back to any fascicle of the cited text
+    when the cited one has no match, so a passage that is verbatim in 卷16 passes
+    while the answer says 第13卷. That is exactly the 2026-07-29 prod report, and
+    every guard waved it through.
+
+    Needs no gold annotation, so it covers every answerable question rather than
+    the handful whose fascicles someone hand-labelled. ``juan_text(title, juan)``
+    returns the fascicle's text, or None when it cannot be resolved — unresolvable
+    citations are left out of the denominator rather than silently scored wrong.
+    """
+    checked = correct = 0
+    for c in iter_quote_citations(answer):
+        if c.juan is None:
+            continue
+        body = juan_text(c.title, c.juan)
+        if not body:
+            continue
+        checked += 1
+        if normalise_for_match(c.quote) in normalise_for_match(body):
+            correct += 1
+    return {"fascicle_checked": checked, "fascicle_correct": correct}
+
+
 def aggregate_faithfulness(rows: list[dict]) -> dict:
     """Aggregate per-answer faithfulness dicts into headline rates + a state
     distribution.
@@ -135,6 +177,8 @@ def aggregate_faithfulness(rows: list[dict]) -> dict:
     served_trustworthy = sum(r.get("served_trustworthy", 0) for r in rows)
     answers_with_quotes = sum(r.get("has_checked_quotes", 0) for r in rows)
     quotes_all_verbatim = sum(r.get("quotes_all_verbatim", 0) for r in rows)
+    fascicle_checked = sum(r.get("fascicle_checked", 0) for r in rows)
+    fascicle_correct = sum(r.get("fascicle_correct", 0) for r in rows)
 
     distribution = dict.fromkeys(TRUST_STATES, 0)
     for r in rows:
@@ -160,6 +204,15 @@ def aggregate_faithfulness(rows: list[dict]) -> dict:
         "verbatim_quote_rate": (
             quotes_all_verbatim / answers_with_quotes if answers_with_quotes else None
         ),
+        # Of the quoted passages whose cited fascicle we could resolve, how many
+        # really are in that fascicle. The only rate here that consults
+        # text_contents rather than the retrieved chunks, and therefore the only
+        # one that can fall when the answer cites the wrong 卷 — see
+        # compute_fascicle_accuracy.
+        "fascicle_accuracy_rate": (
+            fascicle_correct / fascicle_checked if fascicle_checked else None
+        ),
+        "fascicle_checked": fascicle_checked,
         "answers_with_quotes": answers_with_quotes,
         # The brand number: among citing answers, the fraction whose SERVED text
         # misrepresents nothing (post-guard). The deterministic quote-downgrade
