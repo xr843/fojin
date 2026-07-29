@@ -159,7 +159,7 @@ function RelatedTextsCard({ textId }: { textId: number }) {
   );
 }
 
-/** Inline version (used in ReaderSidebar tabs) */
-const RelatedTexts = memo(RelatedTextsContent);
-export default RelatedTexts;
+// 曾另有一个不带 Card 外框的 default 导出，供 ReaderSidebar 的页签使用。
+// 那个侧栏在 dcd35aaf 就被移出阅读器了，组件却留了下来，直到 2026-07-29 追查
+// CBETA 硬换行时才发现它根本无法从界面到达。侧栏已删，这个导出随之移除。
 export const RelatedTextsStandalone = memo(RelatedTextsCard);
