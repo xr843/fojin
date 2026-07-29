@@ -297,4 +297,57 @@ describe("CitationDrawer", () => {
     const marked = Array.from(marks).map((m) => m.textContent).join("");
     expect(marked).toContain("意牟尼即無學意非意業");
   });
+  it("省略号缩写的引文按段精确高亮，不再涂黄整块", async () => {
+    // 线上截图（2026-07-29）：答案引「於無學法說純白聲……以無漏業非順愛故，又不能
+    // 感白異熟故，說名非白」。整条带省略号，作为连续串在原文里并不存在（中间那段
+    // 被模型省掉了），于是 findQuoteSpan 失败、退回到高亮整个被引 chunk——约 500 字，
+    // 起点还落在句子中间，看起来就是高亮画错了。拆开后每段都能精确命中。
+    mockContext.mockResolvedValue({
+      text_id: 7748,
+      juan_num: 41,
+      title_zh: "阿毘達磨順正理論",
+      center_chunk_index: 3,
+      radius: 2,
+      chunks: [
+        chunk(
+          3,
+          "或無學法，於超一切染身中可得故，立純白名；非如學法，非超一切染身中可得故，" +
+            "不名純白。故彼經中依如是義，於無學法說純白聲。今此經中以無漏業非順愛故，" +
+            "又不能感白異熟故，說名非白。",
+          true,
+        ),
+      ],
+      has_more_before: false,
+      has_more_after: false,
+    } as never);
+
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <CitationDrawer
+            target={{
+              ...TARGET,
+              quote: "於無學法說純白聲……以無漏業非順愛故，又不能感白異熟故，說名非白",
+            }}
+            onClose={() => {}}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const marks = await waitFor(() => {
+      const m = document.querySelectorAll("mark.chat-citation-quote-mark");
+      expect(m.length).toBeGreaterThan(0);
+      return m;
+    });
+    // 两个分段各自高亮，而不是一整块
+    expect(marks.length).toBe(2);
+    const marked = Array.from(marks).map((m) => m.textContent ?? "").join("");
+    expect(marked).toContain("於無學法說純白聲");
+    expect(marked).toContain("說名非白");
+    // 被省略掉的那段不得涂黄
+    expect(marked).not.toContain("非如學法");
+    // 且不得退化成整块染色
+    expect(document.querySelector("mark.chat-citation-chunk-mark")).toBeNull();
+  });
 });

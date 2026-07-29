@@ -117,3 +117,49 @@ export function findQuoteSpan(
   return [map[sIdx], map[sIdx + qStripped.length - 1] + 1];
 }
 
+
+// 省略号的三种写法：中文双省略号、单省略号、以及 ASCII 三点。
+const ELLIPSIS = /(?:…{1,2}|\.{3,})/;
+
+/** 与 findQuoteSpan 自身的下限一致（4 字）。另立一个更严的门槛只会让
+ *  「說名非白」这类合法短句无声地标不出来。 */
+const MIN_FRAGMENT_CHARS = 4;
+
+/**
+ * Locate a quoted passage, tolerating the ellipses an LLM uses to abridge it.
+ *
+ * `findQuoteSpan` needs the quote to be one contiguous run. Models routinely
+ * write 「於無學法說純白聲……以無漏業非順愛故」, where the elided middle means no
+ * such run exists — the match fails and the drawer falls back to tinting the
+ * whole ~500-char chunk, whose edges sit on arbitrary ingestion cut points. That
+ * reads as a highlighting bug (prod report 2026-07-29), and it is avoidable:
+ * each fragment on its own does occur, verbatim.
+ *
+ * Fragments are matched left to right and each search resumes after the previous
+ * hit, so the spans come back ordered, non-overlapping, and in the source's own
+ * order — an abridged quote cannot be highlighted out of sequence.
+ */
+export function findQuoteSpans(
+  haystack: string,
+  quote: string | undefined,
+): [number, number][] {
+  if (!quote) return [];
+  const whole = findQuoteSpan(haystack, quote);
+  if (whole) return [whole];
+
+  const fragments = quote
+    .split(ELLIPSIS)
+    .map((f) => f.trim())
+    .filter((f) => f.length >= MIN_FRAGMENT_CHARS);
+  if (fragments.length === 0) return [];
+
+  const spans: [number, number][] = [];
+  let cursor = 0;
+  for (const fragment of fragments) {
+    const hit = findQuoteSpan(haystack.slice(cursor), fragment);
+    if (!hit) continue;
+    spans.push([cursor + hit[0], cursor + hit[1]]);
+    cursor += hit[1];
+  }
+  return spans;
+}
