@@ -54,6 +54,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from scripts.repair_stale_embeddings import _find_candidates
 
+from app.config import settings
+
 # 判据不在这里重写，而是直接复用修复脚本的候选查询。
 #
 # 两边各写一套 SQL 是这类工具最容易出的问题：门禁报的和修复脚本修的会悄悄
@@ -70,13 +72,21 @@ _MIN_CONTENT = 500
 async def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--limit", type=int, default=15, help="最多列出多少卷")
-    ap.add_argument("--dsn", default=os.getenv("DATABASE_URL"), help="数据库连接串")
+    ap.add_argument(
+        "--dsn",
+        default=os.getenv("DATABASE_URL"),
+        help="数据库连接串；缺省时用 app.config 的 settings.database_url",
+    )
     args = ap.parse_args()
-    if not args.dsn:
+    # 容器里没有 DATABASE_URL 环境变量，配置是从 app.config 读的。回退到
+    # settings 与同族的 repair_stale_embeddings 一致，也避免把带口令的 DSN
+    # 写进命令行参数（那会出现在 ps 输出里）。
+    dsn = args.dsn or settings.database_url
+    if not dsn:
         print("需要 --dsn 或环境变量 DATABASE_URL", file=sys.stderr)
         return 2
 
-    engine = create_async_engine(args.dsn)
+    engine = create_async_engine(dsn)
     try:
         async with engine.connect() as conn:
             rows = await _find_candidates(
