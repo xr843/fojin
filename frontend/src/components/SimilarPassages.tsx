@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { List, Typography, Tag, Button, Spin, Empty } from "antd";
 import { ReadOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router";
+import { unwrapCbetaLines } from "../utils/textReflow";
 import { getSimilarPassages } from "../api/client";
 
 function SimilarPassagesInner({
@@ -92,9 +93,12 @@ function SimilarPassagesInner({
                 margin: "4px 0 0",
                 lineHeight: 1.6,
                 color: "var(--fj-ink-light)",
+                // CBETA 每 ~18 字一个硬换行是版式，不是语义。原样渲染时 HTML 会
+                // 把它折叠成空格，摘要里就出现「三清 淨」这样的句中断裂。
+                whiteSpace: "pre-line",
               }}
             >
-              {item.chunk_text}
+              {unwrapCbetaLines(item.chunk_text)}
             </Typography.Paragraph>
           </div>
         </List.Item>
