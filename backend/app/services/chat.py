@@ -818,6 +818,34 @@ async def send_message_stream(
     # Yield session_id immediately so frontend gets a fast response
     yield f"data: {json.dumps({'type': 'session_id', 'session_id': chat_session_id}, ensure_ascii=False)}\n\n"
 
+    # 检索已完成、生成尚未开始 —— 这段等待此前只有一句静态文案，用户看不到任何
+    # 「真的检索到了东西」的证据。这里发一个轻量事件填上它。
+    #
+    # 刻意不在这里发完整的 sources：
+    #   1. 参考经文列表排在答案之后是有意为之（先论点后论据，见下方 sources 的注释）
+    #   2. 前端的 injectCitationLinks 在 sources 为空时直接返回原文，所以流式期间
+    #      它是空转的。一旦提前拿到 sources，它会开始改写「残缺文本」—— 流式中的
+    #      经名可能只写了一半（《般若波），会出现包裹后又随新 token 变化的错包与闪烁。
+    if sources:
+        _seen_titles: list[str] = []
+        for _s in sources:
+            if _s.title_zh and _s.title_zh not in _seen_titles:
+                _seen_titles.append(_s.title_zh)
+        yield (
+            "data: "
+            + json.dumps(
+                {
+                    "type": "retrieved",
+                    "count": len(sources),
+                    # 只取前 3 部：召回通常 5-8 部，全列会把等待提示撑得比答案还长。
+                    # count 仍是全量数字，所以「已检索 8 部经典：《A》《B》《C》」诚实。
+                    "titles": _seen_titles[:3],
+                },
+                ensure_ascii=False,
+            )
+            + "\n\n"
+        )
+
     # --- Phase 3: stream LLM (with fallback on connect-before-first-token failures) ---
     async def _stream_llm_once(u: str, k: str, m: str, p: str):
         """Inner generator that yields content chunks. Raises httpx errors on failure."""

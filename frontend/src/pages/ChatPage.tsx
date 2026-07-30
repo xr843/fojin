@@ -8,6 +8,7 @@ import remarkGfm from "remark-gfm";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import { CITATION_URL_SCHEME, injectCitationLinks } from "../utils/citationLinks";
 import { quoteCheckDetail } from "../utils/trustDetail";
+import { isNearBottom } from "../utils/scrollBottom";
 import {
   SendOutlined,
   RobotOutlined,
@@ -288,7 +289,25 @@ function MessageBubbleInner({
           {m.role === "assistant" ? (
             m.content === THINKING_SENTINEL ? (
               <div className="chat-thinking">
-                {t("chat.thinking")}
+                {/* 收进单个 span：.chat-thinking 是 inline-flex，为「一句短文案 +
+                    三个点」设计的；多段内容直接铺进去会各自变成 flex 项，被挤成
+                    竖排窄列。包一层后它仍只有两个 flex 项，内部按正常文本流换行。 */}
+                <span className="chat-thinking-text">
+                  {m.retrieval ? (
+                    <>
+                      {t("chat.retrieved_hint", { n: m.retrieval.count })}
+                      {m.retrieval.titles.map((tt) => (
+                        <span key={tt} className="chat-retrieved-title">
+                          {t("chat.retrieved_title", { title: tt })}
+                        </span>
+                      ))}
+                      <span className="chat-retrieved-sep">·</span>
+                      {t("chat.generating")}
+                    </>
+                  ) : (
+                    t("chat.thinking")
+                  )}
+                </span>
                 <span className="chat-thinking-dots"><span /><span /><span /></span>
               </div>
             ) : m.content === REQUEST_FAILED_SENTINEL ? (
@@ -578,6 +597,10 @@ export default function ChatPage() {
   const queryClient = useQueryClient();
   const bottomRef = useRef<HTMLDivElement>(null);
   const messagesTopRef = useRef<HTMLDivElement>(null);
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
+  const atBottomRef = useRef(true);
+  const scrollTimerRef = useRef<number | null>(null);
+  const [showJumpToBottom, setShowJumpToBottom] = useState(false);
 
   const { data: sessions, refetch: refetchSessions } = useQuery({
     queryKey: ["chatSessions"],
@@ -707,9 +730,39 @@ export default function ChatPage() {
     },
   }), [navigate]);
 
-  const scrollToBottom = () => {
-    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
-  };
+  /** 自动跟随流式输出，但用户上滚阅读时不抢滚动条。
+   *
+   *  `atBottomRef` 而非 state：onToken 的回调闭包在 handleSendMessage 内创建，
+   *  不随 state 更新重建 —— 读 state 只会永远拿到闭包创建时的旧值。
+   *  force 用于「用户刚发出消息」与「点击回到底部」这两处必须跟到底的场景。 */
+  const scrollToBottom = useCallback((force = false) => {
+    if (!force && !atBottomRef.current) return;
+    // 单个待触发句柄、覆盖式重排：token 频率约 20/s，每次都新起一个 setTimeout
+    // 会在一条长答案里排出上千个定时器，而它们要做的是同一件事。
+    if (scrollTimerRef.current !== null) clearTimeout(scrollTimerRef.current);
+    scrollTimerRef.current = window.setTimeout(() => {
+      scrollTimerRef.current = null;
+      // 触发时必须复判。上面的守卫只在「调用时」判过一次，而真正滚动发生在
+      // 100ms 之后 —— 这 100ms 里用户完全可能已经上滚。少了这次复判，存量定时器
+      // 会把视口拽回底部，而那次程序化滚动又触发 scroll 事件把 atBottom 翻回真，
+      // 跟随重新锁死 —— 「流式生成中途上滚重读」这个正主场景等于没修。
+      if (!force && !atBottomRef.current) return;
+      // behavior:"auto" 而非 "smooth"，两个理由：
+      //   1. 按 token 频率重复调 smooth 会互相打断，而目标位置又一直在下移，
+      //      动画永远追不上；
+      //   2. 平滑动画途中的中间态会持续触发 scroll 事件，把下面的 atBottom 判定
+      //      误翻成「用户已离开底部」，在动画走完之前就把跟随关掉。
+      // （另有实测：在 CDP 驱动的标签页里 smooth 完全不推进。但那可能是自动化
+      //  环境属性而非页面缺陷，所以不作为改动依据 —— 上面两条才是。）
+      bottomRef.current?.scrollIntoView({ behavior: "auto" });
+    }, 100);
+  }, []);
+
+  const handleMessagesScroll = useCallback(() => {
+    const near = isNearBottom(messagesScrollRef.current);
+    atBottomRef.current = near;
+    setShowJumpToBottom((prev) => (prev === !near ? prev : !near));
+  }, [setShowJumpToBottom]);
 
   const loadSession = async (sid: number) => {
     try {
@@ -718,8 +771,16 @@ export default function ChatPage() {
       setMessages(data.messages);
       setCurrentPage(1);
       setHasOlderMessages(data.total > data.messages.length);
-      // 加载历史会话时滚到顶部，让用户先看到问题
-      setTimeout(() => messagesTopRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+      // 加载历史会话时滚到顶部，让用户先看到问题。
+      // behavior:"auto" 与上面的 scrollToBottom 保持一致 —— 平滑滚动在实测环境里
+      // 是空操作，会让这个「滚到顶」的意图静默失效；而且这里是一次离散跳转，
+      // 本来就不需要动画。
+      setTimeout(() => {
+        messagesTopRef.current?.scrollIntoView({ behavior: "auto" });
+        // 跳到顶部后底部有大量未读内容，把「回到底部」按钮的状态同步过来 ——
+        // 程序化滚动不一定触发 scroll 事件，不能只靠事件更新。
+        handleMessagesScroll();
+      }, 100);
     } catch {
       message.error(t("chat.load_session_failed"));
     }
@@ -746,6 +807,12 @@ export default function ChatPage() {
     setMessages([]);
     setHasOlderMessages(false);
     setCurrentPage(1);
+    // 必须显式复位这对状态。路径：打开历史会话 → loadSession 故意滚到顶、
+    // atBottom 转假、↓ 按钮显示 → 点「新对话」→ messages 清空，但此时 scrollTop
+    // 已是 0，内容收缩不会触发 scroll 事件（无需 clamp），所以按钮会留在空首屏
+    // 右下角，点了什么也不会发生。handleDeleteSession 走的是同一条路。
+    atBottomRef.current = true;
+    setShowJumpToBottom(false);
   };
 
   const handleDeleteSession = (sid: number) => {
@@ -849,7 +916,10 @@ export default function ChatPage() {
     // (consumed_at IS NULL on the backend means re-use is safe).
     // Cleared in onDone (success path) below.
     const attachmentIdsForSend = attachments.map((a) => a.id);
-    scrollToBottom();
+    // 用户刚按下发送，无条件跟到底部：这一下是用户自己的动作，不是流式推动的
+    atBottomRef.current = true;
+    setShowJumpToBottom(false);
+    scrollToBottom(true);
 
     const abortController = new AbortController();
     abortRef.current = abortController;
@@ -907,6 +977,14 @@ export default function ChatPage() {
       },
       onSearching: (_searchMsg: string) => {
         // 搜索状态由初始占位符 "正在检索经文并生成回答..." 显示，不覆盖 content
+      },
+      onRetrieved: (retrieval) => {
+        // 只写独立字段。绝不能写进 content —— THINKING_SENTINEL 是按身份比较的
+        // 哨兵，onDone 里「流结束但从未收到 token → 转失败哨兵」的兜底靠它；
+        // 一旦 content 被顶掉，用户会永远卡在假的「正在检索…」上且没有重试按钮。
+        setMessages((prev) =>
+          prev.map((m) => (m.id === assistantId ? { ...m, retrieval } : m)),
+        );
       },
       onMessageId: (realId: number) => {
         // Replace the in-flight Date.now() placeholder with the real
@@ -971,7 +1049,7 @@ export default function ChatPage() {
       modelId: modelId === "deepseek:v4-pro" ? null : modelId,
       attachmentIds: attachmentIdsForSend.length ? attachmentIdsForSend : null,
     });
-  }, [sending, sessionId, masterId, modelId, user, attachments, refetchSessions, refetchQuota, queryClient]);
+  }, [sending, sessionId, masterId, modelId, user, attachments, refetchSessions, refetchQuota, queryClient, scrollToBottom, setShowJumpToBottom]);
 
   const handleSend = useCallback(async () => {
     await handleSendMessage(input);
@@ -1281,7 +1359,11 @@ export default function ChatPage() {
             </div>
           </div>
           {/* Messages */}
-          <div style={{ flex: messages.length === 0 ? "1 1 auto" : 1, overflow: "auto", padding: "16px 0" }}>
+          <div
+            ref={messagesScrollRef}
+            onScroll={handleMessagesScroll}
+            style={{ flex: messages.length === 0 ? "1 1 auto" : 1, overflow: "auto", padding: "16px 0" }}
+          >
             <div className={messages.length === 0 ? "chat-column-inner chat-msgs-empty" : "chat-column-inner"}>
             <div ref={messagesTopRef} />
             {messages.length === 0 && <div className="chat-hero-lead" />}
@@ -1326,6 +1408,26 @@ export default function ChatPage() {
             ))}
             {/* Streaming cursor is shown inline via ▌ in the message bubble */}
             <div ref={bottomRef} />
+            {/* 「回到底部」：sticky + height:0 的锚点，贴在滚动视口下沿且不占布局
+                空间 —— 不用给滚动容器套 position:relative 的外层包裹，避免扰动
+                空状态那套「上下撑高块均分」的 flex 链。 */}
+            <div className="chat-jump-anchor">
+              {showJumpToBottom && (
+                <button
+                  type="button"
+                  className="chat-jump-bottom"
+                  aria-label={t("chat.jump_to_bottom")}
+                  title={t("chat.jump_to_bottom")}
+                  onClick={() => {
+                    atBottomRef.current = true;
+                    setShowJumpToBottom(false);
+                    scrollToBottom(true);
+                  }}
+                >
+                  <DownOutlined />
+                </button>
+              )}
+            </div>
             </div>
           </div>
 

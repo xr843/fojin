@@ -142,8 +142,11 @@ async def test_stream_endpoint_full_event_sequence(client):
     assert comments and len(comments[0]) >= 2048
 
     types = [e["type"] for e in events]
+    # ``retrieved`` 是轻量的检索进度事件，必须落在 token 之前（等待期要有实证）；
+    # 完整的 ``sources`` 仍在所有 token 之后（先论点后论据，且提前发会让前端在
+    # 残缺的流式文本上改写经名）。两者的相对位置由本断言锁住。
     assert types == [
-        "searching", "session_id", "token", "token",
+        "searching", "session_id", "retrieved", "token", "token",
         "trust_status", "sources", "message_id", "done",
     ], f"unexpected SSE sequence: {types}"
 
@@ -151,6 +154,8 @@ async def test_stream_endpoint_full_event_sequence(client):
     assert by_type["session_id"]["session_id"] == 42
     assert [e["content"] for e in events if e["type"] == "token"] == ["般", "若"]
     assert by_type["sources"]["sources"][0]["title_zh"] == "心经"
+    assert by_type["retrieved"]["titles"] == ["心经"]
+    assert by_type["retrieved"]["count"] == 1
     # message_id is the persisted chat_messages.id (frontend swaps its
     # Date.now() placeholder with it — feedback buttons PUT to this id).
     assert by_type["message_id"]["id"] == 77

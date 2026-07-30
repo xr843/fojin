@@ -12,6 +12,7 @@ import {
   getHotQuestions,
   getMasters,
   getRandomHotQuestions,
+  sendChatMessageStream,
 } from "../api/client";
 
 vi.mock("../api/client", async () => {
@@ -30,6 +31,13 @@ vi.mock("../api/client", async () => {
     updateChatMessageFeedback: vi.fn(),
     getChunkContext: vi.fn(),
   };
+});
+
+// jsdom 没有实现 scrollIntoView —— ChatPage 的自动跟随会真的调它。
+beforeAll(() => {
+  if (!Element.prototype.scrollIntoView) {
+    Element.prototype.scrollIntoView = () => {};
+  }
 });
 
 // antd (Button/Tooltip/Select) reads matchMedia via useBreakpoint under jsdom.
@@ -178,5 +186,108 @@ describe("ChatPage 首屏结构", () => {
     expect(list).not.toBeNull();
     expect(foot).not.toBeNull();
     expect(list!.compareDocumentPosition(foot!) & FOLLOWING).toBeTruthy();
+  });
+
+  // P1 的承重约束。THINKING_SENTINEL 是按身份比较的哨兵：onDone 里「流结束但
+  // 从未收到 token → 转失败哨兵」的兜底靠它。若实现把检索到的经名写进 content，
+  // 那条兜底失效，用户会永远卡在假的「正在检索…」上且没有重试按钮。
+  it("P1 承重点: retrieved 事件只写 retrieval 字段，不动 content", async () => {
+    let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+    vi.mocked(sendChatMessageStream).mockImplementation(
+      async (_m, _s, _mid, callbacks) => { cb = callbacks; },
+    );
+    const { container } = await renderEmpty();
+    fireEvent.click(container.querySelector(".chat-hero-card")!);
+    await waitFor(() => expect(cb).toBeDefined());
+
+    cb!.onRetrieved?.({ count: 5, titles: ["般若波罗蜜多心经", "大智度论"] });
+
+    await waitFor(() => {
+      expect(screen.getByText(/已检索 5 部经典/)).toBeInTheDocument();
+    });
+    // .chat-thinking 只在 m.content === THINKING_SENTINEL（按值全等）时渲染，
+    // 所以任何把经名写进 content 的实现 —— 覆盖、前置、追加都一样 —— 都会让这条红。
+    expect(container.querySelector(".chat-thinking")).not.toBeNull();
+  });
+
+  // 上一条验的是症状（哨兵没被顶掉），这一条验真正的后果：哨兵一旦被改写，
+  // onDone 里「流结束却从未收到 token → 转失败哨兵」的兜底就失效，用户会永远
+  // 卡在假的「正在检索…」上、且没有重试按钮。这条不依赖 .chat-thinking 这个
+  // class 名活着，是两条里更耐久的那条。
+  it("P1 承重点: retrieved 之后空完成，仍能落到失败兜底", async () => {
+    let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+    vi.mocked(sendChatMessageStream).mockImplementation(
+      async (_m, _s, _mid, callbacks) => { cb = callbacks; },
+    );
+    const { container } = await renderEmpty();
+    fireEvent.click(container.querySelector(".chat-hero-card")!);
+    await waitFor(() => expect(cb).toBeDefined());
+
+    cb!.onRetrieved?.({ count: 5, titles: ["般若波罗蜜多心经"] });
+    cb!.onDone();   // 一个 token 都没来就结束 —— 兜底必须接住
+
+    await waitFor(() => {
+      expect(screen.getByText("请求失败，请重试")).toBeInTheDocument();
+    });
+  });
+
+  // P0 的核心不变式，也是本轮唯一能自动挡住「存量定时器把用户拽回底部」的断言。
+  // 守卫在「调用时」判过一次，但真正的 scrollIntoView 在 100ms 后才执行；若不在
+  // 触发时复判，用户在流式中途上滚后，存量定时器仍会把视口拽回底部，而那次程序化
+  // 滚动又会触发 scroll 事件把 atBottom 翻回真，跟随重新锁死。
+  it("P0 核心不变式: 流式中途上滚后，存量定时器不再滚动", async () => {
+    vi.useFakeTimers();
+    try {
+      let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+      vi.mocked(sendChatMessageStream).mockImplementation(
+        async (_m, _s, _mid, callbacks) => { cb = callbacks; },
+      );
+      const spy = vi.spyOn(Element.prototype, "scrollIntoView");
+      const { container } = renderPage();
+      await vi.waitFor(() => {
+        expect(screen.getByText("「三毒」指的是哪三种毒？")).toBeInTheDocument();
+      });
+      fireEvent.click(container.querySelector(".chat-hero-card")!);
+      await vi.waitFor(() => expect(cb).toBeDefined());
+
+      const scroller = [...container.querySelectorAll<HTMLElement>("div")]
+        .find((d) => d.style.overflow === "auto" && d.querySelector(".chat-column-inner"))!;
+      // jsdom 不做布局，滚动几何全是 0 —— 手工造出「已上滚」的形状
+      Object.defineProperty(scroller, "scrollHeight", { value: 2000, configurable: true });
+      Object.defineProperty(scroller, "clientHeight", { value: 500, configurable: true });
+      Object.defineProperty(scroller, "scrollTop", { value: 1500, writable: true, configurable: true });
+
+      cb!.onToken("色");            // 此刻仍算在底部 → 排下一个 100ms 定时器
+      scroller.scrollTop = 200;    // 用户上滚
+      fireEvent.scroll(scroller);  // → atBottom 转假
+
+      spy.mockClear();
+      vi.advanceTimersByTime(300); // 让存量定时器全部触发
+      expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // 「新对话」必须复位这对状态。否则：内容清空后 scrollTop 已是 0、不会触发
+  // scroll 事件（无需 clamp），按钮会留在空首屏右下角，点了什么也不会发生。
+  it("P0 边界: 点新对话后不留悬空的回到底部按钮", async () => {
+    const { container } = await renderEmpty();
+    const scroller = [...container.querySelectorAll<HTMLElement>("div")]
+      .find((d) => d.style.overflow === "auto" && d.querySelector(".chat-column-inner"))!;
+    Object.defineProperty(scroller, "scrollHeight", { value: 2000, configurable: true });
+    Object.defineProperty(scroller, "clientHeight", { value: 500, configurable: true });
+    Object.defineProperty(scroller, "scrollTop", { value: 200, writable: true, configurable: true });
+    fireEvent.scroll(scroller);
+    await waitFor(() => {
+      expect(container.querySelector(".chat-jump-bottom")).not.toBeNull();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /新对话/ }));
+
+    await waitFor(() => {
+      expect(container.querySelector(".chat-jump-bottom")).toBeNull();
+    });
   });
 });
