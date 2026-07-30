@@ -8,6 +8,7 @@ import remarkGfm from "remark-gfm";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import { CITATION_URL_SCHEME, injectCitationLinks } from "../utils/citationLinks";
 import { quoteCheckDetail } from "../utils/trustDetail";
+import { isNearBottom } from "../utils/scrollBottom";
 import {
   SendOutlined,
   RobotOutlined,
@@ -578,6 +579,9 @@ export default function ChatPage() {
   const queryClient = useQueryClient();
   const bottomRef = useRef<HTMLDivElement>(null);
   const messagesTopRef = useRef<HTMLDivElement>(null);
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
+  const atBottomRef = useRef(true);
+  const [showJumpToBottom, setShowJumpToBottom] = useState(false);
 
   const { data: sessions, refetch: refetchSessions } = useQuery({
     queryKey: ["chatSessions"],
@@ -707,9 +711,21 @@ export default function ChatPage() {
     },
   }), [navigate]);
 
-  const scrollToBottom = () => {
+  /** 自动跟随流式输出，但用户上滚阅读时不抢滚动条。
+   *
+   *  `atBottomRef` 而非 state：onToken 的回调闭包在 handleSendMessage 内创建，
+   *  不随 state 更新重建 —— 读 state 只会永远拿到闭包创建时的旧值。
+   *  force 用于「用户刚发出消息」与「点击回到底部」这两处必须跟到底的场景。 */
+  const scrollToBottom = useCallback((force = false) => {
+    if (!force && !atBottomRef.current) return;
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
-  };
+  }, []);
+
+  const handleMessagesScroll = useCallback(() => {
+    const near = isNearBottom(messagesScrollRef.current);
+    atBottomRef.current = near;
+    setShowJumpToBottom((prev) => (prev === !near ? prev : !near));
+  }, [setShowJumpToBottom]);
 
   const loadSession = async (sid: number) => {
     try {
@@ -849,7 +865,10 @@ export default function ChatPage() {
     // (consumed_at IS NULL on the backend means re-use is safe).
     // Cleared in onDone (success path) below.
     const attachmentIdsForSend = attachments.map((a) => a.id);
-    scrollToBottom();
+    // 用户刚按下发送，无条件跟到底部：这一下是用户自己的动作，不是流式推动的
+    atBottomRef.current = true;
+    setShowJumpToBottom(false);
+    scrollToBottom(true);
 
     const abortController = new AbortController();
     abortRef.current = abortController;
@@ -971,7 +990,7 @@ export default function ChatPage() {
       modelId: modelId === "deepseek:v4-pro" ? null : modelId,
       attachmentIds: attachmentIdsForSend.length ? attachmentIdsForSend : null,
     });
-  }, [sending, sessionId, masterId, modelId, user, attachments, refetchSessions, refetchQuota, queryClient]);
+  }, [sending, sessionId, masterId, modelId, user, attachments, refetchSessions, refetchQuota, queryClient, scrollToBottom, setShowJumpToBottom]);
 
   const handleSend = useCallback(async () => {
     await handleSendMessage(input);
@@ -1281,7 +1300,11 @@ export default function ChatPage() {
             </div>
           </div>
           {/* Messages */}
-          <div style={{ flex: messages.length === 0 ? "1 1 auto" : 1, overflow: "auto", padding: "16px 0" }}>
+          <div
+            ref={messagesScrollRef}
+            onScroll={handleMessagesScroll}
+            style={{ flex: messages.length === 0 ? "1 1 auto" : 1, overflow: "auto", padding: "16px 0" }}
+          >
             <div className={messages.length === 0 ? "chat-column-inner chat-msgs-empty" : "chat-column-inner"}>
             <div ref={messagesTopRef} />
             {messages.length === 0 && <div className="chat-hero-lead" />}
@@ -1326,6 +1349,26 @@ export default function ChatPage() {
             ))}
             {/* Streaming cursor is shown inline via ▌ in the message bubble */}
             <div ref={bottomRef} />
+            {/* 「回到底部」：sticky + height:0 的锚点，贴在滚动视口下沿且不占布局
+                空间 —— 不用给滚动容器套 position:relative 的外层包裹，避免扰动
+                空状态那套「上下撑高块均分」的 flex 链。 */}
+            <div className="chat-jump-anchor">
+              {showJumpToBottom && (
+                <button
+                  type="button"
+                  className="chat-jump-bottom"
+                  aria-label={t("chat.jump_to_bottom")}
+                  title={t("chat.jump_to_bottom")}
+                  onClick={() => {
+                    atBottomRef.current = true;
+                    setShowJumpToBottom(false);
+                    scrollToBottom(true);
+                  }}
+                >
+                  <DownOutlined />
+                </button>
+              )}
+            </div>
             </div>
           </div>
 

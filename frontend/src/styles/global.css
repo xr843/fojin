@@ -325,6 +325,42 @@ em {
   font-family: "Noto Serif SC", serif;
   letter-spacing: 0.02em;
 }
+/* 「回到底部」悬浮按钮。锚点 sticky 在滚动视口下沿、height:0 不占布局空间；
+   按钮相对锚点绝对定位向上撑出，所以不需要给滚动容器加 position:relative 的
+   外层包裹（那会扰动空状态的撑高块 flex 链）。 */
+.chat-jump-anchor {
+  position: sticky;
+  bottom: 0;
+  height: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.chat-jump-bottom {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  pointer-events: auto;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--fj-border);
+  background: var(--fj-surface);
+  color: var(--fj-ink-muted);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  transition: color 0.2s, border-color 0.2s;
+}
+.chat-jump-bottom:hover {
+  color: var(--fj-accent);
+  border-color: var(--fj-accent);
+}
+.chat-jump-bottom:focus-visible {
+  outline: 2px solid var(--fj-accent);
+  outline-offset: 1px;
+}
+
 /* Key 状态行沉到侧栏底部（会话列表是 flex:1，排它后面即到底） */
 .chat-sidebar-foot {
   flex-shrink: 0;
