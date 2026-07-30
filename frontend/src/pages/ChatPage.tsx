@@ -1141,12 +1141,7 @@ export default function ChatPage() {
             <div className="chat-sidebar-overlay" onClick={() => setSidebarOpen(false)} />
             <div className="chat-sidebar-drawer">
               <Button icon={<PlusOutlined />} block onClick={() => { handleNewChat(); setSidebarOpen(false); }}>{t("chat.new_chat")}</Button>
-              <Button icon={<SettingOutlined />} block type="text" size="small"
-                style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
-                onClick={() => { navigate("/profile?tab=apikey"); setSidebarOpen(false); }}>
-                {keyStatus?.has_api_key ? `${t("chat.key_configured")} (${keyStatus.provider})` : t("chat.configure_key")}
-              </Button>
-              <div style={{ flex: 1, overflow: "auto", marginTop: 8 }}>
+              <div className="chat-session-list" style={{ flex: 1, overflow: "auto", marginTop: 8 }}>
                 {groupedSessions.map((group) => (
                   <div key={group.label}>
                     <div style={{ fontSize: 11, color: "var(--fj-ink-muted)", opacity: 0.6, padding: "6px 12px 2px", fontWeight: 500 }}>
@@ -1174,6 +1169,13 @@ export default function ChatPage() {
                   </div>
                 ))}
               </div>
+              <div className="chat-sidebar-foot">
+                <Button icon={<SettingOutlined />} block type="text" size="small"
+                  style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
+                  onClick={() => { navigate("/profile?tab=apikey"); setSidebarOpen(false); }}>
+                  {keyStatus?.has_api_key ? `${t("chat.key_configured")} (${keyStatus.provider})` : t("chat.configure_key")}
+                </Button>
+              </div>
             </div>
           </>
         )}
@@ -1197,11 +1199,6 @@ export default function ChatPage() {
               {!sidebarCollapsed && t("chat.new_chat")}
             </Button>
           </Tooltip>
-          {!sidebarCollapsed && <Button icon={<SettingOutlined />} block type="text" size="small"
-            style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
-            onClick={() => navigate("/profile?tab=apikey")}>
-            {keyStatus?.has_api_key ? `${t("chat.key_configured")} (${keyStatus.provider})` : t("chat.configure_key")}
-          </Button>}
           {!sidebarCollapsed && sessions && sessions.length > 5 && (
             <Input
               placeholder={t("chat.search_sessions")}
@@ -1212,7 +1209,7 @@ export default function ChatPage() {
               style={{ marginTop: 4, fontSize: 12 }}
             />
           )}
-          {!sidebarCollapsed && <div style={{ flex: 1, overflow: "auto", marginTop: 8 }}>
+          {!sidebarCollapsed && <div className="chat-session-list" style={{ flex: 1, overflow: "auto", marginTop: 8 }}>
             {groupedSessions.map((group) => (
               <div key={group.label}>
                 <div style={{ fontSize: 11, color: "var(--fj-ink-muted)", opacity: 0.6, padding: "6px 12px 2px", fontWeight: 500 }}>
@@ -1245,6 +1242,15 @@ export default function ChatPage() {
               </div>
             ))}
           </div>}
+          {!sidebarCollapsed && (
+            <div className="chat-sidebar-foot">
+              <Button icon={<SettingOutlined />} block type="text" size="small"
+                style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
+                onClick={() => navigate("/profile?tab=apikey")}>
+                {keyStatus?.has_api_key ? `${t("chat.key_configured")} (${keyStatus.provider})` : t("chat.configure_key")}
+              </Button>
+            </div>
+          )}
         </div>}
 
         {/* Chat area */}

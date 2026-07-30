@@ -313,6 +313,13 @@ em {
   font-family: "Noto Serif SC", serif;
   letter-spacing: 0.02em;
 }
+/* Key 状态行沉到侧栏底部（会话列表是 flex:1，排它后面即到底） */
+.chat-sidebar-foot {
+  flex-shrink: 0;
+  border-top: 1px solid var(--fj-border);
+  padding-top: 6px;
+}
+
 /* 宗风控件：收进工具栏但保留文字标签 —— 所选宗风仍被明说，只是不再占一整行 */
 .chat-lineage-btn {
   display: inline-flex;

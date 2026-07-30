@@ -143,4 +143,13 @@ describe("ChatPage 首屏结构", () => {
     expect(toolbar).not.toBeNull();
     expect(toolbar!.querySelector(".chat-lineage-btn")).not.toBeNull();
   });
+
+  it("D8: Key 状态行排在会话列表之后（沉到侧栏底部）", async () => {
+    const { container } = await renderEmpty();
+    const list = container.querySelector(".chat-session-list");
+    const foot = container.querySelector(".chat-sidebar-foot");
+    expect(list).not.toBeNull();
+    expect(foot).not.toBeNull();
+    expect(list!.compareDocumentPosition(foot!) & FOLLOWING).toBeTruthy();
+  });
 });
