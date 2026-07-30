@@ -27,6 +27,7 @@ import {
   DislikeOutlined,
   DislikeFilled,
   ShareAltOutlined,
+  DownOutlined,
 } from "@ant-design/icons";
 const ShareCard = lazy(() => import("../components/ShareCard"));
 const CitationDrawer = lazy(() => import("../components/CitationDrawer"));
@@ -448,8 +449,8 @@ export default function ChatPage() {
   const { user } = useAuthStore();
   const [input, setInput] = useState("");
   const [masterId, setMasterId] = useState<string | null>(null);
-  // 祖师长廊: opened from the composer to swap lineage mid-thread. The gallery
-  // itself lives in the empty state; this is the way back to it.
+  // 祖师长廊: opened from .chat-lineage-btn in the composer toolbar — the sole
+  // entry point, in every state (empty and mid-thread alike).
   const [galleryOpen, setGalleryOpen] = useState(false);
   const { data: mastersData } = useQuery({
     queryKey: ["chat-masters"],
@@ -1131,8 +1132,6 @@ export default function ChatPage() {
       <div style={{
         display: "flex",
         height: "calc(100vh - 120px)",
-        maxWidth: citationTarget ? undefined : 1100,
-        margin: citationTarget ? "0 16px" : "0 auto",
         gap: 16,
       }}>
 
@@ -1142,12 +1141,7 @@ export default function ChatPage() {
             <div className="chat-sidebar-overlay" onClick={() => setSidebarOpen(false)} />
             <div className="chat-sidebar-drawer">
               <Button icon={<PlusOutlined />} block onClick={() => { handleNewChat(); setSidebarOpen(false); }}>{t("chat.new_chat")}</Button>
-              <Button icon={<SettingOutlined />} block type="text" size="small"
-                style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
-                onClick={() => { navigate("/profile?tab=apikey"); setSidebarOpen(false); }}>
-                {keyStatus?.has_api_key ? `${t("chat.key_configured")} (${keyStatus.provider})` : t("chat.configure_key")}
-              </Button>
-              <div style={{ flex: 1, overflow: "auto", marginTop: 8 }}>
+              <div className="chat-session-list" style={{ flex: 1, overflow: "auto", marginTop: 8 }}>
                 {groupedSessions.map((group) => (
                   <div key={group.label}>
                     <div style={{ fontSize: 11, color: "var(--fj-ink-muted)", opacity: 0.6, padding: "6px 12px 2px", fontWeight: 500 }}>
@@ -1175,6 +1169,13 @@ export default function ChatPage() {
                   </div>
                 ))}
               </div>
+              <div className="chat-sidebar-foot">
+                <Button icon={<SettingOutlined />} block type="text" size="small"
+                  style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
+                  onClick={() => { navigate("/profile?tab=apikey"); setSidebarOpen(false); }}>
+                  {keyStatus?.has_api_key ? `${t("chat.key_configured")} (${keyStatus.provider})` : t("chat.configure_key")}
+                </Button>
+              </div>
             </div>
           </>
         )}
@@ -1198,11 +1199,6 @@ export default function ChatPage() {
               {!sidebarCollapsed && t("chat.new_chat")}
             </Button>
           </Tooltip>
-          {!sidebarCollapsed && <Button icon={<SettingOutlined />} block type="text" size="small"
-            style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
-            onClick={() => navigate("/profile?tab=apikey")}>
-            {keyStatus?.has_api_key ? `${t("chat.key_configured")} (${keyStatus.provider})` : t("chat.configure_key")}
-          </Button>}
           {!sidebarCollapsed && sessions && sessions.length > 5 && (
             <Input
               placeholder={t("chat.search_sessions")}
@@ -1213,7 +1209,7 @@ export default function ChatPage() {
               style={{ marginTop: 4, fontSize: 12 }}
             />
           )}
-          {!sidebarCollapsed && <div style={{ flex: 1, overflow: "auto", marginTop: 8 }}>
+          {!sidebarCollapsed && <div className="chat-session-list" style={{ flex: 1, overflow: "auto", marginTop: 8 }}>
             {groupedSessions.map((group) => (
               <div key={group.label}>
                 <div style={{ fontSize: 11, color: "var(--fj-ink-muted)", opacity: 0.6, padding: "6px 12px 2px", fontWeight: 500 }}>
@@ -1246,36 +1242,49 @@ export default function ChatPage() {
               </div>
             ))}
           </div>}
+          {!sidebarCollapsed && (
+            <div className="chat-sidebar-foot">
+              <Button icon={<SettingOutlined />} block type="text" size="small"
+                style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
+                onClick={() => navigate("/profile?tab=apikey")}>
+                {keyStatus?.has_api_key ? `${t("chat.key_configured")} (${keyStatus.provider})` : t("chat.configure_key")}
+              </Button>
+            </div>
+          )}
         </div>}
 
         {/* Chat area */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
           {/* Chat header: mobile toggle + export */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-            {user ? (
-              <Button
-                className="chat-mobile-toggle"
-                type="text"
-                icon={<MenuOutlined />}
-                onClick={() => setSidebarOpen(true)}
-              >
-                {t("chat.session_list")}
-              </Button>
-            ) : <div />}
-            {messages.length > 0 && (
-              <Tooltip title={t("chat.export_tooltip")}>
+          <div style={{ display: "flex", marginBottom: 4 }}>
+            <div className="chat-column-inner" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              {user ? (
                 <Button
+                  className="chat-mobile-toggle"
                   type="text"
-                  icon={<DownloadOutlined />}
-                  onClick={handleExport}
-                  style={{ color: "var(--fj-ink-muted)" }}
-                />
-              </Tooltip>
-            )}
+                  icon={<MenuOutlined />}
+                  onClick={() => setSidebarOpen(true)}
+                >
+                  {t("chat.session_list")}
+                </Button>
+              ) : <div />}
+              {messages.length > 0 && (
+                <Tooltip title={t("chat.export_tooltip")}>
+                  <Button
+                    type="text"
+                    icon={<DownloadOutlined />}
+                    onClick={handleExport}
+                    style={{ color: "var(--fj-ink-muted)" }}
+                  />
+                </Tooltip>
+              )}
+            </div>
           </div>
           {/* Messages */}
-          <div style={{ flex: 1, overflow: "auto", padding: "16px 0" }}>
+          <div style={{ flex: messages.length === 0 ? "1 1 auto" : 1, overflow: "auto", padding: "16px 0" }}>
+            <div className={messages.length === 0 ? "chat-column-inner chat-msgs-empty" : "chat-column-inner"}>
             <div ref={messagesTopRef} />
+            {messages.length === 0 && <div className="chat-hero-lead" />}
             {hasOlderMessages && (
               <div style={{ textAlign: "center", marginBottom: 12 }}>
                 <Button size="small" type="text" loading={loadingOlder} onClick={loadOlderMessages}
@@ -1285,84 +1294,19 @@ export default function ChatPage() {
               </div>
             )}
             {messages.length === 0 && (
-              <div style={{ textAlign: "center", padding: "clamp(16px, 4vh, 60px) 24px", color: "var(--fj-ink-muted)" }}>
-                <RobotOutlined style={{ fontSize: 44, marginBottom: 12, color: "var(--fj-accent)" }} />
-                <div style={{ fontSize: 18, fontFamily: '"Noto Serif SC", serif', marginBottom: 6 }}>
+              <div style={{ textAlign: "center", padding: "0 24px 14px", color: "var(--fj-ink-muted)" }}>
+                {selectedMaster && (
+                  <div style={{ display: "flex", justifyContent: "center", marginBottom: 10 }}>
+                    <MasterSeal text={Array.from(selectedMaster.name_zh).slice(0, 2).join("")} size={40} />
+                  </div>
+                )}
+                <div style={{ fontSize: 22, fontFamily: '"Noto Serif SC", serif', marginBottom: 6 }}>
                   {t("chat.title")}
                 </div>
                 <div style={{ fontSize: 13, lineHeight: 1.7 }}>
                   {t("chat.subtitle")}
                   <br />{t("chat.subtitle2")}
                 </div>
-                <div style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: 10,
-                  marginTop: 18,
-                  maxWidth: 480,
-                  marginLeft: "auto",
-                  marginRight: "auto",
-                }}>
-                  {(welcomeCardsData?.questions ?? []).map((card: HotQuestionCard) => (
-                    <div
-                      key={card.id}
-                      onClick={() => handleSendMessage(card.display_text, { hotQuestionId: card.id })}
-                      style={{
-                        padding: "12px 14px 10px",
-                        borderRadius: 8,
-                        border: "1px solid rgba(217,208,193,0.6)",
-                        fontSize: 13,
-                        cursor: "pointer",
-                        lineHeight: 1.6,
-                        transition: "all 0.2s",
-                        color: "var(--fj-ink-muted)",
-                        textAlign: "left",
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "flex-start",
-                        gap: 6,
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = "var(--fj-accent)";
-                        e.currentTarget.style.color = "var(--fj-accent)";
-                        e.currentTarget.style.background = "rgba(176,141,87,0.06)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = "rgba(217,208,193,0.6)";
-                        e.currentTarget.style.color = "var(--fj-ink-muted)";
-                        e.currentTarget.style.background = "transparent";
-                      }}
-                    >
-                      <span style={{
-                        fontSize: 11,
-                        padding: "2px 8px",
-                        borderRadius: 10,
-                        background: "rgba(176,141,87,0.1)",
-                        color: "var(--fj-highlight)",
-                        fontFamily: '"Noto Serif SC", serif',
-                        letterSpacing: "0.02em",
-                      }}>
-                        {t(`chat.hot_question_category_${HOT_QUESTION_CATEGORY_SLUGS[card.category]}`, card.category)}
-                      </span>
-                      <span>{card.display_text}</span>
-                    </div>
-                  ))}
-                </div>
-                {(welcomeCardsData?.questions?.length ?? 0) > 0 && (
-                  <div style={{ marginTop: 10 }}>
-                    <Button
-                      size="small"
-                      type="text"
-                      icon={<ReloadOutlined />}
-                      loading={welcomeCardsLoading}
-                      onClick={() => refetchWelcomeCards()}
-                      style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
-                    >
-                      {t("chat.refresh_hot_questions", "换一批")}
-                    </Button>
-                  </div>
-                )}
-
               </div>
             )}
             {messages.map((m) => (
@@ -1382,10 +1326,21 @@ export default function ChatPage() {
             ))}
             {/* Streaming cursor is shown inline via ▌ in the message bubble */}
             <div ref={bottomRef} />
+            </div>
           </div>
 
           {/* Input */}
-          <div style={{ padding: "12px 0", borderTop: "1px solid rgba(217,208,193,0.5)" }}>
+          {/* 顶部横线必须画在 840px 的内列上，不能画在满宽外层：根容器改满宽后
+              外层宽达 chat area 全宽（1920 屏上 1620px），横线会比它要分隔的对话列
+              左右各悬空约 390px，成为一条两端不着地的孤线。 */}
+          <div style={{ paddingBottom: 12 }}>
+            <div
+              className="chat-column-inner"
+              style={{
+                paddingTop: 12,
+                borderTop: messages.length === 0 ? undefined : "1px solid rgba(217,208,193,0.5)",
+              }}
+            >
             {/* 游客转化钩子：拿到第一条成功回复后提示保存历史（可关闭，14 天
                 静默）。固定在输入区上方而非消息流末尾：消息流尾部的 mount 受
                 scrollToBottom 时序影响可能落在视口外，用户永远看不到。
@@ -1408,41 +1363,14 @@ export default function ChatPage() {
                 }
               />
             )}
-            {/* 宗风 selector. Was a grey <Select> reading "通用助手" — the 15 master
-                personas, this product's sharpest differentiator, hid inside it.
-                Now: the chosen lineage is stated plainly, and the gallery is one
-                click away. Wording is "依此宗风解经", never "和祖师聊天" — you are
-                choosing an interpretive lens, not a chat character. */}
-            <div className="mg-head" style={{ marginBottom: 8 }}>
-              {selectedMaster ? (
-                <>
-                  <MasterSeal text={Array.from(selectedMaster.name_zh).slice(0, 2).join("")} size={34} />
-                  <span className="mg-head-id">
-                    <span className="mg-head-name">{selectedMaster.name_zh}</span>
-                    <span className="mg-head-sub">
-                      {selectedMaster.tradition} · {selectedMaster.dates} · {t("chat.master_lens")}
-                    </span>
-                  </span>
-                </>
-              ) : (
-                <span className="mg-head-id">
-                  <span className="mg-head-name">{t("chat.general_assistant")}</span>
-                  <span className="mg-head-sub">{t("chat.gallery_hint")}</span>
-                </span>
-              )}
-              <Button
-                size="small"
-                className="mg-head-swap"
-                onClick={() => setGalleryOpen(true)}
-              >
-                {t("chat.change_master")}
-              </Button>
-            </div>
-            {selectedMaster && (
-              <div className="mg-disclaimer" style={{ marginTop: 0, marginBottom: 8 }}>
-                {t("chat.master_disclaimer")}
-              </div>
-            )}
+            {/* 宗风 selector lives in the composer toolbar below (.chat-lineage-btn).
+                It used to be a grey <Select> reading "通用助手" — the 15 master
+                personas, this product's sharpest differentiator, hid inside it. It
+                then became a full-width row to state the chosen lineage plainly;
+                the toolbar control keeps that plain text label while giving the
+                row's vertical space back to the first screen. Wording is
+                "依此宗风解经", never "和祖师聊天" — you are choosing an
+                interpretive lens, not a chat character. */}
             <DraggableModal
               open={galleryOpen}
               onCancel={() => setGalleryOpen(false)}
@@ -1515,6 +1443,21 @@ export default function ChatPage() {
                     disabled={uploadingAttachment || attachments.length >= MAX_ATTACHMENTS}
                   />
                 </Tooltip>
+                <Tooltip title={t("chat.change_master")}>
+                  <Button
+                    type="text"
+                    size="small"
+                    className="chat-lineage-btn"
+                    onClick={() => setGalleryOpen(true)}
+                  >
+                    {/* 不放印章：18px 的 MasterSeal 字号只有 6px（size*0.32），两个汉字
+                        挤成一团认不出，而紧邻的文字标签已经把名号写明了。变化的文字
+                        本身就是「已选宗风」的指示器。印章留在空状态 hero 里 —— 那里
+                        它 40px、字号 13px 可读，且不与名号重复（hero 标题是产品名）。 */}
+                    <span>{selectedMaster ? selectedMaster.name_zh : t("chat.general_assistant")}</span>
+                    <DownOutlined style={{ fontSize: 10 }} />
+                  </Button>
+                </Tooltip>
                 <ChatModelSelector value={modelId} onChange={handleModelChange} />
                 <span className="chat-input-spacer" />
                 {sending ? (
@@ -1537,7 +1480,45 @@ export default function ChatPage() {
                 )}
               </div>
             </div>
+              {selectedMaster && (
+                <div className="mg-disclaimer" style={{ marginTop: 8 }}>
+                  {t("chat.master_disclaimer")}
+                </div>
+              )}
+              {messages.length === 0 && (welcomeCardsData?.questions?.length ?? 0) > 0 && (
+                <>
+                  <div className="chat-hero-cards">
+                    {(welcomeCardsData?.questions ?? []).map((card: HotQuestionCard) => (
+                      <button
+                        key={card.id}
+                        type="button"
+                        className="chat-hero-card"
+                        onClick={() => handleSendMessage(card.display_text, { hotQuestionId: card.id })}
+                      >
+                        <span className="chat-hero-card-tag">
+                          {t(`chat.hot_question_category_${HOT_QUESTION_CATEGORY_SLUGS[card.category]}`, card.category)}
+                        </span>
+                        <span>{card.display_text}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ textAlign: "center", marginTop: 8 }}>
+                    <Button
+                      size="small"
+                      type="text"
+                      icon={<ReloadOutlined />}
+                      loading={welcomeCardsLoading}
+                      onClick={() => refetchWelcomeCards()}
+                      style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
+                    >
+                      {t("chat.refresh_hot_questions", "换一批")}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
+          {messages.length === 0 && <div className="chat-hero-trail" />}
         </div>
 
         {/* Citation drawer — inline side panel, drag to resize */}

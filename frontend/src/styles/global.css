@@ -248,6 +248,105 @@ em {
   40% { opacity: 1; transform: scale(1.1); }
 }
 
+/* ========== Chat Column ========== */
+/* 根容器满宽，对话内容自己居中 —— 侧栏因此贴到页面左边距（与顶栏字标的
+   32px 对齐），而不是跟着一个 1100px 居中块浮到屏幕中间。
+   只加在滚动容器的「内容」上，不加在滚动容器本身，否则滚动条会向内缩。 */
+.chat-column-inner {
+  width: 100%;
+  max-width: 840px;
+  margin: 0 auto;
+}
+
+/* 空状态：hero 贴到输入框上沿，整组由上下两个撑高块均分剩余空间而居中。
+   min-height 而非 height —— 有对话时内容超高仍要能撑开滚动。
+   不用 justify-content: flex-end：它作用在 overflow:auto 容器上时，内容超出
+   容器（矮屏 / 浏览器放大）会让溢出的顶部滚不到，Safari 上尤其。撑高块在
+   空间不足时自己压到 0，hero 永远从滚动原点开始。 */
+.chat-msgs-empty {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+.chat-hero-lead,
+.chat-hero-trail {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* 建议卡片：铺满对话列（840 → 每张 420px），标签与问题同行。
+   rgba(176,141,87,…) 是 --fj-gold 的 rgb，承自被替换的内联样式（标签底色的 alpha
+   由 0.1 提到 0.12，其余原值）。 */
+.chat-hero-cards {
+  display: grid;
+  /* minmax(0, 1fr) 而非 1fr：1fr 等于 minmax(auto, 1fr)，配合 flex 子项默认的
+     min-width:auto，遇到超长不可断词会顶破轨道导致横向溢出。中文问题不会触发，
+     但 en locale 若接入英文问题就会撞上。 */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+.chat-hero-card {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--fj-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fj-ink-muted);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+.chat-hero-card:hover {
+  border-color: var(--fj-accent);
+  color: var(--fj-accent);
+  background: rgba(176, 141, 87, 0.06);
+}
+/* 卡片由 <div onClick> 改成了 <button>，键盘可达（从「发送」Tab 即到第一张）；
+   仓里同类可聚焦元素都自带焦点环，这里跟上约定。 */
+.chat-hero-card:focus-visible {
+  border-color: var(--fj-accent);
+  color: var(--fj-accent);
+  outline: 2px solid var(--fj-accent);
+  outline-offset: 1px;
+}
+.chat-hero-card-tag {
+  flex-shrink: 0;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(176, 141, 87, 0.12);
+  color: var(--fj-highlight);
+  font-family: "Noto Serif SC", serif;
+  letter-spacing: 0.02em;
+}
+/* Key 状态行沉到侧栏底部（会话列表是 flex:1，排它后面即到底） */
+.chat-sidebar-foot {
+  flex-shrink: 0;
+  border-top: 1px solid var(--fj-border);
+  padding-top: 6px;
+}
+
+/* 宗风控件：收进工具栏但保留文字标签 —— 所选宗风仍被明说，只是不再占一整行 */
+.chat-lineage-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fj-ink-light);
+}
+
+/* 新断点。本仓现有 768（隐藏侧栏）与 480（工具栏换行）都不合用：768px 下侧栏
+   已消失、对话列约 748px，两列各 370px 仍宽裕；拖到 480 才换单列的话，
+   600–480 这段每列只剩约 230px，卡片会挤成三四行。 */
+@media (max-width: 600px) {
+  .chat-hero-cards { grid-template-columns: 1fr; }
+}
+
 /* ========== Chat Input Shell (Claude.ai-style) ========== */
 .chat-input-shell {
   border: 1px solid #d9d9d9;
