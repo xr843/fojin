@@ -119,4 +119,9 @@ describe("ChatPage 首屏结构", () => {
     expect(container.querySelector(".chat-hero-lead")).not.toBeNull();
     expect(container.querySelector(".chat-hero-trail")).not.toBeNull();
   });
+
+  it("D5: 未选祖师时首屏不放机器人图标", async () => {
+    const { container } = await renderEmpty();
+    expect(container.querySelectorAll(".anticon-robot")).toHaveLength(0);
+  });
 });

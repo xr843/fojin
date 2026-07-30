@@ -1287,9 +1287,13 @@ export default function ChatPage() {
               </div>
             )}
             {messages.length === 0 && (
-              <div style={{ textAlign: "center", padding: "clamp(16px, 4vh, 60px) 24px", color: "var(--fj-ink-muted)" }}>
-                <RobotOutlined style={{ fontSize: 44, marginBottom: 12, color: "var(--fj-accent)" }} />
-                <div style={{ fontSize: 18, fontFamily: '"Noto Serif SC", serif', marginBottom: 6 }}>
+              <div style={{ textAlign: "center", padding: "0 24px 14px", color: "var(--fj-ink-muted)" }}>
+                {selectedMaster && (
+                  <div style={{ display: "flex", justifyContent: "center", marginBottom: 10 }}>
+                    <MasterSeal text={Array.from(selectedMaster.name_zh).slice(0, 2).join("")} size={40} />
+                  </div>
+                )}
+                <div style={{ fontSize: 22, fontFamily: '"Noto Serif SC", serif', marginBottom: 6 }}>
                   {t("chat.title")}
                 </div>
                 <div style={{ fontSize: 13, lineHeight: 1.7 }}>
