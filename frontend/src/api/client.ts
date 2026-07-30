@@ -1734,6 +1734,13 @@ export async function runResearch(question: string, maxSteps = 3): Promise<Resea
   return data;
 }
 
+/** 检索完成、生成尚未开始时的轻量进度信息。只用于等待期提示，与答案下方的
+ *  完整 `sources` 列表是两回事（后者仍在答案之后才发）。 */
+export interface ChatRetrieval {
+  count: number;
+  titles: string[];
+}
+
 export interface ChatMessageItem {
   id: number;
   role: string;
@@ -1742,6 +1749,8 @@ export interface ChatMessageItem {
   trust_status?: ChatTrustStatus | null;
   feedback?: string | null;
   created_at: string;
+  /** 仅存在于流式生成过程中；不持久化，历史消息读回来时为空。 */
+  retrieval?: ChatRetrieval | null;
 }
 
 export interface SharedQA {
@@ -1874,6 +1883,8 @@ export interface StreamCallbacks {
   onTrustStatus?: (trustStatus: ChatTrustStatus) => void;
   onSessionId: (sessionId: number) => void;
   onSearching?: (message: string) => void;
+  /** 检索完成、生成开始之前触发一次。用于把等待期的静态文案换成实际召回的经典。 */
+  onRetrieved?: (retrieval: ChatRetrieval) => void;
   /**
    * Backend has rewritten one or more 【《X》第N卷】 references in the
    * answer to anchor them to retrieved sources. The full corrected
@@ -1959,6 +1970,12 @@ export function sendChatMessageStream(
               break;
             case "sources":
               callbacks.onSources(event.sources);
+              break;
+            case "retrieved":
+              callbacks?.onRetrieved?.({
+                count: event.count,
+                titles: Array.isArray(event.titles) ? event.titles : [],
+              });
               break;
             case "trust_status":
               callbacks?.onTrustStatus?.(event.trust_status);

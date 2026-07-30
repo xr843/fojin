@@ -289,7 +289,24 @@ function MessageBubbleInner({
           {m.role === "assistant" ? (
             m.content === THINKING_SENTINEL ? (
               <div className="chat-thinking">
-                {t("chat.thinking")}
+                {m.retrieval ? (
+                  <>
+                    {t("chat.retrieved_hint", { n: m.retrieval.count })}
+                    {m.retrieval.titles.length > 0 && (
+                      <span className="chat-retrieved-titles">
+                        {m.retrieval.titles.map((tt) => (
+                          <span key={tt} className="chat-retrieved-title">
+                            {t("chat.retrieved_title", { title: tt })}
+                          </span>
+                        ))}
+                      </span>
+                    )}
+                    <span className="chat-retrieved-sep">·</span>
+                    {t("chat.generating")}
+                  </>
+                ) : (
+                  t("chat.thinking")
+                )}
                 <span className="chat-thinking-dots"><span /><span /><span /></span>
               </div>
             ) : m.content === REQUEST_FAILED_SENTINEL ? (
@@ -926,6 +943,14 @@ export default function ChatPage() {
       },
       onSearching: (_searchMsg: string) => {
         // 搜索状态由初始占位符 "正在检索经文并生成回答..." 显示，不覆盖 content
+      },
+      onRetrieved: (retrieval) => {
+        // 只写独立字段。绝不能写进 content —— THINKING_SENTINEL 是按身份比较的
+        // 哨兵，onDone 里「流结束但从未收到 token → 转失败哨兵」的兜底靠它；
+        // 一旦 content 被顶掉，用户会永远卡在假的「正在检索…」上且没有重试按钮。
+        setMessages((prev) =>
+          prev.map((m) => (m.id === assistantId ? { ...m, retrieval } : m)),
+        );
       },
       onMessageId: (realId: number) => {
         // Replace the in-flight Date.now() placeholder with the real

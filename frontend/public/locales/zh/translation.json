@@ -974,6 +974,7 @@
   "chat.thinking": "正在检索经文并生成回答",
   "chat.jump_to_bottom": "回到底部",
   "chat.retrieved_hint": "已检索 {{n}} 部经典",
+  "chat.retrieved_title": "《{{title}}》",
   "chat.generating": "正在生成回答",
   "chat.request_failed": "请求失败，请重试",
   "chat.reference_sources": "参考经文",

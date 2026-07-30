@@ -974,6 +974,7 @@
   "chat.thinking": "Searching scriptures and generating an answer",
   "chat.jump_to_bottom": "Jump to latest",
   "chat.retrieved_hint": "Retrieved {{n}} scripture(s)",
+  "chat.retrieved_title": "《{{title}}》",
   "chat.generating": "Generating answer",
   "chat.request_failed": "Request failed, please retry",
   "chat.reference_sources": "Sources",

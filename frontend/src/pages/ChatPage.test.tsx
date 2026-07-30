@@ -12,6 +12,7 @@ import {
   getHotQuestions,
   getMasters,
   getRandomHotQuestions,
+  sendChatMessageStream,
 } from "../api/client";
 
 vi.mock("../api/client", async () => {
@@ -30,6 +31,13 @@ vi.mock("../api/client", async () => {
     updateChatMessageFeedback: vi.fn(),
     getChunkContext: vi.fn(),
   };
+});
+
+// jsdom 没有实现 scrollIntoView —— ChatPage 的自动跟随会真的调它。
+beforeAll(() => {
+  if (!Element.prototype.scrollIntoView) {
+    Element.prototype.scrollIntoView = () => {};
+  }
 });
 
 // antd (Button/Tooltip/Select) reads matchMedia via useBreakpoint under jsdom.
@@ -178,5 +186,27 @@ describe("ChatPage 首屏结构", () => {
     expect(list).not.toBeNull();
     expect(foot).not.toBeNull();
     expect(list!.compareDocumentPosition(foot!) & FOLLOWING).toBeTruthy();
+  });
+
+  // P1 的承重约束。THINKING_SENTINEL 是按身份比较的哨兵：onDone 里「流结束但
+  // 从未收到 token → 转失败哨兵」的兜底靠它。若实现把检索到的经名写进 content，
+  // 那条兜底失效，用户会永远卡在假的「正在检索…」上且没有重试按钮。
+  it("P1 承重点: retrieved 事件只写 retrieval 字段，不动 content", async () => {
+    let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+    vi.mocked(sendChatMessageStream).mockImplementation(
+      async (_m, _s, _mid, callbacks) => { cb = callbacks; },
+    );
+    const { container } = await renderEmpty();
+    fireEvent.click(container.querySelector(".chat-hero-card")!);
+    await waitFor(() => expect(cb).toBeDefined());
+
+    cb!.onRetrieved?.({ count: 5, titles: ["般若波罗蜜多心经", "大智度论"] });
+
+    await waitFor(() => {
+      expect(screen.getByText(/已检索 5 部经典/)).toBeInTheDocument();
+    });
+    // 正在检索的占位文案仍在 —— 说明 content 还是哨兵，没有被经名顶掉
+    expect(screen.queryByText("请求失败，请重试")).toBeNull();
+    expect(container.querySelector(".chat-thinking")).not.toBeNull();
   });
 });

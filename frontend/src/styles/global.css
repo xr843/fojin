@@ -325,6 +325,22 @@ em {
   font-family: "Noto Serif SC", serif;
   letter-spacing: 0.02em;
 }
+/* 等待期显示的召回经典 —— 让「真的在查藏经」这件事在生成开始前就可见 */
+.chat-retrieved-titles {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-left: 6px;
+}
+.chat-retrieved-title {
+  font-family: "Noto Serif SC", serif;
+  color: var(--fj-highlight);
+}
+.chat-retrieved-sep {
+  margin: 0 6px;
+  opacity: 0.5;
+}
+
 /* 「回到底部」悬浮按钮。锚点 sticky 在滚动视口下沿、height:0 不占布局空间；
    按钮相对锚点绝对定位向上撑出，所以不需要给滚动容器加 position:relative 的
    外层包裹（那会扰动空状态的撑高块 flex 链）。 */
