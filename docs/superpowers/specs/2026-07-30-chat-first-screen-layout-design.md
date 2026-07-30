@@ -108,7 +108,9 @@
 
 删掉 `.mg-head` 那一整行（`ChatPage.tsx:1416-1440`），在 `.chat-input-toolbar` 里排成 `＋ | 宗风 ▾ | 模型 ▾ | ⟶ | 发送`。
 
-宗风控件为 `Button type="text" size="small"`，文字标签取 `selectedMaster ? selectedMaster.name_zh : t("chat.general_assistant")`，选中祖师时前置 18px `MasterSeal`，后置 `DownOutlined`；`onClick` 开长廊；Tooltip 用现有 `chat.change_master`。
+宗风控件为 `Button type="text" size="small"`，文字标签取 `selectedMaster ? selectedMaster.name_zh : t("chat.general_assistant")`，后置 `DownOutlined`；`onClick` 开长廊；Tooltip 用现有 `chat.change_master`。
+
+> **实施后修订（2026-07-30，commit `83846954`）**：初版在选中祖师时于按钮内前置 18px `MasterSeal`，真机目视否掉了 —— `MasterSeal` 的字号是 `size × 0.32`，18px 只剩 6px，两个汉字挤成认不出的色块；而紧邻的文字标签已把名号写明（`textContent` 实测为「慧能慧能」）。**已去掉按钮内的印章**，只留文字标签 —— 变化的文字本身就是「已选宗风」的指示器。印章保留在空状态 hero（D5），那里 40px、字号 13px 可读，且不与名号重复（hero 标题是产品名而非祖师名）。
 
 **为何保留文字标签**：`ChatPage.tsx:1411-1415` 的注释记录了一个刻意决定 —— 15 位祖师是本产品最锋利的差异点，此前藏在灰色 `Select` 里，遂改成显眼整行「把所选宗风明说出来」。收进工具栏但保留文字标签，守住"明说"，只是不再占一整行。
 

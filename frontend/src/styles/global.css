@@ -275,10 +275,14 @@ em {
 }
 
 /* 建议卡片：铺满对话列（840 → 每张 420px），标签与问题同行。
-   rgba(176,141,87,…) 是 --fj-gold 的 rgb，从被替换的内联样式原样搬运。 */
+   rgba(176,141,87,…) 是 --fj-gold 的 rgb，承自被替换的内联样式（标签底色的 alpha
+   由 0.1 提到 0.12，其余原值）。 */
 .chat-hero-cards {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* minmax(0, 1fr) 而非 1fr：1fr 等于 minmax(auto, 1fr)，配合 flex 子项默认的
+     min-width:auto，遇到超长不可断词会顶破轨道导致横向溢出。中文问题不会触发，
+     但 en locale 若接入英文问题就会撞上。 */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin-top: 10px;
 }
@@ -302,6 +306,14 @@ em {
   border-color: var(--fj-accent);
   color: var(--fj-accent);
   background: rgba(176, 141, 87, 0.06);
+}
+/* 卡片由 <div onClick> 改成了 <button>，键盘可达（从「发送」Tab 即到第一张）；
+   仓里同类可聚焦元素都自带焦点环，这里跟上约定。 */
+.chat-hero-card:focus-visible {
+  border-color: var(--fj-accent);
+  color: var(--fj-accent);
+  outline: 2px solid var(--fj-accent);
+  outline-offset: 1px;
 }
 .chat-hero-card-tag {
   flex-shrink: 0;

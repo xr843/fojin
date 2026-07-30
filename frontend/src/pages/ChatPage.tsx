@@ -449,8 +449,8 @@ export default function ChatPage() {
   const { user } = useAuthStore();
   const [input, setInput] = useState("");
   const [masterId, setMasterId] = useState<string | null>(null);
-  // 祖师长廊: opened from the composer to swap lineage mid-thread. The gallery
-  // itself lives in the empty state; this is the way back to it.
+  // 祖师长廊: opened from .chat-lineage-btn in the composer toolbar — the sole
+  // entry point, in every state (empty and mid-thread alike).
   const [galleryOpen, setGalleryOpen] = useState(false);
   const { data: mastersData } = useQuery({
     queryKey: ["chat-masters"],
@@ -1330,8 +1330,17 @@ export default function ChatPage() {
           </div>
 
           {/* Input */}
-          <div style={{ padding: "12px 0", borderTop: messages.length === 0 ? undefined : "1px solid rgba(217,208,193,0.5)" }}>
-            <div className="chat-column-inner">
+          {/* 顶部横线必须画在 840px 的内列上，不能画在满宽外层：根容器改满宽后
+              外层宽达 chat area 全宽（1920 屏上 1620px），横线会比它要分隔的对话列
+              左右各悬空约 390px，成为一条两端不着地的孤线。 */}
+          <div style={{ paddingBottom: 12 }}>
+            <div
+              className="chat-column-inner"
+              style={{
+                paddingTop: 12,
+                borderTop: messages.length === 0 ? undefined : "1px solid rgba(217,208,193,0.5)",
+              }}
+            >
             {/* 游客转化钩子：拿到第一条成功回复后提示保存历史（可关闭，14 天
                 静默）。固定在输入区上方而非消息流末尾：消息流尾部的 mount 受
                 scrollToBottom 时序影响可能落在视口外，用户永远看不到。

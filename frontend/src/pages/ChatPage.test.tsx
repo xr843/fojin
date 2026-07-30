@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HelmetProvider } from "react-helmet-async";
 import { MemoryRouter } from "react-router";
@@ -103,6 +103,7 @@ async function renderEmpty() {
 }
 
 const FOLLOWING = 4; // Node.DOCUMENT_POSITION_FOLLOWING
+const CONTAINED_BY = 16; // Node.DOCUMENT_POSITION_CONTAINED_BY
 
 describe("ChatPage 首屏结构", () => {
   it("空状态渲染出标题与建议卡片（脚手架自检）", async () => {
@@ -116,10 +117,32 @@ describe("ChatPage 首屏结构", () => {
     expect(container.querySelectorAll(".chat-column-inner")).toHaveLength(3);
   });
 
-  it("D3: 空状态有前后两个撑高块", async () => {
+  // 只断言"存在"是不够的：整个居中效果的承重点是 trail 的位置 —— 把 trail 挪进
+  // 消息列，居中立刻塌掉，而存在性断言照绿。所以这里断言前后次序。
+  it("D3: 撑高块一前一后夹住输入框", async () => {
     const { container } = await renderEmpty();
-    expect(container.querySelector(".chat-hero-lead")).not.toBeNull();
-    expect(container.querySelector(".chat-hero-trail")).not.toBeNull();
+    const lead = container.querySelector(".chat-hero-lead");
+    const trail = container.querySelector(".chat-hero-trail");
+    const shell = container.querySelector(".chat-input-shell");
+    expect(lead).not.toBeNull();
+    expect(trail).not.toBeNull();
+    expect(lead!.compareDocumentPosition(shell!) & FOLLOWING).toBeTruthy();
+    expect(shell!.compareDocumentPosition(trail!) & FOLLOWING).toBeTruthy();
+  });
+
+  // 设计的核心论点：`{cond && <X/>}` 占住稳定槽位，所以空态→有对话时输入框不会
+  // remount。若它 remount，ChatPage 里那个拦 Tab 键的 effect（依赖数组不含 textarea
+  // 元素本身）不会重挂，Tab 轮播会静默失效 —— 门禁与其余断言全都看不出来。
+  // 这里直接锁节点同一性，是唯一能证伪 remount 的断言。
+  it("D3 承重点: 空态→有对话，输入框不 remount", async () => {
+    const { container } = await renderEmpty();
+    const ta = container.querySelector("textarea");
+    expect(ta).not.toBeNull();
+    fireEvent.click(container.querySelector(".chat-hero-card")!);
+    await waitFor(() => {
+      expect(container.querySelector(".chat-hero-cards")).toBeNull();
+    });
+    expect(container.querySelector("textarea")).toBe(ta);
   });
 
   it("D5: 未选祖师时首屏不放机器人图标", async () => {
@@ -133,7 +156,11 @@ describe("ChatPage 首屏结构", () => {
     const cards = container.querySelector(".chat-hero-cards");
     expect(shell).not.toBeNull();
     expect(cards).not.toBeNull();
-    expect(shell!.compareDocumentPosition(cards!) & FOLLOWING).toBeTruthy();
+    const rel = shell!.compareDocumentPosition(cards!);
+    expect(rel & FOLLOWING).toBeTruthy();
+    // 必须是 shell 的兄弟而非后代 —— 后代同样满足 FOLLOWING（返回 20），
+    // 只查 FOLLOWING 会把「卡片塞进输入框内部」也判为通过。
+    expect(rel & CONTAINED_BY).toBeFalsy();
   });
 
   it("D7: 宗风控件在输入框工具栏内，且 .mg-head 整行已移除", async () => {
