@@ -16,20 +16,23 @@ import pytest
 
 from app.services.chat import _interleave_heartbeat
 
+# inner_gen 的契约是产出 (kind, text) 二元组 —— kind 区分 "content" 与
+# "reasoning"（推理增量绝不能混进答案正文）。此前是裸 str，2026-07-30 改。
+
 
 async def _fast_gen():
     for chunk in ["a", "b", "c"]:
-        yield chunk
+        yield "content", chunk
 
 
 async def _slow_first_token(delay: float):
     await asyncio.sleep(delay)
-    yield "late"
+    yield "content", "late"
 
 
 async def _raises_after_n(n: int):
     for i in range(n):
-        yield f"chunk-{i}"
+        yield "content", f"chunk-{i}"
     raise RuntimeError("boom")
 
 
@@ -101,7 +104,7 @@ async def test_consumer_cancellation_cleans_up_producer():
         started.set()
         try:
             await asyncio.sleep(10)
-            yield "unreachable"
+            yield "content", "unreachable"
         except asyncio.CancelledError:
             cancelled.set()
             raise

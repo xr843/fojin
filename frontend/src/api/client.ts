@@ -1741,6 +1741,13 @@ export interface ChatRetrieval {
   titles: string[];
 }
 
+/** 推理模型思考阶段的活性信号（后端按约 1 次/秒节流）。`chars` 是累计的
+ *  reasoning_content 字符数 —— 只用来证明「仍在推进」，不含推理原文：那里面
+ *  全是会被模型自己推翻的中间结论，摆在答案位置上是拿答案真实性冒险。 */
+export interface ChatReasoning {
+  chars: number;
+}
+
 export interface ChatMessageItem {
   id: number;
   role: string;
@@ -1751,6 +1758,8 @@ export interface ChatMessageItem {
   created_at: string;
   /** 仅存在于流式生成过程中；不持久化，历史消息读回来时为空。 */
   retrieval?: ChatRetrieval | null;
+  /** 首个推理信号到达的时刻（epoch ms），用于渲染「已思考 N 秒」。同样不持久化。 */
+  reasoningSince?: number | null;
 }
 
 export interface SharedQA {
@@ -1885,6 +1894,8 @@ export interface StreamCallbacks {
   onSearching?: (message: string) => void;
   /** 检索完成、生成开始之前触发一次。用于把等待期的静态文案换成实际召回的经典。 */
   onRetrieved?: (retrieval: ChatRetrieval) => void;
+  /** 推理模型思考期间按约 1 次/秒触发。用于证明「仍在推进」而非卡死。 */
+  onReasoning?: (reasoning: ChatReasoning) => void;
   /**
    * Backend has rewritten one or more 【《X》第N卷】 references in the
    * answer to anchor them to retrieved sources. The full corrected
@@ -1970,6 +1981,9 @@ export function sendChatMessageStream(
               break;
             case "sources":
               callbacks.onSources(event.sources);
+              break;
+            case "reasoning":
+              callbacks?.onReasoning?.({ chars: event.chars });
               break;
             case "retrieved":
               callbacks?.onRetrieved?.({

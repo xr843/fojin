@@ -749,10 +749,10 @@ async def _rerank(query: str, results: list[dict]) -> list[dict]:
 
     if settings.reranker_api_url:
         reranked = await _api_rerank(query, results)
-        logger.debug("TIMING: API reranking took %.2fs (%d chunks)", time.monotonic() - t0, len(results))
+        logger.info("TIMING: API reranking took %.2fs (%d chunks)", time.monotonic() - t0, len(results))
     else:
         reranked = _keyword_rerank(query, results)
-        logger.debug("TIMING: Keyword reranking took %.2fs (%d chunks)", time.monotonic() - t0, len(results))
+        logger.info("TIMING: Keyword reranking took %.2fs (%d chunks)", time.monotonic() - t0, len(results))
 
     return reranked
 
@@ -915,7 +915,7 @@ async def retrieve_rag_context(
         search_query = f"{prev_query} {query}" if prev_query else query
         query_embedding = await generate_embedding(search_query)
         t1 = time.monotonic()
-        logger.debug("TIMING: Embedding took %.2fs", t1 - t0)
+        logger.info("TIMING: Embedding took %.2fs", t1 - t0)
 
         # Text chunk retrieval: two modes depending on ENABLE_PARALLEL_RAG.
         # Asymmetric scope contract — see chat.py wiring docstring.
@@ -964,7 +964,7 @@ async def retrieve_rag_context(
             )
             source_results = await source_similarity_search(db, query_embedding, limit=3, min_score=0.5)
 
-        logger.debug("TIMING: pgvector search took %.2fs", time.monotonic() - t1)
+        logger.info("TIMING: pgvector search took %.2fs", time.monotonic() - t1)
 
         # Filter out low-relevance chunks and deduplicate by (text_id, juan_num)
         seen = set()
@@ -1046,10 +1046,10 @@ async def retrieve_rag_context(
         dict_text = await _lookup_dictionary_terms(db, query)
         if dict_text:
             context_text += "\n\n" + dict_text
-            logger.debug("TIMING: Dictionary lookup took %.2fs", time.monotonic() - t_dict)
+            logger.info("TIMING: Dictionary lookup took %.2fs", time.monotonic() - t_dict)
     except Exception:
         logger.exception("Embedding/search failed, proceeding without RAG context")
         await db.rollback()
 
-    logger.debug("TIMING: Total RAG retrieval took %.2fs (results: %d)", time.monotonic() - t0, len(sources))
+    logger.info("TIMING: Total RAG retrieval took %.2fs (results: %d)", time.monotonic() - t0, len(sources))
     return sources, context_text
