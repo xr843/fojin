@@ -45,7 +45,7 @@
 
 **Interfaces:**
 - Consumes: 无
-- Produces: 供 Task 2–7 复用的 `renderPage()`、`renderEmpty()`、常量 `FOLLOWING = 4`、mock 数据 `CARDS` / `MASTERS`、以及 `beforeEach` 里灌好的 7 个 `../api/client` mock 与 `useAuthStore` 登录态。
+- Produces: 供 Task 2–7 复用的 `renderPage()`、`renderEmpty()`、mock 数据 `CARDS` / `MASTERS`、以及 `beforeEach` 里灌好的 7 个 `../api/client` mock 与 `useAuthStore` 登录态。（DOM 顺序断言用的 `FOLLOWING` 常量**不在**本任务，见 Task 5。）
 
 - [ ] **Step 1: 写脚手架与自检用例**
 
@@ -156,8 +156,6 @@ async function renderEmpty() {
   return r;
 }
 
-const FOLLOWING = 4; // Node.DOCUMENT_POSITION_FOLLOWING
-
 describe("ChatPage 首屏结构", () => {
   it("空状态渲染出标题与建议卡片（脚手架自检）", async () => {
     const { container } = await renderEmpty();
@@ -167,7 +165,7 @@ describe("ChatPage 首屏结构", () => {
 });
 ```
 
-`FOLLOWING` 与 `MASTERS` 在本任务尚未被用到 —— eslint 的 `no-unused-vars` 只管变量声明，模块级 `const` 未被引用不会报错（已实测 eslint 干净）。它们由 Task 4/6/7 使用。
+本任务**不要**预先声明任何后续任务才用到的常量。本仓 `tsconfig.json` 开着 `noUnusedLocals: true`（未引用的模块级 `const` → `TS6133`），且 `@typescript-eslint/no-unused-vars` 虽配为 `warn`，CI 跑的是 `--max-warnings 0`，同样会挂。DOM 顺序断言要用的 `FOLLOWING` 常量在 Task 5 —— 第一个真正引用它的任务 —— 才声明。
 
 - [ ] **Step 2: 跑测试确认为绿**
 
@@ -642,12 +640,18 @@ git commit -m "feat(chat): 首屏标记改为仅在选中祖师时显示印章�
 - Test: `frontend/src/pages/ChatPage.test.tsx`
 
 **Interfaces:**
-- Consumes: 已有的 `welcomeCardsData` / `welcomeCardsLoading` / `refetchWelcomeCards`（`:615-620`）、`HOT_QUESTION_CATEGORY_SLUGS`（`:75-80`）、`handleSendMessage`
-- Produces: CSS 类 `.chat-hero-cards` / `.chat-hero-card` / `.chat-hero-card-tag`
+- Consumes: Task 1 的 `renderEmpty()`；已有的 `welcomeCardsData` / `welcomeCardsLoading` / `refetchWelcomeCards`（`:615-620`）、`HOT_QUESTION_CATEGORY_SLUGS`（`:75-80`）、`handleSendMessage`
+- Produces: CSS 类 `.chat-hero-cards` / `.chat-hero-card` / `.chat-hero-card-tag`；测试常量 `FOLLOWING = 4`（Task 7 会复用它，不要重复声明）
 
 - [ ] **Step 1: 写失败测试**
 
-追加：
+在 `describe(…)` 块**之前**（紧跟 `renderEmpty()` 函数之后）声明 DOM 顺序断言用的常量 —— 本任务是第一个引用它的任务，提前声明会因 `noUnusedLocals` / `--max-warnings 0` 挂掉门禁：
+
+```tsx
+const FOLLOWING = 4; // Node.DOCUMENT_POSITION_FOLLOWING
+```
+
+然后在 `describe` 内追加：
 
 ```tsx
   it("D6: 建议卡片在输入区内，且排在输入框之后", async () => {
@@ -1220,6 +1224,6 @@ EOF
 
 **Spec 覆盖**：D1→Task 2 · D2→Task 2 · D3→Task 3 · D4→Task 3 · D5→Task 4 · D6→Task 5 · D7→Task 6 · D8→Task 7 · D9→Task 8。spec 的「验证」章节 → Task 8 Step 5/6 的目视矩阵与 Tab 回归；spec 的「风险」章节四条 → 分别落在 Task 3 Step 5 的槽位说明、Task 3 Step 3 的 CSS 注释、Task 8 Step 5 第 7 格、Task 2 Step 6 的「不加在滚动容器本身」。
 
-**类型/命名一致性**：`.chat-column-inner`（Task 2 建，Task 3 叠加）· `.chat-msgs-empty` / `.chat-hero-lead` / `.chat-hero-trail`（Task 3）· `.chat-hero-cards` / `.chat-hero-card` / `.chat-hero-card-tag`（Task 5）· `.chat-lineage-btn`（Task 6 建，Task 6 测）· `.chat-session-list` / `.chat-sidebar-foot`（Task 7）。测试辅助 `renderEmpty()` / `FOLLOWING` 在 Task 1 定义，Task 2–7 引用，名字一致。
+**类型/命名一致性**：`.chat-column-inner`（Task 2 建，Task 3 叠加）· `.chat-msgs-empty` / `.chat-hero-lead` / `.chat-hero-trail`（Task 3）· `.chat-hero-cards` / `.chat-hero-card` / `.chat-hero-card-tag`（Task 5）· `.chat-lineage-btn`（Task 6 建，Task 6 测）· `.chat-session-list` / `.chat-sidebar-foot`（Task 7）。测试辅助 `renderEmpty()` 在 Task 1 定义、Task 2–7 引用；`FOLLOWING` 在 Task 5 定义、Task 7 复用 —— **常量必须在第一个引用它的任务里声明**，本仓 `noUnusedLocals: true` 且 CI 用 `--max-warnings 0`，提前声明会挂门禁（Task 1 首次派活即因此 BLOCKED）。
 
 **新增 i18n 键**：0。用到的 13 个 `chat.*` 键已逐一核对存在于 `zh` locale。
