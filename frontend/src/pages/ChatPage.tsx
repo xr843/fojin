@@ -1441,9 +1441,10 @@ export default function ChatPage() {
                     className="chat-lineage-btn"
                     onClick={() => setGalleryOpen(true)}
                   >
-                    {selectedMaster && (
-                      <MasterSeal text={Array.from(selectedMaster.name_zh).slice(0, 2).join("")} size={18} />
-                    )}
+                    {/* 不放印章：18px 的 MasterSeal 字号只有 6px（size*0.32），两个汉字
+                        挤成一团认不出，而紧邻的文字标签已经把名号写明了。变化的文字
+                        本身就是「已选宗风」的指示器。印章留在空状态 hero 里 —— 那里
+                        它 40px、字号 13px 可读，且不与名号重复（hero 标题是产品名）。 */}
                     <span>{selectedMaster ? selectedMaster.name_zh : t("chat.general_assistant")}</span>
                     <DownOutlined style={{ fontSize: 10 }} />
                   </Button>
