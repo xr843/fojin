@@ -289,24 +289,25 @@ function MessageBubbleInner({
           {m.role === "assistant" ? (
             m.content === THINKING_SENTINEL ? (
               <div className="chat-thinking">
-                {m.retrieval ? (
-                  <>
-                    {t("chat.retrieved_hint", { n: m.retrieval.count })}
-                    {m.retrieval.titles.length > 0 && (
-                      <span className="chat-retrieved-titles">
-                        {m.retrieval.titles.map((tt) => (
-                          <span key={tt} className="chat-retrieved-title">
-                            {t("chat.retrieved_title", { title: tt })}
-                          </span>
-                        ))}
-                      </span>
-                    )}
-                    <span className="chat-retrieved-sep">·</span>
-                    {t("chat.generating")}
-                  </>
-                ) : (
-                  t("chat.thinking")
-                )}
+                {/* 收进单个 span：.chat-thinking 是 inline-flex，为「一句短文案 +
+                    三个点」设计的；多段内容直接铺进去会各自变成 flex 项，被挤成
+                    竖排窄列。包一层后它仍只有两个 flex 项，内部按正常文本流换行。 */}
+                <span className="chat-thinking-text">
+                  {m.retrieval ? (
+                    <>
+                      {t("chat.retrieved_hint", { n: m.retrieval.count })}
+                      {m.retrieval.titles.map((tt) => (
+                        <span key={tt} className="chat-retrieved-title">
+                          {t("chat.retrieved_title", { title: tt })}
+                        </span>
+                      ))}
+                      <span className="chat-retrieved-sep">·</span>
+                      {t("chat.generating")}
+                    </>
+                  ) : (
+                    t("chat.thinking")
+                  )}
+                </span>
                 <span className="chat-thinking-dots"><span /><span /><span /></span>
               </div>
             ) : m.content === REQUEST_FAILED_SENTINEL ? (
@@ -735,7 +736,12 @@ export default function ChatPage() {
    *  force 用于「用户刚发出消息」与「点击回到底部」这两处必须跟到底的场景。 */
   const scrollToBottom = useCallback((force = false) => {
     if (!force && !atBottomRef.current) return;
-    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+    // behavior:"auto" 而非 "smooth"：真机实测平滑滚动在这个容器里是彻底的空操作
+    // （scrollIntoView 与 scrollTo 两种 API 都不动，而 auto 一次到位），所以此前
+    // 的自动跟随其实一直没生效。即时滚动还顺带避开了另一个坑 —— 平滑动画途中的
+    // 中间态会持续触发 scroll 事件，把下面的 atBottom 判定误翻成「用户已离开底部」，
+    // 从而在动画走完之前就把跟随关掉。
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "auto" }), 100);
   }, []);
 
   const handleMessagesScroll = useCallback(() => {

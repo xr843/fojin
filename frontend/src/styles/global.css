@@ -325,16 +325,17 @@ em {
   font-family: "Noto Serif SC", serif;
   letter-spacing: 0.02em;
 }
-/* 等待期显示的召回经典 —— 让「真的在查藏经」这件事在生成开始前就可见 */
-.chat-retrieved-titles {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-left: 6px;
+/* 等待期显示的召回经典 —— 让「真的在查藏经」这件事在生成开始前就可见。
+   .chat-thinking 是 inline-flex（原本只装一句短文案 + 三个点），所以这里必须
+   是它的单个 flex 项、内部按正常文本流走；min-width:0 让它能被压缩换行而不是
+   把整行撑破。 */
+.chat-thinking-text {
+  min-width: 0;
 }
 .chat-retrieved-title {
   font-family: "Noto Serif SC", serif;
   color: var(--fj-highlight);
+  margin-left: 4px;
 }
 .chat-retrieved-sep {
   margin: 0 6px;
