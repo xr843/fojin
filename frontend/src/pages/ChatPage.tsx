@@ -27,6 +27,7 @@ import {
   DislikeOutlined,
   DislikeFilled,
   ShareAltOutlined,
+  DownOutlined,
 } from "@ant-design/icons";
 const ShareCard = lazy(() => import("../components/ShareCard"));
 const CitationDrawer = lazy(() => import("../components/CitationDrawer"));
@@ -1347,41 +1348,14 @@ export default function ChatPage() {
                 }
               />
             )}
-            {/* 宗风 selector. Was a grey <Select> reading "通用助手" — the 15 master
-                personas, this product's sharpest differentiator, hid inside it.
-                Now: the chosen lineage is stated plainly, and the gallery is one
-                click away. Wording is "依此宗风解经", never "和祖师聊天" — you are
-                choosing an interpretive lens, not a chat character. */}
-            <div className="mg-head" style={{ marginBottom: 8 }}>
-              {selectedMaster ? (
-                <>
-                  <MasterSeal text={Array.from(selectedMaster.name_zh).slice(0, 2).join("")} size={34} />
-                  <span className="mg-head-id">
-                    <span className="mg-head-name">{selectedMaster.name_zh}</span>
-                    <span className="mg-head-sub">
-                      {selectedMaster.tradition} · {selectedMaster.dates} · {t("chat.master_lens")}
-                    </span>
-                  </span>
-                </>
-              ) : (
-                <span className="mg-head-id">
-                  <span className="mg-head-name">{t("chat.general_assistant")}</span>
-                  <span className="mg-head-sub">{t("chat.gallery_hint")}</span>
-                </span>
-              )}
-              <Button
-                size="small"
-                className="mg-head-swap"
-                onClick={() => setGalleryOpen(true)}
-              >
-                {t("chat.change_master")}
-              </Button>
-            </div>
-            {selectedMaster && (
-              <div className="mg-disclaimer" style={{ marginTop: 0, marginBottom: 8 }}>
-                {t("chat.master_disclaimer")}
-              </div>
-            )}
+            {/* 宗风 selector lives in the composer toolbar below (.chat-lineage-btn).
+                It used to be a grey <Select> reading "通用助手" — the 15 master
+                personas, this product's sharpest differentiator, hid inside it. It
+                then became a full-width row to state the chosen lineage plainly;
+                the toolbar control keeps that plain text label while giving the
+                row's vertical space back to the first screen. Wording is
+                "依此宗风解经", never "和祖师聊天" — you are choosing an
+                interpretive lens, not a chat character. */}
             <DraggableModal
               open={galleryOpen}
               onCancel={() => setGalleryOpen(false)}
@@ -1454,6 +1428,20 @@ export default function ChatPage() {
                     disabled={uploadingAttachment || attachments.length >= MAX_ATTACHMENTS}
                   />
                 </Tooltip>
+                <Tooltip title={t("chat.change_master")}>
+                  <Button
+                    type="text"
+                    size="small"
+                    className="chat-lineage-btn"
+                    onClick={() => setGalleryOpen(true)}
+                  >
+                    {selectedMaster && (
+                      <MasterSeal text={Array.from(selectedMaster.name_zh).slice(0, 2).join("")} size={18} />
+                    )}
+                    <span>{selectedMaster ? selectedMaster.name_zh : t("chat.general_assistant")}</span>
+                    <DownOutlined style={{ fontSize: 10 }} />
+                  </Button>
+                </Tooltip>
                 <ChatModelSelector value={modelId} onChange={handleModelChange} />
                 <span className="chat-input-spacer" />
                 {sending ? (
@@ -1476,6 +1464,11 @@ export default function ChatPage() {
                 )}
               </div>
             </div>
+              {selectedMaster && (
+                <div className="mg-disclaimer" style={{ marginTop: 8 }}>
+                  {t("chat.master_disclaimer")}
+                </div>
+              )}
               {messages.length === 0 && (welcomeCardsData?.questions?.length ?? 0) > 0 && (
                 <>
                   <div className="chat-hero-cards">

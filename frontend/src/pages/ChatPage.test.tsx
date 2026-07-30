@@ -135,4 +135,12 @@ describe("ChatPage 首屏结构", () => {
     expect(cards).not.toBeNull();
     expect(shell!.compareDocumentPosition(cards!) & FOLLOWING).toBeTruthy();
   });
+
+  it("D7: 宗风控件在输入框工具栏内，且 .mg-head 整行已移除", async () => {
+    const { container } = await renderEmpty();
+    expect(container.querySelector(".mg-head")).toBeNull();
+    const toolbar = container.querySelector(".chat-input-toolbar");
+    expect(toolbar).not.toBeNull();
+    expect(toolbar!.querySelector(".chat-lineage-btn")).not.toBeNull();
+  });
 });

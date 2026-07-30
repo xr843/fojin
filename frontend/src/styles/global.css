@@ -313,6 +313,14 @@ em {
   font-family: "Noto Serif SC", serif;
   letter-spacing: 0.02em;
 }
+/* 宗风控件：收进工具栏但保留文字标签 —— 所选宗风仍被明说，只是不再占一整行 */
+.chat-lineage-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fj-ink-light);
+}
+
 /* 新断点。本仓现有 768（隐藏侧栏）与 480（工具栏换行）都不合用：768px 下侧栏
    已消失、对话列约 748px，两列各 370px 仍宽裕；拖到 480 才换单列的话，
    600–480 这段每列只剩约 230px，卡片会挤成三四行。 */
