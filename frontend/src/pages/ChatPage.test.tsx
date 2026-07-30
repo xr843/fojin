@@ -108,4 +108,9 @@ describe("ChatPage 首屏结构", () => {
     expect(screen.getByText("小津 AI 佛典问答")).toBeInTheDocument();
     expect(container.querySelector(".chat-input-shell")).not.toBeNull();
   });
+
+  it("D1: 头部行/消息区/输入区三处各有一个 .chat-column-inner", async () => {
+    const { container } = await renderEmpty();
+    expect(container.querySelectorAll(".chat-column-inner")).toHaveLength(3);
+  });
 });

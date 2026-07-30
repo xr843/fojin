@@ -1131,8 +1131,6 @@ export default function ChatPage() {
       <div style={{
         display: "flex",
         height: "calc(100vh - 120px)",
-        maxWidth: citationTarget ? undefined : 1100,
-        margin: citationTarget ? "0 16px" : "0 auto",
         gap: 16,
       }}>
 
@@ -1251,30 +1249,33 @@ export default function ChatPage() {
         {/* Chat area */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
           {/* Chat header: mobile toggle + export */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-            {user ? (
-              <Button
-                className="chat-mobile-toggle"
-                type="text"
-                icon={<MenuOutlined />}
-                onClick={() => setSidebarOpen(true)}
-              >
-                {t("chat.session_list")}
-              </Button>
-            ) : <div />}
-            {messages.length > 0 && (
-              <Tooltip title={t("chat.export_tooltip")}>
+          <div style={{ display: "flex", marginBottom: 4 }}>
+            <div className="chat-column-inner" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              {user ? (
                 <Button
+                  className="chat-mobile-toggle"
                   type="text"
-                  icon={<DownloadOutlined />}
-                  onClick={handleExport}
-                  style={{ color: "var(--fj-ink-muted)" }}
-                />
-              </Tooltip>
-            )}
+                  icon={<MenuOutlined />}
+                  onClick={() => setSidebarOpen(true)}
+                >
+                  {t("chat.session_list")}
+                </Button>
+              ) : <div />}
+              {messages.length > 0 && (
+                <Tooltip title={t("chat.export_tooltip")}>
+                  <Button
+                    type="text"
+                    icon={<DownloadOutlined />}
+                    onClick={handleExport}
+                    style={{ color: "var(--fj-ink-muted)" }}
+                  />
+                </Tooltip>
+              )}
+            </div>
           </div>
           {/* Messages */}
           <div style={{ flex: 1, overflow: "auto", padding: "16px 0" }}>
+            <div className="chat-column-inner">
             <div ref={messagesTopRef} />
             {hasOlderMessages && (
               <div style={{ textAlign: "center", marginBottom: 12 }}>
@@ -1382,10 +1383,12 @@ export default function ChatPage() {
             ))}
             {/* Streaming cursor is shown inline via ▌ in the message bubble */}
             <div ref={bottomRef} />
+            </div>
           </div>
 
           {/* Input */}
           <div style={{ padding: "12px 0", borderTop: "1px solid rgba(217,208,193,0.5)" }}>
+            <div className="chat-column-inner">
             {/* 游客转化钩子：拿到第一条成功回复后提示保存历史（可关闭，14 天
                 静默）。固定在输入区上方而非消息流末尾：消息流尾部的 mount 受
                 scrollToBottom 时序影响可能落在视口外，用户永远看不到。
@@ -1536,6 +1539,7 @@ export default function ChatPage() {
                   </Button>
                 )}
               </div>
+            </div>
             </div>
           </div>
         </div>

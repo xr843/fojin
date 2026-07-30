@@ -248,6 +248,16 @@ em {
   40% { opacity: 1; transform: scale(1.1); }
 }
 
+/* ========== Chat Column ========== */
+/* 根容器满宽，对话内容自己居中 —— 侧栏因此贴到页面左边距（与顶栏字标的
+   32px 对齐），而不是跟着一个 1100px 居中块浮到屏幕中间。
+   只加在滚动容器的「内容」上，不加在滚动容器本身，否则滚动条会向内缩。 */
+.chat-column-inner {
+  width: 100%;
+  max-width: 840px;
+  margin: 0 auto;
+}
+
 /* ========== Chat Input Shell (Claude.ai-style) ========== */
 .chat-input-shell {
   border: 1px solid #d9d9d9;
