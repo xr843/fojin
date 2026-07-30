@@ -599,6 +599,7 @@ export default function ChatPage() {
   const messagesTopRef = useRef<HTMLDivElement>(null);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
+  const scrollTimerRef = useRef<number | null>(null);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
 
   const { data: sessions, refetch: refetchSessions } = useQuery({
@@ -736,12 +737,25 @@ export default function ChatPage() {
    *  force 用于「用户刚发出消息」与「点击回到底部」这两处必须跟到底的场景。 */
   const scrollToBottom = useCallback((force = false) => {
     if (!force && !atBottomRef.current) return;
-    // behavior:"auto" 而非 "smooth"：真机实测平滑滚动在这个容器里是彻底的空操作
-    // （scrollIntoView 与 scrollTo 两种 API 都不动，而 auto 一次到位），所以此前
-    // 的自动跟随其实一直没生效。即时滚动还顺带避开了另一个坑 —— 平滑动画途中的
-    // 中间态会持续触发 scroll 事件，把下面的 atBottom 判定误翻成「用户已离开底部」，
-    // 从而在动画走完之前就把跟随关掉。
-    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "auto" }), 100);
+    // 单个待触发句柄、覆盖式重排：token 频率约 20/s，每次都新起一个 setTimeout
+    // 会在一条长答案里排出上千个定时器，而它们要做的是同一件事。
+    if (scrollTimerRef.current !== null) clearTimeout(scrollTimerRef.current);
+    scrollTimerRef.current = window.setTimeout(() => {
+      scrollTimerRef.current = null;
+      // 触发时必须复判。上面的守卫只在「调用时」判过一次，而真正滚动发生在
+      // 100ms 之后 —— 这 100ms 里用户完全可能已经上滚。少了这次复判，存量定时器
+      // 会把视口拽回底部，而那次程序化滚动又触发 scroll 事件把 atBottom 翻回真，
+      // 跟随重新锁死 —— 「流式生成中途上滚重读」这个正主场景等于没修。
+      if (!force && !atBottomRef.current) return;
+      // behavior:"auto" 而非 "smooth"，两个理由：
+      //   1. 按 token 频率重复调 smooth 会互相打断，而目标位置又一直在下移，
+      //      动画永远追不上；
+      //   2. 平滑动画途中的中间态会持续触发 scroll 事件，把下面的 atBottom 判定
+      //      误翻成「用户已离开底部」，在动画走完之前就把跟随关掉。
+      // （另有实测：在 CDP 驱动的标签页里 smooth 完全不推进。但那可能是自动化
+      //  环境属性而非页面缺陷，所以不作为改动依据 —— 上面两条才是。）
+      bottomRef.current?.scrollIntoView({ behavior: "auto" });
+    }, 100);
   }, []);
 
   const handleMessagesScroll = useCallback(() => {
@@ -793,6 +807,12 @@ export default function ChatPage() {
     setMessages([]);
     setHasOlderMessages(false);
     setCurrentPage(1);
+    // 必须显式复位这对状态。路径：打开历史会话 → loadSession 故意滚到顶、
+    // atBottom 转假、↓ 按钮显示 → 点「新对话」→ messages 清空，但此时 scrollTop
+    // 已是 0，内容收缩不会触发 scroll 事件（无需 clamp），所以按钮会留在空首屏
+    // 右下角，点了什么也不会发生。handleDeleteSession 走的是同一条路。
+    atBottomRef.current = true;
+    setShowJumpToBottom(false);
   };
 
   const handleDeleteSession = (sid: number) => {
