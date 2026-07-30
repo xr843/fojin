@@ -1300,75 +1300,6 @@ export default function ChatPage() {
                   {t("chat.subtitle")}
                   <br />{t("chat.subtitle2")}
                 </div>
-                <div style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: 10,
-                  marginTop: 18,
-                  maxWidth: 480,
-                  marginLeft: "auto",
-                  marginRight: "auto",
-                }}>
-                  {(welcomeCardsData?.questions ?? []).map((card: HotQuestionCard) => (
-                    <div
-                      key={card.id}
-                      onClick={() => handleSendMessage(card.display_text, { hotQuestionId: card.id })}
-                      style={{
-                        padding: "12px 14px 10px",
-                        borderRadius: 8,
-                        border: "1px solid rgba(217,208,193,0.6)",
-                        fontSize: 13,
-                        cursor: "pointer",
-                        lineHeight: 1.6,
-                        transition: "all 0.2s",
-                        color: "var(--fj-ink-muted)",
-                        textAlign: "left",
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "flex-start",
-                        gap: 6,
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = "var(--fj-accent)";
-                        e.currentTarget.style.color = "var(--fj-accent)";
-                        e.currentTarget.style.background = "rgba(176,141,87,0.06)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = "rgba(217,208,193,0.6)";
-                        e.currentTarget.style.color = "var(--fj-ink-muted)";
-                        e.currentTarget.style.background = "transparent";
-                      }}
-                    >
-                      <span style={{
-                        fontSize: 11,
-                        padding: "2px 8px",
-                        borderRadius: 10,
-                        background: "rgba(176,141,87,0.1)",
-                        color: "var(--fj-highlight)",
-                        fontFamily: '"Noto Serif SC", serif',
-                        letterSpacing: "0.02em",
-                      }}>
-                        {t(`chat.hot_question_category_${HOT_QUESTION_CATEGORY_SLUGS[card.category]}`, card.category)}
-                      </span>
-                      <span>{card.display_text}</span>
-                    </div>
-                  ))}
-                </div>
-                {(welcomeCardsData?.questions?.length ?? 0) > 0 && (
-                  <div style={{ marginTop: 10 }}>
-                    <Button
-                      size="small"
-                      type="text"
-                      icon={<ReloadOutlined />}
-                      loading={welcomeCardsLoading}
-                      onClick={() => refetchWelcomeCards()}
-                      style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
-                    >
-                      {t("chat.refresh_hot_questions", "换一批")}
-                    </Button>
-                  </div>
-                )}
-
               </div>
             )}
             {messages.map((m) => (
@@ -1545,6 +1476,37 @@ export default function ChatPage() {
                 )}
               </div>
             </div>
+              {messages.length === 0 && (welcomeCardsData?.questions?.length ?? 0) > 0 && (
+                <>
+                  <div className="chat-hero-cards">
+                    {(welcomeCardsData?.questions ?? []).map((card: HotQuestionCard) => (
+                      <button
+                        key={card.id}
+                        type="button"
+                        className="chat-hero-card"
+                        onClick={() => handleSendMessage(card.display_text, { hotQuestionId: card.id })}
+                      >
+                        <span className="chat-hero-card-tag">
+                          {t(`chat.hot_question_category_${HOT_QUESTION_CATEGORY_SLUGS[card.category]}`, card.category)}
+                        </span>
+                        <span>{card.display_text}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ textAlign: "center", marginTop: 8 }}>
+                    <Button
+                      size="small"
+                      type="text"
+                      icon={<ReloadOutlined />}
+                      loading={welcomeCardsLoading}
+                      onClick={() => refetchWelcomeCards()}
+                      style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
+                    >
+                      {t("chat.refresh_hot_questions", "换一批")}
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
           {messages.length === 0 && <div className="chat-hero-trail" />}

@@ -102,6 +102,8 @@ async function renderEmpty() {
   return r;
 }
 
+const FOLLOWING = 4; // Node.DOCUMENT_POSITION_FOLLOWING
+
 describe("ChatPage 首屏结构", () => {
   it("空状态渲染出标题与建议卡片（脚手架自检）", async () => {
     const { container } = await renderEmpty();
@@ -123,5 +125,14 @@ describe("ChatPage 首屏结构", () => {
   it("D5: 未选祖师时首屏不放机器人图标", async () => {
     const { container } = await renderEmpty();
     expect(container.querySelectorAll(".anticon-robot")).toHaveLength(0);
+  });
+
+  it("D6: 建议卡片在输入区内，且排在输入框之后", async () => {
+    const { container } = await renderEmpty();
+    const shell = container.querySelector(".chat-input-shell");
+    const cards = container.querySelector(".chat-hero-cards");
+    expect(shell).not.toBeNull();
+    expect(cards).not.toBeNull();
+    expect(shell!.compareDocumentPosition(cards!) & FOLLOWING).toBeTruthy();
   });
 });

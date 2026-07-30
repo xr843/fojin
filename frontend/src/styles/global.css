@@ -274,6 +274,52 @@ em {
   min-height: 0;
 }
 
+/* 建议卡片：铺满对话列（840 → 每张 420px），标签与问题同行。
+   rgba(176,141,87,…) 是 --fj-gold 的 rgb，从被替换的内联样式原样搬运。 */
+.chat-hero-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+.chat-hero-card {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--fj-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fj-ink-muted);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+.chat-hero-card:hover {
+  border-color: var(--fj-accent);
+  color: var(--fj-accent);
+  background: rgba(176, 141, 87, 0.06);
+}
+.chat-hero-card-tag {
+  flex-shrink: 0;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(176, 141, 87, 0.12);
+  color: var(--fj-highlight);
+  font-family: "Noto Serif SC", serif;
+  letter-spacing: 0.02em;
+}
+/* 新断点。本仓现有 768（隐藏侧栏）与 480（工具栏换行）都不合用：768px 下侧栏
+   已消失、对话列约 748px，两列各 370px 仍宽裕；拖到 480 才换单列的话，
+   600–480 这段每列只剩约 230px，卡片会挤成三四行。 */
+@media (max-width: 600px) {
+  .chat-hero-cards { grid-template-columns: 1fr; }
+}
+
 /* ========== Chat Input Shell (Claude.ai-style) ========== */
 .chat-input-shell {
   border: 1px solid #d9d9d9;
