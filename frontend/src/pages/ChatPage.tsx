@@ -1274,9 +1274,10 @@ export default function ChatPage() {
             </div>
           </div>
           {/* Messages */}
-          <div style={{ flex: 1, overflow: "auto", padding: "16px 0" }}>
-            <div className="chat-column-inner">
+          <div style={{ flex: messages.length === 0 ? "1 1 auto" : 1, overflow: "auto", padding: "16px 0" }}>
+            <div className={messages.length === 0 ? "chat-column-inner chat-msgs-empty" : "chat-column-inner"}>
             <div ref={messagesTopRef} />
+            {messages.length === 0 && <div className="chat-hero-lead" />}
             {hasOlderMessages && (
               <div style={{ textAlign: "center", marginBottom: 12 }}>
                 <Button size="small" type="text" loading={loadingOlder} onClick={loadOlderMessages}
@@ -1387,7 +1388,7 @@ export default function ChatPage() {
           </div>
 
           {/* Input */}
-          <div style={{ padding: "12px 0", borderTop: "1px solid rgba(217,208,193,0.5)" }}>
+          <div style={{ padding: "12px 0", borderTop: messages.length === 0 ? undefined : "1px solid rgba(217,208,193,0.5)" }}>
             <div className="chat-column-inner">
             {/* 游客转化钩子：拿到第一条成功回复后提示保存历史（可关闭，14 天
                 静默）。固定在输入区上方而非消息流末尾：消息流尾部的 mount 受
@@ -1542,6 +1543,7 @@ export default function ChatPage() {
             </div>
             </div>
           </div>
+          {messages.length === 0 && <div className="chat-hero-trail" />}
         </div>
 
         {/* Citation drawer — inline side panel, drag to resize */}

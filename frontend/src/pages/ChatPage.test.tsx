@@ -113,4 +113,10 @@ describe("ChatPage 首屏结构", () => {
     const { container } = await renderEmpty();
     expect(container.querySelectorAll(".chat-column-inner")).toHaveLength(3);
   });
+
+  it("D3: 空状态有前后两个撑高块", async () => {
+    const { container } = await renderEmpty();
+    expect(container.querySelector(".chat-hero-lead")).not.toBeNull();
+    expect(container.querySelector(".chat-hero-trail")).not.toBeNull();
+  });
 });

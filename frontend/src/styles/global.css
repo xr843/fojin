@@ -258,6 +258,22 @@ em {
   margin: 0 auto;
 }
 
+/* 空状态：hero 贴到输入框上沿，整组由上下两个撑高块均分剩余空间而居中。
+   min-height 而非 height —— 有对话时内容超高仍要能撑开滚动。
+   不用 justify-content: flex-end：它作用在 overflow:auto 容器上时，内容超出
+   容器（矮屏 / 浏览器放大）会让溢出的顶部滚不到，Safari 上尤其。撑高块在
+   空间不足时自己压到 0，hero 永远从滚动原点开始。 */
+.chat-msgs-empty {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+.chat-hero-lead,
+.chat-hero-trail {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
 /* ========== Chat Input Shell (Claude.ai-style) ========== */
 .chat-input-shell {
   border: 1px solid #d9d9d9;
