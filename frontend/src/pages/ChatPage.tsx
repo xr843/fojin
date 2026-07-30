@@ -757,8 +757,16 @@ export default function ChatPage() {
       setMessages(data.messages);
       setCurrentPage(1);
       setHasOlderMessages(data.total > data.messages.length);
-      // 加载历史会话时滚到顶部，让用户先看到问题
-      setTimeout(() => messagesTopRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+      // 加载历史会话时滚到顶部，让用户先看到问题。
+      // behavior:"auto" 与上面的 scrollToBottom 保持一致 —— 平滑滚动在实测环境里
+      // 是空操作，会让这个「滚到顶」的意图静默失效；而且这里是一次离散跳转，
+      // 本来就不需要动画。
+      setTimeout(() => {
+        messagesTopRef.current?.scrollIntoView({ behavior: "auto" });
+        // 跳到顶部后底部有大量未读内容，把「回到底部」按钮的状态同步过来 ——
+        // 程序化滚动不一定触发 scroll 事件，不能只靠事件更新。
+        handleMessagesScroll();
+      }, 100);
     } catch {
       message.error(t("chat.load_session_failed"));
     }
