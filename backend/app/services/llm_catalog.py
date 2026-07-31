@@ -50,6 +50,16 @@ CATALOG: list[ModelOption] = [
                 "Kimi K3", "Moonshot 最新旗舰，上下文 1M", False),
     ModelOption("zhipu:glm-5.2", "zhipu", "glm-5.2",
                 "智谱 GLM-5.2", "智谱最新旗舰，上下文 1M", False),
+    # 国际三家。同样只对自带 Key 的用户可选。
+    # 名单能放开加，是因为选择器只列当前真能用的模型 —— 加一个厂商不会让下拉变长。
+    ModelOption("openai:gpt-5.6-sol", "openai", "gpt-5.6-sol",
+                "GPT-5.6 Sol", "OpenAI 旗舰，复杂推理", False),
+    ModelOption("anthropic:claude-opus-5", "anthropic", "claude-opus-5",
+                "Claude Opus 5", "Anthropic 旗舰", False),
+    # Gemini 3 系列没有 Pro 档（官方文档确认），最新的稳定版就是 3.6 Flash；
+    # 3.1 Pro 尚是 preview，不进目录。
+    ModelOption("gemini:gemini-3.6-flash", "gemini", "gemini-3.6-flash",
+                "Gemini 3.6 Flash", "Google 最新稳定版", False),
 ]
 
 CATALOG_BY_ID = {opt.id: opt for opt in CATALOG}

@@ -61,7 +61,8 @@ PROVIDER_DEFAULT_MODELS = {
     "siliconflow": "Qwen/Qwen2.5-7B-Instruct",
     # 国际
     "openai": "gpt-5.6-luna",
-    "gemini": "gemini-2.0-flash",
+    # gemini-2.0 系列 2026-06 已停服（官方文档标 Shut down）
+    "gemini": "gemini-3.6-flash",
     "groq": "llama-3.3-70b-versatile",
     "mistral": "mistral-small-latest",
     "xai": "grok-2-latest",

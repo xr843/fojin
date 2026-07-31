@@ -176,14 +176,23 @@ def test_model_descriptions_carry_no_pricing():
             f"{opt.id} 的描述里出现了价格字样: {opt.description!r}"
 
 
-def test_catalog_and_provider_defaults_agree_on_generation():
-    """同一个厂商的型号在三处各写一份：CATALOG（/chat 的选择器）、
-    PROVIDER_DEFAULT_MODELS（自带 Key 未指定模型时的默认）、以及前端个人中心的
-    建议列表。前两处在同一个仓、同一门语言里，没有理由不一致 —— 只更新其中一处，
-    自带 Key 的用户会拿到和界面上写的完全不同的模型。
+# 目录与默认值可以不同档，但必须在这里登记理由 —— 空着的分歧一律视为"改了一处
+# 忘了另一处"。登记项本身也会被校验：写了但实际相等，说明理由已过期。
+INTENTIONAL_TIER_DIFFERENCES = {
+    # 目录是"用户主动挑"的清单，给旗舰；默认值是"没挑时替他决定"，钱是用户自己
+    # 出的，给经济档更稳妥。BYOK 用户没在选择器里指定模型时走的就是默认值。
+    "openai": ("gpt-5.6-sol", "gpt-5.6-luna"),
+    # 同理：Opus 是旗舰，Sonnet 是主力档。没主动挑模型的人不该被默认送进最贵的那档。
+    "anthropic": ("claude-opus-5", "claude-sonnet-5"),
+}
 
-    只比对非 deepseek 的三家：deepseek 在 CATALOG 里刻意有 pro/flash 两档，而默认
-    值只能是一个，本来就不该相等。
+
+def test_catalog_and_provider_defaults_agree_on_generation():
+    """同一个厂商的型号在 CATALOG（/chat 的选择器）与 PROVIDER_DEFAULT_MODELS
+    （自带 Key 未指定模型时的默认）里各写一份。两处都在同一个仓、同一门语言里，
+    只更新其中一处，自带 Key 的用户会拿到和界面上写的完全不同的模型。
+
+    deepseek 不比：它在 CATALOG 里刻意有 pro/flash 两档，而默认值只能是一个。
     """
     from app.services.llm_client import PROVIDER_DEFAULT_MODELS
 
@@ -191,10 +200,27 @@ def test_catalog_and_provider_defaults_agree_on_generation():
         if opt.provider == "deepseek":
             continue
         default = PROVIDER_DEFAULT_MODELS.get(opt.provider)
+        expected = INTENTIONAL_TIER_DIFFERENCES.get(opt.provider)
+        if expected:
+            assert (opt.model, default) == expected, (
+                f"{opt.provider} 登记了有意的档位差异 {expected}，但实际是 "
+                f"({opt.model!r}, {default!r}) —— 版本变了就把登记项一起更新"
+            )
+            continue
         assert default == opt.model, (
             f"{opt.provider}: 选择器写的是 {opt.model!r}，"
-            f"而 PROVIDER_DEFAULT_MODELS 写的是 {default!r}"
+            f"而 PROVIDER_DEFAULT_MODELS 写的是 {default!r}。"
+            f"若这是有意的档位差异，请登记进 INTENTIONAL_TIER_DIFFERENCES 并写明理由"
         )
+
+
+def test_registered_tier_differences_are_still_differences():
+    """登记表里的项若已变成相等，说明那条理由过期了 —— 及时删掉，别让豁免长草。"""
+    from app.services.llm_client import PROVIDER_DEFAULT_MODELS
+
+    for provider, (cat, default) in INTENTIONAL_TIER_DIFFERENCES.items():
+        assert cat != default, f"{provider} 的登记项两边相同，已无差异可豁免"
+        assert PROVIDER_DEFAULT_MODELS.get(provider) == default
 
 
 def test_one_entry_per_provider_except_deepseek():
