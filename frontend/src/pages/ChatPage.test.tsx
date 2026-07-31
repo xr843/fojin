@@ -536,8 +536,29 @@ describe("收起态图标轨", () => {
     expect(document.activeElement).toBe(input);
   });
 
+  // 最近聊天：与"展开侧栏"动作相同、意图不同。断言必须落在"会话列表真的露出来了"
+  // 上 —— 只断言侧栏展开的话，这个按钮就算什么也不做（沿用 Tooltip 的默认行为）
+  // 也可能碰巧通过。
+  it("收起态: 点最近聊天 → 展开侧栏并露出会话列表", async () => {
+    localStorage.setItem("fojin.chat.sidebarCollapsed", "1");
+    const { container } = renderPage();
+    await screen.findByRole("button", { name: "最近聊天" });
+    expect(container.querySelector(".chat-session-list")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "最近聊天" }));
+
+    await waitFor(() => {
+      expect(container.querySelector(".chat-sidebar[data-collapsed]")).toBeNull();
+    });
+    const list = container.querySelector(".chat-session-list")!;
+    expect(list).not.toBeNull();
+    expect(list.querySelectorAll(".chat-session-row").length).toBe(6);
+    // 收起状态要落盘，否则刷新后又缩回去
+    expect(localStorage.getItem("fojin.chat.sidebarCollapsed")).toBe("0");
+  });
+
   // 收起态原本把 Key 状态整个藏了 —— 而"有没有配 Key"直接决定问答能不能用。
-  it("收起态: 轨上是四个无边框图标，Key 状态没被藏掉", async () => {
+  it("收起态: 轨上是五个无边框图标，Key 状态没被藏掉", async () => {
     localStorage.setItem("fojin.chat.sidebarCollapsed", "1");
     const { container } = renderPage();
     await waitFor(() => {
@@ -546,24 +567,24 @@ describe("收起态图标轨", () => {
     await screen.findByRole("button", { name: "搜索会话" });   // 等会话查询落地
     const rail = container.querySelector(".chat-sidebar")!;
     const labels = [...rail.querySelectorAll("button")].map((b) => b.getAttribute("aria-label"));
-    expect(labels).toEqual(["展开侧栏", "新对话", "搜索会话", "配置 API Key"]);
+    expect(labels).toEqual(["展开侧栏", "新对话", "搜索会话", "最近聊天", "配置 API Key"]);
     // 每个都挂上了图标轨样式类（边框是靠 .chat-rail-btn 去掉的）
-    expect(rail.querySelectorAll("button.chat-rail-btn")).toHaveLength(4);
+    expect(rail.querySelectorAll("button.chat-rail-btn")).toHaveLength(5);
   });
 
-  // 轨上四个必须是同一套描边图标。antd 的图标是实心字形，描边粗细烘焙在字形里
+  // 轨上五个必须是同一套描边图标。antd 的图标是实心字形，描边粗细烘焙在字形里
   // 改不掉 —— 混用的话四个并排时轻重不一，正是要修的那个观感问题。
-  it("收起态: 四个都是描边图标（无 antd 实心字形混入）", async () => {
+  it("收起态: 五个都是描边图标（无 antd 实心字形混入）", async () => {
     localStorage.setItem("fojin.chat.sidebarCollapsed", "1");
     const { container } = renderPage();
     await screen.findByRole("button", { name: "搜索会话" });
     const rail = container.querySelector(".chat-sidebar")!;
 
     expect([...rail.querySelectorAll("[data-rail-icon]")].map((e) => e.getAttribute("data-rail-icon")))
-      .toEqual(["sidebar", "new-chat", "search", "settings"]);
+      .toEqual(["sidebar", "new-chat", "search", "chats", "settings"]);
     // 一个 antd 字形都不该剩下
     expect(rail.querySelectorAll(".anticon")).toHaveLength(0);
-    // 四个描边粗细一致，否则并排看仍然轻重不一
+    // 描边粗细必须一致，否则并排看轻重不一
     const widths = [...rail.querySelectorAll("[data-rail-icon]")]
       .map((e) => e.getAttribute("stroke-width"));
     expect(new Set(widths).size).toBe(1);

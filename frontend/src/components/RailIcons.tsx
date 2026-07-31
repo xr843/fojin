@@ -51,6 +51,16 @@ export function RailSearchIcon() {
   );
 }
 
+/** 对话气泡：最近聊天。ChatGPT 收起轨上的第四个就是它。 */
+export function RailChatsIcon() {
+  return (
+    <svg {...BASE} data-rail-icon="chats">
+      {/* 近圆形泡身 + 左下角小尾巴 */}
+      <path d="M20 11.6c0 4.09-3.58 7.4-8 7.4a9 9 0 0 1-2.63-.38L5 20.2l1.32-3.4A7.1 7.1 0 0 1 4 11.6C4 7.51 7.58 4.2 12 4.2s8 3.31 8 7.4z" />
+    </svg>
+  );
+}
+
 /**
  * 齿轮：API Key 配置。
  *
