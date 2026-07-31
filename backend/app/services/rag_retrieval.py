@@ -900,7 +900,14 @@ async def retrieve_rag_context(
         logger.exception("precise_retrieval failed; falling back to vector RAG")
         precise = None
     if precise:
-        logger.debug("precise_retrieval hit: %d source(s)", len(precise))
+        # info 而非 debug：这条提前 return 绕过了下面全部 6 个 TIMING 埋点（含
+        # 「Total RAG retrieval」）。若它不输出，生产日志里这类请求就完全没有
+        # 检索侧计时，而且无法区分「走了精确检索所以快」与「日志没打出来」——
+        # 那正好是分段计时唯一要回答的问题的盲区。
+        logger.info(
+            "TIMING: Precise retrieval hit, took %.2fs (%d source(s), skipped vector RAG)",
+            time.monotonic() - t0, len(precise),
+        )
         context_text = "\n\n".join(_format_context_block({
             "text_id": s.text_id,
             "juan_num": s.juan_num,

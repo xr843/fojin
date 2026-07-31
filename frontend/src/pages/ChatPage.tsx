@@ -325,8 +325,11 @@ function MessageBubbleInner({
                       <span className="chat-retrieved-sep">·</span>
                     </>
                   )}
+                  {/* 括号并在翻译值里，不写死在这里 —— 全角（）是 U+FF08/FF09，
+                      落在半宽全宽形式区，i18n 扫描器的 CJK 正则结构上扫不到它，
+                      门禁绿灯不能当作「英文界面没问题」的证据。英文值自带半角括号。 */}
                   {reasoningSince
-                    ? `${t("chat.reasoning_hint")}（${t("chat.thinking_seconds", { n: thinkingSeconds })}）`
+                    ? `${t("chat.reasoning_hint")}${t("chat.thinking_seconds", { n: thinkingSeconds })}`
                     : m.retrieval
                       ? t("chat.generating")
                       : t("chat.thinking")}

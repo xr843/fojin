@@ -2,7 +2,7 @@
 
 日期：2026-07-30
 状态：待评审
-影响范围：`backend/app/services/rag_retrieval.py`、`backend/app/services/chat.py`、`frontend/src/api/client.ts`、`frontend/src/pages/ChatPage.tsx`、`frontend/src/styles/global.css`、`frontend/public/locales/{zh,zh-Hant,en}/translation.json`
+影响范围：`backend/app/services/rag_retrieval.py`、`backend/app/services/chat.py`、`frontend/src/api/client.ts`、`frontend/src/pages/ChatPage.tsx`、`frontend/public/locales/{zh,zh-Hant,en}/translation.json`
 
 ## 问题
 

@@ -650,9 +650,18 @@ async def _interleave_heartbeat(inner_gen, heartbeat_interval: float):
                 # 有人传回产出裸 str 的生成器，两字一块的中文 chunk（流式里很常见）
                 # 会被静默解成 kind="色", chunk="空"，而更长的块才报错 —— 间歇性的
                 # 静默错乱，正是本次改动要根除的那类问题。
-                if not isinstance(item, tuple) or len(item) != 2:
+                if (
+                    not isinstance(item, tuple)
+                    or len(item) != 2
+                    or item[0] not in ("content", "reasoning")
+                ):
+                    # 取值也要查，不只查形状：队列用 "done"/"error" 作哨兵，
+                    # inner_gen 若产出 ("done", None) 会被消费端当作流正常结束，
+                    # **静默截断答案**；产出 ("error", x) 会被当成上游异常抛出。
+                    # 形状错了至少会报 ValueError，取值撞了则完全无声。
                     raise TypeError(
-                        f"_interleave_heartbeat 的 inner_gen 必须产出 (kind, text) 二元组，收到 {type(item).__name__}"
+                        f"_interleave_heartbeat 的 inner_gen 必须产出 "
+                        f'("content"|"reasoning", text)，收到 {item!r:.80}'
                     )
                 await queue.put(item)
             await queue.put(("done", None))
@@ -1001,9 +1010,17 @@ async def send_message_stream(
                             last_reasoning_emit = now
                             yield (
                                 "data: "
-                                + json.dumps({"type": "reasoning", "chars": reasoning_chars})
+                                + json.dumps({"type": "reasoning", "chars": reasoning_chars},
+                                             ensure_ascii=False)
                                 + "\n\n"
                             )
+                        continue
+                    if kind != "content":
+                        # 白名单落地，不是黑名单。本轮引入了 kind 命名空间，而
+                        # Anthropic 的 thinking_delta 已列为后续项 —— 若下一个加
+                        # kind 的人忘了补 continue，黑名单写法会让新的非正文内容
+                        # **默认**流进 full_answer 变成答案。默认方向必须是拒绝。
+                        logger.warning("未知的流块类型，已丢弃: %s", kind)
                         continue
                     if not received_first_token:
                         received_first_token = True
