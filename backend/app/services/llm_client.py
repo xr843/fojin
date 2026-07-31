@@ -47,9 +47,12 @@ PROVIDER_URLS = {
 PROVIDER_DEFAULT_MODELS = {
     # 国内
     "deepseek": "deepseek-v4-flash",
-    "dashscope": "qwen3.6-plus",
-    "zhipu": "glm-5.1",
-    "moonshot": "kimi-k2.6",
+    # 2026-07-31 按厂商官方模型列表核对。这里比目录更要紧：自带 Key 但没指定模型的
+    # 用户走的就是这个默认值，而 qwen3.6-plus 已经从阿里的列表里消失了 —— 那种情况
+    # 不是"退回上一代"，是直接 model not found。
+    "dashscope": "qwen3.7-plus",
+    "zhipu": "glm-5.2",
+    "moonshot": "kimi-k3",
     "doubao": "doubao-1.5-pro-32k",
     "minimax": "MiniMax-Text-01",
     "stepfun": "step-1-8k",
@@ -57,13 +60,13 @@ PROVIDER_DEFAULT_MODELS = {
     "yi": "yi-lightning",
     "siliconflow": "Qwen/Qwen2.5-7B-Instruct",
     # 国际
-    "openai": "gpt-4o-mini",
+    "openai": "gpt-5.6-luna",
     "gemini": "gemini-2.0-flash",
     "groq": "llama-3.3-70b-versatile",
     "mistral": "mistral-small-latest",
     "xai": "grok-2-latest",
-    "openrouter": "openai/gpt-4o-mini",
-    "anthropic": "claude-sonnet-4-20250514",
+    "openrouter": "openai/gpt-5.6-luna",
+    "anthropic": "claude-sonnet-5",
 }
 
 # Anthropic uses a different API format; detect by provider or URL

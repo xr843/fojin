@@ -18,31 +18,31 @@ const PROVIDER_MODELS: Record<string, Array<{ value: string; label: string; hint
     { value: "deepseek-v4-flash", label: "V4 Flash", hintKey: "profile.modelHint.economy_daily" },
     { value: "deepseek-v4-pro", label: "V4 Pro", hintKey: "profile.modelHint.flagship" },
   ],
+  // 2026-07-31 按厂商官方模型列表核对。这些是"点一下就填进去"的建议值，指向已下线
+  // 的型号会直接把用户的配置搞坏 —— moonshot-v1 系列 8/31 全平台下线，glm-4 与
+  // qwen3.6 已被更新代次取代。用户仍可自行输入任意模型 ID。
   dashscope: [
-    { value: "qwen-plus", label: "Qwen Plus", hintKey: "profile.modelHint.stable_general" },
-    { value: "qwen-turbo", label: "Qwen Turbo", hintKey: "profile.modelHint.economy_fast" },
-    { value: "qwen-max", label: "Qwen Max", hintKey: "profile.modelHint.flagship" },
-    { value: "qwen3.6-flash", label: "Qwen 3.6 Flash", hintKey: "profile.modelHint.next_gen_economy" },
-    { value: "qwen3.6-plus", label: "Qwen 3.6 Plus", hintKey: "profile.modelHint.next_gen_main" },
+    { value: "qwen3.7-flash", label: "Qwen3.7 Flash", hintKey: "profile.modelHint.economy_fast" },
+    { value: "qwen3.7-plus", label: "Qwen3.7 Plus", hintKey: "profile.modelHint.stable_general" },
+    { value: "qwen3.7-max", label: "Qwen3.7 Max", hintKey: "profile.modelHint.flagship" },
   ],
   moonshot: [
-    { value: "moonshot-v1-8k", label: "v1-8k", hintKey: "profile.modelHint.context_8k_economy" },
-    { value: "moonshot-v1-32k", label: "v1-32k", hintKey: "profile.modelHint.context_32k" },
-    { value: "moonshot-v1-128k", label: "v1-128k", hintKey: "profile.modelHint.context_128k" },
+    { value: "kimi-k3", label: "Kimi K3", hintKey: "profile.modelHint.flagship" },
+    { value: "kimi-k2.6", label: "Kimi K2.6", hintKey: "profile.modelHint.midrange" },
   ],
   zhipu: [
-    { value: "glm-4-flash", label: "GLM-4 Flash", hintKey: "profile.modelHint.free_low_cost" },
-    { value: "glm-4-air", label: "GLM-4 Air", hintKey: "profile.modelHint.midrange" },
-    { value: "glm-4-plus", label: "GLM-4 Plus", hintKey: "profile.modelHint.flagship" },
+    { value: "glm-5.2", label: "GLM-5.2", hintKey: "profile.modelHint.flagship" },
+    { value: "glm-5.1", label: "GLM-5.1", hintKey: "profile.modelHint.midrange" },
   ],
   anthropic: [
-    { value: "claude-haiku-4-5", label: "Haiku 4.5", hintKey: "profile.modelHint.fast_economy" },
-    { value: "claude-sonnet-4-6", label: "Sonnet 4.6", hintKey: "profile.modelHint.main_recommended" },
-    { value: "claude-opus-4-7", label: "Opus 4.7", hintKey: "profile.modelHint.flagship" },
+    { value: "claude-haiku-4-5-20251001", label: "Haiku 4.5", hintKey: "profile.modelHint.fast_economy" },
+    { value: "claude-sonnet-5", label: "Sonnet 5", hintKey: "profile.modelHint.main_recommended" },
+    { value: "claude-opus-5", label: "Opus 5", hintKey: "profile.modelHint.flagship" },
   ],
   openai: [
-    { value: "gpt-4o-mini", label: "GPT-4o mini", hintKey: "profile.modelHint.economy_daily" },
-    { value: "gpt-4o", label: "GPT-4o", hintKey: "profile.modelHint.main" },
+    { value: "gpt-5.6-luna", label: "GPT-5.6 Luna", hintKey: "profile.modelHint.economy_daily" },
+    { value: "gpt-5.6-terra", label: "GPT-5.6 Terra", hintKey: "profile.modelHint.main" },
+    { value: "gpt-5.6-sol", label: "GPT-5.6 Sol", hintKey: "profile.modelHint.flagship" },
   ],
   gemini: [
     { value: "gemini-2.0-flash", label: "2.0 Flash", hintKey: "profile.modelHint.fast_economy" },
