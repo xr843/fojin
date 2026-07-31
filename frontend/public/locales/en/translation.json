@@ -1526,5 +1526,6 @@
   "profile.back_to_chat": "Back to AI Q&A",
   "profile.byok_description_generic": "Adding your own AI API key lifts the platform's free daily limit, but the usage is billed to your key. Keys are stored with AES encryption and used only for AI API calls.",
   "chat.quota_low": "Your free daily quota is running low — {{remaining}} left.",
-  "chat.quota_low_action": "Add your own API key to lift the limit"
+  "chat.quota_low_action": "Add your own API key to lift the limit",
+  "chat.configure_other_models": "Use another provider…"
 }

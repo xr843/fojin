@@ -1526,5 +1526,6 @@
   "profile.back_to_chat": "返回 AI 问答",
   "profile.byok_description_generic": "配置自己的 AI API Key 后，问答次数不再受平台免费额度限制，但调用费用由你的 Key 承担。Key 经 AES 加密存储，仅用于调用 AI 接口。",
   "chat.quota_low": "今日免费额度快用完了，剩余 {{remaining}} 次。",
-  "chat.quota_low_action": "配置自己的 API Key 可不受此限制"
+  "chat.quota_low_action": "配置自己的 API Key 可不受此限制",
+  "chat.configure_other_models": "配置其他厂商模型…"
 }

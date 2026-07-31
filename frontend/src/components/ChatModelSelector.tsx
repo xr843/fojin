@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Select, Tooltip } from "antd";
-import { PictureOutlined } from "@ant-design/icons";
+import { PictureOutlined, SettingOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { fetchChatModels, type ChatModelOption } from "../api/chatModels";
@@ -22,7 +22,12 @@ const PROVIDER_LOGO: Record<string, string> = {
 interface ChatModelSelectorProps {
   value: string;
   onChange: (modelId: string) => void;
+  /** 点「配置其他厂商模型」时调用（跳到个人中心的 API Key 面板）。 */
+  onConfigureKey: () => void;
 }
+
+/** 末项的哨兵值。它不是一个模型 —— 选中它只跳转，不改变当前所选模型。 */
+const CONFIGURE_KEY_VALUE = "__configure_key__";
 
 const FALLBACK_OPTIONS: ChatModelOption[] = [
   {
@@ -67,22 +72,37 @@ function buildLabel(model: ChatModelOption, t: TFunction): React.ReactNode {
   );
 }
 
-/** 扁平列表，不按 provider 分组。
+/** 只列当前**真能用**的模型，末尾放一个通往 Key 配置页的入口。
  *
- * 原先分组的两个代价都不小：分组标题直接显示的是原始 provider id（deepseek /
- * dashscope 这种机器名），5 个模型要占 9 行；而 antd 会给分组内的选项额外加一段
- * 左缩进（.ant-select-item-option-grouped），那正是下拉左侧那条空白。
- * 每个选项前面已经有厂商 logo，provider 这一层信息并没有丢。 */
+ * 不列不可用的，是因为它们占位却点不动：目录里多数厂商没有平台 Key，全列出来会
+ * 变成「10 项里 2 项能点」。收进一个入口后，目录随便加厂商都不会撑长这个下拉，
+ * 而「还能用别的」这件事仍然说得出来 —— 只是从一排灰条变成一句话。
+ *
+ * 也不按 provider 分组：分组标题显示的是原始 provider id（deepseek / dashscope
+ * 这种机器名），且 antd 会给分组内的选项额外加一段左缩进
+ * （.ant-select-item-option-grouped）。每个选项前面已有厂商 logo。 */
 function buildOptions(models: ChatModelOption[], t: TFunction): SelectOption[] {
-  return models.map((m) => ({
-    value: m.id,
-    label: buildLabel(m, t),
-    title: m.description,
-    disabled: !m.available,
-  }));
+  const usable = models.filter((m) => m.available);
+  return [
+    ...usable.map((m) => ({
+      value: m.id,
+      label: buildLabel(m, t),
+      title: m.description,
+    })),
+    {
+      value: CONFIGURE_KEY_VALUE,
+      label: (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <SettingOutlined />
+          {t("chat.configure_other_models")}
+        </span>
+      ),
+      title: t("chat.configure_other_models"),
+    },
+  ];
 }
 
-export default function ChatModelSelector({ value, onChange }: ChatModelSelectorProps) {
+export default function ChatModelSelector({ value, onChange, onConfigureKey }: ChatModelSelectorProps) {
   const { t } = useTranslation();
   const [models, setModels] = useState<ChatModelOption[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -133,7 +153,14 @@ export default function ChatModelSelector({ value, onChange }: ChatModelSelector
       loading={loading}
       disabled={loading}
       value={value}
-      onChange={onChange}
+      // 末项不是模型：拦下来只跳转，不写进 value，也不落 localStorage。
+      onChange={(next) => {
+        if (next === CONFIGURE_KEY_VALUE) {
+          onConfigureKey();
+          return;
+        }
+        onChange(next);
+      }}
       options={options}
     />
   );

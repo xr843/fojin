@@ -1889,7 +1889,7 @@ export default function ChatPage() {
                     <DownOutlined style={{ fontSize: 10 }} />
                   </Button>
                 </Tooltip>
-                <ChatModelSelector value={modelId} onChange={handleModelChange} />
+                <ChatModelSelector value={modelId} onChange={handleModelChange} onConfigureKey={goConfigureKey} />
                 <span className="chat-input-spacer" />
                 {sending ? (
                   <Button
