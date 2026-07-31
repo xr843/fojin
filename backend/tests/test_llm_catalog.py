@@ -124,3 +124,44 @@ def test_resolve_byok_provider_mismatch_falls_to_platform(monkeypatch):
     assert model == "deepseek-v4-pro"
     assert is_byok is False
     assert provider == "deepseek"
+
+
+# ── DeepSeek V4 Flash（可选档，默认仍是 pro）─────────────────────────────
+
+def test_flash_is_in_catalog_but_not_the_default():
+    """加 flash 的整个前提就是"默认不变"——默认路径的答案质量要等 backend/eval
+    的 90 题量出引用准确性与幻觉率的差之后再说。这条断言把这个前提钉住：
+    有人手滑把 flash 挪到第一位、或改了 DEFAULT_MODEL_ID，这里立刻红。"""
+    assert "deepseek:v4-flash" in CATALOG_BY_ID
+    assert DEFAULT_MODEL_ID == "deepseek:v4-pro"
+    assert CATALOG[0].id == "deepseek:v4-pro", "首项即默认（前端无 localStorage 时取它）"
+
+
+def test_resolve_platform_deepseek_flash(monkeypatch):
+    """flash 与 pro 同属 deepseek，平台已有的 Key 直接覆盖它 —— 加进目录就是
+    所有人立刻可用，不需要任何人配 Key。"""
+    monkeypatch.setattr(llm_module.settings, "llm_api_url", "https://api.deepseek.com/v1")
+    monkeypatch.setattr(llm_module.settings, "llm_api_key", "platform-key")
+
+    url, key, model, is_byok, provider = _resolve_with_model_override(None, "deepseek:v4-flash")
+    assert url == PROVIDER_URLS["deepseek"]
+    assert key == "platform-key"
+    assert model == "deepseek-v4-flash"   # 上游真实模型名，不是目录 id
+    assert is_byok is False
+    assert provider == "deepseek"
+
+
+def test_flash_counts_as_a_reasoning_model():
+    """两个模型都支持思考模式。_REASONING_MODEL_MARKERS 里的 "deepseek-v4" 是
+    子串匹配，所以 flash 自动落进推理分支 —— 推理额度与前端那条「正在推敲经文」
+    的进度提示都靠它。若有人把标记收窄成精确匹配，这条会红。"""
+    assert llm_module._is_reasoning_model("deepseek-v4-flash") is True
+    assert llm_module._is_reasoning_model("deepseek-v4-pro") is True
+
+
+def test_flash_gets_the_same_reasoning_headroom_as_pro():
+    """推理模型会额外拿一份 headroom，免得隐藏推理把可见答案的额度吃光。
+    flash 必须和 pro 拿到一样的待遇，否则长答案会被截断。"""
+    assert llm_module._with_reasoning_headroom("deepseek-v4-flash", 2000) == \
+           llm_module._with_reasoning_headroom("deepseek-v4-pro", 2000)
+    assert llm_module._with_reasoning_headroom("deepseek-v4-flash", 2000) > 2000
