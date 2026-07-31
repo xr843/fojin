@@ -165,3 +165,12 @@ def test_flash_gets_the_same_reasoning_headroom_as_pro():
     assert llm_module._with_reasoning_headroom("deepseek-v4-flash", 2000) == \
            llm_module._with_reasoning_headroom("deepseek-v4-pro", 2000)
     assert llm_module._with_reasoning_headroom("deepseek-v4-flash", 2000) > 2000
+
+
+def test_model_descriptions_carry_no_pricing():
+    """描述是给读者选模型用的提示，不是价目表。摆价格在选择器里只会让人以为
+    便宜的那个"缩水"了 —— 而两者规格其实相同。"""
+    import re
+    for opt in CATALOG:
+        assert not re.search(r"价格|费用|元|/\s*3|便宜|免费", opt.description), \
+            f"{opt.id} 的描述里出现了价格字样: {opt.description!r}"
