@@ -6,7 +6,7 @@ import { Typography, Card, Tabs, List, Tag, Empty, Spin, Descriptions, Button, S
 import { BookOutlined, HistoryOutlined, UserOutlined, ReadOutlined, KeyOutlined, DeleteOutlined, CheckCircleOutlined, LockOutlined, ArrowLeftOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../stores/authStore";
-import { getBookmarks, getHistory, getApiKeyStatus, saveApiKey, deleteApiKey, changePassword } from "../api/client";
+import { getBookmarks, getHistory, getApiKeyStatus, getChatQuota, saveApiKey, deleteApiKey, changePassword } from "../api/client";
 
 const { Title } = Typography;
 
@@ -111,6 +111,15 @@ export default function ProfilePage() {
     value: p.value,
     label: t(p.labelKey),
   }));
+
+  // 额度上限从接口取，不写死在翻译文件里。此前 profile.byok_description 里硬编码
+  // 的「每日 10 次」是匿名用户的限额，而这个页面只有登录用户看得到（他们的实际
+  // 上限是 200）—— 数字与 FREE_DAILY_LIMIT_USER 各写一处，迟早再次漂移。
+  const { data: quota } = useQuery({
+    queryKey: ["chat-quota"],
+    queryFn: getChatQuota,
+    enabled: !!token,
+  });
 
   const { data: keyStatus, refetch: refetchKey } = useQuery({
     queryKey: ["apiKeyStatus"],
@@ -356,7 +365,9 @@ export default function ProfilePage() {
                   <Space direction="vertical" size="middle" style={{ width: "100%" }}>
                     <Alert
                       message="Bring Your Own Key (BYOK)"
-                      description={t("profile.byok_description")}
+                      description={quota
+                        ? t("profile.byok_description", { limit: quota.limit })
+                        : t("profile.byok_description_generic")}
                       type="info"
                       showIcon
                     />

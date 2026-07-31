@@ -324,7 +324,7 @@
   "profile.password_changed": "Password changed. Other devices have been signed out.",
   "profile.password_too_frequent": "Too many attempts. Please try again later.",
   "profile.password_change_failed": "The current password is incorrect or the new password does not meet requirements",
-  "profile.byok_description": "Add your own AI API key for unlimited AI Buddhist Q&A. Without a key, the platform free quota applies (10 requests per day). Keys are stored with AES encryption and used only for AI API calls.",
+  "profile.byok_description": "Signed-in accounts get {{limit}} free questions a day — plenty for regular study. Adding your own AI API key lifts that limit, but the usage is billed to your key. Keys are stored with AES encryption and used only for AI API calls.",
   "profile.api_key_configured": "Configured: {{provider}} · {{preview}}",
   "profile.delete": "Delete",
   "profile.provider": "Provider",
@@ -1523,5 +1523,8 @@
   "chat.save": "Save",
   "chat.search_sessions_label": "Search conversations",
   "chat.recent_chats": "Recent chats",
-  "profile.back_to_chat": "Back to AI Q&A"
+  "profile.back_to_chat": "Back to AI Q&A",
+  "profile.byok_description_generic": "Adding your own AI API key lifts the platform's free daily limit, but the usage is billed to your key. Keys are stored with AES encryption and used only for AI API calls.",
+  "chat.quota_low": "Your free daily quota is running low — {{remaining}} left.",
+  "chat.quota_low_action": "Add your own API key to lift the limit"
 }

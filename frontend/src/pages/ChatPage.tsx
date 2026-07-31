@@ -74,6 +74,10 @@ import {
 } from "../api/chatAttachments";
 import { useAuthStore, type UserProfile } from "../stores/authStore";
 
+// 登录用户的额度提示只在快用完时出现。常驻一个「今日剩余 198 次」是纯噪音 ——
+// 而毫无预警地撞上上限、直接吃一个错误，才是真正会让人懵的那种体验。
+const LOW_QUOTA_THRESHOLD = 20;
+
 const MAX_ATTACHMENTS = 5;
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 const ATTACHMENT_ACCEPT = ".pdf,.txt,.md,.docx,.csv,.html,.htm";
@@ -1805,6 +1809,20 @@ export default function ChatPage() {
               <Alert
                 message={<span>{t("chat.quota_info", { limit: quota.limit, remaining: quota.remaining })}<a onClick={() => navigate("/login")}>{t("chat.login")}</a>{t("chat.login_quota_hint")}</span>}
                 type={quota.remaining <= 2 ? "warning" : "info"} showIcon closable
+                style={{ marginBottom: 8, fontSize: 12 }}
+              />
+            )}
+            {/* 登录用户此前在这里什么都看不到 —— 撞到上限是毫无预警的。
+                remaining 对自带 Key 的用户是 -1，所以 >= 0 已经把他们排除掉了。 */}
+            {user && quota && quota.remaining >= 0 && quota.remaining <= LOW_QUOTA_THRESHOLD && (
+              <Alert
+                message={
+                  <span>
+                    {t("chat.quota_low", { remaining: quota.remaining })}
+                    <a onClick={goConfigureKey}>{t("chat.quota_low_action")}</a>
+                  </span>
+                }
+                type={quota.remaining <= 3 ? "error" : "warning"} showIcon closable
                 style={{ marginBottom: 8, fontSize: 12 }}
               />
             )}

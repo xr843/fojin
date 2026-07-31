@@ -697,3 +697,39 @@ describe("会话与 URL", () => {
     });
   });
 });
+
+// ── 额度将尽提醒（登录用户此前什么都看不到）────────────────────────────
+
+describe("额度提醒", () => {
+  function loggedIn(quota: { limit: number; used: number; remaining: number; has_byok: boolean }) {
+    vi.mocked(getChatQuota).mockResolvedValue(quota);
+    return renderPage();
+  }
+
+  // 承重点：阈值以上不该出现。常驻一个「今日剩余 197 次」是纯噪音，
+  // 只断言"快用完时会显示"的话，一个无条件常显的实现照样能过。
+  it("额度充足时不打扰（197/200 不提示）", async () => {
+    loggedIn({ limit: 200, used: 3, remaining: 197, has_byok: false });
+    await screen.findByText("「三毒」指的是哪三种毒？");
+    expect(screen.queryByText(/额度快用完/)).toBeNull();
+  });
+
+  it("剩余降到阈值内时提醒（15 次）", async () => {
+    loggedIn({ limit: 200, used: 185, remaining: 15, has_byok: false });
+    expect(await screen.findByText(/今日免费额度快用完了，剩余 15 次/)).toBeInTheDocument();
+  });
+
+  it("剩余极少时升级为 error 级", async () => {
+    const { container } = loggedIn({ limit: 200, used: 198, remaining: 2, has_byok: false });
+    await screen.findByText(/剩余 2 次/);
+    expect(container.querySelector(".ant-alert-error")).not.toBeNull();
+  });
+
+  // 自带 Key 的用户后端返回 remaining = -1（不限次）。若实现用 `remaining <= 20`
+  // 判定，-1 会满足条件 —— 给一个根本没有限额的人弹「额度快用完」。
+  it("承重点: 自带 Key（remaining 为 -1）不弹额度提醒", async () => {
+    loggedIn({ limit: 200, used: 500, remaining: -1, has_byok: true });
+    await screen.findByText("「三毒」指的是哪三种毒？");
+    expect(screen.queryByText(/额度快用完/)).toBeNull();
+  });
+});
