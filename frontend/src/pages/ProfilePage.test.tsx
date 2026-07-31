@@ -10,11 +10,13 @@ import { useAuthStore } from "../stores/authStore";
 import {
   getApiKeyStatus,
   getBookmarks,
+  getChatQuota,
   getHistory,
 } from "../api/client";
 
 vi.mock("../api/client", () => ({
   getApiKeyStatus: vi.fn(),
+  getChatQuota: vi.fn(),
   getBookmarks: vi.fn(),
   getHistory: vi.fn(),
   saveApiKey: vi.fn(),
@@ -67,6 +69,9 @@ describe("ProfilePage", () => {
       model: null,
       key_preview: null,
     });
+    vi.mocked(getChatQuota).mockResolvedValue({
+      limit: 200, used: 3, remaining: 197, has_byok: false,
+    });
     vi.mocked(getBookmarks).mockResolvedValue({ total: 0, page: 1, size: 20, items: [] });
     vi.mocked(getHistory).mockResolvedValue({ total: 0, page: 1, size: 20, items: [] });
     useAuthStore.setState({ token: null, user: null });
@@ -108,6 +113,44 @@ describe("ProfilePage", () => {
     expect(screen.getByText("Display name")).toBeInTheDocument();
     expect(screen.getByText("Email")).toBeInTheDocument();
     expect(screen.getByText("Joined")).toBeInTheDocument();
+  });
+
+  // ── BYOK 说明里的额度数字 ─────────────────────────────────────────
+  //
+  // 这段文案原先硬编码「每日 10 次」——那是**匿名**用户的限额，而这个页面只有
+  // 登录用户看得到（他们的实际上限是 200）。少说了 20 倍，还是注册用户唯一能
+  // 看到额度的地方。根因是数字在翻译文件和后端常量里各写了一处。
+
+  it("额度数字来自接口，不是翻译文件里的写死值", async () => {
+    useAuthStore.setState({
+      token: "token",
+      user: {
+        id: 1, username: "reader", email: "reader@example.com", display_name: null,
+        role: "user", is_active: true, created_at: "2026-01-10T00:00:00Z",
+      },
+    });
+    vi.mocked(getChatQuota).mockResolvedValue({
+      limit: 999, used: 0, remaining: 999, has_byok: false,   // 故意取一个不可能写死的值
+    });
+    renderPage(<ProfilePage />, "/profile?tab=apikey");
+
+    expect(await screen.findByText(/999 free questions a day/)).toBeInTheDocument();
+  });
+
+  it("拿不到额度时退回不带数字的说法，而不是显示错的数字", async () => {
+    useAuthStore.setState({
+      token: "token",
+      user: {
+        id: 1, username: "reader", email: "reader@example.com", display_name: null,
+        role: "user", is_active: true, created_at: "2026-01-10T00:00:00Z",
+      },
+    });
+    vi.mocked(getChatQuota).mockRejectedValue(new Error("boom"));
+    const { container } = renderPage(<ProfilePage />, "/profile?tab=apikey");
+
+    await screen.findByText(/Adding your own AI API key lifts the platform/);
+    // 兜底文案里一个具体次数都不该出现
+    expect(container.textContent).not.toMatch(/\d+\s*(free questions|次)/);
   });
 
   // ── 从 /chat 来的返回入口 ──────────────────────────────────────────

@@ -324,7 +324,7 @@
   "profile.password_changed": "密码已修改，其他设备上的登录已失效",
   "profile.password_too_frequent": "操作过于频繁，请稍后再试",
   "profile.password_change_failed": "当前密码不正确或新密码不合要求",
-  "profile.byok_description": "配置自己的 AI API Key，即可无限使用 AI 佛典问答功能。不配置则使用平台免费额度（每日 10 次）。Key 经 AES 加密存储，仅用于调用 AI 接口。",
+  "profile.byok_description": "登录后每日可免费问答 {{limit}} 次，日常研读足够用。配置自己的 AI API Key 后不再受此限制，但调用费用由你的 Key 承担。Key 经 AES 加密存储，仅用于调用 AI 接口。",
   "profile.api_key_configured": "已配置: {{provider}} · {{preview}}",
   "profile.delete": "删除",
   "profile.provider": "服务商",
@@ -1523,5 +1523,8 @@
   "chat.save": "保存",
   "chat.search_sessions_label": "搜索会话",
   "chat.recent_chats": "最近聊天",
-  "profile.back_to_chat": "返回 AI 问答"
+  "profile.back_to_chat": "返回 AI 问答",
+  "profile.byok_description_generic": "配置自己的 AI API Key 后，问答次数不再受平台免费额度限制，但调用费用由你的 Key 承担。Key 经 AES 加密存储，仅用于调用 AI 接口。",
+  "chat.quota_low": "今日免费额度快用完了，剩余 {{remaining}} 次。",
+  "chat.quota_low_action": "配置自己的 API Key 可不受此限制"
 }
