@@ -43,12 +43,6 @@ interface SelectOption {
   disabled?: boolean;
 }
 
-interface SelectGroup {
-  label: string;
-  title: string;
-  options: SelectOption[];
-}
-
 function buildLabel(model: ChatModelOption, t: TFunction): React.ReactNode {
   const suffix = model.available ? "" : t("chat.model_requires_key");
   const text = `${model.label}${suffix}`;
@@ -73,27 +67,19 @@ function buildLabel(model: ChatModelOption, t: TFunction): React.ReactNode {
   );
 }
 
-function groupByProvider(models: ChatModelOption[], t: TFunction): SelectGroup[] {
-  const groups = new Map<string, ChatModelOption[]>();
-  for (const m of models) {
-    const arr = groups.get(m.provider) ?? [];
-    arr.push(m);
-    groups.set(m.provider, arr);
-  }
-  const result: SelectGroup[] = [];
-  for (const [provider, items] of groups) {
-    result.push({
-      label: provider,
-      title: provider,
-      options: items.map((m) => ({
-        value: m.id,
-        label: buildLabel(m, t),
-        title: m.description,
-        disabled: !m.available,
-      })),
-    });
-  }
-  return result;
+/** 扁平列表，不按 provider 分组。
+ *
+ * 原先分组的两个代价都不小：分组标题直接显示的是原始 provider id（deepseek /
+ * dashscope 这种机器名），5 个模型要占 9 行；而 antd 会给分组内的选项额外加一段
+ * 左缩进（.ant-select-item-option-grouped），那正是下拉左侧那条空白。
+ * 每个选项前面已经有厂商 logo，provider 这一层信息并没有丢。 */
+function buildOptions(models: ChatModelOption[], t: TFunction): SelectOption[] {
+  return models.map((m) => ({
+    value: m.id,
+    label: buildLabel(m, t),
+    title: m.description,
+    disabled: !m.available,
+  }));
 }
 
 export default function ChatModelSelector({ value, onChange }: ChatModelSelectorProps) {
@@ -131,20 +117,24 @@ export default function ChatModelSelector({ value, onChange }: ChatModelSelector
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const groupedOptions = useMemo<SelectGroup[]>(() => {
+  const options = useMemo<SelectOption[]>(() => {
     if (!models) return [];
-    return groupByProvider(models, t);
+    return buildOptions(models, t);
   }, [models, t]);
 
   return (
     <Select
       size="small"
       style={{ minWidth: 180 }}
+      // 弹层不跟随触发器宽度：触发器只有 180px，跟随会把「通义千问 Qwen3.6 Plus」
+      // 「Kimi K2.6（需配置 Key）」这类较长的标签截断。
+      popupMatchSelectWidth={false}
+      classNames={{ popup: { root: "chat-model-popup" } }}
       loading={loading}
       disabled={loading}
       value={value}
       onChange={onChange}
-      options={groupedOptions}
+      options={options}
     />
   );
 }

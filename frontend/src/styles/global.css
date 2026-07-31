@@ -430,6 +430,17 @@ em {
   background: rgba(217, 208, 193, 0.3);
 }
 
+/* 模型选择下拉：收紧行高与左右内边距。antd 默认的 5px/12px 是给正文尺寸的列表
+   准备的，而这里是 size="small" 的工具栏控件，跟着输入框走更协调。 */
+.chat-model-popup .ant-select-item {
+  min-height: 0;
+  padding: 5px 10px;
+  line-height: 1.35;
+}
+.chat-model-popup {
+  min-width: 210px;
+}
+
 /* 侧栏右缘的分隔线。
    用 ::after 而不是 border-right：全局是 border-box，加边框会把内容盒挤掉
    1px，48px 轨里 34px 的按钮就不再正中（实测偏移会从 0 变成 -0.5）。绝对定位
