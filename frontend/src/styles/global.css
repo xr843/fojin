@@ -430,6 +430,37 @@ em {
   background: rgba(217, 208, 193, 0.3);
 }
 
+/* ── 收起态：一条居中的图标轨 ─────────────────────────────────────── */
+.chat-sidebar[data-collapsed] {
+  align-items: center;
+  gap: 4px;          /* 展开态的 8px 在窄轨里会把三个图标拉得过散 */
+  padding-top: 2px;
+}
+.chat-rail-btn.ant-btn {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  padding: 0;
+  border-radius: 8px;
+  color: var(--fj-ink-muted);
+  /* 展开态的 + 是主按钮（有边框有底色），收起态统一成无边框图标 —— 带边框的
+     方块在 48px 宽的轨里又挤又重。 */
+  border: none;
+  box-shadow: none;
+}
+.chat-rail-btn.ant-btn:hover,
+.chat-rail-btn.ant-btn:focus-visible {
+  background: rgba(217, 208, 193, 0.45);
+  color: var(--fj-ink);
+}
+.chat-rail-btn.ant-btn:focus-visible {
+  outline: 2px solid var(--fj-accent);
+  outline-offset: 1px;
+}
+.chat-rail-btn .anticon {
+  font-size: 16px;
+}
+
 /* Key 状态行沉到侧栏底部（会话列表是 flex:1，排它后面即到底） */
 .chat-sidebar-foot {
   flex-shrink: 0;

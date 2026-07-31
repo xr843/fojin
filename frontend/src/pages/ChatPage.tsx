@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams, Link } from "react-router";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
 import { Input, Button, message, Alert, Tooltip, Modal, Tag, Spin, Dropdown } from "antd";
+import type { InputRef } from "antd";
 import Markdown, { defaultUrlTransform, type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
@@ -33,6 +34,7 @@ import {
   EditOutlined,
   PushpinOutlined,
   PushpinFilled,
+  SearchOutlined,
 } from "@ant-design/icons";
 const ShareCard = lazy(() => import("../components/ShareCard"));
 const CitationDrawer = lazy(() => import("../components/CitationDrawer"));
@@ -676,14 +678,27 @@ export default function ChatPage() {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem("fojin.chat.sidebarCollapsed") === "1";
   });
-  const toggleSidebarCollapsed = () => {
-    setSidebarCollapsed((prev) => {
-      const next = !prev;
-      try { window.localStorage.setItem("fojin.chat.sidebarCollapsed", next ? "1" : "0"); } catch { /* ignore */ }
-      return next;
-    });
-  };
+  const setCollapsed = useCallback((next: boolean) => {
+    setSidebarCollapsed(next);
+    try { window.localStorage.setItem("fojin.chat.sidebarCollapsed", next ? "1" : "0"); } catch { /* ignore */ }
+  }, []);
+  const toggleSidebarCollapsed = () => setCollapsed(!sidebarCollapsed);
   const [sessionFilter, setSessionFilter] = useState("");
+  // 收起态点搜索图标 → 展开侧栏并把光标送进搜索框。展开是异步的（输入框此刻还
+  // 没挂载），所以用一个 ref 记下意图，等 sidebarCollapsed 落地后再 focus。
+  // 用 ref 而不是 state：effect 里改 state 会被 React Compiler 判成
+  // set-state-in-effect（本仓库是 error 级）。
+  const sessionSearchRef = useRef<InputRef>(null);
+  const wantSearchFocusRef = useRef(false);
+  useEffect(() => {
+    if (sidebarCollapsed || !wantSearchFocusRef.current) return;
+    wantSearchFocusRef.current = false;
+    sessionSearchRef.current?.focus();
+  }, [sidebarCollapsed]);
+  const handleRailSearch = useCallback(() => {
+    wantSearchFocusRef.current = true;
+    setCollapsed(false);
+  }, [setCollapsed]);
   const [tabIndex, setTabIndex] = useState(-1);
   const [hasOlderMessages, setHasOlderMessages] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -1462,19 +1477,43 @@ export default function ChatPage() {
             <Button
               type="text"
               size="small"
+              className={sidebarCollapsed ? "chat-rail-btn" : undefined}
               icon={sidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
               onClick={toggleSidebarCollapsed}
               aria-label={sidebarCollapsed ? t("chat.expand_sidebar") : t("chat.collapse_sidebar")}
               style={{ alignSelf: sidebarCollapsed ? "center" : "flex-end", color: "var(--fj-ink-muted)" }}
             />
           </Tooltip>
+          {/* 收起态是一条图标轨：按钮去掉边框、统一 32×32 居中。带边框的方块在
+              48px 宽的窄轨里会显得又挤又重，这也是它和 ChatGPT 观感差最多的地方。 */}
           <Tooltip title={sidebarCollapsed ? t("chat.new_chat") : ""} placement="right">
-            <Button icon={<PlusOutlined />} block={!sidebarCollapsed} onClick={handleNewChat} aria-label={t("chat.new_chat")}>
+            <Button
+              icon={<PlusOutlined />}
+              type={sidebarCollapsed ? "text" : "default"}
+              className={sidebarCollapsed ? "chat-rail-btn" : undefined}
+              block={!sidebarCollapsed}
+              onClick={handleNewChat}
+              aria-label={t("chat.new_chat")}
+            >
               {!sidebarCollapsed && t("chat.new_chat")}
             </Button>
           </Tooltip>
+          {/* 搜索在收起态原本整个消失。这里给它一个入口：点开即展开并聚焦。
+              显示条件与展开态的搜索框严格一致，否则会展开出一个没有搜索框的侧栏。 */}
+          {sidebarCollapsed && sessions && sessions.length > 5 && (
+            <Tooltip title={t("chat.search_sessions_label")} placement="right">
+              <Button
+                type="text"
+                className="chat-rail-btn"
+                icon={<SearchOutlined />}
+                onClick={handleRailSearch}
+                aria-label={t("chat.search_sessions_label")}
+              />
+            </Tooltip>
+          )}
           {!sidebarCollapsed && sessions && sessions.length > 5 && (
             <Input
+              ref={sessionSearchRef}
               placeholder={t("chat.search_sessions")}
               size="small"
               allowClear
@@ -1503,6 +1542,27 @@ export default function ChatPage() {
               </div>
             ))}
           </div>}
+          {/* 收起态原本连 Key 状态一起消失了 —— 但「有没有配 Key」直接决定问答
+              能不能用，是这条轨上唯一必须留住的状态。压成一个图标沉到底部。 */}
+          {sidebarCollapsed && (
+            <>
+              <div style={{ flex: 1 }} />
+              <Tooltip
+                placement="right"
+                title={keyStatus?.has_api_key
+                  ? `${t("chat.key_configured")} (${keyStatus.provider})`
+                  : t("chat.configure_key")}
+              >
+                <Button
+                  type="text"
+                  className="chat-rail-btn"
+                  icon={<SettingOutlined />}
+                  onClick={() => navigate("/profile?tab=apikey")}
+                  aria-label={t("chat.configure_key")}
+                />
+              </Tooltip>
+            </>
+          )}
           {!sidebarCollapsed && (
             <div className="chat-sidebar-foot">
               <Button icon={<SettingOutlined />} block type="text" size="small"

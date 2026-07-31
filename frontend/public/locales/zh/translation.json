@@ -1520,5 +1520,6 @@
   "chat.pin_failed": "操作失败",
   "chat.session_group_pinned": "已置顶",
   "chat.session_actions": "更多操作",
-  "chat.save": "保存"
+  "chat.save": "保存",
+  "chat.search_sessions_label": "搜索会话"
 }

@@ -105,6 +105,8 @@ beforeEach(() => {
 afterEach(() => {
   vi.clearAllMocks();
   useAuthStore.setState({ token: null, user: null });
+  // 侧栏收起状态持久化在 localStorage —— 不清的话它会泄漏到后面的用例里
+  localStorage.removeItem("fojin.chat.sidebarCollapsed");
 });
 
 /** 等空状态首屏就绪（建议卡片到位）后再断言结构。 */
@@ -493,4 +495,60 @@ describe("会话行 ⋯ 菜单", () => {
       .find((el) => el.textContent?.includes("四圣谛是哪四谛"))!;
     expect(pinnedRow.querySelector(".chat-session-pin-mark")).not.toBeNull();
   });
+});
+
+// ── 收起态的图标轨（对标 ChatGPT 的窄轨）────────────────────────────────
+
+describe("收起态图标轨", () => {
+  beforeEach(() => {
+    // 搜索入口与展开态的搜索框共用 `sessions.length > 5` 这个显示条件，
+    // 所以这里必须给足 6 条 —— 少于 6 条时轨上本来就不该有搜索图标。
+    vi.mocked(getChatSessions).mockResolvedValue(
+      Array.from({ length: 6 }, (_, i) => ({
+        id: (i + 1) as ChatSessionId,
+        title: `会话 ${i + 1}`,
+        pinned: false,
+        created_at: new Date().toISOString(),
+      })),
+    );
+  });
+
+  // 收起态的图标轨：点搜索图标要展开侧栏**并且**把光标送进搜索框。只断言
+  // "搜索框出现了"是不够的 —— 展开后还要用户自己再点一次输入框，那这个图标
+  // 就只是个"展开"按钮的重复。
+  it("收起态: 点搜索图标 → 展开侧栏并聚焦搜索框", async () => {
+    localStorage.setItem("fojin.chat.sidebarCollapsed", "1");
+    const { container } = renderPage();
+    await waitFor(() => {
+      expect(container.querySelector(".chat-sidebar[data-collapsed]")).not.toBeNull();
+    });
+    // 收起态不该有搜索框，只有轨上的图标
+    expect(container.querySelector(".chat-sidebar input")).toBeNull();
+
+    // findBy* 而非 getBy*：会话列表是异步查询，图标要等它落地才出现
+    fireEvent.click(await screen.findByRole("button", { name: "搜索会话" }));
+
+    await waitFor(() => {
+      expect(container.querySelector(".chat-sidebar[data-collapsed]")).toBeNull();
+    });
+    const input = container.querySelector<HTMLInputElement>(".chat-sidebar input")!;
+    expect(input).not.toBeNull();
+    expect(document.activeElement).toBe(input);
+  });
+
+  // 收起态原本把 Key 状态整个藏了 —— 而"有没有配 Key"直接决定问答能不能用。
+  it("收起态: 轨上是四个无边框图标，Key 状态没被藏掉", async () => {
+    localStorage.setItem("fojin.chat.sidebarCollapsed", "1");
+    const { container } = renderPage();
+    await waitFor(() => {
+      expect(container.querySelector(".chat-sidebar[data-collapsed]")).not.toBeNull();
+    });
+    await screen.findByRole("button", { name: "搜索会话" });   // 等会话查询落地
+    const rail = container.querySelector(".chat-sidebar")!;
+    const labels = [...rail.querySelectorAll("button")].map((b) => b.getAttribute("aria-label"));
+    expect(labels).toEqual(["展开侧栏", "新对话", "搜索会话", "配置 API Key"]);
+    // 每个都挂上了图标轨样式类（边框是靠 .chat-rail-btn 去掉的）
+    expect(rail.querySelectorAll("button.chat-rail-btn")).toHaveLength(4);
+  });
+
 });

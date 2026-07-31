@@ -1520,5 +1520,6 @@
   "chat.pin_failed": "Action failed",
   "chat.session_group_pinned": "Pinned",
   "chat.session_actions": "More actions",
-  "chat.save": "Save"
+  "chat.save": "Save",
+  "chat.search_sessions_label": "Search conversations"
 }
