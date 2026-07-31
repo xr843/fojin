@@ -976,6 +976,8 @@
   "chat.retrieved_hint": "Retrieved {{n}} scripture(s)",
   "chat.retrieved_title": "《{{title}}》",
   "chat.generating": "Generating answer",
+  "chat.reasoning_hint": "Working through the scriptures",
+  "chat.thinking_seconds": " (thinking for {{n}}s)",
   "chat.request_failed": "Request failed, please retry",
   "chat.reference_sources": "Sources",
   "chat.export_empty": "No conversation to export",

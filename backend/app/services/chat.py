@@ -100,6 +100,10 @@ logger = logging.getLogger(__name__)
 # browsers per spec, so this is invisible to the frontend consumer.
 LLM_STREAM_HEARTBEAT_INTERVAL_S = 25.0
 
+# 推理进度事件的最小间隔。推理模型可产出数千 token 的 reasoning_content，逐块
+# 转发等于把 SSE 流量放大数倍，而前端只用它显示一个「已思考 N 秒」的活性信号。
+REASONING_EMIT_INTERVAL_S = 1.0
+
 # Fixed backoff before a single same-provider retry of a transient
 # pre-first-token stream failure (see _stream_attempt). Kept short: the goal
 # is to ride out a one-off blip (connection reset, upstream 5xx/429/timeout),
@@ -490,7 +494,7 @@ async def send_message(
         hot_question_id=hot_question_id, model_id=model_id, attachment_ids=attachment_ids,
     )
     _t1 = _time.monotonic()
-    logger.debug("TIMING: _prepare_chat took %.2fs", _t1 - _t0)
+    logger.info("TIMING: _prepare_chat took %.2fs", _t1 - _t0)
 
     # Call LLM (with fallback for platform users only)
     async def _call_once(u: str, k: str, m: str, p: str) -> str:
@@ -512,7 +516,7 @@ async def send_message(
     answer: str
     try:
         answer = await _call_once(api_url, api_key, model, provider)
-        logger.debug("TIMING: LLM call took %.2fs", _time.monotonic() - _t1)
+        logger.info("TIMING: LLM call took %.2fs", _time.monotonic() - _t1)
     except (httpx.TimeoutException, httpx.HTTPStatusError, httpx.RequestError) as primary_exc:
         status = getattr(getattr(primary_exc, "response", None), "status_code", None)
         if is_byok and status in (400, 401, 403, 404, 422, 429):
@@ -638,8 +642,28 @@ async def _interleave_heartbeat(inner_gen, heartbeat_interval: float):
 
     async def _producer():
         try:
-            async for chunk in inner_gen:
-                await queue.put(("content", chunk))
+            # inner_gen 自己给出 kind（"content" / "reasoning"），这里只透传。
+            # 推理增量必须与正文分道：它绝不能进 full_answer，也不能置
+            # received_first_token —— 见下方消费端的注释。
+            async for item in inner_gen:
+                # 显式守卫，不要退回 `async for kind, chunk in inner_gen`：若哪天
+                # 有人传回产出裸 str 的生成器，两字一块的中文 chunk（流式里很常见）
+                # 会被静默解成 kind="色", chunk="空"，而更长的块才报错 —— 间歇性的
+                # 静默错乱，正是本次改动要根除的那类问题。
+                if (
+                    not isinstance(item, tuple)
+                    or len(item) != 2
+                    or item[0] not in ("content", "reasoning")
+                ):
+                    # 取值也要查，不只查形状：队列用 "done"/"error" 作哨兵，
+                    # inner_gen 若产出 ("done", None) 会被消费端当作流正常结束，
+                    # **静默截断答案**；产出 ("error", x) 会被当成上游异常抛出。
+                    # 形状错了至少会报 ValueError，取值撞了则完全无声。
+                    raise TypeError(
+                        f"_interleave_heartbeat 的 inner_gen 必须产出 "
+                        f'("content"|"reasoning", text)，收到 {item!r:.80}'
+                    )
+                await queue.put(item)
             await queue.put(("done", None))
         except asyncio.CancelledError:
             raise
@@ -663,7 +687,9 @@ async def _interleave_heartbeat(inner_gen, heartbeat_interval: float):
                 return
             if kind == "error":
                 raise payload  # type: ignore[misc]
-            yield ("content", payload)
+            # 透传 producer 给的 kind（"content" / "reasoning"）。此处曾硬编码成
+            # ("content", payload)，会把上游区分好的推理增量重新混成正文。
+            yield (kind, payload)
     finally:
         if not task.done():
             task.cancel()
@@ -867,7 +893,7 @@ async def send_message_stream(
                         if event_type == "content_block_delta":
                             content = chunk.get("delta", {}).get("text", "")
                             if content:
-                                yield content
+                                yield "content", content
                         elif event_type == "message_stop":
                             break
                     except (json.JSONDecodeError, KeyError):
@@ -891,7 +917,15 @@ async def send_message_stream(
                         delta = chunk.get("choices", [{}])[0].get("delta", {})
                         content = delta.get("content", "")
                         if content:
-                            yield content
+                            yield "content", content
+                            continue
+                        # 推理模型（deepseek-v4-* 等）在思考阶段发的是
+                        # reasoning_content，此前这些块因 content 为空被整个丢弃
+                        # —— 用户在 7–13 秒里只看到一句静态占位符，而服务端一直
+                        # 在收数据。作为独立 kind 吐出去，供上游发进度事件。
+                        reasoning = delta.get("reasoning_content", "")
+                        if reasoning:
+                            yield "reasoning", reasoning
                     except (json.JSONDecodeError, IndexError, KeyError):
                         continue
 
@@ -911,9 +945,14 @@ async def send_message_stream(
         while True:
             yielded = False
             try:
-                async for chunk in _stream_llm_once(u, k, m, p):
-                    yielded = True
-                    yield chunk
+                async for kind, chunk in _stream_llm_once(u, k, m, p):
+                    # yielded 只由正文置真。重试语义是「已经吐过 token 就不重试，
+                    # 否则会重复输出」—— 推理是短暂的进度信号，重复无害；答案重复
+                    # 有害。只认正文恰好等价于本改动之前的行为（那时推理被丢弃，
+                    # yielded 本来就不会因它置真）。
+                    if kind == "content":
+                        yielded = True
+                    yield kind, chunk
                 return
             except (httpx.TimeoutException, httpx.HTTPStatusError, httpx.RequestError) as exc:
                 status = getattr(getattr(exc, "response", None), "status_code", None)
@@ -942,6 +981,8 @@ async def send_message_stream(
 
     full_answer = ""
     received_first_token = False
+    reasoning_chars = 0
+    last_reasoning_emit = 0.0
     phase2_start = _time.monotonic()
     try:
         for idx, (att_url, att_key, att_model, att_provider, is_fb) in enumerate(attempts):
@@ -955,6 +996,31 @@ async def send_message_stream(
                         # with ":", but the bytes keep CF/nginx from reaping
                         # the connection while the LLM pauses generation.
                         yield ": keepalive\n\n"
+                        continue
+                    if kind == "reasoning":
+                        # 推理增量：只作为「仍在推进」的实证发出去，绝不碰
+                        # full_answer（否则会被自己推翻的中间结论会变成答案正文），
+                        # 也绝不置 received_first_token（否则下方的空回复兜底失效，
+                        # 用户会永远卡在假的「正在检索…」上且没有重试按钮）。
+                        reasoning_chars += len(content)
+                        now = _time.monotonic()
+                        # 节流：推理可达 4000 token，逐块转发等于把 SSE 流量放大
+                        # 数倍，而前端只显示一个数字。
+                        if now - last_reasoning_emit >= REASONING_EMIT_INTERVAL_S:
+                            last_reasoning_emit = now
+                            yield (
+                                "data: "
+                                + json.dumps({"type": "reasoning", "chars": reasoning_chars},
+                                             ensure_ascii=False)
+                                + "\n\n"
+                            )
+                        continue
+                    if kind != "content":
+                        # 白名单落地，不是黑名单。本轮引入了 kind 命名空间，而
+                        # Anthropic 的 thinking_delta 已列为后续项 —— 若下一个加
+                        # kind 的人忘了补 continue，黑名单写法会让新的非正文内容
+                        # **默认**流进 full_answer 变成答案。默认方向必须是拒绝。
+                        logger.warning("未知的流块类型，已丢弃: %s", kind)
                         continue
                     if not received_first_token:
                         received_first_token = True

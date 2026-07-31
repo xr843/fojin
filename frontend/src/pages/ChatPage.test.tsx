@@ -231,6 +231,27 @@ describe("ChatPage 首屏结构", () => {
     });
   });
 
+  // 推理进度：把此前被丢弃的 reasoning 增量用作「仍在推进」的实证。
+  // 与 retrieved 同一条承重约束 —— 只写独立字段，绝不碰 content（哨兵一旦被顶掉，
+  // onDone 的空回复兜底就失效）。
+  it("推理进度: reasoning 事件换掉静态文案，且 content 仍是哨兵", async () => {
+    let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+    vi.mocked(sendChatMessageStream).mockImplementation(
+      async (_m, _s, _mid, callbacks) => { cb = callbacks; },
+    );
+    const { container } = await renderEmpty();
+    fireEvent.click(container.querySelector(".chat-hero-card")!);
+    await waitFor(() => expect(cb).toBeDefined());
+
+    cb!.onReasoning?.({ chars: 1820 });
+
+    await waitFor(() => {
+      expect(screen.getByText(/正在推敲经文/)).toBeInTheDocument();
+    });
+    // 哨兵未被顶掉 —— .chat-thinking 只在 content === THINKING_SENTINEL 时渲染
+    expect(container.querySelector(".chat-thinking")).not.toBeNull();
+  });
+
   // P0 的核心不变式，也是本轮唯一能自动挡住「存量定时器把用户拽回底部」的断言。
   // 守卫在「调用时」判过一次，但真正的 scrollIntoView 在 100ms 后才执行；若不在
   // 触发时复判，用户在流式中途上滚后，存量定时器仍会把视口拽回底部，而那次程序化

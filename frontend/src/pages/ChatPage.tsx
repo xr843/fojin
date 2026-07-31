@@ -266,6 +266,24 @@ function MessageBubbleInner({
   const trustLabelKey = trustStatusLabelKey(m.trust_status);
   const quoteDetail = quoteCheckDetail(m.trust_status);
 
+  // 「已思考 N 秒」要自己走秒 —— 后端只在推理增量到达时发活性信号（约 1 次/秒
+  // 且会随推理结束而停），秒数不能靠事件驱动。memo 不拦组件自身的 state 更新，
+  // 所以这个 tick 只会重渲染这一个气泡。
+  const reasoningSince = m.content === THINKING_SENTINEL ? m.reasoningSince : null;
+  const [thinkingSeconds, setThinkingSeconds] = useState(0);
+  useEffect(() => {
+    if (!reasoningSince) return;
+    // Date.now() 只能在 effect 的回调里读，不能在渲染期 —— React Compiler 的
+    // react-hooks/purity 会把渲染期调用判为 error（CI 跑 --max-warnings 0）。
+    // 也不在 effect 体内同步 setState（react-hooks/set-state-in-effect），所以
+    // 只挂 interval：首帧显示「已思考 0 秒」本来就是对的，1 秒后开始走。
+    const id = setInterval(
+      () => setThinkingSeconds(Math.max(0, Math.floor((Date.now() - reasoningSince) / 1000))),
+      1000,
+    );
+    return () => clearInterval(id);
+  }, [reasoningSince]);
+
   return (
     <div style={{
       display: "flex", gap: 12, marginBottom: 16, padding: "0 16px",
@@ -292,8 +310,11 @@ function MessageBubbleInner({
                 {/* 收进单个 span：.chat-thinking 是 inline-flex，为「一句短文案 +
                     三个点」设计的；多段内容直接铺进去会各自变成 flex 项，被挤成
                     竖排窄列。包一层后它仍只有两个 flex 项，内部按正常文本流换行。 */}
+                {/* 三段独立组合，不要把推理嵌进检索分支里 —— 生产上 retrieved
+                    确实总先于 reasoning 到达，但那是时序巧合而非契约，任一方缺席
+                    时另一方都应照常显示。 */}
                 <span className="chat-thinking-text">
-                  {m.retrieval ? (
+                  {m.retrieval && (
                     <>
                       {t("chat.retrieved_hint", { n: m.retrieval.count })}
                       {m.retrieval.titles.map((tt) => (
@@ -302,11 +323,16 @@ function MessageBubbleInner({
                         </span>
                       ))}
                       <span className="chat-retrieved-sep">·</span>
-                      {t("chat.generating")}
                     </>
-                  ) : (
-                    t("chat.thinking")
                   )}
+                  {/* 括号并在翻译值里，不写死在这里 —— 全角（）是 U+FF08/FF09，
+                      落在半宽全宽形式区，i18n 扫描器的 CJK 正则结构上扫不到它，
+                      门禁绿灯不能当作「英文界面没问题」的证据。英文值自带半角括号。 */}
+                  {reasoningSince
+                    ? `${t("chat.reasoning_hint")}${t("chat.thinking_seconds", { n: thinkingSeconds })}`
+                    : m.retrieval
+                      ? t("chat.generating")
+                      : t("chat.thinking")}
                 </span>
                 <span className="chat-thinking-dots"><span /><span /><span /></span>
               </div>
@@ -977,6 +1003,19 @@ export default function ChatPage() {
       },
       onSearching: (_searchMsg: string) => {
         // 搜索状态由初始占位符 "正在检索经文并生成回答..." 显示，不覆盖 content
+      },
+      onReasoning: () => {
+        // 只当作活性信号：把等待期文案换成「正在推敲经文…（已思考 N 秒）」。
+        // 秒数由前端自己计时，后端只负责证明「还在推进」——静态文案在 7-13 秒里
+        // 读起来像卡死，一个在动的计数器才说明系统活着。
+        // 与 onRetrieved 同一条承重约束：只写独立字段，绝不碰 content。
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId && m.reasoningSince == null
+              ? { ...m, reasoningSince: Date.now() }
+              : m,
+          ),
+        );
       },
       onRetrieved: (retrieval) => {
         // 只写独立字段。绝不能写进 content —— THINKING_SENTINEL 是按身份比较的

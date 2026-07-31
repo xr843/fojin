@@ -976,6 +976,8 @@
   "chat.retrieved_hint": "已檢索 {{n}} 部經典",
   "chat.retrieved_title": "《{{title}}》",
   "chat.generating": "正在生成回答",
+  "chat.reasoning_hint": "正在推敲經文",
+  "chat.thinking_seconds": "（已思考 {{n}} 秒）",
   "chat.request_failed": "請求失敗，請重試",
   "chat.reference_sources": "參考經文",
   "chat.export_empty": "暫無對話內容可匯出",
