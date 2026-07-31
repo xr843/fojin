@@ -32,8 +32,11 @@ class ModelOption:
 CATALOG: list[ModelOption] = [
     ModelOption("deepseek:v4-pro", "deepseek", "deepseek-v4-pro",
                 "DeepSeek V4 Pro", "旗舰模型，复杂推理", False),
+    # 描述里不提价格：这是给读者选模型用的提示，价格是运营侧的事，摆在选择器里
+    # 只会让人以为便宜的那个"缩水"了。实际上两者规格相同，所以说明这一点最有用。
+    # 也不写"更快"——名字里的 Flash 已经是厂商的定位，而我们没有实测数据支撑。
     ModelOption("deepseek:v4-flash", "deepseek", "deepseek-v4-flash",
-                "DeepSeek V4 Flash", "同代轻快档，上下文同为 1M，价格约 1/3", False),
+                "DeepSeek V4 Flash", "同代轻量档，上下文同为 1M", False),
     ModelOption("dashscope:qwen3.6-plus", "dashscope", "qwen3.6-plus",
                 "通义千问 Qwen3.6 Plus", "阿里最新文本旗舰", False),
     ModelOption("moonshot:kimi-k2.6", "moonshot", "kimi-k2.6",
