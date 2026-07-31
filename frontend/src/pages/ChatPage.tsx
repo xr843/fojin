@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useMemo, useEffect, lazy, Suspense, memo
 import { useNavigate, useSearchParams, Link } from "react-router";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
-import { Input, Button, message, Alert, Tooltip, Modal, Tag, Spin } from "antd";
+import { Input, Button, message, Alert, Tooltip, Modal, Tag, Spin, Dropdown } from "antd";
 import Markdown, { defaultUrlTransform, type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
@@ -29,6 +29,10 @@ import {
   DislikeFilled,
   ShareAltOutlined,
   DownOutlined,
+  MoreOutlined,
+  EditOutlined,
+  PushpinOutlined,
+  PushpinFilled,
 } from "@ant-design/icons";
 const ShareCard = lazy(() => import("../components/ShareCard"));
 const CitationDrawer = lazy(() => import("../components/CitationDrawer"));
@@ -43,6 +47,7 @@ import {
   getChatSessions,
   getChatSessionMessages,
   deleteChatSession,
+  updateChatSession,
   getApiKeyStatus,
   getChatQuota,
   getChunkContext,
@@ -176,14 +181,21 @@ function parseCitationHref(href: string): ParsedCitation | null {
   return { textId, juanNum, chunkIndex, titleZh, quote };
 }
 
-function groupSessionsByDate(sessions: ChatSessionItem[]): { label: string; items: ChatSessionItem[] }[] {
+// Pinned sessions leave the date groups entirely and form their own section at
+// the top — that is the whole point of pinning. Leaving them ALSO in 今天/更早
+// would show the same conversation twice and give two rows the same React key.
+function groupSessions(sessions: ChatSessionItem[]): { label: string; items: ChatSessionItem[] }[] {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const yesterday = new Date(today.getTime() - 86400000);
   const weekAgo = new Date(today.getTime() - 7 * 86400000);
 
-  const groups: Record<string, ChatSessionItem[]> = { today: [], yesterday: [], week: [], older: [] };
+  const groups: Record<string, ChatSessionItem[]> = { pinned: [], today: [], yesterday: [], week: [], older: [] };
   for (const s of sessions) {
+    if (s.pinned) {
+      groups.pinned.push(s);
+      continue;
+    }
     const d = new Date(s.created_at);
     if (d >= today) groups.today.push(s);
     else if (d >= yesterday) groups.yesterday.push(s);
@@ -193,11 +205,113 @@ function groupSessionsByDate(sessions: ChatSessionItem[]): { label: string; item
 
   // label is an i18n key — render with t(group.label)
   const result: { label: string; items: ChatSessionItem[] }[] = [];
+  if (groups.pinned.length) result.push({ label: "chat.session_group_pinned", items: groups.pinned });
   if (groups.today.length) result.push({ label: "chat.session_group_today", items: groups.today });
   if (groups.yesterday.length) result.push({ label: "chat.session_group_yesterday", items: groups.yesterday });
   if (groups.week.length) result.push({ label: "chat.session_group_week", items: groups.week });
   if (groups.older.length) result.push({ label: "chat.session_group_older", items: groups.older });
   return result;
+}
+
+interface SessionRowProps {
+  s: ChatSessionItem;
+  active: boolean;
+  onSelect: (id: number) => void;
+  onRename: (s: ChatSessionItem) => void;
+  onTogglePin: (s: ChatSessionItem) => void;
+  onDelete: (id: number) => void;
+}
+
+/** One conversation in the sidebar, with its ⋯ menu (重命名 / 置顶 / 删除).
+ *
+ * Shared by the desktop sidebar and the mobile drawer, which render the same
+ * list twice. Before this existed the two copies had already drifted apart in
+ * their click handlers; a three-item menu duplicated by hand would drift again.
+ */
+function SessionRow({ s, active, onSelect, onRename, onTogglePin, onDelete }: SessionRowProps) {
+  const { t } = useTranslation();
+  const pinned = !!s.pinned;
+  // 受控 open 有两个理由，都不是为了好看：
+  // ① antd 的 Dropdown 不给触发器加任何 aria —— 读屏软件只会念「更多操作，按钮」，
+  //    不会说这是个菜单、也不会说它已展开。aria-expanded 需要我们自己知道状态。
+  // ② 鼠标点开时 antd 不把焦点移进菜单（实测 activeElement 仍是 body），Esc 因此
+  //    没有接收者。挂一个 document 级监听补上。
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+  return (
+    <div
+      className="chat-session-row"
+      data-active={active || undefined}
+      // 选中/悬停的配色全部交给 CSS（见 .chat-session-row[data-active]）——
+      // 行内 style 的优先级压过类选择器，留在这里会让 :hover 规则永远不生效。
+      style={{
+        padding: "8px 6px 8px 12px",
+        borderRadius: 6,
+        cursor: "pointer",
+        fontSize: 13,
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: 4,
+      }}
+      onClick={() => onSelect(s.id)}
+    >
+      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+        {pinned && (
+          <PushpinFilled
+            className="chat-session-pin-mark"
+            style={{ fontSize: 10, marginRight: 4, opacity: 0.55 }}
+          />
+        )}
+        {s.title || t("chat.new_chat")}
+      </span>
+      <Dropdown
+        trigger={["click"]}
+        placement="bottomRight"
+        open={open}
+        onOpenChange={setOpen}
+        menu={{
+          items: [
+            { key: "rename", icon: <EditOutlined />, label: t("chat.rename") },
+            { key: "pin", icon: <PushpinOutlined />, label: pinned ? t("chat.unpin") : t("chat.pin") },
+            { type: "divider" },
+            { key: "delete", icon: <DeleteOutlined />, label: t("chat.delete"), danger: true },
+          ],
+          onClick: ({ key, domEvent }) => {
+            // 承重。菜单虽然渲染进 portal，但 React 合成事件沿**组件树**冒泡，
+            // 而 Dropdown 在组件树里就挂在这一行内部 —— 不拦住的话，点「重命名」
+            // 会同时触发整行的 onClick 把用户甩进这个会话。实测过：去掉这一行，
+            // ChatPage.test.tsx 的「点菜单项不会顺带切换会话」立刻变红。
+            domEvent.stopPropagation();
+            if (key === "rename") onRename(s);
+            else if (key === "pin") onTogglePin(s);
+            else if (key === "delete") onDelete(s.id);
+          },
+        }}
+      >
+        {/* 必须是原生 <button>：Dropdown 的 click 触发器只听 click 事件，而浏览器
+            只为真正的可交互元素把 Enter/空格合成成 click。span[role=button] 看着
+            一样，键盘用户却永远打不开这个菜单。 */}
+        <button
+          type="button"
+          className="chat-session-more"
+          aria-label={t("chat.session_actions")}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <MoreOutlined style={{ fontSize: 13 }} />
+        </button>
+      </Dropdown>
+    </div>
+  );
 }
 
 interface MessageBubbleProps {
@@ -691,7 +805,7 @@ export default function ChatPage() {
     [sessions, sessionFilter],
   );
   const groupedSessions = useMemo(
-    () => groupSessionsByDate(filteredSessions ?? []),
+    () => groupSessions(filteredSessions ?? []),
     [filteredSessions],
   );
 
@@ -841,6 +955,17 @@ export default function ChatPage() {
     setShowJumpToBottom(false);
   };
 
+  // 声明在 handleDeleteSession 之前是必需的，不是排版偏好：删除当前会话要中断
+  // 流，而 React Compiler 对「引用了声明在自己之后的绑定」会整支放弃编译，连带
+  // 把同组件里其它 useCallback 的手写依赖数组判成不可保留（实测 4 个 error）。
+  const [streamingId, setStreamingId] = useState(0);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const handleCancel = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+  }, []);
+
   const handleDeleteSession = (sid: number) => {
     Modal.confirm({
       title: t("chat.delete_session_title"),
@@ -851,7 +976,15 @@ export default function ChatPage() {
       onOk: async () => {
         try {
           await deleteChatSession(sid);
-          if (sessionId === sid) handleNewChat();
+          if (sessionId === sid) {
+            // 删掉正在生成的那个会话时必须先中断流。handleNewChat 只清 messages，
+            // 而解锁 `sending` 的唯一出口是 onDone —— 不 abort 的话流会继续跑到
+            // 天然结束（首字就要 6-18s，长答案更久），这期间 onToken 在空数组上
+            // map（无声无息），输入框却因 `if (!msg || sending) return` 一直发不出
+            // 东西。abort 会走 onError→onDone，把 sending/streamingId 一并复位。
+            handleCancel();
+            handleNewChat();
+          }
           refetchSessions();
         } catch {
           message.error(t("chat.delete_failed"));
@@ -860,13 +993,45 @@ export default function ChatPage() {
     });
   };
 
-  const [streamingId, setStreamingId] = useState(0);
-  const abortRef = useRef<AbortController | null>(null);
+  // Rename runs through a real Modal rather than Modal.confirm: confirm()'s
+  // content is rendered once and never re-rendered, so a controlled <Input>
+  // inside it can't show what the user types.
+  const [renameTarget, setRenameTarget] = useState<ChatSessionItem | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [renameSaving, setRenameSaving] = useState(false);
 
-  const handleCancel = useCallback(() => {
-    abortRef.current?.abort();
-    abortRef.current = null;
+  const handleOpenRename = useCallback((s: ChatSessionItem) => {
+    setRenameTarget(s);
+    setRenameValue(s.title || "");
   }, []);
+
+  const handleSubmitRename = useCallback(async () => {
+    if (!renameTarget) return;
+    const title = renameValue.trim();
+    if (!title || title === renameTarget.title) {
+      setRenameTarget(null);
+      return;
+    }
+    setRenameSaving(true);
+    try {
+      await updateChatSession(renameTarget.id, { title });
+      setRenameTarget(null);
+      refetchSessions();
+    } catch {
+      message.error(t("chat.rename_failed"));
+    } finally {
+      setRenameSaving(false);
+    }
+  }, [renameTarget, renameValue, refetchSessions, t]);
+
+  const handleTogglePin = useCallback(async (s: ChatSessionItem) => {
+    try {
+      await updateChatSession(s.id, { pinned: !s.pinned });
+      refetchSessions();
+    } catch {
+      message.error(t("chat.pin_failed"));
+    }
+  }, [refetchSessions, t]);
 
   const handleFileChange = useCallback(async (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -1265,23 +1430,15 @@ export default function ChatPage() {
                       {t(group.label)}
                     </div>
                     {group.items.map((s) => (
-                      <div key={s.id}
-                        style={{
-                          padding: "8px 12px", borderRadius: 6, cursor: "pointer", fontSize: 13,
-                          color: sessionId === s.id ? "var(--fj-accent)" : "var(--fj-ink-muted)",
-                          background: sessionId === s.id ? "rgba(217,208,193,0.3)" : "transparent",
-                          display: "flex", justifyContent: "space-between", alignItems: "center",
-                        }}
-                        onClick={() => { loadSession(s.id); setSidebarOpen(false); }}
-                      >
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-                          {s.title || t("chat.new_chat")}
-                        </span>
-                        <DeleteOutlined
-                          style={{ fontSize: 11, color: "var(--fj-ink-muted)", marginLeft: 4 }}
-                          onClick={(e) => { e.stopPropagation(); handleDeleteSession(s.id); }}
-                        />
-                      </div>
+                      <SessionRow
+                        key={s.id}
+                        s={s}
+                        active={sessionId === s.id}
+                        onSelect={(id) => { loadSession(id); setSidebarOpen(false); }}
+                        onRename={handleOpenRename}
+                        onTogglePin={handleTogglePin}
+                        onDelete={handleDeleteSession}
+                      />
                     ))}
                   </div>
                 ))}
@@ -1333,28 +1490,15 @@ export default function ChatPage() {
                   {t(group.label)}
                 </div>
                 {group.items.map((s) => (
-                  <div key={s.id}
-                    style={{
-                      padding: "8px 12px",
-                      borderRadius: 6,
-                      cursor: "pointer",
-                      fontSize: 13,
-                      color: sessionId === s.id ? "var(--fj-accent)" : "var(--fj-ink-muted)",
-                      background: sessionId === s.id ? "rgba(217,208,193,0.3)" : "transparent",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                    onClick={() => loadSession(s.id)}
-                  >
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-                      {s.title || t("chat.new_chat")}
-                    </span>
-                    <DeleteOutlined
-                      style={{ fontSize: 11, color: "var(--fj-ink-muted)", marginLeft: 4 }}
-                      onClick={(e) => { e.stopPropagation(); handleDeleteSession(s.id); }}
-                    />
-                  </div>
+                  <SessionRow
+                    key={s.id}
+                    s={s}
+                    active={sessionId === s.id}
+                    onSelect={loadSession}
+                    onRename={handleOpenRename}
+                    onTogglePin={handleTogglePin}
+                    onDelete={handleDeleteSession}
+                  />
                 ))}
               </div>
             ))}
@@ -1688,6 +1832,26 @@ export default function ChatPage() {
           />
         </Suspense>
       )}
+      <Modal
+        open={renameTarget !== null}
+        title={t("chat.rename_session_title")}
+        okText={t("chat.save")}
+        cancelText={t("chat.cancel")}
+        confirmLoading={renameSaving}
+        onOk={handleSubmitRename}
+        onCancel={() => setRenameTarget(null)}
+        destroyOnHidden
+        width={400}
+      >
+        <Input
+          value={renameValue}
+          onChange={(e) => setRenameValue(e.target.value)}
+          onPressEnter={handleSubmitRename}
+          placeholder={t("chat.rename_placeholder")}
+          maxLength={200}
+          autoFocus
+        />
+      </Modal>
     </>
   );
 }

@@ -1510,5 +1510,15 @@
   "chat.master_lens": "Reading through this lineage",
   "chat.change_master": "Change school",
   "chat.master_disclaimer": "What follows is an AI interpretation generated from the canon — not the master's own teaching. Every citation carries its text and fascicle number; open it to check the original.",
-  "reader.citation.quote_not_here": "The quoted passage was not found in this fascicle"
+  "reader.citation.quote_not_here": "The quoted passage was not found in this fascicle",
+  "chat.rename": "Rename",
+  "chat.rename_session_title": "Rename conversation",
+  "chat.rename_placeholder": "Enter a new name",
+  "chat.rename_failed": "Rename failed",
+  "chat.pin": "Pin conversation",
+  "chat.unpin": "Unpin",
+  "chat.pin_failed": "Action failed",
+  "chat.session_group_pinned": "Pinned",
+  "chat.session_actions": "More actions",
+  "chat.save": "Save"
 }

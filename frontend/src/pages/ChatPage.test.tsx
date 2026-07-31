@@ -12,8 +12,13 @@ import {
   getHotQuestions,
   getMasters,
   getRandomHotQuestions,
+  getChatSessionMessages,
   sendChatMessageStream,
+  updateChatSession,
+  deleteChatSession,
+  type ChatSessionItem,
 } from "../api/client";
+import type { ChatSessionId } from "../types/branded";
 
 vi.mock("../api/client", async () => {
   const actual = await vi.importActual<typeof import("../api/client")>("../api/client");
@@ -28,6 +33,7 @@ vi.mock("../api/client", async () => {
     getRandomHotQuestions: vi.fn(),
     sendChatMessageStream: vi.fn(),
     deleteChatSession: vi.fn(),
+    updateChatSession: vi.fn(),
     updateChatMessageFeedback: vi.fn(),
     getChunkContext: vi.fn(),
   };
@@ -310,5 +316,181 @@ describe("ChatPage 首屏结构", () => {
     await waitFor(() => {
       expect(container.querySelector(".chat-jump-bottom")).toBeNull();
     });
+  });
+});
+
+// ── 会话行的 ⋯ 菜单（重命名 / 置顶 / 删除）──────────────────────────────
+
+const SESSIONS: ChatSessionItem[] = [
+  { id: 11 as ChatSessionId, title: "《心经》色空怎么讲", pinned: false, created_at: new Date().toISOString() },
+  { id: 12 as ChatSessionId, title: "四圣谛是哪四谛", pinned: true, created_at: new Date().toISOString() },
+];
+
+/** 渲染出会话列表，并把 ⋯ 菜单打开在第 index 行上。 */
+async function openRowMenu(index: number) {
+  const title = SESSIONS[index].title!;
+  const r = renderPage();
+  await waitFor(() => {
+    expect(screen.getByText(title)).toBeInTheDocument();
+  });
+  const rows = r.container.querySelectorAll<HTMLElement>(".chat-session-row");
+  const row = [...rows].find((el) => el.textContent?.includes(title))!;
+  fireEvent.click(row.querySelector(".chat-session-more")!);
+  await waitFor(() => {
+    expect(screen.getByText("重命名")).toBeInTheDocument();
+  });
+  return { ...r, row };
+}
+
+describe("会话行 ⋯ 菜单", () => {
+  beforeEach(() => {
+    vi.mocked(getChatSessions).mockResolvedValue(SESSIONS);
+    vi.mocked(updateChatSession).mockResolvedValue(SESSIONS[0]);
+    vi.mocked(getChatSessionMessages).mockResolvedValue({
+      total: 0, page: 1, size: 50, messages: [],
+    });
+    vi.mocked(deleteChatSession).mockResolvedValue(undefined);
+  });
+
+  it("菜单开出三项：重命名 / 置顶 / 删除", async () => {
+    await openRowMenu(0);
+    expect(screen.getByText("重命名")).toBeInTheDocument();
+    expect(screen.getByText("置顶聊天")).toBeInTheDocument();
+    expect(screen.getByText("删除")).toBeInTheDocument();
+  });
+
+  // antd 的 Dropdown 一个 aria 都不加（实测 role/aria-haspopup/aria-expanded 全为
+  // null）。读屏软件只会念「更多操作，按钮」，既不知道它开菜单，也不知道开没开。
+  it("a11y: 触发器声明自己是菜单按钮，并如实反映展开状态", async () => {
+    const { row } = await openRowMenu(0);
+    const btn = row.querySelector(".chat-session-more")!;
+    expect(btn.tagName).toBe("BUTTON");     // span[role=button] 上 Enter 不会合成 click
+    expect(btn.getAttribute("aria-haspopup")).toBe("menu");
+    expect(btn.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  // 鼠标点开时 antd 不把焦点移进菜单，Esc 因此没有接收者 —— 得自己在
+  // document 上接。
+  it("a11y: 鼠标点开的菜单，Esc 能关掉", async () => {
+    const { row } = await openRowMenu(0);
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => {
+      expect(row.querySelector(".chat-session-more")!.getAttribute("aria-expanded")).toBe("false");
+    });
+  });
+
+  // 承重点。antd 的菜单渲染进 portal，但 React 合成事件仍沿**组件树**冒泡，
+  // 而 Dropdown 在组件树里就挂在会话行内部 —— 不 stopPropagation 的话，点
+  // 「重命名」会同时触发整行的 onClick，把用户甩进另一个会话。DOM 上看不出来，
+  // 只有断言 getChatSessionMessages 没被调用才能证伪。
+  it("承重点: 点菜单项不会顺带切换会话", async () => {
+    await openRowMenu(0);
+    fireEvent.click(screen.getByText("重命名"));
+    await screen.findByPlaceholderText("输入新的对话名称");
+    expect(vi.mocked(getChatSessionMessages)).not.toHaveBeenCalled();
+  });
+
+  it("已置顶的行菜单显示「取消置顶」，且发出的是 pinned:false", async () => {
+    await openRowMenu(1);
+    expect(screen.queryByText("置顶聊天")).toBeNull();
+    fireEvent.click(screen.getByText("取消置顶"));
+    await waitFor(() => {
+      expect(vi.mocked(updateChatSession)).toHaveBeenCalledWith(12, { pinned: false });
+    });
+  });
+
+  it("未置顶的行发出的是 pinned:true", async () => {
+    await openRowMenu(0);
+    fireEvent.click(screen.getByText("置顶聊天"));
+    await waitFor(() => {
+      expect(vi.mocked(updateChatSession)).toHaveBeenCalledWith(11, { pinned: true });
+    });
+  });
+
+  // 注意 /保\s*存/：antd 的 Button 会在恰好两个汉字之间插一个空格，
+  // 无线的 /保存/ 匹配不到 —— 这是把断言写成恒假、而非恒真的那一类。
+  it("重命名弹窗预填当前标题，提交时去掉首尾空白", async () => {
+    await openRowMenu(0);
+    fireEvent.click(screen.getByText("重命名"));
+    const input = await screen.findByPlaceholderText("输入新的对话名称");
+    expect((input as HTMLInputElement).value).toBe("《心经》色空怎么讲");
+    fireEvent.change(input, { target: { value: "  色空章逐句读  " } });
+    fireEvent.click(screen.getByRole("button", { name: /保\s*存/ }));
+    await waitFor(() => {
+      expect(vi.mocked(updateChatSession)).toHaveBeenCalledWith(11, { title: "色空章逐句读" });
+    });
+  });
+
+  it("标题没改动就提交不发请求（省掉一次无谓写库）", async () => {
+    await openRowMenu(0);
+    fireEvent.click(screen.getByText("重命名"));
+    await screen.findByPlaceholderText("输入新的对话名称");
+    fireEvent.click(screen.getByRole("button", { name: /保\s*存/ }));
+    // 用输入框消失（destroyOnHidden 会销毁弹窗内容）判定「已关闭」——
+    // 标题节点在 antd 关闭后仍留在 DOM 里，用它判定会恒假。
+    // 判定「弹窗已关闭」不能等 DOM 消失：jsdom 不派发 transitionend，rc-motion
+    // 的离场动画永远走不完，destroyOnHidden 也就永远不销毁内容。退场类是弹窗
+    // 由开变关的第一手证据，也让下面那条 not.toHaveBeenCalled 不至于恒真
+    // （若这一次点击根本没落到 onOk 上，这里就先红了）。
+    await waitFor(() => {
+      expect(document.querySelector(".ant-modal")?.className).toContain("ant-zoom-leave");
+    });
+    expect(vi.mocked(updateChatSession)).not.toHaveBeenCalled();
+  });
+
+  // 删除「正在生成回答」的那个会话，必须先中断流。不中断的话流会跑到天然结束，
+  // 这期间 sending 一直为真，输入框被 `if (!msg || sending) return` 锁死 6-18 秒，
+  // 而画面上什么都没有 —— 用户只会以为站坏了。
+  // （这是 ⋯ 菜单之前就有的老问题，删除入口本来就挂在同一行上。）
+  it("承重点: 删除正在流式生成的当前会话，会中断请求", async () => {
+    let signal: AbortSignal | undefined;
+    let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+    vi.mocked(sendChatMessageStream).mockImplementation(
+      async (_m, _s, _mid, callbacks, options) => {
+        cb = callbacks;
+        signal = options?.signal;      // 流不结束，模拟"正在生成"
+      },
+    );
+    const { container } = renderPage();
+    await waitFor(() => expect(screen.getByText(SESSIONS[0].title!)).toBeInTheDocument());
+
+    fireEvent.click(container.querySelector(".chat-hero-card")!);
+    await waitFor(() => expect(cb).toBeDefined());
+    cb!.onSessionId(SESSIONS[0].id);   // 后端回传：当前活动会话 = 11
+    await waitFor(() => expect(signal).toBeDefined());
+    expect(signal!.aborted).toBe(false);
+
+    const row = [...container.querySelectorAll<HTMLElement>(".chat-session-row")]
+      .find((el) => el.textContent?.includes(SESSIONS[0].title!))!;
+    fireEvent.click(row.querySelector(".chat-session-more")!);
+    await waitFor(() => expect(screen.getByText("删除")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("删除"));
+    // Modal.confirm 的确认键；antd 会在两个汉字间插空格
+    const ok = await screen.findByRole("button", { name: /删\s*除/ });
+    fireEvent.click(ok);
+
+    await waitFor(() => {
+      expect(signal!.aborted).toBe(true);
+    });
+  });
+
+  // 置顶的会话必须从日期分组里**移走**，不是同时出现在两处 —— 后者会让同一个
+  // 会话渲染两次并撞 React key。
+  it("置顶会话只出现一次，且在「已置顶」组里", async () => {
+    const { container } = renderPage();
+    await waitFor(() => {
+      expect(screen.getByText("四圣谛是哪四谛")).toBeInTheDocument();
+    });
+    expect(screen.getAllByText("四圣谛是哪四谛")).toHaveLength(1);
+
+    const list = container.querySelector(".chat-session-list")!;
+    const labels = [...list.querySelectorAll("div")]
+      .filter((d) => ["已置顶", "今天"].includes(d.textContent?.trim() ?? ""))
+      .map((d) => d.textContent!.trim());
+    expect(labels[0]).toBe("已置顶");
+
+    const pinnedRow = [...container.querySelectorAll(".chat-session-row")]
+      .find((el) => el.textContent?.includes("四圣谛是哪四谛"))!;
+    expect(pinnedRow.querySelector(".chat-session-pin-mark")).not.toBeNull();
   });
 });

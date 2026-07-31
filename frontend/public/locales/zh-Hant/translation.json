@@ -1510,5 +1510,15 @@
   "chat.master_lens": "依此宗風解經",
   "chat.change_master": "更換宗派",
   "chat.master_disclaimer": "以下為 AI 依據典籍生成的詮釋，非祖師本人開示。每處引證均標註經號與卷次，可點開核對原文。",
-  "reader.citation.quote_not_here": "本卷未找到被引的這段原文"
+  "reader.citation.quote_not_here": "本卷未找到被引的這段原文",
+  "chat.rename": "重新命名",
+  "chat.rename_session_title": "重新命名對話",
+  "chat.rename_placeholder": "輸入新的對話名稱",
+  "chat.rename_failed": "重新命名失敗",
+  "chat.pin": "置頂聊天",
+  "chat.unpin": "取消置頂",
+  "chat.pin_failed": "操作失敗",
+  "chat.session_group_pinned": "已置頂",
+  "chat.session_actions": "更多操作",
+  "chat.save": "儲存"
 }

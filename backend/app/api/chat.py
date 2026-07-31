@@ -33,6 +33,7 @@ from app.schemas.chat import (
     HotQuestionCard,
     HotQuestionCardsResponse,
     SessionListItem,
+    SessionUpdateRequest,
 )
 from app.services.chat import (
     FREE_DAILY_LIMIT_ANONYMOUS,
@@ -48,6 +49,7 @@ from app.services.chat import (
     send_message,
     send_message_stream,
     update_message_feedback,
+    update_session,
 )
 from app.services.chat_trust import trust_status_from_diagnostic
 from app.services.master_profiles import list_masters
@@ -462,6 +464,21 @@ async def set_message_feedback(
         trust_status=trust_by_message.get(msg.id),
         feedback=msg.feedback,
         created_at=msg.created_at,
+    )
+
+
+@router.patch("/sessions/{session_id}", response_model=SessionListItem)
+async def patch_session(
+    session_id: int,
+    payload: SessionUpdateRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Rename and/or (un)pin a chat session.
+
+    重命名 / 置顶会话。需要登录，且只能改自己的会话。"""
+    return await update_session(
+        db, session_id, user.id, title=payload.title, pinned=payload.pinned
     )
 
 
