@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { Typography, Card, Tabs, List, Tag, Empty, Spin, Descriptions, Button, Space, Pagination, Input, Select, message, Alert, Form } from "antd";
-import { BookOutlined, HistoryOutlined, UserOutlined, ReadOutlined, KeyOutlined, DeleteOutlined, CheckCircleOutlined, LockOutlined } from "@ant-design/icons";
+import { BookOutlined, HistoryOutlined, UserOutlined, ReadOutlined, KeyOutlined, DeleteOutlined, CheckCircleOutlined, LockOutlined, ArrowLeftOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../stores/authStore";
 import { getBookmarks, getHistory, getApiKeyStatus, saveApiKey, deleteApiKey, changePassword } from "../api/client";
@@ -204,9 +204,28 @@ export default function ProfilePage() {
     );
   }
 
+  // 这一页的 API Key 面板全站只有 /chat 的三个「配置 Key」入口进得来，所以从那里
+  // 来的人需要一条回头路。判据用 from=chat 而不是无条件显示：从头像菜单点进个人
+  // 中心的人，看到一个「返回 AI 问答」只会莫名其妙。
+  // 带上 ?s= 一起回去，才是真的"返回"——否则落在空白新对话上，和点顶部导航没区别
+  // （sessionId 只是 ChatPage 的组件 state，离开就没了）。
+  const cameFromChat = searchParams.get("from") === "chat";
+  const backSid = searchParams.get("s");
+  const backToChat = backSid && /^\d+$/.test(backSid) ? `/chat?s=${backSid}` : "/chat";
+
   return (
     <div style={{ maxWidth: 800, margin: "24px auto" }}>
       <Space direction="vertical" size="large" style={{ width: "100%" }}>
+        {cameFromChat && (
+          <Button
+            type="link"
+            icon={<ArrowLeftOutlined />}
+            onClick={() => navigate(backToChat)}
+            style={{ paddingLeft: 0, alignSelf: "flex-start" }}
+          >
+            {t("profile.back_to_chat")}
+          </Button>
+        )}
         <Title level={3}>{t("auth.profile")}</Title>
 
         <Tabs

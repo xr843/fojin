@@ -611,6 +611,10 @@ export const MessageBubble = memo(
 
 export default function ChatPage() {
   const navigate = useNavigate();
+  // 必须声明在 loadSession / handleNewChat 之前：引用声明在自己之后的绑定会让
+  // React Compiler 对整个组件放弃编译，并把同组件里其它 useCallback 的手写依赖
+  // 判成不可保留（见 PR #1077 里踩过的 4 个 lint error）。
+  const [searchParams, setSearchParams] = useSearchParams();
   const { t } = useTranslation();
   const { user } = useAuthStore();
   const [input, setInput] = useState("");
@@ -924,10 +928,27 @@ export default function ChatPage() {
     setShowJumpToBottom((prev) => (prev === !near ? prev : !near));
   }, [setShowJumpToBottom]);
 
-  const loadSession = async (sid: number) => {
+  /** 把「当前在读哪个会话」写进 URL（?s=）。
+   *
+   * 两个用处：① 去 /profile 配 Key 再返回时能落回原会话 —— 此前 sessionId 只是
+   * 组件 state，一离开 /chat 就没了；② 顺带让单条对话可收藏。
+   * 一律 replace：不然每切一次会话就往浏览历史塞一条，后退键会变得很难用。 */
+  const syncSessionParam = useCallback((sid: number | undefined) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (sid === undefined) next.delete("s");
+      else next.set("s", String(sid));
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  /** silent：按 URL 恢复时用。链接可能是旧的（会话已删、或本就不属于自己，
+   *  后端会 403/404），一进页面就弹错误提示只是噪音，退回空白首屏即可。 */
+  const loadSession = useCallback(async (sid: number, silent = false) => {
     try {
       const data = await getChatSessionMessages(sid, 1, 50);
       setSessionId(sid);
+      syncSessionParam(sid);
       setMessages(data.messages);
       setCurrentPage(1);
       setHasOlderMessages(data.total > data.messages.length);
@@ -942,9 +963,27 @@ export default function ChatPage() {
         handleMessagesScroll();
       }, 100);
     } catch {
-      message.error(t("chat.load_session_failed"));
+      syncSessionParam(undefined);   // 别把打不开的 id 留在地址栏里
+      if (!silent) message.error(t("chat.load_session_failed"));
     }
-  };
+  }, [syncSessionParam, handleMessagesScroll, t]);
+
+  // 挂载时按 ?s= 恢复会话。ref 守卫是必需的：syncSessionParam 会改 searchParams，
+  // 不守就会自我触发成循环；loadSession 每次渲染都是新引用（exhaustive-deps 要求
+  // 列进依赖），也靠这个守卫兜住重复执行。
+  const restoredRef = useRef(false);
+  useEffect(() => {
+    if (restoredRef.current) return;
+    const raw = searchParams.get("s");
+    if (!raw) return;
+    const sid = Number(raw);
+    if (!Number.isInteger(sid) || sid <= 0) return;
+    restoredRef.current = true;
+    // 放进微任务里调：loadSession 第一句就是 await，实际不会同步 setState，但
+    // React Compiler 只看调用点、不看 await，会判成 set-state-in-effect（error 级）。
+    // 挪进回调既符合规则本意（"外部状态变化时在回调里 setState"），也不改变时序。
+    queueMicrotask(() => { loadSession(sid, true); });
+  }, [searchParams, loadSession]);
 
   const loadOlderMessages = async () => {
     if (!sessionId || loadingOlder) return;
@@ -964,6 +1003,7 @@ export default function ChatPage() {
 
   const handleNewChat = () => {
     setSessionId(undefined);
+    syncSessionParam(undefined);
     setMessages([]);
     setHasOlderMessages(false);
     setCurrentPage(1);
@@ -1223,6 +1263,7 @@ export default function ChatPage() {
       onSessionId: (newSessionId: number) => {
         if (!sessionId) {
           setSessionId(newSessionId);
+          syncSessionParam(newSessionId);
           if (user) refetchSessions();
         }
       },
@@ -1273,7 +1314,7 @@ export default function ChatPage() {
       modelId: modelId === "deepseek:v4-pro" ? null : modelId,
       attachmentIds: attachmentIdsForSend.length ? attachmentIdsForSend : null,
     });
-  }, [sending, sessionId, masterId, modelId, user, attachments, refetchSessions, refetchQuota, queryClient, scrollToBottom, setShowJumpToBottom]);
+  }, [sending, sessionId, masterId, modelId, user, attachments, refetchSessions, refetchQuota, queryClient, scrollToBottom, setShowJumpToBottom, syncSessionParam]);
 
   const handleSend = useCallback(async () => {
     await handleSendMessage(input);
@@ -1376,7 +1417,6 @@ export default function ChatPage() {
   }, [tabSuggestions, tabIndex]);
 
   // Handle pre-filled message from URL params (e.g. from "Ask XiaoJin" button on reader page)
-  const [searchParams, setSearchParams] = useSearchParams();
   const autoSentRef = useRef(false);
   useEffect(() => {
     const q = searchParams.get("q");
@@ -1392,6 +1432,14 @@ export default function ChatPage() {
       : `关于这段经文：\n\n> ${context}\n\n${q}`; // i18n-exempt — chat message payload sent to the zh RAG pipeline
     handleSendMessage(msg);
   }, [searchParams, setSearchParams, handleSendMessage]);
+
+  /** 去配 Key。带上来源与当前会话，好让 /profile 给出一个能真正返回原会话的按钮 ——
+   *  sessionId 只是组件 state，离开 /chat 就没了，光有「返回」会落在空白新对话上。 */
+  const goConfigureKey = useCallback(() => {
+    const q = new URLSearchParams({ tab: "apikey", from: "chat" });
+    if (sessionId !== undefined) q.set("s", String(sessionId));
+    navigate(`/profile?${q.toString()}`);
+  }, [navigate, sessionId]);
 
   const handleExport = useCallback(() => {
     if (messages.length === 0) {
@@ -1466,7 +1514,7 @@ export default function ChatPage() {
               <div className="chat-sidebar-foot">
                 <Button icon={<SettingOutlined />} block type="text" size="small"
                   style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
-                  onClick={() => { navigate("/profile?tab=apikey"); setSidebarOpen(false); }}>
+                  onClick={() => { goConfigureKey(); setSidebarOpen(false); }}>
                   {keyStatus?.has_api_key ? `${t("chat.key_configured")} (${keyStatus.provider})` : t("chat.configure_key")}
                 </Button>
               </div>
@@ -1577,7 +1625,7 @@ export default function ChatPage() {
                   type="text"
                   className="chat-rail-btn"
                   icon={<RailSettingsIcon />}
-                  onClick={() => navigate("/profile?tab=apikey")}
+                  onClick={goConfigureKey}
                   aria-label={t("chat.configure_key")}
                 />
               </Tooltip>
@@ -1587,7 +1635,7 @@ export default function ChatPage() {
             <div className="chat-sidebar-foot">
               <Button icon={<SettingOutlined />} block type="text" size="small"
                 style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
-                onClick={() => navigate("/profile?tab=apikey")}>
+                onClick={goConfigureKey}>
                 {keyStatus?.has_api_key ? `${t("chat.key_configured")} (${keyStatus.provider})` : t("chat.configure_key")}
               </Button>
             </div>

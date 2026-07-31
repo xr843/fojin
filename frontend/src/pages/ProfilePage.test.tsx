@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, useLocation } from "react-router";
 import type { ReactNode } from "react";
 import i18n from "../i18n";
 import enTranslation from "../../public/locales/en/translation.json";
@@ -22,6 +22,12 @@ vi.mock("../api/client", () => ({
   changePassword: vi.fn(),
 }));
 
+/** 把当前 URL 渲染出来，好断言返回按钮跳去了哪。 */
+function LocationProbe() {
+  const loc = useLocation();
+  return <span data-testid="loc">{loc.pathname + loc.search}</span>;
+}
+
 function renderPage(ui: ReactNode, initialPath = "/profile") {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -30,6 +36,7 @@ function renderPage(ui: ReactNode, initialPath = "/profile") {
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[initialPath]}>
         {ui}
+        <LocationProbe />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -101,5 +108,47 @@ describe("ProfilePage", () => {
     expect(screen.getByText("Display name")).toBeInTheDocument();
     expect(screen.getByText("Email")).toBeInTheDocument();
     expect(screen.getByText("Joined")).toBeInTheDocument();
+  });
+
+  // ── 从 /chat 来的返回入口 ──────────────────────────────────────────
+  //
+  // API Key 面板全站只有 /chat 的三个「配置 Key」按钮进得来，所以从那儿来的人
+  // 需要一条回头路。但从头像菜单进个人中心的人不该看到它，所以判据是 from=chat。
+
+  function loginAndRender(path: string) {
+    useAuthStore.setState({
+      token: "token",
+      user: {
+        id: 1, username: "reader", email: "reader@example.com", display_name: null,
+        role: "user", is_active: true, created_at: "2026-01-10T00:00:00Z",
+      },
+    });
+    return renderPage(<ProfilePage />, path);
+  }
+
+  it("不是从 /chat 来时，不出现返回按钮", () => {
+    loginAndRender("/profile?tab=apikey");
+    expect(screen.queryByRole("button", { name: /Back to AI Q&A/ })).toBeNull();
+  });
+
+  // 承重点：必须带回原来那个会话。只跳 /chat 的话会落在空白新对话上 ——
+  // 和点顶部导航没有任何区别，这个按钮也就白加了。
+  it("从 /chat 带会话来时，返回按钮回到那个会话", () => {
+    loginAndRender("/profile?tab=apikey&from=chat&s=42");
+    fireEvent.click(screen.getByRole("button", { name: /Back to AI Q&A/ }));
+    expect(screen.getByTestId("loc").textContent).toBe("/chat?s=42");
+  });
+
+  it("从 /chat 来但没有会话（新对话未发言）时，回到 /chat", () => {
+    loginAndRender("/profile?tab=apikey&from=chat");
+    fireEvent.click(screen.getByRole("button", { name: /Back to AI Q&A/ }));
+    expect(screen.getByTestId("loc").textContent).toBe("/chat");
+  });
+
+  // s 来自地址栏，是可被随意编辑的输入。非数字不该被原样拼进跳转目标。
+  it("?s= 不是数字时退回 /chat，不把脏值拼进 URL", () => {
+    loginAndRender("/profile?tab=apikey&from=chat&s=../../evil");
+    fireEvent.click(screen.getByRole("button", { name: /Back to AI Q&A/ }));
+    expect(screen.getByTestId("loc").textContent).toBe("/chat");
   });
 });

@@ -2,7 +2,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HelmetProvider } from "react-helmet-async";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, useLocation } from "react-router";
+import { message } from "antd";
 import ChatPage from "./ChatPage";
 import { useAuthStore } from "../stores/authStore";
 import {
@@ -19,6 +20,18 @@ import {
   type ChatSessionItem,
 } from "../api/client";
 import type { ChatSessionId } from "../types/branded";
+
+// 只替换 message，其余 antd 组件保持真实。
+// 为什么不能靠"页面上有没有出现错误文案"来断言：antd v5 的静态 message 在
+// React 19 下要靠入口处那个 v5-patch 才生效，而测试不走入口 —— 于是 message.error
+// 在 jsdom 里是无声的，用 queryByText 断言会永远为真（实测变异打不红）。
+vi.mock("antd", async () => {
+  const actual = await vi.importActual<typeof import("antd")>("antd");
+  return {
+    ...actual,
+    message: { ...actual.message, error: vi.fn(), success: vi.fn(), warning: vi.fn(), info: vi.fn() },
+  };
+});
 
 vi.mock("../api/client", async () => {
   const actual = await vi.importActual<typeof import("../api/client")>("../api/client");
@@ -69,13 +82,20 @@ const MASTERS = [
   },
 ];
 
-function renderPage() {
+/** 把当前 URL 渲染出来，好断言跳转目标 —— 比 mock useNavigate 更接近真实。 */
+function LocationProbe() {
+  const loc = useLocation();
+  return <span data-testid="loc">{loc.pathname + loc.search}</span>;
+}
+
+function renderPage(entry = "/chat") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <HelmetProvider>
       <QueryClientProvider client={client}>
-        <MemoryRouter initialEntries={["/chat"]}>
+        <MemoryRouter initialEntries={[entry]}>
           <ChatPage />
+          <LocationProbe />
         </MemoryRouter>
       </QueryClientProvider>
     </HelmetProvider>,
@@ -590,4 +610,90 @@ describe("收起态图标轨", () => {
     expect(new Set(widths).size).toBe(1);
   });
 
+});
+
+// ── 会话与 URL 的往返（去配 Key 再回来不丢会话）────────────────────────
+
+describe("会话与 URL", () => {
+  const SIX = Array.from({ length: 6 }, (_, i) => ({
+    id: (i + 1) as ChatSessionId,
+    title: `会话 ${i + 1}`,
+    pinned: false,
+    created_at: new Date().toISOString(),
+  }));
+
+  beforeEach(() => {
+    vi.mocked(getChatSessions).mockResolvedValue(SIX);
+    vi.mocked(getChatSessionMessages).mockResolvedValue({
+      total: 1, page: 1, size: 50,
+      messages: [{ id: 99, role: "user" as const, content: "色即是空怎么讲", sources: null, created_at: new Date().toISOString() }],
+    });
+  });
+
+  // 承重点。sessionId 此前只是组件 state，一离开 /chat 就没了 —— 这条断言的是
+  // 「带 ?s= 进来能把那个会话读回来」，也就是返回按钮真正依赖的能力。
+  it("带 ?s= 进入时恢复该会话", async () => {
+    renderPage("/chat?s=3");
+    await waitFor(() => {
+      expect(vi.mocked(getChatSessionMessages)).toHaveBeenCalledWith(3, 1, 50);
+    });
+    expect(await screen.findByText("色即是空怎么讲")).toBeInTheDocument();
+  });
+
+  // 旧链接（会话已删 / 本就不属于自己，后端 403/404）不该在进页面时糊一脸报错。
+  it("?s= 指向打不开的会话时静默退回空白首屏", async () => {
+    vi.mocked(getChatSessionMessages).mockRejectedValue(new Error("404"));
+    renderPage("/chat?s=999");
+    await waitFor(() => {
+      expect(vi.mocked(getChatSessionMessages)).toHaveBeenCalledWith(999, 1, 50);
+    });
+    // 首屏建议卡片还在 = 退回了空白态
+    expect(await screen.findByText("「三毒」指的是哪三种毒？")).toBeInTheDocument();
+    // 打不开的 id 不该留在地址栏里
+    await waitFor(() => {
+      expect(screen.getByTestId("loc").textContent).not.toContain("s=999");
+    });
+    // 「静默」必须单独断言：只查"退回了空白态"的话，实现照样弹一个错误提示也能过
+    // ——这条最初就是这么写的，变异测试（忽略 silent 参数）没能打红才发现。
+    expect(vi.mocked(message.error)).not.toHaveBeenCalled();
+  });
+
+  it("点开会话后 ?s= 跟着写进 URL（可收藏）", async () => {
+    const { container } = renderPage();
+    await waitFor(() => expect(screen.getByText("会话 2")).toBeInTheDocument());
+    const row = [...container.querySelectorAll<HTMLElement>(".chat-session-row")]
+      .find((el) => el.textContent?.includes("会话 2"))!;
+    fireEvent.click(row.querySelector("span")!);
+    await waitFor(() => {
+      expect(screen.getByTestId("loc").textContent).toBe("/chat?s=2");
+    });
+  });
+
+  it("点新对话清掉 ?s=", async () => {
+    renderPage("/chat?s=3");
+    await waitFor(() => {
+      expect(screen.getByTestId("loc").textContent).toBe("/chat?s=3");
+    });
+    fireEvent.click(screen.getByRole("button", { name: /新对话/ }));
+    await waitFor(() => {
+      expect(screen.getByTestId("loc").textContent).toBe("/chat");
+    });
+  });
+
+  // 「配置 Key」必须把来源和会话一起带过去，否则 /profile 那边既不知道该不该显示
+  // 返回按钮，也不知道该返回到哪个会话。
+  it("配置 Key 跳转带上 from=chat 与当前会话", async () => {
+    renderPage("/chat?s=3");
+    await waitFor(() => {
+      expect(screen.getByTestId("loc").textContent).toBe("/chat?s=3");
+    });
+    fireEvent.click(screen.getByRole("button", { name: /已配置 Key|配置 API Key/ }));
+    await waitFor(() => {
+      const loc = screen.getByTestId("loc").textContent!;
+      expect(loc).toContain("/profile?");
+      expect(loc).toContain("tab=apikey");
+      expect(loc).toContain("from=chat");
+      expect(loc).toContain("s=3");
+    });
+  });
 });
