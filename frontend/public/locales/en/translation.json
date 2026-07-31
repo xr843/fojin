@@ -1521,5 +1521,6 @@
   "chat.session_group_pinned": "Pinned",
   "chat.session_actions": "More actions",
   "chat.save": "Save",
-  "chat.search_sessions_label": "Search conversations"
+  "chat.search_sessions_label": "Search conversations",
+  "chat.recent_chats": "Recent chats"
 }

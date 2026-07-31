@@ -42,6 +42,7 @@ import {
   RailSidebarIcon,
   RailNewChatIcon,
   RailSearchIcon,
+  RailChatsIcon,
   RailSettingsIcon,
 } from "../components/RailIcons";
 import DraggableModal from "../components/DraggableModal";
@@ -1512,6 +1513,21 @@ export default function ChatPage() {
                 icon={<RailSearchIcon />}
                 onClick={handleRailSearch}
                 aria-label={t("chat.search_sessions_label")}
+              />
+            </Tooltip>
+          )}
+          {/* 最近聊天：展开侧栏露出会话列表。与"展开侧栏"按钮动作相同、意图不同 ——
+              一个是"开合面板"，一个是"我的旧对话在哪"。ChatGPT 同样两个都给。
+              不设显示条件：一个会话都没有时展开出空列表，正好告诉新用户以后
+              会话会出现在这里。 */}
+          {sidebarCollapsed && (
+            <Tooltip title={t("chat.recent_chats")} placement="right">
+              <Button
+                type="text"
+                className="chat-rail-btn"
+                icon={<RailChatsIcon />}
+                onClick={() => setCollapsed(false)}
+                aria-label={t("chat.recent_chats")}
               />
             </Tooltip>
           )}
