@@ -26,19 +26,28 @@ from app.services.prompt_builder import _estimate_tokens
 
 logger = logging.getLogger(__name__)
 
-# Blended $/1K tokens (input+output averaged — chat is output-heavy, so this
-# tends to under-count for output-dominant turns; acceptable for trend/alert).
+# 估价表，$/1K token。只用于成本趋势与告警，不是账单。
 # Mirror of scripts/build_alignments.LLM_PRICE_PER_1K.
+#
+# ⚠️ 已有各行的换算基准并不一致（2026-07-31 用厂商公开价反推）：
+#     deepseek-v4-pro   0.00087 ≈ 输出价(¥6/M)，而非 (输入+输出)/2 的 0.00062
+#     deepseek-v4-flash 0.00028 ≈ 输出价(¥2/M)
+#     gpt-4o-mini       0.00015 ＝ 输入价($0.15/M)，输出价是它的 4 倍
+# 也就是说上面那句"取均值"的说明，对这三行没有一行成立。本次没有重算历史行 ——
+# 改动会让已有的 Prometheus 序列断层，而这属于另一件事。新增行一律注明来源与算法。
 PRICE_PER_1K_USD: dict[str, float] = {
     "claude-haiku-4-5-20251001": 0.0008,
     "gpt-4o-mini": 0.00015,
     "qwen-plus": 0.0004,
-    "qwen3.6-plus": 0.0004,
     "deepseek-chat": 0.00028,       # legacy alias → deepseek-v4-flash
     "deepseek-reasoner": 0.0014,    # legacy alias (thinking)
     "deepseek-v4-flash": 0.00028,
     "deepseek-v4-pro": 0.00087,
-    "glm-5.1": 0.0006,
+    # 官方定价页 2026-07-31：输入(未命中缓存) ¥20/M、输出 ¥100/M。
+    # 按 (20+100)/2 ÷ 7.2 折算 = 0.00833。
+    "kimi-k3": 0.00833,
+    # qwen3.7-plus 与 glm-5.2 暂缺：两家的定价页都取不到具体数字，而往估价表里
+    # 填猜测值，比让它退回下面那个有据可查的默认值更糟。缺失即走 DEFAULT。
 }
 DEFAULT_PRICE_PER_1K_USD = 0.0008   # unknown model → Haiku-ish estimate
 

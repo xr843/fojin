@@ -35,13 +35,14 @@ const PROVIDER_MODELS: Record<string, Array<{ value: string; label: string; hint
     { value: "glm-5.1", label: "GLM-5.1", hintKey: "profile.modelHint.midrange" },
   ],
   anthropic: [
-    { value: "claude-haiku-4-5", label: "Haiku 4.5", hintKey: "profile.modelHint.fast_economy" },
-    { value: "claude-sonnet-4-6", label: "Sonnet 4.6", hintKey: "profile.modelHint.main_recommended" },
-    { value: "claude-opus-4-7", label: "Opus 4.7", hintKey: "profile.modelHint.flagship" },
+    { value: "claude-haiku-4-5-20251001", label: "Haiku 4.5", hintKey: "profile.modelHint.fast_economy" },
+    { value: "claude-sonnet-5", label: "Sonnet 5", hintKey: "profile.modelHint.main_recommended" },
+    { value: "claude-opus-5", label: "Opus 5", hintKey: "profile.modelHint.flagship" },
   ],
   openai: [
-    { value: "gpt-4o-mini", label: "GPT-4o mini", hintKey: "profile.modelHint.economy_daily" },
-    { value: "gpt-4o", label: "GPT-4o", hintKey: "profile.modelHint.main" },
+    { value: "gpt-5.6-luna", label: "GPT-5.6 Luna", hintKey: "profile.modelHint.economy_daily" },
+    { value: "gpt-5.6-terra", label: "GPT-5.6 Terra", hintKey: "profile.modelHint.main" },
+    { value: "gpt-5.6-sol", label: "GPT-5.6 Sol", hintKey: "profile.modelHint.flagship" },
   ],
   gemini: [
     { value: "gemini-2.0-flash", label: "2.0 Flash", hintKey: "profile.modelHint.fast_economy" },

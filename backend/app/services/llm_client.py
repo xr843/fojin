@@ -60,13 +60,13 @@ PROVIDER_DEFAULT_MODELS = {
     "yi": "yi-lightning",
     "siliconflow": "Qwen/Qwen2.5-7B-Instruct",
     # 国际
-    "openai": "gpt-4o-mini",
+    "openai": "gpt-5.6-luna",
     "gemini": "gemini-2.0-flash",
     "groq": "llama-3.3-70b-versatile",
     "mistral": "mistral-small-latest",
     "xai": "grok-2-latest",
-    "openrouter": "openai/gpt-4o-mini",
-    "anthropic": "claude-sonnet-4-20250514",
+    "openrouter": "openai/gpt-5.6-luna",
+    "anthropic": "claude-sonnet-5",
 }
 
 # Anthropic uses a different API format; detect by provider or URL

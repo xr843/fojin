@@ -207,3 +207,27 @@ def test_one_entry_per_provider_except_deepseek():
     for provider, n in counts.items():
         if provider != "deepseek":
             assert n == 1, f"{provider} 有 {n} 个条目，与目录约定不符"
+
+
+def test_price_table_has_no_retired_models():
+    """估价表的键是**上游模型名**。留着已下架的型号不会报错（未知模型退回默认价），
+    但会让人以为覆盖率比实际更高 —— 而真正在跑的新模型反倒在吃默认估价。
+    这里只钉住已确认下架/被取代的那几个。"""
+    from app.services.llm_cost import PRICE_PER_1K_USD
+
+    retired = {"qwen3.6-plus", "glm-5.1", "kimi-k2.6", "kimi-k2", "moonshot-v1-8k"}
+    leftover = retired & PRICE_PER_1K_USD.keys()
+    assert not leftover, f"估价表里仍留着已下架的型号: {sorted(leftover)}"
+
+
+def test_provider_defaults_are_not_retired_models():
+    """PROVIDER_DEFAULT_MODELS 是自带 Key 用户没指定模型时真正发出去的字符串。
+    指向已下架型号的后果不是"退回上一代"，是那位用户直接 model not found。"""
+    from app.services.llm_client import PROVIDER_DEFAULT_MODELS
+
+    retired = {
+        "qwen3.6-plus", "glm-5.1", "kimi-k2.6",      # 本次同步前的旧值
+        "gpt-4o-mini", "claude-sonnet-4-20250514",   # 国际两家的旧值
+    }
+    bad = {p: m for p, m in PROVIDER_DEFAULT_MODELS.items() if m in retired}
+    assert not bad, f"这些厂商的默认模型已下架/被取代: {bad}"
