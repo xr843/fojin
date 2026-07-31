@@ -430,6 +430,27 @@ em {
   background: rgba(217, 208, 193, 0.3);
 }
 
+/* 侧栏右缘的分隔线。
+   用 ::after 而不是 border-right：全局是 border-box，加边框会把内容盒挤掉
+   1px，48px 轨里 34px 的按钮就不再正中（实测偏移会从 0 变成 -0.5）。绝对定位
+   的伪元素完全不参与布局。
+   颜色走 --fj-border，深浅两套主题各自有定义；再压低透明度到「很浅」，让它只
+   划出边界而不抢注意力。 */
+.chat-sidebar {
+  position: relative;
+}
+.chat-sidebar::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--fj-border);
+  opacity: 0.45;
+  pointer-events: none;
+}
+
 /* ── 收起态：一条居中的图标轨 ─────────────────────────────────────── */
 .chat-sidebar[data-collapsed] {
   align-items: center;
