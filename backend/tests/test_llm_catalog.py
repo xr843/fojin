@@ -77,7 +77,7 @@ def test_resolve_platform_mismatch_raises(monkeypatch):
     monkeypatch.setattr(llm_module.settings, "llm_api_key", "platform-key")
 
     with pytest.raises(ServiceError) as exc_info:
-        _resolve_with_model_override(None, "moonshot:kimi-k2.6")
+        _resolve_with_model_override(None, "moonshot:kimi-k3")
     # User-facing message must mention the provider so user knows which key to add
     assert "moonshot" in str(exc_info.value).lower() or "Kimi" in str(exc_info.value)
 
@@ -97,11 +97,11 @@ def test_resolve_byok_matching_provider_overrides_model(monkeypatch):
     user.api_model = "kimi-something-stale"
 
     url, key, model, is_byok, provider = _resolve_with_model_override(
-        user, "moonshot:kimi-k2.6"
+        user, "moonshot:kimi-k3"
     )
     assert url == PROVIDER_URLS["moonshot"]
     assert key == "user-moonshot-key"
-    assert model == "kimi-k2.6"
+    assert model == "kimi-k3"
     assert is_byok is True
     assert provider == "moonshot"
 
@@ -174,3 +174,36 @@ def test_model_descriptions_carry_no_pricing():
     for opt in CATALOG:
         assert not re.search(r"价格|费用|元|/\s*3|便宜|免费", opt.description), \
             f"{opt.id} 的描述里出现了价格字样: {opt.description!r}"
+
+
+def test_catalog_and_provider_defaults_agree_on_generation():
+    """同一个厂商的型号在三处各写一份：CATALOG（/chat 的选择器）、
+    PROVIDER_DEFAULT_MODELS（自带 Key 未指定模型时的默认）、以及前端个人中心的
+    建议列表。前两处在同一个仓、同一门语言里，没有理由不一致 —— 只更新其中一处，
+    自带 Key 的用户会拿到和界面上写的完全不同的模型。
+
+    只比对非 deepseek 的三家：deepseek 在 CATALOG 里刻意有 pro/flash 两档，而默认
+    值只能是一个，本来就不该相等。
+    """
+    from app.services.llm_client import PROVIDER_DEFAULT_MODELS
+
+    for opt in CATALOG:
+        if opt.provider == "deepseek":
+            continue
+        default = PROVIDER_DEFAULT_MODELS.get(opt.provider)
+        assert default == opt.model, (
+            f"{opt.provider}: 选择器写的是 {opt.model!r}，"
+            f"而 PROVIDER_DEFAULT_MODELS 写的是 {default!r}"
+        )
+
+
+def test_one_entry_per_provider_except_deepseek():
+    """「每个模型商只保留最新的一个旗舰模型」是这份目录的既定约定，deepseek 是
+    有意的例外（pro/flash 同代两档）。多出来的条目应该是一次自觉的决定。"""
+    from collections import Counter
+
+    counts = Counter(opt.provider for opt in CATALOG)
+    assert counts["deepseek"] == 2, "deepseek 应恰有 pro/flash 两档"
+    for provider, n in counts.items():
+        if provider != "deepseek":
+            assert n == 1, f"{provider} 有 {n} 个条目，与目录约定不符"

@@ -37,12 +37,19 @@ CATALOG: list[ModelOption] = [
     # 也不写"更快"——名字里的 Flash 已经是厂商的定位，而我们没有实测数据支撑。
     ModelOption("deepseek:v4-flash", "deepseek", "deepseek-v4-flash",
                 "DeepSeek V4 Flash", "同代轻量档，上下文同为 1M", False),
-    ModelOption("dashscope:qwen3.6-plus", "dashscope", "qwen3.6-plus",
-                "通义千问 Qwen3.6 Plus", "阿里最新文本旗舰", False),
-    ModelOption("moonshot:kimi-k2.6", "moonshot", "kimi-k2.6",
-                "Kimi K2.6", "Moonshot 最新旗舰", False),
-    ModelOption("zhipu:glm-5.1", "zhipu", "glm-5.1",
-                "智谱 GLM-5.1", "744B 参数，编码与推理强", False),
+    # 这三家都只对自带 Key 的用户可选（平台没有配它们的 Key）。上游模型名写错的
+    # 后果不是"退回默认"，而是那位用户直接吃一个 model not found —— 所以每次更新
+    # 都以厂商官方模型列表为准，不采信二手文章。2026-07-31 核对：
+    #   · qwen3.6-plus 已不在阿里的模型列表里 —— 沿用 plus 档只升版本，不改档位：
+    #     换成 max 会悄悄抬高自带 Key 用户的花费，而这次要做的是同步版本
+    #   · kimi-k2.6 仍可调用但已非最新；k3 起上下文到 1M
+    #   · glm-5.1 仍在，但 5.2 才是当前旗舰（1M 上下文）
+    ModelOption("dashscope:qwen3.7-plus", "dashscope", "qwen3.7-plus",
+                "通义千问 Qwen3.7 Plus", "阿里最新一代主力档", False),
+    ModelOption("moonshot:kimi-k3", "moonshot", "kimi-k3",
+                "Kimi K3", "Moonshot 最新旗舰，上下文 1M", False),
+    ModelOption("zhipu:glm-5.2", "zhipu", "glm-5.2",
+                "智谱 GLM-5.2", "智谱最新旗舰，上下文 1M", False),
 ]
 
 CATALOG_BY_ID = {opt.id: opt for opt in CATALOG}
