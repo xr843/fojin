@@ -457,8 +457,15 @@ em {
   outline: 2px solid var(--fj-accent);
   outline-offset: 1px;
 }
+/* 描边图标（RailIcons）按 width/height 定尺寸；antd 的实心字形按 font-size。
+   轨上四个都是前者，这条 .anticon 规则留给展开态尚存的 antd 图标兜底。 */
 .chat-rail-btn .anticon {
   font-size: 16px;
+}
+.chat-rail-btn svg {
+  width: 19px;
+  height: 19px;
+  display: block;
 }
 
 /* Key 状态行沉到侧栏底部（会话列表是 flex:1，排它后面即到底） */

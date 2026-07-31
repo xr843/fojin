@@ -551,4 +551,22 @@ describe("收起态图标轨", () => {
     expect(rail.querySelectorAll("button.chat-rail-btn")).toHaveLength(4);
   });
 
+  // 轨上四个必须是同一套描边图标。antd 的图标是实心字形，描边粗细烘焙在字形里
+  // 改不掉 —— 混用的话四个并排时轻重不一，正是要修的那个观感问题。
+  it("收起态: 四个都是描边图标（无 antd 实心字形混入）", async () => {
+    localStorage.setItem("fojin.chat.sidebarCollapsed", "1");
+    const { container } = renderPage();
+    await screen.findByRole("button", { name: "搜索会话" });
+    const rail = container.querySelector(".chat-sidebar")!;
+
+    expect([...rail.querySelectorAll("[data-rail-icon]")].map((e) => e.getAttribute("data-rail-icon")))
+      .toEqual(["sidebar", "new-chat", "search", "settings"]);
+    // 一个 antd 字形都不该剩下
+    expect(rail.querySelectorAll(".anticon")).toHaveLength(0);
+    // 四个描边粗细一致，否则并排看仍然轻重不一
+    const widths = [...rail.querySelectorAll("[data-rail-icon]")]
+      .map((e) => e.getAttribute("stroke-width"));
+    expect(new Set(widths).size).toBe(1);
+  });
+
 });

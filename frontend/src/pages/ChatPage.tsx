@@ -19,7 +19,6 @@ import {
   SettingOutlined,
   MenuOutlined,
   MenuFoldOutlined,
-  MenuUnfoldOutlined,
   DownloadOutlined,
   StopOutlined,
   CopyOutlined,
@@ -34,12 +33,17 @@ import {
   EditOutlined,
   PushpinOutlined,
   PushpinFilled,
-  SearchOutlined,
 } from "@ant-design/icons";
 const ShareCard = lazy(() => import("../components/ShareCard"));
 const CitationDrawer = lazy(() => import("../components/CitationDrawer"));
 import ChatModelSelector from "../components/ChatModelSelector";
 import MasterGallery, { MasterSeal } from "../components/MasterGallery";
+import {
+  RailSidebarIcon,
+  RailNewChatIcon,
+  RailSearchIcon,
+  RailSettingsIcon,
+} from "../components/RailIcons";
 import DraggableModal from "../components/DraggableModal";
 import { getMasters } from "../api/client";
 import type { CitationTarget } from "../components/CitationDrawer";
@@ -1478,7 +1482,7 @@ export default function ChatPage() {
               type="text"
               size="small"
               className={sidebarCollapsed ? "chat-rail-btn" : undefined}
-              icon={sidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+              icon={sidebarCollapsed ? <RailSidebarIcon /> : <MenuFoldOutlined />}
               onClick={toggleSidebarCollapsed}
               aria-label={sidebarCollapsed ? t("chat.expand_sidebar") : t("chat.collapse_sidebar")}
               style={{ alignSelf: sidebarCollapsed ? "center" : "flex-end", color: "var(--fj-ink-muted)" }}
@@ -1488,7 +1492,7 @@ export default function ChatPage() {
               48px 宽的窄轨里会显得又挤又重，这也是它和 ChatGPT 观感差最多的地方。 */}
           <Tooltip title={sidebarCollapsed ? t("chat.new_chat") : ""} placement="right">
             <Button
-              icon={<PlusOutlined />}
+              icon={sidebarCollapsed ? <RailNewChatIcon /> : <PlusOutlined />}
               type={sidebarCollapsed ? "text" : "default"}
               className={sidebarCollapsed ? "chat-rail-btn" : undefined}
               block={!sidebarCollapsed}
@@ -1505,7 +1509,7 @@ export default function ChatPage() {
               <Button
                 type="text"
                 className="chat-rail-btn"
-                icon={<SearchOutlined />}
+                icon={<RailSearchIcon />}
                 onClick={handleRailSearch}
                 aria-label={t("chat.search_sessions_label")}
               />
@@ -1556,7 +1560,7 @@ export default function ChatPage() {
                 <Button
                   type="text"
                   className="chat-rail-btn"
-                  icon={<SettingOutlined />}
+                  icon={<RailSettingsIcon />}
                   onClick={() => navigate("/profile?tab=apikey")}
                   aria-label={t("chat.configure_key")}
                 />
