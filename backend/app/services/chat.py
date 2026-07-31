@@ -42,6 +42,7 @@ from app.services.chat_sessions import (  # noqa: F401
     get_session_for_user,
     list_sessions,
     update_message_feedback,
+    update_session,
 )
 from app.services.chat_trust import build_trust_status, persist_answer_diagnostic
 from app.services.citation_guard import enforce_citation_whitelist, log_mutations

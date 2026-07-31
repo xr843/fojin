@@ -1672,6 +1672,10 @@ export interface ChatResponse {
 export interface ChatSessionItem {
   id: ChatSessionId;
   title: string | null;
+  // Optional, not `boolean`: during a rolling backend deploy a replica running
+  // the pre-0174 code answers /chat/sessions without this field, and the new
+  // bundle is already being served. Undefined must read as "not pinned".
+  pinned?: boolean;
   created_at: string;
 }
 
@@ -1841,6 +1845,15 @@ export async function getChatSessionMessages(
 
 export async function deleteChatSession(sessionId: number): Promise<void> {
   await api.delete(`/chat/sessions/${sessionId}`);
+}
+
+/** Rename and/or (un)pin a session. Omitted fields are left untouched. */
+export async function updateChatSession(
+  sessionId: number,
+  patch: { title?: string; pinned?: boolean },
+): Promise<ChatSessionItem> {
+  const { data } = await api.patch<ChatSessionItem>(`/chat/sessions/${sessionId}`, patch);
+  return data;
 }
 
 export async function updateChatMessageFeedback(

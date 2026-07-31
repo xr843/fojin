@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ChatRequest(BaseModel):
@@ -166,9 +166,29 @@ class ChatSessionResponse(BaseModel):
 class SessionListItem(BaseModel):
     id: int
     title: str | None
+    pinned: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class SessionUpdateRequest(BaseModel):
+    """Rename and/or (un)pin a session. Omitted fields are left untouched."""
+
+    # 500 is the column width; a sidebar row shows ~20 chars, so anything past
+    # 200 is already unreadable there and only serves to bloat the list payload.
+    title: str | None = Field(None, min_length=1, max_length=200)
+    pinned: bool | None = None
+
+    @field_validator("title")
+    @classmethod
+    def _strip_title(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        cleaned = v.strip()
+        if not cleaned:
+            raise ValueError("会话名称不能为空")
+        return cleaned
 
 
 class ShareQARequest(BaseModel):

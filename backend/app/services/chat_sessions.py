@@ -42,9 +42,42 @@ async def list_sessions(session: AsyncSession, user_id: int) -> list[ChatSession
     result = await session.execute(
         select(ChatSession)
         .where(ChatSession.user_id == user_id)
-        .order_by(ChatSession.created_at.desc())
+        .order_by(ChatSession.pinned.desc(), ChatSession.created_at.desc())
     )
     return list(result.scalars().all())
+
+
+async def update_session(
+    db: AsyncSession,
+    session_id: int,
+    user_id: int,
+    title: str | None = None,
+    pinned: bool | None = None,
+) -> ChatSession:
+    """Rename and/or (un)pin a session the user owns.
+
+    Both fields are optional so one endpoint serves both menu actions, but a
+    request carrying neither is rejected rather than silently succeeding — a
+    caller that sends an empty patch has a bug, and a 200 would hide it.
+    """
+    if title is None and pinned is None:
+        raise ValidationError("没有要更新的内容")
+
+    cs = await get_session_for_user(db, session_id, user_id)
+
+    if title is not None:
+        # The schema already strips and length-checks; this is the last line of
+        # defence for any other caller.
+        cleaned = title.strip()
+        if not cleaned:
+            raise ValidationError("会话名称不能为空")
+        cs.title = cleaned
+    if pinned is not None:
+        cs.pinned = pinned
+
+    await db.commit()
+    await db.refresh(cs)
+    return cs
 
 
 async def get_history(session: AsyncSession, session_id: int) -> list[ChatMessage]:

@@ -378,6 +378,58 @@ em {
   outline-offset: 1px;
 }
 
+/* 会话行的 ⋯ 菜单。默认隐藏、悬停/聚焦/菜单展开时现身 —— 侧栏只有 220px，
+   常驻一个图标会挤掉本就不够的标题宽度。 */
+.chat-session-more {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 4px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  color: var(--fj-ink-muted);
+  transition: opacity 0.12s ease, background 0.12s ease;
+}
+/* :focus 与 :focus-within 都写上，不只写 :focus-visible —— 后者的命中规则由
+   浏览器启发式决定（编程式聚焦、部分自动化环境下并不匹配），而"键盘 Tab 到了
+   一个 opacity:0 的按钮上"是这里最糟的失败态。 */
+.chat-session-row:hover .chat-session-more,
+.chat-session-row:focus-within .chat-session-more,
+.chat-session-more:focus,
+.chat-session-more.ant-dropdown-open {
+  opacity: 1;
+}
+/* 触屏没有 hover：那里必须常驻，否则菜单永远打不开。 */
+@media (hover: none) {
+  .chat-session-more {
+    opacity: 0.65;
+  }
+}
+.chat-session-more:hover {
+  background: rgba(217, 208, 193, 0.45);
+  color: var(--fj-ink);
+}
+.chat-session-more:focus-visible {
+  outline: 2px solid var(--fj-accent);
+  outline-offset: 1px;
+  opacity: 1;
+}
+.chat-session-row {
+  color: var(--fj-ink-muted);
+  background: transparent;
+}
+.chat-session-row:hover {
+  background: rgba(217, 208, 193, 0.18);
+}
+.chat-session-row[data-active] {
+  color: var(--fj-accent);
+  background: rgba(217, 208, 193, 0.3);
+}
+
 /* Key 状态行沉到侧栏底部（会话列表是 flex:1，排它后面即到底） */
 .chat-sidebar-foot {
   flex-shrink: 0;
