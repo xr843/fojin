@@ -824,9 +824,28 @@ em {
    column via an additional class applied when the panel is open (handled
    in ChatPage inline style). */
 @media (max-width: 768px) {
+  /* 手机上把原文对照堆到对话下方，而不是并排。
+     .chat-shell 的 flex-direction 必须在这里翻成 column —— 光给面板
+     width:100% 是不够的：外壳仍是 row/nowrap，面板 flex-shrink:0 占满整行宽，
+     对话列被压成 0 宽，容器还横向溢出。真机 390px 复现过：对话整个消失，
+     输入框缩成一条竖线，工具栏溢出屏幕。 */
+  .chat-shell {
+    flex-direction: column;
+  }
+  /* 行内样式只给了 minWidth:0；换成纵向后要限制的是高度，否则对话列会按内容
+     撑开，把面板顶出视口。 */
+  .chat-main-column {
+    min-height: 0;
+  }
   .chat-citation-panel {
     width: 100% !important;
-    height: 60vh;
+    /* 60vh → 50vh。这个 60vh 从来没被真正执行过：面板此前根本堆叠不起来，
+       所以它只是给一个并排面板设了个高度，没人验过纵向分配。真机 390px 量过：
+       60vh 时对话列 228px，扣掉页头与输入区后消息可视区只剩 32px（约一行），
+       等于对话仍然看不见 —— 而用户点开原文正是为了「两边对着看」。
+       50vh 给到消息 104px（约四行），原文仍有 354px（约十四行）。 */
+    height: 50vh;
+    flex-shrink: 0;
     border-top: 1px solid var(--fj-border, #e8e0d4);
   }
   .chat-citation-divider {
