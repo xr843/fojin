@@ -972,17 +972,24 @@ export default function ChatPage() {
     }
   }, [syncSessionParam, handleMessagesScroll, t]);
 
-  // 挂载时按 ?s= 恢复会话。ref 守卫是必需的：syncSessionParam 会改 searchParams，
-  // 不守就会自我触发成循环；loadSession 每次渲染都是新引用（exhaustive-deps 要求
-  // 列进依赖），也靠这个守卫兜住重复执行。
+  // 按 ?s= 恢复会话。**只在挂载后判这一次**，之后 URL 里的 s 一律视为本页面自己
+  // 写进去的，不再回头去"恢复"。
+  //
+  // 守卫必须在读 s 之前就置位。此前它只在真的拿到 s 之后才置位，于是干净进入
+  // /chat（没有 s）时守卫一直是 false；等流回传 session_id、syncSessionParam 把
+  // ?s= 写进 URL，searchParams 一变这个 effect 就重跑，把**刚写进去的那个 id**
+  // 当成历史会话去拉消息 —— 而此刻助手回答还没落库，拿回空数组，setMessages 把
+  // 正在流式的对话整个替换掉：页面退回空白首屏，而「停止」按钮还在（sending 没
+  // 人动）。用户看到的就是"问第一个问题问到一半，整个对话没了"。
+  // 只发生在每次页面加载后的第一问 —— 此后守卫为真。
   const restoredRef = useRef(false);
   useEffect(() => {
     if (restoredRef.current) return;
+    restoredRef.current = true;
     const raw = searchParams.get("s");
     if (!raw) return;
     const sid = Number(raw);
     if (!Number.isInteger(sid) || sid <= 0) return;
-    restoredRef.current = true;
     // 放进微任务里调：loadSession 第一句就是 await，实际不会同步 setState，但
     // React Compiler 只看调用点、不看 await，会判成 set-state-in-effect（error 级）。
     // 挪进回调既符合规则本意（"外部状态变化时在回调里 setState"），也不改变时序。

@@ -733,3 +733,45 @@ describe("额度提醒", () => {
     expect(screen.queryByText(/额度快用完/)).toBeNull();
   });
 });
+
+  // ── 用户实拍录屏复现（2026-08-01）────────────────────────────────────
+  //
+  // 症状：重新登录后问第一个问题，回答生成到一半，整个对话突然消失、退回空白首屏，
+  // 而输入区的「停止」按钮还在（说明流仍在跑）。之后的问题都正常。
+  //
+  // 机制：恢复 effect 的 `if (!raw) return` 早退时没有置位守卫。干净进 /chat 时
+  // 守卫保持 false；等流回传 session_id、syncSessionParam 把 ?s= 写进 URL，
+  // searchParams 一变，这个 effect 就把**刚写进去的那个 id** 当成"要恢复的历史
+  // 会话"去拉消息 —— 而此刻助手回答还没落库，拿回空数组，setMessages 把正在流式
+  // 的对话整个替换掉。
+  it("回归: 流式中途写入 ?s= 不得把正在进行的对话清空", async () => {
+    let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+    vi.mocked(sendChatMessageStream).mockImplementation(
+      async (_m, _s, _mid, callbacks) => { cb = callbacks; },
+    );
+    // 新会话此刻在后端还没有任何已落库的消息
+    vi.mocked(getChatSessionMessages).mockResolvedValue({
+      total: 0, page: 1, size: 50, messages: [],
+    });
+
+    const { container } = renderPage();          // 干净进入，URL 里没有 ?s=
+    await waitFor(() => expect(screen.getByText("「三毒」指的是哪三种毒？")).toBeInTheDocument());
+
+    fireEvent.click(container.querySelector(".chat-hero-card")!);
+    await waitFor(() => expect(cb).toBeDefined());
+
+    cb!.onSessionId(4242 as unknown as number);  // 后端回传新会话 id → 写入 ?s=
+    await waitFor(() => {
+      expect(screen.getByTestId("loc").textContent).toBe("/chat?s=4242");
+    });
+    cb!.onToken("色即是空");
+
+    // 给"错误的恢复"足够的时间发生（微任务 + 一次 HTTP 往返）
+    await new Promise((r) => setTimeout(r, 120));
+
+    // 对话必须还在：空白首屏的建议卡片不该回来
+    expect(container.querySelector(".chat-hero-cards")).toBeNull();
+    expect(container.textContent).toContain("色即是空");
+    // 而且根本不该去拉这个会话的历史消息
+    expect(vi.mocked(getChatSessionMessages)).not.toHaveBeenCalled();
+  });
