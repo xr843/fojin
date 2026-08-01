@@ -4,6 +4,7 @@ import {
   extractPrecedingQuote,
   pickSourceForQuote,
 } from "./citationMatch";
+import { localizeHan } from "./hanScript";
 
 /**
  * Custom URL scheme for citation links. Lives here rather than in ChatPage so
@@ -30,8 +31,20 @@ export const CITATION_URL_SCHEME = "fojin-citation";
  * When a matched source lacks chunk_index (legacy chat history from before
  * the chunk_index field was wired through) we emit chunk_index=-1; the click
  * handler in the renderer falls back to reader-page navigation in that case.
+ *
+ * `language` decides the script of the **visible** sutra name only. CBETA's
+ * title_zh is always traditional, so a simplified reader would otherwise read
+ * 「色不异空」 and see 【《般若波羅蜜多心經》…】 in the same sentence. Everything
+ * else is left byte-for-byte alone — above all the quoted passage, which has
+ * been verbatim-checked against the canon; re-scripting it would make the
+ * 「已逐字核验」 badge a lie. Defaults to simplified, matching
+ * scriptForLanguage's own fallback for any non-Hant locale.
  */
-export function injectCitationLinks(content: string, sources: ChatSource[] | null): string {
+export function injectCitationLinks(
+  content: string,
+  sources: ChatSource[] | null,
+  language: string = "zh",
+): string {
   if (!sources || sources.length === 0) return content;
 
   // Two indexes over the RAG sources, both keyed on the simplified title so
@@ -102,7 +115,7 @@ export function injectCitationLinks(content: string, sources: ChatSource[] | nul
       // 第N卷 placeholder the LLM left unsubstituted into a real number.
       // Non-卷 qualifiers (卷上, 第十八愿) carry no 第…卷 slot and are kept.
       const label = tail.replace(/第[^】卷]*卷/, `第${juan}卷`); // i18n-exempt — rewrites the LLM's Chinese citation marker, must match answer text
-      return `[【《${title}》${label}】](${url})`;
+      return `[【《${localizeHan(title, language)}》${label}】](${url})`;
     },
   );
 
@@ -120,7 +133,7 @@ export function injectCitationLinks(content: string, sources: ChatSource[] | nul
         const source = titleMap.get(simplifiedTitle);
         if (!source) return bareMatch;
         const { url } = buildCitation(source, simplifiedTitle, null, null);
-        return `[《${title}》](${url})`;
+        return `[《${localizeHan(title, language)}》](${url})`;
       });
     })
     .join("");

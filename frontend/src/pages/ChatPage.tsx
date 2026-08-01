@@ -8,6 +8,7 @@ import Markdown, { defaultUrlTransform, type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import { CITATION_URL_SCHEME, injectCitationLinks } from "../utils/citationLinks";
+import { localizeHan } from "../utils/hanScript";
 import { quoteCheckDetail } from "../utils/trustDetail";
 import { isNearBottom } from "../utils/scrollBottom";
 import {
@@ -353,7 +354,10 @@ function MessageBubbleInner({
   // only short-circuits parent-driven, prop-equal re-renders — so tooltips/toasts
   // update immediately, without `t` having to enter the comparator (and without
   // risking the per-token memo skip if t's identity weren't stable).
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // CBETA 的 title_zh 恒为繁体；经名该用哪种字形由读者的界面语言决定，不由语料决定。
+  // 只作用于**经名**——答案正文（尤其是通过了逐字核验的引文）一个字都不改写。
+  const lang = i18n.language;
   const isAssistantText =
     m.role === "assistant" && m.content !== THINKING_SENTINEL && m.content !== REQUEST_FAILED_SENTINEL;
 
@@ -366,8 +370,8 @@ function MessageBubbleInner({
   }, [isAssistantText, isStreaming, m.content]);
 
   const rendered = useMemo(
-    () => (isAssistantText ? tightenLists(injectCitationLinks(cleanContent, m.sources)) + (isStreaming ? " ▌" : "") : ""),
-    [isAssistantText, cleanContent, m.sources, isStreaming],
+    () => (isAssistantText ? tightenLists(injectCitationLinks(cleanContent, m.sources, lang)) + (isStreaming ? " ▌" : "") : ""),
+    [isAssistantText, cleanContent, m.sources, isStreaming, lang],
   );
 
   // Distinct retrieved sources (deduped by text + fascicle) shown as a
@@ -507,7 +511,7 @@ function MessageBubbleInner({
                         onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(176,141,87,0.16)"; e.currentTarget.style.color = "var(--fj-accent)"; }}
                         onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(176,141,87,0.06)"; e.currentTarget.style.color = "var(--fj-ink-muted)"; }}
                       >
-                        {t("reader.citation.title_with_juan", { title: s.title_zh, n: s.juan_num })}
+                        {t("reader.citation.title_with_juan", { title: localizeHan(s.title_zh ?? "", lang), n: s.juan_num })}
                       </button>
                     ))}
                   </div>
@@ -515,19 +519,30 @@ function MessageBubbleInner({
                 {suggestions.length > 0 && !sending && (
                   <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>
                     {suggestions.map((q, i) => (
-                      <span
+                      // 必须是原生 <button>：浏览器只为真正的可交互元素把 Enter/空格
+                      // 合成成 click。span[role=button] 看着一模一样，键盘用户和读屏
+                      // 用户却永远触发不了这些追问 —— 而它们是继续对话的主要入口。
+                      // fontFamily 要显式 inherit：button 不继承字体族，去掉这行会在
+                      // 一堆 Noto Serif 里冒出一颗系统默认字体的胶囊。用长属性而不是
+                      // font 简写——简写会连带重置 fontSize，得靠对象键序才能救回来。
+                      <button
                         key={i}
+                        type="button"
                         onClick={() => onSuggestionClick(q)}
                         style={{
                           display: "inline-block", padding: "4px 12px", borderRadius: 14,
                           border: "1px solid var(--fj-gold, #b08d57)", color: "var(--fj-gold, #b08d57)",
+                          fontFamily: "inherit",
+                          // button 的 UA 默认是 text-align:center。单行时看不出来，
+                          // 长追问换行后每一行都会居中——和改动前的 span 不一样。
+                          textAlign: "start",
                           fontSize: 12, cursor: "pointer", background: "transparent", transition: "all 0.2s", lineHeight: 1.6,
                         }}
                         onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(176,141,87,0.1)"; e.currentTarget.style.color = "var(--fj-accent)"; e.currentTarget.style.borderColor = "var(--fj-accent)"; }}
                         onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--fj-gold, #b08d57)"; e.currentTarget.style.borderColor = "var(--fj-gold, #b08d57)"; }}
                       >
                         {q}
-                      </span>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -619,7 +634,7 @@ export default function ChatPage() {
   // React Compiler 对整个组件放弃编译，并把同组件里其它 useCallback 的手写依赖
   // 判成不可保留（见 PR #1077 里踩过的 4 个 lint error）。
   const [searchParams, setSearchParams] = useSearchParams();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuthStore();
   const [input, setInput] = useState("");
   const [masterId, setMasterId] = useState<string | null>(null);
@@ -1470,7 +1485,9 @@ export default function ChatPage() {
           md += `**${t("chat.export_sources_label")}**\n`;
           for (const s of m.sources) {
             const title = s.title_zh
-              ? t("chat.export_source_titled", { title: s.title_zh, n: s.juan_num })
+              // 导出的 .md 是给人读的：经名跟随导出时的界面语言，与用户屏幕上
+              // 刚看到的 chip 一致，否则文件里的《雜阿含經》对不上页面的《杂阿含经》。
+              ? t("chat.export_source_titled", { title: localizeHan(s.title_zh, i18n.language), n: s.juan_num })
               : t("chat.export_source_untitled", { id: s.text_id, n: s.juan_num });
             md += `- 📖 ${title} (${Math.round(s.score * 100)}%)\n`;
           }
@@ -1485,7 +1502,7 @@ export default function ChatPage() {
     a.download = `${sessionTitle}-${new Date().toISOString().slice(0, 10)}.md`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [messages, sessions, sessionId, t]);
+  }, [messages, sessions, sessionId, t, i18n.language]);
 
   return (
     <>
@@ -1963,7 +1980,16 @@ export default function ChatPage() {
         {citationTarget !== null && (
           <>
             <div className="chat-citation-divider" onMouseDown={handleCitationDragStart} />
-            <div className="chat-citation-panel" style={{ width: citationPanelWidth }}>
+            {/* complementary 而不是 dialog：这是个**非模态**侧栏，左边的对话仍可读可点
+                （见 global.css 里 .chat-citation-panel 的说明）。标成 dialog 会让读屏
+                以为进入了模态上下文。整页此前只有一个 <main>，补上这个 landmark 后，
+                读屏用户才能直接跳到原文对照区，而不必从对话里一路 Tab 过来。 */}
+            <div
+              className="chat-citation-panel"
+              role="complementary"
+              aria-label={t("reader.citation.title")}
+              style={{ width: citationPanelWidth }}
+            >
               <Suspense fallback={<div style={{ padding: 40, textAlign: "center" }}>…</div>}>
                 <CitationDrawer
                   target={citationTarget}

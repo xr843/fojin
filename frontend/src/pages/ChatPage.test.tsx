@@ -775,3 +775,51 @@ describe("额度提醒", () => {
     // 而且根本不该去拉这个会话的历史消息
     expect(vi.mocked(getChatSessionMessages)).not.toHaveBeenCalled();
   });
+
+describe("导出 Markdown", () => {
+  /** 抓住 handleExport 生成的那个 Blob —— jsdom 没有 createObjectURL。 */
+  function captureExport() {
+    const blobs: Blob[] = [];
+    const createURL = vi.fn((b: Blob) => { blobs.push(b); return "blob:x"; });
+    (URL as unknown as { createObjectURL: unknown }).createObjectURL = createURL;
+    (URL as unknown as { revokeObjectURL: unknown }).revokeObjectURL = vi.fn();
+    // a.click() 在 jsdom 里会尝试导航，噪声很大且无意义。
+    const clickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => {});
+    return { blobs, clickSpy };
+  }
+
+  it("导出的参考经文按界面语言折字，不直出 CBETA 繁体", async () => {
+    // 导出的是给人读的 .md：界面是简体，文件里却写《雜阿含經》，
+    // 与用户屏幕上刚看到的 chip 对不上号。
+    vi.mocked(getChatSessions).mockResolvedValue([
+      { id: 7 as ChatSessionId, title: "心经问答", created_at: "2026-08-01T00:00:00Z", pinned: false },
+    ] as unknown as ChatSessionItem[]);
+    vi.mocked(getChatSessionMessages).mockResolvedValue({
+      total: 2, page: 1, size: 50,
+      messages: [
+        { id: 1, role: "user", content: "色是什么", sources: null, created_at: "2026-08-01T00:00:00Z" },
+        {
+          id: 2, role: "assistant", content: "色是 rūpa。", created_at: "2026-08-01T00:00:01Z",
+          sources: [{ text_id: 5, title_zh: "雜阿含經", juan_num: 16, chunk_index: 0, chunk_text: "…", score: 0.9 }],
+        },
+      ],
+    } as never);
+
+    const { blobs, clickSpy } = captureExport();
+    try {
+      renderPage("/chat?s=7");
+      await waitFor(() => expect(screen.getByText(/色是 rūpa/)).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole("button", { name: "download" }));
+      await waitFor(() => expect(blobs).toHaveLength(1));
+
+      const md = await blobs[0].text();
+      expect(md).toContain("《杂阿含经》第16卷");
+      expect(md).not.toContain("《雜阿含經》第16卷");
+    } finally {
+      clickSpy.mockRestore();
+    }
+  });
+});

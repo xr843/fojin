@@ -1,7 +1,9 @@
-import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, beforeAll, afterAll, afterEach } from "vitest";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import i18n from "../i18n";
+import zhHantTranslation from "../../public/locales/zh-Hant/translation.json";
 import CitationDrawer, { type CitationTarget } from "./CitationDrawer";
 import {
   getChunkContext,
@@ -13,6 +15,9 @@ let originalScrollIntoView: typeof Element.prototype.scrollIntoView | undefined;
 
 // jsdom 不实现 matchMedia / scrollIntoView，而 antd Tabs 与 CitationBlocks 用到它们。
 beforeAll(() => {
+  // 只有 zh 内联在 i18n 实例里，其余走 HttpBackend——jsdom 下永不 resolve。
+  // 切 zh-Hant 的用例必须先预置资源包，否则 changeLanguage() 挂到超时。
+  i18n.addResourceBundle("zh-Hant", "translation", zhHantTranslation, true, true);
   if (!window.matchMedia) {
     window.matchMedia = (query: string) =>
       ({
@@ -59,14 +64,14 @@ function chunk(i: number, text: string, isCenter = false): ChunkContextItem {
   return { chunk_index: i, chunk_text: text, is_center: isCenter };
 }
 
-function renderDrawer() {
+function renderDrawer(overrides: Partial<React.ComponentProps<typeof CitationDrawer>> = {}) {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter>
-        <CitationDrawer target={TARGET} onClose={() => {}} />
+        <CitationDrawer target={TARGET} onClose={() => {}} {...overrides} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -75,6 +80,12 @@ function renderDrawer() {
 beforeEach(() => {
   vi.clearAllMocks();
   mockAlignment.mockResolvedValue({ parallels: [] } as never);
+});
+
+// 语言是 i18n 单例上的全局状态：切过 zh-Hant 的用例必须还原，否则会漏进同一
+// worker 里后续的用例与后续的测试文件。
+afterEach(async () => {
+  if (i18n.language !== "zh") await i18n.changeLanguage("zh");
 });
 
 describe("CitationDrawer", () => {
@@ -401,5 +412,85 @@ describe("CitationDrawer", () => {
       expect(document.querySelector("mark.chat-citation-chunk-mark")).not.toBeNull();
     });
     expect(screen.queryByText("本卷未找到被引的这段原文")).not.toBeInTheDocument();
+  });
+});
+
+describe("CitationDrawer — 面板标题的字形跟随界面语言", () => {
+  beforeEach(() => {
+    mockContext.mockResolvedValue({
+      text_id: 1558, juan_num: 16, title_zh: "阿毘達磨俱舍論",
+      center_chunk_index: 7, radius: 2,
+      chunks: [chunk(7, "無學身語業，即意三牟尼", true)],
+      has_more_before: false, has_more_after: false,
+    } as never);
+  });
+
+  it("简体界面：从 chip 传进来的 CBETA 繁体经名折成简体", async () => {
+    renderDrawer({ target: { ...TARGET, titleZh: "阿毘達磨俱舍論" } });
+    expect(await screen.findByText("《阿毘达磨俱舍论》· 第 16 卷")).toBeInTheDocument();
+  });
+
+  it("繁體界面：简体经名还原成繁体", async () => {
+    // 这才是生产上真正发生的那一半：内联引文的 titleZh 走 parseCitationHref，
+    // 而 URL 里存的是 toSimplified 过的键，于是繁體读者点开抽屉看到简体标题。
+    await i18n.changeLanguage("zh-Hant");
+    renderDrawer({ target: { ...TARGET, titleZh: "阿毘达磨俱舍论" } });
+    expect(await screen.findByText("《阿毘達磨俱舍論》· 第 16 卷")).toBeInTheDocument();
+  });
+});
+
+describe("CitationDrawer — Esc 关闭", () => {
+  beforeEach(() => {
+    mockContext.mockResolvedValue({
+      text_id: 1558, juan_num: 16, title_zh: "阿毘達磨俱舍論",
+      center_chunk_index: 7, radius: 2,
+      chunks: [chunk(7, "無學身語業，即意三牟尼", true)],
+      has_more_before: false, has_more_after: false,
+    } as never);
+  });
+
+  it("按 Esc 关闭面板", async () => {
+    // 侧栏面板按 Esc 关闭是所有人的普遍预期，不只是键盘用户——鼠标用户也会按。
+    // 此前整个组件没有任何 keydown 监听，Esc 完全没有接收者（真机实测按了没反应）。
+    const onClose = vi.fn();
+    renderDrawer({ onClose });
+    await screen.findByText(/阿毘/);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("有 antd 弹窗开着时，Esc 归弹窗，不连带关掉面板", async () => {
+    // 重命名会话 / 分享卡片都是 Modal。两者都监听 Esc，若面板也照单全收，
+    // 用户按一次 Esc 会同时失去弹窗和正在对照的原文。
+    const onClose = vi.fn();
+    renderDrawer({ onClose });
+    await screen.findByText(/阿毘/);
+    const wrap = document.createElement("div");
+    wrap.className = "ant-modal-wrap";
+    document.body.appendChild(wrap);
+    try {
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(onClose).not.toHaveBeenCalled();
+    } finally {
+      wrap.remove();
+    }
+  });
+
+  it("Modal 关闭后残留的隐藏 .ant-modal-wrap 不该把 Esc 永久锁死", async () => {
+    // antd 关掉 Modal 后并不移除 .ant-modal-wrap，只是 display:none。
+    // 按「存在性」判断的话，用户重命名过一次会话之后，面板的 Esc 就再也不响应了。
+    const onClose = vi.fn();
+    renderDrawer({ onClose });
+    await screen.findByText(/阿毘/);
+    const wrap = document.createElement("div");
+    wrap.className = "ant-modal-wrap";
+    wrap.style.display = "none";
+    document.body.appendChild(wrap);
+    try {
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(onClose).toHaveBeenCalledTimes(1);
+    } finally {
+      wrap.remove();
+    }
   });
 });

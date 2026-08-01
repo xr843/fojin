@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { getChunkContext, getChunkAlignment, type ChunkContextItem, type ParallelPair } from "../api/client";
 import { findQuoteSpans } from "../utils/citationMatch";
+import { localizeHan } from "../utils/hanScript";
 import { reflowText } from "../utils/textReflow";
 import { hasDisplayConfidence } from "../utils/parallelDisplay";
 
@@ -292,8 +293,28 @@ function CitationBlocks({ chunks, quote }: { chunks: ChunkContextItem[]; quote?:
  * with the chat on the left while verifying the cited passage.
  */
 export default function CitationDrawer({ target, onClose }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [activeLang, setActiveLang] = useState<string>("lzh");
+
+  // Esc 关闭。此前整个组件没有任何 keydown 监听 —— 面板是个非模态侧栏，浏览器
+  // 不会替它处理 Esc，真机实测按了完全没反应。
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      // 别抢 antd Modal 的 Esc：重命名会话 / 分享卡片开着时，这一下属于它们，
+      // 否则用户按一次会同时失去弹窗和正在对照的原文。
+      //
+      // 判**可见性**而不是存在性：antd 关掉 Modal 后并不移除 .ant-modal-wrap，
+      // 只是把它 display:none 留在 DOM 里。按存在性判断的话，用户重命名过一次
+      // 会话之后，面板的 Esc 就再也不响应了。
+      const modalOpen = Array.from(document.querySelectorAll<HTMLElement>(".ant-modal-wrap"))
+        .some((el) => el.style.display !== "none");
+      if (modalOpen) return;
+      onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["citation-context", target?.textId, target?.juanNum, target?.chunkIndex],
@@ -386,9 +407,12 @@ export default function CitationDrawer({ target, onClose }: Props) {
     ? `/texts/${target.textId}/read?juan=${target.juanNum}&highlight_chunk=${target.chunkIndex}`
     : "#";
 
+  // 经名的字形跟随读者的界面语言，不跟随语料。两个来源都会走错方向：chip 传来
+  // 的是 CBETA 原始繁体，内联引文传来的是 URL 里那个 toSimplified 过的键 —— 前者
+  // 让简体读者看到繁体，后者让繁體讀者看到简体。localizeHan 把两边收敛到同一处。
   const titleText = target
     ? t("reader.citation.title_with_juan", {
-        title: target.titleZh || data?.title_zh || "",
+        title: localizeHan(target.titleZh || data?.title_zh || "", i18n.language),
         n: target.juanNum,
       })
     : t("reader.citation.title");
