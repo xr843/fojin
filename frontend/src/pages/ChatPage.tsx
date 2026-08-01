@@ -1206,8 +1206,19 @@ export default function ChatPage() {
     // abort mid-stream and surface as "请求失败，请重试".
     const timeoutId = setTimeout(() => abortController.abort(), 300_000);
 
+    // 断流埋点的两个本地计数。放在闭包里而不是 state / ref：每次发送都要一份
+    // 全新的，且绝不能在 setMessages 的 updater 里做统计（StrictMode 会跑两遍）。
+    //
+    // 为什么非要前端来记：中途断流在服务端量不出来。docker logs 里那行
+    // "LLM stream broke mid-stream" 随每次部署重建容器而清空；DB 侧也查不到 ——
+    // _save_messages 把 user+assistant 两行一起写，断流时一行都不落，而游客
+    // 根本不建 session、完全不落库。只有前端知道「这一条流吐没吐过 token」。
+    let tokenCount = 0;
+    let sawError = false;
+
     await sendChatMessageStream(msg, sessionId, masterId, {
       onToken: (content: string) => {
+        tokenCount += 1;
         setMessages((prev) =>
           prev.map((m) => {
             if (m.id !== assistantId) return m;
@@ -1294,6 +1305,13 @@ export default function ChatPage() {
         }
       },
       onError: (errMsg: string) => {
+        sawError = true;
+        // mid_stream 与 no_token 必须分开：后者前端已能自愈（转失败哨兵 + 给出
+        // 重试按钮），前者留下的是一段看似完整的半截答案 —— 没有失败标记、没有
+        // 重试按钮，而分享/复制照常可用。分开记才知道真正要修的那部分占多少。
+        if (typeof umami !== "undefined") {
+          umami.track("chat_stream_error", { stage: tokenCount > 0 ? "mid_stream" : "no_token" });
+        }
         message.error(errMsg);
         setMessages((prev) =>
           prev.map((m) =>
@@ -1308,6 +1326,12 @@ export default function ChatPage() {
         abortRef.current = null;
         setStreamingId(0);
         setSending(false);
+        // 流结束了，却既没有 error 帧也没有任何 token —— 后端发了个光秃秃的 done。
+        // 下面那段兜底会把气泡转成失败哨兵，但服务端不会为此留下任何痕迹，
+        // 所以这里单独记一档。sawError 拦住重复计数。
+        if (!sawError && tokenCount === 0 && typeof umami !== "undefined") {
+          umami.track("chat_stream_error", { stage: "empty_done" });
+        }
         // Empty completion: the stream ended without ever delivering a token
         // (and without an error frame — e.g. a bare `done`). If the bubble is
         // still the thinking placeholder, nothing will ever replace it and it
@@ -1507,7 +1531,12 @@ export default function ChatPage() {
   return (
     <>
       <Helmet><title>{t("chat.page_title")}</title></Helmet>
-      <div style={{
+      {/* className 是必需的，不是装饰：这个外壳的 display:flex 写在行内样式里，
+          而行内样式没有任何 CSS 选择器够得到 —— 于是 global.css 里那条
+          「移动端把引用面板铺满宽度」的规则结构上不可能生效为「堆叠」，面板
+          只会在同一行里把对话列挤成 0 宽。给它一个类名，断点才改得动
+          flex-direction。 */}
+      <div className="chat-shell" style={{
         display: "flex",
         height: "calc(100vh - 120px)",
         gap: 16,
@@ -1671,7 +1700,7 @@ export default function ChatPage() {
         </div>}
 
         {/* Chat area */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+        <div className="chat-main-column" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
           {/* Chat header: mobile toggle + export */}
           <div style={{ display: "flex", marginBottom: 4 }}>
             <div className="chat-column-inner" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>

@@ -823,3 +823,84 @@ describe("导出 Markdown", () => {
     }
   });
 });
+
+describe("断流埋点 chat_stream_error", () => {
+  /** 为什么要这个埋点：中途断流在今天完全量不出来。
+   *  · docker logs 里那行 "LLM stream broke mid-stream" 随每次部署重建容器而清空
+   *  · 「孤儿 user 消息」查不到 —— _save_messages 把 user+assistant 两行一起写，
+   *    断流时一行都不落
+   *  · 「Umami chat 事件 − DB user 行」也不行 —— 游客根本不建 session、完全不落库，
+   *    而游客是大多数，差值会被游客淹没
+   *  只剩前端知道真相：它手里有「这一条流吐没吐过 token」。 */
+  function withUmami() {
+    const track = vi.fn();
+    (window as Window & { umami?: { track: typeof track } }).umami = { track };
+    (globalThis as unknown as { umami: unknown }).umami = { track };
+    return track;
+  }
+
+  async function startSend() {
+    let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+    vi.mocked(sendChatMessageStream).mockImplementation(
+      async (_m, _s, _mid, cbs) => { cb = cbs; },
+    );
+    vi.mocked(getChatSessionMessages).mockResolvedValue({
+      total: 0, page: 1, size: 50, messages: [],
+    } as never);
+    const { container } = renderPage();
+    await waitFor(() => expect(screen.getByText("「三毒」指的是哪三种毒？")).toBeInTheDocument());
+    fireEvent.click(container.querySelector(".chat-hero-card")!);
+    await waitFor(() => expect(cb).toBeDefined());
+    return cb!;
+  }
+
+  afterEach(() => {
+    delete (window as Window & { umami?: unknown }).umami;
+    delete (globalThis as unknown as { umami?: unknown }).umami;
+  });
+
+  /** 只数 chat_stream_error 这一类事件 —— 同一次发送还会打 "chat" 等其它点。 */
+  const errEvents = (track: ReturnType<typeof vi.fn>) =>
+    track.mock.calls.filter((c) => c[0] === "chat_stream_error").map((c) => c[1]);
+
+  it("吐过 token 后才失败 → 记为 mid_stream，且只记一次", async () => {
+    // 这一种最危险：气泡里留着一段看似完整的半截答案，没有失败标记也没有重试按钮，
+    // 而分享/复制按钮照常可用 —— 截断的内容能被做成分享卡片送出去。
+    //
+    // onDone 必须跟着调：client.ts 里**每一处** onError 后面都紧跟 onDone()，
+    // 不调就是在测一个production里不存在的时序（第一版就是这么漏掉重复计数的）。
+    const track = withUmami();
+    const cb = await startSend();
+    cb.onToken!("「色」是梵语 rūpa 的意译，在《心经》的语境中");
+    cb.onError!("上游中断");
+    cb.onDone!();
+    expect(errEvents(track)).toEqual([{ stage: "mid_stream" }]);
+  });
+
+  it("一个 token 都没到就失败 → 记为 no_token，且不被 onDone 重复计一次", async () => {
+    // 承重：onError 之后 onDone 必定到达，而此时 tokenCount 仍是 0 —— 少了
+    // sawError 守卫，同一次失败会同时记 no_token 和 empty_done，
+    // 直接把失败率的分子灌成两倍。
+    const track = withUmami();
+    const cb = await startSend();
+    cb.onError!("上游 503");
+    cb.onDone!();
+    expect(errEvents(track)).toEqual([{ stage: "no_token" }]);
+  });
+
+  it("流悄无声息地结束（没有 error 帧、也没有 token）→ 记为 empty_done", async () => {
+    const track = withUmami();
+    const cb = await startSend();
+    cb.onDone!();
+    expect(errEvents(track)).toEqual([{ stage: "empty_done" }]);
+  });
+
+  it("正常完成不记任何错误事件", async () => {
+    // 承重：这个埋点是要拿来算失败率的分子，成功路径漏进去就直接把分子污染了。
+    const track = withUmami();
+    const cb = await startSend();
+    cb.onToken!("完整答案");
+    cb.onDone!();
+    expect(errEvents(track)).toEqual([]);
+  });
+});
