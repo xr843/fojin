@@ -49,8 +49,8 @@ const PROVIDER_MODELS: Record<string, Array<{ value: string; label: string; hint
     { value: "gemini-2.5-pro", label: "2.5 Pro", hintKey: "profile.modelHint.flagship" },
   ],
   doubao: [
-    { value: "doubao-1.5-lite-32k", label: "1.5 Lite", hintKey: "profile.modelHint.economy" },
-    { value: "doubao-1.5-pro-32k", label: "1.5 Pro", hintKey: "profile.modelHint.main" },
+    { value: "doubao-seed-2-1-turbo-260628", label: "Seed 2.1 Turbo", hintKey: "profile.modelHint.economy_fast" },
+    { value: "doubao-seed-2-1-pro-260628", label: "Seed 2.1 Pro", hintKey: "profile.modelHint.flagship" },
   ],
   siliconflow: [
     { value: "deepseek-ai/DeepSeek-V3", label: "DeepSeek V3", hintKey: "profile.modelHint.deepseek_mirror" },

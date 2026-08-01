@@ -53,7 +53,7 @@ PROVIDER_DEFAULT_MODELS = {
     "dashscope": "qwen3.7-plus",
     "zhipu": "glm-5.2",
     "moonshot": "kimi-k3",
-    "doubao": "doubao-1.5-pro-32k",
+    "doubao": "doubao-seed-2-1-pro-260628",   # 1.5 已落后两代
     "minimax": "MiniMax-Text-01",
     "stepfun": "step-1-8k",
     "baichuan": "Baichuan4-Air",

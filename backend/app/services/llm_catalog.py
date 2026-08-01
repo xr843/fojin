@@ -50,6 +50,12 @@ CATALOG: list[ModelOption] = [
                 "Kimi K3", "Moonshot 最新旗舰，上下文 1M", False),
     ModelOption("zhipu:glm-5.2", "zhipu", "glm-5.2",
                 "智谱 GLM-5.2", "智谱最新旗舰，上下文 1M", False),
+    # 2026-08-01 从火山方舟官方模型列表页核对（该站是 JS 渲染，WebFetch 只能拿到
+    # 导航骨架，必须用浏览器打开才读得到表格）。"推荐模型"一栏里的旗舰就是它。
+    # 没取 doubao-seed-evolving：它上下文更大（1024k）但是**滚动别名**，模型会在
+    # 用户脚下悄悄更换——对一个把答案真实性当最高准则的项目，钉死版本更稳妥。
+    ModelOption("doubao:seed-2-1-pro", "doubao", "doubao-seed-2-1-pro-260628",
+                "豆包 Seed 2.1 Pro", "字节最新旗舰，上下文 256k", False),
     # 国际三家。同样只对自带 Key 的用户可选。
     # 名单能放开加，是因为选择器只列当前真能用的模型 —— 加一个厂商不会让下拉变长。
     ModelOption("openai:gpt-5.6-sol", "openai", "gpt-5.6-sol",
