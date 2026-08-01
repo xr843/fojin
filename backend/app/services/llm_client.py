@@ -115,13 +115,27 @@ def _is_reasoning_model(model: str | None) -> bool:
     return any(k in m for k in _REASONING_MODEL_MARKERS)
 
 
+# 隐藏推理与可见答案共用同一个 max_tokens。这个额度必须大到「推理再长也饿不死
+# 答案」——它是天花板不是目标，推理少的模型（pro 实测只用约 1k）一分钱都不多花。
+#
+# 曾经是 4000，那是 2026-06-23 针对**标题**（30 token 上限）定的，从没在「重推理
+# 模型 + 完整 RAG 答案」上验证过。2026-08-01 生产实测把它打穿：同一问题、同一把
+# BYOK Key、同一端点，只换模型 ——
+#   deepseek-v4-pro    8 个推理事件、首字 11.2s、1,515 字、38s 完成
+#   deepseek-v4-flash  57–66 个推理事件、11,826 字符推理（≈7,884 token）、正文 0 字
+# 而当时整个上限只有 2000+4000=6000：推理独自顶穿天花板，模型被 length 截断，
+# 正文一个 token 都没轮到，用户等 60–69 秒只拿到「未能生成任何回答内容」。
+# 24000 ≈ 实测推理量的 3 倍，相对该档 384K 的最大输出仍是很小的一块。
+_REASONING_HEADROOM_TOKENS = 24000
+
+
 def _with_reasoning_headroom(model: str | None, max_tokens: int) -> int:
     """Add budget for hidden reasoning_content on reasoning models so the
     visible answer isn't starved. max_tokens is a ceiling, not a target, so
     this is ~free for responses that don't hit the old cap — it only prevents
     reasoning from eating the entire short cap (empty titles) or truncating
     long answers."""
-    return max_tokens + 4000 if _is_reasoning_model(model) else max_tokens
+    return max_tokens + _REASONING_HEADROOM_TOKENS if _is_reasoning_model(model) else max_tokens
 
 
 def _build_anthropic_body(model: str, messages: list[dict], *, temperature: float = 0.7,
