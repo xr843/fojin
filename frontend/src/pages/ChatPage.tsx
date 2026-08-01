@@ -1750,7 +1750,7 @@ export default function ChatPage() {
                     <MasterSeal text={Array.from(selectedMaster.name_zh).slice(0, 2).join("")} size={40} />
                   </div>
                 )}
-                <div style={{ fontSize: 22, fontFamily: '"Noto Serif SC", serif', marginBottom: 6 }}>
+                <div className="chat-hero-title">
                   {t("chat.title")}
                 </div>
                 {/* 只留「可核对」这一句。原来上面还有一行「可以问我关于佛经内容、

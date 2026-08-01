@@ -274,6 +274,23 @@ em {
   min-height: 0;
 }
 
+/* 首屏标题。取 --fj-highlight 而非 --fj-accent：两者浅色下同为 #8b2500，但
+   accent 在暗色主题会变亮到 #e5764a，当文字用只有 3.35:1（token 注释里记着这笔
+   账）；highlight 正是为「加粗强调文字」这一用途单独调出来的，暗色下 #f2a07a
+   在 --fj-bg 上是 6.98:1。同一支朱砂：选了祖师时 MasterSeal 就压在这行标题上方，
+   浅色下两者同为 #8b2500；暗色下印章是填充（accent #e5764a）、标题是文字
+   （highlight #f2a07a，同色相调亮一档以够对比度），这是刻意的填充/文字分工。
+   700 是真字重：Noto Serif SC 自托管了 400/600/700 三档（public/fonts/
+   noto-serif-sc.css），不会退化成合成粗体那种糊边。
+   字号/字体从内联样式搬进来，与同区块其余 .chat-hero-* 规则保持一处可改。 */
+.chat-hero-title {
+  font-family: "Noto Serif SC", serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--fj-highlight);
+  margin-bottom: 6px;
+}
+
 /* 建议卡片：铺满对话列（840 → 每张 420px），标签与问题同行。
    rgba(176,141,87,…) 是 --fj-gold 的 rgb，承自被替换的内联样式（标签底色的 alpha
    由 0.1 提到 0.12，其余原值）。 */

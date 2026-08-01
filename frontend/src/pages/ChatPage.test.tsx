@@ -1,3 +1,5 @@
+import { readFileSync } from "fs";
+import { resolve } from "path";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -920,5 +922,24 @@ describe("空状态副标题", () => {
     // 重复：下方四张卡片（白话翻译/经文解读/对比辨析/佛教史话）带真实例题且可点，
     // 输入框 placeholder 还在轮播真实例题。抽象地再说一遍只是噪音。
     expect(hero.textContent).not.toContain("可以问我关于");
+  });
+});
+
+describe("空状态标题", () => {
+  // 朱红加粗必须走 --fj-highlight，不能写 --fj-accent、更不能写死 #8b2500：
+  // 三者在浅色主题下像素完全一致，只有切到暗色才分道扬镳（token 注释里记着
+  // accent 当正文用在暗色卡片上只有 3.35:1，highlight 正是为「加粗强调文字」
+  // 这一用途单独调出来的）。肉眼复验默认在浅色下做，看不出这个差别，所以这条
+  // 断言是唯一能拦住它的地方。
+  it("用全站印章色（--fj-highlight）加粗，而不是继承正文的灰褐色", async () => {
+    const { container } = await renderEmpty();
+    const title = container.querySelector(".chat-hero-title");
+    expect(title).not.toBeNull();
+    expect(title!.textContent).toBe("小津 AI 佛典问答");
+
+    const css = readFileSync(resolve(__dirname, "../styles/global.css"), "utf-8");
+    const rule = css.match(/\.chat-hero-title\s*\{([^}]*)\}/)?.[1] ?? "";
+    expect(rule).toMatch(/color:\s*var\(--fj-highlight\)/);
+    expect(rule).toMatch(/font-weight:\s*(700|bold)\b/);
   });
 });
