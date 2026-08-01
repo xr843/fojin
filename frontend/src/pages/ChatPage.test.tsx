@@ -904,3 +904,21 @@ describe("断流埋点 chat_stream_error", () => {
     expect(errEvents(track)).toEqual([]);
   });
 });
+
+describe("空状态副标题", () => {
+  it("只留「可核对」那句，不再重复卡片已经在演示的「能问什么」", async () => {
+    await renderEmpty();
+    // 两行原本同处一个 <div>、由 <br> 分隔，getByText 匹配不到单独的文本节点，
+    // 所以对整块 hero 的 textContent 断言。
+    const hero = screen.getByText("小津 AI 佛典问答").parentElement!;
+
+    // 差异点声明必须在：整个首屏只有这一处告诉用户答案可以被核对，
+    // 而且措辞是「你可以核对」而非「我保证正确」—— 不能悄悄丢掉。
+    expect(hero.textContent).toContain("答案标注经文出处，可点开核对原文");
+
+    // 原来的第一行「可以问我关于佛经内容、佛教历史、经典翻译等问题」是第三次
+    // 重复：下方四张卡片（白话翻译/经文解读/对比辨析/佛教史话）带真实例题且可点，
+    // 输入框 placeholder 还在轮播真实例题。抽象地再说一遍只是噪音。
+    expect(hero.textContent).not.toContain("可以问我关于");
+  });
+});

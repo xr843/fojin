@@ -1753,9 +1753,14 @@ export default function ChatPage() {
                 <div style={{ fontSize: 22, fontFamily: '"Noto Serif SC", serif', marginBottom: 6 }}>
                   {t("chat.title")}
                 </div>
+                {/* 只留「可核对」这一句。原来上面还有一行「可以问我关于佛经内容、
+                    佛教历史、经典翻译等问题」，那是第三次重复：下方四张卡片
+                    （白话翻译/经文解读/对比辨析/佛教史话）把同样三个类目演示得更
+                    具体、还可点，输入框 placeholder 也在轮播真实例题。而这一句是
+                    整个首屏唯一说明「答案可以被核对」的地方 —— 它是差异点，
+                    且措辞是「你可以核对」而非「我保证正确」。 */}
                 <div style={{ fontSize: 13, lineHeight: 1.7 }}>
                   {t("chat.subtitle")}
-                  <br />{t("chat.subtitle2")}
                 </div>
               </div>
             )}
