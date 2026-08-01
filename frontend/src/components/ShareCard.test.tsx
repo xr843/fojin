@@ -70,6 +70,11 @@ describe("ShareCard", () => {
     );
 
     expect(await screen.findByText("Share this Buddhist Q&A")).toBeInTheDocument();
+    // 二维码那块由 `{qrDataUrl && …}` 守着，而 qrDataUrl 来自 QRCode.toDataURL()
+    // 这个 Promise（ShareCard.tsx:118/355）—— 它比模态框标题晚到。只等标题就同步
+    // 断言它，谁先到全看时序：实测 24 轮全量里红了 1 轮（约 4%），报错时 DOM 还停在
+    // ant-zoom-appear-prepare。所以这里要等**最后到的那个**，而不是加 sleep。
+    expect(await screen.findByText("Scan to open")).toBeInTheDocument();
     expect(screen.getByText("AI Buddhist Q&A · Source-based answers")).toBeInTheDocument();
     expect(screen.getByText("Question")).toBeInTheDocument();
     expect(screen.getByText("Answer")).toBeInTheDocument();
@@ -78,7 +83,6 @@ describe("ShareCard", () => {
     expect(screen.getByText("Download image")).toBeInTheDocument();
     expect(screen.getByText("Copy image")).toBeInTheDocument();
     expect(screen.getByText("Copy link")).toBeInTheDocument();
-    expect(screen.getByText("Scan to open")).toBeInTheDocument();
     expect(screen.getByText(/Fascicle 1/)).toBeInTheDocument();
 
     await waitFor(() => expect(createSharedQA).toHaveBeenCalledTimes(1));
