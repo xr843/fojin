@@ -1073,12 +1073,20 @@ async def send_message_stream(
         yield f"data: {json.dumps({'type': 'error', 'message': error_msg}, ensure_ascii=False)}\n\n"
         full_answer = full_answer or error_msg
 
+    # reasoning 与 model 是这条日志里最贵的两个字段，别删：
+    # 隐藏推理和可见答案共用同一个 max_tokens，所以「0 chars」的成因几乎总是
+    # 「reasoning 把预算吃光了」—— 没有这两个数就分不清是模型选得不对、上游抽风、
+    # 还是预算不够。而 provider 分不出 pro 和 flash（两者都是 deepseek），
+    # 2026-08-01 那次排查因此得先去翻 Prometheus 的 model 标签才知道用的是哪个。
     logger.info(
-        "chat/stream phase-2 LLM done in %.2fs (%d chars, session_id=%s, provider=%s)",
+        "chat/stream phase-2 LLM done in %.2fs (%d chars, reasoning=%d chars, "
+        "session_id=%s, provider=%s, model=%s)",
         _time.monotonic() - phase2_start,
         len(full_answer),
+        reasoning_chars,
         chat_session_id,
         provider,
+        model,
     )
 
     # Empty-completion guard: the stream finished without ever producing an

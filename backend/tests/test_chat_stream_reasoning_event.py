@@ -166,3 +166,25 @@ async def test_reasoning_events_are_throttled():
     # 载荷是累计字符数，必须单调递增
     chars = [e["chars"] for e in reasoning_events]
     assert chars == sorted(chars), f"累计字符数应单调递增；实际: {chars}"
+
+
+@pytest.mark.anyio
+async def test_phase2_log_records_reasoning_volume_and_model(caplog):
+    """phase-2 日志必须带上推理字符数与模型名。
+
+    2026-08-01 的排查里，日志只说「96.75s, 0 chars, provider=deepseek」——
+    看不出这 96 秒花在哪，也看不出是 pro 还是 flash（provider 两者都是 deepseek）。
+    定位因此绕了很远：先翻 Prometheus 的 model 标签才知道是 flash，再从 SSE 流里
+    数 reasoning 事件才知道推理吃掉了全部预算。
+
+    这两个字段一旦在日志里，同一个故障一眼就能断：
+      "0 chars, reasoning=11826 chars, model=deepseek-v4-flash" —— 推理顶穿上限。
+    """
+    import logging
+    with caplog.at_level(logging.INFO, logger="app.services.chat"):
+        await _run([{"reasoning_content": "先看《地藏經》怎麼說"}, {"content": "答案正文"}])
+
+    line = next((r.getMessage() for r in caplog.records if "phase-2 LLM done" in r.getMessage()), None)
+    assert line is not None, "phase-2 计时日志没打出来"
+    assert "reasoning=10 chars" in line, f"日志缺少推理字符数: {line}"
+    assert "model=deepseek-v4-pro" in line, f"日志缺少模型名: {line}"
