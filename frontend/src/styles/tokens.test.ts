@@ -49,7 +49,14 @@ describe("design token contrast", () => {
   };
 
   // Every token below is used as body-copy colour somewhere in the app.
-  const textTokens = ["fj-ink", "fj-ink-light", "fj-ink-muted", "fj-accent"];
+  //
+  // --fj-cinnabar is the exception: today it only paints the 22px/700 /chat
+  // hero title, which WCAG classes as large text (bar 3:1, not 4.5:1). It is
+  // held to the stricter body-copy bar on purpose — it was introduced by a
+  // "make it lighter" request, and the next such request is exactly how a
+  // brand colour drifts under AA without anyone noticing. Keeping it in this
+  // list also means it is safe the day someone reuses it at body size.
+  const textTokens = ["fj-ink", "fj-ink-light", "fj-ink-muted", "fj-accent", "fj-cinnabar"];
 
   for (const name of textTokens) {
     for (const [surfaceName, surface] of Object.entries(surfaces)) {

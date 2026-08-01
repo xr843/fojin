@@ -926,12 +926,11 @@ describe("空状态副标题", () => {
 });
 
 describe("空状态标题", () => {
-  // 朱红加粗必须走 --fj-highlight，不能写 --fj-accent、更不能写死 #8b2500：
-  // 三者在浅色主题下像素完全一致，只有切到暗色才分道扬镳（token 注释里记着
-  // accent 当正文用在暗色卡片上只有 3.35:1，highlight 正是为「加粗强调文字」
-  // 这一用途单独调出来的）。肉眼复验默认在浅色下做，看不出这个差别，所以这条
-  // 断言是唯一能拦住它的地方。
-  it("用全站印章色（--fj-highlight）加粗，而不是继承正文的灰褐色", async () => {
+  // 朱红加粗必须走 --fj-cinnabar，不能写 --fj-accent、更不能写死十六进制。
+  // --fj-accent 在浅色下也是一支红，肉眼复验（默认就在浅色下做）看不出差别，
+  // 但它在暗色会变亮到 #e5764a，当文字用只有 3.35:1 —— 这个错只有切主题才暴露，
+  // 所以这条断言是唯一能拦住它的地方。
+  it("用朱红专用色（--fj-cinnabar）加粗，而不是继承正文的灰褐色", async () => {
     const { container } = await renderEmpty();
     const title = container.querySelector(".chat-hero-title");
     expect(title).not.toBeNull();
@@ -939,7 +938,7 @@ describe("空状态标题", () => {
 
     const css = readFileSync(resolve(__dirname, "../styles/global.css"), "utf-8");
     const rule = css.match(/\.chat-hero-title\s*\{([^}]*)\}/)?.[1] ?? "";
-    expect(rule).toMatch(/color:\s*var\(--fj-highlight\)/);
+    expect(rule).toMatch(/color:\s*var\(--fj-cinnabar\)/);
     expect(rule).toMatch(/font-weight:\s*(700|bold)\b/);
   });
 });
