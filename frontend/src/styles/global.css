@@ -403,10 +403,17 @@ em {
 .chat-session-more.ant-dropdown-open {
   opacity: 1;
 }
-/* 触屏没有 hover：那里必须常驻，否则菜单永远打不开。 */
+/* 触屏没有 hover：那里必须常驻，否则菜单永远打不开。
+   同时把命中区撑到 24×24 —— 实测桌面下它只有 21×17，低于 WCAG 2.2 AA 的
+   最小目标尺寸（2.5.8）。桌面用鼠标勉强能点，手指点不准，而这恰恰是它唯一
+   常驻可见的场合。用 min-width/height 而不是加 padding：padding 会把图标
+   在 220px 的窄栏里往外顶，挤掉本就不够的标题宽度。 */
 @media (hover: none) {
   .chat-session-more {
     opacity: 0.65;
+    min-width: 24px;
+    min-height: 24px;
+    justify-content: center;
   }
 }
 .chat-session-more:hover {

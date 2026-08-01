@@ -81,3 +81,47 @@ describe("injectCitationLinks — 卷号与段号必须同源", () => {
     expect(chunk).toBe("7");
   });
 });
+
+/**
+ * CBETA 的 title_zh 恒为繁体，而答案正文是 LLM 写的简体。两者并排出现在同一句话里
+ * ——生产实测：简体界面下答案写「色不异空」，紧跟的引文标记却是
+ * 【《般若波羅蜜多心經》第1卷】，而点开后抽屉标题又是简体的《般若波罗蜜多心经》。
+ * 同一部经在一屏内出现两种字形，直接削弱「这是同一段原文」的可信度，而可核对引用
+ * 正是这个产品唯一在转的护城河。
+ *
+ * 修法与 CollectionsPage / CrossCanonPage 一致：localizeHan(text, language)。
+ * 只动**经名**，绝不动答案正文——被逐字核验过的引文一个字都不能改写。
+ */
+describe("injectCitationLinks — 可见经名跟随界面语言", () => {
+  it("简体界面：把 CBETA 繁体经名折成简体", () => {
+    const out = injectCitationLinks("见【《阿毘達磨俱舍論》第9卷】所说。", [src()], "zh");
+    expect(out).toContain("【《阿毘达磨俱舍论》第9卷】");
+  });
+
+  it("繁体界面：保持繁体，不被折成简体", () => {
+    const out = injectCitationLinks("见【《阿毘達磨俱舍論》第9卷】所说。", [src()], "zh-Hant");
+    expect(out).toContain("【《阿毘達磨俱舍論》第9卷】");
+  });
+
+  it("裸经名（无【】标记的第二遍扫描）同样跟随界面语言", () => {
+    const out = injectCitationLinks("《阿毘達磨俱舍論》里说。", [src()], "zh");
+    expect(out).toContain("[《阿毘达磨俱舍论》]");
+  });
+
+  it("只折经名，不碰答案正文里被引的经句", () => {
+    // 承重。「無學身語業，即意三牟尼」是通过了逐字核验的引文，界面语言不是
+    // 改写它的理由——一旦这里也转字，「已逐字核验」这个徽章当场就变成假话。
+    const out = injectCitationLinks(
+      "论云「無學身語業，即意三牟尼」者。【《阿毘達磨俱舍論》第9卷】",
+      [src()],
+      "zh",
+    );
+    expect(out).toContain("「無學身語業，即意三牟尼」");
+    expect(out).toContain("《阿毘达磨俱舍论》");
+  });
+
+  it("URL 里的标题仍是简体，与界面语言无关（抽屉靠它做键匹配）", () => {
+    const out = injectCitationLinks("见【《阿毘達磨俱舍論》第9卷】所说。", [src()], "zh-Hant");
+    expect(urlOf(out)).toContain(encodeURIComponent("阿毘达磨俱舍论"));
+  });
+});

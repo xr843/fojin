@@ -1,12 +1,17 @@
-import { describe, it, expect, vi, beforeAll } from "vitest";
+import { describe, it, expect, vi, beforeAll, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import type { Components } from "react-markdown";
+import i18n from "../i18n";
+import zhHantTranslation from "../../public/locales/zh-Hant/translation.json";
 import { MessageBubble } from "./ChatPage";
 import type { ChatMessageItem, ChatSource } from "../api/client";
 import type { TextId } from "../types/branded";
 
 // antd (Button/Tooltip) reads matchMedia via useBreakpoint under jsdom.
 beforeAll(() => {
+  // 只有 zh 被内联进 i18n 实例，其余走 HttpBackend——在 jsdom 里永远不 resolve。
+  // 切到 zh-Hant 的用例必须先把包预置进去，否则 changeLanguage() 挂到超时。
+  i18n.addResourceBundle("zh-Hant", "translation", zhHantTranslation, true, true);
   if (!window.matchMedia) {
     window.matchMedia = ((query: string) => ({
       matches: false, media: query, onchange: null,
@@ -14,6 +19,12 @@ beforeAll(() => {
       addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
     })) as unknown as typeof window.matchMedia;
   }
+});
+
+// 语言是 i18n 单例上的全局状态：切过 zh-Hant 的用例必须还原，否则会漏进同
+// 一 worker 里后续的用例（和后续的测试文件）。
+afterEach(async () => {
+  if (i18n.language !== "zh") await i18n.changeLanguage("zh");
 });
 
 const markdownComponents = {} as Components;
@@ -146,7 +157,8 @@ describe("MessageBubble", () => {
     // Label + a clickable chip for the retrieved source, even though the answer
     // text never named it inline.
     expect(screen.getByText("参考经文")).toBeInTheDocument();
-    const chip = screen.getByText("《雜阿含經》· 第 16 卷");
+    // 经名折成简体：界面语言是 zh（见 src/test/setup.ts），而 title_zh 恒为 CBETA 繁体。
+    const chip = screen.getByText("《杂阿含经》· 第 16 卷");
     fireEvent.click(chip);
     expect(onSourceClick).toHaveBeenCalledWith(expect.objectContaining({ text_id: 5, juan_num: 16 }));
   });
@@ -161,8 +173,8 @@ describe("MessageBubble", () => {
         ],
       }),
     });
-    expect(screen.getAllByText("《心經》· 第 1 卷")).toHaveLength(1);
-    expect(screen.getByText("《金剛經》· 第 1 卷")).toBeInTheDocument();
+    expect(screen.getAllByText("《心经》· 第 1 卷")).toHaveLength(1);
+    expect(screen.getByText("《金刚经》· 第 1 卷")).toBeInTheDocument();
   });
 
   it("shows no source list when the answer has no retrieved sources", () => {
@@ -173,5 +185,62 @@ describe("MessageBubble", () => {
   it("skips sources without a title (nothing to label the chip with)", () => {
     renderBubble({ m: msg({ sources: [src({ title_zh: undefined })] }) });
     expect(screen.queryByText("参考经文")).toBeNull();
+  });
+
+  // ——— 繁简：CBETA 的 title_zh 恒为繁体，界面语言说了算 ———
+  // 生产实测（简体界面）：答案正文写「色不异空」，紧跟的引文标记却是
+  // 【《般若波羅蜜多心經》第1卷】，chip 也是繁体，而点开抽屉标题又变回简体。
+  // 同一部经一屏三种字形，直接削弱「这是同一段原文」的可信度。
+
+  it("内联引文标记的经名跟随界面语言，不直出 CBETA 繁体", () => {
+    renderBubble({
+      m: msg({
+        content: "如【《般若波羅蜜多心經》第1卷】所说。",
+        sources: [src({ text_id: 9 as TextId, juan_num: 1, chunk_index: 0, title_zh: "般若波羅蜜多心經" })],
+      }),
+    });
+    expect(document.body.textContent).toContain("《般若波罗蜜多心经》第1卷");
+    expect(document.body.textContent).not.toContain("《般若波羅蜜多心經》第1卷");
+  });
+
+  it("繁體界面：经名保持繁体，不被折成简体", async () => {
+    // 这条才真正证明 i18n.language 被接进了 injectCitationLinks / chip。
+    // 只测简体是恒真的——injectCitationLinks 的 language 默认就是 "zh"，
+    // 组件哪怕一个参数都不传，简体断言照样绿。
+    await i18n.changeLanguage("zh-Hant");
+    renderBubble({
+      m: msg({
+        content: "如【《般若波羅蜜多心經》第1卷】所说。",
+        sources: [src({ text_id: 9 as TextId, juan_num: 1, chunk_index: 0, title_zh: "般若波羅蜜多心經" })],
+      }),
+    });
+    expect(document.body.textContent).toContain("《般若波羅蜜多心經》第1卷");
+    expect(document.body.textContent).not.toContain("《般若波罗蜜多心经》第1卷");
+  });
+
+  it("折字只作用于经名，答案正文里被逐字核验过的引文一字不动", () => {
+    // 承重。「已逐字核验」这个徽章的全部价值就在于引文与藏经原文逐字相同；
+    // 若界面语言能改写引文本身，徽章当场变成假话。
+    renderBubble({
+      m: msg({
+        content: "论云「無學身語業，即意三牟尼」者。【《雜阿含經》第16卷】",
+        sources: [src({ text_id: 5 as TextId, juan_num: 16, chunk_index: 0, title_zh: "雜阿含經" })],
+      }),
+    });
+    expect(document.body.textContent).toContain("「無學身語業，即意三牟尼」");
+    expect(document.body.textContent).toContain("《杂阿含经》第16卷");
+  });
+
+  it("追问建议是原生 button —— span 上挂 onClick，键盘和读屏永远够不到", () => {
+    const { onSuggestionClick } = renderBubble({
+      m: msg({ content: "答案正文\n[追问] 什么是阿赖耶识" }),
+    });
+    const chip = screen.getByRole("button", { name: "什么是阿赖耶识" });
+    // 断言标签名而不只是 role：span[role=button] 也能被 getByRole 找到，但浏览器
+    // 只为真正的可交互元素把 Enter/空格合成成 click。这里守的正是那一点。
+    expect(chip.tagName).toBe("BUTTON");
+    expect(chip.tabIndex).toBeGreaterThanOrEqual(0);
+    fireEvent.click(chip);
+    expect(onSuggestionClick).toHaveBeenCalledWith("什么是阿赖耶识");
   });
 });
