@@ -1,3 +1,5 @@
+import { readFileSync } from "fs";
+import { resolve } from "path";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -920,5 +922,23 @@ describe("空状态副标题", () => {
     // 重复：下方四张卡片（白话翻译/经文解读/对比辨析/佛教史话）带真实例题且可点，
     // 输入框 placeholder 还在轮播真实例题。抽象地再说一遍只是噪音。
     expect(hero.textContent).not.toContain("可以问我关于");
+  });
+});
+
+describe("空状态标题", () => {
+  // 朱红加粗必须走 --fj-cinnabar，不能写 --fj-accent、更不能写死十六进制。
+  // --fj-accent 在浅色下也是一支红，肉眼复验（默认就在浅色下做）看不出差别，
+  // 但它在暗色会变亮到 #e5764a，当文字用只有 3.35:1 —— 这个错只有切主题才暴露，
+  // 所以这条断言是唯一能拦住它的地方。
+  it("用朱红专用色（--fj-cinnabar）加粗，而不是继承正文的灰褐色", async () => {
+    const { container } = await renderEmpty();
+    const title = container.querySelector(".chat-hero-title");
+    expect(title).not.toBeNull();
+    expect(title!.textContent).toBe("小津 AI 佛典问答");
+
+    const css = readFileSync(resolve(__dirname, "../styles/global.css"), "utf-8");
+    const rule = css.match(/\.chat-hero-title\s*\{([^}]*)\}/)?.[1] ?? "";
+    expect(rule).toMatch(/color:\s*var\(--fj-cinnabar\)/);
+    expect(rule).toMatch(/font-weight:\s*(700|bold)\b/);
   });
 });

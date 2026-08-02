@@ -44,6 +44,12 @@
   /* Search-result keyword highlight. It sits as bold 18px body text on the card,
      which the brand accent is not tuned for: in dark it only reaches 3.35:1. */
   --fj-highlight:       #8b2500;
+  /* 朱红：大号标题用的那支朱砂，比 --fj-accent (#8b2500) 亮一档。accent 是深赭，
+     压成 22px 标题时偏「暗酱」而不像朱红；这支在同色相上提亮度到 HSL 40%，
+     在 --fj-bg 上 5.49:1、在白卡上 5.98:1，仍然过 body-copy 的 4.5:1 家规。
+     不能改 --fj-highlight 来达到同样效果 —— 那支还管着全站 <em> 搜索结果高亮
+     和首页八处强调，动它是一次悄无声息的全站变色。 */
+  --fj-cinnabar:        #b23a1a;
 }
 
 :root[data-theme="dark"] {
@@ -72,6 +78,10 @@
   --fj-warning:         #ffc069;
   --fj-info:            #91caff;
   --fj-highlight:       #f2a07a;
+  /* 暗色下不需要再提亮：#f2a07a 在 --fj-bg (#2f2820) 上已是 6.98:1，而且这里
+     的观感问题（浅色下偏暗酱）本来就只发生在浅色主题。与 --fj-highlight 同值
+     是巧合不是别名 —— 两支色在浅色下已经分家，不要合并。 */
+  --fj-cinnabar:        #f2a07a;
   color-scheme: dark;
 }
 
@@ -272,6 +282,25 @@ em {
 .chat-hero-trail {
   flex: 1 1 0;
   min-height: 0;
+}
+
+/* 首屏标题。取 --fj-cinnabar：站点那支朱砂在 22px 标题尺度上要比 --fj-accent
+   (#8b2500) 亮一档才像朱红，accent 压这么大一块会读成暗酱红（五档实景比过）。
+   实测 浅色 #b23a1a 5.49:1、暗色 #f2a07a 6.98:1。
+   也不要图省事写 --fj-accent：它在暗色会变亮到 #e5764a，当文字用只有 3.35:1
+   —— 这笔账 token 注释里记着，别再踩一次。
+   与 MasterSeal 的关系：选了祖师时印章正压在这行标题上方，两者同属这支朱砂，
+   但印章是填充（--fj-accent）、标题是文字（--fj-cinnabar），文字那支必须更亮
+   才够对比度，所以两者不同值是刻意的，不是没对齐。
+   700 是真字重：Noto Serif SC 自托管了 400/600/700 三档（public/fonts/
+   noto-serif-sc.css），不会退化成合成粗体那种糊边。
+   字号/字体从内联样式搬进来，与同区块其余 .chat-hero-* 规则保持一处可改。 */
+.chat-hero-title {
+  font-family: "Noto Serif SC", serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--fj-cinnabar);
+  margin-bottom: 6px;
 }
 
 /* 建议卡片：铺满对话列（840 → 每张 420px），标签与问题同行。
