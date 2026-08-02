@@ -6,4 +6,10 @@ Disallow: /admin/
 Disallow: /profile/
 Disallow: /login
 
+# 带查询串的搜索结果页：查询组合无限、内容随库变动，没有收录价值。
+# 实测（2026-08 生产日志）Googlebot/bingbot 一周抓了 288 次 /search?…，
+# 且全部以 301 收场——纯粹在烧抓取预算。无参数的 /search 是搜索入口页，
+# 收在 sitemap-static.xml 里，必须保持可抓，故这里只禁带 ? 的形式。
+Disallow: /search?
+
 Sitemap: https://fojin.app/sitemap.xml
