@@ -126,8 +126,10 @@ export default defineConfig({
         // exclude landscape-bg.png (577KB) — it's only the og:image for social
         // crawlers, which don't run a service worker, so precaching it into every
         // PWA install just wastes ~577KB the user never sees.
+        // og-image.png (236KB) is excluded for exactly the same reason: it is the
+        // share card served to WeChat/Twitter crawlers, never rendered in the app.
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webp}"],
-        globIgnores: ["**/landscape-bg.png"],
+        globIgnores: ["**/landscape-bg.png", "**/og-image.png"],
         navigateFallbackDenylist: [/^\/api\//],
         skipWaiting: true,
         clientsClaim: true,
