@@ -112,6 +112,12 @@ class Settings(BaseSettings):
     dianjin_api_key: str = ""
     dianjin_api_url: str = "https://guji.cckb.cn/api"
 
+    # 百度搜索资源平台 - 主动推送 API token（可选）。领取：ziyuan.baidu.com →
+    # 站点管理 → 普通收录 → API 提交。仅 scripts/baidu_push.py 使用，用来把新
+    # 页面 URL 主动推给百度收录；未设置时该脚本报错退出（不静默跳过），不影响
+    # 应用本身启动或运行。
+    baidu_push_token: str = ""
+
     # OAuth: GitHub
     github_client_id: str = ""
     github_client_secret: str = ""
