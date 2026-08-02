@@ -32,6 +32,7 @@ router = APIRouter(tags=["seo"])
 
 _RELATED_TEXTS_LIMIT = 30
 _RELATED_PERSONS_LIMIT = 12
+_DUPLICATE_CANDIDATES_LIMIT = 50
 
 
 def _person_display_dates(props: dict | None) -> str:
@@ -132,6 +133,51 @@ def _build_person_jsonld(entity: KGEntity, *, canonical: str) -> dict:
         if same_as:
             payload["sameAs"] = same_as
     return payload
+
+
+async def _find_canonical_person_id(db: AsyncSession, entity: KGEntity) -> int:
+    """Resolve the canonical id for entities sharing (name_zh, entity_type).
+
+    kg_entities has real duplicate person rows — e.g. 6 separate rows all
+    named 法藏 — each getting its own self-referencing /persons/{id} SEO
+    page. That splits search ranking signal across N URLs instead of
+    consolidating it on one (keyword cannibalization). There is no
+    merge/redirect table for this: the only existing dedup (migration 0159)
+    covers just the subset of persons carrying an external ``dila`` id.
+
+    Canonical-selection rule, applied deterministically so every duplicate
+    resolves to the same winner regardless of which one a crawler fetches:
+
+      1. Longest ``description`` wins (more content = the page worth ranking).
+      2. Ties — including "all empty" — broken by the smallest ``id``.
+
+    The candidate lookup is an exact-equality match on ``name_zh`` (indexed:
+    ix_kg_entities_name_zh from migration 0006) filtered by entity_type, so
+    it stays a cheap index scan even though it runs on every request.
+    Candidates are capped at _DUPLICATE_CANDIDATES_LIMIT, ordered by id
+    ascending, to bound the pathological case of a name shared by an
+    unexpectedly large number of rows. Measured on prod (2026-08): the
+    largest person cluster is 18 rows, and 50+ distinct names have 7 or
+    more — so duplication is widespread, but the cap still carries ~2.7x
+    headroom over the worst case. Because candidates arrive in
+    ascending-id order, Python's max() — which keeps the first winner on a
+    tie — implements rule 2 for free.
+    """
+    if not entity.name_zh:
+        return entity.id
+
+    result = await db.execute(
+        select(KGEntity.id, KGEntity.description)
+        .where(KGEntity.name_zh == entity.name_zh)
+        .where(KGEntity.entity_type == entity.entity_type)
+        .order_by(KGEntity.id.asc())
+        .limit(_DUPLICATE_CANDIDATES_LIMIT)
+    )
+    candidates = result.all()
+    if len(candidates) <= 1:
+        return entity.id
+    winner = max(candidates, key=lambda row: len(row.description or ""))
+    return winner.id
 
 
 async def _fetch_person_related(
@@ -335,7 +381,19 @@ async def person_seo_html(
         raise HTTPException(status_code=404, detail="person not found")
 
     base_url = str(request.base_url).rstrip("/")
-    canonical = f"{base_url}/persons/{entity.id}"
+
+    try:
+        canonical_id = await _find_canonical_person_id(db, entity)
+    except Exception as e:  # canonical resolution is best-effort; self-reference is always safe
+        logger.warning("canonical person lookup failed for %s: %s", entity.id, e)
+        canonical_id = entity.id
+    # og:url / JSON-LD url / breadcrumb item below all reuse this same value —
+    # deliberate: og:url's own spec calls it "the canonical URL of your
+    # object", and a JSON-LD url that disagreed with <link rel="canonical">
+    # would be a self-contradictory signal. The page BODY still renders this
+    # entity's own content (name, description, related texts/persons) below —
+    # only the crawler-facing URL signals move to the winning duplicate.
+    canonical = f"{base_url}/persons/{canonical_id}"
 
     try:
         related_texts, related_persons = await _fetch_person_related(db, entity.id)

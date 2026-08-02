@@ -10,24 +10,32 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#8b2500" />
-    <meta name="description" content="佛津 FoJin — 聚合全球佛教数字资源，提供平行阅读、知识图谱、AI 问答等功能的古籍研究平台。覆盖汉传、藏传、南传、梵文等传统。" />
+    <!-- 文案里刻意不写数据源/典籍的精确条数：这类计数会随入库增长而过期
+         （README 长期停在 613，实际已 721），静态 HTML 又无法随库更新。
+         见 src/seoStaticCounts.test.ts —— 该约定就是为防这类漂移而立的。 -->
+    <meta name="description" content="向大藏经提问，小津用原文回答——每条引用标注经名与卷号，可点开比对原典。汉传·南传·藏传三系跨语对读，聚合全球公开佛教典籍与辞典，完全免费。" />
     <meta name="robots" content="index, follow" />
     <link rel="canonical" href="https://fojin.app/" />
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="佛津 FoJin — 全球佛教古籍数字资源聚合平台" />
-    <meta property="og:description" content="聚合全球佛教数字资源，提供平行阅读、知识图谱、AI 问答等功能。覆盖汉传、藏传、南传、梵文等传统。" />
+    <meta property="og:title" content="佛津 FoJin — 问佛经，得到能核对原文的答案" />
+    <meta property="og:description" content="AI 从大藏经原文作答，每条引用都标注经名与卷号、可点开比对原典。汉传·南传·藏传跨语对读，完全免费。" />
     <meta property="og:url" content="https://fojin.app/" />
-    <meta property="og:image" content="https://fojin.app/landscape-bg.png" />
+    <!-- 分享卡片图：1200x630。此前指向 landscape-bg.png（纯背景画，不含任何产品信息），
+         微信/Twitter 里分享出去说不清产品是什么。改为带主张+引用示例的卡片。 -->
+    <meta property="og:image" content="https://fojin.app/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="佛津 FoJin — 问佛经，得到能核对原文的答案" />
     <meta property="og:locale" content="zh_CN" />
     <meta property="og:site_name" content="佛津 FoJin" />
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="佛津 FoJin — 全球佛教古籍数字资源聚合平台" />
-    <meta name="twitter:description" content="聚合全球佛教数字资源，提供平行阅读、知识图谱、AI 问答等功能。" />
-    <meta name="twitter:image" content="https://fojin.app/landscape-bg.png" />
+    <meta name="twitter:title" content="佛津 FoJin — 问佛经，得到能核对原文的答案" />
+    <meta name="twitter:description" content="AI 从大藏经原文作答，每条引用都标注经名与卷号、可点开比对原典。完全免费。" />
+    <meta name="twitter:image" content="https://fojin.app/og-image.png" />
 
     <link rel="alternate" type="application/rss+xml" title="佛津 FoJin — 最新收录" href="https://fojin.app/feed.xml" />
     <link rel="preload" href="/fonts/MaShanZheng-title.woff2" as="font" type="font/woff2" crossorigin />
@@ -39,7 +47,7 @@
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
     <!-- Umami Analytics is opt-in at build time via VITE_UMAMI_URL + VITE_UMAMI_WEBSITE_ID;
          see src/umami.ts. Self-hosters who don't set both envs get no tracking script. -->
-    <title>佛津 FoJin — 全球佛教古籍数字资源聚合平台</title>
+    <title>佛津 FoJin — 佛经 AI 问答，每句引用可点开核对原文</title>
 
     <!-- JSON-LD Structured Data -->
     <script type="application/ld+json">
@@ -50,7 +58,7 @@
           "@type": "WebSite",
           "name": "佛津 FoJin",
           "url": "https://fojin.app/",
-          "description": "全球佛教古籍数字资源聚合平台",
+          "description": "佛经 AI 问答平台——从大藏经原文作答，每条引用标注经名卷号并可点开核对原典",
           "inLanguage": "zh-CN",
           "potentialAction": {
             "@type": "SearchAction",
@@ -89,24 +97,26 @@
     <div id="root"></div>
     <noscript>
       <div style="max-width:800px;margin:40px auto;padding:0 24px;font-family:serif;color:#2b2318">
-        <h1>佛津 FoJin — 全球佛教古籍数字资源聚合平台</h1>
-        <p>佛津聚合全球佛教数字资源，覆盖多个国家和地区，涵盖汉传、藏传、南传、梵文等多种传统。</p>
+        <h1>佛津 FoJin — 佛经 AI 问答，每句引用可点开核对原文</h1>
+        <p>用大白话向大藏经提问，佛学助手「小津」从典籍原文作答。答案里的每条引用都标注经名与卷号，点开即可比对原典——这是佛津与一般 AI 问答最不同的地方：<strong>你不必相信它，你可以去查它</strong>。</p>
         <h2>核心功能</h2>
         <ul>
+          <li><strong>AI 问答</strong> — 检索大藏经原文后作答，引用可点开核对，并有防幻觉护栏</li>
+          <li><strong>祖师说法</strong> — 以 15 位历史祖师的视角作答，各自只依其宗派典籍</li>
+          <li><strong>跨藏对读</strong> — 汉传·南传·藏传三语逐段对照，一览异译</li>
           <li><strong>典籍搜索</strong> — 跨数据源检索佛教古籍，支持按经名、编号、译者查询</li>
-          <li><strong>平行阅读</strong> — 多版本逐段对照，一览异译</li>
-          <li><strong>知识图谱</strong> — 人物、寺院、宗派关系可视化</li>
-          <li><strong>AI 问答</strong> — 基于典籍原文的智能问答</li>
-          <li><strong>学术标注</strong> — 段落级批注与协作笔记</li>
-          <li><strong>引用生成</strong> — 一键导出学术引用格式</li>
+          <li><strong>佛学辞典</strong> — 汉语、梵语、巴利语、藏语多语辞书汇编查询</li>
+          <li><strong>知识图谱</strong> — 人物、寺院、宗派关系与地理可视化</li>
+          <li><strong>引用生成</strong> — 一键导出 BibTeX、RIS、APA 学术引用格式</li>
         </ul>
         <h2>数据来源</h2>
-        <p>所有数据均来自全球学术机构、图书馆、大学及佛教研究组织的公开数字资源，包括 CBETA、BDRC、SAT、SuttaCentral 等权威项目。数据定期同步更新，经过自动去重与校验。</p>
+        <p>聚合全球学术机构、图书馆、大学及佛教研究组织的公开数字资源，包括 CBETA、BDRC、SAT、SuttaCentral、84000 等权威项目。数据定期同步更新，经过自动去重与校验。完全免费，代码以 Apache 2.0 开源。</p>
         <h2>导航</h2>
         <ul>
+          <li><a href="/chat">AI 问答</a></li>
           <li><a href="/search">搜索典籍</a></li>
-          <li><a href="/sources">数据源导航</a></li>
           <li><a href="/dictionary">佛学辞典</a></li>
+          <li><a href="/sources">数据源导航</a></li>
           <li><a href="/kg">知识图谱</a></li>
         </ul>
       </div>
