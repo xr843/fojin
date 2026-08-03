@@ -22,7 +22,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.seo import _escape_meta_value
+from app.api.seo import _escape_meta_value, public_base_url
 from app.database import get_db
 from app.models.knowledge_graph import KGEntity, KGRelation
 from app.models.text import BuddhistText
@@ -380,7 +380,7 @@ async def person_seo_html(
     if entity is None or entity.entity_type != "person":
         raise HTTPException(status_code=404, detail="person not found")
 
-    base_url = str(request.base_url).rstrip("/")
+    base_url = public_base_url(request)
 
     try:
         canonical_id = await _find_canonical_person_id(db, entity)
