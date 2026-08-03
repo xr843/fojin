@@ -60,6 +60,16 @@ _ROBOTS_RE = re.compile(
 _HEAD_CLOSE_RE = re.compile(r"</head>", re.IGNORECASE)
 _ROOT_DIV_RE = re.compile(r'<div\s+id="root"\s*></div>', re.IGNORECASE)
 
+# Open Graph / Twitter equivalents of the three tags above. Without these the
+# injected page keeps the SPA template's homepage og:* values, so *sharing any
+# text or shared-QA link posts a card advertising the homepage* — wrong title,
+# and an og:url that sends the reader to `/` instead of the thing being shared.
+_OG_TITLE_RE = re.compile(r'<meta\s+property="og:title"\s+content="[^"]*"\s*/?>', re.IGNORECASE)
+_OG_DESCRIPTION_RE = re.compile(r'<meta\s+property="og:description"\s+content="[^"]*"\s*/?>', re.IGNORECASE)
+_OG_URL_RE = re.compile(r'<meta\s+property="og:url"\s+content="[^"]*"\s*/?>', re.IGNORECASE)
+_TW_TITLE_RE = re.compile(r'<meta\s+name="twitter:title"\s+content="[^"]*"\s*/?>', re.IGNORECASE)
+_TW_DESCRIPTION_RE = re.compile(r'<meta\s+name="twitter:description"\s+content="[^"]*"\s*/?>', re.IGNORECASE)
+
 # Cap on how much text we inject into the SEO HTML body. Googlebot weighs the
 # *first* ~2000 chars heaviest; injecting much more than this hits diminishing
 # returns and inflates page weight for real users (the SEO block is rendered
@@ -153,7 +163,16 @@ def _inject_meta(
     canonical_url: str,
     robots: str = "index, follow",
 ) -> str:
-    """Replace <title>, <meta name="description">, <link rel="canonical">, and <meta name="robots">.
+    """Replace title / description / canonical / robots **and the og:* + twitter:* mirrors**.
+
+    The Open Graph tags matter as much as ``<title>`` here: they are what a
+    WeChat or Twitter share card renders. Leaving the template's values in
+    place meant every shared text — and every shared QA, which is the entire
+    point of ``/share/qa/{id}`` — posted a card titled after the homepage,
+    with an ``og:url`` pointing at ``/`` rather than the thing being shared.
+
+    ``og:image`` is deliberately NOT touched: there is no per-text image, so
+    the site-wide share card is the correct asset.
 
     If a canonical link is missing entirely (the default for the React SPA
     template), we add it just before the closing </head> tag.
@@ -174,6 +193,14 @@ def _inject_meta(
         f'<meta name="robots" content="{safe_robots}" />',
         new_html,
     )
+    for pattern, replacement in (
+        (_OG_TITLE_RE, f'<meta property="og:title" content="{safe_title}" />'),
+        (_OG_DESCRIPTION_RE, f'<meta property="og:description" content="{safe_desc}" />'),
+        (_OG_URL_RE, f'<meta property="og:url" content="{safe_canonical}" />'),
+        (_TW_TITLE_RE, f'<meta name="twitter:title" content="{safe_title}" />'),
+        (_TW_DESCRIPTION_RE, f'<meta name="twitter:description" content="{safe_desc}" />'),
+    ):
+        new_html = _sub_literal(pattern, replacement, new_html)
     canonical_tag = f'<link rel="canonical" href="{safe_canonical}" />'
     if _CANONICAL_RE.search(new_html):
         new_html = _sub_literal(_CANONICAL_RE, canonical_tag, new_html)
@@ -528,13 +555,16 @@ def _build_share_qa_meta(record: SharedQA, request: Request) -> dict[str, str]:
 
 
 _OG_TAG_PATTERNS = (
-    re.compile(r'<meta\s+property="og:title"\s+content="[^"]*"\s*/?>', re.IGNORECASE),
-    re.compile(r'<meta\s+property="og:description"\s+content="[^"]*"\s*/?>', re.IGNORECASE),
+    # First three reuse the named patterns defined near the top — the share-QA
+    # path strips exactly the tags the text path rewrites, and two copies of
+    # these regexes would drift apart the first time one side is edited.
+    _OG_TITLE_RE,
+    _OG_DESCRIPTION_RE,
     re.compile(r'<meta\s+property="og:image"\s+content="[^"]*"\s*/?>', re.IGNORECASE),
     re.compile(r'<meta\s+property="og:image:width"\s+content="[^"]*"\s*/?>', re.IGNORECASE),
     re.compile(r'<meta\s+property="og:image:height"\s+content="[^"]*"\s*/?>', re.IGNORECASE),
     re.compile(r'<meta\s+property="og:type"\s+content="[^"]*"\s*/?>', re.IGNORECASE),
-    re.compile(r'<meta\s+property="og:url"\s+content="[^"]*"\s*/?>', re.IGNORECASE),
+    _OG_URL_RE,
     re.compile(r'<meta\s+name="twitter:card"\s+content="[^"]*"\s*/?>', re.IGNORECASE),
 )
 
