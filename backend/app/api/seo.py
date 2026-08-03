@@ -90,6 +90,31 @@ def _escape_meta_value(value: str) -> str:
     )
 
 
+def public_base_url(request: Request) -> str:
+    """Base URL as the *outside world* sees it, i.e. with the real scheme.
+
+    ``request.base_url`` reports the scheme of the connection uvicorn actually
+    accepted. Behind our nginx hop that is always ``http``, so every URL built
+    from it went out as ``http://`` — og:url, the JSON-LD ``url``, and every
+    breadcrumb item. Cloudflare's Automatic HTTPS Rewrites then silently
+    patched only the ``href``-bearing ``<link rel="canonical">``, leaving the
+    page self-contradictory: canonical said https, og:url said http, and the
+    sitemap (which hardcodes https) disagreed with both.
+
+    nginx sets ``X-Forwarded-Proto`` with ``proxy_set_header``, which
+    OVERWRITES any client-supplied value, so unlike ``X-Forwarded-For`` (which
+    is *appended* to — see backend/entrypoint.sh for why we deliberately do not
+    run uvicorn with ``--proxy-headers``) this header cannot be spoofed through
+    the proxy and is safe to trust. Values other than http/https are ignored.
+    """
+    base = str(request.base_url).rstrip("/")
+    forwarded = request.headers.get("x-forwarded-proto", "")
+    scheme = forwarded.split(",")[0].strip().lower()
+    if scheme in ("http", "https"):
+        base = re.sub(r"^https?://", f"{scheme}://", base, count=1)
+    return base
+
+
 def _sub_literal(pattern: re.Pattern[str], replacement: str, html: str, *, count: int = 1) -> str:
     """``pattern.sub`` that treats ``replacement`` as a literal string.
 
@@ -195,7 +220,7 @@ def _build_text_meta(text, request: Request, *, route: str) -> tuple[str, str, s
     )
     description = "".join(desc_parts)
 
-    base = str(request.base_url).rstrip("/")
+    base = public_base_url(request)
     # base_url comes from the inbound request — under cloudflare/nginx the
     # forwarded scheme/host should already be set on the request.
     if route == "read":
@@ -241,7 +266,7 @@ async def _serve_text_seo_html(
     # Detail route is the indexable surface — give Googlebot a real body.
     # Reader route stays a SPA shell (it's noindex anyway).
     if route == "detail":
-        base_url = str(request.base_url).rstrip("/")
+        base_url = public_base_url(request)
         patched = _inject_text_jsonld(
             patched, _build_breadcrumb_jsonld(text, canonical_url=canonical, base_url=base_url)
         )
@@ -489,7 +514,7 @@ def _build_share_qa_meta(record: SharedQA, request: Request) -> dict[str, str]:
     answer_plain = _strip_markdown(record.answer or "")
     description = _truncate_for_meta(answer_plain or question, limit=150)
 
-    base = str(request.base_url).rstrip("/")
+    base = public_base_url(request)
     canonical = f"{base}/share/qa/{record.id}"
     og_image = f"{base}/api/og/share/qa/{record.id}"
     return {

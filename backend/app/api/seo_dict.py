@@ -35,7 +35,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from app.api.seo import _escape_meta_value
+from app.api.seo import _escape_meta_value, public_base_url
 from app.database import get_db
 from app.models.dictionary import DictionaryEntry
 from app.models.text import BuddhistText, TextContent
@@ -353,7 +353,7 @@ async def dict_seo_html(headword: str, request: Request, db: AsyncSession = Depe
         for e in entries
     ]
 
-    base_url = str(request.base_url).rstrip("/")
+    base_url = public_base_url(request)
     canonical = f"{base_url}/dict/{canonical_headword}"
     headword = canonical_headword
 
