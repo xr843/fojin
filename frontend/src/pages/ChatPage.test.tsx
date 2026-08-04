@@ -946,6 +946,27 @@ describe("空状态标题", () => {
     expect(rule).toMatch(/color:\s*var\(--fj-cinnabar\)/);
     expect(rule).toMatch(/font-weight:\s*(700|bold)\b/);
   });
+
+  // 简体下这行标题换成了品牌那支毛笔体（Ma Shan Zheng），与首页 88px 的「佛津」
+  // 同一支。三条不变量都是肉眼复验看不出、或只在别的 locale 才暴露的：
+  //  1) 字重必须 < 600 —— Ma Shan Zheng 只有 400 一档，写 700 浏览器会合成粗体，
+  //     把毛笔的提按笔锋涂成糊边（基础规则那句「700 是真字重」只对 Noto Serif SC
+  //     成立，换字体就不成立了）。
+  //  2) 选择器必须排除 zh-Hant —— 这支字体是 GB2312 字量，繁体「問」(U+554F) 没有
+  //     字形，简化成 :lang(zh) 会让繁体标题只有「問」一个字掉回衬线，夹在毛笔字
+  //     中间像渲染坏了。简体页面上永远看不到这个错。
+  //  3) 这条规则不许自己写 color —— 朱红由上面的基础规则提供，在这里覆盖就绕过了
+  //     上面那条 --fj-cinnabar 断言。
+  it("简体用毛笔体但不合成粗体、不波及繁体、不另写颜色", () => {
+    const css = readFileSync(resolve(__dirname, "../styles/global.css"), "utf-8");
+    const rule = css.match(
+      /\.chat-hero-title:lang\(zh\):not\(:lang\(zh-Hant\)\)\s*\{([^}]*)\}/,
+    )?.[1];
+    expect(rule, "毛笔体规则必须只作用于简体：.chat-hero-title:lang(zh):not(:lang(zh-Hant))").toBeDefined();
+    expect(rule!).toMatch(/font-family:\s*"Ma Shan Zheng Title"/);
+    expect(Number(rule!.match(/font-weight:\s*(\d+)/)?.[1])).toBeLessThan(600);
+    expect(rule!).not.toMatch(/color:/);
+  });
 });
 
 // 用户实测（2026-08-04）：1.3MB 的 Word 上传，界面只说「上传失败，请稍后重试」。
