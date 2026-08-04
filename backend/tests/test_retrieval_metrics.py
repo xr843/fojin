@@ -264,7 +264,11 @@ def test_graded_metrics_keep_strict_under_the_original_key_names():
     q = _q([{"title": "心经", "relevance": 2}, {"title": "大乘广五蕴论", "relevance": 1}])
     m = compute_metrics_graded([("心经", None)], q)
     assert m["recall@5"] == 1.0          # strict: 1/1 canonical hit
-    assert m["lenient_recall@5"] == 0.5  # lenient: 1 of 2 acceptable hit
+    # Lenient recall is normalised by the STRICT count: the question needed one
+    # good source and one was found. Dividing by the enlarged gold set instead
+    # would make 宽松 score BELOW 严格 whenever equivalents are added, which
+    # reads as a broken ruler.
+    assert m["lenient_recall@5"] == 1.0
     assert m["hit@5"] == 1.0
     assert m["retrieval_type"] == "passage"
 
@@ -273,7 +277,7 @@ def test_graded_lenient_credits_an_equivalent_source_strict_rejects():
     q = _q([{"title": "心经", "relevance": 2}, {"title": "大乘广五蕴论", "relevance": 1}])
     m = compute_metrics_graded([("大乘广五蕴论", None)], q)
     assert m["recall@5"] == 0.0          # canonical source missed
-    assert m["lenient_recall@5"] == 0.5  # but the equivalent one counts
+    assert m["lenient_recall@5"] == 1.0  # but the equivalent fully covers it
     assert m["hit@5"] == 0.0
     assert m["lenient_hit@5"] == 1.0
 
@@ -333,3 +337,21 @@ def test_aggregate_by_type_keeps_advisory_bucket_countable():
     ])
     assert out["advisory"]["n"] == 2
     assert "recall@5" not in out["advisory"]     # no numbers to average
+
+
+def test_lenient_recall_is_never_below_strict_recall():
+    # The property that makes the two columns readable side by side. Adding an
+    # 等价来源 must never make the 宽松 number worse than the 严格 one.
+    q = _q([{"title": "心经", "relevance": 2},
+            {"title": "大乘广五蕴论", "relevance": 1},
+            {"title": "阿毘达磨俱舍论", "relevance": 1}])
+    for retrieved in ([("心经", None)], [("大乘广五蕴论", None)], [("楞伽经义疏", 1)]):
+        m = compute_metrics_graded(retrieved, q)
+        assert m["lenient_recall@5"] >= m["recall@5"], retrieved
+
+
+def test_lenient_recall_caps_at_one():
+    q = _q([{"title": "心经", "relevance": 2},
+            {"title": "大乘广五蕴论", "relevance": 1}])
+    m = compute_metrics_graded([("心经", None), ("大乘广五蕴论", None)], q)
+    assert m["lenient_recall@5"] == 1.0

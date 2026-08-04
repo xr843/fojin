@@ -200,6 +200,13 @@ def compute_metrics_graded(
     baseline keeps comparing like for like. The lenient family, which also
     credits ``relevance == 1`` equivalents, is added under a ``lenient_`` prefix.
 
+    Lenient RECALL is normalised by the strict gold count, not the enlarged
+    lenient one: the question needed N canonical sources, and the score asks how
+    many of those slots an acceptable source filled. Dividing by the enlarged set
+    instead would drop 宽松 below 严格 for every question that gained an
+    equivalent — a ruler whose "more forgiving" column scores worse reads as
+    broken, and the columns stop being comparable side by side.
+
     Also stamps ``retrieval_type`` so :func:`aggregate_by_type` can report
     归属题 and 段落题 apart.
     """
@@ -208,6 +215,10 @@ def compute_metrics_graded(
 
     out = compute_metrics(retrieved, strict, ks)
     lenient_metrics = compute_metrics(retrieved, lenient, ks)
+    if strict and lenient:
+        for k in ks:
+            matched = len(_matched_gold_indices(retrieved, lenient, k))
+            lenient_metrics[f"recall@{k}"] = min(1.0, matched / len(strict))
     for key, value in lenient_metrics.items():
         if key == "num_gold":
             # Named so it does NOT match _METRIC_PREFIXES — a change in how many
