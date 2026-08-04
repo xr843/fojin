@@ -186,3 +186,61 @@ def test_version_check_is_skipped_when_caller_passes_no_version(tmp_path):
     b.write_text(json.dumps([{"id": "x", "retrieval_metrics": {"recall@5": 0.5}}]), encoding="utf-8")
     _, error = compare_baseline(str(b), current_agg={"recall@5": 0.5}, current_faith={})
     assert error is None
+
+
+# --- eval/run_regression.sh's own control flow ------------------------------
+# The wrapper tests above inject a fake gate, so run_regression.sh itself was
+# never executed by any test. Its two branches decide whether answer quality
+# gets measured at all and whether a broken ruler is allowed through — both are
+# exactly the "gate quietly stops gating" shape this file exists to prevent.
+
+GATE = Path(__file__).resolve().parents[1] / "eval" / "run_regression.sh"
+
+
+def _run_gate(tmp_path, *, reachable_exit=0, extra_env=None):
+    """Run run_regression.sh with a fake `python` that records its args."""
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    calls = tmp_path / "python-calls.txt"
+    (bindir / "python").write_text(
+        "#!/usr/bin/env bash\n"
+        f'printf "%s\\n" "$*" >> "{calls}"\n'
+        f'case "$*" in *check_gold_reachable*) exit {reachable_exit};; esac\n'
+        "exit 0\n"
+    )
+    (bindir / "python").chmod(0o755)
+
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(json.dumps([]), encoding="utf-8")
+
+    env = dict(os.environ)
+    env["PATH"] = f"{bindir}:{env['PATH']}"
+    env["BASELINE"] = str(baseline)
+    env.pop("LLM", None)
+    env.update(extra_env or {})
+
+    proc = subprocess.run(["bash", str(GATE)], env=env, capture_output=True, text=True)
+    return proc, (calls.read_text() if calls.exists() else "")
+
+
+def test_gate_checks_the_ruler_before_measuring_with_it(tmp_path):
+    proc, calls = _run_gate(tmp_path, reachable_exit=1)
+    assert proc.returncode != 0
+    assert "check_gold_reachable" in calls
+    # must NOT have gone on to measure with a ruler it just rejected
+    assert "run_eval" not in calls
+
+
+def test_gate_defaults_to_retrieval_only(tmp_path):
+    proc, calls = _run_gate(tmp_path)
+    assert proc.returncode == 0
+    assert "--no-llm" in calls
+    assert "--temperature" not in calls
+
+
+def test_llm_env_switches_to_full_eval_at_temperature_zero(tmp_path):
+    proc, calls = _run_gate(tmp_path, extra_env={"LLM": "1"})
+    assert proc.returncode == 0
+    run_eval_call = [ln for ln in calls.splitlines() if "run_eval" in ln][0]
+    assert "--no-llm" not in run_eval_call
+    assert "--temperature 0" in run_eval_call
