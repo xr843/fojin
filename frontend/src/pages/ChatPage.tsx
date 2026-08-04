@@ -1140,10 +1140,18 @@ export default function ChatPage() {
       setAttachments((prev) => [...prev, meta]);
       message.success(t("chat.attachment_uploaded", { filename: meta.filename, n: meta.char_count }));
     } catch (err: unknown) {
-      const detail =
-        (err as { response?: { data?: { detail?: string } } })?.response
-          ?.data?.detail;
-      message.error(detail || t("chat.upload_failed"));
+      const res = (err as { response?: { status?: number; data?: unknown } })?.response;
+      // detail 只在后端自己回 JSON 时才有。两种情况下它不是字符串：反向代理
+      // 挡下请求时 body 是 HTML 错误页；FastAPI 的 422 里 detail 是数组。
+      // 不判类型就 `detail || 兜底`，前者掉进兜底、后者把 [object Object] 甩给用户。
+      const raw = (res?.data as { detail?: unknown } | undefined)?.detail;
+      const detail = typeof raw === "string" ? raw : undefined;
+      // 413 常常不是后端发的：nginx 的 client_max_body_size 先于应用层生效，
+      // 回的是一张没有 detail 的 HTML 页。此时说「稍后重试」是误导 —— 重试多少
+      // 次都一样，用户需要知道的是文件太大。
+      const fallback =
+        res?.status === 413 ? t("chat.attachment_too_large") : t("chat.upload_failed");
+      message.error(detail || fallback);
     } finally {
       setUploadingAttachment(false);
     }
