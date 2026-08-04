@@ -8,6 +8,7 @@ import { MemoryRouter, useLocation } from "react-router";
 import { message } from "antd";
 import ChatPage from "./ChatPage";
 import { useAuthStore } from "../stores/authStore";
+import { uploadChatAttachment } from "../api/chatAttachments";
 import {
   getApiKeyStatus,
   getChatQuota,
@@ -53,6 +54,10 @@ vi.mock("../api/client", async () => {
     getChunkContext: vi.fn(),
   };
 });
+
+vi.mock("../api/chatAttachments", () => ({
+  uploadChatAttachment: vi.fn(),
+}));
 
 // jsdom 没有实现 scrollIntoView —— ChatPage 的自动跟随会真的调它。
 beforeAll(() => {
@@ -940,5 +945,75 @@ describe("空状态标题", () => {
     const rule = css.match(/\.chat-hero-title\s*\{([^}]*)\}/)?.[1] ?? "";
     expect(rule).toMatch(/color:\s*var\(--fj-cinnabar\)/);
     expect(rule).toMatch(/font-weight:\s*(700|bold)\b/);
+  });
+});
+
+// 用户实测（2026-08-04）：1.3MB 的 Word 上传，界面只说「上传失败，请稍后重试」。
+// 真正发生的是反向代理按 nginx 默认的 client_max_body_size=1m 挡掉了请求，
+// 回了一张 **HTML** 413 错误页 —— 于是 `err.response.data.detail` 取不到，
+// 前端一路掉进兜底文案，把一个「文件太大」说成了「服务出错，再试试」。
+describe("附件上传失败时说的是人话", () => {
+  /** 选一个 1.3MB 的 .docx —— 过得了前端 10MB 自检，会真的发出请求。 */
+  function pickWordFile(container: HTMLElement, sizeBytes = 1_300_000) {
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(["stub"], "读书笔记.docx", {
+      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
+    // File 构造出来的 size 由内容决定，这里要的是「体积大但不占内存」。
+    Object.defineProperty(file, "size", { value: sizeBytes });
+    fireEvent.change(input, { target: { files: [file] } });
+  }
+
+  async function shownMessage() {
+    await waitFor(() => {
+      expect(vi.mocked(message.error)).toHaveBeenCalled();
+    });
+    return vi.mocked(message.error).mock.calls[0][0];
+  }
+
+  it("代理回 413（HTML 页面、没有 detail）时要说文件太大，不能说「稍后重试」", async () => {
+    vi.mocked(uploadChatAttachment).mockRejectedValue({
+      response: {
+        status: 413,
+        // nginx 的 413 body 就长这样：HTML，不是 JSON。
+        data: "<html>\r\n<head><title>413 Request Entity Too Large</title></head>\r\n</html>\r\n",
+      },
+    });
+    const { container } = await renderEmpty();
+    pickWordFile(container);
+
+    const shown = await shownMessage();
+    expect(shown).not.toBe("上传失败，请稍后重试");
+    expect(shown).toContain("10MB");
+  });
+
+  it("后端给了 detail（如 415 不支持的类型）时照原样透出，别被兜底盖掉", async () => {
+    vi.mocked(uploadChatAttachment).mockRejectedValue({
+      response: {
+        status: 415,
+        data: { detail: "暂不支持该文件类型，可上传 PDF / TXT / MD / DOCX / CSV / HTML" },
+      },
+    });
+    const { container } = await renderEmpty();
+    pickWordFile(container, 40_000);
+
+    expect(await shownMessage()).toBe(
+      "暂不支持该文件类型，可上传 PDF / TXT / MD / DOCX / CSV / HTML",
+    );
+  });
+
+  it("422 的 detail 是数组不是字符串，不能把 [object Object] 甩给用户", async () => {
+    vi.mocked(uploadChatAttachment).mockRejectedValue({
+      response: {
+        status: 422,
+        data: { detail: [{ loc: ["body", "file"], msg: "field required", type: "missing" }] },
+      },
+    });
+    const { container } = await renderEmpty();
+    pickWordFile(container, 40_000);
+
+    const shown = await shownMessage();
+    expect(typeof shown).toBe("string");
+    expect(shown).not.toContain("object Object");
   });
 });
