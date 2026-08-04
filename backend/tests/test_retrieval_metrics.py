@@ -7,8 +7,10 @@ so the gate itself can't silently rot.
 
 import pytest
 from eval.retrieval_metrics import (
+    aggregate_by_type,
     aggregate,
     compute_metrics,
+    compute_metrics_graded,
     detect_regressions,
     gold_entries,
     hit_at_k,
@@ -16,6 +18,7 @@ from eval.retrieval_metrics import (
     normalize_title,
     precision_at_k,
     recall_at_k,
+    retrieval_type,
     source_matches_gold,
     sources_to_pairs,
 )
@@ -202,3 +205,153 @@ class _FakeSource:
 def test_sources_to_pairs_from_objects():
     sources = [_FakeSource("心經", 1), _FakeSource("法華經", 2)]
     assert sources_to_pairs(sources) == [("心經", 1), ("法華經", 2)]
+
+
+# --- retrieval_type: 归属题 vs 段落题 ---------------------------------------
+# The gold set conflates two questions a retriever answers differently:
+# "which sutra IS this from" (attribution — a lookup) vs "show me a passage
+# about X" (passage — a similarity search). Mixing them into one Recall@5
+# hides which mechanism is failing, so they are bucketed and reported apart.
+
+def test_retrieval_type_reads_annotation():
+    assert retrieval_type({"retrieval_type": "attribution",
+                           "reference_sources": ["心经"]}) == "attribution"
+    assert retrieval_type({"retrieval_type": "passage",
+                           "reference_sources": ["心经"]}) == "passage"
+
+
+def test_retrieval_type_is_none_without_gold():
+    # out-of-scope questions have no gold and must not land in either bucket
+    assert retrieval_type({"id": "oos-001", "question": "今天天气怎么样？"}) is None
+
+
+def test_retrieval_type_unspecified_when_gold_but_unannotated():
+    # Deliberately NOT defaulted to "passage": an un-annotated question must
+    # stay visible in the report instead of silently padding a bucket.
+    assert retrieval_type({"reference_sources": ["杂阿含经"]}) == "unspecified"
+
+
+# --- relevance grading: 正解 vs 等价可接受来源 -------------------------------
+# relevance 2 = the canonical source the answer should cite;
+# relevance 1 = an equally defensible alternative (e.g. 大乘广五蕴论 for 五蕴).
+# Strict metrics count only 2; lenient counts 1 and 2.
+
+def test_gold_entries_filters_by_min_relevance():
+    q = {"gold_sources": [
+        {"title": "般若波罗蜜多心经", "relevance": 2},
+        {"title": "大乘广五蕴论", "relevance": 1},
+    ]}
+    assert len(gold_entries(q)) == 2                      # unchanged default
+    assert len(gold_entries(q, min_relevance=2)) == 1
+    assert gold_entries(q, min_relevance=2)[0]["title"] == normalize_title("般若波罗蜜多心经")
+    assert len(gold_entries(q, min_relevance=1)) == 2
+
+
+def test_reference_sources_are_relevance_2_so_strict_is_unchanged():
+    q = {"reference_sources": ["杂阿含经", "中论"]}
+    assert len(gold_entries(q, min_relevance=2)) == 2
+
+
+# --- compute_metrics_graded: strict + lenient in one row --------------------
+
+def _q(gold_sources, rtype="passage"):
+    return {"gold_sources": gold_sources, "retrieval_type": rtype}
+
+
+def test_graded_metrics_keep_strict_under_the_original_key_names():
+    # Old baselines compare on `recall@5`/`hit@5`; those names must keep
+    # meaning "strict" or every stored baseline silently changes meaning.
+    q = _q([{"title": "心经", "relevance": 2}, {"title": "大乘广五蕴论", "relevance": 1}])
+    m = compute_metrics_graded([("心经", None)], q)
+    assert m["recall@5"] == 1.0          # strict: 1/1 canonical hit
+    # Lenient recall is normalised by the STRICT count: the question needed one
+    # good source and one was found. Dividing by the enlarged gold set instead
+    # would make 宽松 score BELOW 严格 whenever equivalents are added, which
+    # reads as a broken ruler.
+    assert m["lenient_recall@5"] == 1.0
+    assert m["hit@5"] == 1.0
+    assert m["retrieval_type"] == "passage"
+
+
+def test_graded_lenient_credits_an_equivalent_source_strict_rejects():
+    q = _q([{"title": "心经", "relevance": 2}, {"title": "大乘广五蕴论", "relevance": 1}])
+    m = compute_metrics_graded([("大乘广五蕴论", None)], q)
+    assert m["recall@5"] == 0.0          # canonical source missed
+    assert m["lenient_recall@5"] == 1.0  # but the equivalent fully covers it
+    assert m["hit@5"] == 0.0
+    assert m["lenient_hit@5"] == 1.0
+
+
+def test_graded_metrics_none_when_no_gold():
+    m = compute_metrics_graded([("心经", None)], {"id": "oos-001"})
+    assert m["recall@5"] is None
+    assert m["lenient_recall@5"] is None
+    assert m["retrieval_type"] is None
+
+
+# --- aggregate_by_type -----------------------------------------------------
+
+def test_aggregate_by_type_buckets_and_skips_typeless_rows():
+    rows = [
+        {"retrieval_type": "attribution", "recall@5": 1.0, "hit@5": 1.0},
+        {"retrieval_type": "attribution", "recall@5": 0.0, "hit@5": 0.0},
+        {"retrieval_type": "passage", "recall@5": 0.5, "hit@5": 1.0},
+        {"retrieval_type": None, "recall@5": None, "hit@5": None},
+    ]
+    out = aggregate_by_type(rows)
+    assert out["attribution"]["recall@5"] == 0.5
+    assert out["attribution"]["n"] == 2
+    assert out["passage"]["recall@5"] == 0.5
+    assert out["passage"]["n"] == 1
+    assert None not in out and "None" not in out
+
+
+# --- regression gate must also watch the lenient family --------------------
+
+def test_detect_regressions_flags_lenient_drop():
+    regs = detect_regressions({"lenient_recall@5": 0.30}, {"lenient_recall@5": 0.50})
+    assert any("lenient_recall@5" in r for r in regs)
+
+
+# --- advisory: 在范围内但不依赖特定典籍 --------------------------------------
+# "初学佛应该先读哪些经典" has no canonical source. Forcing gold onto it would
+# make the ruler lie again, but leaving it bare would be indistinguishable from
+# a question someone forgot to annotate — so it is declared explicitly.
+
+def test_advisory_is_declared_not_inferred_from_missing_gold():
+    assert retrieval_type({"retrieval_type": "advisory", "id": "prac-011"}) == "advisory"
+    # bare, undeclared, no gold → still None (out-of-scope or not yet annotated)
+    assert retrieval_type({"id": "prac-011"}) is None
+
+
+def test_advisory_questions_carry_no_retrieval_metrics():
+    m = compute_metrics_graded([("心经", None)], {"retrieval_type": "advisory"})
+    assert m["recall@5"] is None
+    assert m["retrieval_type"] == "advisory"
+
+
+def test_aggregate_by_type_keeps_advisory_bucket_countable():
+    out = aggregate_by_type([
+        {"retrieval_type": "advisory", "recall@5": None},
+        {"retrieval_type": "advisory", "recall@5": None},
+    ])
+    assert out["advisory"]["n"] == 2
+    assert "recall@5" not in out["advisory"]     # no numbers to average
+
+
+def test_lenient_recall_is_never_below_strict_recall():
+    # The property that makes the two columns readable side by side. Adding an
+    # 等价来源 must never make the 宽松 number worse than the 严格 one.
+    q = _q([{"title": "心经", "relevance": 2},
+            {"title": "大乘广五蕴论", "relevance": 1},
+            {"title": "阿毘达磨俱舍论", "relevance": 1}])
+    for retrieved in ([("心经", None)], [("大乘广五蕴论", None)], [("楞伽经义疏", 1)]):
+        m = compute_metrics_graded(retrieved, q)
+        assert m["lenient_recall@5"] >= m["recall@5"], retrieved
+
+
+def test_lenient_recall_caps_at_one():
+    q = _q([{"title": "心经", "relevance": 2},
+            {"title": "大乘广五蕴论", "relevance": 1}])
+    m = compute_metrics_graded([("心经", None), ("大乘广五蕴论", None)], q)
+    assert m["lenient_recall@5"] == 1.0

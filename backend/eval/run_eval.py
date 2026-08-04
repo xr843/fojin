@@ -42,9 +42,9 @@ from eval.faithfulness import (
 )
 from eval.retrieval_metrics import (
     aggregate,
-    compute_metrics,
+    aggregate_by_type,
+    compute_metrics_graded,
     detect_regressions,
-    gold_entries,
     sources_to_pairs,
 )
 from eval.scorer import score_out_of_scope, score_with_llm_judge
@@ -116,7 +116,8 @@ async def _prefetch_cited_fascicles(session, answer: str, sources: list):
 
 
 async def run_single_question(
-    question_data: dict, skip_llm: bool = False, temperature: float = 0.7
+    question_data: dict, skip_llm: bool = False, temperature: float = 0.7,
+    test_set_version: str | None = None,
 ) -> dict:
     """Run a single question through the RAG + LLM pipeline and score it."""
     qid = question_data["id"]
@@ -129,6 +130,10 @@ async def run_single_question(
         "category": category,
         "question": question,
         "difficulty": question_data.get("difficulty", "medium"),
+        # Stamped per row (the report JSON is a flat list, so there is no header
+        # to put it in) — lets a later run detect that a stored baseline was
+        # measured with a different ruler. See baseline_version_mismatch.
+        "test_set_version": test_set_version,
     }
 
     # Step 1: RAG retrieval
@@ -140,8 +145,10 @@ async def run_single_question(
     result["context_length"] = len(context_text)
     # Deterministic retrieval metrics (Recall@K/Hit@K/MRR/Precision@K). Needs no
     # LLM, so this is populated even in --no-llm mode.
-    result["retrieval_metrics"] = compute_metrics(
-        sources_to_pairs(sources), gold_entries(question_data)
+    # Strict (relevance>=2) keeps the original key names so stored baselines keep
+    # comparing like for like; the lenient family and retrieval_type ride along.
+    result["retrieval_metrics"] = compute_metrics_graded(
+        sources_to_pairs(sources), question_data
     )
     retrieval_time = time.monotonic() - t0
 
@@ -215,6 +222,49 @@ async def run_single_question(
 def _fmt_rate(value: object) -> str:
     """Percent string for a 0..1 rate, or 'N/A' when the rate is unmeasured."""
     return f"{round(value * 100, 1)}%" if isinstance(value, int | float) else "N/A"
+
+
+_TYPE_NAMES = {
+    "attribution": "归属题（出处/位置，查表问题）",
+    "passage": "段落题（义理/内容，相似度问题）",
+    "unspecified": "⚠️ 未标注题型",
+    "advisory": "无典可依（只评答案质量）",
+}
+
+
+def _retrieval_type_section(results: list[dict]) -> list[str]:
+    """Retrieval metrics split by 归属题 / 段落题.
+
+    The two are answered by different mechanisms — attribution is a lookup,
+    passage is a similarity search — so a single pooled Recall@5 hides which one
+    is failing. Buckets carry their question count so a 10-question bucket isn't
+    read as a stable rate.
+    """
+    by_type = aggregate_by_type([r["retrieval_metrics"] for r in results if r.get("retrieval_metrics")])
+    if not by_type:
+        return []
+    lines = [
+        "", "### 按题型拆分", "",
+        "| 题型 | 题数 | Recall@5 严格 | Recall@5 宽松 | Hit@5 严格 | MRR |",
+        "|------|------|------|------|------|------|",
+    ]
+    for key in ("attribution", "passage", "unspecified", "advisory"):
+        bucket = by_type.get(key)
+        if not bucket:
+            continue
+        if key == "advisory":
+            lines.append(f"| {_TYPE_NAMES[key]} | {bucket['n']} | — | — | — | — |")
+            continue
+        lines.append(
+            f"| {_TYPE_NAMES[key]} | {bucket['n']} "
+            f"| {round(bucket.get('recall@5', 0), 3)} "
+            f"| {round(bucket.get('lenient_recall@5', 0), 3)} "
+            f"| {round(bucket.get('hit@5', 0), 3)} "
+            f"| {round(bucket.get('mrr', 0), 3)} |"
+        )
+    if "unspecified" in by_type:
+        lines += ["", "*⚠️ 有题目未标注 retrieval_type，请补 test_set.json 的 `retrieval_type` 字段。*"]
+    return lines
 
 
 def _faithfulness_section(faith_agg: dict) -> list[str]:
@@ -338,15 +388,27 @@ def generate_report(results: list[dict], tag: str = "") -> str:
         f"| 回答完整性 | {avg(all_scores['answer_completeness'])} | 3 |",
         f"| 无编造 | {avg(all_scores['no_hallucination'])} | 1 |",
         "", "## 检索指标（确定性，对照黄金来源）", "",
-        f"*基于 {graded}/{total} 道有黄金来源标注的题目*", "",
-        "| 指标 | 值 |", "|------|-----|",
-        f"| Recall@1 | {round(retr_agg.get('recall@1', 0), 3)} |",
-        f"| Recall@3 | {round(retr_agg.get('recall@3', 0), 3)} |",
-        f"| Recall@5 | {round(retr_agg.get('recall@5', 0), 3)} |",
-        f"| Hit@5 | {round(retr_agg.get('hit@5', 0), 3)} |",
-        f"| MRR | {round(retr_agg.get('mrr', 0), 3)} |",
-        f"| Precision@5 | {round(retr_agg.get('precision@5', 0), 3)} |",
+        f"*基于 {graded}/{total} 道有黄金来源标注的题目*",
+        "",
+        "*严格 = 只认 relevance≥2 的正解；宽松 = 同时认 relevance=1 的等价可接受来源。"
+        "两者差值就是「检索找到了站得住的出处，只是不是那一部」的量。*",
+        "",
+        "| 指标 | 严格 | 宽松 |", "|------|------|------|",
+        f"| Recall@1 | {round(retr_agg.get('recall@1', 0), 3)} | "
+        f"{round(retr_agg.get('lenient_recall@1', 0), 3)} |",
+        f"| Recall@3 | {round(retr_agg.get('recall@3', 0), 3)} | "
+        f"{round(retr_agg.get('lenient_recall@3', 0), 3)} |",
+        f"| Recall@5 | {round(retr_agg.get('recall@5', 0), 3)} | "
+        f"{round(retr_agg.get('lenient_recall@5', 0), 3)} |",
+        f"| Hit@5 | {round(retr_agg.get('hit@5', 0), 3)} | "
+        f"{round(retr_agg.get('lenient_hit@5', 0), 3)} |",
+        f"| MRR | {round(retr_agg.get('mrr', 0), 3)} | "
+        f"{round(retr_agg.get('lenient_mrr', 0), 3)} |",
+        f"| Precision@5 | {round(retr_agg.get('precision@5', 0), 3)} | "
+        f"{round(retr_agg.get('lenient_precision@5', 0), 3)} |",
     ]
+
+    lines += _retrieval_type_section(results)
 
     lines += _faithfulness_section(faith_agg)
 
@@ -392,11 +454,37 @@ def generate_report(results: list[dict], tag: str = "") -> str:
     return "\n".join(lines)
 
 
+def baseline_version_mismatch(
+    baseline_results: list[dict], current_version: str | None
+) -> str | None:
+    """Message when the baseline was measured with a different test-set version.
+
+    Changing the gold set changes what the numbers MEAN — after the v1.2→v1.3
+    ruler rebuild (11 more graded questions, 112 equivalent sources, some gold
+    re-graded) a v1.2 baseline and a v1.3 run are simply different measurements,
+    and comparing them manufactures phantom regressions. Detected rather than
+    silently tolerated; the caller decides whether to warn or fail.
+    """
+    baseline_versions = {
+        r.get("test_set_version") for r in baseline_results if r.get("test_set_version")
+    }
+    if not baseline_versions:
+        baseline_versions = {"(未标注，v1.2 或更早)"}
+    if current_version and baseline_versions != {current_version}:
+        return (
+            f"baseline 的测试集版本 {sorted(baseline_versions)} 与本次 {current_version} 不一致 —— "
+            "口径已变，指标不可直接对比。请用新版重新生成 baseline："
+            "python -m eval.run_eval --no-llm --tag baseline"
+        )
+    return None
+
+
 def compare_baseline(
     baseline_path: str,
     current_agg: dict,
     current_faith: dict,
     tolerance: float = 0.02,
+    current_version: str | None = None,
 ) -> tuple[list[str], str | None]:
     """Compare this run against a prior raw eval JSON.
 
@@ -405,9 +493,15 @@ def compare_baseline(
     regressions found", which is why the two are separate return values rather
     than an empty list. Extracted from ``main`` so the distinction is testable
     without a corpus DB.
+
+    A test-set version mismatch is reported through ``error`` too: comparing
+    across ruler versions is not a meaningful "no regressions" answer either.
     """
     try:
         baseline_results = json.loads(Path(baseline_path).read_text(encoding="utf-8"))
+        mismatch = baseline_version_mismatch(baseline_results, current_version)
+        if mismatch:
+            return [], mismatch
         baseline_agg = aggregate(
             [r["retrieval_metrics"] for r in baseline_results if r.get("retrieval_metrics")]
         )
@@ -469,7 +563,10 @@ async def main():
     for i, q in enumerate(questions):
         print(f"  [{i+1}/{len(questions)}] {q['id']}: {q['question'][:40]}...", end="", flush=True)
         try:
-            result = await run_single_question(q, skip_llm=args.no_llm, temperature=args.temperature)
+            result = await run_single_question(
+                q, skip_llm=args.no_llm, temperature=args.temperature,
+                test_set_version=test_set.get("version"),
+            )
             results.append(result)
             score = result["scores"]
             t = result["timing"]["total_s"]
@@ -524,7 +621,8 @@ async def main():
 
     if args.baseline:
         regressions, error = compare_baseline(
-            args.baseline, current_agg, current_faith, args.regression_tolerance
+            args.baseline, current_agg, current_faith, args.regression_tolerance,
+            current_version=test_set.get("version"),
         )
         print(f"\n{'='*60}\n回归检查（对照 {args.baseline}）：")
         if error is not None:
