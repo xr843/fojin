@@ -12,6 +12,7 @@ The gate command and Telegram endpoint are injected via env so this runs in CI
 with no docker and no network — only the wrapper's own control flow is exercised.
 """
 
+import json
 import os
 import subprocess
 from pathlib import Path
@@ -124,3 +125,64 @@ def test_readable_baseline_compares_cleanly(tmp_path):
     regressions, error = compare_baseline(str(good), current_agg={}, current_faith={})
     assert error is None
     assert regressions == []
+
+
+# --- test-set version guard ------------------------------------------------
+# Changing the gold set changes what the numbers MEAN. Comparing a v1.3 run
+# against a v1.2 baseline manufactures phantom regressions (or hides real ones),
+# so a version mismatch must surface as an error, not as a clean comparison.
+
+def test_baseline_from_an_older_ruler_is_an_error_not_a_clean_pass(tmp_path):
+    from eval.run_eval import compare_baseline
+
+    old = tmp_path / "baseline-v12.json"
+    old.write_text(json.dumps([
+        {"id": "term-001", "test_set_version": "1.2",
+         "retrieval_metrics": {"recall@5": 0.9, "hit@5": 1.0}},
+    ]), encoding="utf-8")
+
+    regressions, error = compare_baseline(
+        str(old), current_agg={"recall@5": 0.2}, current_faith={}, current_version="1.3"
+    )
+    assert regressions == []
+    assert error is not None and "1.2" in error and "1.3" in error
+
+
+def test_unstamped_baseline_is_treated_as_older_ruler(tmp_path):
+    from eval.run_eval import compare_baseline
+
+    legacy = tmp_path / "baseline-legacy.json"
+    legacy.write_text(json.dumps([
+        {"id": "term-001", "retrieval_metrics": {"recall@5": 0.9}},
+    ]), encoding="utf-8")
+
+    _, error = compare_baseline(
+        str(legacy), current_agg={"recall@5": 0.2}, current_faith={}, current_version="1.3"
+    )
+    assert error is not None
+
+
+def test_same_version_baseline_still_compares(tmp_path):
+    from eval.run_eval import compare_baseline
+
+    same = tmp_path / "baseline-v13.json"
+    same.write_text(json.dumps([
+        {"id": "term-001", "test_set_version": "1.3",
+         "retrieval_metrics": {"recall@5": 0.50}},
+    ]), encoding="utf-8")
+
+    regressions, error = compare_baseline(
+        str(same), current_agg={"recall@5": 0.20}, current_faith={}, current_version="1.3"
+    )
+    assert error is None
+    assert any("recall@5" in r for r in regressions)
+
+
+def test_version_check_is_skipped_when_caller_passes_no_version(tmp_path):
+    # Back-compat: existing callers/tests that omit current_version keep working.
+    from eval.run_eval import compare_baseline
+
+    b = tmp_path / "b.json"
+    b.write_text(json.dumps([{"id": "x", "retrieval_metrics": {"recall@5": 0.5}}]), encoding="utf-8")
+    _, error = compare_baseline(str(b), current_agg={"recall@5": 0.5}, current_faith={})
+    assert error is None

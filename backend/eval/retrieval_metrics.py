@@ -32,8 +32,38 @@ DEFAULT_RELEVANCE = 2
 DEFAULT_KS = (1, 3, 5)
 DEFAULT_TOLERANCE = 0.02
 
+# Relevance grading of a gold entry:
+#   2 = 正解 — the canonical source the answer is expected to cite
+#   1 = 等价可接受来源 — an equally defensible alternative (e.g. 大乘廣五蘊論
+#       answers 五蕴 as well as the 心經 does). Counted by the lenient family
+#       only, so "the retriever found a good source, just not THE one" stops
+#       reading as a miss.
+STRICT_RELEVANCE = 2
+LENIENT_RELEVANCE = 1
+
+# The two questions a retriever answers by different mechanisms:
+#   attribution — "「色不异空」出自哪部经" : the source identity IS the answer.
+#                 A lookup problem; similarity search structurally under-serves it.
+#   passage     — "什么是中道"           : any doctrinally sound passage works.
+#                 A similarity problem, which is what dense retrieval is for.
+# Aggregating them together hides which mechanism is failing, so they are
+# bucketed apart. A gold-bearing question with no annotation is UNSPECIFIED —
+# deliberately not folded into "passage", so the gap stays visible in the report.
+# A third case that is neither: in-scope questions with no canonical source at
+# all ("初学佛应该先读哪些经典"). Forcing gold onto them would make the ruler lie;
+# leaving them bare would be indistinguishable from a question someone forgot to
+# annotate — so ADVISORY is declared explicitly and scored on answer quality only.
+ATTRIBUTION = "attribution"
+PASSAGE = "passage"
+ADVISORY = "advisory"
+UNSPECIFIED = "unspecified"
+_VALID_TYPES = (ATTRIBUTION, PASSAGE)
+
 # detect_regressions only cares about quality metrics, not bookkeeping counts.
-_METRIC_PREFIXES = ("recall@", "hit@", "precision@", "mrr")
+# "lenient_" covers the graded family; the lenient gold COUNT is deliberately
+# named `num_gold_lenient` so it does not match and get gated as if it were a
+# quality metric.
+_METRIC_PREFIXES = ("recall@", "hit@", "precision@", "mrr", "lenient_")
 
 
 def normalize_title(title: str) -> str:
@@ -46,8 +76,14 @@ def normalize_title(title: str) -> str:
     return s.casefold()
 
 
-def gold_entries(question: dict) -> list[dict]:
-    """Normalize a question's gold set to ``[{title, juan, relevance}]``."""
+def gold_entries(question: dict, min_relevance: int = 0) -> list[dict]:
+    """Normalize a question's gold set to ``[{title, juan, relevance}]``.
+
+    ``min_relevance`` filters the result to entries graded at least that high;
+    the default of 0 keeps every entry, so existing callers are unaffected.
+    Title-level ``reference_sources`` carry ``DEFAULT_RELEVANCE`` (2), so a
+    corpus annotated only that way scores identically under strict and lenient.
+    """
     structured = question.get("gold_sources")
     if structured:
         out = []
@@ -55,18 +91,31 @@ def gold_entries(question: dict) -> list[dict]:
             title = normalize_title(g.get("title", ""))
             if not title:
                 continue
-            out.append({
-                "title": title,
-                "juan": g.get("juan"),
-                "relevance": g.get("relevance", DEFAULT_RELEVANCE),
-            })
+            relevance = g.get("relevance", DEFAULT_RELEVANCE)
+            if relevance < min_relevance:
+                continue
+            out.append({"title": title, "juan": g.get("juan"), "relevance": relevance})
         return out
 
     return [
         {"title": normalize_title(t), "juan": None, "relevance": DEFAULT_RELEVANCE}
         for t in question.get("reference_sources", [])
-        if normalize_title(t)
+        if normalize_title(t) and min_relevance <= DEFAULT_RELEVANCE
     ]
+
+
+def retrieval_type(question: dict) -> str | None:
+    """Which retrieval mechanism this question exercises, or None if it has no gold.
+
+    Out-of-scope questions (no gold at all) belong in neither bucket — they are
+    scored on refusal behaviour, not retrieval.
+    """
+    declared = question.get("retrieval_type")
+    if declared == ADVISORY:
+        return ADVISORY
+    if not gold_entries(question):
+        return None
+    return declared if declared in _VALID_TYPES else UNSPECIFIED
 
 
 def source_matches_gold(src_title: str, src_juan: int | None, gold: dict) -> bool:
@@ -139,6 +188,51 @@ def compute_metrics(
         out[f"precision@{k}"] = precision_at_k(retrieved, gold, k) if has_gold else None
     out["mrr"] = mrr(retrieved, gold) if has_gold else None
     return out
+
+
+def compute_metrics_graded(
+    retrieved: list[tuple], question: dict, ks: tuple[int, ...] = DEFAULT_KS
+) -> dict:
+    """Strict + lenient retrieval metrics for one question, in one row.
+
+    Strict metrics keep the ORIGINAL key names (``recall@5``, ``hit@5``, …) and
+    the original meaning — only ``relevance >= 2`` gold counts — so every stored
+    baseline keeps comparing like for like. The lenient family, which also
+    credits ``relevance == 1`` equivalents, is added under a ``lenient_`` prefix.
+
+    Also stamps ``retrieval_type`` so :func:`aggregate_by_type` can report
+    归属题 and 段落题 apart.
+    """
+    strict = gold_entries(question, min_relevance=STRICT_RELEVANCE)
+    lenient = gold_entries(question, min_relevance=LENIENT_RELEVANCE)
+
+    out = compute_metrics(retrieved, strict, ks)
+    lenient_metrics = compute_metrics(retrieved, lenient, ks)
+    for key, value in lenient_metrics.items():
+        if key == "num_gold":
+            # Named so it does NOT match _METRIC_PREFIXES — a change in how many
+            # gold entries exist is bookkeeping, not a quality regression.
+            out["num_gold_lenient"] = value
+        elif key != "num_retrieved":
+            out[f"lenient_{key}"] = value
+    out["retrieval_type"] = retrieval_type(question)
+    return out
+
+
+def aggregate_by_type(rows: list[dict]) -> dict[str, dict]:
+    """Group metric rows by ``retrieval_type`` and aggregate each bucket.
+
+    Rows without a type (out-of-scope questions) are dropped rather than pooled
+    into a bucket they don't belong to. Each bucket carries ``n``, its question
+    count, so a 3-question bucket isn't read as a stable rate.
+    """
+    buckets: dict[str, list[dict]] = {}
+    for row in rows:
+        rtype = row.get("retrieval_type")
+        if not rtype:
+            continue
+        buckets.setdefault(rtype, []).append(row)
+    return {rtype: {**aggregate(rs), "n": len(rs)} for rtype, rs in buckets.items()}
 
 
 def aggregate(rows: list[dict]) -> dict:
