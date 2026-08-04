@@ -19,14 +19,48 @@
   unicode-range: U+0000-00FF;
 }
 
-/* Subset: only 佛津 (4KB) — preloaded in index.html for instant title render.
-   Covers U+4F5B/U+6D25, which the full face above deliberately excludes, so
-   Chinese pages draw the brand from this tiny file alone. */
+/* Subset (3.1KB) — preloaded in index.html for instant title render. It carries
+   the brand 佛津 plus the Chinese glyphs of the /chat hero title
+   「小津 AI 佛典问答」: U+4F5B U+5178 U+5C0F U+6D25 U+7B54 U+95EE.
+   Deliberately NO Latin: the brush face's「AI」is a cursive squiggle that reads
+   like 刈 at title size (compared side by side in the browser), and leaving A/I
+   out is what makes those two letters fall through to Noto Serif SC — a
+   CSS-only fix that needs no <span> around「AI」in the JSX.
+   As the brand face it is pinned to U+4F5B/U+6D25, which the full face above
+   deliberately excludes, so Chinese pages draw the brand from this tiny file
+   alone.
+   The `-v2` in the filename is a cache buster, not decoration: public/ is copied
+   verbatim by vite (no content hash) and Cloudflare caches .woff2 at the edge and
+   keeps serving it across a deploy. Reusing the old name after re-subsetting
+   would leave visitors on the old 佛津-only file — the hero title would come out
+   half brush, half serif until the edge expired. Bump the suffix whenever the
+   glyph set changes. */
 @font-face {
   font-family: 'Ma Shan Zheng';
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url('/fonts/MaShanZheng-title.woff2') format('woff2');
+  src: url('/fonts/MaShanZheng-title-v2.woff2') format('woff2');
   unicode-range: U+4F5B, U+6D25;
+}
+
+/* Same file, second family name — for the /chat hero title, which needs the
+   brush face for 小典问答 as well as 佛津.
+   Why a separate family instead of widening the brand face's unicode-range: the
+   brand face must stay pinned to U+4F5B/U+6D25 so the homepage 佛津 keeps
+   selecting it, and a second face of the same family with a wider range would
+   put the two in competition — the comment above records that ordering alone
+   was NOT enough to keep the 3.2MB file from downloading, so overlapping ranges
+   inside one family are not something to trust here. A distinct family cannot
+   collide by construction. Same URL, so no extra request — already preloaded.
+   No unicode-range on purpose: the browser falls back per glyph on anything the
+   file does not actually contain — the Latin「AI」(left out deliberately) and
+   the zh-Hant 問, which Ma Shan Zheng, a GB2312-scope typeface, has no glyph
+   for at all. */
+@font-face {
+  font-family: 'Ma Shan Zheng Title';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/MaShanZheng-title-v2.woff2') format('woff2');
 }
