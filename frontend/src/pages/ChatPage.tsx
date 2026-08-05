@@ -636,7 +636,20 @@ export default function ChatPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { t, i18n } = useTranslation();
   const { user } = useAuthStore();
-  const [input, setInput] = useState("");
+  // 不带 context 的 ?q= 是这个输入框的**初值**，不是一次副作用。
+  //
+  // 在此之前它被彻底丢掉：下面那个 effect 的守卫是
+  // `if (!q || !context) return`，于是辞典那颗「问小津」按钮
+  // （navigate(`/chat?q=因果`)）送来的词一个都没到过对话框 —— 用户点完只看见
+  // 一个空白的 /chat，没有报错、没有日志、没有埋点。30 天里 dictionary→chat
+  // 只有 71 次跳转，落地即失望。
+  //
+  // 只填不发是有意的：来的是一个词头而不是一句问题，用户多半要再改一笔；而且
+  // 这种 URL 会被收藏、被分享，自动发送等于每打开一次就烧一次配额。
+  // 也因此 ?q= 不必从地址栏抹掉 —— 它已经被消费成初值，留着还能让链接可复现。
+  const [input, setInput] = useState(
+    () => (searchParams.get("context") ? "" : searchParams.get("q")) ?? "",
+  );
   const [masterId, setMasterId] = useState<string | null>(null);
   // 祖师长廊: opened from .chat-lineage-btn in the composer toolbar — the sole
   // entry point, in every state (empty and mid-thread alike).
@@ -1312,13 +1325,24 @@ export default function ChatPage() {
           if (user) refetchSessions();
         }
       },
-      onError: (errMsg: string) => {
+      onError: (errMsg: string, code?: string) => {
         sawError = true;
         // mid_stream 与 no_token 必须分开：后者前端已能自愈（转失败哨兵 + 给出
         // 重试按钮），前者留下的是一段看似完整的半截答案 —— 没有失败标记、没有
         // 重试按钮，而分享/复制照常可用。分开记才知道真正要修的那部分占多少。
-        if (typeof umami !== "undefined") {
-          umami.track("chat_stream_error", { stage: tokenCount > 0 ? "mid_stream" : "no_token" });
+        //
+        // 但 stage 只说了「什么时候断的」，没说「为什么断」，而两者的处置完全
+        // 不同：配额用完是产品决策，上游超时是运维，空回复是模型选型。带上后端
+        // 的 code 才分得开。
+        //
+        // 「用户按了停止」必须排除：abort 走的也是 onError，而推理模型要等
+        // 24-180 秒才吐第一个字（生产日志实测最长 182.95s），等不及手动停止
+        // 正是最典型的动作 —— 记进去就是把用户的不耐烦算成系统故障。
+        if (typeof umami !== "undefined" && code !== "cancelled") {
+          umami.track("chat_stream_error", {
+            stage: tokenCount > 0 ? "mid_stream" : "no_token",
+            reason: code ?? "unknown",
+          });
         }
         message.error(errMsg);
         setMessages((prev) =>
@@ -1338,7 +1362,7 @@ export default function ChatPage() {
         // 下面那段兜底会把气泡转成失败哨兵，但服务端不会为此留下任何痕迹，
         // 所以这里单独记一档。sawError 拦住重复计数。
         if (!sawError && tokenCount === 0 && typeof umami !== "undefined") {
-          umami.track("chat_stream_error", { stage: "empty_done" });
+          umami.track("chat_stream_error", { stage: "empty_done", reason: "silent_done" });
         }
         // Empty completion: the stream ended without ever delivering a token
         // (and without an error frame — e.g. a bare `done`). If the bubble is
@@ -1480,6 +1504,9 @@ export default function ChatPage() {
     const q = searchParams.get("q");
     const context = searchParams.get("context");
     const source = searchParams.get("source");
+    // 这里只管「带 context 的自动发送」。不带 context 的 ?q= 由上面 input 的
+    // useState 初值消费 —— 别把这个守卫拆成两个 return 去在这儿 setInput：
+    // react-hooks/set-state-in-effect 会红（实测），而且那本来就多绕一帧。
     if (!q || !context || autoSentRef.current) return;
 
     autoSentRef.current = true;
