@@ -151,6 +151,8 @@ const CONTAINED_BY = 16; // Node.DOCUMENT_POSITION_CONTAINED_BY
 describe("ChatPage 首屏结构", () => {
   it("空状态渲染出标题与建议卡片（脚手架自检）", async () => {
     const { container } = await renderEmpty();
+    // 半角空格是对的：getByText 默认 normalizer 把连续空白折叠成一个普通空格，
+    // 而文案里那个是全角 U+3000。盯住码位的是「全角空格」那条专门的断言。
     expect(screen.getByText("小津 佛典问答")).toBeInTheDocument();
     expect(container.querySelector(".chat-input-shell")).not.toBeNull();
   });
@@ -964,7 +966,7 @@ describe("空状态副标题", () => {
     await renderEmpty();
     // 两行原本同处一个 <div>、由 <br> 分隔，getByText 匹配不到单独的文本节点，
     // 所以对整块 hero 的 textContent 断言。
-    const hero = screen.getByText("小津 佛典问答").parentElement!;
+    const hero = screen.getByText("小津 佛典问答").parentElement!;  // 同上：normalizer 折叠了 U+3000
 
     // 差异点声明必须在：整个首屏只有这一处告诉用户答案可以被核对，
     // 而且措辞是「你可以核对」而非「我保证正确」—— 不能悄悄丢掉。
@@ -986,7 +988,7 @@ describe("空状态标题", () => {
     const { container } = await renderEmpty();
     const title = container.querySelector(".chat-hero-title");
     expect(title).not.toBeNull();
-    expect(title!.textContent).toBe("小津 佛典问答");
+    expect(title!.textContent).toBe("小津　佛典问答");
 
     const css = readFileSync(resolve(__dirname, "../styles/global.css"), "utf-8");
     const rule = css.match(/\.chat-hero-title\s*\{([^}]*)\}/)?.[1] ?? "";
@@ -1014,20 +1016,59 @@ describe("空状态标题", () => {
     expect(Number(rule!.match(/font-weight:\s*(\d+)/)?.[1])).toBeLessThan(600);
     expect(rule!).not.toMatch(/color:/);
 
-    // 字号上限：这行字整体宽约 6.6×字号（生产实测 38px → 252px），而最窄的
-    // 320px 屏减去左右留白只有 288px 可用 —— 288/6.6 ≈ 43。超过就在窄屏换行，
-    // 而这条规则**没有任何 @media 覆盖**（全宽度共用一个值），所以再放大必须
-    // 同时加断点。桌面上调大很容易，窄屏换行却要真去 320px 下看才发现。
-    const px = Number(rule!.match(/font-size:\s*(\d+)px/)?.[1]);
-    expect(px, "毛笔标题必须写明 font-size").toBeGreaterThan(0);
-    const mediaOverride = /@media[^{]*\{[^@]*\.chat-hero-title:lang\(zh\)/.test(css);
-    if (!mediaOverride) {
+    // 窄屏不换行：字号必须写成 clamp，且它在真机上算出来的行宽要塞得进可用宽。
+    //
+    // 三个常数都是量出来的，不是估的：
+    //  · K = 7.4 —— 「小津 + U+3000 + 佛典问答」整行宽 ÷ 字号，生产浏览器实测
+    //    38px → 280px。半角空格时是 6.6，换了空格就变了，所以下面还要盯码位。
+    //  · CHROME = 68 —— 移动端 .layout-content-inner 的 20px，加 ChatPage 里 hero
+    //    外层那个内联 padding: 0 24px 的 48px。两者都不随视口变。
+    //  · VIEWPORTS —— Umami 90 天里真实出现过的屏宽，289 是最窄的一台。
+    //
+    // 为什么非要这条：定值 38px + 全角空格 = 280px，而 320px 屏只有 252px 可用
+    // （97 个真实会话），289px 屏只有 221px。桌面上把字号调大是一眼可见的收益，
+    // 窄屏换行却要真去那个宽度下看才发现 —— 没人会去。
+    const K = 7.4;
+    const CHROME = 68;
+    const VIEWPORTS = [289, 292, 303, 320, 360, 390, 414, 768, 1920];
+
+    const clamp = rule!.match(
+      /font-size:\s*clamp\(\s*([\d.]+)px\s*,\s*([\d.]+)vw\s*,\s*([\d.]+)px\s*\)/,
+    );
+    expect(
+      clamp,
+      "毛笔标题的 font-size 必须是 clamp(下限px, N vw, 上限px)：定值在最窄的真机上会换行",
+    ).not.toBeNull();
+    const [floor, vwCoef, ceil] = clamp!.slice(1).map(Number);
+
+    for (const vw of VIEWPORTS) {
+      const fs = Math.min(Math.max(floor, (vwCoef * vw) / 100), ceil);
+      const lineW = K * fs;
       expect(
-        px,
-        `${px}px × 6.6 ≈ ${Math.round(px * 6.6)}px，超过 320px 窄屏可用的 288px 就会换行；` +
-          "要再放大请同时给 .chat-hero-title:lang(zh) 加一条 @media (max-width: 768px) 覆盖",
-      ).toBeLessThanOrEqual(43);
+        lineW,
+        `${vw}px 屏：字号算出 ${fs.toFixed(1)}px → 行宽 ${lineW.toFixed(0)}px，` +
+          `超过可用的 ${vw - CHROME}px 就会换行（clamp ${floor}/${vwCoef}vw/${ceil}）`,
+      ).toBeLessThanOrEqual(vw - CHROME);
     }
+  });
+
+  it("「津」「佛」之间是全角空格 U+3000，不是普通空格", () => {
+    // 用户要的是「正好一个字的距离」。半角空格在这支字体下只有 9.7px，不到一个字
+    // （38px）的三分之一；全角空格正好一个字宽。它是个看不见的字符 —— 谁在编辑
+    // 这句文案时顺手敲成普通空格，间距会悄悄缩回去而没有任何报错。
+    const zh = JSON.parse(
+      readFileSync(resolve(__dirname, "../../public/locales/zh/translation.json"), "utf-8"),
+    );
+    const title = zh["chat.title"] as string;
+    const codes = [...title].map((c) => c.codePointAt(0)!);
+    expect(
+      codes.includes(0x3000),
+      `chat.title 里必须有全角空格 U+3000，实际码位：${codes.map((c) => "U+" + c.toString(16).toUpperCase()).join(" ")}`,
+    ).toBe(true);
+    expect(codes.includes(0x20), "不该同时留着半角空格（U+0020）").toBe(false);
+    // 上面那条 clamp 断言里的 K=7.4 是按「6 个汉字 + 1 个全角空格」量出来的。
+    // 字数一变，K 就不再成立，所以在这里钉住长度。
+    expect(title, "标题长度变了就要重新量 K（见上一条断言）").toHaveLength(7);
   });
 
   // 这行标题不含拉丁字母是刻意的。原文案「小津 AI 佛典问答」试过三种安置那两个
