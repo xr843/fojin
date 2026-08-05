@@ -1014,20 +1014,71 @@ describe("空状态标题", () => {
     expect(Number(rule!.match(/font-weight:\s*(\d+)/)?.[1])).toBeLessThan(600);
     expect(rule!).not.toMatch(/color:/);
 
-    // 字号上限：这行字整体宽约 6.6×字号（生产实测 38px → 252px），而最窄的
-    // 320px 屏减去左右留白只有 288px 可用 —— 288/6.6 ≈ 43。超过就在窄屏换行，
-    // 而这条规则**没有任何 @media 覆盖**（全宽度共用一个值），所以再放大必须
-    // 同时加断点。桌面上调大很容易，窄屏换行却要真去 320px 下看才发现。
-    const px = Number(rule!.match(/font-size:\s*(\d+)px/)?.[1]);
-    expect(px, "毛笔标题必须写明 font-size").toBeGreaterThan(0);
-    const mediaOverride = /@media[^{]*\{[^@]*\.chat-hero-title:lang\(zh\)/.test(css);
-    if (!mediaOverride) {
+    // 窄屏不换行：字号必须写成 clamp，且它在真机上算出来的行宽要塞得进可用宽。
+    //
+    // 三个常数都是量出来的，不是估的：
+    //  · K = 7.2 —— 整行宽 ÷ 字号，生产浏览器实测：38px → 266.9px（比值 7.03），
+    //    28px → 200.4px（7.16，比例略高是因为 letter-spacing 固定 2px 不随字号缩）。
+    //    取两者里的大头再留余量。间距或字数一改，K 就要重新量 —— 下面那条断言
+    //    钉住了这两个前提。
+    //  · CHROME = 68 —— 移动端 .layout-content-inner 的 20px，加 ChatPage 里 hero
+    //    外层那个内联 padding: 0 24px 的 48px。两者都不随视口变。
+    //  · VIEWPORTS —— Umami 90 天里真实出现过的屏宽，289 是最窄的一台。
+    //
+    // 为什么非要这条：320px 屏只有 252px 可用（97 个真实会话），289px 屏只有
+    // 221px。桌面上把字号或间距调大是一眼可见的收益，窄屏换行却要真去那个宽度
+    // 下看才发现 —— 没人会去。
+    const K = 7.2;
+    const CHROME = 68;
+    const VIEWPORTS = [289, 292, 303, 320, 360, 390, 414, 768, 1920];
+
+    const clamp = rule!.match(
+      /font-size:\s*clamp\(\s*([\d.]+)px\s*,\s*([\d.]+)vw\s*,\s*([\d.]+)px\s*\)/,
+    );
+    expect(
+      clamp,
+      "毛笔标题的 font-size 必须是 clamp(下限px, N vw, 上限px)：定值在最窄的真机上会换行",
+    ).not.toBeNull();
+    const [floor, vwCoef, ceil] = clamp!.slice(1).map(Number);
+
+    for (const vw of VIEWPORTS) {
+      const fs = Math.min(Math.max(floor, (vwCoef * vw) / 100), ceil);
+      const lineW = K * fs;
       expect(
-        px,
-        `${px}px × 6.6 ≈ ${Math.round(px * 6.6)}px，超过 320px 窄屏可用的 288px 就会换行；` +
-          "要再放大请同时给 .chat-hero-title:lang(zh) 加一条 @media (max-width: 768px) 覆盖",
-      ).toBeLessThanOrEqual(43);
+        lineW,
+        `${vw}px 屏：字号算出 ${fs.toFixed(1)}px → 行宽 ${lineW.toFixed(0)}px，` +
+          `超过可用的 ${vw - CHROME}px 就会换行（clamp ${floor}/${vwCoef}vw/${ceil}）`,
+      ).toBeLessThanOrEqual(vw - CHROME);
     }
+  });
+
+  it("「津」「佛」之间的空当由 word-spacing 管，且单位是 em", () => {
+    const css = readFileSync(resolve(__dirname, "../styles/global.css"), "utf-8");
+    const rule = css.match(
+      /\.chat-hero-title:lang\(zh\):not\(:lang\(zh-Hant\)\)\s*\{([^}]*)\}/,
+    )?.[1];
+    const ws = rule!.match(/word-spacing:\s*([\d.]+)(em|px|rem)/);
+    expect(
+      ws,
+      "这行标题的字间空当是刻意调过的（半角空格只有 9.7px 太挤），必须显式写 word-spacing",
+    ).not.toBeNull();
+    // px 会在 clamp 的小字号那一档显得过宽 —— 字号缩了间距不缩。
+    expect(ws![2], "word-spacing 必须用 em，跟着 clamp 的字号一起缩").toBe("em");
+
+    const zh = JSON.parse(
+      readFileSync(resolve(__dirname, "../../public/locales/zh/translation.json"), "utf-8"),
+    );
+    const title = zh["chat.title"] as string;
+    // 必须是普通半角空格。曾经改成过全角 U+3000（正好一个字宽），但那条路是死的：
+    // word-spacing 对它完全无效（0em 与 0.5em 实测都是 40px），因为按 CSS Text
+    // 规范 U+3000 不是 word-separator —— 想再调细一点都做不到。
+    expect(
+      [...title].map((c) => c.codePointAt(0)!),
+      `chat.title 的分隔符必须是普通空格 U+0020，否则 word-spacing 会静默失效。实际：${[...title].map((c) => "U+" + c.codePointAt(0)!.toString(16).toUpperCase()).join(" ")}`,
+    ).toContain(0x20);
+    // 上面那条 clamp 断言里的 K 是按「6 个汉字 + 1 个空格」量出来的，字数一变就
+    // 不再成立。
+    expect(title, "标题长度变了就要重新量 K（见上一条断言）").toHaveLength(7);
   });
 
   // 这行标题不含拉丁字母是刻意的。原文案「小津 AI 佛典问答」试过三种安置那两个
