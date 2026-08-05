@@ -54,13 +54,35 @@
    inside one family are not something to trust here. A distinct family cannot
    collide by construction. Same URL, so no extra request — already preloaded.
    No unicode-range on purpose: the browser falls back per glyph on anything the
-   file does not actually contain — the Latin「AI」(left out deliberately) and
-   the zh-Hant 問, which Ma Shan Zheng, a GB2312-scope typeface, has no glyph
-   for at all. */
+   file does not actually contain — the Latin「AI」(left out deliberately, see
+   'WenKai Latin' below) and the zh-Hant 問, which Ma Shan Zheng, a GB2312-scope
+   typeface, has no glyph for at all. */
 @font-face {
   font-family: 'Ma Shan Zheng Title';
   font-style: normal;
   font-weight: 400;
   font-display: swap;
   src: url('/fonts/MaShanZheng-title-v2.woff2') format('woff2');
+}
+
+/* LXGW WenKai TC (霞鹜文楷, OFL-1.1) — 888 bytes, exactly three glyphs:
+   space, A, I. It exists for one reason: the「AI」in the /chat hero title.
+   Neither of the fonts above can draw those two letters acceptably. Ma Shan
+   Zheng's Latin is running-script — at title size "AI" reads as 刈. Noto Serif
+   SC's is a slab-serif Latin that sits in a brush line like a different sign
+   bolted on (the user flagged exactly this). WenKai's Latin is drawn with the
+   same brush logic and matches the stroke weight of the Chinese beside it;
+   six candidates were rendered side by side in the browser before picking it.
+   Sits BETWEEN the brush face and Noto Serif SC in .chat-hero-title's stack —
+   order is load-bearing, see global.css.
+   Only A and I are in the file, so if that title's copy ever grows other Latin,
+   the new letters will silently drop to Noto Serif SC and the mismatch is back.
+   ChatPage.test.tsx locks the copy against this file's coverage — when it goes
+   red, re-cut the subset (and bump -v1) rather than deleting the assertion. */
+@font-face {
+  font-family: 'WenKai Latin';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/LXGWWenKai-ai-v1.woff2') format('woff2');
 }

@@ -967,6 +967,33 @@ describe("空状态标题", () => {
     expect(Number(rule!.match(/font-weight:\s*(\d+)/)?.[1])).toBeLessThan(600);
     expect(rule!).not.toMatch(/color:/);
   });
+
+  // 「AI」这两个字母哪支字体都得单独交代：毛笔体的拉丁是行书连笔，读作「刈」；
+  // Noto Serif SC 的粗衬线字母插在毛笔行里像另换了块招牌（这一版真上过线，
+  // 用户一眼看出不对）。最终配的是霞鹜文楷，只切了 space/A/I 三个字形。
+  it("「AI」由 WenKai Latin 接住，且标题文案不许出现它没有的拉丁字母", () => {
+    const css = readFileSync(resolve(__dirname, "../styles/global.css"), "utf-8");
+    const rule =
+      css.match(/\.chat-hero-title:lang\(zh\):not\(:lang\(zh-Hant\)\)\s*\{([^}]*)\}/)?.[1] ?? "";
+    // 顺序是承重的：毛笔（只有汉字）→ 文楷（只有 A/I/空格）→ Noto 兜底。
+    // 把文楷提到毛笔前面，汉字就会被文楷抢走，整行不再是「佛津」那支。
+    expect(rule).toMatch(
+      /font-family:\s*"Ma Shan Zheng Title",\s*"WenKai Latin",\s*"Noto Serif SC"/,
+    );
+
+    // 子集里只有 A 和 I。标题文案哪天多出别的拉丁字母，那些字母会静默掉回
+    // Noto Serif SC —— 用户指出的那种拼接感就又回来了，而且没人会察觉。
+    const zh = JSON.parse(
+      readFileSync(resolve(__dirname, "../../public/locales/zh/translation.json"), "utf-8"),
+    );
+    const stray = [...(zh["chat.title"] as string)].filter(
+      (c) => /[!-~]/.test(c) && !"AI".includes(c),
+    );
+    expect(
+      stray,
+      `LXGWWenKai-ai-v1.woff2 只含 A/I，标题里这些拉丁字符会掉回 Noto Serif SC：${stray.join("")}`,
+    ).toEqual([]);
+  });
 });
 
 // 用户实测（2026-08-04）：1.3MB 的 Word 上传，界面只说「上传失败，请稍后重试」。
