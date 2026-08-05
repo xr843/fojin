@@ -1013,6 +1013,21 @@ describe("空状态标题", () => {
     expect(rule!).toMatch(/font-family:\s*"Ma Shan Zheng Title"/);
     expect(Number(rule!.match(/font-weight:\s*(\d+)/)?.[1])).toBeLessThan(600);
     expect(rule!).not.toMatch(/color:/);
+
+    // 字号上限：这行字整体宽约 6.6×字号（生产实测 38px → 252px），而最窄的
+    // 320px 屏减去左右留白只有 288px 可用 —— 288/6.6 ≈ 43。超过就在窄屏换行，
+    // 而这条规则**没有任何 @media 覆盖**（全宽度共用一个值），所以再放大必须
+    // 同时加断点。桌面上调大很容易，窄屏换行却要真去 320px 下看才发现。
+    const px = Number(rule!.match(/font-size:\s*(\d+)px/)?.[1]);
+    expect(px, "毛笔标题必须写明 font-size").toBeGreaterThan(0);
+    const mediaOverride = /@media[^{]*\{[^@]*\.chat-hero-title:lang\(zh\)/.test(css);
+    if (!mediaOverride) {
+      expect(
+        px,
+        `${px}px × 6.6 ≈ ${Math.round(px * 6.6)}px，超过 320px 窄屏可用的 288px 就会换行；` +
+          "要再放大请同时给 .chat-hero-title:lang(zh) 加一条 @media (max-width: 768px) 覆盖",
+      ).toBeLessThanOrEqual(43);
+    }
   });
 
   // 这行标题不含拉丁字母是刻意的。原文案「小津 AI 佛典问答」试过三种安置那两个
