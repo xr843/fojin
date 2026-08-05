@@ -305,9 +305,12 @@ em {
 
 /* 简体中文下换成品牌那支毛笔体（Ma Shan Zheng），与首页 88px 的「佛津」、页眉
    品牌同一支；颜色仍是上面那支朱砂 --fj-cinnabar，不动。
-   ——「AI」两个字母不在子集里（见 fonts.css），会自己掉回 Noto Serif SC。
-     这是有意的：毛笔体的拉丁是行书连笔，"AI" 在标题尺度上读起来像「刈」，
-     浏览器里两版并排比过。汉字走毛笔、拉丁缩写走衬线，本来也是中文排版常态。
+   ——「AI」两个字母不在毛笔子集里（见 fonts.css），由中间那支 WenKai Latin
+     （霞鹜文楷）接住。字体栈的顺序是承重的：毛笔体只有汉字 → 文楷只有 A/I/空格
+     → Noto Serif SC 兜底。把文楷排到毛笔前面，汉字就会被文楷抢走。
+     为什么不用毛笔自带的拉丁：那是行书连笔，"AI" 在标题尺度上读起来像「刈」。
+     为什么不留给 Noto Serif SC：粗衬线的方正字母插在毛笔行里像另换了块招牌
+     —— 这一版曾经上线，用户一眼就看出不对。六个候选在浏览器里并排比过。
    —— font-weight 回到 400：Ma Shan Zheng 只有一档字重，写 700 会触发合成粗体，
      把毛笔的提按笔锋涂糊（上面那段讲 Noto Serif SC 自带 700 的话只对基础规则
      成立，换了字体就不成立了）。粗细由字形自带。
@@ -318,7 +321,7 @@ em {
      問答」会只有「問」一个字掉回衬线，夹在毛笔字中间像渲染坏了；整行保持衬线
      反而干净。拉丁「AI」换字体读作有意为之，同一种文字里换一个字不会。 */
 .chat-hero-title:lang(zh):not(:lang(zh-Hant)) {
-  font-family: "Ma Shan Zheng Title", "Noto Serif SC", serif;
+  font-family: "Ma Shan Zheng Title", "WenKai Latin", "Noto Serif SC", serif;
   font-size: 28px;
   font-weight: 400;
   letter-spacing: 2px;

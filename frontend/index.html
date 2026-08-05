@@ -39,6 +39,14 @@
 
     <link rel="alternate" type="application/rss+xml" title="佛津 FoJin — 最新收录" href="https://fojin.app/feed.xml" />
     <link rel="preload" href="/fonts/MaShanZheng-title-v2.woff2" as="font" type="font/woff2" crossorigin />
+    <!-- 888 bytes, only the「AI」of /chat's hero title (see fonts.css). Preloaded
+         for the same reason as the brush face above: with font-display:swap those
+         two letters would otherwise paint in Noto Serif SC first and then jump —
+         and that first frame is exactly the mismatch this font was added to remove.
+         Unlike the brush face this one is used on ONE route, so on every other page
+         devtools will say it "was preloaded but not used". That warning is expected,
+         not a bug: 888 bytes bought site-wide to guarantee no flash on /chat. -->
+    <link rel="preload" href="/fonts/LXGWWenKai-ai-v1.woff2" as="font" type="font/woff2" crossorigin />
     <!-- Hero background: preload so the (tiny, ~19KB) WebP starts downloading during
          HTML parse in parallel with the JS bundle, instead of only after React mounts
          the <img>. Kills the white→image flash on first paint. -->
