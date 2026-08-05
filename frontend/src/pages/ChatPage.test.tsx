@@ -151,7 +151,7 @@ const CONTAINED_BY = 16; // Node.DOCUMENT_POSITION_CONTAINED_BY
 describe("ChatPage 首屏结构", () => {
   it("空状态渲染出标题与建议卡片（脚手架自检）", async () => {
     const { container } = await renderEmpty();
-    expect(screen.getByText("小津 AI 佛典问答")).toBeInTheDocument();
+    expect(screen.getByText("小津 佛典问答")).toBeInTheDocument();
     expect(container.querySelector(".chat-input-shell")).not.toBeNull();
   });
 
@@ -917,7 +917,7 @@ describe("空状态副标题", () => {
     await renderEmpty();
     // 两行原本同处一个 <div>、由 <br> 分隔，getByText 匹配不到单独的文本节点，
     // 所以对整块 hero 的 textContent 断言。
-    const hero = screen.getByText("小津 AI 佛典问答").parentElement!;
+    const hero = screen.getByText("小津 佛典问答").parentElement!;
 
     // 差异点声明必须在：整个首屏只有这一处告诉用户答案可以被核对，
     // 而且措辞是「你可以核对」而非「我保证正确」—— 不能悄悄丢掉。
@@ -939,7 +939,7 @@ describe("空状态标题", () => {
     const { container } = await renderEmpty();
     const title = container.querySelector(".chat-hero-title");
     expect(title).not.toBeNull();
-    expect(title!.textContent).toBe("小津 AI 佛典问答");
+    expect(title!.textContent).toBe("小津 佛典问答");
 
     const css = readFileSync(resolve(__dirname, "../styles/global.css"), "utf-8");
     const rule = css.match(/\.chat-hero-title\s*\{([^}]*)\}/)?.[1] ?? "";
@@ -968,31 +968,27 @@ describe("空状态标题", () => {
     expect(rule!).not.toMatch(/color:/);
   });
 
-  // 「AI」这两个字母哪支字体都得单独交代：毛笔体的拉丁是行书连笔，读作「刈」；
-  // Noto Serif SC 的粗衬线字母插在毛笔行里像另换了块招牌（这一版真上过线，
-  // 用户一眼看出不对）。最终配的是霞鹜文楷，只切了 space/A/I 三个字形。
-  it("「AI」由 WenKai Latin 接住，且标题文案不许出现它没有的拉丁字母", () => {
-    const css = readFileSync(resolve(__dirname, "../styles/global.css"), "utf-8");
-    const rule =
-      css.match(/\.chat-hero-title:lang\(zh\):not\(:lang\(zh-Hant\)\)\s*\{([^}]*)\}/)?.[1] ?? "";
-    // 顺序是承重的：毛笔（只有汉字）→ 文楷（只有 A/I/空格）→ Noto 兜底。
-    // 把文楷提到毛笔前面，汉字就会被文楷抢走，整行不再是「佛津」那支。
-    expect(rule).toMatch(
-      /font-family:\s*"Ma Shan Zheng Title",\s*"WenKai Latin",\s*"Noto Serif SC"/,
-    );
-
-    // 子集里只有 A 和 I。标题文案哪天多出别的拉丁字母，那些字母会静默掉回
-    // Noto Serif SC —— 用户指出的那种拼接感就又回来了，而且没人会察觉。
+  // 这行标题不含拉丁字母是刻意的。原文案「小津 AI 佛典问答」试过三种安置那两个
+  // 字母的办法，全部失败：毛笔自带的拉丁是行书连笔，28px 下 A 和 I 连成一团；
+  // Noto Serif SC 的粗衬线字母插在毛笔行里像另换了块招牌（上过线，用户一眼看出
+  // 不对）；配霞鹜文楷在 76px 放大图上确有区别，到 28px 实际尺寸几乎看不出来。
+  // 毛笔子集里一个拉丁字形都没有，所以文案里再出现拉丁就会静默掉回 Noto Serif
+  // SC —— 视觉上是回归，测试上却毫无动静。这条断言就是那个哨兵。
+  it("简体标题文案不含拉丁字母（毛笔子集里没有，加进来会静默掉回衬线）", () => {
     const zh = JSON.parse(
       readFileSync(resolve(__dirname, "../../public/locales/zh/translation.json"), "utf-8"),
     );
-    const stray = [...(zh["chat.title"] as string)].filter(
-      (c) => /[!-~]/.test(c) && !"AI".includes(c),
-    );
+    // 不锁死文案本身 —— 那句由上面那条 textContent 断言盯着，这里只管「不许有
+    // 拉丁」这一条规则，文案怎么改都行。写成 toBe 会抢在下面这条之前失败，
+    // 把真正的原因藏起来。
+    const latin = [...(zh["chat.title"] as string)].filter((c) => /[!-~]/.test(c));
     expect(
-      stray,
-      `LXGWWenKai-ai-v1.woff2 只含 A/I，标题里这些拉丁字符会掉回 Noto Serif SC：${stray.join("")}`,
+      latin,
+      `毛笔子集 MaShanZheng-title-v2.woff2 只有汉字，这些字符会掉回 Noto Serif SC：${latin.join("")}`,
     ).toEqual([]);
+
+    // 「AI」这个定位词并没有丢，只是不在招牌这一行重复。
+    expect(zh["chat.page_title"]).toContain("AI");
   });
 });
 
