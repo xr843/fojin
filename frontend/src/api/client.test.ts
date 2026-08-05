@@ -2,42 +2,34 @@ import { afterEach, describe, it, expect, beforeEach, vi } from "vitest";
 import axios from "axios";
 import type { AxiosError, InternalAxiosRequestConfig, AxiosResponse } from "axios";
 import { useAuthStore } from "../stores/authStore";
+import { api } from "./client";
 import i18n from "../i18n";
 import enTranslation from "../../public/locales/en/translation.json";
 
 /**
  * 测试 API client 的拦截器逻辑。
- * 由于 client.ts 在模块加载时就注册了拦截器，
- * 我们直接提取拦截器的回调函数进行单元测试。
+ *
+ * 这两个拦截器过去是在本文件里**照抄一份**再测的。那等于在测复制品：改
+ * client.ts 的真实现，这里一条都不会红 —— 2026-08-05 把 401 的硬跳转拿掉时，
+ * 抄来的副本还在断言 `window.location.href === "/login"`，测试全绿。
+ * 现在从 axios 实例上取真回调，测的才是线上跑的那份。
  */
-
-// 请求拦截器：从 localStorage 注入 JWT token
-function requestInterceptor(config: InternalAxiosRequestConfig): InternalAxiosRequestConfig {
-  try {
-    const raw = localStorage.getItem("fojin-auth");
-    if (raw) {
-      const { state } = JSON.parse(raw);
-      if (state?.token) {
-        config.headers.Authorization = `Bearer ${state.token}`;
-      }
-    }
-  } catch {
-    // ignore parse errors
-  }
-  return config;
+type Handler<T> = { fulfilled?: T; rejected?: T };
+function realInterceptor<T>(mgr: unknown, kind: "fulfilled" | "rejected"): T {
+  const handlers = (mgr as { handlers: Handler<T>[] }).handlers;
+  const fn = handlers.find((h) => h[kind])?.[kind];
+  if (!fn) throw new Error(`client.ts 没有注册 ${kind} 拦截器`);
+  return fn;
 }
 
-// 响应错误拦截器：401 时自动登出
-function responseErrorInterceptor(error: AxiosError): Promise<never> {
-  if (
-    error.response?.status === 401 &&
-    !error.config?.url?.startsWith("/auth/")
-  ) {
-    useAuthStore.getState().logout();
-    window.location.href = "/login";
-  }
-  return Promise.reject(error);
-}
+const requestInterceptor = realInterceptor<
+  (c: InternalAxiosRequestConfig) => InternalAxiosRequestConfig
+>(api.interceptors.request, "fulfilled");
+
+const responseErrorInterceptor = realInterceptor<(e: AxiosError) => Promise<never>>(
+  api.interceptors.response,
+  "rejected",
+);
 
 function makeConfig(url: string = "/test"): InternalAxiosRequestConfig {
   return {
@@ -134,7 +126,23 @@ describe("响应拦截器 - 401 自动登出", () => {
 
     expect(useAuthStore.getState().token).toBeNull();
     expect(useAuthStore.getState().user).toBeNull();
-    expect(window.location.href).toBe("/login");
+  });
+
+  it("401 只清身份，不把用户从当前页面踢走", async () => {
+    // 承重条。这里曾经跟着一句 window.location.href = "/login"，而 JWT 只活
+    // 8 小时、没有 refresh token，NotificationBell 又在每次路由变化都打一次
+    // /notifications/unread-count —— 隔夜回访的用户于是在首屏还没画出来时就被
+    // 一个后台轮询打出的 401 硬跳走，目的地当场丢失（这条路径不写 returnTo）。
+    // Umami 30 天实测：282 个会话的第一个 pageview 就是 /login。
+    //
+    // 需要登录的路由由 ProtectedRoute 自己跳（它会写 returnTo），公开页应当
+    // 原地降级成游客继续看，所以这里必须一动不动。
+    const error = makeAxiosError(401, "/notifications/unread-count");
+
+    await expect(responseErrorInterceptor(error)).rejects.toBeTruthy();
+
+    expect(useAuthStore.getState().user).toBeNull();     // 身份该清还是要清
+    expect(window.location.href).toBe("/");              // 但页面不许动
   });
 
   it("/auth/ 路径收到 401 时不触发登出", async () => {
@@ -252,7 +260,31 @@ describe("sendChatMessageStream", () => {
     MockStreamXHR.instances[0].onerror?.();
     await promise;
 
-    expect(callbacks.onError).toHaveBeenCalledWith("Network error. Please try again later.");
+    expect(callbacks.onError).toHaveBeenCalledWith("Network error. Please try again later.", "network");
+    expect(callbacks.onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it("流上收到 401：清身份 + 报出原因，但不硬跳登录页丢掉整段对话", async () => {
+    // 承重条。这里曾经是 window.location.href = "/login" 且 return（连 onDone
+    // 都不调，Promise 永不 settle —— 因为反正整页要重载）。代价是用户刚打完的
+    // 那个问题和整段对话一起消失，而 /chat 本来就是公开页、游客也能问。
+    Object.defineProperty(window, "location", { value: { href: "/chat" }, writable: true });
+    useAuthStore.setState({ token: "expired", user: null });
+
+    const { sendChatMessageStream } = await import("./client");
+    const callbacks = {
+      onToken: vi.fn(), onSources: vi.fn(), onSessionId: vi.fn(),
+      onError: vi.fn(), onDone: vi.fn(),
+    };
+
+    const promise = sendChatMessageStream("hello", undefined, null, callbacks);
+    MockStreamXHR.instances[0].status = 401;
+    MockStreamXHR.instances[0].onload?.();
+    await promise;   // 必须能 settle —— 旧实现在这里永远挂着
+
+    expect(useAuthStore.getState().token).toBeNull();
+    expect(window.location.href).toBe("/chat");
+    expect(callbacks.onError).toHaveBeenCalledWith(expect.any(String), "unauthorized");
     expect(callbacks.onDone).toHaveBeenCalledTimes(1);
   });
 });

@@ -114,6 +114,30 @@ REASONING_EMIT_INTERVAL_S = 1.0
 # path.
 LLM_STREAM_RETRY_BACKOFF_S = 0.5
 
+# 每个 error 帧带一个稳定的机器可读 code。前端把它原样送进 Umami 的
+# chat_stream_error 埋点 —— 断流率的分子这才分得开「配额用完」「上游超时」
+# 「空回复」这些完全不同的成因。
+#
+# 为什么不直接把 message 送去分析：message 是给人看的中文长句，一次文案润色
+# 就会把历史数据劈成两个桶；而且 message 由 str(exc) 拼出来，可能把上游返回
+# 的内容带进分析库。code 是白名单，两个问题都没有。
+def _error_frame(message: str, code: str) -> str:
+    """SSE error frame. ``code`` must come from the fixed set below, not free text."""
+    return (
+        "data: "
+        + json.dumps({"type": "error", "message": message, "code": code}, ensure_ascii=False)
+        + "\n\n"
+    )
+
+
+# 准备阶段的应用级拒绝 → code。异常类名是稳定的，而 str(exc) 不是。
+_PREP_ERROR_CODES = {
+    "QuotaExceededError": "quota",
+    "ValidationError": "validation",
+    "AccessDeniedError": "access_denied",
+    "ServiceError": "service",
+}
+
 # Provider → base URL mapping (most are OpenAI-compatible; Anthropic uses its own format)
 
 
@@ -830,7 +854,10 @@ async def send_message_stream(
             "chat/stream prepare rejected: %s: %s (user_id=%s session_id=%s)",
             type(prep_error).__name__, prep_error, user_id, session_id,
         )
-        yield f"data: {json.dumps({'type': 'error', 'message': str(prep_error)}, ensure_ascii=False)}\n\n"
+        yield _error_frame(
+            str(prep_error),
+            _PREP_ERROR_CODES.get(type(prep_error).__name__, "prepare"),
+        )
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
         return
 
@@ -1040,7 +1067,7 @@ async def send_message_stream(
                 if received_first_token:
                     logger.warning("LLM stream broke mid-stream: %s", exc)
                     error_msg = "抱歉，AI 回答中途中断，请稍后重试。"
-                    yield f"data: {json.dumps({'type': 'error', 'message': error_msg}, ensure_ascii=False)}\n\n"
+                    yield _error_frame(error_msg, "upstream_mid_stream")
                     full_answer = full_answer or error_msg
                     break
                 # Pre-first-token failure: try fallback if any remain
@@ -1055,22 +1082,28 @@ async def send_message_stream(
                     resp_body = exc.response.text[:500] if isinstance(exc, httpx.HTTPStatusError) and exc.response else "N/A"
                     logger.warning("BYOK LLM stream HTTP %s: %s | url=%s model=%s", status, resp_body, att_url, att_model)
                     error_msg = _byok_error_message(exc, status)
+                    error_code = "byok_config"
                 elif isinstance(exc, httpx.TimeoutException):
                     logger.warning("LLM stream timed out")
                     error_msg = "抱歉，AI 服务响应超时，请稍后重试。"
+                    error_code = "upstream_timeout"
                 elif isinstance(exc, httpx.HTTPStatusError):
                     resp_body = exc.response.text[:500] if exc.response else "N/A"
                     logger.warning("LLM stream returned HTTP %s: %s | url=%s model=%s", status, resp_body, att_url, att_model)
                     error_msg = f"抱歉，AI 服务返回错误（HTTP {status}），请稍后重试。"
+                    # status 进 code：上游 429（限流）和 5xx（挂了）要分开看，
+                    # 两者的处置完全不同。取值来自 httpx 的响应码，不是自由文本。
+                    error_code = f"upstream_http_{status}"
                 else:
                     logger.warning("LLM stream request error: %s", exc)
                     error_msg = "抱歉，AI 服务暂时不可用，请稍后重试。"
-                yield f"data: {json.dumps({'type': 'error', 'message': error_msg}, ensure_ascii=False)}\n\n"
+                    error_code = "upstream_request"
+                yield _error_frame(error_msg, error_code)
                 full_answer = full_answer or error_msg
     except Exception:
         logger.exception("LLM stream failed")
         error_msg = "抱歉，AI 服务暂时不可用，请稍后重试。"
-        yield f"data: {json.dumps({'type': 'error', 'message': error_msg}, ensure_ascii=False)}\n\n"
+        yield _error_frame(error_msg, "internal")
         full_answer = full_answer or error_msg
 
     # reasoning 与 model 是这条日志里最贵的两个字段，别删：
@@ -1105,7 +1138,7 @@ async def send_message_stream(
             chat_session_id, provider,
         )
         empty_msg = "抱歉，本次未能生成任何回答内容，请重试。"
-        yield f"data: {json.dumps({'type': 'error', 'message': empty_msg}, ensure_ascii=False)}\n\n"
+        yield _error_frame(empty_msg, "empty_completion")
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
         return
 

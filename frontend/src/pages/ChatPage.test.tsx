@@ -879,9 +879,9 @@ describe("断流埋点 chat_stream_error", () => {
     const track = withUmami();
     const cb = await startSend();
     cb.onToken!("「色」是梵语 rūpa 的意译，在《心经》的语境中");
-    cb.onError!("上游中断");
+    cb.onError!("上游中断", "upstream_mid_stream");
     cb.onDone!();
-    expect(errEvents(track)).toEqual([{ stage: "mid_stream" }]);
+    expect(errEvents(track)).toEqual([{ stage: "mid_stream", reason: "upstream_mid_stream" }]);
   });
 
   it("一个 token 都没到就失败 → 记为 no_token，且不被 onDone 重复计一次", async () => {
@@ -890,16 +890,39 @@ describe("断流埋点 chat_stream_error", () => {
     // 直接把失败率的分子灌成两倍。
     const track = withUmami();
     const cb = await startSend();
-    cb.onError!("上游 503");
+    cb.onError!("上游 503", "upstream_http_503");
     cb.onDone!();
-    expect(errEvents(track)).toEqual([{ stage: "no_token" }]);
+    expect(errEvents(track)).toEqual([{ stage: "no_token", reason: "upstream_http_503" }]);
   });
 
   it("流悄无声息地结束（没有 error 帧、也没有 token）→ 记为 empty_done", async () => {
     const track = withUmami();
     const cb = await startSend();
     cb.onDone!();
-    expect(errEvents(track)).toEqual([{ stage: "empty_done" }]);
+    expect(errEvents(track)).toEqual([{ stage: "empty_done", reason: "silent_done" }]);
+  });
+
+  it("用户按停止 → 一个错误事件都不记", async () => {
+    // 承重条。abort 和真故障走的是同一个 onError，而推理模型要 24-180 秒才吐
+    // 第一个字（生产日志实测最长 182.95s），等不及手动停止是最典型的动作 ——
+    // 记进去就是把用户的不耐烦算成系统断流。2026-08-05 那版 6.4% 的断流率里
+    // 混的正是这一类，而当时没有任何测试拦得住。
+    const track = withUmami();
+    const cb = await startSend();
+    cb.onError!("已取消", "cancelled");
+    cb.onDone!();
+    expect(errEvents(track)).toEqual([]);
+  });
+
+  it("旧后端的 error 帧没有 code 时，reason 记为 unknown 而不是丢字段", async () => {
+    // 滚动部署期间前端先上、后端还是旧副本，会收到不带 code 的 error 帧。
+    // 让它落进一个显式的桶，别变成 undefined —— 那样 Umami 里这一维直接消失，
+    // 看上去像「这些失败没有成因」。
+    const track = withUmami();
+    const cb = await startSend();
+    cb.onError!("抱歉，AI 服务暂时不可用");
+    cb.onDone!();
+    expect(errEvents(track)).toEqual([{ stage: "no_token", reason: "unknown" }]);
   });
 
   it("正常完成不记任何错误事件", async () => {
@@ -909,6 +932,30 @@ describe("断流埋点 chat_stream_error", () => {
     cb.onToken!("完整答案");
     cb.onDone!();
     expect(errEvents(track)).toEqual([]);
+  });
+});
+
+describe("URL 上的 ?q=", () => {
+  const inputOf = (c: HTMLElement) =>
+    c.querySelector<HTMLTextAreaElement>(".chat-input-shell textarea")!;
+
+  it("只有 q、没有 context 时把词填进输入框，而不是丢掉", async () => {
+    // 承重条。守卫原本是 `if (!q || !context) return`，于是所有不带 context 的
+    // ?q= 被静默丢弃 —— 辞典那颗「问小津」按钮 navigate 到 /chat?q=因果，用户
+    // 落地看到的是一个空白对话框，词没了。这个失败没有任何报错、日志或埋点，
+    // 只能靠这条断言拦住。
+    const { container } = renderPage("/chat?q=%E5%9B%A0%E6%9E%9C");
+    await waitFor(() => expect(inputOf(container).value).toBe("因果"));
+    // 不许自动发送：这种 URL 会被收藏和分享，自动发等于每打开一次烧一次配额。
+    expect(sendChatMessageStream).not.toHaveBeenCalled();
+  });
+
+  it("带 context 时仍然自动发送（阅读页「问小津」的老行为不能被改坏）", async () => {
+    renderPage("/chat?q=%E8%BF%99%E6%AE%B5%E6%80%8E%E4%B9%88%E8%A7%A3&context=%E8%89%B2%E5%8D%B3%E6%98%AF%E7%A9%BA&source=%E5%BF%83%E7%BB%8F");
+    await waitFor(() => expect(sendChatMessageStream).toHaveBeenCalled());
+    const sent = vi.mocked(sendChatMessageStream).mock.calls[0][0];
+    expect(sent).toContain("色即是空");
+    expect(sent).toContain("《心经》");
   });
 });
 

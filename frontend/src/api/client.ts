@@ -35,7 +35,19 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Auto-logout on 401 responses (except auth endpoints)
+// 401（/auth/ 以外）→ 令牌已死，清掉本地身份。但**不**在这里强制跳登录页。
+//
+// 曾经这里跟着一句 `window.location.href = "/login"`，后果是：JWT 只活 8 小时
+// 且没有 refresh token，而 NotificationBell 在每次路由变化都会打一次
+// /notifications/unread-count。隔夜回访的用户于是在首屏还没画出来的时候，就被
+// 一个后台轮询打出的 401 硬跳走了 —— 他要去的地址当场丢失（这条路径不写
+// returnTo），整页还白重载一次。Umami 30 天实测：282 个会话的**第一个**
+// pageview 就是 /login（全站第二大入口页），到过 /chat 的 715 个会话里有 374
+// 个撞到过它。
+//
+// 清掉身份之后交给路由自己判断：ProtectedRoute 见 user 为空会跳登录并顺手写
+// returnTo；而 /texts、/dictionary、/chat 这些公开页原地降级成游客继续看。
+// 令牌失效的意思是「我不再认识你」，不是「你不能待在这个页面」。
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -44,7 +56,6 @@ api.interceptors.response.use(
       !error.config?.url?.startsWith("/auth/")
     ) {
       useAuthStore.getState().logout();
-      window.location.href = "/login";
     }
     return Promise.reject(error);
   },
@@ -1927,7 +1938,16 @@ export interface StreamCallbacks {
    * target the correct row.
    */
   onMessageId?: (assistantMessageId: number) => void;
-  onError: (message: string) => void;
+  /**
+   * @param message 给用户看的文案（会进气泡）。
+   * @param code    给埋点用的稳定标识，白名单取值：服务端 error 帧里的 code
+   *                （quota / upstream_timeout / empty_completion …），或本文件
+   *                产生的 http_<status> / network / client_timeout / cancelled。
+   *                `cancelled` 是用户自己按的停止，**不是**故障 —— 消费方必须
+   *                把它排除在失败率之外，否则「等不及推理模型、手动停止」会被
+   *                当成断流计入分子。
+   */
+  onError: (message: string, code?: string) => void;
   onDone: () => void;
 }
 
@@ -2022,7 +2042,10 @@ export function sendChatMessageStream(
               callbacks?.onMessageId?.(event.id);
               break;
             case "error":
-              callbacks.onError(event.message);
+              // code 是后端新加的字段。滚动部署期间（前端已换、后端还是旧副本）
+              // 会收到没有 code 的帧，落到 "server" 而不是 undefined —— 分析时
+              // 「旧后端」和「未知成因」是两件事，别混成一个空桶。
+              callbacks.onError(event.message, event.code ?? "server");
               break;
             case "done":
               done = true;
@@ -2046,14 +2069,20 @@ export function sendChatMessageStream(
       if (remaining) processChunk(remaining);
       if (!done) {
         if (xhr.status === 401) {
+          // 登录态过期。这里曾经硬跳 /login，代价是把整段对话连同用户刚打完的
+          // 那个问题一起清掉 —— 而 /chat 本来就是公开页，游客也能问。清掉身份、
+          // 把原因说明白就够了：他可以直接重发（走游客配额），或者点页面上那个
+          // 会先把对话暂存下来的登录入口（goLoginKeepingTranscript）。
           useAuthStore.getState().logout();
-          window.location.href = "/login";
+          callbacks.onError(i18n.t("chat.stream.sessionExpired"), "unauthorized");
+          callbacks.onDone();
+          resolve();
           return;
         }
         if (xhr.status !== 200) {
           let detail = i18n.t("chat.stream.sendFailed");
           try { detail = JSON.parse(xhr.responseText).detail || detail; } catch { /* ignore */ }
-          callbacks.onError(detail);
+          callbacks.onError(detail, `http_${xhr.status}`);
         }
         callbacks.onDone();
         resolve();
@@ -2062,7 +2091,7 @@ export function sendChatMessageStream(
 
     xhr.onerror = function () {
       if (!done) {
-        callbacks.onError(i18n.t("chat.stream.networkError"));
+        callbacks.onError(i18n.t("chat.stream.networkError"), "network");
         callbacks.onDone();
         resolve();
       }
@@ -2070,7 +2099,7 @@ export function sendChatMessageStream(
 
     xhr.ontimeout = function () {
       if (!done) {
-        callbacks.onError(i18n.t("chat.stream.timeout"));
+        callbacks.onError(i18n.t("chat.stream.timeout"), "client_timeout");
         callbacks.onDone();
         resolve();
       }
@@ -2088,7 +2117,7 @@ export function sendChatMessageStream(
       signal.addEventListener("abort", () => {
         xhr.abort();
         if (!done) {
-          callbacks.onError(i18n.t("chat.stream.cancelled"));
+          callbacks.onError(i18n.t("chat.stream.cancelled"), "cancelled");
           callbacks.onDone();
           resolve();
         }

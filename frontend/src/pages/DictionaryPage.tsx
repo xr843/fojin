@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useSearchParams, useNavigate } from "react-router";
+import { useSearchParams, useNavigate, Link } from "react-router";
 import { Helmet } from "react-helmet-async";
 import { Input, Tag, Spin, Empty, Badge, Button, Select, Pagination } from "antd";
 import { SearchOutlined, RobotOutlined, DownOutlined, UpOutlined, ArrowLeftOutlined } from "@ant-design/icons";
@@ -54,40 +54,60 @@ function EntryItem({ entry }: { entry: DictEntry }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div
-      className="dict-entry-item"
-      onClick={() => setExpanded(!expanded)}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          setExpanded(!expanded);
-        }
-      }}
-    >
-      <div>
-        <span className="dict-entry-headword">{entry.headword}</span>
-        {entry.reading && (
-          <span className="dict-entry-reading">({entry.reading})</span>
-        )}
-        <Tag
-          color={LANG_COLORS[entry.lang] || "default"}
-          style={{ fontSize: 11, marginLeft: 8 }}
-        >
-          {LANG_LABEL_KEYS[entry.lang] ? t(LANG_LABEL_KEYS[entry.lang]) : entry.lang}
-        </Tag>
-        {entry.source_name && (
-          <Tag color="orange" style={{ fontSize: 11, marginLeft: 4 }}>
-            {entry.source_name}
+    <div className="dict-entry-item">
+      {/* 可点开合的部分单独包一层，出口链接留在它外面。嵌在 role="button" 里
+          的 <a>/<button> 是 nested-interactive：读屏软件只报最外层那个按钮，
+          键盘用户 Tab 不到里面的出口。 */}
+      <div
+        className="dict-entry-main"
+        onClick={() => setExpanded(!expanded)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setExpanded(!expanded);
+          }
+        }}
+      >
+        <div>
+          <span className="dict-entry-headword">{entry.headword}</span>
+          {entry.reading && (
+            <span className="dict-entry-reading">({entry.reading})</span>
+          )}
+          <Tag
+            color={LANG_COLORS[entry.lang] || "default"}
+            style={{ fontSize: 11, marginLeft: 8 }}
+          >
+            {LANG_LABEL_KEYS[entry.lang] ? t(LANG_LABEL_KEYS[entry.lang]) : entry.lang}
           </Tag>
+          {entry.source_name && (
+            <Tag color="orange" style={{ fontSize: 11, marginLeft: 4 }}>
+              {entry.source_name}
+            </Tag>
+          )}
+        </div>
+        {expanded ? (
+          <div className="dict-entry-def-full">{entry.definition}</div>
+        ) : (
+          <div className="dict-entry-def-preview">
+            {truncate(entry.definition, 200)}
+          </div>
         )}
       </div>
-      {expanded ? (
-        <div className="dict-entry-def-full">{entry.definition}</div>
-      ) : (
-        <div className="dict-entry-def-preview">
-          {truncate(entry.definition, 200)}
+
+      {/* 读完释义处的两个出口。辞典此前是个死胡同：30 天 1,886 次浏览里
+          dictionary→dictionary 有 1,331 次，去 /chat 只有 71 次、去经文只有
+          15 次 —— 唯一的出口是右下角那颗浮动按钮，而且它带的是搜索框里的词、
+          不是眼前这一条的词头。出口要贴着内容放，且要带**这一条**的词头。 */}
+      {expanded && (
+        <div className="dict-entry-exits">
+          <Link to={`/chat?q=${encodeURIComponent(entry.headword)}`}>
+            {t("dict.entry_ask", { word: entry.headword })}
+          </Link>
+          <Link to={`/search?q=${encodeURIComponent(entry.headword)}`}>
+            {t("dict.entry_in_canon")}
+          </Link>
         </div>
       )}
     </div>

@@ -126,6 +126,12 @@ async def test_empty_completion_emits_error_not_bare_done():
     )
     err = next(e for e in events if e.get("type") == "error")
     assert "回答" in err["message"] or "重试" in err["message"], err
+    # code 是给埋点用的稳定标识，前端原样送进 Umami 的 chat_stream_error.reason。
+    # 断流率的分子必须分得开成因：空回复要改的是模型/预算，上游超时要改的是运维，
+    # 配额用完根本不是故障 —— 只看 message 分不开，因为它是一句会被润色的中文。
+    assert err.get("code") == "empty_completion", (
+        f"空回复必须带 code=empty_completion，实际 {err.get('code')!r}"
+    )
 
 
 @pytest.mark.anyio

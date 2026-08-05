@@ -209,8 +209,32 @@
 .dict-entry-item {
   padding: 12px 16px;
   border-bottom: 1px solid var(--fj-border);
-  cursor: pointer;
   transition: background 0.15s;
+}
+
+/* cursor 从 .dict-entry-item 挪到这里：出口链接是它的兄弟节点而不是子节点
+   （见 EntryItem 里 nested-interactive 那段注释），整块都显示 pointer 会让
+   出口那一行看起来也只是「点开/收起」的一部分。 */
+.dict-entry-main {
+  cursor: pointer;
+}
+
+.dict-entry-exits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--fj-border);
+  font-size: 13px;
+}
+
+.dict-entry-exits a {
+  color: var(--fj-highlight);
+}
+
+.dict-entry-exits a:hover {
+  text-decoration: underline;
 }
 
 .dict-entry-item:last-child {
