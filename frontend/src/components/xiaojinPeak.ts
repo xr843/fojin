@@ -11,7 +11,9 @@
  */
 
 export const BG_NATURAL = { w: 1280, h: 717 };
-export const PEAK_FRACTION = { fx: 0.8172, fy: 0.4003 };
+/** fx 说明：0.8172 是「最高像素」所在列，但这座峰左肩先到顶、冠部向右倾，
+ *  视觉尖端在更右。0.826 是真机三档对比（0.822/0.826/0.830）眼选的正中值。 */
+export const PEAK_FRACTION = { fx: 0.826, fy: 0.4003 };
 /** home.css `.home-hero-bg img { object-position: center 70% }` */
 export const BG_OBJECT_POS = { x: 0.5, y: 0.7 };
 
