@@ -104,6 +104,21 @@ describe("XiaojinPet", () => {
     expect(screen.queryByText(/^玄奘译【《心经》第1卷】$/)).toBeNull();
   });
 
+  it("答案尾部的 [追问] 建议行不展示（正文保留）", async () => {
+    renderPet();
+    openBubble();
+    const cb = await askAndGetCallbacks("什么是三法印？");
+    act(() => {
+      cb.onToken("三法印者，诸行无常、诸法无我、涅槃寂静。\n\n");
+      cb.onToken("[追问] 三法印与一实相印有何异同？\n");
+      cb.onToken("[追问] 如何理解诸法无我？");
+      cb.onDone();
+    });
+    expect(screen.getByText(/涅槃寂静/)).toBeTruthy();
+    expect(screen.queryByText(/追问/)).toBeNull();
+    expect(screen.queryByText(/一实相印/)).toBeNull();
+  });
+
   it("流式出错：错误文案上屏、空气泡撤掉、可以再问", async () => {
     renderPet();
     openBubble();
