@@ -478,27 +478,6 @@
   cursor: default;
 }
 
-/* ---------- 意见反馈入口（原右下角浮球的替身） ---------- */
-.xiaojin-feedback {
-  display: block;
-  margin: 8px 0 0 auto;
-  padding: 0 2px;
-  border: 0;
-  background: none;
-  color: var(--xiaojin-bubble-muted);
-  font-size: 11px;
-  font-family: inherit;
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  text-decoration-color: var(--xiaojin-bubble-border);
-}
-
-.xiaojin-feedback:hover {
-  color: var(--fj-accent);
-  text-decoration-color: var(--fj-accent);
-}
-
 /* ---------- 响应式 ---------- */
 @media (max-width: 768px) {
   /* 窄屏下首页改成 height:auto 会滚动，页脚跟着内容走、不再钉在视口底，
