@@ -115,6 +115,10 @@ export default function XiaojinPet() {
   const msgsRef = useRef<HTMLDivElement>(null);
   // 本轮是否收到过任何 token —— onDone 用它判「空完成」，不在 updater 里做副作用。
   const gotTokenRef = useRef(false);
+  // 本轮是否已走过 onError。客户端契约（api/client.ts）：每条错误路径 onError
+  // 之后必补一次 onDone —— 不做这个标记，onDone 的空完成兜底会把配额/登录过期
+  // 等真实错误文案覆盖成通用「回答中断了」（2026-08-06 生产实锤）。
+  const erroredRef = useRef(false);
 
   // 离开首页时掐掉在途的流 —— 没人看的答案不必继续烧 token。
   useEffect(() => () => abortRef.current?.abort(), []);
@@ -211,6 +215,7 @@ export default function XiaojinPet() {
     setQuery("");
     setChatError(null);
     gotTokenRef.current = false;
+    erroredRef.current = false;
     prefetchMarkdown(); // 与 LLM 首字并行下载，用户感知不到
     setMessages((m) => [...m, { role: "user", content: term }, { role: "assistant", content: "" }]);
     setStreaming(true);
@@ -248,6 +253,7 @@ export default function XiaojinPet() {
         });
       },
       onError: (msg, code) => {
+        erroredRef.current = true; // 含 cancelled：onDone 不得再伪造空完成错误
         if (code === "cancelled") return; // 自己 abort 的，不是故障
         // 失败的空气泡不留着，错误行来说话
         setMessages((m) => (m[m.length - 1]?.content === "" ? m.slice(0, -1) : m));
@@ -256,9 +262,15 @@ export default function XiaojinPet() {
       },
       onDone: () => {
         // 流正常结束但一个 token 都没来：按失败兜底，别留无字空泡。
-        if (!gotTokenRef.current) {
+        // erroredRef 守卫：onError 之后客户端必补一次 onDone，真实错误文案
+        // （配额/登录过期/上游故障）不能被这里覆盖成通用兜底。
+        if (!gotTokenRef.current && !erroredRef.current) {
           setMessages((m) => (m[m.length - 1]?.content === "" ? m.slice(0, -1) : m));
           setChatError(t("xiaojin.error"));
+        }
+        // cancelled 后残留的空泡也要撤（onError 分支 return 得早，没走撤泡）
+        if (!gotTokenRef.current && erroredRef.current) {
+          setMessages((m) => (m[m.length - 1]?.content === "" ? m.slice(0, -1) : m));
         }
         finish();
       },

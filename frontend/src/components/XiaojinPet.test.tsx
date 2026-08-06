@@ -142,7 +142,12 @@ describe("XiaojinPet", () => {
     openBubble();
     const cb = await askAndGetCallbacks("什么是无我？");
     act(() => {
+      // 真实客户端契约（api/client.ts）：每条错误路径 onError 之后必补一次
+      // onDone（401/非200/网络/超时/取消全如此）。用例必须照这个顺序打，
+      // 否则「onDone 把真实错误改写成通用兜底」这类 bug 测不出来——
+      // 2026-08-06 生产实锤：配额/登录过期的具体文案全被盖成「回答中断了」。
       cb.onError("今日提问次数已用完", "quota");
+      cb.onDone();
     });
     expect(screen.getByRole("alert").textContent).toBe("今日提问次数已用完");
     expect(screen.queryByText(/小津思索中/)).toBeNull();
@@ -155,6 +160,17 @@ describe("XiaojinPet", () => {
     });
     expect(await screen.findByText("好。")).toBeTruthy();
     // 新一轮开始时旧错误行已清掉
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("cancelled（用户自己停的）后跟 onDone：不显示任何错误", async () => {
+    renderPet();
+    openBubble();
+    const cb = await askAndGetCallbacks("被中断的一问");
+    act(() => {
+      cb.onError("已停止", "cancelled");
+      cb.onDone();
+    });
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
