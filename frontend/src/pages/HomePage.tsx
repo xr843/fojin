@@ -17,6 +17,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { InfoCircleOutlined, CloseOutlined } from "@ant-design/icons";
 import SourceSelector from "../components/SourceSelector";
+import MonkPet from "../components/MonkPet";
 import { getStats, getSources, getFilters, getSearchSuggestions, getHomeShowcase } from "../api/client";
 import { getLocalizedCollections } from "../data/collections";
 import { getLangName } from "../utils/sourceUrls";
@@ -350,6 +351,10 @@ export default function HomePage() {
         </div>
 
       </section>
+
+      {/* 左下角的打坐小沙弥。position:fixed，不参与 hero 的定高布局；
+          右下角留给 Layout 里的 FeedbackButton。 */}
+      <MonkPet />
     </div>
   );
 }

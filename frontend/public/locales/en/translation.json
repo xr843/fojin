@@ -1527,5 +1527,17 @@
   "profile.byok_description_generic": "Adding your own AI API key lifts the platform's free daily limit, but the usage is billed to your key. Keys are stored with AES encryption and used only for AI API calls.",
   "chat.quota_low": "Your free daily quota is running low — {{remaining}} left.",
   "chat.quota_low_action": "Add your own API key to lift the limit",
-  "chat.configure_other_models": "Use another provider…"
+  "chat.configure_other_models": "Use another provider…",
+  "monk.open": "Ask the little monk",
+  "monk.close": "Close",
+  "monk.dismiss": "Hide the little monk",
+  "monk.bubble_label": "Ask the little monk",
+  "monk.greeting": "Amitabha. I am FoJin's little monk — ask about doctrine, where a term comes from, or which sutra you need.",
+  "monk.placeholder": "Ask me anything…",
+  "monk.send": "Send",
+  "monk.prompts": [
+    "Who translated the Heart Sutra?",
+    "What are the Three Marks of Existence?",
+    "Which sutra says 'form is emptiness'?"
+  ]
 }

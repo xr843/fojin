@@ -1527,5 +1527,17 @@
   "profile.byok_description_generic": "配置自己的 AI API Key 后，问答次数不再受平台免费额度限制，但调用费用由你的 Key 承担。Key 经 AES 加密存储，仅用于调用 AI 接口。",
   "chat.quota_low": "今日免费额度快用完了，剩余 {{remaining}} 次。",
   "chat.quota_low_action": "配置自己的 API Key 可不受此限制",
-  "chat.configure_other_models": "配置其他厂商模型…"
+  "chat.configure_other_models": "配置其他厂商模型…",
+  "monk.open": "问小沙弥",
+  "monk.close": "关闭",
+  "monk.dismiss": "不再显示小沙弥",
+  "monk.bubble_label": "小沙弥问答",
+  "monk.greeting": "阿弥陀佛。我是佛津的小沙弥——想问经论义理、名相出处，还是找哪一部经？",
+  "monk.placeholder": "问我任何问题…",
+  "monk.send": "发送",
+  "monk.prompts": [
+    "《心经》是谁翻译的？",
+    "什么是三法印？",
+    "「色即是空」出自哪部经？"
+  ]
 }
