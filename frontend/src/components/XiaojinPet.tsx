@@ -44,6 +44,20 @@ function writePos(p: Pos) {
   }
 }
 
+/**
+ * 渲染前剥掉 [追问] 行 —— 后端在答案尾部附带的追问建议。/chat 与 ReaderAIPanel
+ * 各有一份 parseFollowUps 把它们解析成按钮；气泡里按用户要求不展示追问，直接
+ * 丢弃。逐行判断，流式中途「[追问] …」前缀一旦成形该行立即隐藏，不会先整段
+ * 露出来再消失。
+ */
+function stripFollowUps(content: string): string {
+  return content
+    .split("\n")
+    .filter((line) => !/^\[追问]/.test(line.trim()))
+    .join("\n")
+    .replace(/\n+$/, "");
+}
+
 /** 把位置夹回视口内 —— 换了窗口尺寸/分辨率后，存下来的坐标可能已在屏幕外。 */
 function clampPos(p: Pos, w: number, h: number): Pos {
   return {
@@ -305,7 +319,9 @@ export default function XiaojinPet() {
             <div className="xiaojin-msgs" ref={msgsRef}>
               {messages.map((m, i) => (
                 <div key={i} className={m.role === "user" ? "xiaojin-msg-user" : "xiaojin-msg-assistant"}>
-                  {m.content || (
+                  {m.content ? (
+                    m.role === "assistant" ? stripFollowUps(m.content) : m.content
+                  ) : (
                     <span className="xiaojin-thinking">{t("xiaojin.thinking")}</span>
                   )}
                 </div>
