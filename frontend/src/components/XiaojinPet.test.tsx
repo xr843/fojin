@@ -290,7 +290,7 @@ describe("XiaojinPet", () => {
     expect(localStorage.getItem(HIDDEN_KEY)).toBe("1");
   });
 
-  it("登录后气泡里有意见反馈入口，点开弹窗", () => {
+  it("气泡里没有意见反馈入口（2026-08-06 用户要求整个移除，含登录态）", () => {
     useAuthStore.setState({
       token: "t",
       user: {
@@ -300,17 +300,8 @@ describe("XiaojinPet", () => {
     });
     renderPet();
     openBubble();
-    fireEvent.click(screen.getByText("意见反馈"));
-    // 弹窗开出（antd Modal 渲染在 portal 里）
-    expect(screen.getByText("反馈内容")).toBeTruthy();
-    // 气泡随手收起
-    expect(screen.queryByLabelText("问我任何问题…")).toBeNull();
-  });
-
-  it("匿名用户看不到意见反馈入口（提交反馈需要登录态）", () => {
-    renderPet();
-    openBubble();
     expect(screen.queryByText("意见反馈")).toBeNull();
+    expect(document.querySelector(".xiaojin-feedback")).toBeNull();
   });
 
   it("已被赶走过就整个不渲染", () => {

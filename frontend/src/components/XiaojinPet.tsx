@@ -3,7 +3,6 @@ import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../stores/authStore";
 import { sendChatMessageStream } from "../api/client";
-import FeedbackModal from "./FeedbackModal";
 import "../styles/xiaojin-pet.css";
 
 /** 见 XiaojinMarkdown.tsx 顶部注释：懒加载是为了不把 152K 的 markdown chunk
@@ -77,8 +76,8 @@ function clampPos(p: Pos, w: number, h: number): Pos {
  * 「小津」是 /chat 里既有的问答人格（chat.title、dict.ask_ai 都在用这个名字），
  * 这里只是给它一个身相：打坐僧相。全站同一个名字，别再造第二个称呼。
  *
- * 原先占右下角的意见反馈浮球（FeedbackButton）已删除，反馈入口收进气泡底部
- * （登录用户可见，与原浮球同门槛）——一个角落一个角色，别再放第二个浮动物。
+ * 意见反馈入口已按用户要求整个移除（先是右下角浮球 FeedbackButton，后是气泡
+ * 底部的文字入口）——气泡里只留对话本身，向 ryOS Rover 的极简形态看齐。
  *
  * 对话就在气泡里进行（ryOS Rover 形态）：回车直接调 /chat/stream，答案在气泡内
  * 流式渲染，不跳页。走的是与 /chat 完全同一条后端管线（检索 + 引文护栏 +
@@ -98,7 +97,6 @@ export default function XiaojinPet() {
   const [hidden, setHidden] = useState(readHidden);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const user = useAuthStore((s) => s.user);
   const inputRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -388,20 +386,6 @@ export default function XiaojinPet() {
               ↑
             </button>
           </div>
-          {/* 意见反馈入口 —— 原右下角浮球的替身，同样只对登录用户开放
-              （submitFeedback 需要登录态）。 */}
-          {user && (
-            <button
-              type="button"
-              className="xiaojin-feedback"
-              onClick={() => {
-                setOpen(false);
-                setFeedbackOpen(true);
-              }}
-            >
-              {t("feedback.title")}
-            </button>
-          )}
         </div>
       )}
 
@@ -439,8 +423,6 @@ export default function XiaojinPet() {
         </button>
       </div>
 
-      {/* Modal 挂在气泡外：入口点击时气泡随即关闭，弹窗不能跟着一起卸载。 */}
-      <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
     </div>
   );
 }
