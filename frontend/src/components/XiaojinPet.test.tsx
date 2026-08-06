@@ -1,10 +1,18 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router";
 import XiaojinPet from "./XiaojinPet";
 import { useAuthStore } from "../stores/authStore";
+import { sendChatMessageStream } from "../api/client";
+
+vi.mock("../api/client", async () => {
+  const actual = await vi.importActual<typeof import("../api/client")>("../api/client");
+  return { ...actual, sendChatMessageStream: vi.fn() };
+});
 
 const HIDDEN_KEY = "fojin_xiaojin_hidden";
+
+type Callbacks = Parameters<typeof sendChatMessageStream>[3];
 
 /** 用真 router，把落点摊到 DOM 上断言，而不是 mock useNavigate。 */
 function LocationProbe() {
@@ -14,6 +22,7 @@ function LocationProbe() {
       <div data-testid="path">{loc.pathname}</div>
       <div data-testid="q">{new URLSearchParams(loc.search).get("q") ?? ""}</div>
       <div data-testid="send">{new URLSearchParams(loc.search).get("send") ?? ""}</div>
+      <div data-testid="s">{new URLSearchParams(loc.search).get("s") ?? ""}</div>
     </>
   );
 }
@@ -32,7 +41,19 @@ const openBubble = () => fireEvent.click(screen.getByLabelText("问小津"));
 beforeEach(() => {
   localStorage.clear();
   useAuthStore.setState({ token: null, user: null });
+  vi.clearAllMocks();
+  vi.mocked(sendChatMessageStream).mockResolvedValue(undefined);
 });
+
+/** 发一问并拿到本轮的流式回调（问题进入迷你对话，不发生任何跳转）。 */
+async function askAndGetCallbacks(question: string): Promise<Callbacks> {
+  const input = screen.getByLabelText("问我任何问题…");
+  fireEvent.change(input, { target: { value: question } });
+  fireEvent.keyDown(input, { key: "Enter" });
+  await waitFor(() => expect(sendChatMessageStream).toHaveBeenCalled());
+  const calls = vi.mocked(sendChatMessageStream).mock.calls;
+  return calls[calls.length - 1][3];
+}
 
 describe("XiaojinPet", () => {
   it("默认收起：只有小津，没有输入框", () => {
@@ -49,46 +70,106 @@ describe("XiaojinPet", () => {
     expect(document.activeElement).toBe(input);
   });
 
-  it("回车把问题带去 /chat 并带上 send=1（用户已按过回车，落地要直接发送）", () => {
+  it("回车就地作答：问题进对话流、答案流式渲染、全程不跳页", async () => {
     renderPet();
     openBubble();
-    const question = "什么是缘起？";
+    const cb = await askAndGetCallbacks("什么是缘起？");
+
+    // 用户消息立即上屏，助手侧先是思索占位
+    expect(screen.getByText("什么是缘起？")).toBeTruthy();
+    expect(screen.getByText(/小津思索中/)).toBeTruthy();
+
+    act(() => {
+      cb.onToken("诸法因缘生，");
+      cb.onToken("诸法因缘灭。");
+      cb.onDone();
+    });
+    expect(screen.getByText("诸法因缘生，诸法因缘灭。")).toBeTruthy();
+    // 关键不变式：始终没离开首页
+    expect(screen.getByTestId("path").textContent).toBe("/");
+    // 问候语让位给对话流
+    expect(screen.queryByText(/阿弥陀佛/)).toBeNull();
+  });
+
+  it("citation correction 到达时整段替换为改写后的全文（与 /chat 落库版本一致）", async () => {
+    renderPet();
+    openBubble();
+    const cb = await askAndGetCallbacks("《心经》谁译的？");
+    act(() => {
+      cb.onToken("玄奘译【《心经》第1卷】");
+      cb.onCitationCorrection?.("玄奘译【《般若波罗蜜多心经》第1卷】");
+      cb.onDone();
+    });
+    expect(screen.getByText(/般若波罗蜜多心经/)).toBeTruthy();
+    expect(screen.queryByText(/^玄奘译【《心经》第1卷】$/)).toBeNull();
+  });
+
+  it("流式出错：错误文案上屏、空气泡撤掉、可以再问", async () => {
+    renderPet();
+    openBubble();
+    const cb = await askAndGetCallbacks("什么是无我？");
+    act(() => {
+      cb.onError("今日提问次数已用完", "quota");
+    });
+    expect(screen.getByRole("alert").textContent).toBe("今日提问次数已用完");
+    expect(screen.queryByText(/小津思索中/)).toBeNull();
+
+    // 还能继续发第二问（流已收尾、发送不再被锁）
+    const cb2 = await askAndGetCallbacks("再问一次");
+    act(() => {
+      cb2.onToken("好。");
+      cb2.onDone();
+    });
+    expect(screen.getByText("好。")).toBeTruthy();
+    // 新一轮开始时旧错误行已清掉
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("空完成（onDone 但一个 token 没来）：撤空泡并给兜底错误", async () => {
+    renderPet();
+    openBubble();
+    const cb = await askAndGetCallbacks("测试空完成");
+    act(() => {
+      cb.onDone();
+    });
+    expect(screen.queryByText(/小津思索中/)).toBeNull();
+    expect(screen.getByRole("alert").textContent).toContain("回答中断了");
+  });
+
+  it("多轮对话把 session id 串给下一问", async () => {
+    renderPet();
+    openBubble();
+    const cb = await askAndGetCallbacks("第一问");
+    act(() => {
+      cb.onSessionId(42);
+      cb.onToken("答一");
+      cb.onDone();
+    });
+    await askAndGetCallbacks("第二问");
+    const calls = vi.mocked(sendChatMessageStream).mock.calls;
+    expect(calls[0][1]).toBeUndefined();
+    expect(calls[1][1]).toBe(42);
+  });
+
+  it("流式进行中发送被锁，onDone 后解锁", async () => {
+    renderPet();
+    openBubble();
+    const cb = await askAndGetCallbacks("第一问");
+    // 流未结束：再回车不产生第二次调用
     const input = screen.getByLabelText("问我任何问题…");
-    fireEvent.change(input, { target: { value: question } });
+    fireEvent.change(input, { target: { value: "抢答" } });
     fireEvent.keyDown(input, { key: "Enter" });
+    expect(vi.mocked(sendChatMessageStream).mock.calls.length).toBe(1);
 
-    expect(screen.getByTestId("path").textContent).toBe("/chat");
-    expect(screen.getByTestId("q").textContent).toBe(question);
-    // 没有 send=1 就退化成「只填不发」，吞掉用户在气泡里那次回车
-    expect(screen.getByTestId("send").textContent).toBe("1");
+    act(() => {
+      cb.onToken("答");
+      cb.onDone();
+    });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(vi.mocked(sendChatMessageStream).mock.calls.length).toBe(2));
   });
 
-  // 不编码的话 & 会把 query 截成两段、# 会变成 hash，深链静默丢内容。
-  // 上一版用例只测了纯汉字问题，去掉 encodeURIComponent 照样全绿 —— 所以专挑
-  // 会撕裂 query string 的字符。
-  it("问题里带 & 与 # 也能完整送达", () => {
-    renderPet();
-    openBubble();
-    const question = "空 & 有 #不二";
-    fireEvent.change(screen.getByLabelText("问我任何问题…"), { target: { value: question } });
-    fireEvent.keyDown(screen.getByLabelText("问我任何问题…"), { key: "Enter" });
-
-    expect(screen.getByTestId("path").textContent).toBe("/chat");
-    expect(screen.getByTestId("q").textContent).toBe(question);
-  });
-
-  it("点发送按钮与回车等效", () => {
-    renderPet();
-    openBubble();
-    const question = "唯识三性是什么";
-    fireEvent.change(screen.getByLabelText("问我任何问题…"), { target: { value: question } });
-    fireEvent.click(screen.getByLabelText("发送"));
-
-    expect(screen.getByTestId("path").textContent).toBe("/chat");
-    expect(screen.getByTestId("q").textContent).toBe(question);
-  });
-
-  it("空输入不跳转，发送按钮是禁用的", () => {
+  it("空输入不发送", () => {
     renderPet();
     openBubble();
     const send = screen.getByLabelText("发送") as HTMLButtonElement;
@@ -96,17 +177,46 @@ describe("XiaojinPet", () => {
 
     fireEvent.change(screen.getByLabelText("问我任何问题…"), { target: { value: "   " } });
     fireEvent.keyDown(screen.getByLabelText("问我任何问题…"), { key: "Enter" });
-    expect(screen.getByTestId("path").textContent).toBe("/");
+    expect(sendChatMessageStream).not.toHaveBeenCalled();
   });
 
-  it("点推荐问题直接带该问题跳转", () => {
+  it("没有推荐问题（chips 已按需求移除）", () => {
     renderPet();
     openBubble();
-    const chip = screen.getByText("什么是三法印？");
-    fireEvent.click(chip);
+    expect(document.querySelector(".xiaojin-chip")).toBeNull();
+  });
 
+  it("登录用户拿到 session 后出现「查看完整引文」，点击落到 /chat?s=", async () => {
+    useAuthStore.setState({
+      token: "t",
+      user: {
+        id: 1, username: "reader", email: "r@example.com", display_name: null,
+        role: "user", is_active: true, created_at: "2026-01-01T00:00:00Z",
+      },
+    });
+    renderPet();
+    openBubble();
+    const cb = await askAndGetCallbacks("第一问");
+    act(() => {
+      cb.onSessionId(77);
+      cb.onToken("答");
+      cb.onDone();
+    });
+    fireEvent.click(screen.getByText(/查看完整引文/));
     expect(screen.getByTestId("path").textContent).toBe("/chat");
-    expect(screen.getByTestId("q").textContent).toBe("什么是三法印？");
+    expect(screen.getByTestId("s").textContent).toBe("77");
+  });
+
+  it("游客不显示「查看完整引文」（游客会话不落库，跳过去只会 404）", async () => {
+    renderPet();
+    openBubble();
+    const cb = await askAndGetCallbacks("第一问");
+    act(() => {
+      cb.onSessionId(77);
+      cb.onToken("答");
+      cb.onDone();
+    });
+    expect(screen.queryByText(/查看完整引文/)).toBeNull();
   });
 
   it("Esc 关闭气泡", () => {

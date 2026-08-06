@@ -1535,9 +1535,7 @@
   "xiaojin.greeting": "阿彌陀佛。我是小津——想問經論義理、名相出處，還是找哪一部經？",
   "xiaojin.placeholder": "問我任何問題…",
   "xiaojin.send": "發送",
-  "xiaojin.prompts": [
-    "《心經》是誰翻譯的？",
-    "什麼是三法印？",
-    "「色即是空」出自哪部經？"
-  ]
+  "xiaojin.thinking": "小津思索中",
+  "xiaojin.error": "回答中斷了，請稍後再試。",
+  "xiaojin.continue": "去 AI 問答查看完整引文 →"
 }

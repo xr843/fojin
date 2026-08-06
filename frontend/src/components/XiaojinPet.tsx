@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../stores/authStore";
+import { sendChatMessageStream } from "../api/client";
 import FeedbackModal from "./FeedbackModal";
 import "../styles/xiaojin-pet.css";
 
@@ -60,8 +61,11 @@ function clampPos(p: Pos, w: number, h: number): Pos {
  * 原先占右下角的意见反馈浮球（FeedbackButton）已删除，反馈入口收进气泡底部
  * （登录用户可见，与原浮球同门槛）——一个角落一个角色，别再放第二个浮动物。
  *
- * 问题不在这里作答：回车后跳 `/chat?q=`，由 ChatPage 既有的深链逻辑接管并自动发问。
- * 这样它始终只有一条真相来源（/chat 的检索与引文护栏），首页不复制一套流式渲染。
+ * 对话就在气泡里进行（ryOS Rover 形态）：回车直接调 /chat/stream，答案在气泡内
+ * 流式渲染，不跳页。走的是与 /chat 完全同一条后端管线（检索 + 引文护栏 +
+ * citation correction），所以答案与引文标记和 /chat 同源；气泡里只render纯文本，
+ * 完整的引文核对 UI 在 /chat —— 登录用户会看到「查看完整引文」入口跳去同一会话。
+ * 游客也能问（后端 get_optional_user + 匿名配额），配额用尽由 onError 文案兜底。
  *
  * 可拖动：按住小津本体拖到页面任意位置（pointer events，鼠标/触屏同一套），
  * 位移超过 5px 算拖动并吞掉随后的 click，否则算点击开气泡。位置持久化到
@@ -80,6 +84,27 @@ export default function XiaojinPet() {
   const inputRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const figureRef = useRef<HTMLDivElement>(null);
+
+  // ---- 气泡内迷你对话 ----
+  const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
+  const [streaming, setStreaming] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
+  // 多轮对话靠它串起同一个会话；也是「查看完整引文」跳 /chat?s= 的凭据。
+  const [sessionId, setSessionId] = useState<number | undefined>(undefined);
+  const sessionRef = useRef<number | undefined>(undefined);
+  const abortRef = useRef<AbortController | null>(null);
+  const msgsRef = useRef<HTMLDivElement>(null);
+  // 本轮是否收到过任何 token —— onDone 用它判「空完成」，不在 updater 里做副作用。
+  const gotTokenRef = useRef(false);
+
+  // 离开首页时掐掉在途的流 —— 没人看的答案不必继续烧 token。
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  // 新 token 到达时贴底 —— 迷你窗口，永远跟随最新内容。
+  useEffect(() => {
+    const el = msgsRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages]);
 
   // null = 没拖过，走 CSS 默认的右下角锚点；有值 = 用户拖过，left/top 直定。
   // 惰性初始化直接恢复上次位置（夹取用兜底尺寸 80×100 —— 此刻还没有 rect，
@@ -161,21 +186,67 @@ export default function XiaojinPet() {
     computePlacement();
   };
 
-  const rawPrompts = t("xiaojin.prompts", { returnObjects: true });
-  const prompts: string[] = Array.isArray(rawPrompts) ? rawPrompts : [];
+  const ask = useCallback((text: string) => {
+    const term = text.trim();
+    if (!term || abortRef.current) return; // 流式进行中不重入
+    setQuery("");
+    setChatError(null);
+    gotTokenRef.current = false;
+    setMessages((m) => [...m, { role: "user", content: term }, { role: "assistant", content: "" }]);
+    setStreaming(true);
 
-  const ask = useCallback(
-    (text: string) => {
-      const term = text.trim();
-      if (!term) return;
-      setOpen(false);
-      setQuery("");
-      // send=1：ChatPage 会直接发送并从 URL 抹掉参数。裸 ?q= 是只填不发的
-      // （收藏/分享场景），但这里用户已经在气泡里按过回车，意图是问、不是编辑。
-      navigate(`/chat?q=${encodeURIComponent(term)}&send=1`);
-    },
-    [navigate],
-  );
+    const ac = new AbortController();
+    abortRef.current = ac;
+    const appendToLast = (chunk: string) => {
+      gotTokenRef.current = true;
+      setMessages((m) => {
+        const next = m.slice();
+        const last = next[next.length - 1];
+        next[next.length - 1] = { ...last, content: last.content + chunk };
+        return next;
+      });
+    };
+    const finish = () => {
+      abortRef.current = null;
+      setStreaming(false);
+    };
+
+    sendChatMessageStream(term, sessionRef.current, null, {
+      onToken: appendToLast,
+      onSources: () => {},
+      onSessionId: (sid) => {
+        sessionRef.current = sid;
+        setSessionId(sid);
+      },
+      // 护栏改写过引文锚点时，用改写后的全文替换 —— 与 /chat 落库的版本保持一致。
+      onCitationCorrection: (corrected) => {
+        gotTokenRef.current = true;
+        setMessages((m) => {
+          const next = m.slice();
+          next[next.length - 1] = { role: "assistant", content: corrected };
+          return next;
+        });
+      },
+      onError: (msg, code) => {
+        if (code === "cancelled") return; // 自己 abort 的，不是故障
+        // 失败的空气泡不留着，错误行来说话
+        setMessages((m) => (m[m.length - 1]?.content === "" ? m.slice(0, -1) : m));
+        setChatError(msg);
+        finish();
+      },
+      onDone: () => {
+        // 流正常结束但一个 token 都没来：按失败兜底，别留无字空泡。
+        if (!gotTokenRef.current) {
+          setMessages((m) => (m[m.length - 1]?.content === "" ? m.slice(0, -1) : m));
+          setChatError(t("xiaojin.error"));
+        }
+        finish();
+      },
+    }, { signal: ac.signal }).catch(() => {
+      // sendChatMessageStream 内部已把错误送进 onError；这里只兜 Promise 链
+      finish();
+    });
+  }, [t]);
 
   // 开合气泡时把焦点送进输入框，键盘用户不必再 Tab 一轮。
   useEffect(() => {
@@ -229,15 +300,30 @@ export default function XiaojinPet() {
           >
             ✕
           </button>
-          <p className="xiaojin-greeting">{t("xiaojin.greeting")}</p>
-          {prompts.length > 0 && (
-            <div className="xiaojin-chips">
-              {prompts.map((p) => (
-                <button type="button" key={p} className="xiaojin-chip" onClick={() => ask(p)}>
-                  {p}
-                </button>
+          {messages.length === 0 && <p className="xiaojin-greeting">{t("xiaojin.greeting")}</p>}
+          {messages.length > 0 && (
+            <div className="xiaojin-msgs" ref={msgsRef}>
+              {messages.map((m, i) => (
+                <div key={i} className={m.role === "user" ? "xiaojin-msg-user" : "xiaojin-msg-assistant"}>
+                  {m.content || (
+                    <span className="xiaojin-thinking">{t("xiaojin.thinking")}</span>
+                  )}
+                </div>
               ))}
             </div>
+          )}
+          {chatError && <p className="xiaojin-error" role="alert">{chatError}</p>}
+          {user && sessionId !== undefined && (
+            <button
+              type="button"
+              className="xiaojin-continue"
+              onClick={() => {
+                setOpen(false);
+                navigate(`/chat?s=${sessionId}`);
+              }}
+            >
+              {t("xiaojin.continue")}
+            </button>
           )}
           <div className="xiaojin-input-row">
             <input
@@ -256,7 +342,7 @@ export default function XiaojinPet() {
               type="button"
               className="xiaojin-send"
               onClick={() => ask(query)}
-              disabled={!query.trim()}
+              disabled={!query.trim() || streaming}
               aria-label={t("xiaojin.send")}
             >
               ↑
