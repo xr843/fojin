@@ -25,16 +25,16 @@ function renderPet() {
   );
 }
 
-const openBubble = () => fireEvent.click(screen.getByLabelText("问小沙弥"));
+const openBubble = () => fireEvent.click(screen.getByLabelText("问小津"));
 
 beforeEach(() => {
   localStorage.clear();
 });
 
 describe("MonkPet", () => {
-  it("默认收起：只有小沙弥，没有输入框", () => {
+  it("默认收起：只有小津，没有输入框", () => {
     renderPet();
-    expect(screen.getByLabelText("问小沙弥")).toBeTruthy();
+    expect(screen.getByLabelText("问小津")).toBeTruthy();
     expect(screen.queryByLabelText("问我任何问题…")).toBeNull();
   });
 
@@ -121,14 +121,14 @@ describe("MonkPet", () => {
 
   it("赶走它之后本次立刻消失，并记进 localStorage", () => {
     renderPet();
-    fireEvent.click(screen.getByLabelText("不再显示小沙弥"));
-    expect(screen.queryByLabelText("问小沙弥")).toBeNull();
+    fireEvent.click(screen.getByLabelText("不再显示小津"));
+    expect(screen.queryByLabelText("问小津")).toBeNull();
     expect(localStorage.getItem(HIDDEN_KEY)).toBe("1");
   });
 
   it("已被赶走过就整个不渲染", () => {
     localStorage.setItem(HIDDEN_KEY, "1");
     renderPet();
-    expect(screen.queryByLabelText("问小沙弥")).toBeNull();
+    expect(screen.queryByLabelText("问小津")).toBeNull();
   });
 });

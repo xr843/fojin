@@ -352,7 +352,7 @@ export default function HomePage() {
 
       </section>
 
-      {/* 左下角的打坐小沙弥。position:fixed，不参与 hero 的定高布局；
+      {/* 左下角的小津。position:fixed，不参与 hero 的定高布局；
           右下角留给 Layout 里的 FeedbackButton。 */}
       <MonkPet />
     </div>

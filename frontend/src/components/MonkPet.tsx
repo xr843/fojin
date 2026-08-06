@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import "../styles/monk-pet.css";
 
-/** 用户主动赶走小沙弥后不再出现。私密模式下 localStorage 会抛，一律当没隐藏。 */
+/** 用户主动赶走小津后不再出现。私密模式下 localStorage 会抛，一律当没隐藏。 */
 const HIDDEN_KEY = "fojin_monk_pet_hidden";
 
 function readHidden(): boolean {
@@ -15,7 +15,10 @@ function readHidden(): boolean {
 }
 
 /**
- * 首页左下角的打坐小沙弥 —— 一个通往 /chat 的迷你问答入口。
+ * 首页左下角的小津 —— 一个通往 /chat 的迷你问答入口。
+ *
+ * 「小津」是 /chat 里既有的问答人格（chat.title、dict.ask_ai 都在用这个名字），
+ * 这里只是给它一个身相：打坐僧相。全站同一个名字，别再造第二个称呼。
  *
  * 右下角已经被 FeedbackButton 占着（Layout 里 isHome 时渲染，right:24/bottom:24），
  * 所以这里落在左下角；正好也压在首页山水图左侧那丛树上，比悬在雾里稳。
@@ -51,7 +54,7 @@ export default function MonkPet() {
     if (open) inputRef.current?.focus();
   }, [open]);
 
-  // Esc 关闭；点到气泡与小沙弥之外也关闭。
+  // Esc 关闭；点到气泡与小津之外也关闭。
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -151,7 +154,7 @@ export default function MonkPet() {
 }
 
 /**
- * 打坐小沙弥。汉传衣制：正金黄海青（#d6a13c）+ 赭红祖衣斜披左肩，结跏趺坐、手结定印。
+ * 小津的身相：打坐僧相。汉传衣制——正金黄海青（#d6a13c）+ 赭红祖衣斜披左肩，结跏趺坐、手结定印。
  * 一切颜色走 CSS 变量，深色模式由 monk-pet.css 整体提亮，避免暗底上发闷。
  * 平时垂目，鼠标靠近或气泡展开时睁眼——闭着的眼睛「眨」不出效果，睁眼才读得出反应。
  */
