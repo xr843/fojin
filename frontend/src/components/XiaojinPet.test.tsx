@@ -84,7 +84,7 @@ describe("XiaojinPet", () => {
       cb.onToken("诸法因缘灭。");
       cb.onDone();
     });
-    expect(screen.getByText("诸法因缘生，诸法因缘灭。")).toBeTruthy();
+    expect(await screen.findByText("诸法因缘生，诸法因缘灭。")).toBeTruthy();
     // 关键不变式：始终没离开首页
     expect(screen.getByTestId("path").textContent).toBe("/");
     // 问候语让位给对话流
@@ -100,7 +100,7 @@ describe("XiaojinPet", () => {
       cb.onCitationCorrection?.("玄奘译【《般若波罗蜜多心经》第1卷】");
       cb.onDone();
     });
-    expect(screen.getByText(/般若波罗蜜多心经/)).toBeTruthy();
+    expect(await screen.findByText(/般若波罗蜜多心经/)).toBeTruthy();
     expect(screen.queryByText(/^玄奘译【《心经》第1卷】$/)).toBeNull();
   });
 
@@ -114,9 +114,27 @@ describe("XiaojinPet", () => {
       cb.onToken("[追问] 如何理解诸法无我？");
       cb.onDone();
     });
-    expect(screen.getByText(/涅槃寂静/)).toBeTruthy();
+    expect(await screen.findByText(/涅槃寂静/)).toBeTruthy();
     expect(screen.queryByText(/追问/)).toBeNull();
     expect(screen.queryByText(/一实相印/)).toBeNull();
+  });
+
+  it("答案里的 markdown 渲染成富文本，不再裸露 ** 与 -", async () => {
+    renderPet();
+    openBubble();
+    const cb = await askAndGetCallbacks("你能帮我做什么？");
+    act(() => {
+      cb.onToken("我可以协助您：\n\n- **解读佛典义理**：结合原文与注疏。\n- **查询经文出处**：定位到卷。");
+      cb.onDone();
+    });
+    // 懒加载的 markdown chunk 到位后才有 <strong>
+    const strongs = await screen.findAllByText("解读佛典义理");
+    expect(strongs[0].tagName).toBe("STRONG");
+    expect(document.querySelectorAll(".xiaojin-md li").length).toBe(2);
+    // 星号与减号不再作为字面量出现在正文里
+    const md = document.querySelector(".xiaojin-md")!;
+    expect(md.textContent).not.toContain("**");
+    expect(md.textContent).not.toContain("- ");
   });
 
   it("流式出错：错误文案上屏、空气泡撤掉、可以再问", async () => {
@@ -135,7 +153,7 @@ describe("XiaojinPet", () => {
       cb2.onToken("好。");
       cb2.onDone();
     });
-    expect(screen.getByText("好。")).toBeTruthy();
+    expect(await screen.findByText("好。")).toBeTruthy();
     // 新一轮开始时旧错误行已清掉
     expect(screen.queryByRole("alert")).toBeNull();
   });
