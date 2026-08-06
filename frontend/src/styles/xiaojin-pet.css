@@ -27,6 +27,13 @@
   --xiaojin-blush: #d1806c;
   /* 五官线条画在浅色肤面上，深浅模式都得是深色 —— 不跟 --fj-ink 走。 */
   --xiaojin-line: #2b2318;
+
+  /* 气泡：ryOS Rover 式淡黄便签纸。宣纸黄一档，别撞散 --fj-gold 的用途。 */
+  --xiaojin-bubble-bg: #fdf5c8;
+  --xiaojin-bubble-border: #d9c17a;
+  --xiaojin-bubble-input: #fffbe6;
+  --xiaojin-bubble-ink: #2b2318;
+  --xiaojin-bubble-muted: #8a774a;
 }
 
 /* 深色底上整体提亮一档，否则金黄发闷、祖衣糊成一块。 */
@@ -38,6 +45,13 @@
   --xiaojin-kesa: #c2532c;
   --xiaojin-collar: #efe8db;
   --xiaojin-blush: #c47a63;
+
+  /* 深色下的黄便签：压暗成琥珀纸，字提亮 */
+  --xiaojin-bubble-bg: #4c4120;
+  --xiaojin-bubble-border: #6e5e2d;
+  --xiaojin-bubble-input: #5a4d25;
+  --xiaojin-bubble-ink: #f0e9d8;
+  --xiaojin-bubble-muted: #c9ba8e;
 }
 
 /* ---------- 小津本体 ---------- */
@@ -159,9 +173,10 @@
   position: absolute;
   width: 272px;
   padding: 12px 12px 10px;
-  border: 1px solid var(--fj-border);
+  border: 1px solid var(--xiaojin-bubble-border);
   border-radius: 12px;
-  background: var(--fj-surface);
+  background: var(--xiaojin-bubble-bg);
+  color: var(--xiaojin-bubble-ink);
   box-shadow: 0 10px 28px rgba(43, 35, 24, 0.16);
   animation: xiaojin-bubble-in 0.22s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -196,18 +211,18 @@
   position: absolute;
   width: 12px;
   height: 12px;
-  background: var(--fj-surface);
+  background: var(--xiaojin-bubble-bg);
   transform: rotate(45deg);
 }
 .xiaojin-pet[data-v="above"] .xiaojin-bubble::after {
   bottom: -7px;
-  border-right: 1px solid var(--fj-border);
-  border-bottom: 1px solid var(--fj-border);
+  border-right: 1px solid var(--xiaojin-bubble-border);
+  border-bottom: 1px solid var(--xiaojin-bubble-border);
 }
 .xiaojin-pet[data-v="below"] .xiaojin-bubble::after {
   top: -7px;
-  border-left: 1px solid var(--fj-border);
-  border-top: 1px solid var(--fj-border);
+  border-left: 1px solid var(--xiaojin-bubble-border);
+  border-top: 1px solid var(--xiaojin-bubble-border);
 }
 .xiaojin-pet[data-h="right"] .xiaojin-bubble::after {
   right: 28px;
@@ -226,7 +241,7 @@
   border: 0;
   border-radius: 50%;
   background: none;
-  color: var(--fj-ink-muted);
+  color: var(--xiaojin-bubble-muted);
   font-size: 11px;
   line-height: 1;
   cursor: pointer;
@@ -234,39 +249,88 @@
 
 .xiaojin-bubble-close:hover {
   color: var(--fj-accent);
-  background: var(--fj-bg-alt);
+  background: rgba(0, 0, 0, 0.06);
 }
 
 .xiaojin-greeting {
   margin: 0 18px 9px 0;
   font-size: 13px;
   line-height: 1.6;
-  color: var(--fj-ink);
+  color: var(--xiaojin-bubble-ink);
 }
 
-.xiaojin-chips {
+/* ---------- 气泡内迷你对话流 ---------- */
+.xiaojin-msgs {
   display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  margin-bottom: 9px;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 264px;
+  overflow-y: auto;
+  margin: 2px 0 9px;
+  padding-right: 2px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 
-.xiaojin-chip {
-  padding: 2px 9px;
-  border: 1px solid var(--fj-border);
-  border-radius: 11px;
-  background: var(--fj-bg-alt);
-  color: var(--fj-ink-light);
+.xiaojin-msg-user {
+  align-self: flex-end;
+  max-width: 88%;
+  padding: 4px 9px;
+  border-radius: 10px 10px 3px 10px;
+  background: rgba(139, 37, 0, 0.1);
+  color: var(--xiaojin-bubble-ink);
+  font-size: 12.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.xiaojin-msg-assistant {
+  align-self: stretch;
+  color: var(--xiaojin-bubble-ink);
+  font-size: 12.5px;
+  line-height: 1.75;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.xiaojin-thinking {
+  color: var(--xiaojin-bubble-muted);
+}
+.xiaojin-thinking::after {
+  content: "…";
+  animation: xiaojin-dots 1.4s steps(4, end) infinite;
+}
+@keyframes xiaojin-dots {
+  0% { content: ""; }
+  33% { content: "·"; }
+  66% { content: "··"; }
+  100% { content: "···"; }
+}
+
+.xiaojin-error {
+  margin: 0 0 8px;
   font-size: 11.5px;
-  cursor: pointer;
-  transition:
-    color 0.16s,
-    border-color 0.16s;
+  line-height: 1.5;
+  color: var(--fj-danger);
 }
 
-.xiaojin-chip:hover {
+/* 「查看完整引文」——去 /chat 同一会话核对引文的出口 */
+.xiaojin-continue {
+  display: block;
+  margin: 0 0 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--xiaojin-bubble-muted);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.xiaojin-continue:hover {
   color: var(--fj-accent);
-  border-color: var(--fj-accent);
 }
 
 .xiaojin-input-row {
@@ -274,9 +338,9 @@
   align-items: center;
   gap: 6px;
   padding: 3px 3px 3px 10px;
-  border: 1px solid var(--fj-border);
+  border: 1px solid var(--xiaojin-bubble-border);
   border-radius: 9px;
-  background: var(--fj-bg-alt);
+  background: var(--xiaojin-bubble-input);
 }
 
 .xiaojin-input-row:focus-within {
@@ -288,14 +352,14 @@
   min-width: 0;
   border: 0;
   background: none;
-  color: var(--fj-ink);
+  color: var(--xiaojin-bubble-ink);
   font-size: 13px;
   font-family: inherit;
   outline: none;
 }
 
 .xiaojin-input::placeholder {
-  color: var(--fj-ink-muted);
+  color: var(--xiaojin-bubble-muted);
 }
 
 .xiaojin-send {
@@ -325,13 +389,13 @@
   padding: 0 2px;
   border: 0;
   background: none;
-  color: var(--fj-ink-muted);
+  color: var(--xiaojin-bubble-muted);
   font-size: 11px;
   font-family: inherit;
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 2px;
-  text-decoration-color: var(--fj-border);
+  text-decoration-color: var(--xiaojin-bubble-border);
 }
 
 .xiaojin-feedback:hover {
@@ -372,6 +436,10 @@
 @media (prefers-reduced-motion: reduce) {
   .xiaojin-torso {
     animation: none;
+  }
+  .xiaojin-thinking::after {
+    animation: none;
+    content: "…";
   }
   .xiaojin-bubble {
     animation: none;

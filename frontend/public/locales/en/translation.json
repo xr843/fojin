@@ -1535,9 +1535,7 @@
   "xiaojin.greeting": "Amitabha. I am XiaoJin — ask about doctrine, where a term comes from, or which sutra you need.",
   "xiaojin.placeholder": "Ask me anything…",
   "xiaojin.send": "Send",
-  "xiaojin.prompts": [
-    "Who translated the Heart Sutra?",
-    "What are the Three Marks of Existence?",
-    "Which sutra says 'form is emptiness'?"
-  ]
+  "xiaojin.thinking": "XiaoJin is thinking",
+  "xiaojin.error": "The answer was interrupted — please try again.",
+  "xiaojin.continue": "Open in AI Q&A to verify citations →"
 }
