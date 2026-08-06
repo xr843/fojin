@@ -1204,6 +1204,24 @@ describe("?q= 深链的发送契约", () => {
     // 真浏览器里发送前那一帧的闪现，jsdom 观测不到。
   });
 
+  it("send=1 深链在会话号写回后不还魂：URL 只剩 ?s=", async () => {
+    // 生产实锤的还魂路径：react-router 函数式 updater 的 prev 来自创建闭包那次
+    // 渲染的 location（带 ?q=&send=1），不是 replace 后的实时 URL。onSessionId
+    // 一写 ?s= 就把抹掉的参数带回来，刷新即重发重扣配额。
+    let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+    vi.mocked(sendChatMessageStream).mockImplementation(
+      async (_m, _s, _mid, callbacks) => { cb = callbacks; },
+    );
+    renderPage("/chat?q=%E4%BB%80%E4%B9%88%E6%98%AF%E4%B8%89%E6%B3%95%E5%8D%B0%EF%BC%9F&send=1");
+
+    await waitFor(() => expect(cb).toBeDefined());
+    cb!.onSessionId(2726 as unknown as number);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("loc").textContent).toBe("/chat?s=2726");
+    });
+  });
+
   it("裸 ?q=（辞典/收藏链接）：只填不发", async () => {
     const sent: string[] = [];
     vi.mocked(sendChatMessageStream).mockImplementation(async (m) => {
