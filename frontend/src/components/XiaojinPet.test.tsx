@@ -43,6 +43,13 @@ beforeEach(() => {
   useAuthStore.setState({ token: null, user: null });
   vi.clearAllMocks();
   vi.mocked(sendChatMessageStream).mockResolvedValue(undefined);
+  // 首帧定位在 rAF 回调里 setPlaced(true)；jsdom 的 rAF 不随断言推进，
+  // visibility:hidden 会把可访问性树整个藏掉（getByRole 全灭）。打成同步。
+  vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+    cb(0);
+    return 0;
+  });
+  vi.stubGlobal("cancelAnimationFrame", () => {});
 });
 
 /** 发一问并拿到本轮的流式回调（问题进入迷你对话，不发生任何跳转）。 */
@@ -56,10 +63,14 @@ async function askAndGetCallbacks(question: string): Promise<Callbacks> {
 }
 
 describe("XiaojinPet", () => {
-  it("默认收起：只有小津，没有输入框", () => {
+  it("默认收起：只有小津，没有输入框；首帧定位完成后不再隐藏", () => {
     renderPet();
     expect(screen.getByLabelText("问小津")).toBeTruthy();
     expect(screen.queryByLabelText("问我任何问题…")).toBeNull();
+    // jsdom 无山水背景 → 锚点回退 CSS 右下角，但 placed 必须置真（不能永远藏着）
+    const root = document.querySelector<HTMLElement>(".xiaojin-pet")!;
+    expect(root.style.visibility).not.toBe("hidden");
+    expect(root.style.left).toBe(""); // 无锚点 → 不写内联坐标，走 CSS 默认
   });
 
   it("点一下展开气泡，焦点落进输入框", () => {
