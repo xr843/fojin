@@ -12,13 +12,10 @@
      ant-layout-footer 恒定压在视口底。bottom 是相对视口算的，给小 18px 会让小津
      有 32px 骑到页脚白条上（实测），所以先让开页脚再垫 10px，让它坐在水面上。 */
   bottom: 60px;
+  /* 用户拖过之后，组件用内联 left/top 覆盖上面的 right/bottom 锚点。 */
   /* 低于 antd Modal(1000) / chat 抽屉(999,1000) / reader 面板(1100)，
      高于首页自身的 0/1 层，所以任何弹窗都能盖住它。 */
   z-index: 90;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
 
   /* 造型配色 —— 正金 #d6a13c 黄海青 + 赭红祖衣。 */
   --xiaojin-skin: #f2ddc4;
@@ -52,8 +49,12 @@
   border: 0;
   padding: 0;
   background: none;
-  cursor: pointer;
+  cursor: grab;
   line-height: 0;
+  /* 拖动：touch 拖小津时不能同时滚页面；按住时也别选中文字/图形 */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
   filter: drop-shadow(0 3px 7px rgba(43, 35, 24, 0.2));
   transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -67,6 +68,10 @@
 .xiaojin-body:hover,
 .xiaojin-body:focus-visible {
   transform: translateY(-3px) scale(1.04);
+}
+
+.xiaojin-body:active {
+  cursor: grabbing;
 }
 
 .xiaojin-body:focus-visible {
@@ -146,9 +151,12 @@
   border-color: var(--fj-accent);
 }
 
-/* ---------- 气泡 ---------- */
+/* ---------- 气泡 ----------
+   绝对定位挂在小津身上，朝向由容器上的 data-v / data-h 决定：
+   v=above 开在头顶、below 开在脚下（拖到页面顶部时用）；
+   h=right 气泡右缘贴齐小津（向左伸展）、left 反之。 */
 .xiaojin-bubble {
-  position: relative;
+  position: absolute;
   width: 272px;
   padding: 12px 12px 10px;
   border: 1px solid var(--fj-border);
@@ -156,6 +164,19 @@
   background: var(--fj-surface);
   box-shadow: 0 10px 28px rgba(43, 35, 24, 0.16);
   animation: xiaojin-bubble-in 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.xiaojin-pet[data-v="above"] .xiaojin-bubble {
+  bottom: calc(100% + 10px);
+}
+.xiaojin-pet[data-v="below"] .xiaojin-bubble {
+  top: calc(100% + 10px);
+}
+.xiaojin-pet[data-h="right"] .xiaojin-bubble {
+  right: 0;
+}
+.xiaojin-pet[data-h="left"] .xiaojin-bubble {
+  left: 0;
 }
 
 @keyframes xiaojin-bubble-in {
@@ -169,18 +190,30 @@
   }
 }
 
-/* 指向小津的小尖角 */
+/* 指向小津的小尖角 —— 位置与描边随气泡朝向翻转 */
 .xiaojin-bubble::after {
   content: "";
   position: absolute;
-  right: 28px;
-  bottom: -7px;
   width: 12px;
   height: 12px;
   background: var(--fj-surface);
+  transform: rotate(45deg);
+}
+.xiaojin-pet[data-v="above"] .xiaojin-bubble::after {
+  bottom: -7px;
   border-right: 1px solid var(--fj-border);
   border-bottom: 1px solid var(--fj-border);
-  transform: rotate(45deg);
+}
+.xiaojin-pet[data-v="below"] .xiaojin-bubble::after {
+  top: -7px;
+  border-left: 1px solid var(--fj-border);
+  border-top: 1px solid var(--fj-border);
+}
+.xiaojin-pet[data-h="right"] .xiaojin-bubble::after {
+  right: 28px;
+}
+.xiaojin-pet[data-h="left"] .xiaojin-bubble::after {
+  left: 28px;
 }
 
 .xiaojin-bubble-close {
@@ -318,7 +351,7 @@
     width: 62px;
   }
   .xiaojin-bubble {
-    width: min(272px, calc(100vw - 40px));
+    width: min(272px, calc(100vw - 24px));
   }
   /* 触屏没有 hover，赶走它的按钮就常驻。 */
   .xiaojin-dismiss {
