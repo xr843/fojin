@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router";
 import XiaojinPet from "./XiaojinPet";
+import { useAuthStore } from "../stores/authStore";
 
 const HIDDEN_KEY = "fojin_xiaojin_hidden";
 
@@ -30,6 +31,7 @@ const openBubble = () => fireEvent.click(screen.getByLabelText("问小津"));
 
 beforeEach(() => {
   localStorage.clear();
+  useAuthStore.setState({ token: null, user: null });
 });
 
 describe("XiaojinPet", () => {
@@ -127,6 +129,29 @@ describe("XiaojinPet", () => {
     fireEvent.click(screen.getByLabelText("不再显示小津"));
     expect(screen.queryByLabelText("问小津")).toBeNull();
     expect(localStorage.getItem(HIDDEN_KEY)).toBe("1");
+  });
+
+  it("登录后气泡里有意见反馈入口，点开弹窗", () => {
+    useAuthStore.setState({
+      token: "t",
+      user: {
+        id: 1, username: "reader", email: "r@example.com", display_name: null,
+        role: "user", is_active: true, created_at: "2026-01-01T00:00:00Z",
+      },
+    });
+    renderPet();
+    openBubble();
+    fireEvent.click(screen.getByText("意见反馈"));
+    // 弹窗开出（antd Modal 渲染在 portal 里）
+    expect(screen.getByText("反馈内容")).toBeTruthy();
+    // 气泡随手收起
+    expect(screen.queryByLabelText("问我任何问题…")).toBeNull();
+  });
+
+  it("匿名用户看不到意见反馈入口（提交反馈需要登录态）", () => {
+    renderPet();
+    openBubble();
+    expect(screen.queryByText("意见反馈")).toBeNull();
   });
 
   it("已被赶走过就整个不渲染", () => {

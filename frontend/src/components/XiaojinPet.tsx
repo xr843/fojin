@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
+import { useAuthStore } from "../stores/authStore";
+import FeedbackModal from "./FeedbackModal";
 import "../styles/xiaojin-pet.css";
 
 /** 用户主动赶走小津后不再出现。私密模式下 localStorage 会抛，一律当没隐藏。 */
@@ -15,13 +17,13 @@ function readHidden(): boolean {
 }
 
 /**
- * 首页左下角的小津 —— 一个通往 /chat 的迷你问答入口。
+ * 首页右下角的小津 —— 一个通往 /chat 的迷你问答入口。
  *
  * 「小津」是 /chat 里既有的问答人格（chat.title、dict.ask_ai 都在用这个名字），
  * 这里只是给它一个身相：打坐僧相。全站同一个名字，别再造第二个称呼。
  *
- * 右下角已经被 FeedbackButton 占着（Layout 里 isHome 时渲染，right:24/bottom:24），
- * 所以这里落在左下角；正好也压在首页山水图左侧那丛树上，比悬在雾里稳。
+ * 原先占右下角的意见反馈浮球（FeedbackButton）已删除，反馈入口收进气泡底部
+ * （登录用户可见，与原浮球同门槛）——一个角落一个角色，别再放第二个浮动物。
  *
  * 问题不在这里作答：回车后跳 `/chat?q=`，由 ChatPage 既有的深链逻辑接管并自动发问。
  * 这样它始终只有一条真相来源（/chat 的检索与引文护栏），首页不复制一套流式渲染。
@@ -32,6 +34,8 @@ export default function XiaojinPet() {
   const [hidden, setHidden] = useState(readHidden);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const user = useAuthStore((s) => s.user);
   const inputRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -129,6 +133,20 @@ export default function XiaojinPet() {
               ↑
             </button>
           </div>
+          {/* 意见反馈入口 —— 原右下角浮球的替身，同样只对登录用户开放
+              （submitFeedback 需要登录态）。 */}
+          {user && (
+            <button
+              type="button"
+              className="xiaojin-feedback"
+              onClick={() => {
+                setOpen(false);
+                setFeedbackOpen(true);
+              }}
+            >
+              {t("feedback.title")}
+            </button>
+          )}
         </div>
       )}
 
@@ -151,6 +169,9 @@ export default function XiaojinPet() {
           ✕
         </button>
       </div>
+
+      {/* Modal 挂在气泡外：入口点击时气泡随即关闭，弹窗不能跟着一起卸载。 */}
+      <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
     </div>
   );
 }
