@@ -962,6 +962,11 @@ export default function ChatPage() {
     setShowJumpToBottom((prev) => (prev === !near ? prev : !near));
   }, [setShowJumpToBottom]);
 
+  /** 深链 effect（下方）是否已经代用户自动发送过。挂在这里（syncSessionParam
+   *  之前）是因为它的闭包要读这个 ref —— 用它区分「自动发送后残留的 ?q=」
+   *  与「用户手动收藏的裸 ?q=」，前者清、后者留。 */
+  const autoSentRef = useRef(false);
+
   /** 把「当前在读哪个会话」写进 URL（?s=）。
    *
    * 两个用处：① 去 /profile 配 Key 再返回时能落回原会话 —— 此前 sessionId 只是
@@ -970,6 +975,16 @@ export default function ChatPage() {
   const syncSessionParam = useCallback((sid: number | undefined) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
+      // ⚠️ prev 不是实时 URL：react-router 的函数式 updater 读的是创建这个闭包
+      // 那次渲染的 location。onSessionId 的闭包诞生于带 ?q=&send=（或 context）
+      // 的首次渲染 —— 深链 effect 早已把它们 replace 掉，这里的 prev 又原样
+      // 还魂，刷新这条 URL 就会重发一次、重扣一次配额（生产实测）。一次性的
+      // 入场参数在写入会话号时一并清掉；裸 ?q= 的「只填不发、可收藏」不受影响
+      // —— 那条路不发送、不产生会话号，根本走不到这里。
+      next.delete("send");
+      next.delete("context");
+      next.delete("source");
+      if (autoSentRef.current) next.delete("q");
       if (sid === undefined) next.delete("s");
       else next.set("s", String(sid));
       return next;
@@ -1501,7 +1516,6 @@ export default function ChatPage() {
   }, [tabSuggestions, tabIndex]);
 
   // Handle pre-filled message from URL params (e.g. from "Ask XiaoJin" button on reader page)
-  const autoSentRef = useRef(false);
   useEffect(() => {
     const q = searchParams.get("q");
     const context = searchParams.get("context");
