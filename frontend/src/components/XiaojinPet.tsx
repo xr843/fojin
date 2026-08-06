@@ -158,13 +158,16 @@ export default function XiaojinPet() {
     return { w: r?.width || 80, h: r?.height || 100 };
   };
 
-  /** 山尖的视口坐标 → 小津左上角（骑坐在尖上：水平居中、底部叠进尖 6px）。
-   *  山尖被 cover 裁出视口（窄屏竖屏）或页面没有山水背景时返回 null。 */
-  const computePeakAnchor = useCallback((): Pos | null => {
+  /** 山尖的视口坐标 → 小津左上角（悬浮在尖上方：水平居中）。
+   *  返回三态：Pos = 算出来了；null = 山尖被 cover 裁出视口（窄屏）→ 回退右下角；
+   *  undefined = hero 还没排版好（rect≈0，dev 下样式异步加载时必现）→ 下一帧重试。
+   *  三态是 2026-08-06 的实锤修复：之前把「没排好版」也当 null 一锤定音，
+   *  小津就永远落在右下角兜底位了。 */
+  const computePeakAnchor = useCallback((): Pos | null | undefined => {
     const hero = document.querySelector(".home-hero-bg");
     if (!hero) return null;
     const r = hero.getBoundingClientRect();
-    if (r.width < 2 || r.height < 2) return null;
+    if (r.width < 2 || r.height < 2) return undefined;
     const pt = coverPoint(r.width, r.height, BG_NATURAL, PEAK_FRACTION, BG_OBJECT_POS);
     const { w, h } = figureSize();
     const px = r.left + pt.x;
@@ -177,13 +180,23 @@ export default function XiaojinPet() {
   }, []);
 
   // 首帧定位：rAF 回调里测 DOM 再 setState（effect 体内同步 setState 会被
-  // react-hooks/set-state-in-effect 判硬错，rAF 回调不在此列）。
+  // react-hooks/set-state-in-effect 判硬错，rAF 回调不在此列）。hero 未排版
+  // （undefined）就逐帧重试，封顶 ~1s —— 已排版但山尖被裁（null）立即落定，
+  // 不让窄屏用户白等一秒的隐身。
   useEffect(() => {
-    const id = requestAnimationFrame(() => {
-      setAnchor(computePeakAnchor());
-      setPlaced(true);
-    });
-    return () => cancelAnimationFrame(id);
+    let raf = 0;
+    let tries = 0;
+    const attempt = () => {
+      const a = computePeakAnchor();
+      if (a !== undefined || tries++ > 60) {
+        setAnchor(a ?? null);
+        setPlaced(true);
+        return;
+      }
+      raf = requestAnimationFrame(attempt);
+    };
+    raf = requestAnimationFrame(attempt);
+    return () => cancelAnimationFrame(raf);
   }, [computePeakAnchor]);
 
   // 窗口尺寸变化：拖过的夹回视口；没拖过的重算山尖锚点（cover 裁切随尺寸变）。
@@ -194,7 +207,7 @@ export default function XiaojinPet() {
         const { w, h } = figureSize();
         setPos(clampPos(pos, w, h));
       } else {
-        setAnchor(computePeakAnchor());
+        setAnchor(computePeakAnchor() ?? null);
       }
     };
     window.addEventListener("resize", onResize);
