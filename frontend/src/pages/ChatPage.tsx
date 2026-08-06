@@ -648,7 +648,9 @@ export default function ChatPage() {
   // 这种 URL 会被收藏、被分享，自动发送等于每打开一次就烧一次配额。
   // 也因此 ?q= 不必从地址栏抹掉 —— 它已经被消费成初值，留着还能让链接可复现。
   const [input, setInput] = useState(
-    () => (searchParams.get("context") ? "" : searchParams.get("q")) ?? "",
+    // send=1（小津气泡）与带 context 的 ?q= 都会被下面的 effect 直接发送，
+    // 不能再灌进输入框，否则消息发出后草稿里还躺着一份同文。
+    () => (searchParams.get("context") || searchParams.get("send") === "1" ? "" : searchParams.get("q")) ?? "",
   );
   const [masterId, setMasterId] = useState<string | null>(null);
   // 祖师长廊: opened from .chat-lineage-btn in the composer toolbar — the sole
@@ -1504,17 +1506,23 @@ export default function ChatPage() {
     const q = searchParams.get("q");
     const context = searchParams.get("context");
     const source = searchParams.get("source");
-    // 这里只管「带 context 的自动发送」。不带 context 的 ?q= 由上面 input 的
-    // useState 初值消费 —— 别把这个守卫拆成两个 return 去在这儿 setInput：
-    // react-hooks/set-state-in-effect 会红（实测），而且那本来就多绕一帧。
-    if (!q || !context || autoSentRef.current) return;
+    // 自动发送只认两种显式意图：带 context（阅读页「问小津」）和 send=1
+    // （首页小津气泡——用户在气泡里已经按过回车，落地再要他点一次等于吞掉
+    // 那次回车）。裸 ?q= 仍然只填不发，由上面 input 的 useState 初值消费——
+    // 那种 URL 会被收藏分享，自动发送等于每打开一次烧一次配额。别在这儿
+    // setInput：react-hooks/set-state-in-effect 会红（实测），而且多绕一帧。
+    const send = searchParams.get("send") === "1";
+    if (!q || (!context && !send) || autoSentRef.current) return;
 
     autoSentRef.current = true;
+    // 发送前把参数从 URL 抹掉：send=1 的链接刷新/回退时不该重发重扣配额。
     setSearchParams({}, { replace: true });
 
-    const msg = source
-      ? `关于《${source}》中的这段经文：\n\n> ${context}\n\n${q}` // i18n-exempt — chat message payload sent to the zh RAG pipeline
-      : `关于这段经文：\n\n> ${context}\n\n${q}`; // i18n-exempt — chat message payload sent to the zh RAG pipeline
+    const msg = context
+      ? source
+        ? `关于《${source}》中的这段经文：\n\n> ${context}\n\n${q}` // i18n-exempt — chat message payload sent to the zh RAG pipeline
+        : `关于这段经文：\n\n> ${context}\n\n${q}` // i18n-exempt — chat message payload sent to the zh RAG pipeline
+      : q;
     handleSendMessage(msg);
   }, [searchParams, setSearchParams, handleSendMessage]);
 

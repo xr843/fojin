@@ -1174,3 +1174,47 @@ describe("附件上传失败时说的是人话", () => {
     expect(shown).not.toContain("object Object");
   });
 });
+
+describe("?q= 深链的发送契约", () => {
+  it("send=1（小津气泡）：落地即发送，参数从 URL 抹掉，草稿不残留同文", async () => {
+    const sent: string[] = [];
+    vi.mocked(sendChatMessageStream).mockImplementation(async (m) => {
+      sent.push(m);
+    });
+    renderPage("/chat?q=%E4%BB%80%E4%B9%88%E6%98%AF%E4%B8%89%E6%B3%95%E5%8D%B0%EF%BC%9F&send=1");
+
+    await waitFor(() => expect(sent).toEqual(["什么是三法印？"]));
+    // 参数抹掉：刷新/回退这条 URL 不该重发重扣配额
+    expect(screen.getByTestId("loc").textContent).toBe("/chat");
+    // 草稿残留这里不设断言：handleSendMessage 发送时本就 setInput("")，
+    // 断了也咬不住（实测突变仍绿）。input 初值里对 send=1 的排除防的是
+    // 真浏览器里发送前那一帧的闪现，jsdom 观测不到。
+  });
+
+  it("裸 ?q=（辞典/收藏链接）：只填不发", async () => {
+    const sent: string[] = [];
+    vi.mocked(sendChatMessageStream).mockImplementation(async (m) => {
+      sent.push(m);
+    });
+    renderPage("/chat?q=%E8%88%AC%E8%8B%A5");
+
+    await waitFor(() => expect(screen.getByDisplayValue("般若")).toBeInTheDocument());
+    expect(sent).toEqual([]);
+    // 只填不发的 URL 保持可收藏、可复现
+    expect(screen.getByTestId("loc").textContent).toContain("q=");
+  });
+
+  it("带 context 的 ?q=（阅读页）：包着经文引用发送，不受 send 参数影响", async () => {
+    const sent: string[] = [];
+    vi.mocked(sendChatMessageStream).mockImplementation(async (m) => {
+      sent.push(m);
+    });
+    renderPage("/chat?q=%E8%BF%99%E6%AE%B5%E6%80%8E%E4%B9%88%E8%A7%A3%EF%BC%9F&context=%E8%89%B2%E5%8D%B3%E6%98%AF%E7%A9%BA&source=%E5%BF%83%E7%BB%8F");
+
+    await waitFor(() => expect(sent.length).toBe(1));
+    expect(sent[0]).toContain("《心经》");
+    expect(sent[0]).toContain("> 色即是空");
+    expect(sent[0]).toContain("这段怎么解？");
+    expect(screen.getByTestId("loc").textContent).toBe("/chat");
+  });
+});
