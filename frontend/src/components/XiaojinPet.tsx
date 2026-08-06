@@ -7,6 +7,14 @@ import "../styles/xiaojin-pet.css";
 
 /** 用户主动赶走小津后不再出现。私密模式下 localStorage 会抛，一律当没隐藏。 */
 const HIDDEN_KEY = "fojin_xiaojin_hidden";
+/** 用户把小津拖到哪，下次进来还在哪。 */
+const POS_KEY = "fojin_xiaojin_pos";
+/** 指针位移超过这个像素数才算拖动，否则算点击。 */
+const DRAG_THRESHOLD = 5;
+/** 夹取时给视口四边留的呼吸边距。 */
+const EDGE = 8;
+
+type Pos = { x: number; y: number };
 
 function readHidden(): boolean {
   try {
@@ -14,6 +22,33 @@ function readHidden(): boolean {
   } catch {
     return false;
   }
+}
+
+function readPos(): Pos | null {
+  try {
+    const raw = localStorage.getItem(POS_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw) as Pos;
+    return typeof p?.x === "number" && typeof p?.y === "number" ? p : null;
+  } catch {
+    return null;
+  }
+}
+
+function writePos(p: Pos) {
+  try {
+    localStorage.setItem(POS_KEY, JSON.stringify(p));
+  } catch {
+    // 私密模式：本次会话内有效即可
+  }
+}
+
+/** 把位置夹回视口内 —— 换了窗口尺寸/分辨率后，存下来的坐标可能已在屏幕外。 */
+function clampPos(p: Pos, w: number, h: number): Pos {
+  return {
+    x: Math.min(Math.max(p.x, EDGE), Math.max(EDGE, window.innerWidth - w - EDGE)),
+    y: Math.min(Math.max(p.y, EDGE), Math.max(EDGE, window.innerHeight - h - EDGE)),
+  };
 }
 
 /**
@@ -27,6 +62,12 @@ function readHidden(): boolean {
  *
  * 问题不在这里作答：回车后跳 `/chat?q=`，由 ChatPage 既有的深链逻辑接管并自动发问。
  * 这样它始终只有一条真相来源（/chat 的检索与引文护栏），首页不复制一套流式渲染。
+ *
+ * 可拖动：按住小津本体拖到页面任意位置（pointer events，鼠标/触屏同一套），
+ * 位移超过 5px 算拖动并吞掉随后的 click，否则算点击开气泡。位置持久化到
+ * localStorage，恢复与窗口 resize 时都夹回视口。气泡朝向按小津当前位置自动
+ * 选（上下取空间大的一侧、左右取够放 272px 的一侧），拖到页面顶上气泡开在
+ * 下方，不会伸出屏幕外。
  */
 export default function XiaojinPet() {
   const navigate = useNavigate();
@@ -38,6 +79,87 @@ export default function XiaojinPet() {
   const user = useAuthStore((s) => s.user);
   const inputRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const figureRef = useRef<HTMLDivElement>(null);
+
+  // null = 没拖过，走 CSS 默认的右下角锚点；有值 = 用户拖过，left/top 直定。
+  // 惰性初始化直接恢复上次位置（夹取用兜底尺寸 80×100 —— 此刻还没有 rect，
+  // 而小津本体最大也就 76px 宽；resize 监听会用真实尺寸再夹一次）。
+  const [pos, setPos] = useState<Pos | null>(() => {
+    const saved = readPos();
+    return saved ? clampPos(saved, 80, 100) : null;
+  });
+  // 气泡朝向：above/below 是相对小津的垂直方向，right/left 是气泡贴齐小津的哪条边。
+  const [placement, setPlacement] = useState<{ v: "above" | "below"; h: "right" | "left" }>({
+    v: "above",
+    h: "right",
+  });
+  // 一次拖动的起点快照；active 在越过阈值后置真。
+  const dragRef = useRef<{ px: number; py: number; x: number; y: number; active: boolean } | null>(null);
+  // 拖动结束后浏览器仍会补发一次 click —— 用这个标记吞掉它，别让拖完弹气泡。
+  const draggedRef = useRef(false);
+
+  const figureSize = () => {
+    const r = figureRef.current?.getBoundingClientRect();
+    return { w: r?.width || 80, h: r?.height || 100 };
+  };
+
+  // 窗口尺寸变化时把小津夹回视口，别让它留在屏幕外找不回来。
+  useEffect(() => {
+    const onResize = () => {
+      setPos((p) => {
+        if (!p) return p;
+        const { w, h } = figureSize();
+        return clampPos(p, w, h);
+      });
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  /** 按小津当前位置选气泡朝向：垂直取空间大的一侧，水平取够放气泡的一侧。 */
+  const computePlacement = useCallback(() => {
+    const r = figureRef.current?.getBoundingClientRect();
+    if (!r) return;
+    setPlacement({
+      v: r.top >= window.innerHeight - r.bottom ? "above" : "below",
+      h: r.right >= window.innerWidth - r.left ? "right" : "left",
+    });
+  }, []);
+
+  const onFigurePointerDown = (e: React.PointerEvent) => {
+    if (!e.isPrimary) return;
+    const r = rootRef.current?.getBoundingClientRect();
+    if (!r) return;
+    dragRef.current = { px: e.clientX, py: e.clientY, x: r.left, y: r.top, active: false };
+    // jsdom 没有 setPointerCapture —— 可选调用
+    (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+  };
+
+  const onFigurePointerMove = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (!d) return;
+    const dx = e.clientX - d.px;
+    const dy = e.clientY - d.py;
+    if (!d.active) {
+      if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+      d.active = true;
+      draggedRef.current = true;
+    }
+    const { w, h } = figureSize();
+    setPos(clampPos({ x: d.x + dx, y: d.y + dy }, w, h));
+  };
+
+  const onFigurePointerUp = () => {
+    const d = dragRef.current;
+    dragRef.current = null;
+    if (!d?.active) return;
+    // 落定：存位置，并按新位置重算气泡该往哪边开。
+    setPos((p) => {
+      if (p) writePos(p);
+      return p;
+    });
+    computePlacement();
+  };
 
   const rawPrompts = t("xiaojin.prompts", { returnObjects: true });
   const prompts: string[] = Array.isArray(rawPrompts) ? rawPrompts : [];
@@ -89,7 +211,14 @@ export default function XiaojinPet() {
   if (hidden) return null;
 
   return (
-    <div className="xiaojin-pet" ref={rootRef} data-open={open ? "" : undefined}>
+    <div
+      className="xiaojin-pet"
+      ref={rootRef}
+      data-open={open ? "" : undefined}
+      data-v={placement.v}
+      data-h={placement.h}
+      style={pos ? { left: pos.x, top: pos.y, right: "auto", bottom: "auto" } : undefined}
+    >
       {open && (
         <div className="xiaojin-bubble" role="dialog" aria-label={t("xiaojin.bubble_label")}>
           <button
@@ -150,11 +279,25 @@ export default function XiaojinPet() {
         </div>
       )}
 
-      <div className="xiaojin-figure">
+      <div className="xiaojin-figure" ref={figureRef}>
         <button
           type="button"
           className="xiaojin-body"
-          onClick={() => setOpen((o) => !o)}
+          onPointerDown={onFigurePointerDown}
+          onPointerMove={onFigurePointerMove}
+          onPointerUp={onFigurePointerUp}
+          onClick={() => {
+            // 刚拖完：这次 click 是拖动的尾巴，不是点击意图。
+            if (draggedRef.current) {
+              draggedRef.current = false;
+              return;
+            }
+            setOpen((o) => {
+              const next = !o;
+              if (next) computePlacement();
+              return next;
+            });
+          }}
           aria-expanded={open}
           aria-label={t("xiaojin.open")}
         >

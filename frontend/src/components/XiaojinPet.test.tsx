@@ -160,3 +160,72 @@ describe("XiaojinPet", () => {
     expect(screen.queryByLabelText("问小津")).toBeNull();
   });
 });
+
+describe("XiaojinPet 拖动", () => {
+  const POS_KEY = "fojin_xiaojin_pos";
+
+  function body() {
+    return screen.getByLabelText("问小津");
+  }
+
+  /** jsdom 里 rect 全零，拖动位移即最终坐标（起点 0,0 + delta）。 */
+  function drag(from: [number, number], to: [number, number]) {
+    const el = body();
+    fireEvent.pointerDown(el, { pointerId: 1, isPrimary: true, clientX: from[0], clientY: from[1] });
+    fireEvent.pointerMove(el, { pointerId: 1, clientX: to[0], clientY: to[1] });
+    fireEvent.pointerUp(el, { pointerId: 1, clientX: to[0], clientY: to[1] });
+    // 浏览器在 pointerup 后必补发一次 click —— 模拟它来验证吞掉逻辑
+    fireEvent.click(el);
+  }
+
+  it("拖过阈值：位置更新为 left/top、写入 localStorage，且拖完不弹气泡", () => {
+    renderPet();
+    drag([10, 10], [110, 60]);
+
+    const root = document.querySelector<HTMLElement>(".xiaojin-pet")!;
+    expect(root.style.left).toBe("100px");
+    expect(root.style.top).toBe("50px");
+    expect(JSON.parse(localStorage.getItem(POS_KEY)!)).toEqual({ x: 100, y: 50 });
+    // 拖动的收尾 click 被吞掉，气泡不弹
+    expect(screen.queryByLabelText("问我任何问题…")).toBeNull();
+    // 再点一下（真点击）气泡照常打开 —— 吞 click 只吞一次
+    fireEvent.click(body());
+    expect(screen.getByLabelText("问我任何问题…")).toBeTruthy();
+  });
+
+  it("位移小于阈值算点击：气泡打开、位置不动", () => {
+    renderPet();
+    const el = body();
+    fireEvent.pointerDown(el, { pointerId: 1, isPrimary: true, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(el, { pointerId: 1, clientX: 12, clientY: 12 });
+    fireEvent.pointerUp(el, { pointerId: 1, clientX: 12, clientY: 12 });
+    fireEvent.click(el);
+
+    expect(screen.getByLabelText("问我任何问题…")).toBeTruthy();
+    expect(document.querySelector<HTMLElement>(".xiaojin-pet")!.style.left).toBe("");
+    expect(localStorage.getItem(POS_KEY)).toBeNull();
+  });
+
+  it("下次进来恢复上次拖到的位置", () => {
+    localStorage.setItem(POS_KEY, JSON.stringify({ x: 50, y: 80 }));
+    renderPet();
+    const root = document.querySelector<HTMLElement>(".xiaojin-pet")!;
+    expect(root.style.left).toBe("50px");
+    expect(root.style.top).toBe("80px");
+  });
+
+  it("存的位置在屏幕外时夹回视口", () => {
+    localStorage.setItem(POS_KEY, JSON.stringify({ x: 99999, y: 99999 }));
+    renderPet();
+    const root = document.querySelector<HTMLElement>(".xiaojin-pet")!;
+    const left = parseInt(root.style.left, 10);
+    const top = parseInt(root.style.top, 10);
+    expect(left).toBeGreaterThanOrEqual(0);
+    expect(left).toBeLessThanOrEqual(window.innerWidth);
+    expect(top).toBeGreaterThanOrEqual(0);
+    expect(top).toBeLessThanOrEqual(window.innerHeight);
+  });
+
+  // 气泡朝向（data-v/data-h）依赖真实布局的 getBoundingClientRect，jsdom 里
+  // rect 全零测不出翻转 —— 朝向逻辑在真浏览器里人工验证（拖到顶部气泡开脚下）。
+});

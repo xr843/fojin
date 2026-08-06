@@ -352,8 +352,8 @@ export default function HomePage() {
 
       </section>
 
-      {/* 右下角的小津。position:fixed，不参与 hero 的定高布局。
-          原先占右下角的意见反馈浮球已并入小津气泡底部。 */}
+      {/* 小津：默认右下角，可拖到任意位置（位置记在 localStorage）。
+          position:fixed，不参与 hero 的定高布局；意见反馈入口在它气泡底部。 */}
       <XiaojinPet />
     </div>
   );
