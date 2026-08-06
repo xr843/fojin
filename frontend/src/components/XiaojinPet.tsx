@@ -1,10 +1,15 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, lazy, Suspense } from "react";
 import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../stores/authStore";
 import { sendChatMessageStream } from "../api/client";
 import FeedbackModal from "./FeedbackModal";
 import "../styles/xiaojin-pet.css";
+
+/** 见 XiaojinMarkdown.tsx 顶部注释：懒加载是为了不把 152K 的 markdown chunk
+ *  压进首页首屏。提问时预取，等首字的几秒里就下完了。 */
+const XiaojinMarkdown = lazy(() => import("./XiaojinMarkdown"));
+const prefetchMarkdown = () => { void import("./XiaojinMarkdown"); };
 
 /** 用户主动赶走小津后不再出现。私密模式下 localStorage 会抛，一律当没隐藏。 */
 const HIDDEN_KEY = "fojin_xiaojin_hidden";
@@ -206,6 +211,7 @@ export default function XiaojinPet() {
     setQuery("");
     setChatError(null);
     gotTokenRef.current = false;
+    prefetchMarkdown(); // 与 LLM 首字并行下载，用户感知不到
     setMessages((m) => [...m, { role: "user", content: term }, { role: "assistant", content: "" }]);
     setStreaming(true);
 
@@ -319,10 +325,16 @@ export default function XiaojinPet() {
             <div className="xiaojin-msgs" ref={msgsRef}>
               {messages.map((m, i) => (
                 <div key={i} className={m.role === "user" ? "xiaojin-msg-user" : "xiaojin-msg-assistant"}>
-                  {m.content ? (
-                    m.role === "assistant" ? stripFollowUps(m.content) : m.content
-                  ) : (
+                  {!m.content ? (
                     <span className="xiaojin-thinking">{t("xiaojin.thinking")}</span>
+                  ) : m.role === "assistant" ? (
+                    // fallback 是纯文本：chunk 万一没到（或加载失败）答案照样读得了，
+                    // 只是 markdown 语法裸露——不会白屏。
+                    <Suspense fallback={<span className="xiaojin-md-plain">{stripFollowUps(m.content)}</span>}>
+                      <XiaojinMarkdown content={stripFollowUps(m.content)} />
+                    </Suspense>
+                  ) : (
+                    m.content
                   )}
                 </div>
               ))}
