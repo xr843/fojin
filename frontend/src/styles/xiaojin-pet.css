@@ -1,12 +1,13 @@
 /* ========================================
    首页的小津（打坐僧相 · 正金黄海青）
-   左下角常驻，点开是通往 /chat 的迷你问答入口。
+   右下角常驻，点开是通往 /chat 的迷你问答入口；气泡底部兼作
+   意见反馈入口（原 FeedbackButton 浮球已删）。
    人物名与 /chat 的问答人格一致，都叫「小津」。
    ======================================== */
 
 .xiaojin-pet {
   position: fixed;
-  left: 24px;
+  right: 24px;
   /* 桌面端首页是定高不滚动的（.home-page = calc(100vh - 52px - 50px)），50px 的
      ant-layout-footer 恒定压在视口底。bottom 是相对视口算的，给小 18px 会让小津
      有 32px 骑到页脚白条上（实测），所以先让开页脚再垫 10px，让它坐在水面上。 */
@@ -16,7 +17,7 @@
   z-index: 90;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: flex-end;
   gap: 10px;
 
   /* 造型配色 —— 正金 #d6a13c 黄海青 + 赭红祖衣。 */
@@ -120,7 +121,7 @@
 .xiaojin-dismiss {
   position: absolute;
   top: -2px;
-  right: -6px;
+  left: -6px;
   width: 20px;
   height: 20px;
   padding: 0;
@@ -172,7 +173,7 @@
 .xiaojin-bubble::after {
   content: "";
   position: absolute;
-  left: 28px;
+  right: 28px;
   bottom: -7px;
   width: 12px;
   height: 12px;
@@ -284,12 +285,33 @@
   cursor: default;
 }
 
+/* ---------- 意见反馈入口（原右下角浮球的替身） ---------- */
+.xiaojin-feedback {
+  display: block;
+  margin: 8px 0 0 auto;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: var(--fj-ink-muted);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: var(--fj-border);
+}
+
+.xiaojin-feedback:hover {
+  color: var(--fj-accent);
+  text-decoration-color: var(--fj-accent);
+}
+
 /* ---------- 响应式 ---------- */
 @media (max-width: 768px) {
   /* 窄屏下首页改成 height:auto 会滚动，页脚跟着内容走、不再钉在视口底，
      这时就按普通浮动按钮贴边即可。 */
   .xiaojin-pet {
-    left: 14px;
+    right: 14px;
     bottom: 14px;
   }
   .xiaojin-body svg {

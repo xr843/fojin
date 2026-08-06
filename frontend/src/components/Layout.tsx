@@ -27,7 +27,6 @@ import { currentUILang } from "../i18n";
 import ThemeToggle from "./ThemeToggle";
 import { useAuthStore } from "../stores/authStore";
 import { getAdminPendingSummary, type AdminPendingSummary } from "../api/client";
-import FeedbackButton from "./FeedbackButton";
 import NotificationBell from "./NotificationBell";
 import CursorGlow from "./CursorGlow";
 
@@ -457,7 +456,6 @@ export default function Layout() {
           )}
         </Space>
       </Drawer>
-      {isHome && <FeedbackButton />}
       <CursorGlow />
     </AntLayout>
   );
