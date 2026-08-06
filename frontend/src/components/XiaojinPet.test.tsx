@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router";
-import MonkPet from "./MonkPet";
+import XiaojinPet from "./XiaojinPet";
 
-const HIDDEN_KEY = "fojin_monk_pet_hidden";
+const HIDDEN_KEY = "fojin_xiaojin_hidden";
 
 /** 用真 router，把落点摊到 DOM 上断言，而不是 mock useNavigate。 */
 function LocationProbe() {
@@ -19,7 +19,7 @@ function LocationProbe() {
 function renderPet() {
   return render(
     <MemoryRouter initialEntries={["/"]}>
-      <MonkPet />
+      <XiaojinPet />
       <LocationProbe />
     </MemoryRouter>,
   );
@@ -31,7 +31,7 @@ beforeEach(() => {
   localStorage.clear();
 });
 
-describe("MonkPet", () => {
+describe("XiaojinPet", () => {
   it("默认收起：只有小津，没有输入框", () => {
     renderPet();
     expect(screen.getByLabelText("问小津")).toBeTruthy();

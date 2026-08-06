@@ -1528,14 +1528,14 @@
   "chat.quota_low": "今日免費額度快用完了，剩餘 {{remaining}} 次。",
   "chat.quota_low_action": "設定自己的 API Key 可不受此限制",
   "chat.configure_other_models": "設定其他廠商模型…",
-  "monk.open": "問小津",
-  "monk.close": "關閉",
-  "monk.dismiss": "不再顯示小津",
-  "monk.bubble_label": "小津問答",
-  "monk.greeting": "阿彌陀佛。我是小津——想問經論義理、名相出處，還是找哪一部經？",
-  "monk.placeholder": "問我任何問題…",
-  "monk.send": "發送",
-  "monk.prompts": [
+  "xiaojin.open": "問小津",
+  "xiaojin.close": "關閉",
+  "xiaojin.dismiss": "不再顯示小津",
+  "xiaojin.bubble_label": "小津問答",
+  "xiaojin.greeting": "阿彌陀佛。我是小津——想問經論義理、名相出處，還是找哪一部經？",
+  "xiaojin.placeholder": "問我任何問題…",
+  "xiaojin.send": "發送",
+  "xiaojin.prompts": [
     "《心經》是誰翻譯的？",
     "什麼是三法印？",
     "「色即是空」出自哪部經？"

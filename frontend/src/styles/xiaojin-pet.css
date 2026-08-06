@@ -4,7 +4,7 @@
    人物名与 /chat 的问答人格一致，都叫「小津」。
    ======================================== */
 
-.monk-pet {
+.xiaojin-pet {
   position: fixed;
   left: 24px;
   /* 桌面端首页是定高不滚动的（.home-page = calc(100vh - 52px - 50px)），50px 的
@@ -20,34 +20,34 @@
   gap: 10px;
 
   /* 造型配色 —— 正金 #d6a13c 黄海青 + 赭红祖衣。 */
-  --monk-skin: #f2ddc4;
-  --monk-skin-d: #e6ccab;
-  --monk-robe: #d6a13c;
-  --monk-robe-d: #b58326;
-  --monk-kesa: #8b2500;
-  --monk-collar: #f4ead9;
-  --monk-blush: #d1806c;
+  --xiaojin-skin: #f2ddc4;
+  --xiaojin-skin-d: #e6ccab;
+  --xiaojin-robe: #d6a13c;
+  --xiaojin-robe-d: #b58326;
+  --xiaojin-kesa: #8b2500;
+  --xiaojin-collar: #f4ead9;
+  --xiaojin-blush: #d1806c;
   /* 五官线条画在浅色肤面上，深浅模式都得是深色 —— 不跟 --fj-ink 走。 */
-  --monk-line: #2b2318;
+  --xiaojin-line: #2b2318;
 }
 
 /* 深色底上整体提亮一档，否则金黄发闷、祖衣糊成一块。 */
-:root[data-theme="dark"] .monk-pet {
-  --monk-skin: #e8d2b6;
-  --monk-skin-d: #d4b795;
-  --monk-robe: #ddb055;
-  --monk-robe-d: #bd8f33;
-  --monk-kesa: #c2532c;
-  --monk-collar: #efe8db;
-  --monk-blush: #c47a63;
+:root[data-theme="dark"] .xiaojin-pet {
+  --xiaojin-skin: #e8d2b6;
+  --xiaojin-skin-d: #d4b795;
+  --xiaojin-robe: #ddb055;
+  --xiaojin-robe-d: #bd8f33;
+  --xiaojin-kesa: #c2532c;
+  --xiaojin-collar: #efe8db;
+  --xiaojin-blush: #c47a63;
 }
 
 /* ---------- 小津本体 ---------- */
-.monk-figure {
+.xiaojin-figure {
   position: relative;
 }
 
-.monk-body {
+.xiaojin-body {
   border: 0;
   padding: 0;
   background: none;
@@ -57,36 +57,36 @@
   transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.monk-body svg {
+.xiaojin-body svg {
   display: block;
   width: 76px;
   height: auto;
 }
 
-.monk-body:hover,
-.monk-body:focus-visible {
+.xiaojin-body:hover,
+.xiaojin-body:focus-visible {
   transform: translateY(-3px) scale(1.04);
 }
 
-.monk-body:focus-visible {
+.xiaojin-body:focus-visible {
   outline: 2px solid var(--fj-accent);
   outline-offset: 4px;
   border-radius: 8px;
 }
 
-.monk-shadow {
+.xiaojin-shadow {
   fill: #000;
   opacity: 0.09;
 }
 
 /* 呼吸：整个躯干极缓地起伏，幅度压在 2% 以内，看得出活着但不晃眼。 */
-.monk-torso {
+.xiaojin-torso {
   transform-origin: 50% 100%;
   transform-box: fill-box;
-  animation: monk-breathe 4.2s ease-in-out infinite;
+  animation: xiaojin-breathe 4.2s ease-in-out infinite;
 }
 
-@keyframes monk-breathe {
+@keyframes xiaojin-breathe {
   0%,
   100% {
     transform: scaleY(1) scaleX(1);
@@ -97,27 +97,27 @@
 }
 
 /* 平时垂目；鼠标靠近或气泡展开时睁眼看你。 */
-.monk-eyes-open {
+.xiaojin-eyes-open {
   opacity: 0;
   transition: opacity 0.2s ease;
 }
-.monk-eyes-closed {
+.xiaojin-eyes-closed {
   opacity: 1;
   transition: opacity 0.2s ease;
 }
-.monk-figure:hover .monk-eyes-open,
-.monk-body:focus-visible .monk-eyes-open,
-.monk-pet[data-open] .monk-eyes-open {
+.xiaojin-figure:hover .xiaojin-eyes-open,
+.xiaojin-body:focus-visible .xiaojin-eyes-open,
+.xiaojin-pet[data-open] .xiaojin-eyes-open {
   opacity: 1;
 }
-.monk-figure:hover .monk-eyes-closed,
-.monk-body:focus-visible .monk-eyes-closed,
-.monk-pet[data-open] .monk-eyes-closed {
+.xiaojin-figure:hover .xiaojin-eyes-closed,
+.xiaojin-body:focus-visible .xiaojin-eyes-closed,
+.xiaojin-pet[data-open] .xiaojin-eyes-closed {
   opacity: 0;
 }
 
 /* ---------- 赶走它 ---------- */
-.monk-dismiss {
+.xiaojin-dismiss {
   position: absolute;
   top: -2px;
   right: -6px;
@@ -135,18 +135,18 @@
   transition: opacity 0.18s ease;
 }
 
-.monk-figure:hover .monk-dismiss,
-.monk-dismiss:focus-visible {
+.xiaojin-figure:hover .xiaojin-dismiss,
+.xiaojin-dismiss:focus-visible {
   opacity: 1;
 }
 
-.monk-dismiss:hover {
+.xiaojin-dismiss:hover {
   color: var(--fj-accent);
   border-color: var(--fj-accent);
 }
 
 /* ---------- 气泡 ---------- */
-.monk-bubble {
+.xiaojin-bubble {
   position: relative;
   width: 272px;
   padding: 12px 12px 10px;
@@ -154,10 +154,10 @@
   border-radius: 12px;
   background: var(--fj-surface);
   box-shadow: 0 10px 28px rgba(43, 35, 24, 0.16);
-  animation: monk-bubble-in 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: xiaojin-bubble-in 0.22s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-@keyframes monk-bubble-in {
+@keyframes xiaojin-bubble-in {
   from {
     opacity: 0;
     transform: translateY(6px) scale(0.97);
@@ -169,7 +169,7 @@
 }
 
 /* 指向小津的小尖角 */
-.monk-bubble::after {
+.xiaojin-bubble::after {
   content: "";
   position: absolute;
   left: 28px;
@@ -182,7 +182,7 @@
   transform: rotate(45deg);
 }
 
-.monk-bubble-close {
+.xiaojin-bubble-close {
   position: absolute;
   top: 6px;
   right: 6px;
@@ -198,26 +198,26 @@
   cursor: pointer;
 }
 
-.monk-bubble-close:hover {
+.xiaojin-bubble-close:hover {
   color: var(--fj-accent);
   background: var(--fj-bg-alt);
 }
 
-.monk-greeting {
+.xiaojin-greeting {
   margin: 0 18px 9px 0;
   font-size: 13px;
   line-height: 1.6;
   color: var(--fj-ink);
 }
 
-.monk-chips {
+.xiaojin-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
   margin-bottom: 9px;
 }
 
-.monk-chip {
+.xiaojin-chip {
   padding: 2px 9px;
   border: 1px solid var(--fj-border);
   border-radius: 11px;
@@ -230,12 +230,12 @@
     border-color 0.16s;
 }
 
-.monk-chip:hover {
+.xiaojin-chip:hover {
   color: var(--fj-accent);
   border-color: var(--fj-accent);
 }
 
-.monk-input-row {
+.xiaojin-input-row {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -245,11 +245,11 @@
   background: var(--fj-bg-alt);
 }
 
-.monk-input-row:focus-within {
+.xiaojin-input-row:focus-within {
   border-color: var(--fj-gold);
 }
 
-.monk-input {
+.xiaojin-input {
   flex: 1;
   min-width: 0;
   border: 0;
@@ -260,11 +260,11 @@
   outline: none;
 }
 
-.monk-input::placeholder {
+.xiaojin-input::placeholder {
   color: var(--fj-ink-muted);
 }
 
-.monk-send {
+.xiaojin-send {
   flex-shrink: 0;
   width: 26px;
   height: 26px;
@@ -279,7 +279,7 @@
   transition: opacity 0.16s;
 }
 
-.monk-send:disabled {
+.xiaojin-send:disabled {
   opacity: 0.35;
   cursor: default;
 }
@@ -288,42 +288,42 @@
 @media (max-width: 768px) {
   /* 窄屏下首页改成 height:auto 会滚动，页脚跟着内容走、不再钉在视口底，
      这时就按普通浮动按钮贴边即可。 */
-  .monk-pet {
+  .xiaojin-pet {
     left: 14px;
     bottom: 14px;
   }
-  .monk-body svg {
+  .xiaojin-body svg {
     width: 62px;
   }
-  .monk-bubble {
+  .xiaojin-bubble {
     width: min(272px, calc(100vw - 40px));
   }
   /* 触屏没有 hover，赶走它的按钮就常驻。 */
-  .monk-dismiss {
+  .xiaojin-dismiss {
     opacity: 1;
   }
 }
 
 @media (max-width: 480px) {
-  .monk-body svg {
+  .xiaojin-body svg {
     width: 54px;
   }
-  .monk-greeting {
+  .xiaojin-greeting {
     font-size: 12.5px;
   }
 }
 
 /* ---------- 动效偏好 ---------- */
 @media (prefers-reduced-motion: reduce) {
-  .monk-torso {
+  .xiaojin-torso {
     animation: none;
   }
-  .monk-bubble {
+  .xiaojin-bubble {
     animation: none;
   }
-  .monk-body,
-  .monk-body:hover,
-  .monk-body:focus-visible {
+  .xiaojin-body,
+  .xiaojin-body:hover,
+  .xiaojin-body:focus-visible {
     transition: none;
     transform: none;
   }
