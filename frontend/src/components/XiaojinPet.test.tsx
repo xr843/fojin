@@ -12,6 +12,7 @@ function LocationProbe() {
     <>
       <div data-testid="path">{loc.pathname}</div>
       <div data-testid="q">{new URLSearchParams(loc.search).get("q") ?? ""}</div>
+      <div data-testid="send">{new URLSearchParams(loc.search).get("send") ?? ""}</div>
     </>
   );
 }
@@ -46,7 +47,7 @@ describe("XiaojinPet", () => {
     expect(document.activeElement).toBe(input);
   });
 
-  it("回车把问题带去 /chat，且 q 能原样解回来", () => {
+  it("回车把问题带去 /chat 并带上 send=1（用户已按过回车，落地要直接发送）", () => {
     renderPet();
     openBubble();
     const question = "什么是缘起？";
@@ -56,6 +57,8 @@ describe("XiaojinPet", () => {
 
     expect(screen.getByTestId("path").textContent).toBe("/chat");
     expect(screen.getByTestId("q").textContent).toBe(question);
+    // 没有 send=1 就退化成「只填不发」，吞掉用户在气泡里那次回车
+    expect(screen.getByTestId("send").textContent).toBe("1");
   });
 
   // 不编码的话 & 会把 query 截成两段、# 会变成 hash，深链静默丢内容。

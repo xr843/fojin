@@ -44,7 +44,9 @@ export default function XiaojinPet() {
       if (!term) return;
       setOpen(false);
       setQuery("");
-      navigate(`/chat?q=${encodeURIComponent(term)}`);
+      // send=1：ChatPage 会直接发送并从 URL 抹掉参数。裸 ?q= 是只填不发的
+      // （收藏/分享场景），但这里用户已经在气泡里按过回车，意图是问、不是编辑。
+      navigate(`/chat?q=${encodeURIComponent(term)}&send=1`);
     },
     [navigate],
   );
