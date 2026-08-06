@@ -170,9 +170,10 @@ export default function XiaojinPet() {
     const px = r.left + pt.x;
     const py = r.top + pt.y;
     if (px - w / 2 < EDGE || px + w / 2 > window.innerWidth - EDGE || py - h < EDGE) return null;
-    // +28：SVG viewBox 底部留白 ≈13px + 山尖雾冠（apex 检测点之上的半透明过渡）
-    // ≈9px + 骑坐叠入 6px。真机逐档试出来的值 —— 调小会悬空，调大会陷进山里。
-    return { x: px - w / 2, y: py - h + 28 };
+    // +6：让小津悬浮在山尖上方 ~30px —— 打坐悬空的意境，用户对比过贴地版
+    // （+28，SVG 底部留白+雾冠+叠坐的实测和）后拍板选了悬空。要改回贴地就
+    // 把叠入量调回 +28。
+    return { x: px - w / 2, y: py - h + 6 };
   }, []);
 
   // 首帧定位：rAF 回调里测 DOM 再 setState（effect 体内同步 setState 会被
