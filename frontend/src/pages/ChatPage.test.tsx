@@ -59,6 +59,19 @@ vi.mock("../api/chatAttachments", () => ({
   uploadChatAttachment: vi.fn(),
 }));
 
+// ChatModelSelector 挂在每个 ChatPage 里，不 mock 的话它会在 jsdom 里真发
+// XHR → Network Error → 异步 console.error。日志落在环境拆除之后就是 CI 那个
+// 「Closing rpc while onUserConsoleLog was pending」的 EnvironmentTeardownError
+// —— 389/389 全绿仍 exit 1（2026-08-06 实锤一次）。
+vi.mock("../api/chatModels", () => ({
+  fetchChatModels: vi.fn().mockResolvedValue([
+    {
+      id: "deepseek-v4-pro", provider: "deepseek", label: "DeepSeek V4 Pro",
+      description: "", vision: false, available: true, requires_byok: false,
+    },
+  ]),
+}));
+
 // jsdom 没有实现 scrollIntoView —— ChatPage 的自动跟随会真的调它。
 beforeAll(() => {
   if (!Element.prototype.scrollIntoView) {
