@@ -130,6 +130,24 @@
   opacity: 1;
   transition: opacity 0.2s ease;
 }
+
+/* 静候时不时睁眼眨一下（用户要求）。只在「没 hover、没聚焦、气泡收起」时跑
+   —— 动画属性在 cascade 里压过普通声明，交互态必须用 :not() 摘掉动画，
+   否则 hover 睁眼会被动画盖回去。 */
+.xiaojin-pet:not([data-open]) .xiaojin-figure:not(:hover):not(:focus-within) .xiaojin-eyes-open {
+  animation: xiaojin-peek 6.4s ease-in-out infinite;
+}
+.xiaojin-pet:not([data-open]) .xiaojin-figure:not(:hover):not(:focus-within) .xiaojin-eyes-closed {
+  animation: xiaojin-peek-closed 6.4s ease-in-out infinite;
+}
+@keyframes xiaojin-peek {
+  0%, 78%, 92%, 100% { opacity: 0; }
+  82%, 88% { opacity: 1; }
+}
+@keyframes xiaojin-peek-closed {
+  0%, 78%, 92%, 100% { opacity: 1; }
+  82%, 88% { opacity: 0; }
+}
 .xiaojin-figure:hover .xiaojin-eyes-open,
 .xiaojin-body:focus-visible .xiaojin-eyes-open,
 .xiaojin-pet[data-open] .xiaojin-eyes-open {
@@ -515,6 +533,10 @@
   .xiaojin-thinking::after {
     animation: none;
     content: "…";
+  }
+  .xiaojin-eyes-open,
+  .xiaojin-eyes-closed {
+    animation: none;
   }
   .xiaojin-bubble {
     animation: none;

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../stores/authStore";
 import { sendChatMessageStream } from "../api/client";
+import { BG_NATURAL, PEAK_FRACTION, BG_OBJECT_POS, coverPoint } from "./xiaojinPeak";
 import "../styles/xiaojin-pet.css";
 
 /** 见 XiaojinMarkdown.tsx 顶部注释：懒加载是为了不把 152K 的 markdown chunk
@@ -85,6 +86,9 @@ function clampPos(p: Pos, w: number, h: number): Pos {
  * 完整的引文核对 UI 在 /chat —— 登录用户会看到「查看完整引文」入口跳去同一会话。
  * 游客也能问（后端 get_optional_user + 匿名配额），配额用尽由 onError 文案兜底。
  *
+ * 默认落点：背景山水图的山尖（cover 裁切实时换算，见 xiaojinPeak.ts；窄屏裁掉
+ * 山尖时退回右下角 CSS 锚点）。用户拖过之后以拖为准并持久化。
+ *
  * 可拖动：按住小津本体拖到页面任意位置（pointer events，鼠标/触屏同一套），
  * 位移超过 5px 算拖动并吞掉随后的 click，否则算点击开气泡。位置持久化到
  * localStorage，恢复与窗口 resize 时都夹回视口。气泡朝向按小津当前位置自动
@@ -134,6 +138,11 @@ export default function XiaojinPet() {
     const saved = readPos();
     return saved ? clampPos(saved, 80, 100) : null;
   });
+  // 山尖锚点（无拖动记录时的默认落点）。null = 山尖被裁出视口/测不到，退回 CSS 右下角。
+  const [anchor, setAnchor] = useState<Pos | null>(null);
+  // 首帧定位完成前隐藏，避免「右下角闪现一帧再跳上山顶」。拖过的（pos 有值）直接可见。
+  const [placed, setPlaced] = useState(() => readPos() !== null);
+
   // 气泡朝向：above/below 是相对小津的垂直方向，right/left 是气泡贴齐小津的哪条边。
   const [placement, setPlacement] = useState<{ v: "above" | "below"; h: "right" | "left" }>({
     v: "above",
@@ -149,18 +158,47 @@ export default function XiaojinPet() {
     return { w: r?.width || 80, h: r?.height || 100 };
   };
 
-  // 窗口尺寸变化时把小津夹回视口，别让它留在屏幕外找不回来。
+  /** 山尖的视口坐标 → 小津左上角（骑坐在尖上：水平居中、底部叠进尖 6px）。
+   *  山尖被 cover 裁出视口（窄屏竖屏）或页面没有山水背景时返回 null。 */
+  const computePeakAnchor = useCallback((): Pos | null => {
+    const hero = document.querySelector(".home-hero-bg");
+    if (!hero) return null;
+    const r = hero.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) return null;
+    const pt = coverPoint(r.width, r.height, BG_NATURAL, PEAK_FRACTION, BG_OBJECT_POS);
+    const { w, h } = figureSize();
+    const px = r.left + pt.x;
+    const py = r.top + pt.y;
+    if (px - w / 2 < EDGE || px + w / 2 > window.innerWidth - EDGE || py - h < EDGE) return null;
+    // +28：SVG viewBox 底部留白 ≈13px + 山尖雾冠（apex 检测点之上的半透明过渡）
+    // ≈9px + 骑坐叠入 6px。真机逐档试出来的值 —— 调小会悬空，调大会陷进山里。
+    return { x: px - w / 2, y: py - h + 28 };
+  }, []);
+
+  // 首帧定位：rAF 回调里测 DOM 再 setState（effect 体内同步 setState 会被
+  // react-hooks/set-state-in-effect 判硬错，rAF 回调不在此列）。
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      setAnchor(computePeakAnchor());
+      setPlaced(true);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [computePeakAnchor]);
+
+  // 窗口尺寸变化：拖过的夹回视口；没拖过的重算山尖锚点（cover 裁切随尺寸变）。
+  // pos 进依赖：监听器随之重挂，闭包里永远是当前值，不必维护一个渲染期 ref。
   useEffect(() => {
     const onResize = () => {
-      setPos((p) => {
-        if (!p) return p;
+      if (pos) {
         const { w, h } = figureSize();
-        return clampPos(p, w, h);
-      });
+        setPos(clampPos(pos, w, h));
+      } else {
+        setAnchor(computePeakAnchor());
+      }
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, []);
+  }, [pos, computePeakAnchor]);
 
   /** 按小津当前位置选气泡朝向：垂直取空间大的一侧，水平取够放气泡的一侧。 */
   const computePlacement = useCallback(() => {
@@ -318,7 +356,12 @@ export default function XiaojinPet() {
       data-open={open ? "" : undefined}
       data-v={placement.v}
       data-h={placement.h}
-      style={pos ? { left: pos.x, top: pos.y, right: "auto", bottom: "auto" } : undefined}
+      style={{
+        ...((pos ?? anchor)
+          ? { left: (pos ?? anchor)!.x, top: (pos ?? anchor)!.y, right: "auto", bottom: "auto" }
+          : {}),
+        ...(placed ? {} : { visibility: "hidden" as const }),
+      }}
     >
       {open && (
         <div className="xiaojin-bubble" role="dialog" aria-label={t("xiaojin.bubble_label")}>
