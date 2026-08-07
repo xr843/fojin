@@ -11,7 +11,15 @@ import "../styles/xiaojin-pet.css";
 const XiaojinMarkdown = lazy(() => import("./XiaojinMarkdown"));
 const prefetchMarkdown = () => { void import("./XiaojinMarkdown"); };
 
-/** 用户主动赶走小津后不再出现。私密模式下 localStorage 会抛，一律当没隐藏。 */
+/**
+ * 旧的「永久隐藏」键。现在按 ✕ 只改内存 state —— **刷新即回**，不落任何存储。
+ *
+ * 沿革：曾写 localStorage 做永久隐藏，但站内没有任何找回入口，等于单向门：
+ * 点一下（移动端 ✕ 常驻，误触很容易）小津就永远消失，只能开 DevTools 清键
+ * 自救。2026-08-07 用户实际撞上并报障。中途一度改 sessionStorage，实测发现
+ * **同标签页刷新它照样还在**（只有关标签页才清），仍然不满足「刷新回来」，
+ * 遂改为不落存储。这个常量只剩一个用途：清掉存量用户的旧键。
+ */
 const HIDDEN_KEY = "fojin_xiaojin_hidden";
 /** 用户把小津拖到哪，下次进来还在哪。 */
 const POS_KEY = "fojin_xiaojin_pos";
@@ -22,12 +30,16 @@ const EDGE = 8;
 
 type Pos = { x: number; y: number };
 
+/** 恒为 false —— 顺带清掉存量用户的旧永久隐藏键，让被单向门关掉的小津回来。
+ *  几个版本后（存量键清完）这个函数连同 HIDDEN_KEY 可以一起删。 */
 function readHidden(): boolean {
   try {
-    return localStorage.getItem(HIDDEN_KEY) === "1";
+    localStorage.removeItem(HIDDEN_KEY);
+    sessionStorage.removeItem(HIDDEN_KEY);
   } catch {
-    return false;
+    // 私密模式：本来就没存过
   }
+  return false;
 }
 
 function readPos(): Pos | null {
@@ -377,14 +389,8 @@ export default function XiaojinPet() {
     };
   }, [open]);
 
-  const dismiss = () => {
-    try {
-      localStorage.setItem(HIDDEN_KEY, "1");
-    } catch {
-      // 私密模式：这次会话内隐藏即可，不必persist
-    }
-    setHidden(true);
-  };
+  // 只改内存 state：刷新/切走再回来，小津就回来了。刻意不落存储——见 HIDDEN_KEY 注释。
+  const dismiss = () => setHidden(true);
 
   if (hidden) return null;
 

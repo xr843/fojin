@@ -1522,7 +1522,7 @@
   "chat.configure_other_models": "設定其他廠商模型…",
   "xiaojin.open": "問小津",
   "xiaojin.close": "關閉",
-  "xiaojin.dismiss": "不再顯示小津",
+  "xiaojin.dismiss": "暫時關閉小津（重新整理後回來）",
   "xiaojin.bubble_label": "小津問答",
   "xiaojin.greeting": "阿彌陀佛。我是小津——想問經論義理、名相出處，還是找哪一部經？🙏",
   "xiaojin.placeholder": "問我任何問題…",
