@@ -362,19 +362,45 @@ describe("XiaojinPet 拖动", () => {
     fireEvent.click(el);
   }
 
-  it("拖过阈值：位置更新为 left/top、写入 localStorage，且拖完不弹气泡", () => {
+  it("拖过阈值：位置更新为 left/top，且拖完不弹气泡", () => {
     renderPet();
     drag([10, 10], [110, 60]);
 
     const root = document.querySelector<HTMLElement>(".xiaojin-pet")!;
     expect(root.style.left).toBe("100px");
     expect(root.style.top).toBe("50px");
-    expect(JSON.parse(localStorage.getItem(POS_KEY)!)).toEqual({ x: 100, y: 50 });
     // 拖动的收尾 click 被吞掉，气泡不弹
     expect(screen.queryByLabelText("问我任何问题…")).toBeNull();
     // 再点一下（真点击）气泡照常打开 —— 吞 click 只吞一次
     fireEvent.click(body());
     expect(screen.getByLabelText("问我任何问题…")).toBeTruthy();
+  });
+
+  it("拖动不写盘：刷新要回默认落点（用户 2026-08-07 要求）", () => {
+    renderPet();
+    drag([10, 10], [110, 60]);
+    expect(document.querySelector<HTMLElement>(".xiaojin-pet")!.style.left).toBe("100px");
+    // 写盘就意味着刷新后还停在拖到的地方
+    expect(localStorage.getItem(POS_KEY)).toBeNull();
+  });
+
+  it("重新挂载（＝刷新）后回到默认落点，不留拖动残迹", () => {
+    const { unmount } = renderPet();
+    drag([10, 10], [110, 60]);
+    expect(document.querySelector<HTMLElement>(".xiaojin-pet")!.style.left).toBe("100px");
+
+    unmount();
+    renderPet();
+    // jsdom 无山水背景 → 锚点回退 CSS 默认，不写内联坐标
+    expect(document.querySelector<HTMLElement>(".xiaojin-pet")!.style.left).toBe("");
+  });
+
+  it("迁移：存量用户盘里的旧坐标被清掉，不再把人送回上次拖到的地方", () => {
+    localStorage.setItem(POS_KEY, JSON.stringify({ x: 50, y: 80 }));
+    renderPet();
+    const root = document.querySelector<HTMLElement>(".xiaojin-pet")!;
+    expect(root.style.left).toBe("");
+    expect(localStorage.getItem(POS_KEY)).toBeNull();
   });
 
   it("位移小于阈值算点击：气泡打开、位置不动", () => {
@@ -387,27 +413,6 @@ describe("XiaojinPet 拖动", () => {
 
     expect(screen.getByLabelText("问我任何问题…")).toBeTruthy();
     expect(document.querySelector<HTMLElement>(".xiaojin-pet")!.style.left).toBe("");
-    expect(localStorage.getItem(POS_KEY)).toBeNull();
-  });
-
-  it("下次进来恢复上次拖到的位置", () => {
-    localStorage.setItem(POS_KEY, JSON.stringify({ x: 50, y: 80 }));
-    renderPet();
-    const root = document.querySelector<HTMLElement>(".xiaojin-pet")!;
-    expect(root.style.left).toBe("50px");
-    expect(root.style.top).toBe("80px");
-  });
-
-  it("存的位置在屏幕外时夹回视口", () => {
-    localStorage.setItem(POS_KEY, JSON.stringify({ x: 99999, y: 99999 }));
-    renderPet();
-    const root = document.querySelector<HTMLElement>(".xiaojin-pet")!;
-    const left = parseInt(root.style.left, 10);
-    const top = parseInt(root.style.top, 10);
-    expect(left).toBeGreaterThanOrEqual(0);
-    expect(left).toBeLessThanOrEqual(window.innerWidth);
-    expect(top).toBeGreaterThanOrEqual(0);
-    expect(top).toBeLessThanOrEqual(window.innerHeight);
   });
 
   // 气泡朝向（data-v/data-h）依赖真实布局的 getBoundingClientRect，jsdom 里

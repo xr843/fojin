@@ -19,7 +19,12 @@ const prefetchMarkdown = () => { void import("./XiaojinMarkdown"); };
  * 这个常量只剩一个用途：清掉存量用户的旧键，几个版本后可连同 readHidden 删除。
  */
 const HIDDEN_KEY = "fojin_xiaojin_hidden";
-/** 用户把小津拖到哪，下次进来还在哪。 */
+/**
+ * 上古的拖动位置键。**位置现在不再跨刷新记忆**：用户 2026-08-07 明确要求
+ * 每次刷新首页小津都回到默认落点（山尖正上方）。拖动只在本次浏览内有效。
+ * 这个常量只剩一个用途：清掉存量用户盘里的旧坐标，否则他们刷新后还是会被
+ * 送回上次拖到的地方（与「退出」那条同一类坑，见 xiaojinStore 的 merge）。
+ */
 const POS_KEY = "fojin_xiaojin_pos";
 /** 指针位移超过这个像素数才算拖动，否则算点击。 */
 const DRAG_THRESHOLD = 5;
@@ -38,23 +43,14 @@ function clearLegacyHiddenKey() {
   }
 }
 
+/** 清掉存量用户的旧坐标。恒返回 null —— 每次进页面都从默认落点重新算起。 */
 function readPos(): Pos | null {
   try {
-    const raw = localStorage.getItem(POS_KEY);
-    if (!raw) return null;
-    const p = JSON.parse(raw) as Pos;
-    return typeof p?.x === "number" && typeof p?.y === "number" ? p : null;
+    localStorage.removeItem(POS_KEY);
   } catch {
-    return null;
+    // 私密模式：本来就没存过
   }
-}
-
-function writePos(p: Pos) {
-  try {
-    localStorage.setItem(POS_KEY, JSON.stringify(p));
-  } catch {
-    // 私密模式：本次会话内有效即可
-  }
+  return null;
 }
 
 /**
@@ -153,17 +149,13 @@ export default function XiaojinPet() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
-  // null = 没拖过，走 CSS 默认的右下角锚点；有值 = 用户拖过，left/top 直定。
-  // 惰性初始化直接恢复上次位置（夹取用兜底尺寸 80×100 —— 此刻还没有 rect，
-  // 而小津本体最大也就 76px 宽；resize 监听会用真实尺寸再夹一次）。
-  const [pos, setPos] = useState<Pos | null>(() => {
-    const saved = readPos();
-    return saved ? clampPos(saved, 80, 100) : null;
-  });
+  // null = 本次还没拖过 → 用山尖锚点；有值 = 本次拖过，left/top 直定。
+  // 不从存储恢复：刷新必须回到默认落点。readPos 只负责清掉存量旧坐标。
+  const [pos, setPos] = useState<Pos | null>(() => readPos());
   // 山尖锚点（无拖动记录时的默认落点）。null = 山尖被裁出视口/测不到，退回 CSS 右下角。
   const [anchor, setAnchor] = useState<Pos | null>(null);
   // 首帧定位完成前隐藏，避免「右下角闪现一帧再跳上山顶」。拖过的（pos 有值）直接可见。
-  const [placed, setPlaced] = useState(() => readPos() !== null);
+  const [placed, setPlaced] = useState(false);
 
   // 气泡朝向：above/below 是相对小津的垂直方向，right/left 是气泡贴齐小津的哪条边。
   const [placement, setPlacement] = useState<{ v: "above" | "below"; h: "right" | "left" }>({
@@ -304,11 +296,7 @@ export default function XiaojinPet() {
     const d = dragRef.current;
     dragRef.current = null;
     if (!d?.active) return;
-    // 落定：存位置，并按新位置重算气泡该往哪边开。
-    setPos((p) => {
-      if (p) writePos(p);
-      return p;
-    });
+    // 落定：只按新位置重算气泡朝向。刻意不写盘——刷新要回默认落点。
     computePlacement();
   };
 
