@@ -11,7 +11,11 @@ import { persist } from "zustand/middleware";
  * 控制面板做找回入口。
  */
 interface XiaojinState {
-  /** 用户主动退出小津。持久；靠页脚的「唤回小津」恢复。 */
+  /**
+   * 用户退出小津 —— **只管这一次浏览，刷新自动回来**（不持久化，见下方
+   * partialize/merge）。用户 2026-08-07 明确要求：按了退出，下次刷新页面
+   * 仍要自动弹出小津。页脚的「唤回小津」用于不刷新就叫回来。
+   */
   hidden: boolean;
   /** 以哪位祖师的口吻作答；null = 通用助手小津。持久。 */
   masterId: string | null;
@@ -29,6 +33,18 @@ export const useXiaojinStore = create<XiaojinState>()(
       show: () => set({ hidden: false }),
       setMasterId: (masterId) => set({ masterId }),
     }),
-    { name: "fojin-xiaojin" },
+    {
+      name: "fojin-xiaojin",
+      // 只持久化祖师偏好。hidden 刻意不写盘 —— 刷新必须让小津回来。
+      partialize: (s) => ({ masterId: s.masterId }),
+      // merge 里强制 hidden:false：光靠 partialize 不够 —— 存量用户的
+      // localStorage 里还留着上一版写进去的 hidden:true，默认 merge 会把它
+      // 灌回来，小津照样不出现。
+      merge: (persisted, current) => ({
+        ...current,
+        ...(persisted as Partial<XiaojinState>),
+        hidden: false,
+      }),
+    },
   ),
 );
