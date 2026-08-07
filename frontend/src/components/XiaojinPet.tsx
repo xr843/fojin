@@ -169,8 +169,9 @@ export default function XiaojinPet() {
     v: "above",
     h: "right",
   });
-  // 右键（触屏长按）菜单：null = 未开；有值 = 菜单左上角的视口坐标。
-  const [menu, setMenu] = useState<Pos | null>(null);
+  // 右键（触屏长按）菜单：null = 未开。up=true 时锚定底边向上展开——
+  // 小津默认在右下角，向下弹必然被视口裁掉（2026-08-07 用户实测截图）。
+  const [menu, setMenu] = useState<{ x: number; y: number; up: boolean } | null>(null);
   // 祖师列表：只在第一次开菜单时拉，首页默认不为它花一次请求。
   const [masters, setMasters] = useState<MasterProfile[] | null>(null);
   const longPressRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -417,12 +418,17 @@ export default function XiaojinPet() {
 
   const activeMaster = masterId ? (masters ?? []).find((m) => m.id === masterId) ?? null : null;
 
+  /** 菜单实测高度 ≈303px（16 条目时）。取整加余量做翻转判据。 */
+  const MENU_EST = 330;
+
   const openMenu = useCallback((x: number, y: number) => {
     setOpen(false);
-    // 菜单宽 216 / 高约 44+条目；夹进视口，别开出屏幕
+    // 下方放不下就向上翻（锚 bottom），放得下才向下（锚 top）。
+    const up = y > window.innerHeight - MENU_EST;
     setMenu({
       x: Math.min(x, window.innerWidth - 224),
-      y: Math.min(y, window.innerHeight - 220),
+      y,
+      up,
     });
     if (!masters) {
       // 失败时保持 null 而不是设成 []：[] 会让下面这个 !masters 守卫永远为假，
@@ -608,7 +614,11 @@ export default function XiaojinPet() {
           className="xiaojin-menu"
           role="menu"
           aria-label={t("xiaojin.menu_label")}
-          style={{ left: menu.x, top: menu.y }}
+          style={
+            menu.up
+              ? { left: menu.x, bottom: Math.max(8, window.innerHeight - menu.y) }
+              : { left: menu.x, top: menu.y }
+          }
         >
           <button type="button" role="menuitem" className="xiaojin-menu-item" onClick={startNewConversation}>
             {t("xiaojin.menu_new_chat")}
