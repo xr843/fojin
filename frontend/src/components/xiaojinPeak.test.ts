@@ -6,21 +6,21 @@ import { coverPoint, BG_NATURAL, PEAK_FRACTION, BG_OBJECT_POS } from "./xiaojinP
  * 图 1280×717，山尖比例 (0.8172, 0.4003)，object-position center 70%。
  */
 describe("coverPoint（cover 裁切下的比例点→容器坐标）", () => {
-  it("宽容器（按宽放大、裁上下）：1920×809 → 山尖 (1585.9, 244.0)", () => {
+  it("宽容器（按宽放大、裁上下）：1920×809 → 山尖 (1578.2, 244.0)", () => {
     // s = max(1920/1280, 809/717) = 1.5 → 渲染 1920×1075.5
     // ox = (1920-1920)*0.5 = 0; oy = (809-1075.5)*0.7 = -186.55
-    // x = 0 + 0.826*1920 = 1585.92; y = -186.55 + 0.4003*1075.5 = 243.97
+    // x = 0 + 0.822*1920 = 1578.24; y = -186.55 + 0.4003*1075.5 = 243.97
     const pt = coverPoint(1920, 809, BG_NATURAL, PEAK_FRACTION, BG_OBJECT_POS);
-    expect(pt.x).toBeCloseTo(1585.92, 1);
+    expect(pt.x).toBeCloseTo(1578.24, 1);
     expect(pt.y).toBeCloseTo(243.97, 1);
   });
 
   it("窄容器（按高放大、裁左右）：390×640 → 山尖溢出右缘（x > 390）", () => {
     // s = max(390/1280, 640/717) = 0.8926 → 渲染 1142.5×640
-    // ox = (390-1142.5)*0.5 = -376.3; x = -376.3 + 0.826*1142.5 = 567.5 —— 出画
+    // ox = (390-1142.5)*0.5 = -376.3; x = -376.3 + 0.822*1142.5 = 562.9 —— 出画
     const pt = coverPoint(390, 640, BG_NATURAL, PEAK_FRACTION, BG_OBJECT_POS);
     expect(pt.x).toBeGreaterThan(390); // 窄屏山尖被裁掉 → 组件应回退右下角锚点
-    expect(pt.x).toBeCloseTo(567.5, 0);
+    expect(pt.x).toBeCloseTo(562.9, 0);
     expect(pt.y).toBeCloseTo(256.2, 0);
   });
 
