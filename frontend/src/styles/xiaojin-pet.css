@@ -548,3 +548,84 @@
     transform: none;
   }
 }
+
+/* ---------- 右键 / 长按菜单 ---------- */
+.xiaojin-menu {
+  position: fixed;
+  z-index: 95; /* 压过小津(90)，仍低于 antd Modal(1000) */
+  width: 176px;
+  padding: 4px;
+  border: 1px solid var(--xiaojin-bubble-border);
+  border-radius: 10px;
+  background: var(--xiaojin-bubble-bg);
+  color: var(--xiaojin-bubble-ink);
+  box-shadow: 0 10px 28px rgba(43, 35, 24, 0.2);
+  font-size: 12.5px;
+  animation: xiaojin-bubble-in 0.14s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.xiaojin-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.xiaojin-menu-item:hover {
+  background: rgba(139, 37, 0, 0.1);
+}
+
+/* 勾选位固定宽度：选中与未选中的条目左缘对齐，菜单不会跳 */
+.xiaojin-menu-tick {
+  flex: 0 0 12px;
+  color: var(--fj-accent);
+}
+
+.xiaojin-menu-hint {
+  margin-left: auto;
+  padding-left: 6px;
+  font-size: 10.5px;
+  color: var(--xiaojin-bubble-muted);
+}
+
+.xiaojin-menu-title {
+  padding: 4px 8px 2px;
+  font-size: 10.5px;
+  color: var(--xiaojin-bubble-muted);
+}
+
+/* 祖师有十几位，菜单不能顶破视口 */
+.xiaojin-menu-scroll {
+  max-height: 196px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.xiaojin-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--xiaojin-bubble-border);
+  opacity: 0.7;
+}
+
+/* 气泡顶部的「正以 X 的口吻作答」 */
+.xiaojin-persona {
+  margin: 0 18px 6px 0;
+  font-size: 11px;
+  color: var(--xiaojin-bubble-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .xiaojin-menu {
+    animation: none;
+  }
+}

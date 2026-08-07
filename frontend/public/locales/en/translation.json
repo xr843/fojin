@@ -1529,5 +1529,12 @@
   "xiaojin.send": "Send",
   "xiaojin.thinking": "XiaoJin is thinking",
   "xiaojin.error": "The answer was interrupted — please try again.",
-  "xiaojin.continue": "Open in AI Q&A to verify citations →"
+  "xiaojin.continue": "Open in AI Q&A to verify citations →",
+  "xiaojin.menu_label": "XiaoJin menu",
+  "xiaojin.menu_new_chat": "New conversation",
+  "xiaojin.menu_master": "Answer in the voice of",
+  "xiaojin.menu_master_default": "XiaoJin (general)",
+  "xiaojin.menu_quit": "Quit XiaoJin",
+  "xiaojin.speaking_as": "Speaking as {{name}}",
+  "xiaojin.recall": "Bring back XiaoJin"
 }

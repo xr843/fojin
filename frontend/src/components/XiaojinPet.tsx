@@ -2,7 +2,8 @@ import { useState, useRef, useEffect, useCallback, lazy, Suspense } from "react"
 import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../stores/authStore";
-import { sendChatMessageStream } from "../api/client";
+import { useXiaojinStore } from "../stores/xiaojinStore";
+import { sendChatMessageStream, getMasters, type MasterProfile } from "../api/client";
 import { BG_NATURAL, PEAK_FRACTION, BG_OBJECT_POS, coverPoint } from "./xiaojinPeak";
 import "../styles/xiaojin-pet.css";
 
@@ -12,13 +13,10 @@ const XiaojinMarkdown = lazy(() => import("./XiaojinMarkdown"));
 const prefetchMarkdown = () => { void import("./XiaojinMarkdown"); };
 
 /**
- * 旧的「永久隐藏」键。现在按 ✕ 只改内存 state —— **刷新即回**，不落任何存储。
- *
- * 沿革：曾写 localStorage 做永久隐藏，但站内没有任何找回入口，等于单向门：
- * 点一下（移动端 ✕ 常驻，误触很容易）小津就永远消失，只能开 DevTools 清键
- * 自救。2026-08-07 用户实际撞上并报障。中途一度改 sessionStorage，实测发现
- * **同标签页刷新它照样还在**（只有关标签页才清），仍然不满足「刷新回来」，
- * 遂改为不落存储。这个常量只剩一个用途：清掉存量用户的旧键。
+ * 上古的「永久隐藏」键。隐藏状态现在归 useXiaojinStore（持久），配页脚的
+ * 「唤回小津」做找回入口 —— 成对才成立：2026-08-07 曾只写这个键、站内无处
+ * 恢复，用户点一次小津就永远消失，只能开 DevTools 自救。
+ * 这个常量只剩一个用途：清掉存量用户的旧键，几个版本后可连同 readHidden 删除。
  */
 const HIDDEN_KEY = "fojin_xiaojin_hidden";
 /** 用户把小津拖到哪，下次进来还在哪。 */
@@ -30,16 +28,14 @@ const EDGE = 8;
 
 type Pos = { x: number; y: number };
 
-/** 恒为 false —— 顺带清掉存量用户的旧永久隐藏键，让被单向门关掉的小津回来。
- *  几个版本后（存量键清完）这个函数连同 HIDDEN_KEY 可以一起删。 */
-function readHidden(): boolean {
+/** 清掉存量用户的旧永久隐藏键（新状态归 useXiaojinStore）。 */
+function clearLegacyHiddenKey() {
   try {
     localStorage.removeItem(HIDDEN_KEY);
     sessionStorage.removeItem(HIDDEN_KEY);
   } catch {
     // 私密模式：本来就没存过
   }
-  return false;
 }
 
 function readPos(): Pos | null {
@@ -110,7 +106,15 @@ function clampPos(p: Pos, w: number, h: number): Pos {
 export default function XiaojinPet() {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const [hidden, setHidden] = useState(readHidden);
+  const hidden = useXiaojinStore((st) => st.hidden);
+  const hide = useXiaojinStore((st) => st.hide);
+  const masterId = useXiaojinStore((st) => st.masterId);
+  const setMasterId = useXiaojinStore((st) => st.setMasterId);
+  const [legacyCleared] = useState(() => {
+    clearLegacyHiddenKey();
+    return true;
+  });
+  void legacyCleared;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const user = useAuthStore((s) => s.user);
@@ -129,6 +133,8 @@ export default function XiaojinPet() {
   const msgsRef = useRef<HTMLDivElement>(null);
   // 本轮是否收到过任何 token —— onDone 用它判「空完成」，不在 updater 里做副作用。
   const gotTokenRef = useRef(false);
+  // 当前祖师：用 ref 供 ask 读取，免得把 masterId 塞进 useCallback 依赖。
+  const masterIdRef = useRef<string | null>(null);
   // 本轮是否已走过 onError。客户端契约（api/client.ts）：每条错误路径 onError
   // 之后必补一次 onDone —— 不做这个标记，onDone 的空完成兜底会把配额/登录过期
   // 等真实错误文案覆盖成通用「回答中断了」（2026-08-06 生产实锤）。
@@ -136,6 +142,10 @@ export default function XiaojinPet() {
 
   // 离开首页时掐掉在途的流 —— 没人看的答案不必继续烧 token。
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  useEffect(() => {
+    masterIdRef.current = masterId;
+  }, [masterId]);
 
   // 新 token 到达时贴底 —— 迷你窗口，永远跟随最新内容。
   useEffect(() => {
@@ -160,6 +170,12 @@ export default function XiaojinPet() {
     v: "above",
     h: "right",
   });
+  // 右键（触屏长按）菜单：null = 未开；有值 = 菜单左上角的视口坐标。
+  const [menu, setMenu] = useState<Pos | null>(null);
+  // 祖师列表：只在第一次开菜单时拉，首页默认不为它花一次请求。
+  const [masters, setMasters] = useState<MasterProfile[] | null>(null);
+  const longPressRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
   // 一次拖动的起点快照；active 在越过阈值后置真。
   const dragRef = useRef<{ px: number; py: number; x: number; y: number; active: boolean } | null>(null);
   // 拖动结束后浏览器仍会补发一次 click —— 用这个标记吞掉它，别让拖完弹气泡。
@@ -323,7 +339,7 @@ export default function XiaojinPet() {
       setStreaming(false);
     };
 
-    sendChatMessageStream(term, sessionRef.current, null, {
+    sendChatMessageStream(term, sessionRef.current, masterIdRef.current, {
       onToken: appendToLast,
       onSources: () => {},
       onSessionId: (sid) => {
@@ -389,8 +405,62 @@ export default function XiaojinPet() {
     };
   }, [open]);
 
-  // 只改内存 state：刷新/切走再回来，小津就回来了。刻意不落存储——见 HIDDEN_KEY 注释。
-  const dismiss = () => setHidden(true);
+  /** 新对话：断掉在途的流、清空气泡里的往来与会话号，下一问从零开始。
+   *  没有这个入口时，气泡里的 sessionId 一旦建立就一直串下去——想换话题
+   *  只能刷新整页。 */
+  const startNewConversation = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    sessionRef.current = undefined;
+    setSessionId(undefined);
+    setMessages([]);
+    setChatError(null);
+    setStreaming(false);
+    setMenu(null);
+    setOpen(true);
+  }, []);
+
+  const activeMaster = masterId ? (masters ?? []).find((m) => m.id === masterId) ?? null : null;
+
+  const openMenu = useCallback((x: number, y: number) => {
+    setOpen(false);
+    // 菜单宽 176 / 高约 44+条目；夹进视口，别开出屏幕
+    setMenu({
+      x: Math.min(x, window.innerWidth - 184),
+      y: Math.min(y, window.innerHeight - 220),
+    });
+    if (!masters) {
+      // 失败时保持 null 而不是设成 []：[] 会让下面这个 !masters 守卫永远为假，
+      // 一次瞬时网络失败就把祖师列表永久降级到只剩「通用」，直到刷新整页。
+      // 菜单是用户手动开的、频率低，失败后下次再开重试没有风暴风险。
+      getMasters()
+        .then(setMasters)
+        .catch(() => {});
+    }
+  }, [masters]);
+
+  // 菜单开着时：Esc 或点别处关掉
+  useEffect(() => {
+    if (!menu) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenu(null);
+    };
+    const onDown = (e: MouseEvent) => {
+      if (!(e.target as Element)?.closest?.(".xiaojin-menu")) setMenu(null);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDown);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDown);
+    };
+  }, [menu]);
+
+  // 持久退出。找回入口在页脚（Layout 的「唤回小津」），两者必须成对存在。
+  const dismiss = () => {
+    setMenu(null);
+    hide();
+  };
 
   if (hidden) return null;
 
@@ -418,6 +488,11 @@ export default function XiaojinPet() {
           >
             ✕
           </button>
+          {activeMaster && (
+            <div className="xiaojin-persona">
+              {t("xiaojin.speaking_as", { name: activeMaster.name_zh })}
+            </div>
+          )}
           {messages.length === 0 && <p className="xiaojin-greeting">{t("xiaojin.greeting")}</p>}
           {messages.length > 0 && (
             <div className="xiaojin-msgs" ref={msgsRef}>
@@ -481,9 +556,31 @@ export default function XiaojinPet() {
         <button
           type="button"
           className="xiaojin-body"
-          onPointerDown={onFigurePointerDown}
-          onPointerMove={onFigurePointerMove}
-          onPointerUp={onFigurePointerUp}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            openMenu(e.clientX, e.clientY);
+          }}
+          onPointerDown={(e) => {
+            onFigurePointerDown(e);
+            // 触屏没有右键：长按 550ms 弹菜单。指针一动（拖动）就取消。
+            if (e.pointerType === "touch") {
+              clearTimeout(longPressRef.current);
+              const { clientX, clientY } = e;
+              longPressRef.current = setTimeout(() => {
+                dragRef.current = null; // 别让这次长按尾随成一次拖动
+                draggedRef.current = true; // 吞掉随后的 click，免得同时弹气泡
+                openMenu(clientX, clientY);
+              }, 550);
+            }
+          }}
+          onPointerMove={(e) => {
+            clearTimeout(longPressRef.current);
+            onFigurePointerMove(e);
+          }}
+          onPointerUp={() => {
+            clearTimeout(longPressRef.current);
+            onFigurePointerUp();
+          }}
           onClick={() => {
             // 刚拖完：这次 click 是拖动的尾巴，不是点击意图。
             if (draggedRef.current) {
@@ -510,6 +607,58 @@ export default function XiaojinPet() {
           ✕
         </button>
       </div>
+
+      {menu && (
+        <div
+          className="xiaojin-menu"
+          role="menu"
+          aria-label={t("xiaojin.menu_label")}
+          style={{ left: menu.x, top: menu.y }}
+        >
+          <button type="button" role="menuitem" className="xiaojin-menu-item" onClick={startNewConversation}>
+            {t("xiaojin.menu_new_chat")}
+          </button>
+          <div className="xiaojin-menu-sep" />
+          <div className="xiaojin-menu-title">{t("xiaojin.menu_master")}</div>
+          <div className="xiaojin-menu-scroll">
+            <button
+              type="button"
+              role="menuitemradio"
+              aria-checked={masterId === null}
+              className="xiaojin-menu-item"
+              onClick={() => {
+                setMasterId(null);
+                startNewConversation();
+              }}
+            >
+              <span className="xiaojin-menu-tick">{masterId === null ? "✓" : ""}</span>
+              {t("xiaojin.menu_master_default")}
+            </button>
+            {(masters ?? []).map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                role="menuitemradio"
+                aria-checked={masterId === m.id}
+                className="xiaojin-menu-item"
+                onClick={() => {
+                  setMasterId(m.id);
+                  // 换人重开一局：旧上下文是上一位祖师的，串下去会串味
+                  startNewConversation();
+                }}
+              >
+                <span className="xiaojin-menu-tick">{masterId === m.id ? "✓" : ""}</span>
+                {m.name_zh}
+                <span className="xiaojin-menu-hint">{m.tradition}</span>
+              </button>
+            ))}
+          </div>
+          <div className="xiaojin-menu-sep" />
+          <button type="button" role="menuitem" className="xiaojin-menu-item" onClick={dismiss}>
+            {t("xiaojin.menu_quit")}
+          </button>
+        </div>
+      )}
 
     </div>
   );

@@ -26,6 +26,7 @@ import { useTranslation } from "react-i18next";
 import { currentUILang } from "../i18n";
 import ThemeToggle from "./ThemeToggle";
 import { useAuthStore } from "../stores/authStore";
+import { useXiaojinStore } from "../stores/xiaojinStore";
 import { getAdminPendingSummary, type AdminPendingSummary } from "../api/client";
 import NotificationBell from "./NotificationBell";
 import CursorGlow from "./CursorGlow";
@@ -38,6 +39,8 @@ export default function Layout() {
   const { user, logout } = useAuthStore();
   const { t, i18n } = useTranslation();
   const isHome = location.pathname === "/";
+  const xiaojinHidden = useXiaojinStore((st) => st.hidden);
+  const recallXiaojin = useXiaojinStore((st) => st.show);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const handleLogout = () => {
@@ -391,6 +394,29 @@ export default function Layout() {
         }}
       >
         {t("footer.copyright")}
+        {/* 「退出小津」的找回入口。持久退出必须成对配一个恢复口，否则就是
+            2026-08-07 那个单向门 bug。只在首页（小津的地盘）且确实退出了才露。 */}
+        {isHome && xiaojinHidden && (
+          <>
+            <span style={{ margin: "0 8px", opacity: 0.4 }}>|</span>
+            <button
+              type="button"
+              onClick={recallXiaojin}
+              style={{
+                border: 0,
+                background: "none",
+                color: "inherit",
+                font: "inherit",
+                cursor: "pointer",
+                textDecoration: "underline",
+                textUnderlineOffset: 2,
+                padding: 0,
+              }}
+            >
+              {t("xiaojin.recall")}
+            </button>
+          </>
+        )}
         <span style={{ margin: "0 8px", opacity: 0.4 }}>|</span>
         <a
           href="https://github.com/xr843/fojin"

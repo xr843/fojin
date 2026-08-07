@@ -3,11 +3,13 @@ import { render, screen, fireEvent, waitFor, act } from "@testing-library/react"
 import { MemoryRouter, useLocation } from "react-router";
 import XiaojinPet from "./XiaojinPet";
 import { useAuthStore } from "../stores/authStore";
+import { useXiaojinStore } from "../stores/xiaojinStore";
+import { getMasters } from "../api/client";
 import { sendChatMessageStream } from "../api/client";
 
 vi.mock("../api/client", async () => {
   const actual = await vi.importActual<typeof import("../api/client")>("../api/client");
-  return { ...actual, sendChatMessageStream: vi.fn() };
+  return { ...actual, sendChatMessageStream: vi.fn(), getMasters: vi.fn() };
 });
 
 const HIDDEN_KEY = "fojin_xiaojin_hidden";
@@ -44,6 +46,11 @@ beforeEach(() => {
   useAuthStore.setState({ token: null, user: null });
   vi.clearAllMocks();
   vi.mocked(sendChatMessageStream).mockResolvedValue(undefined);
+  vi.mocked(getMasters).mockResolvedValue([
+    { id: "huineng", name_zh: "慧能", name_en: "Huineng", tradition: "禅宗", dates: "638–713", description: "", epigraph: null },
+    { id: "xuanzang", name_zh: "玄奘", name_en: "Xuanzang", tradition: "唯识", dates: "602–664", description: "", epigraph: null },
+  ]);
+  useXiaojinStore.setState({ hidden: false, masterId: null });
   // 首帧定位在 rAF 回调里 setPlaced(true)；jsdom 的 rAF 不随断言推进，
   // visibility:hidden 会把可访问性树整个藏掉（getByRole 全灭）。打成同步。
   vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
@@ -295,26 +302,22 @@ describe("XiaojinPet", () => {
     expect(screen.queryByLabelText("问我任何问题…")).toBeNull();
   });
 
-  it("按 ✕ 立刻消失，但不落任何存储（刷新即回，不是单向门）", () => {
+  it("按 ✕ 退出：小津消失且状态进 store（持久，靠页脚唤回）", () => {
     renderPet();
     fireEvent.click(screen.getByLabelText("暂时关闭小津（刷新后回来）"));
     expect(screen.queryByLabelText("问小津")).toBeNull();
-    // 落 localStorage = 永久单向门；落 sessionStorage 同标签页刷新照样还在
-    // （实测），两者都不满足「刷新回来」。
-    expect(localStorage.getItem(HIDDEN_KEY)).toBeNull();
-    expect(sessionStorage.getItem(HIDDEN_KEY)).toBeNull();
+    expect(useXiaojinStore.getState().hidden).toBe(true);
   });
 
-  it("关掉后重新挂载（等价于刷新）小津就回来", () => {
-    const { unmount } = renderPet();
+  it("store 里 show() 之后小津回来（页脚「唤回小津」走的就是这条）", () => {
+    renderPet();
     fireEvent.click(screen.getByLabelText("暂时关闭小津（刷新后回来）"));
     expect(screen.queryByLabelText("问小津")).toBeNull();
-    unmount();
-    renderPet();
+    act(() => useXiaojinStore.getState().show());
     expect(screen.getByLabelText("问小津")).toBeTruthy();
   });
 
-  it("迁移：旧的永久隐藏键被清掉，小津回来", () => {
+  it("迁移：上古的永久隐藏键被清掉，小津回来", () => {
     localStorage.setItem(HIDDEN_KEY, "1");
     sessionStorage.setItem(HIDDEN_KEY, "1");
     renderPet();
@@ -407,4 +410,108 @@ describe("XiaojinPet 拖动", () => {
 
   // 气泡朝向（data-v/data-h）依赖真实布局的 getBoundingClientRect，jsdom 里
   // rect 全零测不出翻转 —— 朝向逻辑在真浏览器里人工验证（拖到顶部气泡开脚下）。
+});
+
+describe("XiaojinPet 右键菜单", () => {
+  const openMenu = async () => {
+    fireEvent.contextMenu(screen.getByLabelText("问小津"), { clientX: 100, clientY: 100 });
+    await waitFor(() => expect(screen.getByRole("menu")).toBeTruthy());
+  };
+
+  it("右键弹菜单，含新对话 / 祖师列表 / 退出", async () => {
+    renderPet();
+    await openMenu();
+    expect(screen.getByText("新对话")).toBeTruthy();
+    expect(screen.getByText("退出小津")).toBeTruthy();
+    // 祖师是懒加载的：开菜单才拉
+    expect(await screen.findByText("慧能")).toBeTruthy();
+    expect(screen.getByText("玄奘")).toBeTruthy();
+    expect(getMasters).toHaveBeenCalledTimes(1);
+  });
+
+  it("首页默认不拉祖师列表（不为菜单花一次请求）", () => {
+    renderPet();
+    expect(getMasters).not.toHaveBeenCalled();
+  });
+
+  it("新对话：清空往来并断开会话，下一问不带旧 session", async () => {
+    renderPet();
+    openBubble();
+    const cb = await askAndGetCallbacks("第一问");
+    act(() => {
+      cb.onSessionId(42);
+      cb.onToken("答一");
+      cb.onDone();
+    });
+    expect(await screen.findByText("答一")).toBeTruthy();
+
+    await openMenu();
+    fireEvent.click(screen.getByText("新对话"));
+    // 往来清空
+    expect(screen.queryByText("答一")).toBeNull();
+    expect(screen.queryByText("第一问")).toBeNull();
+
+    await askAndGetCallbacks("第二问");
+    const calls = vi.mocked(sendChatMessageStream).mock.calls;
+    // 关键：不带旧 sessionId，否则「新对话」名不副实（上下文还串着）
+    expect(calls[calls.length - 1][1]).toBeUndefined();
+  });
+
+  it("选祖师：masterId 进 store、传给流式接口，并重开一局", async () => {
+    renderPet();
+    openBubble();
+    const cb = await askAndGetCallbacks("第一问");
+    act(() => {
+      cb.onSessionId(7);
+      cb.onToken("答");
+      cb.onDone();
+    });
+
+    await openMenu();
+    fireEvent.click(await screen.findByText("慧能"));
+    expect(useXiaojinStore.getState().masterId).toBe("huineng");
+    // 换人必须重开：旧上下文是上一位祖师的
+    expect(screen.queryByText("答")).toBeNull();
+
+    await askAndGetCallbacks("以六祖口吻");
+    const calls = vi.mocked(sendChatMessageStream).mock.calls;
+    expect(calls[calls.length - 1][2]).toBe("huineng");
+    expect(calls[calls.length - 1][1]).toBeUndefined();
+  });
+
+  it("选中的祖师在气泡里有标识（选完气泡直接开着，不必再点一次）", async () => {
+    renderPet();
+    await openMenu();
+    fireEvent.click(await screen.findByText("玄奘"));
+    // startNewConversation 会把气泡打开——再点小津反而是关掉它
+    expect(screen.getByLabelText("问我任何问题…")).toBeTruthy();
+    expect(await screen.findByText(/正以 玄奘 的口吻作答/)).toBeTruthy();
+  });
+
+  it("菜单里的退出＝持久退出", async () => {
+    renderPet();
+    await openMenu();
+    fireEvent.click(screen.getByText("退出小津"));
+    expect(screen.queryByLabelText("问小津")).toBeNull();
+    expect(useXiaojinStore.getState().hidden).toBe(true);
+  });
+});
+
+describe("XiaojinPet 祖师列表的失败恢复", () => {
+  it("首次拉取失败后再开菜单会重试（不永久降级成只剩「通用」）", async () => {
+    vi.mocked(getMasters).mockRejectedValueOnce(new Error("network"));
+    renderPet();
+    const body = screen.getByLabelText("问小津");
+
+    fireEvent.contextMenu(body, { clientX: 100, clientY: 100 });
+    await waitFor(() => expect(getMasters).toHaveBeenCalledTimes(1));
+    // 失败这轮只有「通用」
+    await waitFor(() => expect(screen.queryByText("慧能")).toBeNull());
+
+    // 关掉再开：必须重试。把失败结果记成 [] 的写法会让这里永远拉不到。
+    fireEvent.mouseDown(document.body);
+    fireEvent.contextMenu(body, { clientX: 100, clientY: 100 });
+    expect(await screen.findByText("慧能")).toBeTruthy();
+    expect(getMasters).toHaveBeenCalledTimes(2);
+  });
 });
