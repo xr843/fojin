@@ -1,7 +1,8 @@
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, beforeEach } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Routes, Route, useLocation } from "react-router";
 import Layout from "./Layout";
+import { useXiaojinStore } from "../stores/xiaojinStore";
 
 /** 把当前路径渲染出来，供断言导航是否真的发生 */
 function LocationProbe() {
@@ -45,5 +46,24 @@ describe("Layout 顶部导航", () => {
     for (const label of ["数据源", "AI 问答", "佛学辞典", "知识图谱", "佛教地理", "经典专题"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
+  });
+});
+
+
+describe("页脚的「唤回小津」", () => {
+  beforeEach(() => useXiaojinStore.setState({ hidden: false, masterId: null }));
+
+  it("小津在场时不显示（别添无用的噪音）", () => {
+    renderLayout();
+    expect(screen.queryByText("唤回小津")).not.toBeInTheDocument();
+  });
+
+  it("退出后出现，点一下把小津放回来 —— 持久退出必须成对配这个入口", () => {
+    useXiaojinStore.setState({ hidden: true });
+    renderLayout();
+    const recall = screen.getByText("唤回小津");
+    fireEvent.click(recall);
+    expect(useXiaojinStore.getState().hidden).toBe(false);
+    expect(screen.queryByText("唤回小津")).not.toBeInTheDocument();
   });
 });

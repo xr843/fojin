@@ -1529,5 +1529,12 @@
   "xiaojin.send": "發送",
   "xiaojin.thinking": "小津思索中",
   "xiaojin.error": "回答中斷了，請稍後再試。",
-  "xiaojin.continue": "去 AI 問答查看完整引文 →"
+  "xiaojin.continue": "去 AI 問答查看完整引文 →",
+  "xiaojin.menu_label": "小津選單",
+  "xiaojin.menu_new_chat": "新對話",
+  "xiaojin.menu_master": "以誰的口吻作答",
+  "xiaojin.menu_master_default": "小津（通用）",
+  "xiaojin.menu_quit": "退出小津",
+  "xiaojin.speaking_as": "正以 {{name}} 的口吻作答",
+  "xiaojin.recall": "喚回小津"
 }
