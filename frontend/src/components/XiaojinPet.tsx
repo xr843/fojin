@@ -169,9 +169,10 @@ export default function XiaojinPet() {
     v: "above",
     h: "right",
   });
-  // 右键（触屏长按）菜单：null = 未开。up=true 时锚定底边向上展开——
-  // 小津默认在右下角，向下弹必然被视口裁掉（2026-08-07 用户实测截图）。
-  const [menu, setMenu] = useState<{ x: number; y: number; up: boolean } | null>(null);
+  // 右键（触屏长按）菜单：null = 未开。定位以**小津本体**为锚而不是点击点：
+  // up=true 整个菜单在头顶之上（bottom 锚），否则在脚下（top 锚）——右键都发生
+  // 在小津身上，按点击点摆菜单必然盖住它（2026-08-07 用户两轮实测截图）。
+  const [menu, setMenu] = useState<{ x: number; top: number; bottom: number; up: boolean } | null>(null);
   // 祖师列表：只在第一次开菜单时拉，首页默认不为它花一次请求。
   const [masters, setMasters] = useState<MasterProfile[] | null>(null);
   const longPressRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -423,11 +424,15 @@ export default function XiaojinPet() {
 
   const openMenu = useCallback((x: number, y: number) => {
     setOpen(false);
-    // 下方放不下就向上翻（锚 bottom），放得下才向下（锚 top）。
-    const up = y > window.innerHeight - MENU_EST;
+    // 锚在小津本体的上/下缘（留 8px 空隙），避开身体；figure 量不到时退回点击点。
+    const fr = figureRef.current?.getBoundingClientRect();
+    const headTop = fr && fr.height > 1 ? fr.top : y;
+    const feetBottom = fr && fr.height > 1 ? fr.bottom : y;
+    const up = window.innerHeight - feetBottom < MENU_EST;
     setMenu({
       x: Math.min(x, window.innerWidth - 224),
-      y,
+      top: feetBottom + 8,
+      bottom: Math.max(8, window.innerHeight - headTop + 8),
       up,
     });
     if (!masters) {
@@ -616,8 +621,8 @@ export default function XiaojinPet() {
           aria-label={t("xiaojin.menu_label")}
           style={
             menu.up
-              ? { left: menu.x, bottom: Math.max(8, window.innerHeight - menu.y) }
-              : { left: menu.x, top: menu.y }
+              ? { left: menu.x, bottom: menu.bottom }
+              : { left: menu.x, top: menu.top }
           }
         >
           <button type="button" role="menuitem" className="xiaojin-menu-item" onClick={startNewConversation}>

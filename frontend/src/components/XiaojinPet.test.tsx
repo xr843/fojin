@@ -436,20 +436,30 @@ describe("XiaojinPet 右键菜单", () => {
     expect(getMasters).toHaveBeenCalledTimes(1);
   });
 
-  it("贴近底部右键：菜单锚定底边向上展开，不被视口裁掉（jsdom innerHeight=768）", async () => {
+  /** jsdom 的 rect 全零，给 figure 钉一个真实矩形，才能断言「菜单避开小津」。 */
+  function stubFigureRect(top: number, bottom: number) {
+    const fig = document.querySelector(".xiaojin-figure") as HTMLElement;
+    fig.getBoundingClientRect = () =>
+      ({ top, bottom, left: 1820, right: 1900, width: 80, height: bottom - top, x: 1820, y: top, toJSON: () => ({}) }) as DOMRect;
+  }
+
+  it("小津贴底（右下角默认位）：菜单整体落在头顶之上，不盖身体", async () => {
     renderPet();
-    fireEvent.contextMenu(screen.getByLabelText("问小津"), { clientX: 900, clientY: 700 });
+    stubFigureRect(650, 740); // spaceBelow=28 < 330 → 向上翻
+    fireEvent.contextMenu(screen.getByLabelText("问小津"), { clientX: 1850, clientY: 700 });
     const menu = await screen.findByRole("menu");
-    // 700 > 768-330 → 向上翻：bottom = 768-700 = 68，top 不设
-    expect((menu as HTMLElement).style.bottom).toBe("68px");
+    // bottom = innerHeight(768) - headTop(650) + 8 = 126 → 菜单底边在头顶上方 8px
+    expect((menu as HTMLElement).style.bottom).toBe("126px");
     expect((menu as HTMLElement).style.top).toBe("");
   });
 
-  it("上半屏右键：菜单照常向下展开（top 锚定）", async () => {
+  it("小津在上半屏（拖上去了）：菜单整体落在脚下，不盖身体", async () => {
     renderPet();
-    fireEvent.contextMenu(screen.getByLabelText("问小津"), { clientX: 100, clientY: 120 });
+    stubFigureRect(100, 190); // spaceBelow=578 ≥ 330 → 向下
+    fireEvent.contextMenu(screen.getByLabelText("问小津"), { clientX: 1850, clientY: 150 });
     const menu = await screen.findByRole("menu");
-    expect((menu as HTMLElement).style.top).toBe("120px");
+    // top = feetBottom(190) + 8 = 198 → 菜单顶边在脚下 8px
+    expect((menu as HTMLElement).style.top).toBe("198px");
     expect((menu as HTMLElement).style.bottom).toBe("");
   });
 
