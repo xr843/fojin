@@ -40,6 +40,7 @@ const openBubble = () => fireEvent.click(screen.getByLabelText("问小津"));
 
 beforeEach(() => {
   localStorage.clear();
+  sessionStorage.clear();
   useAuthStore.setState({ token: null, user: null });
   vi.clearAllMocks();
   vi.mocked(sendChatMessageStream).mockResolvedValue(undefined);
@@ -294,11 +295,32 @@ describe("XiaojinPet", () => {
     expect(screen.queryByLabelText("问我任何问题…")).toBeNull();
   });
 
-  it("赶走它之后本次立刻消失，并记进 localStorage", () => {
+  it("按 ✕ 立刻消失，但不落任何存储（刷新即回，不是单向门）", () => {
     renderPet();
-    fireEvent.click(screen.getByLabelText("不再显示小津"));
+    fireEvent.click(screen.getByLabelText("暂时关闭小津（刷新后回来）"));
     expect(screen.queryByLabelText("问小津")).toBeNull();
-    expect(localStorage.getItem(HIDDEN_KEY)).toBe("1");
+    // 落 localStorage = 永久单向门；落 sessionStorage 同标签页刷新照样还在
+    // （实测），两者都不满足「刷新回来」。
+    expect(localStorage.getItem(HIDDEN_KEY)).toBeNull();
+    expect(sessionStorage.getItem(HIDDEN_KEY)).toBeNull();
+  });
+
+  it("关掉后重新挂载（等价于刷新）小津就回来", () => {
+    const { unmount } = renderPet();
+    fireEvent.click(screen.getByLabelText("暂时关闭小津（刷新后回来）"));
+    expect(screen.queryByLabelText("问小津")).toBeNull();
+    unmount();
+    renderPet();
+    expect(screen.getByLabelText("问小津")).toBeTruthy();
+  });
+
+  it("迁移：旧的永久隐藏键被清掉，小津回来", () => {
+    localStorage.setItem(HIDDEN_KEY, "1");
+    sessionStorage.setItem(HIDDEN_KEY, "1");
+    renderPet();
+    expect(screen.getByLabelText("问小津")).toBeTruthy();
+    expect(localStorage.getItem(HIDDEN_KEY)).toBeNull();
+    expect(sessionStorage.getItem(HIDDEN_KEY)).toBeNull();
   });
 
   it("气泡里没有意见反馈入口（2026-08-06 用户要求整个移除，含登录态）", () => {
@@ -315,11 +337,7 @@ describe("XiaojinPet", () => {
     expect(document.querySelector(".xiaojin-feedback")).toBeNull();
   });
 
-  it("已被赶走过就整个不渲染", () => {
-    localStorage.setItem(HIDDEN_KEY, "1");
-    renderPet();
-    expect(screen.queryByLabelText("问小津")).toBeNull();
-  });
+
 });
 
 describe("XiaojinPet 拖动", () => {

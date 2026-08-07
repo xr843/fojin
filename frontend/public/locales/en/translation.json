@@ -1522,7 +1522,7 @@
   "chat.configure_other_models": "Use another provider…",
   "xiaojin.open": "Ask XiaoJin",
   "xiaojin.close": "Close",
-  "xiaojin.dismiss": "Hide XiaoJin",
+  "xiaojin.dismiss": "Hide XiaoJin for now (back on refresh)",
   "xiaojin.bubble_label": "Ask XiaoJin",
   "xiaojin.greeting": "Amitabha. I am XiaoJin — ask about doctrine, where a term comes from, or which sutra you need. 🙏",
   "xiaojin.placeholder": "Ask me anything…",
