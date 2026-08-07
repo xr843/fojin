@@ -26,6 +26,13 @@ const HIDDEN_KEY = "fojin_xiaojin_hidden";
  * 送回上次拖到的地方（与「退出」那条同一类坑，见 xiaojinStore 的 merge）。
  */
 const POS_KEY = "fojin_xiaojin_pos";
+/**
+ * 默认落点开关：true = 背景山水的山尖正上方（cover 实时换算，见 xiaojinPeak.ts），
+ * false = CSS 右下角锚点（right:24 / bottom:60，雾中小岛那一带）。
+ * 2026-08-07 用户要求试右下角；山尖那套换算代码保留，切回改这一个值即可。
+ */
+const PERCH_ON_PEAK = false;
+
 /** 指针位移超过这个像素数才算拖动，否则算点击。 */
 const DRAG_THRESHOLD = 5;
 /** 夹取时给视口四边留的呼吸边距。 */
@@ -218,7 +225,7 @@ export default function XiaojinPet() {
       if (done) return;
       cancelAnimationFrame(raf);
       clearTimeout(timer);
-      const a = computePeakAnchor();
+      const a = PERCH_ON_PEAK ? computePeakAnchor() : null;
       if (a !== undefined) {
         done = true;
         setAnchor(a ?? null);
@@ -252,7 +259,7 @@ export default function XiaojinPet() {
         const { w, h } = figureSize();
         setPos(clampPos(pos, w, h));
       } else {
-        setAnchor(computePeakAnchor() ?? null);
+        setAnchor(PERCH_ON_PEAK ? computePeakAnchor() ?? null : null);
       }
     };
     window.addEventListener("resize", onResize);
