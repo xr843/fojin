@@ -185,18 +185,43 @@ export default function XiaojinPet() {
   // 不让窄屏用户白等一秒的隐身。
   useEffect(() => {
     let raf = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     let tries = 0;
+    let done = false;
+    // rAF + 定时器双驱动：前台标签页 rAF 先到（绘制前定位，无闪跳）；
+    // 后台标签页 rAF 停摆（实锤：CDP 后台页里循环整个不走），定时器兜底。
+    const schedule = () => {
+      raf = requestAnimationFrame(attempt);
+      timer = setTimeout(attempt, 250);
+    };
     const attempt = () => {
+      if (done) return;
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
       const a = computePeakAnchor();
-      if (a !== undefined || tries++ > 60) {
+      if (a !== undefined) {
+        done = true;
         setAnchor(a ?? null);
         setPlaced(true);
         return;
       }
-      raf = requestAnimationFrame(attempt);
+      tries += 1;
+      // ~1s 还没排好版：先在 CSS 兜底位现身，别让用户一直看不见小津；
+      // 后台继续找山尖（dev 冷启样式加载可超 1s），找到再挪上去，够久就放弃。
+      if (tries === 20) setPlaced(true);
+      if (tries > 160) {
+        done = true;
+        setAnchor(null);
+        return;
+      }
+      schedule();
     };
-    raf = requestAnimationFrame(attempt);
-    return () => cancelAnimationFrame(raf);
+    schedule();
+    return () => {
+      done = true;
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+    };
   }, [computePeakAnchor]);
 
   // 窗口尺寸变化：拖过的夹回视口；没拖过的重算山尖锚点（cover 裁切随尺寸变）。
