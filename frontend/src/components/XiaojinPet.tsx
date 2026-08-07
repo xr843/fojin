@@ -424,9 +424,9 @@ export default function XiaojinPet() {
 
   const openMenu = useCallback((x: number, y: number) => {
     setOpen(false);
-    // 菜单宽 176 / 高约 44+条目；夹进视口，别开出屏幕
+    // 菜单宽 216 / 高约 44+条目；夹进视口，别开出屏幕
     setMenu({
-      x: Math.min(x, window.innerWidth - 184),
+      x: Math.min(x, window.innerWidth - 224),
       y: Math.min(y, window.innerHeight - 220),
     });
     if (!masters) {
@@ -632,7 +632,7 @@ export default function XiaojinPet() {
               }}
             >
               <span className="xiaojin-menu-tick">{masterId === null ? "✓" : ""}</span>
-              {t("xiaojin.menu_master_default")}
+              <span className="xiaojin-menu-name">{t("xiaojin.menu_master_default")}</span>
             </button>
             {(masters ?? []).map((m) => (
               <button
@@ -648,8 +648,10 @@ export default function XiaojinPet() {
                 }}
               >
                 <span className="xiaojin-menu-tick">{masterId === m.id ? "✓" : ""}</span>
-                {m.name_zh}
-                <span className="xiaojin-menu-hint">{m.tradition}</span>
+                <span className="xiaojin-menu-name">{m.name_zh}</span>
+                <span className="xiaojin-menu-hint" title={m.tradition}>
+                  {m.tradition}
+                </span>
               </button>
             ))}
           </div>

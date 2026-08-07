@@ -553,7 +553,7 @@
 .xiaojin-menu {
   position: fixed;
   z-index: 95; /* 压过小津(90)，仍低于 antd Modal(1000) */
-  width: 176px;
+  width: 216px;
   padding: 4px;
   border: 1px solid var(--xiaojin-bubble-border);
   border-radius: 10px;
@@ -589,11 +589,24 @@
   color: var(--fj-accent);
 }
 
+/* 祖师名永远一行：不收缩、不换行。长宗派标签（「藏传·格鲁派」「南传·上座部
+   论师」）此前会把名字挤到第二行——名字是主体，标签才该让位。 */
+.xiaojin-menu-name {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* 标签让位并截断；完整文字挂 title，悬停可看全。 */
 .xiaojin-menu-hint {
+  flex: 0 1 auto;
+  min-width: 0;
   margin-left: auto;
   padding-left: 6px;
   font-size: 10.5px;
   color: var(--xiaojin-bubble-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .xiaojin-menu-title {
