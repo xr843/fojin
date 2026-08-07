@@ -1532,7 +1532,7 @@
   "xiaojin.continue": "去 AI 问答查看完整引文 →",
   "xiaojin.menu_label": "小津菜单",
   "xiaojin.menu_new_chat": "新对话",
-  "xiaojin.menu_master": "以谁的口吻作答",
+  "xiaojin.menu_master": "请谁作答",
   "xiaojin.menu_master_default": "小津（通用）",
   "xiaojin.menu_quit": "退出小津",
   "xiaojin.speaking_as": "正以 {{name}} 的口吻作答",
