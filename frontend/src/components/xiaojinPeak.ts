@@ -14,8 +14,10 @@ export const BG_NATURAL = { w: 1280, h: 717 };
 /** fx 说明：0.8172 是「最高像素」所在列（左肩），0.826 是一次目测误标——
  *  目测值不锚定图像特征，误差会随窗口宽度漂移（用户两次方向相反的投诉
  *  ±0.327 袍宽完美对称，中点 0.8216 与原图山脊中线扫描 0.822 汇合）。
- *  0.822 = apex 下方 16-32px 处山体左右边界的中点，是稳定的图像特征。 */
-export const PEAK_FRACTION = { fx: 0.822, fy: 0.4003 };
+ *  0.822 = apex 下方 16-32px 处山体左右边界的中点，是稳定的图像特征；
+ *  0.8210 是在它基础上按用户「往左一点点，差不多 2px」微调的终值
+ *  （2px ÷ 渲染宽 1920px ≈ 0.00104）。 */
+export const PEAK_FRACTION = { fx: 0.821, fy: 0.4003 };
 /** home.css `.home-hero-bg img { object-position: center 70% }` */
 export const BG_OBJECT_POS = { x: 0.5, y: 0.7 };
 
