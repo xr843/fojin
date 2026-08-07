@@ -554,6 +554,9 @@
   position: fixed;
   z-index: 95; /* 压过小津(90)，仍低于 antd Modal(1000) */
   width: 216px;
+  /* 极矮视口（横屏手机）上下都放不下时的兜底：整个菜单可滚，别裁掉「退出」 */
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
   padding: 4px;
   border: 1px solid var(--xiaojin-bubble-border);
   border-radius: 10px;

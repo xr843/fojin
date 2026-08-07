@@ -436,6 +436,23 @@ describe("XiaojinPet 右键菜单", () => {
     expect(getMasters).toHaveBeenCalledTimes(1);
   });
 
+  it("贴近底部右键：菜单锚定底边向上展开，不被视口裁掉（jsdom innerHeight=768）", async () => {
+    renderPet();
+    fireEvent.contextMenu(screen.getByLabelText("问小津"), { clientX: 900, clientY: 700 });
+    const menu = await screen.findByRole("menu");
+    // 700 > 768-330 → 向上翻：bottom = 768-700 = 68，top 不设
+    expect((menu as HTMLElement).style.bottom).toBe("68px");
+    expect((menu as HTMLElement).style.top).toBe("");
+  });
+
+  it("上半屏右键：菜单照常向下展开（top 锚定）", async () => {
+    renderPet();
+    fireEvent.contextMenu(screen.getByLabelText("问小津"), { clientX: 100, clientY: 120 });
+    const menu = await screen.findByRole("menu");
+    expect((menu as HTMLElement).style.top).toBe("120px");
+    expect((menu as HTMLElement).style.bottom).toBe("");
+  });
+
   it("首页默认不拉祖师列表（不为菜单花一次请求）", () => {
     renderPet();
     expect(getMasters).not.toHaveBeenCalled();
