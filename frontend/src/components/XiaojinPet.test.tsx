@@ -302,11 +302,13 @@ describe("XiaojinPet", () => {
     expect(screen.queryByLabelText("问我任何问题…")).toBeNull();
   });
 
-  it("按 ✕ 退出：小津消失且状态进 store（持久，靠页脚唤回）", () => {
+  it("按 ✕ 退出：小津消失，但不写盘（刷新自动回来，见 xiaojinStore.test）", () => {
     renderPet();
     fireEvent.click(screen.getByLabelText("暂时关闭小津（刷新后回来）"));
     expect(screen.queryByLabelText("问小津")).toBeNull();
     expect(useXiaojinStore.getState().hidden).toBe(true);
+    const persisted = JSON.parse(localStorage.getItem("fojin-xiaojin") ?? "{}");
+    expect(persisted.state?.hidden).toBeUndefined();
   });
 
   it("store 里 show() 之后小津回来（页脚「唤回小津」走的就是这条）", () => {
