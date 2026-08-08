@@ -1536,5 +1536,6 @@
   "xiaojin.menu_master_default": "XiaoJin (general)",
   "xiaojin.menu_quit": "Quit XiaoJin",
   "xiaojin.speaking_as": "Speaking as {{name}}",
-  "xiaojin.recall": "Bring back XiaoJin"
+  "xiaojin.recall": "Bring back XiaoJin",
+  "admin_dashboard.trends.series.anonymous_messages": "Guest messages"
 }

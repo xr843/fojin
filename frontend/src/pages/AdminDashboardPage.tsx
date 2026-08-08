@@ -250,9 +250,15 @@ export default function AdminDashboardPage() {
   // color domain below all reference the exact same strings (a mismatch would
   // silently drop a series back to a default color).
   const S_MESSAGES = t("admin_dashboard.trends.series.messages");
+  const S_ANON_MESSAGES = t("admin_dashboard.trends.series.anonymous_messages");
   const S_NEW_USERS = t("admin_dashboard.trends.series.new_users");
   const S_ACTIVE_USERS = t("admin_dashboard.trends.series.active_users");
-  const messagesData = trends.messages.map((d) => ({ ...d, type: S_MESSAGES }));
+  // 游客消息数（内容不落库，只记数）——没有它，这张图只覆盖注册用户。
+  // ?? []：滚动部署期间旧后端还没有这个字段，别让 map 炸掉整页。
+  const messagesData = [
+    ...trends.messages.map((d) => ({ ...d, type: S_MESSAGES })),
+    ...(trends.anonymous_messages ?? []).map((d) => ({ ...d, type: S_ANON_MESSAGES })),
+  ];
   const usersData = [
     ...trends.registrations.map((d) => ({ ...d, type: S_NEW_USERS })),
     ...trends.active_users.map((d) => ({ ...d, type: S_ACTIVE_USERS })),
@@ -269,8 +275,8 @@ export default function AdminDashboardPage() {
   // both land on orange. Declaring the SAME full domain→range on both children
   // pins every series to a distinct color: 消息数 蓝 / 新增用户 橙 / 活跃用户 绿.
   const seriesColor = {
-    domain: [S_MESSAGES, S_NEW_USERS, S_ACTIVE_USERS],
-    range: ["#1677ff", "#fa8c16", "#52c41a"],
+    domain: [S_MESSAGES, S_ANON_MESSAGES, S_NEW_USERS, S_ACTIVE_USERS],
+    range: ["#1677ff", "#13c2c2", "#fa8c16", "#52c41a"],
   };
   // G2 draws into a <canvas>, so the --fj-* custom properties never reach it: the
   // chart kept G2's light theme and painted its axis labels a dark grey that is

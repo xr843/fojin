@@ -316,6 +316,11 @@ export default function XiaojinPet() {
     setChatError(null);
     gotTokenRef.current = false;
     erroredRef.current = false;
+    // Umami：与 /chat 页同口径（截断 30 字保隐私），事件名独立成 xiaojin_chat
+    // —— 既补上气泡提问在 Umami 里的缺口，也把「首页气泡 vs /chat 页」区分开。
+    if (typeof umami !== "undefined") {
+      umami.track("xiaojin_chat", { question: term.slice(0, 30) });
+    }
     prefetchMarkdown(); // 与 LLM 首字并行下载，用户感知不到
     setMessages((m) => [...m, { role: "user", content: term }, { role: "assistant", content: "" }]);
     setStreaming(true);

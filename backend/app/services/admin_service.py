@@ -11,6 +11,7 @@ from app.models.alignment_candidate import AlignmentCandidate
 from app.models.annotation import Annotation
 from app.models.audit import AdminAuditLog
 from app.models.chat import ChatMessage, ChatSession
+from app.models.daily_metric import DailyMetricCount
 from app.models.source import SourceSuggestion
 from app.models.user import ReadingHistory, User
 from app.schemas.admin import (
@@ -19,6 +20,7 @@ from app.schemas.admin import (
     AdminOverview,
     DailyCount,
 )
+from app.services.daily_metrics import ANONYMOUS_MESSAGES
 
 logger = logging.getLogger(__name__)
 
@@ -130,12 +132,14 @@ async def get_trends(db: AsyncSession, days: int = 30, redis=None) -> dict:
     registrations = await _daily_counts(db, User, User.created_at, since_dt, date_grid)
     messages = await _daily_counts(db, ChatMessage, ChatMessage.created_at, since_dt, date_grid)
     active_users = await _daily_active_users(db, since_dt, date_grid)
+    anonymous_messages = await _daily_metric_series(db, ANONYMOUS_MESSAGES, date_grid)
 
     # Stored as plain dicts so the Redis JSON round-trip is lossless;
     # AdminTrends(**result) coerces them back into DailyCount either way.
     result = {
         "registrations": [d.model_dump() for d in registrations],
         "messages": [d.model_dump() for d in messages],
+        "anonymous_messages": [d.model_dump() for d in anonymous_messages],
         "active_users": [d.model_dump() for d in active_users],
     }
     await _cache_set(redis, cache_key, result)
@@ -170,6 +174,21 @@ async def _daily_counts(
     )
     rows = {row[0]: row[1] for row in result.all()}
     return _fill_missing_days(rows, date_grid)
+
+
+async def _daily_metric_series(
+    db: AsyncSession, metric: str, date_grid: list[date]
+) -> list[DailyCount]:
+    """daily_metric_counts 里某个 metric 按 date_grid 对齐输出（缺日补零）。
+    该表按服务器本地日（CST）写入，天生与 _local_day 的口径一致。"""
+    result = await db.execute(
+        select(DailyMetricCount.day, DailyMetricCount.count).where(
+            DailyMetricCount.metric == metric,
+            DailyMetricCount.day >= date_grid[0],
+        )
+    )
+    rows = {row[0]: row[1] for row in result.all()}
+    return [DailyCount(date=d.isoformat(), count=rows.get(d, 0)) for d in date_grid]
 
 
 async def _daily_active_users(
