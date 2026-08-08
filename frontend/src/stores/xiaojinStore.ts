@@ -19,9 +19,11 @@ interface XiaojinState {
   hidden: boolean;
   /** 以哪位祖师的口吻作答；null = 通用助手小津。持久。 */
   masterId: string | null;
+  /** 该祖师的传承字符串（决定小津换哪套衣着）。与 masterId 同生同灭，持久。 */
+  masterTradition: string | null;
   hide: () => void;
   show: () => void;
-  setMasterId: (id: string | null) => void;
+  setMaster: (id: string | null, tradition: string | null) => void;
 }
 
 export const useXiaojinStore = create<XiaojinState>()(
@@ -29,14 +31,16 @@ export const useXiaojinStore = create<XiaojinState>()(
     (set) => ({
       hidden: false,
       masterId: null,
+      masterTradition: null,
       hide: () => set({ hidden: true }),
       show: () => set({ hidden: false }),
-      setMasterId: (masterId) => set({ masterId }),
+      setMaster: (masterId, masterTradition) =>
+        set({ masterId, masterTradition: masterId === null ? null : masterTradition }),
     }),
     {
       name: "fojin-xiaojin",
       // 只持久化祖师偏好。hidden 刻意不写盘 —— 刷新必须让小津回来。
-      partialize: (s) => ({ masterId: s.masterId }),
+      partialize: (s) => ({ masterId: s.masterId, masterTradition: s.masterTradition }),
       // merge 里强制 hidden:false：光靠 partialize 不够 —— 存量用户的
       // localStorage 里还留着上一版写进去的 hidden:true，默认 merge 会把它
       // 灌回来，小津照样不出现。
