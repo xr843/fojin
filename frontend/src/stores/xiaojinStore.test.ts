@@ -11,7 +11,7 @@ async function rehydrate() {
 describe("xiaojinStore 持久化边界", () => {
   beforeEach(() => {
     localStorage.clear();
-    useXiaojinStore.setState({ hidden: false, masterId: null });
+    useXiaojinStore.setState({ hidden: false, masterId: null, masterTradition: null });
   });
 
   it("退出不写盘：hidden 只活在内存里", () => {
@@ -23,10 +23,17 @@ describe("xiaojinStore 持久化边界", () => {
     expect(persisted.state?.hidden).toBeUndefined();
   });
 
-  it("祖师偏好照常写盘（那是真偏好，该记住）", () => {
-    useXiaojinStore.getState().setMasterId("huineng");
+  it("祖师偏好照常写盘（含传承——决定换哪套衣着）", () => {
+    useXiaojinStore.getState().setMaster("huineng", "禅宗");
     const persisted = JSON.parse(localStorage.getItem(KEY) ?? "{}");
     expect(persisted.state?.masterId).toBe("huineng");
+    expect(persisted.state?.masterTradition).toBe("禅宗");
+  });
+
+  it("清空祖师时传承一并清空（不留孤儿传承）", () => {
+    useXiaojinStore.getState().setMaster("tsongkhapa", "藏传·格鲁派");
+    useXiaojinStore.getState().setMaster(null, "藏传·格鲁派");
+    expect(useXiaojinStore.getState().masterTradition).toBeNull();
   });
 
   it("存量用户盘里残留的 hidden:true 在水合时被强制清掉", async () => {

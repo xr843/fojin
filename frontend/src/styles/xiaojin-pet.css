@@ -36,6 +36,31 @@
   --xiaojin-bubble-muted: #8a774a;
 }
 
+/* ---------- 随传承换装（不画祖师本人，只换衣制——见 xiaojinAttire.ts） ---------- */
+/* 印度论师（龙树/鸠摩罗什）：素赭袈裟，无祖衣 */
+.xiaojin-pet[data-attire="indian"] {
+  --xiaojin-robe: #a8763e;
+  --xiaojin-robe-d: #8c5f2e;
+}
+/* 南传（觉音/马哈希/阿姜查）：偏袒右肩的橙黄袍 */
+.xiaojin-pet[data-attire="theravada"] {
+  --xiaojin-robe: #d97b29;
+  --xiaojin-robe-d: #b76118;
+  --xiaojin-kesa: #a04e10;
+}
+/* 藏传·格鲁/噶当（宗喀巴/阿底峡）：绛红僧裙 + 黄班智达帽 */
+.xiaojin-pet[data-attire="gelug"] {
+  --xiaojin-robe: #8f3a2e;
+  --xiaojin-robe-d: #732c22;
+  --xiaojin-kesa: #5f221a;
+  --xiaojin-hat: #e3b93d;
+}
+/* 藏传·噶举（米拉日巴）：绛红僧裙 + 白禅带 */
+.xiaojin-pet[data-attire="kagyu"] {
+  --xiaojin-robe: #9c3f2f;
+  --xiaojin-robe-d: #7d3023;
+}
+
 /* 深色底上整体提亮一档，否则金黄发闷、祖衣糊成一块。 */
 :root[data-theme="dark"] .xiaojin-pet {
   --xiaojin-skin: #e8d2b6;
@@ -52,6 +77,26 @@
   --xiaojin-bubble-input: #5a4d25;
   --xiaojin-bubble-ink: #f0e9d8;
   --xiaojin-bubble-muted: #c9ba8e;
+}
+
+:root[data-theme="dark"] .xiaojin-pet[data-attire="indian"] {
+  --xiaojin-robe: #c08d50;
+  --xiaojin-robe-d: #a1743c;
+}
+:root[data-theme="dark"] .xiaojin-pet[data-attire="theravada"] {
+  --xiaojin-robe: #e8933f;
+  --xiaojin-robe-d: #cc7827;
+  --xiaojin-kesa: #b25e1c;
+}
+:root[data-theme="dark"] .xiaojin-pet[data-attire="gelug"] {
+  --xiaojin-robe: #ab5140;
+  --xiaojin-robe-d: #8f3f31;
+  --xiaojin-kesa: #77362a;
+  --xiaojin-hat: #eec858;
+}
+:root[data-theme="dark"] .xiaojin-pet[data-attire="kagyu"] {
+  --xiaojin-robe: #b25443;
+  --xiaojin-robe-d: #944335;
 }
 
 :root[data-theme="dark"] .xiaojin-md code,
@@ -584,6 +629,15 @@
 
 .xiaojin-menu-item:hover {
   background: rgba(139, 37, 0, 0.1);
+}
+
+/* 传承色点：一眼分辨这位祖师会换哪套衣（色值=该装袍色主调） */
+.xiaojin-menu-dot {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.15);
 }
 
 /* 勾选位固定宽度：选中与未选中的条目左缘对齐，菜单不会跳 */

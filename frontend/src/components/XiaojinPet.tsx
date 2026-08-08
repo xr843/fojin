@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../stores/authStore";
 import { useXiaojinStore } from "../stores/xiaojinStore";
 import { sendChatMessageStream, getMasters, type MasterProfile } from "../api/client";
+import { traditionToAttire, ATTIRE_DOT } from "./xiaojinAttire";
 import { BG_NATURAL, PEAK_FRACTION, BG_OBJECT_POS, coverPoint } from "./xiaojinPeak";
 import "../styles/xiaojin-pet.css";
 
@@ -112,7 +113,8 @@ export default function XiaojinPet() {
   const hidden = useXiaojinStore((st) => st.hidden);
   const hide = useXiaojinStore((st) => st.hide);
   const masterId = useXiaojinStore((st) => st.masterId);
-  const setMasterId = useXiaojinStore((st) => st.setMasterId);
+  const masterTradition = useXiaojinStore((st) => st.masterTradition);
+  const setMaster = useXiaojinStore((st) => st.setMaster);
   const [legacyCleared] = useState(() => {
     clearLegacyHiddenKey();
     return true;
@@ -423,6 +425,21 @@ export default function XiaojinPet() {
   }, []);
 
   const activeMaster = masterId ? (masters ?? []).find((m) => m.id === masterId) ?? null : null;
+  // 衣着随传承换（见 xiaojinAttire.ts 的原则注释：不画祖师本人，只换衣制）
+  const attire = traditionToAttire(masterTradition);
+
+  // 老用户升级边角：先前只存了 masterId 没存 tradition —— 补拉一次祖师表回填，
+  // 否则选过宗喀巴的人升级后要重选一次才见黄帽。
+  useEffect(() => {
+    if (!masterId || masterTradition) return;
+    getMasters()
+      .then((ms) => {
+        const m = ms.find((x) => x.id === masterId);
+        if (m) setMaster(m.id, m.tradition);
+        setMasters((cur) => cur ?? ms);
+      })
+      .catch(() => {});
+  }, [masterId, masterTradition, setMaster]);
 
   /** 菜单实测高度 ≈303px（16 条目时）。取整加余量做翻转判据。 */
   const MENU_EST = 330;
@@ -482,6 +499,7 @@ export default function XiaojinPet() {
       data-open={open ? "" : undefined}
       data-v={placement.v}
       data-h={placement.h}
+      data-attire={attire}
       style={{
         ...((pos ?? anchor)
           ? { left: (pos ?? anchor)!.x, top: (pos ?? anchor)!.y, right: "auto", bottom: "auto" }
@@ -607,7 +625,7 @@ export default function XiaojinPet() {
           aria-expanded={open}
           aria-label={t("xiaojin.open")}
         >
-          <XiaojinFigure />
+          <XiaojinFigure attire={attire} />
         </button>
         <button
           type="button"
@@ -642,7 +660,7 @@ export default function XiaojinPet() {
               aria-checked={masterId === null}
               className="xiaojin-menu-item"
               onClick={() => {
-                setMasterId(null);
+                setMaster(null, null);
                 startNewConversation();
               }}
             >
@@ -657,12 +675,16 @@ export default function XiaojinPet() {
                 aria-checked={masterId === m.id}
                 className="xiaojin-menu-item"
                 onClick={() => {
-                  setMasterId(m.id);
+                  setMaster(m.id, m.tradition);
                   // 换人重开一局：旧上下文是上一位祖师的，串下去会串味
                   startNewConversation();
                 }}
               >
                 <span className="xiaojin-menu-tick">{masterId === m.id ? "✓" : ""}</span>
+                <span
+                  className="xiaojin-menu-dot"
+                  style={{ background: ATTIRE_DOT[traditionToAttire(m.tradition)] }}
+                />
                 <span className="xiaojin-menu-name">{m.name_zh}</span>
                 <span className="xiaojin-menu-hint" title={m.tradition}>
                   {m.tradition}
@@ -686,9 +708,11 @@ export default function XiaojinPet() {
  * 一切颜色走 CSS 变量，深色模式由 xiaojin-pet.css 整体提亮，避免暗底上发闷。
  * 平时垂目，鼠标靠近或气泡展开时睁眼——闭着的眼睛「眨」不出效果，睁眼才读得出反应。
  */
-function XiaojinFigure() {
+function XiaojinFigure({ attire }: { attire: "han" | "indian" | "theravada" | "gelug" | "kagyu" }) {
+  // 帽尖高出头顶：格鲁装 viewBox 上探 14 个单位，同宽下身高相应变高（戴帽当然更高）
+  const viewBox = attire === "gelug" ? "0 -14 100 126" : "0 0 100 112";
   return (
-    <svg viewBox="0 0 100 112" width="76" aria-hidden="true" focusable="false">
+    <svg viewBox={viewBox} width="76" aria-hidden="true" focusable="false">
       <ellipse className="xiaojin-shadow" cx="50" cy="104" rx="31" ry="4" />
       <g className="xiaojin-torso">
         {/* 结跏趺坐 */}
@@ -699,17 +723,29 @@ function XiaojinFigure() {
         {/* 双膝 */}
         <ellipse cx="26" cy="92" rx="12.5" ry="7.5" fill="var(--xiaojin-robe-d)" />
         <ellipse cx="74" cy="92" rx="12.5" ry="7.5" fill="var(--xiaojin-robe-d)" />
-        {/* 祖衣斜披 */}
-        <path d="M40 50 L66.5 88 l-12 4.5 L31.5 57z" fill="var(--xiaojin-kesa)" opacity="0.92" />
-        {/* 交领 */}
-        <path
-          d="M43 49.5 l7 11.5 7-11.5"
-          fill="none"
-          stroke="var(--xiaojin-collar)"
-          strokeWidth="3.2"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
+        {/* 袒右肩（南传）：右肩露肤，袍从左肩斜覆 —— 衣制上与汉传最鲜明的区别 */}
+        {attire === "theravada" && (
+          <path d="M51 48 C62 48 70.5 56 76.5 72 L68 76 C64 64 58 56 49.5 52.5 Z" fill="var(--xiaojin-skin)" />
+        )}
+        {/* 祖衣斜披：印度论师素衣不披；噶举以白禅带代之；其余按 --xiaojin-kesa */}
+        {attire !== "indian" && (
+          <path
+            d="M40 50 L66.5 88 l-12 4.5 L31.5 57z"
+            fill={attire === "kagyu" ? "var(--xiaojin-collar)" : "var(--xiaojin-kesa)"}
+            opacity={attire === "kagyu" ? "0.95" : "0.92"}
+          />
+        )}
+        {/* 交领（袒肩装无领） */}
+        {attire !== "theravada" && (
+          <path
+            d="M43 49.5 l7 11.5 7-11.5"
+            fill="none"
+            stroke="var(--xiaojin-collar)"
+            strokeWidth="3.2"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+        )}
         {/* 定印 */}
         <ellipse cx="50" cy="88.5" rx="11.5" ry="5" fill="var(--xiaojin-skin)" />
         <ellipse cx="50" cy="85.2" rx="8.2" ry="3.6" fill="var(--xiaojin-skin-d)" />
@@ -718,6 +754,16 @@ function XiaojinFigure() {
         <ellipse cx="26" cy="35" rx="3.7" ry="6" fill="var(--xiaojin-skin)" />
         <ellipse cx="74" cy="35" rx="3.7" ry="6" fill="var(--xiaojin-skin)" />
         <circle cx="50" cy="31" r="24.5" fill="var(--xiaojin-skin)" />
+        {attire === "gelug" && (
+          <g>
+            {/* 班智达帽：帽体沿头顶弧线扣实 + 前倾中峰（宗喀巴/阿底峡的图像学标准件） */}
+            <path
+              d="M27.9 20.5 A24.5 24.5 0 0 1 72.1 20.5 Q50 13 27.9 20.5 Z"
+              fill="var(--xiaojin-hat)"
+            />
+            <path d="M44.5 10.5 Q46 -2 54.5 -7.5 Q53.5 1 56.5 10.5 Q50 7.5 44.5 10.5 Z" fill="var(--xiaojin-hat)" />
+          </g>
+        )}
         {/* 垂目 */}
         <g className="xiaojin-eyes-closed">
           <path

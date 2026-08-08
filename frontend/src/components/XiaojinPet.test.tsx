@@ -50,7 +50,7 @@ beforeEach(() => {
     { id: "huineng", name_zh: "慧能", name_en: "Huineng", tradition: "禅宗", dates: "638–713", description: "", epigraph: null },
     { id: "xuanzang", name_zh: "玄奘", name_en: "Xuanzang", tradition: "唯识", dates: "602–664", description: "", epigraph: null },
   ]);
-  useXiaojinStore.setState({ hidden: false, masterId: null });
+  useXiaojinStore.setState({ hidden: false, masterId: null, masterTradition: null });
   // 首帧定位在 rAF 回调里 setPlaced(true)；jsdom 的 rAF 不随断言推进，
   // visibility:hidden 会把可访问性树整个藏掉（getByRole 全灭）。打成同步。
   vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
@@ -551,6 +551,55 @@ describe("XiaojinPet 右键菜单", () => {
     fireEvent.click(screen.getByText("退出小津"));
     expect(screen.queryByLabelText("问小津")).toBeNull();
     expect(useXiaojinStore.getState().hidden).toBe(true);
+  });
+});
+
+describe("XiaojinPet 随传承换装", () => {
+  const openMenu = async () => {
+    fireEvent.contextMenu(screen.getByLabelText("问小津"), { clientX: 100, clientY: 100 });
+    await waitFor(() => expect(screen.getByRole("menu")).toBeTruthy());
+  };
+  const rootAttire = () => document.querySelector<HTMLElement>(".xiaojin-pet")!.dataset.attire;
+
+  it("默认（无祖师）是汉传装", () => {
+    renderPet();
+    expect(rootAttire()).toBe("han");
+  });
+
+  it("选格鲁派祖师 → 换黄帽装；换回通用 → 回汉传装", async () => {
+    vi.mocked(getMasters).mockResolvedValue([
+      { id: "tsongkhapa", name_zh: "宗喀巴", name_en: "Tsongkhapa", tradition: "藏传·格鲁派", dates: "1357–1419", description: "", epigraph: null },
+    ]);
+    renderPet();
+    await openMenu();
+    fireEvent.click(await screen.findByText("宗喀巴"));
+    expect(rootAttire()).toBe("gelug");
+    expect(useXiaojinStore.getState().masterTradition).toBe("藏传·格鲁派");
+    // 格鲁装的可见证据：班智达帽路径进了 SVG
+    expect(document.querySelectorAll('.xiaojin-figure path[fill="var(--xiaojin-hat)"]').length).toBeGreaterThan(0);
+
+    await openMenu();
+    fireEvent.click(screen.getByText(/通用/));
+    expect(rootAttire()).toBe("han");
+    expect(useXiaojinStore.getState().masterTradition).toBeNull();
+  });
+
+  it("老用户回填：persist 里只有 masterId 没 tradition → 静默拉一次列表补上", async () => {
+    useXiaojinStore.setState({ masterId: "huineng", masterTradition: null });
+    renderPet();
+    // 不开菜单也要发起回填（否则老用户的换装永远不生效）
+    await waitFor(() => expect(getMasters).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(useXiaojinStore.getState().masterTradition).toBe("禅宗"));
+    expect(rootAttire()).toBe("han"); // 禅宗仍是汉传装——但字段已补齐
+  });
+
+  it("菜单里每位祖师名前有传承色点", async () => {
+    renderPet();
+    await openMenu();
+    await screen.findByText("慧能");
+    const dots = document.querySelectorAll<HTMLElement>(".xiaojin-menu-dot");
+    expect(dots.length).toBe(2); // 慧能 + 玄奘（「通用」不带点）
+    expect(dots[0].style.background).toBe("rgb(214, 161, 60)"); // 禅宗 → han #d6a13c
   });
 });
 
