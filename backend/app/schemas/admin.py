@@ -44,6 +44,9 @@ class DailyCount(BaseModel):
 class AdminTrends(BaseModel):
     registrations: list[DailyCount]
     messages: list[DailyCount]
+    # 游客消息数（daily_metric_counts）：内容不落库，只记数——没有它，
+    # 每日统计只覆盖注册用户
+    anonymous_messages: list[DailyCount] = []
     active_users: list[DailyCount]
 
 

@@ -237,6 +237,29 @@ describe("XiaojinPet", () => {
     await waitFor(() => expect(vi.mocked(sendChatMessageStream).mock.calls.length).toBe(2));
   });
 
+  it("发送时打 xiaojin_chat 的 Umami 事件，问题截断 30 字（与 /chat 同隐私口径）", async () => {
+    const track = vi.fn();
+    vi.stubGlobal("umami", { track });
+    renderPet();
+    openBubble();
+    const long = "这是一条非常长的问题".repeat(5); // 50 字
+    await askAndGetCallbacks(long);
+    expect(track).toHaveBeenCalledWith("xiaojin_chat", { question: long.slice(0, 30) });
+    expect((track.mock.calls[0][1] as { question: string }).question.length).toBe(30);
+    vi.unstubAllGlobals();
+  });
+
+  it("Umami 未加载（被广告拦截器挡掉）时发送照常，不炸", async () => {
+    renderPet();
+    openBubble();
+    const cb = await askAndGetCallbacks("无 umami 也要能问");
+    act(() => {
+      cb.onToken("答");
+      cb.onDone();
+    });
+    expect(await screen.findByText("答")).toBeTruthy();
+  });
+
   it("空输入不发送", () => {
     renderPet();
     openBubble();

@@ -1187,6 +1187,8 @@ export interface DailyCount {
 export interface AdminTrends {
   registrations: DailyCount[];
   messages: DailyCount[];
+  /** 游客消息数（内容不落库，只记数）。可选：滚动部署期旧后端没有此字段。 */
+  anonymous_messages?: DailyCount[];
   active_users: DailyCount[];
 }
 

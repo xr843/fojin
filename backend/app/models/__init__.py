@@ -9,6 +9,7 @@ from app.models.chat import (
     ChatSession,
     TextEmbedding,
 )
+from app.models.daily_metric import DailyMetricCount
 from app.models.dictionary import DictionaryEntry
 from app.models.feed import AcademicFeed, SourceUpdate
 from app.models.gaiji import Gaiji
@@ -43,6 +44,7 @@ __all__ = [
     "ChatAttachment",
     "ChatMessage",
     "ChatSession",
+    "DailyMetricCount",
     "DataSource",
     "DictionaryEntry",
     "Gaiji",

@@ -46,6 +46,7 @@ from app.services.chat_sessions import (  # noqa: F401
 )
 from app.services.chat_trust import build_trust_status, persist_answer_diagnostic
 from app.services.citation_guard import enforce_citation_whitelist, log_mutations
+from app.services.daily_metrics import ANONYMOUS_MESSAGES, increment_daily_metric
 
 # Moved to app.services.hot_questions in the P1-3 split; re-imported here so
 # `from app.services.chat import get_hot_questions` (api layer) and
@@ -139,6 +140,23 @@ _PREP_ERROR_CODES = {
 }
 
 # Provider → base URL mapping (most are OpenAI-compatible; Anthropic uses its own format)
+
+
+async def _record_anonymous_message(sessionmaker, answer: str) -> None:
+    """游客（无会话）成功答案的日计数 +1。
+
+    内容刻意不落库（隐私——无账号即无删除入口），但管理面板的每日消息数
+    只数 chat_messages 会漏掉全部游客流量，这里只记"数"。口径与登录侧
+    对齐：失败/空答不计。计数失败绝不能影响用户——他已经拿到答案了。
+    """
+    if _is_failed_answer(answer):
+        return
+    try:
+        async with sessionmaker() as db_cnt:
+            await increment_daily_metric(db_cnt, ANONYMOUS_MESSAGES)
+            await db_cnt.commit()
+    except Exception:
+        logger.exception("chat/stream anonymous daily-count failed")
 
 
 async def _build_llm_http_client(
@@ -1272,6 +1290,8 @@ async def send_message_stream(
                 + json.dumps({"type": "message_id", "id": assistant_msg_id})
                 + "\n\n"
             )
+    else:
+        await _record_anonymous_message(sessionmaker, corrected_answer)
     yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
 

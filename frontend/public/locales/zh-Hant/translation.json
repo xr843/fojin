@@ -1536,5 +1536,6 @@
   "xiaojin.menu_master_default": "小津（通用）",
   "xiaojin.menu_quit": "退出小津",
   "xiaojin.speaking_as": "正以 {{name}} 的口吻作答",
-  "xiaojin.recall": "喚回小津"
+  "xiaojin.recall": "喚回小津",
+  "admin_dashboard.trends.series.anonymous_messages": "訪客訊息數"
 }

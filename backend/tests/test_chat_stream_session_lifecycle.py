@@ -400,10 +400,13 @@ async def test_save_phase_failure_still_yields_done():
 
 @pytest.mark.anyio
 async def test_anonymous_user_skips_save_phase():
-    """Anonymous users (chat_session is None) only need the prep session;
-    no save session should be opened. The legacy shape held one session
-    for the whole stream regardless — the refactor cleanly avoids the
-    save-phase open when there's nothing to save.
+    """Anonymous users (chat_session is None) must not open a message-save
+    session — their conversation content is deliberately never persisted.
+
+    Since the daily-count feature they DO open one extra short session to
+    bump daily_metric_counts (count only, no content — see
+    tests/test_daily_metrics.py). So the contract is now: prep + counter
+    = exactly 2 opens, and never a third (message save).
     """
     sources = _make_fake_sources()
     # Anonymous: chat_session is None per _prepare_chat contract
@@ -425,10 +428,11 @@ async def test_anonymous_user_skips_save_phase():
         ):
             chunks.append(chunk)
 
-    assert len(counting.opens) == 1, (
-        f"anonymous flow should open exactly one session (prep), got {len(counting.opens)}"
+    assert len(counting.opens) == 2, (
+        "anonymous flow should open exactly two sessions (prep + daily "
+        f"counter), got {len(counting.opens)}"
     )
-    assert len(counting.closes) == 1
+    assert len(counting.closes) == 2
 
 
 class _DetachOnCloseSessionmaker:
