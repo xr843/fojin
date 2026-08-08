@@ -709,10 +709,8 @@ export default function XiaojinPet() {
  * 平时垂目，鼠标靠近或气泡展开时睁眼——闭着的眼睛「眨」不出效果，睁眼才读得出反应。
  */
 function XiaojinFigure({ attire }: { attire: "han" | "indian" | "theravada" | "gelug" | "kagyu" }) {
-  // 帽尖高出头顶：格鲁装 viewBox 上探 14 个单位，同宽下身高相应变高（戴帽当然更高）
-  const viewBox = attire === "gelug" ? "0 -14 100 126" : "0 0 100 112";
   return (
-    <svg viewBox={viewBox} width="76" aria-hidden="true" focusable="false">
+    <svg viewBox="0 0 100 112" width="76" aria-hidden="true" focusable="false">
       <ellipse className="xiaojin-shadow" cx="50" cy="104" rx="31" ry="4" />
       <g className="xiaojin-torso">
         {/* 结跏趺坐 */}
@@ -755,14 +753,12 @@ function XiaojinFigure({ attire }: { attire: "han" | "indian" | "theravada" | "g
         <ellipse cx="74" cy="35" rx="3.7" ry="6" fill="var(--xiaojin-skin)" />
         <circle cx="50" cy="31" r="24.5" fill="var(--xiaojin-skin)" />
         {attire === "gelug" && (
-          <g>
-            {/* 班智达帽：帽体沿头顶弧线扣实 + 前倾中峰（宗喀巴/阿底峡的图像学标准件） */}
-            <path
-              d="M27.9 20.5 A24.5 24.5 0 0 1 72.1 20.5 Q50 13 27.9 20.5 Z"
-              fill="var(--xiaojin-hat)"
-            />
-            <path d="M44.5 10.5 Q46 -2 54.5 -7.5 Q53.5 1 56.5 10.5 Q50 7.5 44.5 10.5 Z" fill="var(--xiaojin-hat)" />
-          </g>
+          /* 黄帽：帽体沿头顶弧线扣实（格鲁即「黄帽派」，黄色本身就是标识；
+             帽尖试过两版都被用户否掉——像「小揪」，2026-08-08 定稿无尖） */
+          <path
+            d="M27.9 20.5 A24.5 24.5 0 0 1 72.1 20.5 Q50 13 27.9 20.5 Z"
+            fill="var(--xiaojin-hat)"
+          />
         )}
         {/* 垂目 */}
         <g className="xiaojin-eyes-closed">
