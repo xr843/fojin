@@ -584,13 +584,16 @@ describe("XiaojinPet 随传承换装", () => {
     expect(useXiaojinStore.getState().masterTradition).toBeNull();
   });
 
-  it("老用户回填：persist 里只有 masterId 没 tradition → 静默拉一次列表补上", async () => {
-    useXiaojinStore.setState({ masterId: "huineng", masterTradition: null });
+  it("存量用户盘里的旧祖师偏好：不读、且挂载时把键清掉", () => {
+    // #1154 曾持久化偏好；现口径是刷新回默认汉传形象（用户 2026-08-08 拍板）。
+    localStorage.setItem(
+      "fojin-xiaojin",
+      JSON.stringify({ state: { masterId: "nagarjuna", masterTradition: "印度·中观" }, version: 0 }),
+    );
     renderPet();
-    // 不开菜单也要发起回填（否则老用户的换装永远不生效）
-    await waitFor(() => expect(getMasters).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(useXiaojinStore.getState().masterTradition).toBe("禅宗"));
-    expect(rootAttire()).toBe("han"); // 禅宗仍是汉传装——但字段已补齐
+    expect(rootAttire()).toBe("han"); // 不是印度装——盘里那份不算数
+    expect(useXiaojinStore.getState().masterId).toBeNull();
+    expect(localStorage.getItem("fojin-xiaojin")).toBeNull(); // 键也清了
   });
 
   it("菜单里每位祖师名前有传承色点", async () => {

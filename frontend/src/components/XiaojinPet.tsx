@@ -41,11 +41,16 @@ const EDGE = 8;
 
 type Pos = { x: number; y: number };
 
-/** 清掉存量用户的旧永久隐藏键（新状态归 useXiaojinStore）。 */
-function clearLegacyHiddenKey() {
+/**
+ * 清掉存量用户盘里的旧键：旧永久隐藏键 + 旧祖师偏好键（fojin-xiaojin，
+ * #1154 曾持久化 masterId/masterTradition，2026-08-08 用户定「刷新回默认
+ * 汉传形象」后不再写盘——不清的话虽然没人读它，但会一直躺在用户盘里）。
+ */
+function clearLegacyKeys() {
   try {
     localStorage.removeItem(HIDDEN_KEY);
     sessionStorage.removeItem(HIDDEN_KEY);
+    localStorage.removeItem("fojin-xiaojin");
   } catch {
     // 私密模式：本来就没存过
   }
@@ -116,7 +121,7 @@ export default function XiaojinPet() {
   const masterTradition = useXiaojinStore((st) => st.masterTradition);
   const setMaster = useXiaojinStore((st) => st.setMaster);
   const [legacyCleared] = useState(() => {
-    clearLegacyHiddenKey();
+    clearLegacyKeys();
     return true;
   });
   void legacyCleared;
@@ -427,19 +432,6 @@ export default function XiaojinPet() {
   const activeMaster = masterId ? (masters ?? []).find((m) => m.id === masterId) ?? null : null;
   // 衣着随传承换（见 xiaojinAttire.ts 的原则注释：不画祖师本人，只换衣制）
   const attire = traditionToAttire(masterTradition);
-
-  // 老用户升级边角：先前只存了 masterId 没存 tradition —— 补拉一次祖师表回填，
-  // 否则选过宗喀巴的人升级后要重选一次才见黄帽。
-  useEffect(() => {
-    if (!masterId || masterTradition) return;
-    getMasters()
-      .then((ms) => {
-        const m = ms.find((x) => x.id === masterId);
-        if (m) setMaster(m.id, m.tradition);
-        setMasters((cur) => cur ?? ms);
-      })
-      .catch(() => {});
-  }, [masterId, masterTradition, setMaster]);
 
   /** 菜单实测高度 ≈303px（16 条目时）。取整加余量做翻转判据。 */
   const MENU_EST = 330;
