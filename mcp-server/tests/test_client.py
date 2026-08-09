@@ -281,5 +281,36 @@ async def test_http_error_becomes_fojin_api_error():
         return httpx.Response(500, json={"detail": "boom"})
 
     async with _client_with(handler) as c:
-        with pytest.raises(FojinAPIError):
+        with pytest.raises(FojinAPIError) as exc:
             await c.read_passage(1, 1)
+    # 5xx detail is NOT surfaced — it says nothing the caller can act on.
+    assert "boom" not in str(exc.value)
+    assert "500" in str(exc.value)
+
+
+@pytest.mark.asyncio
+async def test_client_error_surfaces_server_reason():
+    """A 4xx must carry the server's sentence, not just the status code: the
+    model on the other end can only correct the call if it is told what was
+    wrong with it."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            422, json={"detail": "quote must normalise to at least 12 chars (got 8)"}
+        )
+
+    async with _client_with(handler) as c:
+        with pytest.raises(FojinAPIError) as exc:
+            await c.verify_quote("應無所住而生其心")
+    assert "at least 12 chars (got 8)" in str(exc.value)
+
+
+@pytest.mark.asyncio
+async def test_non_json_client_error_still_reports_status():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(429, text="<html>Too Many Requests</html>")
+
+    async with _client_with(handler) as c:
+        with pytest.raises(FojinAPIError) as exc:
+            await c.lookup_dictionary("空")
+    assert "429" in str(exc.value)
+    assert "<html>" not in str(exc.value)
