@@ -221,10 +221,13 @@ async def _es_candidates(
     }
     try:
         resp = await es.search(index="text_contents", body=body)
+        # elasticsearch-py 8.x returns ObjectApiResponse (Mapping-like, NOT a
+        # dict) — subscript it; an isinstance(resp, dict) guard silently
+        # discards every real result while passing dict-based test doubles.
+        hits = resp["hits"]["hits"]
     except Exception:  # pragma: no cover - ES outage degrades, not crashes
         logger.warning("verify_quote ES candidate search failed", exc_info=True)
         return []
-    hits = resp.get("hits", {}).get("hits", []) if isinstance(resp, dict) else []
     out = []
     for h in hits:
         src = h.get("_source") or {}
