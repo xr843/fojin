@@ -166,6 +166,22 @@ async def resolve_urn(urn: str) -> dict:
     return await _call("resolve_urn", lambda c: c.resolve_urn(urn))
 
 
+@mcp.tool()
+async def verify_quote(quote: str, cite: str | None = None, juan: int | None = None) -> dict:
+    """Verify that a Buddhist-canon quote exists VERBATIM in the corpus.
+
+    Call this before presenting any quoted scripture to a reader: LLMs
+    routinely invent plausible-looking quotes. Returns `verbatim` (bool),
+    where it was found (`matches`, each with a resolvable `urn`), or the
+    closest near-miss window when it wasn't. `cite` optionally narrows the
+    search — a CBETA id ("T0374") or fojin URN ("fojin:cbeta/T0374.13") —
+    and `cite_matched` reports honestly whether the quote is where you
+    claimed (a hit in a different fascicle does NOT confirm your citation).
+    Quote must be ≥12 CJK chars after normalisation; Classical Chinese only.
+    """
+    return await _call("verify_quote", lambda c: c.verify_quote(quote, cite=cite, juan=juan))
+
+
 @mcp.custom_route("/healthz", methods=["GET"])
 async def healthz(_request: Request) -> JSONResponse:
     """Liveness for the hosted endpoint (nginx/compose healthchecks)."""

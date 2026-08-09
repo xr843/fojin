@@ -186,6 +186,20 @@ class FojinClient:
         # double-encode it into a literal "%23" on the server side.
         return await self._get("/urn/resolve", {"urn": urn})
 
+    async def verify_quote(
+        self, quote: str, *, cite: str | None = None, juan: int | None = None
+    ) -> dict[str, Any]:
+        """Open-world verbatim quote verification against the whole corpus.
+
+        The server's verdict shape is already agent-facing (verbatim/bucket/
+        matches-with-URNs/closest/caveats), so it passes through unshaped."""
+        params: dict[str, Any] = {"q": quote}
+        if cite:
+            params["cite"] = cite
+        if juan is not None:
+            params["juan"] = juan
+        return await self._get("/verify/quote", params)
+
 
 # ── pure reshaping (unit-tested with plain dicts) ────────────────────────
 
