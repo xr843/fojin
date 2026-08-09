@@ -31,7 +31,7 @@ from elasticsearch import AsyncElasticsearch
 from sqlalchemy import text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.schemas.verification import ClosestMiss, QuoteMatch, QuoteVerdict
+from app.schemas.verification import ClosestMiss, DiffOp, QuoteMatch, QuoteVerdict
 from app.services.quote_verifier import (
     MIN_QUOTE_CHARS,
     NEAR_MISS_THRESHOLD,
@@ -75,14 +75,42 @@ class _CiteTarget:
     juan: int | None
 
 
+def _anchor_starts(needle: str, haystack: str, nlen: int) -> list[int]:
+    """Window starts guessed by finding an exact run of the quote in the source.
+
+    The scan below steps by ``nlen // 4`` and is then subsampled to at most
+    ``_MAX_RATIO_WINDOWS``, so over a 100k-character fascicle it only lands
+    every few hundred characters — enough to score a near-miss, far too coarse
+    to frame it. A near-miss almost always shares a long verbatim run with its
+    source, so a plain ``str.find`` of a slice of the quote locates the true
+    offset in O(n) and lets the window be cut where a reader would cut it.
+    Best-effort: any miss just leaves the coarse scan's answer standing.
+    """
+    starts: list[int] = []
+    for probe_len in (nlen // 2, nlen // 4, 8):
+        if probe_len < 4:
+            continue
+        offset = (nlen - probe_len) // 2
+        pos = haystack.find(needle[offset : offset + probe_len])
+        if pos != -1:
+            starts.append(max(0, min(pos - offset, len(haystack) - nlen)))
+    return starts
+
+
 def windowed_best_span(needle: str, haystack: str) -> tuple[float, int, int]:
     """Best SequenceMatcher ratio of ``needle`` against any same-length window
     of ``haystack``, plus that window's [start, end) span.
 
-    Same windowing scheme as ``quote_verifier._windowed_ratio`` (coarse step,
-    capped window count, tail always included) — kept span-returning here so
-    the hot chat-path function stays untouched. ``test_verify_quote`` asserts
-    the two agree on ratios. Inputs must already be normalised.
+    Uses ``quote_verifier._windowed_ratio``'s scan (coarse step, capped window
+    count, tail always included) and additionally tries anchor-derived starts,
+    so the reported window is framed on the match rather than merely near it —
+    which is what makes the character-level diff readable.
+
+    That extra candidate means this can score a window the chat-path function
+    misses, so its ratio is ``>=`` that one, never ``<``. The chat path is
+    deliberately left alone: its numbers are the baseline the faithfulness
+    metrics are tracked against, and improving them silently would break the
+    comparison. Inputs must already be normalised.
     """
     if not needle or not haystack:
         return 0.0, 0, 0
@@ -101,6 +129,7 @@ def windowed_best_span(needle: str, haystack: str) -> tuple[float, int, int]:
     if len(starts) > _MAX_RATIO_WINDOWS:
         stride = len(starts) / _MAX_RATIO_WINDOWS
         starts = [starts[int(i * stride)] for i in range(_MAX_RATIO_WINDOWS)]
+    starts.extend(_anchor_starts(needle, haystack, nlen))
     best, best_start = 0.0, 0
     for s in starts:
         r = SequenceMatcher(None, needle, haystack[s : s + nlen], autojunk=False).ratio()
@@ -109,6 +138,23 @@ def windowed_best_span(needle: str, haystack: str) -> tuple[float, int, int]:
             if best >= 0.999:
                 break
     return best, best_start, best_start + nlen
+
+
+def diff_ops(quote: str, window: str) -> list[DiffOp]:
+    """Character-level differences between the quote and the source window.
+
+    Both inputs are already normalised, and the result stays in that space —
+    see ``DiffOp``. Inputs are bounded by the endpoint's 400-character limit
+    on ``q``, so the op list is short enough to return whole; nothing is
+    truncated, because a silently shortened diff is worse than none.
+    """
+    if not quote or not window:
+        return []
+    ops: list[DiffOp] = []
+    matcher = SequenceMatcher(None, quote, window, autojunk=False)
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        ops.append(DiffOp(op=tag, quote=quote[i1:i2], source=window[j1:j2]))
+    return ops
 
 
 async def _resolve_cite(
@@ -374,6 +420,7 @@ async def verify_quote(
                 urn=build_urn(meta[0] if meta else None, juan_num),
                 similarity=round(ratio, 4),
                 window_normalised=window,
+                diff=diff_ops(needle, window),
             )
 
     cite_matched: bool | None = None

@@ -12,6 +12,8 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+__all__ = ["ClosestMiss", "DiffOp", "QuoteMatch", "QuoteVerdict"]
+
 
 class QuoteMatch(BaseModel):
     """One fascicle where the quote was confirmed verbatim (substring test
@@ -26,6 +28,21 @@ class QuoteMatch(BaseModel):
     juan_matched: bool | None = None
 
 
+class DiffOp(BaseModel):
+    """One span of agreement or disagreement between the submitted quote and
+    the closest source window, in normalised space.
+
+    ``quote`` is what the caller sent, ``source`` is what the canon actually
+    reads. For ``equal`` both are the same text; for ``delete`` the source
+    side is empty (the caller has words the source does not) and for
+    ``insert`` the quote side is empty (the source has words the caller
+    dropped)."""
+
+    op: Literal["equal", "replace", "delete", "insert"]
+    quote: str
+    source: str
+
+
 class ClosestMiss(BaseModel):
     """Best near-match window when the quote is NOT verbatim anywhere we
     looked. ``window_normalised`` is in normalised space (NFKC + 繁→简 +
@@ -36,6 +53,13 @@ class ClosestMiss(BaseModel):
     urn: str | None = None
     similarity: float
     window_normalised: str
+    # Character-level differences against window_normalised. Reported in
+    # normalised space only: normalisation folds 繁→简 phrase-wise and drops
+    # punctuation, so a character index cannot be mapped back to the original
+    # text without inventing an alignment. Saying "here, in the space the
+    # verdict was computed in" is answerable; "here, in your original string"
+    # is not.
+    diff: list[DiffOp] = []
 
 
 class QuoteVerdict(BaseModel):

@@ -26,6 +26,7 @@ from app.config import settings
 from app.core.rate_limit import STRICT_PATHS
 from app.services.quote_lookup import (
     QuoteTooShortError,
+    diff_ops,
     verify_quote,
     windowed_best_span,
 )
@@ -130,13 +131,44 @@ DB = FakeDB(
 # ── windowing parity ─────────────────────────────────────────────────────
 
 
-def test_windowed_best_span_agrees_with_quote_verifier_ratio():
+def test_windowed_best_span_never_scores_below_the_chat_path():
+    """The public scan adds anchor-derived window starts the chat-path scan
+    never tries, so it can only find an equal or better window — never a worse
+    one. quote_verifier is deliberately not changed: its numbers are the
+    baseline the faithfulness metrics are tracked against."""
     needle = normalise_for_match(SNOW_VERSE)
     for haystack_raw in (JUAN_13, JUAN_16, JUAN_OTHER, SNOW_VERSE, "短"):
         haystack = normalise_for_match(haystack_raw)
         ratio, start, end = windowed_best_span(needle, haystack)
-        assert ratio == pytest.approx(_windowed_ratio(needle, haystack))
+        assert ratio >= _windowed_ratio(needle, haystack) - 1e-9
+        assert ratio <= 1.0
         assert 0 <= start <= end <= len(haystack)
+
+
+def test_anchoring_frames_the_window_on_the_match():
+    """A long fascicle scanned coarsely lands the window *near* the match; the
+    anchor pass has to land it *on* the match, or the diff is unreadable."""
+    needle = normalise_for_match(SNOW_VERSE)
+    haystack = normalise_for_match("如是我聞" * 400 + SNOW_VERSE + "爾時世尊" * 400)
+    ratio, start, end = windowed_best_span(needle, haystack)
+    assert ratio == pytest.approx(1.0)
+    assert haystack[start:end] == needle
+
+
+def test_diff_ops_name_the_actual_substitution():
+    quote = normalise_for_match("諸行無常，是生滅法，生滅滅已，寂滅最樂")
+    source = normalise_for_match(SNOW_VERSE)
+    ops = diff_ops(quote, source)
+    assert [o.op for o in ops if o.op != "equal"], "a changed character must show up"
+    replaced = [(o.quote, o.source) for o in ops if o.op == "replace"]
+    assert ("最", "为") in replaced          # 最 ← 為, both normalised to 简
+    assert "".join(o.quote for o in ops) == quote
+    assert "".join(o.source for o in ops) == source
+
+
+def test_diff_ops_empty_when_either_side_missing():
+    assert diff_ops("", "abc") == []
+    assert diff_ops("abc", "") == []
 
 
 # ── service verdicts ─────────────────────────────────────────────────────
@@ -187,6 +219,12 @@ async def test_near_miss_reports_closest_window():
     assert out.closest is not None
     assert out.closest.urn == "fojin:cbeta/T0374.13"
     assert "生灭灭已" in out.closest.window_normalised  # normalised (simplified) space
+    # "差异在哪": the verdict must name the changed characters, not merely
+    # score the miss.
+    changed = [(o.op, o.quote, o.source) for o in out.closest.diff if o.op != "equal"]
+    assert changed, "a near miss must come with the differences spelled out"
+    assert "".join(o.quote for o in out.closest.diff) == out.normalised_quote
+    assert "".join(o.source for o in out.closest.diff) == out.closest.window_normalised
 
 
 @pytest.mark.asyncio
