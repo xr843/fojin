@@ -1,0 +1,13 @@
+name = "fojin-ai-sw-killswitch"
+main = "src/index.js"
+compatibility_date = "2026-04-17"
+
+# Both hostnames of the fojin.ai zone. The routes were added by hand in the
+# dashboard long before this file existed; they are declared here so a
+# `wrangler deploy` reproduces them instead of leaving the script unrouted.
+# Keep the script name as-is — renaming it would create a second Worker and
+# leave these routes pointing at the old one.
+routes = [
+  { pattern = "fojin.ai/*", zone_name = "fojin.ai" },
+  { pattern = "www.fojin.ai/*", zone_name = "fojin.ai" },
+]
