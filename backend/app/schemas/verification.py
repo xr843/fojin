@@ -24,6 +24,10 @@ class QuoteMatch(BaseModel):
     title_zh: str | None = None
     juan_num: int
     urn: str | None = None
+    # Absolute, so the caller can render a citation someone can click. A
+    # relative path is unusable to an agent with no host in hand — it links
+    # elsewhere instead, and the verification fojin performed goes uncredited.
+    reader_url: str | None = None
     # True/False only when the caller hinted a juan; None otherwise.
     juan_matched: bool | None = None
 
@@ -51,6 +55,7 @@ class ClosestMiss(BaseModel):
     text_id: int
     juan_num: int
     urn: str | None = None
+    reader_url: str | None = None
     similarity: float
     window_normalised: str
     # Character-level differences against window_normalised. Reported in
@@ -70,6 +75,11 @@ class QuoteVerdict(BaseModel):
     # 1.0 for exact; otherwise the best windowed SequenceMatcher ratio found.
     similarity: float
     matches: list[QuoteMatch] = []
+    # True when the match list hit its cap. It does not prove more exist, but
+    # it does mean this list is a sample rather than the complete answer —
+    # which matters most for short quotes, where a phrase can recur in
+    # hundreds of texts.
+    matches_capped: bool = False
     closest: ClosestMiss | None = None
     # None when no cite hint was given.
     cite_resolved: bool | None = None

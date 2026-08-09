@@ -145,6 +145,13 @@ class Settings(BaseSettings):
     # OAuth callback base URL (e.g. https://fojin.app)
     oauth_redirect_base: str = "http://localhost:3000"
 
+    # Public origin of the site, for absolute links handed to third parties
+    # (agents, citers) who have no host to attach a relative path to.
+    # api/sitemap.py and api/rss.py each carry their own BASE_URL constant and
+    # predate this setting; they are SEO-critical and left alone rather than
+    # refactored in passing. New code should use this.
+    site_base_url: str = "https://fojin.app"
+
     # Chat attachment uploads — parsed-to-text files prepended to user
     # messages. Directory is created on first write; override per-env.
     upload_dir: str = "/data/uploads/chat"

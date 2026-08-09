@@ -3,7 +3,7 @@
   "name": "app.fojin/fojin-mcp",
   "title": "fojin — Buddhist Canon Tools",
   "description": "Buddhist canon tools: search, passages, cross-canon parallels, dictionaries — all URN-cited.",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "websiteUrl": "https://fojin.app",
   "repository": {
     "url": "https://github.com/xr843/fojin",

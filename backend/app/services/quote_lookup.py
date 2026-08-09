@@ -37,7 +37,13 @@ from app.services.quote_verifier import (
     NEAR_MISS_THRESHOLD,
     normalise_for_match,
 )
-from app.services.urn import build_urn, parse_urn, resolve_urn
+from app.services.urn import (
+    absolute_reader_url,
+    build_urn,
+    parse_urn,
+    reader_path,
+    resolve_urn,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -52,11 +58,29 @@ _MAX_FULL_SCAN_JUANS = 60
 # Same window cap as quote_verifier._windowed_ratio.
 _MAX_RATIO_WINDOWS = 256
 
+# The chat verifier requires 12 characters because it extracts quoted spans
+# from prose and must not mistake a 「」-marked emphasis for a citation. Here
+# the caller states outright that the string is a quotation, and the phrases
+# people most need checked are short — 應無所住而生其心 is 8, 色即是空 is 4.
+# Refusing them made the endpoint useless for its most common question. The
+# floor stays at one 四字句, the smallest unit that means anything in
+# Classical Chinese; below that the answer would be noise either way.
+MIN_LOOKUP_QUOTE_CHARS = 4
+
 _CAVEATS = [
     "lzh (Classical Chinese) corpus only; Pali/Tibetan/Sanskrit parallels are not searched.",
     "CBETA gaiji variant characters are not folded yet; a quote using a common "
     "variant form may miss a source encoded with a composition expression.",
 ]
+
+# Added for quotes below the chat verifier's threshold, where "it exists"
+# stops being informative on its own.
+_SHORT_QUOTE_CAVEAT = (
+    "This quote is short, and short phrases recur across the canon: verbatim "
+    "presence alone is weak evidence of a source. Treat cite_matched — whether "
+    "it is where the citation claims — as the answer that carries information, "
+    "and note that matches may be capped (see matches_capped)."
+)
 
 # Loose shape check for a bare cbeta-style work id (T0374, X0600, SC-mn10,
 # 84K-toh123…). Resolution against buddhist_texts is the real validator.
@@ -88,7 +112,9 @@ def _anchor_starts(needle: str, haystack: str, nlen: int) -> list[int]:
     """
     starts: list[int] = []
     for probe_len in (nlen // 2, nlen // 4, 8):
-        if probe_len < 4:
+        # A probe longer than the needle would slice from a negative offset
+        # and anchor on nonsense — reachable now that short quotes are allowed.
+        if probe_len < 4 or probe_len > nlen:
             continue
         offset = (nlen - probe_len) // 2
         pos = haystack.find(needle[offset : offset + probe_len])
@@ -292,6 +318,7 @@ def _match_from(
         title_zh=src.get("title_zh"),
         juan_num=juan_num,
         urn=build_urn(src.get("cbeta_id"), juan_num),
+        reader_url=absolute_reader_url(reader_path(src["text_id"], juan_num)),
         juan_matched=(juan_num == hinted_juan) if hinted_juan is not None else None,
     )
 
@@ -306,9 +333,9 @@ async def verify_quote(
 ) -> QuoteVerdict:
     """Open-world verbatim check of ``quote`` against the corpus."""
     needle = normalise_for_match(quote)
-    if len(needle) < MIN_QUOTE_CHARS:
+    if len(needle) < MIN_LOOKUP_QUOTE_CHARS:
         raise QuoteTooShortError(
-            f"quote must normalise to at least {MIN_QUOTE_CHARS} chars "
+            f"quote must normalise to at least {MIN_LOOKUP_QUOTE_CHARS} chars "
             f"(got {len(needle)})"
         )
 
@@ -418,6 +445,7 @@ async def verify_quote(
                 text_id=text_id,
                 juan_num=juan_num,
                 urn=build_urn(meta[0] if meta else None, juan_num),
+                reader_url=absolute_reader_url(reader_path(text_id, juan_num)),
                 similarity=round(ratio, 4),
                 window_normalised=window,
                 diff=diff_ops(needle, window),
@@ -435,6 +463,10 @@ async def verify_quote(
         else:
             cite_matched = any(m.text_id == target.text_id for m in matches)
 
+    caveats = list(_CAVEATS)
+    if len(needle) < MIN_QUOTE_CHARS:
+        caveats.insert(0, _SHORT_QUOTE_CAVEAT)
+
     return QuoteVerdict(
         quote=quote,
         normalised_quote=needle,
@@ -442,8 +474,9 @@ async def verify_quote(
         bucket=bucket,
         similarity=round(similarity, 4) if not verbatim else 1.0,
         matches=matches,
+        matches_capped=len(matches) >= _MAX_CANDIDATES,
         closest=closest,
         cite_resolved=cite_resolved,
         cite_matched=cite_matched,
-        caveats=list(_CAVEATS),
+        caveats=caveats,
     )

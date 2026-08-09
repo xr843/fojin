@@ -36,6 +36,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.services.text import get_text_id_by_cbeta
 
 logger = logging.getLogger(__name__)
@@ -204,6 +205,25 @@ def parse_urn(urn: str) -> ParsedURN:
     )
 
 
+def reader_path(
+    text_id: int, juan: int | None = None, anchor: str | None = None
+) -> str:
+    """The in-app reader path for a text (and optionally a fascicle).
+
+    Split out of :func:`build_reader_url` so callers that already hold a
+    ``text_id``/``juan`` pair — quote verification, search results — do not
+    have to fabricate a ``ParsedURN`` just to name a link, and so the route
+    shape lives in exactly one place.
+    """
+    if juan is None:
+        # Text-level: jump to the detail page so the user picks a juan.
+        return f"/texts/{text_id}"
+    base = f"/reader?text={text_id}&juan={juan}"
+    if anchor:
+        base += f"&anchor={anchor}"
+    return base
+
+
 def build_reader_url(parsed: ParsedURN, *, text_id: int) -> str:
     """Produce the in-app reader URL a resolver should redirect to.
 
@@ -211,13 +231,22 @@ def build_reader_url(parsed: ParsedURN, *, text_id: int) -> str:
     prod fojin.app. The caller (the API endpoint) decides whether to
     return them as-is or compose an absolute URL.
     """
-    if parsed.juan is None:
-        # Text-level: jump to the detail page so the user picks a juan.
-        return f"/texts/{text_id}"
-    base = f"/reader?text={text_id}&juan={parsed.juan}"
-    if parsed.anchor:
-        base += f"&anchor={parsed.anchor}"
-    return base
+    return reader_path(text_id, parsed.juan, parsed.anchor)
+
+
+def absolute_reader_url(relative: str | None) -> str | None:
+    """Turn a :func:`build_reader_url` path into a link a third party can click.
+
+    The relative form is the published contract of ``/api/urn/resolve`` and
+    stays that way, but it is useless to the consumers that matter most here:
+    an AI agent holding ``/reader?text=42&juan=1`` has no host to attach it to,
+    so it either drops the citation or — observed in a real session — invents a
+    link to CBETA instead. fojin does the verification and someone else gets
+    the click. Callers that serve agents should offer this alongside.
+    """
+    if not relative:
+        return None
+    return f"{settings.site_base_url.rstrip('/')}{relative}"
 
 
 def _expand_work_id(parsed: ParsedURN) -> str:
