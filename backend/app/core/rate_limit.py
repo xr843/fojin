@@ -47,6 +47,16 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if not redis_client:
             return await call_next(request)
 
+        # Internal callers — the hosted fojin-mcp container, compose
+        # healthchecks — reach this port over the docker network or loopback.
+        # The only public path is nginx, and nginx always appends
+        # X-Forwarded-For, so a request without that header cannot have come
+        # from the internet. Per-IP limiting such traffic is worse than
+        # useless: every internal caller shares one 172.x address, so all
+        # fojin-mcp users would burn a single /api/search/semantic budget.
+        if "x-forwarded-for" not in request.headers:
+            return await call_next(request)
+
         # Behind Nginx reverse proxy, request.client.host is always the
         # internal Docker IP. Use the shared helper to extract the real
         # client IP from X-Forwarded-For — taking the LAST entry, since

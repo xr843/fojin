@@ -57,6 +57,9 @@ class FojinClient:
             timeout=timeout, headers={"User-Agent": USER_AGENT}
         )
         self._owns_client = client is None
+        # text_id → cbeta_id is static corpus metadata; caching it collapses the
+        # 1+N fan-out of repeated get_parallels calls on a long-lived client.
+        self._cbeta_cache: dict[int, str] = {}
 
     async def __aenter__(self) -> FojinClient:
         return self
@@ -113,12 +116,23 @@ class FojinClient:
         return shaped
 
     async def _text_cbeta_id(self, text_id: int) -> str | None:
-        """Best-effort text_id → cbeta_id via /texts/{id}; None on any failure."""
+        """Best-effort text_id → cbeta_id via /texts/{id}; None on any failure.
+
+        Successful lookups are cached for the client's lifetime (the mapping is
+        static); failures are not, so a transient error can heal on retry."""
+        if text_id in self._cbeta_cache:
+            return self._cbeta_cache[text_id]
         try:
             meta = await self._get(f"/texts/{text_id}")
         except FojinAPIError:
             return None
-        return meta.get("cbeta_id") if isinstance(meta, dict) else None
+        cbeta_id = meta.get("cbeta_id") if isinstance(meta, dict) else None
+        if isinstance(cbeta_id, str) and cbeta_id:
+            if len(self._cbeta_cache) >= 100_000:  # paranoia bound, ~10K texts real
+                self._cbeta_cache.clear()
+            self._cbeta_cache[text_id] = cbeta_id
+            return cbeta_id
+        return None
 
     async def _enrich_parallel_urns(self, parallels: list[dict[str, Any]]) -> None:
         """Fill each parallel's ``urn`` in place from its reader_ref.text_id.
@@ -158,15 +172,19 @@ class FojinClient:
 
     async def lookup_entity(self, query: str, limit: int = 10) -> dict[str, Any]:
         """Knowledge-graph entity search (persons, places, works, terms)."""
+        # /kg/entities takes `limit` (not `size` like search/dictionary do);
+        # FastAPI silently drops unknown params, so the wrong name means the
+        # caller's limit never arrives.
         data = await self._get(
-            "/kg/entities", {"q": query, "size": _clamp(limit, 1, 50)}
+            "/kg/entities", {"q": query, "limit": _clamp(limit, 1, 50)}
         )
         return {"query": query, "entities": _as_list(data, "results", "entities")}
 
     async def resolve_urn(self, urn: str) -> dict[str, Any]:
         """Resolve a fojin URN → reader URL + existence (server-authoritative)."""
-        # Anchor '#' must be percent-encoded or the server sees an anchorless URN.
-        return await self._get("/urn/resolve", {"urn": urn.replace("#", "%23")})
+        # httpx percent-encodes '#' in query params; pre-encoding here would
+        # double-encode it into a literal "%23" on the server side.
+        return await self._get("/urn/resolve", {"urn": urn})
 
 
 # ── pure reshaping (unit-tested with plain dicts) ────────────────────────

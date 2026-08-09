@@ -9,6 +9,17 @@ instead of inventing scripture.
 
 Read-only by construction: it only issues GETs against fojin's public API.
 
+Two ways to use it:
+
+1. **Hosted endpoint (zero install)** — `https://mcp.fojin.ai/mcp`, streamable
+   HTTP, anonymous, rate-limited. One line in Claude Code:
+
+   ```bash
+   claude mcp add --transport http fojin https://mcp.fojin.ai/mcp
+   ```
+
+2. **Local over stdio** — `uvx fojin-mcp`, the classic MCP install (below).
+
 ## Tools
 
 | Tool | What it returns |
@@ -70,7 +81,35 @@ from a checkout.) Restart Claude Desktop; the six fojin tools then appear.
 ### ChatGPT / other MCP clients
 
 Any client that speaks MCP over stdio can launch `uvx fojin-mcp` (or the
-`fojin-mcp` console script) and will discover the six tools automatically.
+`fojin-mcp` console script); any client that speaks streamable HTTP can point
+at `https://mcp.fojin.ai/mcp`. Both discover the six tools automatically.
+
+## Hosting the HTTP endpoint (self-host)
+
+The same package serves streamable HTTP (requires the `http` extra, which adds
+uvicorn):
+
+```bash
+pip install 'fojin-mcp[http]'
+fojin-mcp --transport streamable-http --port 8765 --public-host mcp.example.com
+```
+
+The hosted mode is **stateless JSON request/response** (`stateless_http` +
+`json_response`): every tool call is one plain POST — no SSE streams, so it
+sits safely behind Cloudflare's proxy and behind multi-worker uvicorn. It adds:
+
+- **Per-client rate limiting** — sliding window keyed on `CF-Connecting-IP` /
+  `X-Real-IP` (falling back to the socket peer). Tune with
+  `--rate-limit`/`--rate-window` or `FOJIN_MCP_RATE_LIMIT`/`FOJIN_MCP_RATE_WINDOW`.
+- **Host-header validation** (DNS-rebinding protection) pinned to
+  `--public-host` / `FOJIN_MCP_PUBLIC_HOSTS` (default `mcp.fojin.ai`).
+- **Access + tool logs** — one JSON line per request (`fojin_mcp.access`) and
+  per tool call (`fojin_mcp.tools`) on stdout/stderr.
+- **`/healthz`** for container/proxy healthchecks.
+
+The production deployment is the `mcp` service in the repo's
+`docker-compose.yml` (it talks to the backend container directly) plus the
+`mcp.fojin.ai` server block in `deploy/host-nginx/fojin.conf`.
 
 ## Design
 
@@ -83,7 +122,9 @@ Any client that speaks MCP over stdio can launch `uvx fojin-mcp` (or the
   `get_parallels` enriches each parallel's URN via a bounded, concurrent,
   best-effort `text_id → cbeta_id` lookup (a miss just leaves `urn: null`).
 - **Testable core.** All HTTP + reshaping lives in `client.py` and is tested
-  against a mocked transport; `server.py` is a thin FastMCP wiring layer.
+  against a mocked transport; `server.py` is a thin MCP wiring layer (SDK v2 —
+  `mcp>=2` is required; 2.0 removed the 1.x module this package imported
+  through 0.1.0), and the hosted-edge concerns live in `http.py`.
 - **Fails soft.** An upstream error returns `{"error": "..."}` to the model
   rather than crashing the tool call.
 
@@ -101,7 +142,7 @@ every change under `mcp-server/`. To release to PyPI, bump `version` in
 `pyproject.toml`, then push a tag:
 
 ```bash
-git tag mcp-v0.1.0 && git push origin mcp-v0.1.0
+git tag mcp-v0.2.0 && git push origin mcp-v0.2.0
 ```
 
 `.github/workflows/mcp-publish.yml` builds and uploads. It needs credentials

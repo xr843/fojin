@@ -296,6 +296,36 @@ services:
       # a proxy can set FRONTEND_BIND=0.0.0.0.
       - "${FRONTEND_BIND:-127.0.0.1}:${FRONTEND_PORT:-3000}:80"
 
+  # Hosted MCP endpoint (mcp.fojin.ai) — fojin's corpus tools for AI agents.
+  # Talks to the backend directly over the compose network (no nginx hop):
+  # internal traffic carries no X-Forwarded-For, which is what exempts it from
+  # the backend's per-IP limiter (app/core/rate_limit.py) — this container
+  # runs its own per-client window keyed on CF-Connecting-IP instead.
+  mcp:
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile
+    container_name: fojin-mcp
+    restart: always
+    logging: *default-logging
+    mem_limit: 192m
+    cpus: 0.25
+    environment:
+      FOJIN_API_BASE_URL: http://backend:8000/api
+      FOJIN_MCP_PUBLIC_HOSTS: ${FOJIN_MCP_PUBLIC_HOSTS:-mcp.fojin.ai}
+      FOJIN_MCP_RATE_LIMIT: ${FOJIN_MCP_RATE_LIMIT:-30}
+    ports:
+      - "127.0.0.1:${MCP_PORT:-8765}:8765"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8765/healthz')"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      backend:
+        condition: service_healthy
+
 volumes:
   pgdata:
   esdata:
