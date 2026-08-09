@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fojin-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "MCP server exposing fojin's verified cross-canon Buddhist corpus (cited, URN-addressable passages) to AI research tools."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -19,8 +19,11 @@ classifiers = [
     "Topic :: Religion",
     "Topic :: Text Processing :: Linguistic",
 ]
+# mcp 2.x is required: 2.0 removed the 1.x `mcp.server.fastmcp` module this
+# package previously imported, so 0.1.0 breaks on any fresh install that
+# resolves mcp>=1.2 to 2.x. 0.2.0 is the v2 migration.
 dependencies = [
-    "mcp>=1.2",
+    "mcp>=2,<3",
     "httpx>=0.27",
 ]
 
@@ -30,6 +33,9 @@ Repository = "https://github.com/xr843/fojin"
 Issues = "https://github.com/xr843/fojin/issues"
 
 [project.optional-dependencies]
+http = [
+    "uvicorn>=0.30",
+]
 dev = [
     "pytest>=8",
     "pytest-asyncio>=0.23",

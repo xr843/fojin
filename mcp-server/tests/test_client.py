@@ -17,7 +17,6 @@ from fojin_mcp.client import (
     shape_search_results,
 )
 
-
 # ── pure reshaping ───────────────────────────────────────────────────────
 
 
@@ -135,19 +134,42 @@ async def test_read_passage_path_and_urn():
 
 
 @pytest.mark.asyncio
-async def test_resolve_urn_percent_encodes_anchor():
+async def test_resolve_urn_encodes_anchor_exactly_once():
     seen = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
-        # httpx exposes the DECODED param; assert the anchor survived (wasn't
-        # stripped as a fragment) by checking the raw query carries %2523/%23.
         seen["raw_query"] = request.url.query.decode()
+        seen["urn_param"] = request.url.params.get("urn")
         return httpx.Response(200, json={"urn": "fojin:cbeta/T0001.1", "exists": True})
 
     async with _client_with(handler) as c:
         await c.resolve_urn("fojin:cbeta/T0001.1#p0001a01")
-    # The '#' was replaced with %23 before sending, so no fragment was dropped.
-    assert "p0001a01" in seen["raw_query"]
+    # httpx encodes '#' once → wire carries %23; a manual pre-encode would
+    # double it to %2523 and the server would see a literal "%23".
+    assert "%23p0001a01" in seen["raw_query"]
+    assert "%2523" not in seen["raw_query"]
+    # What the server decodes must be the original URN, anchor intact.
+    assert seen["urn_param"] == "fojin:cbeta/T0001.1#p0001a01"
+
+
+@pytest.mark.asyncio
+async def test_lookup_entity_sends_limit_param():
+    """/kg/entities takes `limit` — sending `size` is silently ignored by
+    FastAPI and the caller's limit never applies."""
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["path"] = request.url.path
+        seen["params"] = dict(request.url.params)
+        return httpx.Response(200, json={"results": [{"name": "龍樹"}]})
+
+    async with _client_with(handler) as c:
+        out = await c.lookup_entity("龙树", limit=5)
+
+    assert seen["path"] == "/api/kg/entities"
+    assert seen["params"]["limit"] == "5"
+    assert "size" not in seen["params"]
+    assert out["entities"] == [{"name": "龍樹"}]
 
 
 @pytest.mark.asyncio
@@ -196,6 +218,34 @@ async def test_get_parallels_survives_enrichment_lookup_failure():
     async with _client_with(handler) as c:
         out = await c.get_parallels(5, 1)
     assert out["parallels"][0]["urn"] is None
+
+
+@pytest.mark.asyncio
+async def test_cbeta_lookup_cached_across_calls():
+    """text_id→cbeta_id is static; a long-lived client must not re-fetch it on
+    every get_parallels (the hosted endpoint shares one client process-wide)."""
+    text_lookups = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.startswith("/api/alignment"):
+            return httpx.Response(200, json={"text_id": 5, "juan_num": 1,
+                "total_chunks": 1, "chunks_with_parallels": 1,
+                "entries": [{"chunk_index": 0, "chunk_text": "源", "parallels": [
+                    {"text_id": 99, "juan_num": 2, "chunk_index": 0, "lang": "pi",
+                     "title": "M10", "chunk_text": "p", "confidence": 0.9,
+                     "source": "fojin"}]}]})
+        if request.url.path == "/api/texts/99":
+            text_lookups["n"] += 1
+            return httpx.Response(200, json={"text_id": 99, "cbeta_id": "SC-mn10"})
+        return httpx.Response(404, json={"detail": "unexpected"})
+
+    async with _client_with(handler) as c:
+        first = await c.get_parallels(5, 1)
+        second = await c.get_parallels(5, 1)
+
+    assert first["parallels"][0]["urn"] == "fojin:sc/mn10.2"
+    assert second["parallels"][0]["urn"] == "fojin:sc/mn10.2"
+    assert text_lookups["n"] == 1     # second call served from cache
 
 
 @pytest.mark.asyncio
