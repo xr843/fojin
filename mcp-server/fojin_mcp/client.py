@@ -36,6 +36,29 @@ class FojinAPIError(RuntimeError):
     safe to surface to the calling model as a tool error."""
 
 
+def _error_detail(response: httpx.Response) -> str:
+    """The server's own reason for a 4xx, as a suffix for the error message.
+
+    A bare status code is useless to the model on the other end of the tool:
+    ``422`` does not say "your quote is 8 characters and the minimum is 12",
+    so the model cannot correct the call and just gives up. FastAPI puts that
+    sentence in ``{"detail": …}`` — pass it through.
+
+    5xx bodies are deliberately not surfaced: they carry nothing the caller
+    can act on, and are the shape most likely to leak internals.
+    """
+    if not 400 <= response.status_code < 500:
+        return ""
+    try:
+        payload = response.json()
+    except ValueError:
+        return ""
+    detail = payload.get("detail") if isinstance(payload, dict) else None
+    if isinstance(detail, str) and detail.strip():
+        return f": {detail.strip()[:300]}"
+    return ""
+
+
 class FojinClient:
     """Thin async wrapper over the fojin HTTP API.
 
@@ -80,6 +103,7 @@ class FojinClient:
         except httpx.HTTPStatusError as exc:
             raise FojinAPIError(
                 f"fojin API {exc.response.status_code} for {path}"
+                f"{_error_detail(exc.response)}"
             ) from exc
         except httpx.HTTPError as exc:
             raise FojinAPIError(f"fojin API request failed for {path}: {exc}") from exc
