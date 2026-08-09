@@ -10,7 +10,12 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.services.urn import URNParseError, parse_urn, resolve_urn
+from app.services.urn import (
+    URNParseError,
+    absolute_reader_url,
+    parse_urn,
+    resolve_urn,
+)
 
 router = APIRouter(tags=["urn"])
 
@@ -22,7 +27,14 @@ class URNResolveResponse(BaseModel):
     juan: int | None = None
     anchor: str | None = None
     text_id: int | None = None
+    # Relative path — the published contract, unchanged.
     reader_url: str | None = None
+    # The same target as an absolute URL. Added because the relative form is
+    # unusable to a consumer with no host: an agent holding
+    # "/reader?text=42&juan=1" cannot render a link, and in practice links to
+    # CBETA instead. Additive, so existing citers that prepend their own host
+    # keep working.
+    reader_url_absolute: str | None = None
     # True iff the work was found in the database.
     exists: bool
 
@@ -69,5 +81,6 @@ async def urn_resolve(
         anchor=parsed.anchor,
         text_id=text_id,
         reader_url=reader_url,
+        reader_url_absolute=absolute_reader_url(reader_url),
         exists=text_id is not None,
     )

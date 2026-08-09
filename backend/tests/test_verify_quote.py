@@ -254,8 +254,62 @@ async def test_urn_cite_hint_carries_juan():
 
 @pytest.mark.asyncio
 async def test_too_short_quote_rejected():
+    """Below one 四字句 there is nothing to answer either way."""
     with pytest.raises(QuoteTooShortError):
-        await verify_quote(DB, FakeES(), "諸行無常")
+        await verify_quote(DB, FakeES(), "諸行無")
+
+
+@pytest.mark.asyncio
+async def test_four_character_quote_is_answered_not_refused():
+    """色即是空 / 應無所住而生其心 are the phrases people most need checked;
+    the old 12-character floor refused exactly those."""
+    es = FakeES({"match_phrase": [_hit(15, 13)]})
+    out = await verify_quote(DB, es, "諸行無常")
+    assert out.verbatim is True
+    assert out.matches[0].urn == "fojin:cbeta/T0374.13"
+
+
+@pytest.mark.asyncio
+async def test_short_quote_says_what_its_verdict_is_worth():
+    """A four-character hit is nearly always true and nearly always
+    uninformative — the verdict has to say so rather than let the caller
+    read it as provenance."""
+    es = FakeES({"match_phrase": [_hit(15, 13)]})
+    short = await verify_quote(DB, es, "諸行無常")
+    long = await verify_quote(DB, es, SNOW_VERSE)
+    assert any("short" in c.lower() for c in short.caveats)
+    assert not any("short" in c.lower() for c in long.caveats)
+
+
+@pytest.mark.asyncio
+async def test_capped_match_list_is_flagged():
+    """Five matches is the cap, not a census — saying so is the difference
+    between a sample and a false claim of completeness."""
+    es = FakeES({"match_phrase": [_hit(15, j) for j in (13, 16)]})
+    out = await verify_quote(DB, es, SNOW_VERSE)
+    assert out.matches_capped is False        # two hits, cap is five
+
+    from app.services import quote_lookup
+
+    wide = FakeDB(
+        texts={15: ("T0374", "大般涅槃經")},
+        contents={(15, j): JUAN_13 for j in range(1, 9)},
+    )
+    es_wide = FakeES({"match_phrase": [_hit(15, j) for j in range(1, 9)]})
+    out2 = await verify_quote(wide, es_wide, SNOW_VERSE)
+    assert len(out2.matches) == quote_lookup._MAX_CANDIDATES
+    assert out2.matches_capped is True
+
+
+@pytest.mark.asyncio
+async def test_matches_carry_a_clickable_absolute_url():
+    """A relative path is unusable to an agent with no host: in a real
+    session it linked CBETA instead, and fojin's verification went
+    uncredited."""
+    out = await verify_quote(DB, FakeES(), SNOW_VERSE, cite="T0374", juan=13)
+    url = out.matches[0].reader_url
+    assert url is not None and url.startswith("https://")
+    assert url.endswith("/reader?text=15&juan=13")
 
 
 # ── rate limit registration ──────────────────────────────────────────────

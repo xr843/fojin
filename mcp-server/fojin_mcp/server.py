@@ -177,7 +177,11 @@ async def verify_quote(quote: str, cite: str | None = None, juan: int | None = N
     search — a CBETA id ("T0374") or fojin URN ("fojin:cbeta/T0374.13") —
     and `cite_matched` reports honestly whether the quote is where you
     claimed (a hit in a different fascicle does NOT confirm your citation).
-    Quote must be ≥12 CJK chars after normalisation; Classical Chinese only.
+    Quote must be ≥4 CJK chars after normalisation; Classical Chinese only.
+    Short quotes are answered but say less: a four-character phrase recurs
+    across the canon, so read `cite_matched` rather than `verbatim`, and check
+    `matches_capped` before treating the list as complete. Each match carries
+    an absolute `reader_url` — cite that, not a reconstructed third-party link.
     """
     return await _call("verify_quote", lambda c: c.verify_quote(quote, cite=cite, juan=juan))
 
