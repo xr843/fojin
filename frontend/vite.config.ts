@@ -130,7 +130,13 @@ export default defineConfig({
         // share card served to WeChat/Twitter crawlers, never rendered in the app.
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webp}"],
         globIgnores: ["**/landscape-bg.png", "**/og-image.png"],
-        navigateFallbackDenylist: [/^\/api\//],
+        // /agents and /llms.txt are real files served outside the SPA, and a
+        // navigation to either would otherwise be answered from the precached
+        // index.html: /agents has no React Router route (→ 404 page for anyone
+        // with the SW installed), and /llms.txt isn't in globPatterns at all so
+        // it is never precached. Crawlers don't run a SW and so never saw this;
+        // only returning humans would.
+        navigateFallbackDenylist: [/^\/api\//, /^\/agents$/, /^\/llms\.txt$/],
         skipWaiting: true,
         clientsClaim: true,
       },

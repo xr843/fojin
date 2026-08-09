@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>佛典的 AI 基础设施 — fojin 佛津</title>
+<meta name="description" content="搜索、阅读、跨藏对照佛典，并逐字核验每一条引文。托管 MCP 端点、只读 HTTP API、离线 CLI —— 每一段经文都带可解析的 URN 引证。" />
+<link rel="canonical" href="https://fojin.app/agents" />
+<meta name="theme-color" content="#8b2500" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="佛典的 AI 基础设施 — fojin 佛津" />
+<meta property="og:description" content="Buddhist canon infrastructure an AI can call: search, read, cross-reference — and verify every quotation, verbatim." />
+<meta property="og:url" content="https://fojin.app/agents" />
+<meta property="og:image" content="https://fojin.app/og-image.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<!-- Pre-paint theme, same contract as index.html. Must stay an external file:
+     the production CSP is `script-src 'self'` with no 'unsafe-inline', so an
+     inline block would be silently dropped in prod. -->
+<script src="/theme-init.js"></script>
+<style>
+  /* Design tokens mirror frontend/src/styles/global.css. Kept inline (CSP allows
+     'unsafe-inline' for styles, not scripts) so this page is one request.
+     Body copy deliberately uses the local serif stack rather than @import-ing
+     /fonts/noto-serif-sc.css — that sheet is 331 KB of @font-face shards, too
+     heavy for a landing page. Only the 3 KB brush subset for 「佛津」 is loaded. */
+  :root {
+    --fj-bg: #f8f5ef;
+    --fj-bg-alt: #f0ebe2;
+    --fj-ink: #2b2318;
+    --fj-ink-light: #5c4f3d;
+    --fj-ink-muted: #746958;
+    --fj-accent: #8b2500;
+    --fj-accent-hover: #a03000;
+    --fj-cinnabar: #b23a1a;
+    --fj-gold: #b08d57;
+    --fj-border: #d9d0c1;
+    --fj-surface: #ffffff;
+    --fj-surface-alt: #faf8f4;
+    --fj-on-accent: #ffffff;
+    --fj-hero: linear-gradient(180deg, #f4e8d6 0%, #ece0cb 45%, #f8f5ef 100%);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --fj-bg: #2f2820; --fj-bg-alt: #3c342a;
+      --fj-ink: #efe8db; --fj-ink-light: #d2c7b1; --fj-ink-muted: #c6bca6;
+      --fj-accent: #e5764a; --fj-accent-hover: #ef8a5f; --fj-cinnabar: #f2a07a;
+      --fj-gold: #d6b579; --fj-border: #60553f;
+      --fj-surface: #4a4133; --fj-surface-alt: #544a3a;
+      --fj-on-accent: #17120d;
+      --fj-hero: linear-gradient(180deg, #3c342a 0%, #352d24 45%, #2f2820 100%);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --fj-bg: #2f2820; --fj-bg-alt: #3c342a;
+    --fj-ink: #efe8db; --fj-ink-light: #d2c7b1; --fj-ink-muted: #c6bca6;
+    --fj-accent: #e5764a; --fj-accent-hover: #ef8a5f; --fj-cinnabar: #f2a07a;
+    --fj-gold: #d6b579; --fj-border: #60553f;
+    --fj-surface: #4a4133; --fj-surface-alt: #544a3a;
+    --fj-on-accent: #17120d;
+    --fj-hero: linear-gradient(180deg, #3c342a 0%, #352d24 45%, #2f2820 100%);
+    color-scheme: dark;
+  }
+
+  @font-face {
+    font-family: 'Ma Shan Zheng Title';
+    font-style: normal; font-weight: 400; font-display: swap;
+    src: url('/fonts/MaShanZheng-title-v2.woff2') format('woff2');
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--fj-bg);
+    color: var(--fj-ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 16px;
+    line-height: 1.75;
+  }
+  .serif {
+    font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", STSong,
+                 Georgia, serif;
+  }
+  a { color: var(--fj-accent); text-decoration: none; }
+  a:hover { color: var(--fj-accent-hover); text-decoration: underline; }
+  code, pre, .mono {
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.875em;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 0 24px; }
+
+  /* ── header ─────────────────────────────────────────────────── */
+  .site-head {
+    border-bottom: 1px solid var(--fj-border);
+    background: var(--fj-bg);
+  }
+  .site-head .wrap {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; min-height: 60px; flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; }
+  .brand .mark {
+    font-family: 'Ma Shan Zheng Title', "Noto Serif SC", serif;
+    font-size: 28px; color: var(--fj-accent); line-height: 1;
+  }
+  .brand .tag { font-size: 13px; color: var(--fj-ink-muted); letter-spacing: .04em; }
+  .site-head nav { display: flex; gap: 18px; font-size: 14px; }
+  .site-head nav a { color: var(--fj-ink-light); }
+
+  /* ── hero ───────────────────────────────────────────────────── */
+  .hero { background: var(--fj-hero); border-bottom: 1px solid var(--fj-border); }
+  .hero .wrap { padding-top: 56px; padding-bottom: 48px; }
+  .eyebrow {
+    margin: 0 0 14px; font-size: 13px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--fj-gold); font-weight: 600;
+  }
+  h1 {
+    margin: 0 0 18px; font-size: clamp(28px, 5vw, 42px); line-height: 1.35;
+    font-weight: 700; color: var(--fj-ink); letter-spacing: -.01em;
+  }
+  .lede { margin: 0 0 8px; font-size: 17px; color: var(--fj-ink-light); max-width: 62ch; }
+  .lede-en { margin: 0; font-size: 15px; color: var(--fj-ink-muted); max-width: 66ch; }
+
+  .cta { margin-top: 30px; }
+  .cta-label { font-size: 13px; color: var(--fj-ink-muted); margin: 0 0 8px; }
+  /* Wrap rather than scroll: a shell command in a narrow card would otherwise
+     grow its own horizontal scrollbar, which reads as a rendering bug. */
+  .cmd {
+    display: block; white-space: pre-wrap; overflow-wrap: anywhere;
+    background: var(--fj-surface); border: 1px solid var(--fj-border);
+    border-left: 3px solid var(--fj-accent); border-radius: 6px;
+    padding: 14px 16px; color: var(--fj-ink); line-height: 1.6;
+  }
+
+  /* ── sections ───────────────────────────────────────────────── */
+  section { padding: 52px 0; border-bottom: 1px solid var(--fj-border); }
+  section:last-of-type { border-bottom: 0; }
+  h2 {
+    margin: 0 0 6px; font-size: 24px; font-weight: 700; color: var(--fj-ink);
+    letter-spacing: -.01em;
+  }
+  h2 .en { display: block; font-size: 13px; font-weight: 500; letter-spacing: .1em;
+           text-transform: uppercase; color: var(--fj-gold); margin-bottom: 6px; }
+  .section-lede { margin: 0 0 26px; color: var(--fj-ink-light); max-width: 66ch; }
+  h3 { margin: 30px 0 8px; font-size: 17px; font-weight: 700; color: var(--fj-ink); }
+  p { margin: 0 0 14px; }
+
+  /* ── tool table ─────────────────────────────────────────────── */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 15px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--fj-border); vertical-align: top; }
+  th { font-size: 13px; letter-spacing: .06em; text-transform: uppercase;
+       color: var(--fj-ink-muted); font-weight: 600; background: var(--fj-surface-alt); }
+  tbody tr:last-child td { border-bottom: 0; }
+  td code { color: var(--fj-accent); white-space: nowrap; }
+  .table-wrap { border: 1px solid var(--fj-border); border-radius: 8px; overflow: hidden; background: var(--fj-surface); }
+
+  /* ── demo blocks ────────────────────────────────────────────── */
+  pre {
+    margin: 0; overflow-x: auto; -webkit-overflow-scrolling: touch;
+    background: var(--fj-surface); border: 1px solid var(--fj-border);
+    border-radius: 8px; padding: 16px; line-height: 1.6; color: var(--fj-ink);
+  }
+  .demo { margin: 20px 0; }
+  .demo-head {
+    font-size: 13px; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--fj-ink-muted); font-weight: 600; margin: 0 0 8px;
+  }
+  .verdict {
+    margin: 14px 0 0; padding: 14px 16px; border-radius: 8px;
+    background: var(--fj-surface-alt); border: 1px solid var(--fj-border);
+    border-left: 3px solid var(--fj-cinnabar); color: var(--fj-ink-light);
+    font-size: 15px;
+  }
+  .verdict strong { color: var(--fj-ink); }
+
+  /* ── cards ──────────────────────────────────────────────────── */
+  /* 340px keeps this at two columns inside the 880px wrap — four cards land
+     2+2 rather than a lopsided 3+1 — and collapses to one column on phones.
+     min(340px, 100%) is load-bearing: a bare minmax(340px, …) floors the track
+     at 340px, so a 360px-wide phone (328px of content after padding) would be
+     pushed into a horizontal scroll. */
+  .cards {
+    display: grid; gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr));
+  }
+  .card {
+    border: 1px solid var(--fj-border); border-radius: 8px;
+    background: var(--fj-surface); padding: 20px;
+  }
+  .card h3 { margin: 0 0 6px; font-size: 16px; }
+  .card p { margin: 0 0 12px; font-size: 15px; color: var(--fj-ink-light); }
+  .card .cmd { font-size: 13px; padding: 10px 12px; background: var(--fj-surface-alt); }
+
+  ul { margin: 0 0 14px; padding-left: 1.25em; }
+  li { margin-bottom: 8px; }
+  .muted { color: var(--fj-ink-muted); font-size: 15px; }
+
+  /* ── footer ─────────────────────────────────────────────────── */
+  footer { padding: 34px 0 48px; color: var(--fj-ink-muted); font-size: 14px; }
+  footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  footer nav { display: flex; gap: 18px; flex-wrap: wrap; }
+
+  @media (max-width: 640px) {
+    .wrap { padding: 0 16px; }
+    .hero .wrap { padding-top: 40px; padding-bottom: 36px; }
+    section { padding: 40px 0; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-head">
+  <div class="wrap">
+    <div class="brand">
+      <span class="mark">佛津</span>
+      <span class="tag">AI infrastructure</span>
+    </div>
+    <nav>
+      <a href="https://fojin.app">阅读站</a>
+      <a href="/llms.txt">llms.txt</a>
+      <a href="https://github.com/xr843/fojin">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="wrap">
+    <p class="eyebrow">Buddhist canon · infrastructure an AI can call</p>
+    <h1 class="serif">让 AI 引用佛典时，<br />每一句都能被核对</h1>
+    <p class="lede">
+      汉传、巴利、梵、藏四系典籍，一套只读接口。检索、读原文、跨藏对照，
+      以及大模型最容易出错的那一步 —— <strong>逐字核验引文是否真的存在、是否真在你标的出处</strong>。
+      每一段经文都带一个可解析的 URN 引证。
+    </p>
+    <p class="lede-en">
+      Search, read and cross-reference the Buddhist canon over one read-only API,
+      and verify every quotation verbatim before you serve it. Every passage
+      carries a resolvable citation URN.
+    </p>
+    <div class="cta">
+      <p class="cta-label">接入 Claude Code（其它 MCP 客户端指向同一个 URL 即可）</p>
+      <code class="cmd">claude mcp add --transport http fojin https://mcp.fojin.ai/mcp</code>
+    </div>
+  </div>
+</div>
+
+<main>
+
+<section>
+  <div class="wrap">
+    <h2 class="serif"><span class="en">Tools</span>七个工具</h2>
+    <p class="section-lede">
+      托管在 <code>mcp.fojin.ai</code>，匿名可用、按客户端限流、全部只读。
+      同一套工具也可以用 <code>uvx fojin-mcp</code> 在本地以 stdio 方式运行。
+    </p>
+    <div class="table-wrap"><div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th>工具</th><th>返回什么</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>verify_quote</code></td>
+          <td><strong>逐字核验引文</strong>：这句话在藏经里存不存在、在哪几处；
+              并且分开回答「引文是否为真」与「出处是否属实」。找不到时给出最接近的原文与相似度。</td>
+        </tr>
+        <tr>
+          <td><code>search_corpus</code></td>
+          <td>语义检索全语料（1 万余部典籍、30 余种语言），每条命中带 URN、标题、片段与相似度。</td>
+        </tr>
+        <tr>
+          <td><code>read_passage</code></td>
+          <td>某经某卷的完整原文 —— 要引用就引用这里返回的文字，不要凭记忆。</td>
+        </tr>
+        <tr>
+          <td><code>get_parallels</code></td>
+          <td>跨藏对齐的平行段落（汉 ↔ 巴 ↔ 梵 ↔ 藏），各自带 URN 与深链。</td>
+        </tr>
+        <tr>
+          <td><code>lookup_dictionary</code></td>
+          <td>32 部佛学辞典的词条检索。</td>
+        </tr>
+        <tr>
+          <td><code>lookup_entity</code></td>
+          <td>知识图谱实体：人物、地点、著作、义理名相。</td>
+        </tr>
+        <tr>
+          <td><code>resolve_urn</code></td>
+          <td>把 <code>fojin:</code> URN 解析成阅读链接并确认它确实存在。</td>
+        </tr>
+      </tbody>
+    </table>
+    </div></div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2 class="serif"><span class="en">Verify before you quote</span>引文核验</h2>
+    <p class="section-lede">
+      大模型写佛教内容时最典型的错误不是编造经名，而是<strong>把复述当成逐字引用</strong>，
+      或者把一句真经文安到错误的出处上。这两件事需要分开回答 —— 所以核验结果里
+      <code>verbatim</code> 与 <code>cite_matched</code> 是两个字段。
+    </p>
+
+    <div class="demo">
+      <p class="demo-head">请求 — 一句真经文，配一个常见但错误的出处</p>
+<pre><code>GET https://fojin.app/api/verify/quote
+      ?q=諸行無常，是生滅法，生滅滅已，寂滅為樂
+      &amp;cite=T0374</code></pre>
+    </div>
+
+    <div class="demo">
+      <p class="demo-head">响应（节选）</p>
+<pre><code>{
+  "verbatim": true,
+  "bucket": "exact",
+  "cite_resolved": true,
+  "cite_matched": false,
+  "matches": [
+    { "urn": "fojin:cbeta/T2919.1", "title_zh": "佛母經" },
+    { "urn": "fojin:cbeta/T1528.1", "title_zh": "涅槃經本有今無偈論" },
+    { "urn": "fojin:cbeta/X1277.7", "title_zh": "高峰龍泉院因師集賢語錄" }
+  ]
+}</code></pre>
+      <p class="verdict">
+        <strong>引文为真，出处不实。</strong>
+        雪山偈四句连写并不出现在《大般涅槃经》(T0374) 里 —— 经中是罗刹先说半偈、
+        再说后半的叙事结构。四句合诵见于《佛母经》等三十余处引用文献。
+        这种「话是真的，但不在你说的那一卷」正是 <code>cite_matched</code> 存在的理由：
+        沿用旧管线「同名任意卷也算数」的回退，就会把它误判为通过。
+      </p>
+    </div>
+
+    <div class="demo">
+      <p class="demo-head">对照 — 一句听起来很像佛经的伪造引文</p>
+<pre><code>{
+  "verbatim": false,
+  "bucket": "absent",
+  "similarity": 0.818,
+  "closest": { "urn": "fojin:cbeta/X1591.4" }
+}</code></pre>
+      <p class="verdict">
+        没有逐字命中，但给出了最接近的真实段落 —— 模型可以据此把杜撰的句子换成真出处，
+        而不是简单地丢弃。<code>caveats</code> 字段会如实声明当前的覆盖边界
+        （只覆盖汉文语料、尚未折叠 CBETA 缺字异体），请把它一并转述，不要过度声称。
+      </p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2 class="serif"><span class="en">The URN contract</span>可解析的引证</h2>
+    <p class="section-lede">
+      每一段经文都带一个可移植的标识，形如 <code>fojin:cbeta/T0251.1</code>
+      （典藏 / 编号 . 卷）。它可以被直接引用、可以回到 <code>resolve_urn</code> 验证，
+      也可以解析成人能点开的阅读链接。跨藏经统一编号，与 CBETA、SuttaCentral
+      (<code>sc/</code>)、84000 (<code>84k/toh</code>)、GRETIL 的既有编号互通。
+    </p>
+    <ul>
+      <li><strong>引 URN，不要引页码。</strong>URN 稳定、可机读，且能被第三方独立核对。</li>
+      <li><strong>只引工具返回的文字。</strong>凭记忆复述佛典几乎必然产生异文。</li>
+      <li><strong>核验之后再输出。</strong><code>verify_quote</code> 一次调用即可。</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2 class="serif"><span class="en">Every surface</span>其它接入方式</h2>
+    <div class="cards">
+      <div class="card">
+        <h3>只读 HTTP API</h3>
+        <p>不想走 MCP 就直接请求。全部端点见 OpenAPI，匿名可用、按 IP 限流。</p>
+        <code class="cmd">curl https://fojin.app/openapi.json</code>
+      </div>
+      <div class="card">
+        <h3>本地 stdio（PyPI）</h3>
+        <p>同一个服务器，跑在你自己机器上，适合离线或私有部署的客户端。</p>
+        <code class="cmd">uvx fojin-mcp</code>
+      </div>
+      <div class="card">
+        <h3>fojin-cli</h3>
+        <p>离线单二进制（Rust）：给一段汉文，查它在梵、藏正典中的平行文本。无需登录。</p>
+        <code class="cmd">cargo install fojin-cli --locked</code>
+      </div>
+      <div class="card">
+        <h3>master-skill</h3>
+        <p>二十位祖师的 persona 与教学模式，可装进 Claude Code 等 agent 运行时。</p>
+        <code class="cmd">npx master-skill install --all</code>
+      </div>
+    </div>
+    <h3>给爬虫与 agent 的说明</h3>
+    <p class="muted">
+      站点索引见 <a href="/llms.txt">llms.txt</a>；MCP registry 条目为
+      <code>app.fojin/fojin-mcp</code>。原典依各自上游许可（CBETA、SuttaCentral、84000、GRETIL），
+      对齐数据为 CC BY-SA。请在引用时带上 URN。遇到 <code>429</code> 请退避并遵守 <code>Retry-After</code>。
+    </p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>佛津 fojin · 佛典研究的 AI 基础设施</span>
+    <nav>
+      <a href="https://fojin.app">阅读站</a>
+      <a href="/llms.txt">llms.txt</a>
+      <a href="https://fojin.app/docs">API 文档</a>
+      <a href="https://pypi.org/project/fojin-mcp/">PyPI</a>
+      <a href="https://github.com/xr843/fojin">GitHub</a>
+    </nav>
+  </div>
+</footer>
+
+</body>
+</html>

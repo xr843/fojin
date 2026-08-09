@@ -29,6 +29,8 @@ STATIC_PAGES = [
     ("/topics", "weekly", "0.8"),
     ("/kg", "weekly", "0.7"),
     ("/chat", "weekly", "0.6"),
+    # Agent portal — the AI-facing front door (hosted MCP, verify_quote, URNs).
+    ("/agents", "monthly", "0.6"),
     # Sutra landing pages
     ("/sutras/heart-sutra", "monthly", "0.9"),
     ("/sutras/diamond-sutra", "monthly", "0.9"),
