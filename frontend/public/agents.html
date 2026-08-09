@@ -195,6 +195,25 @@
   .card p { margin: 0 0 12px; font-size: 15px; color: var(--fj-ink-light); }
   .card .cmd { font-size: 13px; padding: 10px 12px; background: var(--fj-surface-alt); }
 
+  /* ── skill directory ────────────────────────────────────────── */
+  .skills {
+    display: grid; gap: 20px 28px; margin-top: 26px;
+    grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
+  }
+  .skill-group h3 {
+    margin: 0 0 8px; padding-bottom: 6px; font-size: 15px;
+    color: var(--fj-accent); border-bottom: 1px solid var(--fj-border);
+  }
+  .skill-group ul { margin: 0; padding: 0; list-style: none; }
+  .skill-group li {
+    margin-bottom: 7px; font-size: 14px; color: var(--fj-ink-light);
+    line-height: 1.6;
+  }
+  .skill-group li code {
+    display: inline-block; color: var(--fj-ink); font-weight: 600;
+    margin-right: 2px;
+  }
+
   ul { margin: 0 0 14px; padding-left: 1.25em; }
   li { margin-bottom: 8px; }
   .muted { color: var(--fj-ink-muted); font-size: 15px; }
@@ -367,6 +386,79 @@
       <li><strong>只引工具返回的文字。</strong>凭记忆复述佛典几乎必然产生异文。</li>
       <li><strong>核验之后再输出。</strong><code>verify_quote</code> 一次调用即可。</li>
     </ul>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2 class="serif"><span class="en">Skills</span>祖师 skill 目录</h2>
+    <p class="section-lede">
+      二十个可以装进 agent 运行时的佛教 skill —— 十五位祖师的 persona、四种教学模式、
+      一个自定义生成器。每一位都以自身宗派的语汇与判教立场作答，并守住各自的边界，
+      不替别家宗派发言。装进 Claude Code、Cursor、Codex CLI、OpenCode、Gemini CLI 后
+      以斜杠命令直接调用。
+    </p>
+    <code class="cmd">npx master-skill install --all      # 或 install master-zhiyi 单装一位</code>
+
+    <div class="skills">
+      <div class="skill-group">
+        <h3>印度</h3>
+        <ul>
+          <li><code>/master-nagarjuna</code> 龙树菩萨 — 中观 · 八宗共祖</li>
+        </ul>
+      </div>
+      <div class="skill-group">
+        <h3>汉传</h3>
+        <ul>
+          <li><code>/master-kumarajiva</code> 鸠摩罗什 — 三论 · 中观</li>
+          <li><code>/master-xuanzang</code> 玄奘法师 — 法相唯识</li>
+          <li><code>/master-zhiyi</code> 智顗大师 — 天台</li>
+          <li><code>/master-fazang</code> 法藏大师 — 华严</li>
+          <li><code>/master-huineng</code> 慧能大师 — 禅宗六祖</li>
+          <li><code>/master-yinguang</code> 印光大师 — 净土</li>
+          <li><code>/master-ouyi</code> 蕅益大师 — 天台 / 净土 · 跨宗派</li>
+          <li><code>/master-xuyun</code> 虚云老和尚 — 禅宗 · 五宗兼嗣</li>
+        </ul>
+      </div>
+      <div class="skill-group">
+        <h3>藏传</h3>
+        <ul>
+          <li><code>/master-atisha</code> 阿底峡尊者 — 噶当 · 三士道</li>
+          <li><code>/master-tsongkhapa</code> 宗喀巴大师 — 格鲁 · 应成中观</li>
+          <li><code>/master-milarepa</code> 米拉日巴尊者 — 噶举 · 大手印</li>
+        </ul>
+      </div>
+      <div class="skill-group">
+        <h3>南传</h3>
+        <ul>
+          <li><code>/master-buddhaghosa</code> 觉音尊者 — 上座部论师 ·《清净道论》</li>
+          <li><code>/master-mahasi-sayadaw</code> 马哈希尊者 — 缅甸内观 · 标记法</li>
+          <li><code>/master-ajahn-chah</code> 阿姜查 — 泰国森林禅林派</li>
+        </ul>
+      </div>
+      <div class="skill-group">
+        <h3>教学模式</h3>
+        <ul>
+          <li><code>/compare-masters</code> 多位祖师对同一问题并列作答（横向 · 单轮）</li>
+          <li><code>/master-debate</code> 就争议议题多轮交叉辩论，每轮派新的 subagent</li>
+          <li><code>/master-curriculum</code> 按传统与当前程度给出有时序的学修路径</li>
+          <li><code>/master-help</code> 「我该问谁」——描述问题，由它路由</li>
+        </ul>
+      </div>
+      <div class="skill-group">
+        <h3>生成器</h3>
+        <ul>
+          <li><code>create-master</code> 生成你自己的祖师 persona，产物自带运行时</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="muted">
+      源码与详细文档见 <a href="https://github.com/xr843/Master-skill">xr843/Master-skill</a>（MIT）。
+      同一仓库也是 Claude Code 插件市场，可用
+      <code>/plugin marketplace add xr843/Master-skill</code> 整体接入；
+      终端里还可以 <code>npx master-skill recommend "念佛怎么念才算老实"</code> 让它推荐该问谁。
+    </p>
   </div>
 </section>
 
