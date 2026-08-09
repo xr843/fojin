@@ -136,7 +136,16 @@ export default defineConfig({
         // with the SW installed), and /llms.txt isn't in globPatterns at all so
         // it is never precached. Crawlers don't run a SW and so never saw this;
         // only returning humans would.
-        navigateFallbackDenylist: [/^\/api\//, /^\/agents$/, /^\/llms\.txt$/],
+        // The `(\?|$)` is load-bearing: workbox tests these against
+        // `pathname + search`, not pathname, so an anchored `/^\/agents$/`
+        // stops matching the moment a link carries `?utm_source=…` — and the
+        // navigation falls back to the SPA shell, which has no /agents route.
+        // A shared link is exactly the case that carries query params.
+        navigateFallbackDenylist: [
+          /^\/api\//,
+          /^\/agents(\?|$)/,
+          /^\/llms\.txt(\?|$)/,
+        ],
         skipWaiting: true,
         clientsClaim: true,
       },
