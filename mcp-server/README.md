@@ -30,6 +30,7 @@ Two ways to use it:
 | `lookup_dictionary(term, limit)` | Entries across fojin's 32 dictionaries |
 | `lookup_entity(query, limit)` | Knowledge-graph entities (people, places, works, terms) |
 | `resolve_urn(urn)` | Resolve/verify a `fojin:` URN → reader URL + existence |
+| `verify_quote(quote, cite?, juan?)` | **Open-world verbatim check**: does this quote exist anywhere in the canon? Returns URN-cited matches, honest `cite_matched`/`juan_matched`, or the closest near-miss window. Call it before serving any quoted scripture — LLMs invent quotes |
 
 Every result that names a canonical passage carries a **`urn`** — fojin's stable
 cross-canon identifier, interoperable with CBETA / SuttaCentral (`sc/`) / 84000

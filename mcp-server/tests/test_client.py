@@ -221,6 +221,33 @@ async def test_get_parallels_survives_enrichment_lookup_failure():
 
 
 @pytest.mark.asyncio
+async def test_verify_quote_params_and_passthrough():
+    """verify_quote sends q/cite/juan (omitting absent hints) and passes the
+    server's agent-facing verdict through unshaped."""
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["path"] = request.url.path
+        seen["params"] = dict(request.url.params)
+        return httpx.Response(200, json={
+            "verbatim": True, "bucket": "exact", "similarity": 1.0,
+            "matches": [{"urn": "fojin:cbeta/T0374.13", "juan_matched": True}]})
+
+    async with _client_with(handler) as c:
+        out = await c.verify_quote("諸行無常，是生滅法", cite="T0374", juan=13)
+
+    assert seen["path"] == "/api/verify/quote"
+    assert seen["params"] == {"q": "諸行無常，是生滅法", "cite": "T0374", "juan": "13"}
+    assert out["verbatim"] is True
+    assert out["matches"][0]["urn"] == "fojin:cbeta/T0374.13"
+
+    seen.clear()
+    async with _client_with(handler) as c:
+        await c.verify_quote("諸行無常，是生滅法")
+    assert seen["params"] == {"q": "諸行無常，是生滅法"}   # no None params leak
+
+
+@pytest.mark.asyncio
 async def test_cbeta_lookup_cached_across_calls():
     """text_id→cbeta_id is static; a long-lived client must not re-fetch it on
     every get_parallels (the hosted endpoint shares one client process-wide)."""

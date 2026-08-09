@@ -163,6 +163,10 @@ class Settings(BaseSettings):
     rate_limit_semantic: int = 20
     rate_limit_research: int = 10
     rate_limit_ai_diff: int = 10
+    # Open-world quote verification: no paid inference, but each call is an
+    # ES phrase search plus full-fascicle source reads — same cost class as
+    # /api/search/content (30/min).
+    rate_limit_verify_quote: int = 30
     # Chat (AI Q&A) — the most expensive endpoint: RAG retrieval always uses the
     # platform embedding key (even for BYOK users) plus a long streaming LLM
     # call and a DB pool slot. 30/min/IP is generous for real use (a stream

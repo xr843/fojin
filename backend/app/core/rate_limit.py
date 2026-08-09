@@ -25,6 +25,9 @@ STRICT_PATHS: dict[str, int] = {
     "/api/search/semantic": settings.rate_limit_semantic,
     "/api/research/query": settings.rate_limit_research,
     "/api/alignment/ai-diff": settings.rate_limit_ai_diff,
+    # Open-world quote verification — ES phrase search + fascicle reads per
+    # call; the hosted MCP endpoint fronts it with its own per-client window.
+    "/api/verify/quote": settings.rate_limit_verify_quote,
     # Chat / AI Q&A — the most expensive endpoint (platform-key RAG embedding +
     # streaming LLM + a held DB pool slot), previously left at the loose
     # default. Exact-path map (STRICT_PATHS.get(path)), so both routes are
