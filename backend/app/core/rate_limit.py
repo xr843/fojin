@@ -28,6 +28,9 @@ STRICT_PATHS: dict[str, int] = {
     # Open-world quote verification — ES phrase search + fascicle reads per
     # call; the hosted MCP endpoint fronts it with its own per-client window.
     "/api/verify/quote": settings.rate_limit_verify_quote,
+    # 经注对读：包常驻内存，单次查询只是子串定位——比核验便宜，
+    # 但仍是全文检索，别落进 200/min 的默认桶。
+    "/api/commentary/passage": settings.rate_limit_commentary,
     # Chat / AI Q&A — the most expensive endpoint (platform-key RAG embedding +
     # streaming LLM + a held DB pool slot), previously left at the loose
     # default. Exact-path map (STRICT_PATHS.get(path)), so both routes are

@@ -72,6 +72,7 @@ def test_tools_list_over_streamable_http():
     assert tools == {
         "search_corpus", "read_passage", "get_parallels",
         "lookup_dictionary", "lookup_entity", "resolve_urn", "verify_quote",
+        "commentaries",
     }
 
 

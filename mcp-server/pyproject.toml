@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fojin-mcp"
-version = "0.3.2"
+version = "0.4.0"
 description = "MCP server exposing fojin's verified cross-canon Buddhist corpus (cited, URN-addressable passages) to AI research tools."
 readme = "README.md"
 requires-python = ">=3.10"
