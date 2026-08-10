@@ -248,6 +248,29 @@ async def test_verify_quote_params_and_passthrough():
 
 
 @pytest.mark.asyncio
+async def test_commentaries_clamps_limit_and_passes_through():
+    """服务端返回的结构已经是给 agent 看的，客户端不该再塑形——尤其是
+    truncated / available_sutras 这类「说明自己不完整」的字段，丢一个都会
+    让调用方把样本当全集。"""
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["path"] = request.url.path
+        seen["params"] = dict(request.url.params)
+        return httpx.Response(200, json={
+            "matched": True, "total": 50, "truncated": True,
+            "commentaries": [{"work": "F03n0100", "tier": "A"}],
+            "available_sutras": [], "caveats": ["…"]})
+
+    async with _client_with(handler) as c:
+        out = await c.commentaries("應無所住而生其心", limit=999)
+
+    assert seen["path"] == "/api/commentary/passage"
+    assert seen["params"]["limit"] == "50"          # 999 → 上限 50
+    assert out["truncated"] is True and out["total"] == 50
+
+
+@pytest.mark.asyncio
 async def test_cbeta_lookup_cached_across_calls():
     """text_id→cbeta_id is static; a long-lived client must not re-fetch it on
     every get_parallels (the hosted endpoint shares one client process-wide)."""

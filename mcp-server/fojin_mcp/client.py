@@ -210,6 +210,15 @@ class FojinClient:
         # double-encode it into a literal "%23" on the server side.
         return await self._get("/urn/resolve", {"urn": urn})
 
+    async def commentaries(self, quote: str, limit: int = 8) -> dict[str, Any]:
+        """这一段经文，历代各家怎么注。
+
+        服务端返回的结构已经是给 agent 看的（注家/档次/注文/URN/截断标志/
+        覆盖声明），原样透传。"""
+        return await self._get(
+            "/commentary/passage", {"q": quote, "limit": _clamp(limit, 1, 50)}
+        )
+
     async def verify_quote(
         self, quote: str, *, cite: str | None = None, juan: int | None = None
     ) -> dict[str, Any]:

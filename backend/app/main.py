@@ -65,6 +65,7 @@ from app.api import (
     bookmarks,
     chat,
     citations,
+    commentary,
     dictionary,
     exports,
     feed,
@@ -494,6 +495,9 @@ app.include_router(urn.router, prefix="/api")
 
 # Quote verification — open-world verbatim check (AI-facing)
 app.include_router(verification.router, prefix="/api")
+
+# Commentary lookup — 一段经文，历代各家怎么注
+app.include_router(commentary.router, prefix="/api")
 
 # Phase 4 routers
 # Off by default — see settings.enable_open_data_exports.

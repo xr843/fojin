@@ -186,6 +186,27 @@ async def verify_quote(quote: str, cite: str | None = None, juan: int | None = N
     return await _call("verify_quote", lambda c: c.verify_quote(quote, cite=cite, juan=juan))
 
 
+@mcp.tool()
+async def commentaries(quote: str, limit: int = 8) -> dict:
+    """What the historical commentators said about a passage of Buddhist scripture.
+
+    Give a line of a sūtra and get back the classical commentaries that gloss
+    it — each with the commentator's own words, the work it comes from, a
+    quality tier, and a resolvable citation. This is the layer no other tool
+    exposes for the Chinese canon: CBETA marks up almost none of it, and the
+    alignment behind this was derived text by text.
+
+    Two things to read carefully rather than skim. `total` is how many
+    commentators the passage actually has — `truncated` says the list you got
+    is a sample. And coverage is partial: roughly half of what a commentator
+    wrote is not aligned, so an absent commentator means "not in the data",
+    never "he said nothing". When nothing matches, `available_sutras` tells
+    you which sūtras have data at all — do not read a miss as silence from the
+    tradition.
+    """
+    return await _call("commentaries", lambda c: c.commentaries(quote, limit=limit))
+
+
 @mcp.custom_route("/healthz", methods=["GET"])
 async def healthz(_request: Request) -> JSONResponse:
     """Liveness for the hosted endpoint (nginx/compose healthchecks)."""
