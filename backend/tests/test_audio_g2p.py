@@ -87,10 +87,34 @@ def test_punctuation_is_not_pronounced() -> None:
 
 def test_to_ssml_wraps_lexicon_hits_only() -> None:
     ssml = to_ssml("佛告須菩提", "zh-CN-YunzeNeural", LEXICON)
-    assert '<phoneme alphabet="sapi" ph="fo2">佛</phoneme>' in ssml
-    assert "須菩提" in ssml
+    # ⚠️ Azure zh-CN sapi 字母表：拼音 + 空格 + 声调数字，一个标签只包一个汉字。
+    # 官方文档 speech-ssml-phonetic-sets 的例子是 ph="zu 3" 而非 ph="zu3"。
+    assert '<phoneme alphabet="sapi" ph="fo 2">佛</phoneme>' in ssml
+    # 須菩提 也在词典里，同样逐字包；「告」未收，原样交给厂商前端
+    assert '<phoneme alphabet="sapi" ph="xu 1">須</phoneme>' in ssml
+    assert "</phoneme>告<phoneme" in ssml  # 「告」夹在两个标签之间，未被包裹
+    assert ssml.count("<phoneme") == 4  # 佛 + 須菩提三字
     assert ssml.startswith("<speak")
     assert 'name="zh-CN-YunzeNeural"' in ssml
+
+
+def test_to_ssml_emits_one_phoneme_per_character() -> None:
+    """多字词必须拆成逐字标签 —— 一个标签包整个词是 Azure 不认的写法。"""
+    ssml = to_ssml("般若", "zh-CN-YunzeNeural", LEXICON)
+    assert '<phoneme alphabet="sapi" ph="bo 1">般</phoneme>' in ssml
+    assert '<phoneme alphabet="sapi" ph="re 3">若</phoneme>' in ssml
+    assert ssml.count("<phoneme") == 2
+    assert 'ph="bo1 re3"' not in ssml
+
+
+def test_lexicon_syllable_count_matches_char_count() -> None:
+    """每条词典的音节数必须等于汉字数，否则逐字映射会静默错位。"""
+    from scripts.audio.g2p import _is_han
+
+    for word, pinyin in LEXICON.items():
+        n_han = sum(1 for ch in word if _is_han(ch))
+        assert n_han == len(word), f"{word} 含非汉字，逐字映射前提不成立"
+        assert n_han == len(pinyin.split()), f"{word}: 汉字 {n_han} 个，拼音 {len(pinyin.split())} 个音节"
 
 
 def test_to_ssml_escapes_xml() -> None:

@@ -211,9 +211,18 @@ pypinyin 确实自带一份佛教词表（般若/南无/摩诃/阿兰若均正�
 
 ### 5.3 SSML 注入
 
-Azure：`<phoneme alphabet="sapi" ph="bo1 re3">般若</phoneme>`。
+**✅ 格式已据微软官方文档核定（2026-08-11）**，原先写的 `ph="bo1 re3"` 包整个词是**错的**：
 
-⚠️ **未验证项**：Azure zh-CN 对 `sapi` alphabet 的支持程度需在第 0 步实测确认。若 `<phoneme>` 不可靠，退路是 Azure Custom Lexicon（PLS 格式），或改用支持自定义读音词典的国内厂商（阿里云/火山）。**此项在第 0 步必须验通，否则整个方案不成立。**
+```xml
+<!-- 正确：拼音 + 空格 + 声调数字，一个标签只包一个汉字 -->
+<phoneme alphabet="sapi" ph="bo 1">般</phoneme><phoneme alphabet="sapi" ph="re 3">若</phoneme>
+```
+
+zh-CN 的 `sapi` 字母表用拼音记音，声调以数字 1–5 标注（5 = 轻声），**声调与音节之间必须有空格**。词典内部仍存紧凑形（`"bo1 re3"`）便于人工审读，只在生成 SSML 时展开为逐字标签。
+
+由此产生一条**词典不变式**：每条词条的音节数必须等于汉字数，否则逐字映射会静默错位。已加测试 `test_lexicon_syllable_count_matches_char_count` 守住（当前 71 条全部 1:1）。
+
+⚠️ **仍未验证**：`<phoneme>` 在 zh-CN 神经语音上的**实际生效程度** —— 文档说支持，但只有听过合成结果才算数。这是音色闸门要一并确认的第二件事。若不生效，退路是 Azure Custom Lexicon（PLS 格式），或改用原生支持拼音输入的模型（见 §3.3 补记）。
 
 ## 6. 验收：whisper-audit 当自动读音质检关
 

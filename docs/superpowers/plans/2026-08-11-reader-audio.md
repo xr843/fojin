@@ -206,7 +206,7 @@ def test_punctuation_is_not_pronounced() -> None:
 
 def test_to_ssml_wraps_lexicon_hits_only() -> None:
     ssml = to_ssml("佛告須菩提", "zh-CN-YunzeNeural", LEXICON)
-    assert '<phoneme alphabet="sapi" ph="fo2">佛</phoneme>' in ssml
+    assert '<phoneme alphabet="sapi" ph="fo 2">佛</phoneme>' in ssml  # ⚠️ 声调前有空格
     assert "須菩提" in ssml
     assert ssml.startswith("<speak")
     assert 'name="zh-CN-YunzeNeural"' in ssml
@@ -456,20 +456,40 @@ def to_pinyin(text: str, lexicon: dict[str, str] | None = None) -> str:
     return " ".join(parts)
 
 
-def to_ssml(text: str, voice: str, lexicon: dict[str, str] | None = None) -> str:
-    """整段 → Azure SSML。词典命中处包 <phoneme>，其余交给厂商前端。
+def _split_tone(syllable: str) -> tuple[str, str]:
+    """``"bo1"`` → ``("bo", "1")``。无调尾按轻声（5）处理。"""
+    if syllable and syllable[-1] in "12345":
+        return syllable[:-1], syllable[-1]
+    return syllable, "5"
 
-    只包命中片段（而非逐字全包）：全包会让 TTS 失去词组韵律，读起来像报菜名。
+
+def to_ssml(text: str, voice: str, lexicon: dict[str, str] | None = None) -> str:
+    """整段 → Azure SSML。词典命中处逐字包 <phoneme>，其余交给厂商前端。
+
+    ⚠️ 格式由微软官方文档核定（speech-ssml-phonetic-sets）：zh-CN 的 sapi 字母表
+    用**拼音 + 空格 + 声调数字**，且**一个 <phoneme> 只包一个汉字**：
+        <phoneme alphabet="sapi" ph="zu 3">组</phoneme>
+    不是 ph="zu3"，也不能一个标签包整个词。词典内部仍存紧凑形（"bo1 re3"）便于
+    人工审读，只在生成 SSML 时展开。
+
+    只包命中片段（而非全文逐字包）：全包会让 TTS 失去词组韵律，读起来像报菜名。
     """
     lex = load_lexicon() if lexicon is None else lexicon
     body: list[str] = []
     for frag, pinyin in segment(text, lex):
-        if pinyin is not None:
-            body.append(
-                f'<phoneme alphabet="sapi" ph="{pinyin}">{_escape(frag)}</phoneme>'
-            )
-        else:
+        if pinyin is None:
             body.append(_escape(frag))
+            continue
+        syllables = pinyin.split()
+        # 逐字映射的前提是「一字一音节」，对不上就整体放行 —— 错位标注比不标注更糟
+        if len(frag) != len(syllables) or not all(_is_han(ch) for ch in frag):
+            body.append(_escape(frag))
+            continue
+        for ch, syl in zip(frag, syllables, strict=True):
+            base, tone = _split_tone(syl)
+            body.append(
+                f'<phoneme alphabet="sapi" ph="{base} {tone}">{_escape(ch)}</phoneme>'
+            )
     return (
         '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" '
         'xml:lang="zh-CN">'
