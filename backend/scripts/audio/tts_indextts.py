@@ -66,6 +66,11 @@ def load_model(use_bf16: bool = True):
         model_dir=str(ckpt),
         use_bf16=use_bf16,
         use_qwen_emo=False,
+        # ⚠️ 必须显式关掉：默认为 True 时会去编译 BigVGAN 的融合 kernel，而构建
+        # 参数里带 `-gencode arch=compute_70`（Volta），新版 CUDA 工具链已不支持，
+        # 实测报 `nvcc fatal: Unsupported gpu architecture 'compute_70'`。
+        # 它会优雅降级，但每次加载都白试一次并刷一屏错误。
+        use_cuda_kernel=False,
     )
     return _model
 
@@ -76,11 +81,23 @@ def synthesize(
     spk_audio_prompt: Path,
     lang: str = "zh",
     duration_factor: float = 1.0,
+    text_normalization: bool = False,
 ) -> None:
     """把已带 ``<字|PINYIN>`` 标注的文本合成为 wav。
 
     参数与 tts_azure.synthesize 刻意不同（那边吃 SSML，这边吃标注文本）——
     两者的共同契约是「文本进、音频文件出」，由 build_audio.py 按 engine 分派。
+
+    ⚠️ ``text_normalization`` **默认关闭**，与上游默认值相反。实测（2026-08-11）
+    开启时它会把繁体转成简体：``如是我聞：一時，`` → ``如是我闻,一时,``，
+    而 CBETA 语料是繁体。多数繁简转换对读音无害（聞/闻 同音），但简化字合并了
+    不同的字，会改读音 —— 如 ``乾闥婆``(qián) → ``干闼婆``（「干」可读 gān）、
+    ``髮``(fà)/``發``(fā) 都变 ``发``。对一个专做繁体语料的平台，这是不可接受的
+    静默改写。实测关闭后速度无差异（稳态 RTF 均为 2.78）。
+
+    ⚠️ 副作用：关掉归一化后全角标点（「」『』：。）原样进模型，其韵律处理
+    效果未经试听确认 —— 若发现停顿异常，应由调用方在送入前自行折算标点，
+    而**不要**重新打开归一化（那会连繁体一起改掉）。
 
     输出 wav 而非 mp3：逐句分片先留 wav，整卷拼接后一次性编码成 mp3，
     比每片各编一次少一轮有损压缩。
@@ -95,6 +112,7 @@ def synthesize(
         output_path=str(out_path),
         lang=lang,
         duration_factor=duration_factor,
+        text_normalization=text_normalization,
         verbose=False,
     )
     if not out_path.exists() or out_path.stat().st_size == 0:
