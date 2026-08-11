@@ -128,7 +128,9 @@ class TextAudioCue(Base):
 
 2. **cue 的 `char_start` 用 code-point offset，与现有 `apparatus.char_start` / `line_anchors.char_offset` 完全同一坐标系。** 前端 `cpToU16Map()` 可直接复用，对齐层零成本。
 
-规模：一卷约 8,000 字 ≈ 250 句；50 部经约 300 卷 → cue 表约 7.5 万行。可忽略。
+规模（实测）：金剛經卷 1 共 8,353 字 → **574 句**（最长 66 字、最短 2 字）。50 部经约 300 卷 → cue 表约 17 万行。仍可忽略。
+
+> 逐句合成意味着每卷约 574 次 TTS 调用。Azure 按**字符**计费，故调用次数不影响费用；但需注意并发/速率限制，`build_audio.py` 已做断点续传（分片存在即跳过），重跑不重复付费。
 
 ⚠️ 建表前须 `\dt` 确认真实表名（本仓存在 model 类名 ≠ 表名的历史，如 `BuddhistSource` → `data_sources`）。迁移编号须核对 `backend/alembic/versions/` 现有链，避免 `down_revision` 冲撞。
 
