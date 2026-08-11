@@ -110,6 +110,62 @@ def to_pinyin(text: str, lexicon: dict[str, str] | None = None) -> str:
     return " ".join(parts)
 
 
+def to_indextts_syllable(syllable: str) -> str:
+    """pypinyin 紧凑形 ``"xu1"`` → IndexTTS 词表形 ``"XV1"``。
+
+    IndexTTS 的 ``checkpoints/pinyin.vocab`` 全大写，且用 ``V`` 表示 ü ——
+    它套用了音韵学事实：j/q/x 后拼写作 u 的实际是 ü（「居 jū」实为 /tɕy/）。
+    ``y`` **不**适用此规则（词表里是 YU1/YUAN2，不是 YV1）。
+
+    实测（对本仓词典的 104 个音节）：此规则把缺失从 4 个降到 1 个，
+    仅 ``NOU4``（耨）确实不在词表内 —— 而 pypinyin 本就把「耨」读对，无需标注。
+    """
+    m = re.fullmatch(r"([a-z]+)([1-5])", syllable)
+    if not m:
+        return syllable.upper()
+    base, tone = m.groups()
+    if base[0] in "jqx" and base[1:2] == "u":
+        base = base[0] + "v" + base[2:]
+    return base.upper() + tone
+
+
+def to_indextts_text(
+    text: str,
+    lexicon: dict[str, str] | None = None,
+    vocab: set[str] | None = None,
+) -> str:
+    """整段 → IndexTTS 2.5 的读音标注格式 ``<字|PINYIN>``。
+
+    官方示例：``他在银<行|XING2>里<行|HANG2>走了半天``。
+
+    ⭐ 与 SSML 的关键差异：角括号形式**保留原字**（SSML 是把原字包在标签里，
+    IndexTTS 2.0 的旧式裸替换 ``做DE5`` 则会把原字吃掉）。原字保留意味着
+    cue 的字符坐标与 whisper-audit 回验都不受标注影响。
+
+    ``vocab`` 给出时（读自 IndexTTS 的 ``pinyin.vocab``），不在表内的音节
+    **不标注**，退回让模型自行判读 —— 标一个模型不认的音节可能整句失效。
+    """
+    lex = load_lexicon() if lexicon is None else lexicon
+    out: list[str] = []
+    for frag, pinyin in segment(text, lex):
+        if pinyin is None:
+            out.append(frag)
+            continue
+        syllables = pinyin.split()
+        if len(frag) != len(syllables) or not all(_is_han(ch) for ch in frag):
+            out.append(frag)
+            continue
+        for ch, syl in zip(frag, syllables, strict=True):
+            tagged = to_indextts_syllable(syl)
+            out.append(f"<{ch}|{tagged}>" if vocab is None or tagged in vocab else ch)
+    return "".join(out)
+
+
+def load_indextts_vocab(path: Path) -> set[str]:
+    """读 IndexTTS 的 ``checkpoints/pinyin.vocab``（每行一个大写音节）。"""
+    return {ln.strip() for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()}
+
+
 def _split_tone(syllable: str) -> tuple[str, str]:
     """``"bo1"`` → ``("bo", "1")``。无调尾按轻声（5）处理。"""
     if syllable and syllable[-1] in "12345":

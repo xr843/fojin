@@ -12,7 +12,14 @@ from pathlib import Path
 
 import pytest
 
-from scripts.audio.g2p import load_lexicon, segment, to_pinyin, to_ssml
+from scripts.audio.g2p import (
+    load_lexicon,
+    segment,
+    to_indextts_syllable,
+    to_indextts_text,
+    to_pinyin,
+    to_ssml,
+)
 
 LEXICON = load_lexicon()
 
@@ -105,6 +112,45 @@ def test_to_ssml_emits_one_phoneme_per_character() -> None:
     assert '<phoneme alphabet="sapi" ph="re 3">若</phoneme>' in ssml
     assert ssml.count("<phoneme") == 2
     assert 'ph="bo1 re3"' not in ssml
+
+
+@pytest.mark.parametrize(
+    ("compact", "expected"),
+    [
+        # j/q/x 后写作 u 的实际是 ü，IndexTTS 词表记作 V
+        ("xu1", "XV1"),  # 須（須菩提，金剛經高频）
+        ("xun2", "XVN2"),  # 旬（由旬）
+        ("ju1", "JV1"),
+        ("qu4", "QV4"),
+        # y 不适用该规则 —— 词表里是 YU1/YUAN2
+        ("yu2", "YU2"),  # 瑜（瑜伽）
+        ("yuan2", "YUAN2"),  # 園（祇園）
+        # 普通音节直接大写
+        ("bo1", "BO1"),
+        ("fo2", "FO2"),
+        ("re3", "RE3"),
+    ],
+)
+def test_indextts_syllable_conversion(compact: str, expected: str) -> None:
+    assert to_indextts_syllable(compact) == expected
+
+
+def test_indextts_text_keeps_original_characters() -> None:
+    """角括号标注必须保留原字 —— cue 坐标与 ASR 回验都依赖原文不被改写。"""
+    out = to_indextts_text("佛告須菩提", LEXICON)
+    assert out == "<佛|FO2>告<須|XV1><菩|PU2><提|TI2>"
+    # 原字逐一仍在
+    for ch in "佛告須菩提":
+        assert ch in out
+
+
+def test_indextts_text_skips_syllables_outside_vocab() -> None:
+    """词表外的音节不标注 —— 标一个模型不认的音节可能让整句失效。"""
+    vocab = {"FO2"}  # 只认 FO2
+    out = to_indextts_text("佛告須菩提", LEXICON, vocab=vocab)
+    assert "<佛|FO2>" in out
+    assert "<須|XV1>" not in out  # 不在 vocab，退回裸字
+    assert "須" in out
 
 
 def test_lexicon_syllable_count_matches_char_count() -> None:
