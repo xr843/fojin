@@ -17,6 +17,13 @@
 以下为全局要求，**每个任务都隐含包含本节**：
 
 - **诚信标注**：所有面向用户的位置（播放条、锁屏 MediaSession `artist`）必须标注「AI 合成朗读」，不得让用户以为是法师读诵。
+- **⚖️ 许可证义务（非可选）**：IndexTTS-2.5 受 **bilibili 模型使用许可协议**约束（非 MIT/Apache）。按协议 1.5，合成产出的音频属「模型输出的修改/创作」= **衍生品**，触发三条义务：
+  - **4.1 a)** 发布页面须声明「改动与原权利人无关，不背书、不担保、不承担责任」→ 文案键 `reader.audio.model_disclaimer`，**必须真实渲染出来**，不能只放在 JSON 里
+  - **3.4 b)** 保留原始版权声明及许可协议 → `backend/scripts/audio/INDEXTTS_LICENSE_{ZH,EN}.txt`，**勿删**
+  - **3.4 a)** 通过条款约束下游用户 → 站点使用条款（见 Task 16）
+  - 已核对无碍：2.2 商业门槛为月活 >1 亿 **或** 年收 >1 亿（fojin 月活约 3,000）；4.2 高风险场景不涉及；3.4 c) 不得改进其他 AI 模型（我们只推理不训练）
+  - ⚠️ **3.2 规定人格权（声音权）侵权由使用方独自承担** → 参考音必须用有明确授权的声音，首选合成方本人；**不得克隆法师声音**
+- **i18n 键是扁平点号形式**（`"reader.audio.button"`），不是嵌套对象 —— 实测 1,525 键全部含点号、零嵌套。
 - **播放器不进阅读页**：`frontend/src/pages/TextReaderPage.tsx` 已 1,092 行；跨卷续播要求 `<audio>` 元素挂在 `frontend/src/components/Layout.tsx` 的 `<Outlet />` 之上，切卷时不重挂载。阅读页只允许新增「读诵按钮」与「高亮订阅」两处。
 - **音频禁止入 git**：`.pre-commit-config.yaml:18` 设 `check-added-large-files --maxkb=500`；一卷 mp3 约 17 MB。音频只能通过 rsync 上传到宿主机路径，由 host nginx 直出。
 - **i18n ratchet**：CI 的 `npm run i18n:check` 拦截**新增**硬编码中文。所有前端文案走 translation key，三份 locale 同步：`frontend/public/locales/{zh,zh-Hant,en}/translation.json`。插值用 `{{n}}`，**不是** `{{count}}`。
@@ -2591,60 +2598,21 @@ git commit -m "feat(audio): 播放器 Provider 挂到 Layout 层，跨卷切换�
 - Consumes: `useAudioPlayer()`（Task 12）
 - Produces: `<PlayerBar />` 默认导出
 
-- [ ] **Step 1: 加三份 locale 文案**
+- [x] **Step 1: 加三份 locale 文案** —— ✅ 已完成（commit 见下）
 
-`frontend/public/locales/zh/translation.json` 的 `reader` 对象内加入：
+⚠️ **本仓 i18n 用扁平点号键，不是嵌套对象**（实测：1,525 个键，100% 含点号，
+零嵌套对象）。所以是加 `"reader.audio.button": "读诵"`，**不是**在 `reader`
+对象里加 `"audio": {...}` —— 后者会生成 `reader.audio` 这个 i18next 取不到的形状。
 
-```json
-"audio": {
-  "button": "读诵",
-  "tooltip": "AI 合成朗读，可锁屏收听",
-  "unavailable": "本卷暂无读诵音频",
-  "synthetic_label": "AI 合成朗读",
-  "album": "佛津",
-  "play": "播放",
-  "pause": "暂停",
-  "close": "关闭播放",
-  "speed": "倍速",
-  "now_playing": "正在读诵：{{title}}"
-}
-```
+三份 locale 各加 10 条 `reader.audio.*`：`button` / `tooltip` / `unavailable` /
+`synthetic_label` / `album` / `play` / `pause` / `close` / `speed` /
+`model_disclaimer`。插入位置在最后一条 `reader.parallel.*` 之后（本文件按功能
+分组、非字母序，不要重排）。
 
-`frontend/public/locales/zh-Hant/translation.json`：
+⚠️ 其中 `reader.audio.model_disclaimer` 是**许可证义务**，不是可选文案 ——
+见 §「许可证义务」与 `backend/scripts/audio/README.md`。
 
-```json
-"audio": {
-  "button": "讀誦",
-  "tooltip": "AI 合成朗讀，可鎖屏收聽",
-  "unavailable": "本卷暫無讀誦音頻",
-  "synthetic_label": "AI 合成朗讀",
-  "album": "佛津",
-  "play": "播放",
-  "pause": "暫停",
-  "close": "關閉播放",
-  "speed": "倍速",
-  "now_playing": "正在讀誦：{{title}}"
-}
-```
-
-`frontend/public/locales/en/translation.json`：
-
-```json
-"audio": {
-  "button": "Recitation",
-  "tooltip": "AI-synthesized reading; plays with the screen locked",
-  "unavailable": "No recitation audio for this fascicle yet",
-  "synthetic_label": "AI-synthesized reading",
-  "album": "FoJin",
-  "play": "Play",
-  "pause": "Pause",
-  "close": "Close player",
-  "speed": "Speed",
-  "now_playing": "Now reciting: {{title}}"
-}
-```
-
-⚠️ 插值占位符用 `{{title}}` —— 本仓 i18n 惯例是 `{{n}}` 一类的短名，**不要**用 `{{count}}`（i18next 会把它当复数控制键）。
+⚠️ 插值占位符用 `{{n}}` 一类短名，**不要**用 `{{count}}`（i18next 会把它当复数控制键）。
 
 - [ ] **Step 2: 写下会红的测试 `frontend/src/audio/PlayerBar.test.tsx`**
 
@@ -2701,6 +2669,15 @@ describe("PlayerBar", () => {
     // 诚信约束：不得让用户以为是法师读诵。这条不是样式偏好，是产品底线。
     renderWith();
     expect(screen.getByText("reader.audio.synthetic_label")).toBeTruthy();
+  });
+
+  it("必须渲染模型许可证声明", () => {
+    // ⚖️ bilibili 模型使用许可协议 4.1 a) 要求发布页面作此声明。
+    // 这不是文案偏好 —— 删掉它等于违约，所以用测试钉死。
+    renderWith();
+    expect(
+      screen.getByLabelText("reader.audio.model_disclaimer"),
+    ).toBeTruthy();
   });
 
   it("显示当前曲目标题", () => {
@@ -2789,7 +2766,19 @@ export default function PlayerBar() {
       <div className="reader-audio-meta">
         <div className="reader-audio-title">{track.title}</div>
         <div className="reader-audio-note">
+          {/* 诚信标注：不得让用户以为是法师读诵 */}
           <SoundOutlined /> {t("reader.audio.synthetic_label")}
+          {/* ⚖️ 许可证义务 4.1 a) —— 必须真实渲染，不是可选文案。
+              用 Tooltip 承载全文以免占满播放条；aria-label 让文案进 DOM，
+              测试可断言其存在。 */}
+          <Tooltip title={t("reader.audio.model_disclaimer")}>
+            <span
+              className="reader-audio-license"
+              aria-label={t("reader.audio.model_disclaimer")}
+            >
+              ⓘ
+            </span>
+          </Tooltip>
         </div>
       </div>
       <Slider
@@ -2854,6 +2843,12 @@ export default function PlayerBar() {
 .reader-audio-note {
   font-size: 11px;
   color: var(--fj-ink-muted, #999);
+}
+/* 许可证声明入口（bilibili 模型协议 4.1 a) 要求）—— 低调但必须存在 */
+.reader-audio-license {
+  margin-left: 6px;
+  cursor: help;
+  opacity: 0.7;
 }
 .reader-audio-progress { flex: 1 1 auto; margin: 0 8px; }
 
@@ -3165,6 +3160,120 @@ git commit -m "feat(audio): 宿主机 nginx 静态直出 /audio/，附真机验�
 ```
 
 ---
+
+## Task 16: 下游用户约束条款（许可证义务 3.4 a）
+
+**Files:**
+- Create: `frontend/src/pages/TermsPage.tsx`
+- Modify: `frontend/src/App.tsx`（加 `/terms` 路由）
+- Modify: `frontend/src/components/Layout.tsx`（页脚加链接）
+- Modify: `frontend/public/locales/{zh,zh-Hant,en}/translation.json`
+- Modify: `frontend/src/seo/staticPages.json`
+- Modify: `deploy/host-nginx/fojin.conf`
+
+**Interfaces:**
+- Consumes: 无
+- Produces: `/terms` 路由
+
+**为什么需要**：bilibili 模型使用许可协议 **3.4 a)** 要求「确保下游用户……同样遵守本协议，并通过合适的协议或条款对下游用户进行约束。**若下游用户违反本协议规定，您需承担相应责任**」。合成音频按协议 1.5 属衍生品，站点访客即下游用户。**本仓当前完全没有条款页**（实测：`frontend/src/pages/` 无 terms/legal/privacy，`App.tsx` 无相关路由）。
+
+⚠️ **本任务只搭骨架 + 写模型许可条款那一节**。使用条款的其余内容（免责、隐私、
+知识产权等）是法律文书，应由站点所有者撰写，实施者**不要代写**，留 TODO 注释即可。
+
+- [ ] **Step 1: 加三份 locale 文案**
+
+扁平点号键，插在 `footer.` 相关键附近：
+
+```json
+"terms.title": "使用条款",
+"terms.model_license.heading": "合成音频与模型许可",
+"terms.model_license.body": "本站「在线读诵」功能的音频由 bilibili IndexTTS-2.5 模型合成。该音频属该模型的衍生品，受《bilibili 模型使用许可协议》约束。您收听、下载或以其他方式使用本站合成音频，即表示您同意遵守该协议。协议全文见模型发布页 https://github.com/index-tts/index-tts 。本站对该模型的使用及所作改动与原模型权利人无关，原始权利人对此不背书、不担保、不承担责任。",
+"footer.terms": "使用条款"
+```
+
+（繁体与英文版同步，文意一致即可。）
+
+- [ ] **Step 2: 建页面 `frontend/src/pages/TermsPage.tsx`**
+
+```tsx
+import { Typography } from "antd";
+import { Helmet } from "react-helmet-async";
+import { useTranslation } from "react-i18next";
+
+const { Title, Paragraph } = Typography;
+
+/**
+ * 使用条款。
+ *
+ * ⚖️ 当前只有「合成音频与模型许可」一节 —— 它是 bilibili 模型使用许可协议
+ * 3.4 a) 的硬性要求（须以条款约束下游用户，否则违约责任在本站）。
+ *
+ * TODO(站点所有者)：其余条款（服务免责、隐私、知识产权、账号规则等）
+ * 属法律文书，需由所有者撰写，不应由实施者代拟。
+ */
+export default function TermsPage() {
+  const { t } = useTranslation();
+  return (
+    <div style={{ maxWidth: 760, margin: "0 auto", padding: "24px 16px" }}>
+      <Helmet>
+        <title>{t("terms.title")}</title>
+      </Helmet>
+      <Title level={2}>{t("terms.title")}</Title>
+      <Title level={4}>{t("terms.model_license.heading")}</Title>
+      <Paragraph>{t("terms.model_license.body")}</Paragraph>
+    </div>
+  );
+}
+```
+
+- [ ] **Step 3: 加路由（`frontend/src/App.tsx`）**
+
+在 `<Route element={<Layout />}>` 内加：
+
+```tsx
+<Route path="/terms" element={<TermsPage />} />
+```
+
+并在顶部 import。
+
+- [ ] **Step 4: 页脚加链接（`frontend/src/components/Layout.tsx`）**
+
+在 `{t("footer.copyright")}` 之后加：
+
+```tsx
+{" · "}
+<Link to="/terms">{t("footer.terms")}</Link>
+```
+
+（`Link` 从 `react-router` import；页脚已有的 `Footer` 块见第 385 行附近。）
+
+- [ ] **Step 5: SEO 静态页 + nginx location**
+
+⚠️ 本仓有个反复踩的坑：**每加一条 SEO shell 就要给该路由加一次 nginx 显式
+`location`**，否则 `try_files` 撞上真实目录会产生 301。在 `staticPages.json`
+加 `/terms` 条目的同时，必须在 `deploy/host-nginx/fojin.conf` 加：
+
+```nginx
+    location = /terms { proxy_pass http://127.0.0.1:3000; }
+```
+
+- [ ] **Step 6: 全套前端门禁**
+
+```bash
+cd frontend && npx tsc -b --noEmit && npm run lint && npm run i18n:check && npm test
+```
+
+- [ ] **Step 7: 提交**
+
+```bash
+git add frontend/src/pages/TermsPage.tsx frontend/src/App.tsx \
+        frontend/src/components/Layout.tsx frontend/public/locales \
+        frontend/src/seo/staticPages.json deploy/host-nginx/fojin.conf
+git commit -m "feat(legal): 使用条款页 —— 满足模型许可证的下游约束义务"
+```
+
+---
+
 
 ## 收尾
 
