@@ -21,7 +21,10 @@
 - **音频禁止入 git**：`.pre-commit-config.yaml:18` 设 `check-added-large-files --maxkb=500`；一卷 mp3 约 17 MB。音频只能通过 rsync 上传到宿主机路径，由 host nginx 直出。
 - **i18n ratchet**：CI 的 `npm run i18n:check` 拦截**新增**硬编码中文。所有前端文案走 translation key，三份 locale 同步：`frontend/public/locales/{zh,zh-Hant,en}/translation.json`。插值用 `{{n}}`，**不是** `{{count}}`。
 - **繁体优先**：语料是 CBETA 繁体（`金剛般若波羅蜜經`）。词典键一律用繁体形；pypinyin 的佛教词表**只挂在简体上**，繁体走不到（实测：`南無`→`nan2 wu2` ❌ / `南无`→`na1 mo2` ✅）。
-- **ruff**：CI 固定 `ruff==0.9.7`，检查范围 `app/ eval/`（`scripts/` 不在内，但仍应保持 line-length 120 风格一致）。
+- **ruff**：CI 固定 `ruff==0.9.7`，检查范围 `app/ eval/`（`scripts/` 不在内，但仍应跑 `ruff check scripts/audio/` 保持整洁）。
+  - ⚠️ 本仓 `select` 只有 `E,F,I,UP,B,SIM,RUF`，**没有 `S`（flake8-bandit）** —— 所以 `# noqa: S310` 是无效指令，会被 RUF100 判为「未使用的 noqa」。不要写。
+  - ⚠️ isort 的 `known-first-party = ["app"]` **不含 `scripts`** —— 故 `from scripts.audio.g2p import ...` 与 `pypinyin` 同属第三方组，中间不空行。
+  - ⚠️ 本机 ruff 若高于 0.9.7，`ruff check app/ eval/` 可能报 CI 上不存在的新规则（实测 0.15.6 会报一条 `UP047`）。判断"是不是我引入的"以 CI 版本为准。
 - **前端 lint**：CI 跑 `eslint --max-warnings 0`，一条 warning 即失败。
 - **commit**：conventional commits（`feat:`/`fix:`/`docs:`/`refactor:`），**不加任何 Claude 署名 trailer**；作者邮箱用 `137012659+xr843@users.noreply.github.com`（与本仓既有 commit 一致，本地 repo config 是 protonmail，需显式覆盖）。
 - **分支**：`feat/reader-audio`（已创建）。
@@ -552,10 +555,10 @@ _UA = {"User-Agent": "fojin-audio-pipeline/1.0"}
 
 
 def fetch_juan(api_base: str, text_id: int, juan: int) -> str:
-    req = urllib.request.Request(  # noqa: S310
+    req = urllib.request.Request(
         f"{api_base}/texts/{text_id}/juans/{juan}", headers=_UA
     )
-    with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310
+    with urllib.request.urlopen(req, timeout=30) as resp:
         return json.load(resp).get("content") or ""
 
 
@@ -1613,10 +1616,10 @@ _UA = {"User-Agent": "fojin-audio-pipeline/1.0"}
 
 
 def fetch_juan(api_base: str, text_id: int, juan: int) -> str:
-    req = urllib.request.Request(  # noqa: S310
+    req = urllib.request.Request(
         f"{api_base}/texts/{text_id}/juans/{juan}", headers=_UA
     )
-    with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310
+    with urllib.request.urlopen(req, timeout=30) as resp:
         return json.load(resp).get("content") or ""
 
 
@@ -2027,11 +2030,11 @@ def syllable_mismatch(expected: str, actual: str) -> float:
 
 def fetch_content(api_base: str, text_id: int, juan: int) -> str:
     # ⚠️ 带 UA，否则 Cloudflare 回 403（见 build_audio.py 同处注释）
-    req = urllib.request.Request(  # noqa: S310
+    req = urllib.request.Request(
         f"{api_base}/texts/{text_id}/juans/{juan}",
         headers={"User-Agent": "fojin-audio-pipeline/1.0"},
     )
-    with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310
+    with urllib.request.urlopen(req, timeout=30) as resp:
         return json.load(resp).get("content") or ""
 
 

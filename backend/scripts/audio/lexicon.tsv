@@ -13,7 +13,16 @@
 伽	qie2	seed	僧伽/伽藍/瑜伽/摩睺羅伽 皆 qié；pypinyin 默认 ga1
 舍	she4	seed	繁体中「捨」(shě) 与「舍」(shè) 分立，故可安全做单字默认
 闍	she2	seed	阿闍世/闍維；pypinyin 默认 du1
+相	xiang4	seed	佛典「相」(lakṣaṇa 我相人相眾生相) 读 xiàng；金剛經卷1 全 96 处皆此义，pypinyin 默认 xiang1
 # ── 词级层 ──────────────────────────────────────────────────
+# ⚠️ 以下 5 条是「相」的反向保护：这些词读 xiāng，靠更长匹配压过单字默认 相→xiang4
+相應	xiang1 ying4	seed	⚠️ 反向保护，勿删；pypinyin 作 xiang1 ying1，两处都错
+相續	xiang1 xu4	seed	⚠️ 反向保护，勿删
+相待	xiang1 dai4	seed	⚠️ 反向保护，勿删
+相似	xiang1 si4	seed	⚠️ 反向保护，勿删
+互相	hu4 xiang1	seed	⚠️ 反向保护，勿删
+應供	ying4 gong4	seed	如來十號之一；pypinyin 作 ying1 gong1，两字皆错
+調御	tiao2 yu4	seed	調御丈夫，如來十號之一；pypinyin 作 diao4 yu4
 般若	bo1 re3	seed
 般涅槃	bo1 nie4 pan2	seed
 南無	na1 mo2	seed	⚠️ 各地有 ná/nā 之别，取 pypinyin 佛教词表值，待法师审定

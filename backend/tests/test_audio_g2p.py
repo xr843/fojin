@@ -23,6 +23,7 @@ GOLDEN = [
     ("伽", "qie2"),
     ("舍", "she4"),
     ("闍", "she2"),
+    ("相", "xiang4"),
     # ② 词级层：pypinyin 繁体下读错
     ("般若", "bo1 re3"),
     ("般涅槃", "bo1 nie4 pan2"),
@@ -45,12 +46,20 @@ GOLDEN = [
     ("舍利弗", "she4 li4 fu2"),
     ("舍衛", "she4 wei4"),
     ("王舍城", "wang2 she4 cheng2"),
-    # ③ 反向保护：最长匹配必须让「仿佛」压过单字默认 佛→fo2
+    # ③ 由 Task 2 读音审计在真实经文上发现（金剛經卷1）
+    ("應供", "ying4 gong4"),
+    ("調御", "tiao2 yu4"),
+    # ④ 反向保护：最长匹配必须压过单字默认（佛→fo2、相→xiang4）
     ("仿佛", "fang3 fu2"),
     ("彷彿", "pang2 fu2"),
-    # ④ 真实句子：单字默认在句中生效
+    ("相應", "xiang1 ying4"),
+    ("相續", "xiang1 xu4"),
+    ("互相", "hu4 xiang1"),
+    # ⑤ 真实句子：单字默认在句中生效
     ("佛告須菩提", "fo2 gao4 xu1 pu2 ti2"),
     ("爾時佛", "er3 shi2 fo2"),
+    ("凡所有相，皆是虛妄", "fan2 suo3 you3 xiang4 jie1 shi4 xu1 wang4"),
+    ("無我相、無人相", "wu2 wo3 xiang4 wu2 ren2 xiang4"),
 ]
 
 
