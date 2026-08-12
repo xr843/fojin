@@ -86,10 +86,32 @@ def build_juan(cfg: dict, text_id: int, juan: int, api_base: str, out_root: Path
     if not raw:
         raise RuntimeError(f"text_id={text_id} juan={juan} 无正文")
 
-    content_hash = hashlib.sha256(raw.encode("utf-8")).hexdigest()
-    hash8 = content_hash[:8]
     segs = split_content(raw)
     pron = to_minimax_dict(text=raw.replace("\n", ""))
+
+    # ⚠️ hash 必须覆盖**正文 + 所有影响成品的配置**，不能只 hash 正文。
+    #
+    # 文件名带 hash 前 8 位是为了「重生成 = 新 URL」，从而绕开 Cloudflare
+    # 边缘缓存跨部署存活。但若只 hash 正文，那么「改了词典重新合成」这种
+    # 最常见的重生成场景 URL 不变 —— 边缘缓存会一直供旧音频，而 max-age
+    # 是一年。实测就发生过：补了「般羅/罣礙」重新合成，hash 纹丝不动。
+    #
+    # 另外 MiniMax 合成是**非确定性**的（实测同句同参数 3 次：8.01/8.82/9.30 秒，
+    # 极差 14.8%），所以就算配置全同，重跑也会得到不同音频 —— 这更需要
+    # 「配置变了就换 URL」，而不是指望音频本身可复现。
+    fingerprint = json.dumps(
+        {
+            "text": raw,
+            "pron": pron,
+            "voice": cfg["voice_id"],
+            "model": cfg.get("model", "speech-2.8-hd"),
+            "speed": cfg.get("speed", 1.0),
+            "pipeline": 2,   # 分段/规范化规则改动时手动 +1
+        },
+        ensure_ascii=False, sort_keys=True,
+    )
+    content_hash = hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()
+    hash8 = content_hash[:8]
     log(f"[{text_id}/{juan}] {len(raw)} 字 → {len(segs)} 段，词典 {len(pron)} 条，hash={hash8}")
 
     work = out_root / str(text_id) / f"{juan}-{hash8}.parts"

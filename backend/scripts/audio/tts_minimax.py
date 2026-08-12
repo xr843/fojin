@@ -43,6 +43,7 @@ def synthesize(
     api_key: str | None = None,
     model: str = DEFAULT_MODEL,
     speed: float = 1.0,
+    emotion: str = "neutral",
     pronunciation: list[str] | None = None,
     audio_format: str = "mp3",
     timeout: int = 120,
@@ -62,7 +63,15 @@ def synthesize(
         "model": model,
         "text": text,
         "stream": False,
-        "voice_setting": {"voice_id": voice_id, "speed": speed, "vol": 1.0, "pitch": 0},
+        # emotion 固定 neutral：诵经要平稳。使用者试听时明确提过
+        # 「不要有些个别地方突然加重或提高音调」。
+        "voice_setting": {
+            "voice_id": voice_id,
+            "speed": speed,
+            "vol": 1.0,
+            "pitch": 0,
+            "emotion": emotion,
+        },
         "audio_setting": {
             "sample_rate": 32000,
             "bitrate": 128000,
