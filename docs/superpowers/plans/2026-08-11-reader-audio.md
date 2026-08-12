@@ -1482,8 +1482,18 @@ def _split_long(src: str, start: int, end: int, max_chars: int) -> list[Sentence
     return out or [Sentence(src[start:end], start, end)]
 
 
-def split_sentences(content: str, max_chars: int = 60) -> list[Sentence]:
+def split_sentences(content: str, max_chars: int = 38) -> list[Sentence]:
     """切句。返回的 (char_start, char_end) 必须满足 content[start:end] == text。
+
+    ⚠️ ``max_chars`` 默认 38，刻意压在 IndexTTS ``low_vram`` 的内部分段阈值
+    （40 字，见 infer_v2_5.py ``split_text_by_punctuation(text, max_chars=40)``）
+    **之下**。一旦触发内部分段，段间会插 ``interval_silence``（默认 200ms）的静音 ——
+    实测该静音就是合成音里那 3 处不自然停顿的来源（人声连贯朗读时是 0 处）。
+    而把 interval_silence 设为 0 会引入拼接不连续，谐噪比从 3.89 掉到 2.54，
+    更糟。正解是**根本不触发分段**。
+
+    金剛經全卷 570 句实测：平均 14.3 字、中位 10 字，仅 5.1% 超过 40 字 ——
+    压到 38 后全部句子都在阈值内。
 
     相邻句首尾相接、无空洞 —— 有空洞就意味着有正文永远不会被高亮。
     句间的纯空白（换行）并入前一句的尾部，不单独成句。
