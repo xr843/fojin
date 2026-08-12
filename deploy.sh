@@ -2,7 +2,7 @@
 #
 # fojin 生产部署脚本 —— 幂等、路径感知、带健康检查。
 #
-#   用法:  ./deploy.sh [branch] [--force-frontend] [--force-backend] [--rebuild-backend]
+#   用法:  ./deploy.sh [branch] [--force-frontend] [--force-backend] [--rebuild-backend] [--force-mcp]
 #          branch 默认 master。flags 用于绕过自动判定。
 #
 # 设计要点 (踩过的坑都在这里固化下来):
@@ -31,11 +31,13 @@ cd "$REPO_DIR"
 
 BRANCH=""
 FORCE_FRONTEND=false
+FORCE_MCP=false
 FORCE_BACKEND=false
 REBUILD_BACKEND=false
 for arg in "$@"; do
   case "$arg" in
     --force-frontend)  FORCE_FRONTEND=true ;;
+    --force-mcp)       FORCE_MCP=true ;;
     --force-backend)   FORCE_BACKEND=true ;;
     --rebuild-backend) REBUILD_BACKEND=true ;;
     -*) printf '!!! 未知参数: %s\n' "$arg" >&2; exit 2 ;;
@@ -53,6 +55,7 @@ BRANCH="${BRANCH:-master}"
 STATE_DIR="$REPO_DIR/.deploy-state"
 FRONTEND_BUILD_MARKER="$STATE_DIR/last-frontend-build"
 BACKEND_RESTART_MARKER="$STATE_DIR/last-backend-restart"
+MCP_BUILD_MARKER="$STATE_DIR/last-mcp-build"
 DEPLOY_VERSION_FILE="$REPO_DIR/backend/.deploy-version.json"
 mkdir -p "$STATE_DIR"
 
@@ -172,10 +175,12 @@ fi
 # 改成 "上次成功 build/restart 时记录的 commit" → NEW_REV, 才反映真实未部署量。
 
 FE_BASE="$(marker_commit "$FRONTEND_BUILD_MARKER")"
+MCP_BASE="$(marker_commit "$MCP_BUILD_MARKER")"
 BE_BASE="$(marker_commit "$BACKEND_RESTART_MARKER")"
 
 frontend_changed=false
 backend_changed=false
+mcp_changed=false
 backend_image_changed=false
 
 # Frontend
@@ -191,6 +196,31 @@ elif [ "$FE_BASE" != "$NEW_REV" ]; then
     log "frontend/ 自 ${FE_BASE:0:7} 起有变更 — 触发 rebuild。"
     echo "$FE_DIFF" | grep '^frontend/' | sed 's/^/    /'
     frontend_changed=true
+  fi
+fi
+
+# MCP server (mcp.fojin.ai). Its own image — code is baked in, not bind-mounted,
+# so nothing short of a rebuild picks up a change.
+#
+# Added 2026-08-12 because this script had no mcp branch at all: #1171 fixed the
+# access log's tool field, merged, deployed "successfully", and the container
+# kept running 43-hour-old code. Nothing was wrong except that nobody had told
+# the pipeline this service exists. A service the deploy script doesn't know
+# about is a service that silently stops being deployed.
+if [ -z "$MCP_BASE" ]; then
+  log "mcp 无 build 记录 — 触发首次构建。"
+  mcp_changed=true
+elif ! is_known_commit "$MCP_BASE"; then
+  warn "mcp marker 指向未知 commit ($MCP_BASE) — 保险起见重建。"
+  mcp_changed=true
+elif [ "$MCP_BASE" != "$NEW_REV" ]; then
+  MCP_DIFF="$(git diff --name-only "$MCP_BASE" "$NEW_REV")"
+  # tests/ 不进镜像运行路径，改它不该弹容器。
+  MCP_LIVE_DIFF="$(echo "$MCP_DIFF" | grep -E '^mcp-server/' | grep -vE '^mcp-server/tests/' || true)"
+  if [ -n "$MCP_LIVE_DIFF" ]; then
+    log "mcp-server/ 自 ${MCP_BASE:0:7} 起有变更 — 触发 rebuild。"
+    echo "$MCP_LIVE_DIFF" | sed 's/^/    /'
+    mcp_changed=true
   fi
 fi
 
@@ -258,8 +288,9 @@ fi
 $FORCE_FRONTEND  && { log "--force-frontend 已指定。";  frontend_changed=true; }
 $FORCE_BACKEND   && { log "--force-backend 已指定。";   backend_changed=true; }
 $REBUILD_BACKEND && { log "--rebuild-backend 已指定。"; backend_changed=true; backend_image_changed=true; }
+$FORCE_MCP       && { log "--force-mcp 已指定。";        mcp_changed=true; }
 
-if ! $frontend_changed && ! $backend_changed; then
+if ! $frontend_changed && ! $backend_changed && ! $mcp_changed; then
   # 走到这里意味着工作树已 ff 到 NEW_REV 且服务行为与之等价 (eval/tests/docs-only
   # 等非服务路径改动)。部署身份仍须推进: /api/version 每请求重读该文件 (bind-mount
   # 即时可见), 不推进的话 scheduled smoke 的漂移看门狗会把"故意不重启"误报成
@@ -280,6 +311,16 @@ if $frontend_changed; then
   echo "$NEW_REV" > "$FRONTEND_BUILD_MARKER"
 else
   log "Frontend unchanged — skip."
+fi
+
+# --- 3b. MCP: 代码烘焙进镜像, 必须 build 才生效 -------------------------------
+if $mcp_changed; then
+  log "MCP changed — building image + recreating container ..."
+  docker compose build mcp
+  docker compose up -d mcp
+  echo "$NEW_REV" > "$MCP_BUILD_MARKER"
+else
+  log "MCP unchanged — skip."
 fi
 
 # --- 4. 后端: 代码走 bind-mount, 必须显式 restart 才能让 uvicorn 重载 --------
