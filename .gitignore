@@ -1,5 +1,7 @@
 # Environment
 .env
+.env.*
+!.env.example
 
 # Deploy state (per-host markers used by deploy.sh)
 .deploy-state/
