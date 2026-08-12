@@ -137,11 +137,35 @@ def test_indextts_syllable_conversion(compact: str, expected: str) -> None:
 
 def test_indextts_text_keeps_original_characters() -> None:
     """角括号标注必须保留原字 —— cue 坐标与 ASR 回验都依赖原文不被改写。"""
-    out = to_indextts_text("佛告須菩提", LEXICON)
+    out = to_indextts_text("佛告須菩提", LEXICON, minimal=False)
     assert out == "<佛|FO2>告<須|XV1><菩|PU2><提|TI2>"
-    # 原字逐一仍在
     for ch in "佛告須菩提":
         assert ch in out
+
+
+def test_indextts_minimal_skips_characters_pypinyin_already_reads_right() -> None:
+    """默认最小标注：只标 pypinyin 会读错的字。
+
+    密集标注是实测出的缺陷源 —— 2026-08-12 金剛經开经段，连续 5 个标签的
+    「祇樹給孤獨」处合成音出现插字（6 字念成 8 个音节）。須菩提 三字 pypinyin
+    本就读对，标了只增加密度、不带来收益。
+    """
+    out = to_indextts_text("佛告須菩提", LEXICON)   # 默认 minimal=True
+    assert out == "<佛|FO2>告須菩提"
+    assert out.count("|") == 1
+
+
+def test_indextts_minimal_annotates_only_the_wrong_syllable_in_a_word() -> None:
+    """词内逐字比对：「給孤獨」只有「給」读错（gěi→jǐ），孤/獨 不该被标。"""
+    out = to_indextts_text("給孤獨園", LEXICON)
+    assert out == "<給|JI3>孤獨園"
+
+
+def test_indextts_full_mode_still_available_for_comparison() -> None:
+    """minimal=False 保留全量标注，供 A/B 对照实验用。"""
+    full = to_indextts_text("給孤獨園", LEXICON, minimal=False)
+    assert full.count("|") == 3
+    assert to_indextts_text("給孤獨園", LEXICON).count("|") == 1
 
 
 def test_indextts_text_skips_syllables_outside_vocab() -> None:

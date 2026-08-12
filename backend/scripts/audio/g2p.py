@@ -133,6 +133,7 @@ def to_indextts_text(
     text: str,
     lexicon: dict[str, str] | None = None,
     vocab: set[str] | None = None,
+    minimal: bool = True,
 ) -> str:
     """整段 → IndexTTS 2.5 的读音标注格式 ``<字|PINYIN>``。
 
@@ -141,6 +142,16 @@ def to_indextts_text(
     ⭐ 与 SSML 的关键差异：角括号形式**保留原字**（SSML 是把原字包在标签里，
     IndexTTS 2.0 的旧式裸替换 ``做DE5`` 则会把原字吃掉）。原字保留意味着
     cue 的字符坐标与 whisper-audit 回验都不受标注影响。
+
+    ⭐ ``minimal=True``（默认）：**只标注 pypinyin 会读错的那些字**，逐字比对，
+    读音一致的字原样放行。实测（2026-08-12，金剛經开经段）：标注数 12 → 4，
+    且消除了 ``<祇|QI2><樹|SHU4><給|JI3><孤|GU1><獨|DU2>`` 这种连续 5 个标签
+    的密集串 —— 密集标注处正是合成音出现**插字／结巴**的地方
+    （「祇樹給孤獨園」6 字被念成 8 个音节）。
+
+    这比静态全量标注更稳：词典里那些「与 pypinyin 一致、仅为钉住读音」的条目
+    不再产生标签；而若 pypinyin 哪天版本漂移读错了，差异会自动出现、标注自动补上。
+    ``minimal=False`` 保留全量标注，供对照实验用。
 
     ``vocab`` 给出时（读自 IndexTTS 的 ``pinyin.vocab``），不在表内的音节
     **不标注**，退回让模型自行判读 —— 标一个模型不认的音节可能整句失效。
@@ -155,7 +166,16 @@ def to_indextts_text(
         if len(frag) != len(syllables) or not all(_is_han(ch) for ch in frag):
             out.append(frag)
             continue
-        for ch, syl in zip(frag, syllables, strict=True):
+        # 该片段在无词典时的读音，用于逐字判断哪些字真的需要纠正
+        fallback = (
+            lazy_pinyin(frag, style=Style.TONE3, neutral_tone_with_five=True)
+            if minimal
+            else [None] * len(syllables)
+        )
+        for ch, syl, raw in zip(frag, syllables, fallback, strict=True):
+            if minimal and raw == syl:
+                out.append(ch)  # pypinyin 本来就读对，不必标
+                continue
             tagged = to_indextts_syllable(syl)
             out.append(f"<{ch}|{tagged}>" if vocab is None or tagged in vocab else ch)
     return "".join(out)
