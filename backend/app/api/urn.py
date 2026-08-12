@@ -31,7 +31,7 @@ class URNResolveResponse(BaseModel):
     reader_url: str | None = None
     # The same target as an absolute URL. Added because the relative form is
     # unusable to a consumer with no host: an agent holding
-    # "/reader?text=42&juan=1" cannot render a link, and in practice links to
+    # "/texts/42/read?juan=1" cannot render a link, and in practice links to
     # CBETA instead. Additive, so existing citers that prepend their own host
     # keep working.
     reader_url_absolute: str | None = None
