@@ -309,7 +309,7 @@ async def test_matches_carry_a_clickable_absolute_url():
     out = await verify_quote(DB, FakeES(), SNOW_VERSE, cite="T0374", juan=13)
     url = out.matches[0].reader_url
     assert url is not None and url.startswith("https://")
-    assert url.endswith("/reader?text=15&juan=13")
+    assert url.endswith("/texts/15/read?juan=13")
 
 
 # ── rate limit registration ──────────────────────────────────────────────

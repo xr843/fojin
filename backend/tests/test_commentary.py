@@ -205,7 +205,7 @@ async def test_link_lands_on_the_line_when_the_anchor_resolves():
     urn, url = got[("X24n0456", "X24n0456_p0455c03")]
     # 滚动落点是索引里真有的那一行，不是 anchor 本身——指向页面上不存在的行，
     # 阅读器什么也不做，看起来就像链接坏了。
-    assert url == "https://fojin.app/reader?text=12400&juan=1&anchor=p0455c02"
+    assert url == "https://fojin.app/texts/12400/read?juan=1&anchor=p0455c02"
     assert urn == "fojin:cbeta/X0456.1#p0455c02"
 
 
