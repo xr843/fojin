@@ -191,6 +191,22 @@ def to_indextts_text(
     return "".join(out)
 
 
+def to_minimax_dict(lexicon: dict[str, str] | None = None, text: str | None = None) -> list[str]:
+    """词典 → MiniMax T2A v2 的 ``pronunciation_dict.tone`` 条目列表。
+
+    格式为 ``原文/(pin1)(yin1)``，官方例：``处理/(chu3)(li3)``。
+
+    ⭐ 与 IndexTTS 的关键差异：这是**整个请求的全局词典，不改动正文一个字**
+    （IndexTTS 要在文本里插 ``<佛|FO2>`` 标签）。因此 cue 的字符坐标天然安全，
+    也不存在「标注密度影响合成」这类问题。
+
+    ``text`` 给出时只导出该文本里实际出现的词条 —— 请求体不必带上整本词典。
+    """
+    lex = load_lexicon() if lexicon is None else lexicon
+    items = lex.items() if text is None else ((w, p) for w, p in lex.items() if w in text)
+    return [f"{w}/{''.join(f'({s})' for s in p.split())}" for w, p in items]
+
+
 def load_indextts_vocab(path: Path) -> set[str]:
     """读 IndexTTS 的 ``checkpoints/pinyin.vocab``（每行一个大写音节）。"""
     return {ln.strip() for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()}
