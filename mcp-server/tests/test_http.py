@@ -8,6 +8,7 @@ concerns (rate limiting, Host validation, healthz) without any network.
 
 from __future__ import annotations
 
+import logging
 import json
 
 import httpx
@@ -133,3 +134,62 @@ def test_host_header_validation_rejects_unknown_host():
     with TestClient(app) as tc:
         resp = tc.post("/mcp", json=_rpc("tools/list"), headers=MCP_HEADERS)
     assert resp.status_code >= 400
+
+
+# --- 访问日志真的记下了工具名 --------------------------------------------
+#
+# 2026-08-12 之前它记的是 Mcp-Name 请求头，而没有客户端发这个头：40 小时生产
+# 日志里每一次真实调用都是 "tool": null，唯一带上名字的反而是碰巧设了这个可选
+# 头的扫描器。日志于是回答了「机器人自称在调什么」，而不是「谁在用什么」。
+
+
+def _access_lines(caplog):
+    return [json.loads(r.message) for r in caplog.records
+            if r.name == "fojin_mcp.access"]
+
+
+def test_access_log_records_the_tool_actually_called(mock_fojin_client, caplog):
+    caplog.set_level(logging.INFO, logger="fojin_mcp.access")
+    with TestClient(_test_app()) as tc:
+        tc.post("/mcp", json=_rpc("tools/call", {
+            "name": "search_corpus", "arguments": {"query": "空", "limit": 3},
+        }), headers=MCP_HEADERS)
+    calls = [ln for ln in _access_lines(caplog) if ln["path"] == "/mcp"]
+    assert calls and calls[-1]["tool"] == "search_corpus"
+
+
+def test_access_log_leaves_tool_null_for_non_tool_traffic(caplog):
+    """别的 MCP 方法也带 params.name —— 只看 name 就会把它们记成工具调用。
+
+    故意用 prompts/get 而不是 tools/list：tools/list 压根没有 params.name，
+    拿它来测「不是工具调用就不记名字」等于没测（把方法判断删掉，那种写法照样
+    全绿——试过）。爬虫打的正是这一类方法，记错了整份采用数据就废了。
+    """
+    caplog.set_level(logging.INFO, logger="fojin_mcp.access")
+    with TestClient(_test_app()) as tc:
+        tc.post("/mcp", json=_rpc("prompts/get", {"name": "not-a-tool"}),
+                headers=MCP_HEADERS)
+    calls = [ln for ln in _access_lines(caplog) if ln["path"] == "/mcp"]
+    assert calls and calls[-1]["tool"] is None
+
+
+def test_sniffer_survives_a_body_split_across_chunks():
+    from fojin_mcp.http import _ToolSniffer
+
+    body = json.dumps(_rpc("tools/call", {"name": "commentaries",
+                                          "arguments": {"quote": "應無所住"}})).encode()
+    s = _ToolSniffer()
+    for i in range(0, len(body), 7):        # 切碎，模拟分块到达
+        s.feed(body[i:i + 7])
+    assert s.tool == "commentaries"
+
+
+def test_sniffer_gives_up_on_an_oversized_body_instead_of_hoarding_it():
+    """可观测性不能变成任何人都能 POST 的内存负担——丢一个日志字段，不丢请求。"""
+    from fojin_mcp.http import _ToolSniffer
+
+    s = _ToolSniffer()
+    s.feed(b'{"method":"tools/call","params":{"name":"x","arguments":{"q":"'
+           + b"\xe7\xa9\xba" * _ToolSniffer.LIMIT)
+    assert s.tool is None
+    assert not s._buf
