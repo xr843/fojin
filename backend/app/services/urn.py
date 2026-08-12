@@ -100,10 +100,10 @@ def build_urn(
     "no URN" silently rather than break answer assembly.
 
     ``juan``/``anchor`` are emitted only when given; a work-level URN is valid
-    and resolves to the text detail page. Anchors are currently opaque (CBETA
-    line numbers aren't indexed yet — see the module docstring), so callers pass
-    juan-level URNs; the parameter exists so line-level anchoring is a
-    non-breaking add later.
+    and resolves to the text detail page. Anchors stay opaque to this function —
+    it never parses one — but they are no longer hypothetical: ``text_line_anchors``
+    indexes every CBETA ``<lb>`` marker, and the commentary endpoint resolves a
+    line marker to its juan so it can emit ``fojin:cbeta/X0456.3#p0455c03``.
     """
     if not isinstance(cbeta_id, str) or not cbeta_id:
         return None

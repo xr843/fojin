@@ -42,6 +42,21 @@ def to_cbeta_id(work_id: str) -> str | None:
     return f"{m.group(1)}{m.group(2)}" if m else None
 
 
+# 行标 X24n0456_p0455c03 → 0455c03，也就是 text_line_anchors.line_ref 的写法。
+# 锚点本身带书号前缀（一段里的注文来自不同的书），而库里按 text_id 分表存，
+# 前缀是冗余的。
+_LINE_REF = re.compile(r"_p([0-9a-z]+)$")
+
+
+def line_ref(anchor: str | None) -> str | None:
+    """CBETA 行标里的页-栏-行部分，用于反查它落在第几卷。
+
+    对不上就返回 None：宁可退回书级链接，也不要拼一个跳不到的锚点。
+    """
+    m = _LINE_REF.search(anchor or "")
+    return m.group(1) if m else None
+
+
 @dataclass
 class Package:
     """一部经的经注对读包。文本在内存里常驻——单包约 2 MB。"""
