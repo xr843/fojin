@@ -6,3 +6,4 @@ pytest-cov>=7.1.0
 anyio>=4.14.2
 pytest-anyio==0.0.0
 aiosqlite>=0.22.1  # in-memory async DB for build_works integration tests
+pypinyin>=0.55.0  # 读诵流水线的读音层；tests/test_audio_g2p.py 需要（运行时镜像不装，见 scripts/audio/requirements.txt）
