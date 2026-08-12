@@ -1,6 +1,9 @@
 import { useState, useEffect, type ReactNode } from "react";
 import { Layout as AntLayout, Typography, Button, Dropdown, Space, Drawer, Modal, Badge } from "antd";
 import { Outlet, useNavigate, useLocation } from "react-router";
+
+import AudioPlayerProvider from "../audio/AudioPlayerProvider";
+import PlayerBar from "../audio/PlayerBar";
 import {
   UserOutlined,
   LogoutOutlined,
@@ -380,7 +383,11 @@ export default function Layout() {
         </Space>
       </Header>
       <Content id="main-content" style={{ padding: isHome ? 0 : undefined, flex: 1 }} className={isHome ? undefined : "layout-content-inner"}>
-        <Outlet />
+        <AudioPlayerProvider>
+          <Outlet />
+          {/* 播放器住 Layout 层：切卷会重挂载页面组件，住页面里跨卷续播必断 */}
+          <PlayerBar />
+        </AudioPlayerProvider>
       </Content>
       <Footer
         style={{

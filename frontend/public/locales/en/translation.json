@@ -1458,7 +1458,7 @@
   "reader.audio.pause": "Pause",
   "reader.audio.close": "Close player",
   "reader.audio.speed": "Speed",
-  "reader.audio.model_disclaimer": "Recitation audio is synthesized with the bilibili IndexTTS-2.5 model. This site's use of and modifications to that model are unaffiliated with its original rights holder, who does not endorse, warrant, or accept liability for them.",
+  "reader.audio.model_disclaimer": "Recitation audio on this site is AI-synthesized (MiniMax Speech), not a human recording. Scripture text follows the CBETA electronic canon.",
   "nav.admin_alignment": "Alignment Coverage",
   "nav.admin_alignment_review": "Candidate review",
   "admin_align.page_title": "Cross-canon Alignment Coverage · Admin",

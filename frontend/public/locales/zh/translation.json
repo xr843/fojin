@@ -1458,7 +1458,7 @@
   "reader.audio.pause": "暂停",
   "reader.audio.close": "关闭播放",
   "reader.audio.speed": "倍速",
-  "reader.audio.model_disclaimer": "读诵音频由 bilibili IndexTTS-2.5 模型合成。本站对该模型的使用及所作改动与原模型权利人无关，原始权利人对此不背书、不担保、不承担责任。",
+  "reader.audio.model_disclaimer": "本站读诵音频由 AI 语音合成（MiniMax Speech），非真人录音。经文文本依 CBETA 电子佛典。",
   "nav.admin_alignment": "跨藏对齐覆盖率",
   "nav.admin_alignment_review": "候选复核",
   "admin_align.page_title": "跨藏对齐覆盖率 · 管理后台",

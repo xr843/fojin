@@ -646,6 +646,33 @@ export async function getJuanLineAnchors(textId: number, juanNum: number): Promi
   return data;
 }
 
+export interface AudioCue {
+  /** text_contents.content 的 code-point 偏移，与 apparatus / lineAnchors 同坐标系 */
+  char_start: number;
+  char_end: number;
+  time_ms: number;
+  /** "head" 经名 | "byline" 译者署名 | "juan" 卷题 | "prose" 正文 */
+  kind: string;
+}
+
+export interface TextAudioResponse {
+  text_id: number;
+  juan_num: number;
+  /** 静态路径，由宿主机 nginx 直出，不经后端 */
+  url: string;
+  voice_id: string;
+  /** "minimax" | "azure" | "human" —— 前端据此决定是否标「AI 合成朗读」 */
+  engine: string;
+  duration_ms: number;
+  cues: AudioCue[];
+}
+
+/** 某卷的读诵音频。无音频的卷后端返回 404，调用方应容忍失败并隐藏读诵入口。 */
+export async function getJuanAudio(textId: number, juanNum: number): Promise<TextAudioResponse> {
+  const { data } = await api.get<TextAudioResponse>(`/texts/${textId}/juans/${juanNum}/audio`);
+  return data;
+}
+
 // Content search
 export async function searchContent(params: {
   q: string;
