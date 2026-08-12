@@ -83,7 +83,7 @@ async def _locate(
     }
     located: dict[tuple[int, str], tuple[int, str]] = {}
     if pairs:
-        tids, refs = zip(*sorted(pairs))
+        tids, refs = zip(*sorted(pairs), strict=True)
         for tid, ref, juan, near in await db.execute(
             _JUAN_OF_LINE, {"tids": list(tids), "refs": list(refs)}
         ):
