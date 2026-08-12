@@ -14,6 +14,7 @@ from app.models.source import DataSource
 from app.models.text import BuddhistText
 from app.models.user import ReadingHistory, User
 from app.schemas.text import JuanContentResponse, JuanLanguagesResponse, JuanListResponse, TextResponseBase
+from app.services.audio import get_juan_audio
 from app.services.content import (
     get_juan_apparatus,
     get_juan_content,
@@ -122,6 +123,24 @@ class JuanLineAnchorsResponse(BaseModel):
     text_id: int
     juan_num: int
     anchors: list[LineAnchorItem] = []
+
+
+class AudioCueItem(BaseModel):
+    char_start: int
+    char_end: int
+    time_ms: int
+    # "head" 经名 / "byline" 译者署名 / "juan" 卷题 / "prose" 正文
+    kind: str = "prose"
+
+
+class TextAudioResponse(BaseModel):
+    text_id: int
+    juan_num: int
+    url: str
+    voice_id: str
+    engine: str
+    duration_ms: int
+    cues: list[AudioCueItem] = []
 
 
 class ChunkContextItem(BaseModel):
@@ -240,6 +259,24 @@ async def read_juan_line_anchors(
     Loaded lazily by the reader; a juan can carry several hundred anchors."""
     anchors = await get_juan_line_anchors(db, text_id, juan_num)
     return JuanLineAnchorsResponse(text_id=text_id, juan_num=juan_num, anchors=anchors)
+
+
+@router.get("/texts/{text_id}/juans/{juan_num}/audio", response_model=TextAudioResponse)
+async def read_juan_audio(
+    text_id: int,
+    juan_num: int,
+    lang: str = Query("zh", description="正文语言"),
+    db: AsyncSession = Depends(get_db),
+):
+    """某一卷的读诵音频与句级时间戳。
+
+    获取某一卷的在线读诵音频。音频文件本身由静态目录直出（一部经 1~17 MB，
+    走后端是纯浪费），此处只回地址与时间戳；**没有音频的卷返回 404**，
+    前端据此不渲染「读诵」按钮。"""
+    payload = await get_juan_audio(db, text_id, juan_num, lang)
+    if payload is None:
+        raise HTTPException(status_code=404, detail="该卷暂无读诵音频")
+    return TextAudioResponse(text_id=text_id, juan_num=juan_num, **payload)
 
 
 @router.get("/texts/{text_id}/export", tags=["exports"])
