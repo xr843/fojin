@@ -78,3 +78,34 @@ def test_segments_do_not_overlap() -> None:
     segs = split_content(HEART)
     for a, b in zip(segs, segs[1:]):
         assert b.char_start >= a.char_end
+
+
+def test_normalize_for_tts_turns_ideographic_space_into_pause() -> None:
+    """咒語的全角空格是停顿标记，但 TTS 不认 —— 必须转成逗号。
+
+    使用者实听指出：「揭帝　揭帝　般羅揭帝　般羅僧揭帝　菩提　莎婆訶」
+    应读成六个分开的单元，而原样送入时停顿位置是错的。
+    """
+    from scripts.audio.segment import normalize_for_tts
+
+    src = "「揭帝　揭帝　般羅揭帝　般羅僧揭帝　菩提　莎婆訶」"
+    out = normalize_for_tts(src)
+    assert out == "「揭帝，揭帝，般羅揭帝，般羅僧揭帝，菩提，莎婆訶」"
+    assert "　" not in out
+    assert out.count("，") == 5  # 六个单元 → 五个停顿
+
+
+def test_normalize_for_tts_softens_vocative_exclamation() -> None:
+    """「舍利子！」是呼格不是感叹；！ 会让 TTS 加重语气。"""
+    from scripts.audio.segment import normalize_for_tts
+
+    assert normalize_for_tts("「舍利子！色不異空") == "「舍利子，色不異空"
+
+
+def test_normalize_for_tts_does_not_touch_the_original() -> None:
+    """规范化只作用于送进模型的字符串 —— 原文对象不可被改动。"""
+    from scripts.audio.segment import normalize_for_tts
+
+    src = "「舍利子！色不異空"
+    normalize_for_tts(src)
+    assert src == "「舍利子！色不異空"

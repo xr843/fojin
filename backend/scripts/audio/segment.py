@@ -121,6 +121,24 @@ def _split_prose(
     ]
 
 
+def normalize_for_tts(text: str) -> str:
+    """把一段正文改写成**送进 TTS 的**形式。原文与 cue 坐标不受影响。
+
+    两条规则都来自使用者实听：
+
+    1. **全角空格 U+3000 → 「，」**。CBETA 用它标记咒語的停顿位置
+       （「揭帝　揭帝　般羅揭帝　般羅僧揭帝　菩提　莎婆訶」共六个单元），
+       但 TTS 不认全角空格，会把整串连读或在错的地方停。
+    2. **感叹号 → 逗号**。心經「舍利子！」是**呼格**（称呼舍利弗），
+       不是感叹；CBETA 标点为现代编者所加。TTS 见到 ！ 会加重语气，
+       听感突兀。
+
+    ⚠️ 这个函数只作用于送进模型的字符串。显示给用户的、以及用于计算
+    char_start/char_end 的，始终是原文。
+    """
+    return text.replace("　", "，").replace("！", "，").replace("!", "，")
+
+
 def split_content(raw: str, min_chars: int = 16, max_chars: int = 60) -> list[Segment]:
     """一卷正文 → 合成片段列表，偏移可切回 ``raw``。
 
