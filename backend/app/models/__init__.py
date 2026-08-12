@@ -1,6 +1,7 @@
 from app.models.ai_diff_cache import AiDiffCache
 from app.models.annotation import Annotation, AnnotationReview
 from app.models.answer_review import AnswerReview
+from app.models.audio import TextAudio, TextAudioCue
 from app.models.audit import AdminAuditLog
 from app.models.chat import (
     ChatAnswerDiagnostic,
@@ -59,6 +60,8 @@ __all__ = [
     "TermConcept",
     "TermConceptEntry",
     "TextApparatus",
+    "TextAudio",
+    "TextAudioCue",
     "TextContent",
     "TextEmbedding",
     "TextIdentifier",

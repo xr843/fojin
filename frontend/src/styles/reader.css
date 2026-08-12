@@ -835,3 +835,47 @@
 :root[data-theme="dark"] .reader-dict-popover {
   background: var(--fj-surface);
 }
+
+/* ── 读诵播放条 ─────────────────────────────────────────── */
+.reader-audio-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: var(--fj-card-bg);
+  border-top: 1px solid var(--fj-border);
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
+}
+.reader-audio-meta { min-width: 0; flex: 0 1 240px; }
+.reader-audio-title {
+  font-size: 13px;
+  color: var(--fj-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.reader-audio-note { font-size: 11px; color: var(--fj-ink-muted, #999); }
+/* 合成声明入口 —— 低调但必须存在 */
+.reader-audio-license { margin-left: 6px; cursor: help; opacity: 0.7; }
+.reader-audio-progress { flex: 1 1 auto; margin: 0 4px; }
+.reader-audio-time {
+  font-size: 11px;
+  color: var(--fj-ink-muted, #999);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 正在读诵的那一行 —— 与 .cbeta-line-flash 同色系，区别是持续态 */
+.cbeta-line-playing {
+  background: rgba(184, 134, 11, 0.18);
+  border-radius: 3px;
+  transition: background 240ms ease;
+}
+
+@media (max-width: 640px) {
+  .reader-audio-progress, .reader-audio-meta, .reader-audio-time { display: none; }
+}

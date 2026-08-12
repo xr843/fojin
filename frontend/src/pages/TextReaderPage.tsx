@@ -19,8 +19,10 @@ import {
   DiffOutlined,
   VerticalAlignTopOutlined,
   DownloadOutlined,
+  SoundOutlined,
 } from "@ant-design/icons";
-import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBookmark, addBookmark, removeBookmark, searchDictionaryGrouped, getJuanApparatus, getJuanLineAnchors, type ApparatusEntryItem } from "../api/client";
+import { useAudioPlayer } from "../audio/useAudioPlayback";
+import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBookmark, addBookmark, removeBookmark, searchDictionaryGrouped, getJuanApparatus, getJuanLineAnchors, getJuanAudio, type ApparatusEntryItem } from "../api/client";
 import { useAuthStore } from "../stores/authStore";
 import CitationGenerator from "../components/CitationGenerator";
 import AnnotationPanel from "../components/AnnotationPanel";
@@ -647,6 +649,16 @@ export default function TextReaderPage() {
     enabled: !!textId,
     staleTime: 3600000,
   });
+
+  // 读诵音频：只有预生成过的卷才有，404 是正常态（不重试、不报错）。
+  const { data: audioData } = useQuery({
+    queryKey: ["juanAudio", textId, juanNum],
+    queryFn: () => getJuanAudio(Number(textId), juanNum),
+    enabled: !!textId,
+    staleTime: 3600000,
+    retry: false,
+  });
+  const audioPlayer = useAudioPlayer();
   const lineAnchors = useMemo<LineAnchorConv[]>(() => {
     const raw = content?.content;
     if (!lineAnchorData?.anchors || !raw) return [];
@@ -713,6 +725,71 @@ export default function TextReaderPage() {
       if (flash) clearTimeout(flash);
     };
   }, [searchParams, lineAnchors, juanNum]);
+
+  // 播到哪，高亮到哪。复用 URN 深链已有的 .cbeta-line 定位机制 ——
+  // 那里是瞬时 flash，这里是持续态。
+  //
+  // ⚠️ 自动滚屏必须真机验收：behavior:"smooth" 在 CDP 驱动的浏览器里
+  //    完全不推进（疑 rAF 节流），CDP 下看不到问题不代表生产没问题。
+  useEffect(() => {
+    const root = readerContentRef.current;
+    const raw = content?.content;
+    if (!root || !raw || !audioData) return;
+    const cur = audioPlayer.cueIndex;
+    const isThisJuan =
+      audioPlayer.track?.textId === Number(textId) && audioPlayer.track?.juanNum === juanNum;
+
+    const clear = () =>
+      root
+        .querySelectorAll<HTMLElement>(".cbeta-line-playing")
+        .forEach((el) => el.classList.remove("cbeta-line-playing"));
+
+    if (!isThisJuan || cur < 0) {
+      clear();
+      return;
+    }
+    const cue = audioData.cues[cur];
+    if (!cue) return;
+
+    // cue.char_start 是 code-point 偏移，与 lineAnchors 同坐标系；
+    // 取「不晚于该点」的最后一个行锚，即这一段所在的 CBETA 行。
+    const m = cpToU16Map(raw);
+    const startU16 = cue.char_start < m.length ? m[cue.char_start] : m[m.length - 1];
+    let target: LineAnchorConv | null = null;
+    for (const a of lineAnchors) {
+      if (a.off <= startU16) target = a;
+      else break;
+    }
+    if (!target) return;
+
+    const el = root.querySelector<HTMLElement>(
+      `.cbeta-line[data-ref="${CSS.escape(target.ref)}"]`,
+    );
+    if (!el) return;
+    clear();
+    const line = el.closest("p") ?? el;
+    line.classList.add("cbeta-line-playing");
+
+    // 只在该行滚出视野时才滚 —— 逐句跟随时每句都重新居中会晃得难受。
+    //
+    // ⚠️ 瞬时，不要 behavior:"smooth"。#1173 在生产上实测过：平滑
+    // scrollIntoView 到某一行，六秒后 .reader-container 的 scrollTop 仍是 0，
+    // 而去掉 behavior 的同一调用落到了 23,315 —— 一卷有几万像素高，
+    // 平滑路径在这个容器里根本走不完。
+    const box = line.getBoundingClientRect();
+    const view = root.getBoundingClientRect();
+    if (box.top < view.top || box.bottom > view.bottom) {
+      line.scrollIntoView({ block: "center" });
+    }
+  }, [
+    audioPlayer.cueIndex,
+    audioPlayer.track,
+    audioData,
+    content,
+    lineAnchors,
+    textId,
+    juanNum,
+  ]);
 
   const changeFontSize = (delta: number) => {
     setFontSize((prev) => {
@@ -868,6 +945,33 @@ export default function TextReaderPage() {
               {t("reader.apparatus.toggle")}
             </Button>
           </Tooltip>
+          {audioData && (
+            <Tooltip title={t("reader.audio.tooltip")}>
+              <Button
+                size="small"
+                type={
+                  audioPlayer.track?.textId === Number(textId) &&
+                  audioPlayer.track?.juanNum === juanNum
+                    ? "primary"
+                    : "default"
+                }
+                icon={<SoundOutlined />}
+                onClick={() =>
+                  audioPlayer.play({
+                    textId: Number(textId),
+                    juanNum,
+                    title: t("reader.seo.title", {
+                      title: content?.title_zh ?? "",
+                      n: juanNum,
+                    }),
+                    audio: audioData,
+                  })
+                }
+              >
+                {t("reader.audio.button")}
+              </Button>
+            </Tooltip>
+          )}
           <Tooltip title={t("reader.parallel.tooltip")}>
             <Button
               size="small"

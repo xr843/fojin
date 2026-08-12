@@ -1,0 +1,5 @@
+# 「在线读诵」离线流水线专属依赖 —— 刻意与 backend/requirements.txt 分开，
+# 不进 backend 运行时镜像（TTS SDK 体积大且生产环境用不到）。
+pypinyin>=0.55.0
+azure-cognitiveservices-speech>=1.40.0
+PyYAML>=6.0

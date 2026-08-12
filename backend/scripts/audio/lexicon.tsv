@@ -1,0 +1,100 @@
+# 佛教异读词典 —— 「在线读诵」读音层的真资产
+#
+# 格式：词或字 \t 空格分隔的带调拼音（数字调，Azure sapi alphabet 格式）\t 状态 \t 备注
+# 状态：seed = 机器种入待人工审定 / confirmed = 已确认
+#
+# ⚠️ 键一律用 CBETA 繁体形。pypinyin 的佛教词表只挂简体，繁体走不到。
+# ⚠️ 与 pypinyin 一致的条目也保留 —— 目的是「钉住」读音，防 pypinyin 版本漂移。
+# ⚠️ 匹配规则为最长优先，故「仿佛」必须在表内，才能压过单字默认「佛→fo2」。
+#
+# ── 单字默认层 ──────────────────────────────────────────────
+# 这些字在佛典中的读音与通用汉语默认读音系统性不同。
+佛	fo2	seed	实测：金剛經卷1 中 123 次「佛」pypinyin 仅 5 次读对
+伽	qie2	seed	僧伽/伽藍/瑜伽/摩睺羅伽 皆 qié；pypinyin 默认 ga1
+舍	she4	seed	繁体中「捨」(shě) 与「舍」(shè) 分立，故可安全做单字默认
+闍	she2	seed	阿闍世/闍維；pypinyin 默认 du1
+相	xiang4	seed	佛典「相」(lakṣaṇa 我相人相眾生相) 读 xiàng；金剛經卷1 全 96 处皆此义，pypinyin 默认 xiang1
+# ── 词级层 ──────────────────────────────────────────────────
+# ⚠️ 以下 5 条是「相」的反向保护：这些词读 xiāng，靠更长匹配压过单字默认 相→xiang4
+相應	xiang1 ying4	seed	⚠️ 反向保护，勿删；pypinyin 作 xiang1 ying1，两处都错
+相續	xiang1 xu4	seed	⚠️ 反向保护，勿删
+相待	xiang1 dai4	seed	⚠️ 反向保护，勿删
+相似	xiang1 si4	seed	⚠️ 反向保护，勿删
+互相	hu4 xiang1	seed	⚠️ 反向保护，勿删
+應供	ying4 gong4	seed	如來十號之一；pypinyin 作 ying1 gong1，两字皆错
+調御	tiao2 yu4	seed	調御丈夫，如來十號之一；pypinyin 作 diao4 yu4
+般若	bo1 re3	seed
+般涅槃	bo1 nie4 pan2	seed
+南無	na1 mo2	seed	⚠️ 各地有 ná/nā 之别，取 pypinyin 佛教词表值，待法师审定
+摩訶	mo2 he1	seed
+迦葉	jia1 she4	seed	摩訶迦葉
+阿闍世	a1 she2 shi4	seed
+阿闍梨	a1 she2 li2	seed
+闍維	she2 wei2	seed
+僧伽	seng1 qie2	seed
+瑜伽	yu2 qie2	seed
+和南	he2 na2	seed	vandana
+祇樹	qi2 shu4	seed
+給孤獨	ji3 gu1 du2	seed
+阿鞞跋致	a1 pi2 ba2 zhi4	seed	avaivartika
+辟支佛	bi4 zhi1 fo2	seed	pypinyin 作 pi4 zhi1 fu2，两字皆错
+薄伽梵	bo2 qie2 fan4	seed
+阿蘭若	a1 lan2 re3	seed
+伽藍	qie2 lan2	seed
+優婆塞	you1 po2 sai1	seed
+優婆夷	you1 po2 yi2	seed
+比丘	bi3 qiu1	seed
+比丘尼	bi3 qiu1 ni2	seed
+乾闥婆	qian2 ta4 po2	seed
+緊那羅	jin3 na4 luo2	seed
+那由他	na2 you2 ta1	seed
+由旬	you2 xun2	seed
+旃陀羅	zhan1 tuo2 luo2	seed
+仿佛	fang3 fu2	seed	⚠️ 反向保护，勿删：压过单字默认 佛→fo2
+彷彿	pang2 fu2	seed	⚠️ 反向保护，勿删
+阿耨多羅三藐三菩提	a1 nou4 duo1 luo2 san1 miao3 san1 pu2 ti2	seed
+須菩提	xu1 pu2 ti2	seed
+舍利弗	she4 li4 fu2	seed
+目犍連	mu4 jian1 lian2	seed
+迦旃延	jia1 zhan1 yan2	seed
+憍陳如	jiao1 chen2 ru2	seed
+羅睺羅	luo2 hou2 luo2	seed
+波羅蜜	bo1 luo2 mi4	seed
+涅槃	nie4 pan2	seed
+剎那	cha4 na4	seed	pypinyin 作 sha1 na4
+兜率	dou1 shuai4	seed	pypinyin 作 dou1 lv4
+閻浮提	yan2 fu2 ti2	seed
+阿修羅	a1 xiu1 luo2	seed
+夜叉	ye4 cha1	seed
+羅剎	luo2 cha4	seed	pypinyin 作 luo2 sha1
+迦樓羅	jia1 lou2 luo2	seed
+摩睺羅伽	mo2 hou2 luo2 qie2	seed
+毘盧遮那	pi2 lu2 zhe1 na4	seed
+阿彌陀	a1 mi2 tuo2	seed
+陀羅尼	tuo2 luo2 ni2	seed
+三昧	san1 mei4	seed
+舍衛	she4 wei4	seed
+王舍城	wang2 she4 cheng2	seed
+祇園	qi2 yuan2	seed
+苾芻	bi4 chu2	seed
+阿賴耶	a1 lai4 ye2	seed
+末那	mo4 na4	seed
+楞嚴	leng2 yan2	seed
+揭諦	jie1 di4	seed
+揭帝	jie1 di4	seed	⚠️ 心經用「揭帝」不是「揭諦」，两个字形都要收
+菩提薩埵	pu2 ti2 sa4 duo3	seed
+# ── 咒語（2026-08-12 由心經实听发现：合成音在咒語段读错）──────────
+般羅	bo1 luo2	seed	⚠️ 心經咒語「般羅揭帝」；pypinyin 作 ban1 luo2。注意不是「般若」
+莎婆訶	suo1 po2 he1	seed	⚠️ 心經咒語结尾；pypinyin 作 sha1 po2 he1
+薩婆訶	sa4 po2 he1	seed	svāhā 的另一常见写法（大悲咒等）
+娑婆訶	suo1 po2 he1	seed	svāhā 的又一写法
+唵	an1	seed	oṃ，咒語起首字；pypinyin 作 an3
+吽	hong1	seed	hūṃ；pypinyin 作 hou1
+悉曇	xi1 tan2	seed	siddhaṃ
+# ── 由合成音实听发现：pypinyin 读对、但 TTS 模型读错 ────────────
+# ⚠️ 结构性教训：入不入词典**不能**以 pypinyin 对错为准 —— 模型有自己的 G2P。
+#    佛教术语一律收，全部发给 TTS。
+行深般若波羅蜜多	xing2 shen1 bo1 re3 bo1 luo2 mi4 duo1	seed	⚠️ 整体入词典是为提示模型当作一个词连读，不只是纠音
+觀自在菩薩	guan1 zi4 zai4 pu2 sa4	seed
+罣礙	gua4 ai4	seed	⚠️ MiniMax 读成 gao4 ai4；pypinyin 本身是对的
+顛倒	dian1 dao3	seed	pypinyin 作 dian1 dao4
