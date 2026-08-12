@@ -19,7 +19,7 @@ URN grammar (BNF-ish):
 Examples:
 
     fojin:cbeta/T0001                  → text-level: redirect to /text/{id}
-    fojin:cbeta/T0001.1                → juan-level: redirect to /reader?text=&juan=1
+    fojin:cbeta/T0001.1                → juan-level: redirect to /texts/<id>/read?juan=1
     fojin:cbeta/T0001.1#p0001a01       → line-level: same + ?anchor=p0001a01
 
 The ANCHOR is intentionally opaque: this PR does not index CBETA's
@@ -100,10 +100,10 @@ def build_urn(
     "no URN" silently rather than break answer assembly.
 
     ``juan``/``anchor`` are emitted only when given; a work-level URN is valid
-    and resolves to the text detail page. Anchors are currently opaque (CBETA
-    line numbers aren't indexed yet — see the module docstring), so callers pass
-    juan-level URNs; the parameter exists so line-level anchoring is a
-    non-breaking add later.
+    and resolves to the text detail page. Anchors stay opaque to this function —
+    it never parses one — but they are no longer hypothetical: ``text_line_anchors``
+    indexes every CBETA ``<lb>`` marker, and the commentary endpoint resolves a
+    line marker to its juan so it can emit ``fojin:cbeta/X0456.3#p0455c03``.
     """
     if not isinstance(cbeta_id, str) or not cbeta_id:
         return None
@@ -214,11 +214,19 @@ def reader_path(
     ``text_id``/``juan`` pair — quote verification, search results — do not
     have to fabricate a ``ParsedURN`` just to name a link, and so the route
     shape lives in exactly one place.
+
+    The route is ``/texts/:id/read`` — see ``App.tsx``. It used to be built as
+    ``/reader?text=&juan=``, which no router ever served: the SPA answers 200
+    for any path, so every check that only looked at the status code passed
+    while the browser rendered the 404 page. That shape was in the URN module
+    docstring, in the resolver, in verify_quote, and asserted by three tests —
+    which is how it survived: the tests pinned the broken shape in place.
+    Anything that verifies a reader link has to load it, not curl it.
     """
     if juan is None:
         # Text-level: jump to the detail page so the user picks a juan.
         return f"/texts/{text_id}"
-    base = f"/reader?text={text_id}&juan={juan}"
+    base = f"/texts/{text_id}/read?juan={juan}"
     if anchor:
         base += f"&anchor={anchor}"
     return base
@@ -239,7 +247,7 @@ def absolute_reader_url(relative: str | None) -> str | None:
 
     The relative form is the published contract of ``/api/urn/resolve`` and
     stays that way, but it is useless to the consumers that matter most here:
-    an AI agent holding ``/reader?text=42&juan=1`` has no host to attach it to,
+    an AI agent holding ``/texts/42/read?juan=1`` has no host to attach it to,
     so it either drops the citation or — observed in a real session — invents a
     link to CBETA instead. fojin does the verification and someone else gets
     the click. Callers that serve agents should offer this alongside.

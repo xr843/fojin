@@ -11,7 +11,8 @@ This module owns everything that only matters when fojin-mcp is *hosted* (at
   underneath.
 - :class:`AccessLogMiddleware` — one structured JSON line per request to the
   ``fojin_mcp.access`` logger: the adoption observability the stdio server
-  never had. Logs the ``Mcp-Name`` header (tool name) when a client sends it.
+  never had. The tool name is read out of the JSON-RPC body as it streams past
+  (see :class:`_ToolSniffer` for why it is not read from a header).
 - :func:`build_http_app` — assembles the Starlette app: MCP streamable HTTP in
   stateless + json_response mode (each call is one plain JSON POST — no long
   SSE streams, so Cloudflare's proxy timeout/buffering never enters the
@@ -128,6 +129,61 @@ class RateLimitMiddleware:
         await self.app(scope, receive, send)
 
 
+class _ToolSniffer:
+    """Pulls the tool name out of a JSON-RPC request body as it streams past.
+
+    Why this exists: until 2026-08-12 the access log read the tool name from an
+    ``Mcp-Name`` request header, which no client sends. Every real call was
+    logged as ``"tool": null`` — the one field the log was built for. The only
+    entries that ever carried a name came from scanners that happen to set that
+    optional header, so the log answered "which tool do bots announce" instead
+    of "which tool is anyone using".
+
+    Reads chunks as they flow rather than buffering the whole body and
+    replaying it: a JSON-RPC call arrives in one chunk in practice, and a
+    middleware that holds every request body in memory is a liability on an
+    endpoint anyone can POST to. Parsing is attempted on each chunk until the
+    JSON is complete, and abandoned past ``LIMIT`` — this is observability, so
+    losing a name costs a log field, never a request.
+    """
+
+    LIMIT = 64 * 1024
+
+    def __init__(self) -> None:
+        self._buf = bytearray()
+        self._done = False
+        self.tool: str | None = None
+
+    def feed(self, chunk: bytes) -> None:
+        if self._done or not chunk:
+            return
+        self._buf += chunk
+        if len(self._buf) > self.LIMIT:
+            self._give_up()
+            return
+        try:
+            payload = json.loads(self._buf)
+        except ValueError:
+            return  # 还没收全，等下一块
+        self._done = True
+        self._buf.clear()
+        self.tool = self._name(payload)
+
+    def _give_up(self) -> None:
+        self._done = True
+        self._buf.clear()
+
+    @staticmethod
+    def _name(payload: Any) -> str | None:
+        # 批量请求是一个数组；取第一个真正的工具调用。
+        for one in payload if isinstance(payload, list) else [payload]:
+            if isinstance(one, dict) and one.get("method") == "tools/call":
+                name = (one.get("params") or {}).get("name")
+                if isinstance(name, str) and name:
+                    return name
+        return None
+
+
 class AccessLogMiddleware:
     """One JSON line per request: ts, ip, method, path, status, ms, tool, ua.
 
@@ -145,6 +201,13 @@ class AccessLogMiddleware:
             return
         start = time.monotonic()
         status_holder = {"status": 0}
+        sniffer = _ToolSniffer()
+
+        async def receive_wrapper() -> dict[str, Any]:
+            message = await receive()
+            if message.get("type") == "http.request":
+                sniffer.feed(message.get("body") or b"")
+            return message
 
         async def send_wrapper(message: dict[str, Any]) -> None:
             if message["type"] == "http.response.start":
@@ -152,7 +215,7 @@ class AccessLogMiddleware:
             await send(message)
 
         try:
-            await self.app(scope, receive, send_wrapper)
+            await self.app(scope, receive_wrapper, send_wrapper)
         finally:
             access_logger.info(
                 "%s",
@@ -166,7 +229,8 @@ class AccessLogMiddleware:
                         "path": scope.get("path"),
                         "status": status_holder["status"],
                         "ms": round((time.monotonic() - start) * 1000, 1),
-                        "tool": _header(scope, b"mcp-name"),
+                        # 请求体优先；Mcp-Name 头留作兜底，有客户端会设它。
+                        "tool": sniffer.tool or _header(scope, b"mcp-name"),
                         "ua": _header(scope, b"user-agent"),
                     },
                     ensure_ascii=False,

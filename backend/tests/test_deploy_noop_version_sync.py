@@ -62,8 +62,12 @@ def sandbox(tmp_path):
     shutil.copy(DEPLOY_SH, work / "deploy.sh")
     state = work / ".deploy-state"
     state.mkdir()
+    # 每个服务都要有 marker：缺一个就等于「没有构建记录」，deploy.sh 会判首次
+    # 构建并去调 docker，no-op 路径就走不成了。加服务时忘了这一行，症状是这个
+    # 测试红在 docker 上，而不是红在它想守的东西上。
     (state / "last-frontend-build").write_text(base + "\n", encoding="utf-8")
     (state / "last-backend-restart").write_text(base + "\n", encoding="utf-8")
+    (state / "last-mcp-build").write_text(base + "\n", encoding="utf-8")
     (work / "backend" / ".deploy-version.json").write_text(
         json.dumps(
             {

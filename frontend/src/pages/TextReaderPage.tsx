@@ -674,23 +674,56 @@ export default function TextReaderPage() {
     : null;
 
   // URN deep-link: ?anchor=p0001a09 → scroll to that CBETA line + brief flash.
+  //
+  // Keeps trying for a second instead of looking once. `lineAnchors` being
+  // non-empty means the *data* arrived, not that React has painted the spans
+  // that carry it — a single requestAnimationFrame lands in the gap, finds
+  // nothing, and returns. That is what it did in production: the target line
+  // was in the DOM (verified: 640 anchors rendered, the wanted one 2,940px
+  // down) and scrollIntoView on it worked when called by hand, but the page
+  // sat at the top of the juan. Every URN, verify_quote hit and commentary
+  // link that carried an anchor silently dropped the reader at the top.
   useEffect(() => {
     const anchorParam = searchParams.get("anchor");
     if (!anchorParam || !lineAnchors.length) return;
     const ref = anchorParam.replace(/^p/, "");
-    const raf = requestAnimationFrame(() => {
+    let raf = 0;
+    let flash: ReturnType<typeof setTimeout> | undefined;
+    let cancelled = false;
+    let tries = 0;
+
+    const attempt = () => {
+      if (cancelled) return;
       const el = readerContentRef.current?.querySelector<HTMLElement>(
         `.cbeta-line[data-ref="${CSS.escape(ref)}"]`,
       );
-      if (!el) return;
-      el.scrollIntoView({ block: "center", behavior: "smooth" });
+      if (!el) {
+        // ~1s at 60fps. Give up quietly after that: the anchor may belong to
+        // another juan, and nudging the reader somewhere arbitrary is worse
+        // than leaving it where the reader put it.
+        if (tries++ < 60) raf = requestAnimationFrame(attempt);
+        return;
+      }
+      // Instant, not smooth. Measured on prod: a smooth scrollIntoView to this
+      // line left .reader-container at scrollTop 0 even six seconds later,
+      // while the same call without `behavior` landed it at 23,315 — a juan is
+      // tens of thousands of pixels tall and the smooth path never completes
+      // over that distance in this container. Instant is also what a deep link
+      // wants: arrive at the line, don't animate past everything before it.
+      el.scrollIntoView({ block: "center" });
       const p = el.closest("p");
       if (p) {
         p.classList.add("cbeta-line-flash");
-        setTimeout(() => p.classList.remove("cbeta-line-flash"), 2200);
+        flash = setTimeout(() => p.classList.remove("cbeta-line-flash"), 2200);
       }
-    });
-    return () => cancelAnimationFrame(raf);
+    };
+
+    raf = requestAnimationFrame(attempt);
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
+      if (flash) clearTimeout(flash);
+    };
   }, [searchParams, lineAnchors, juanNum]);
 
   // 播到哪，高亮到哪。复用 URN 深链已有的 .cbeta-line 定位机制 ——

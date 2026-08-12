@@ -120,14 +120,14 @@ def test_build_url_text_level_goes_to_detail_page() -> None:
 def test_build_url_juan_level_goes_to_reader() -> None:
     assert (
         build_reader_url(_p("cbeta", "T0001", juan=3), text_id=42)
-        == "/reader?text=42&juan=3"
+        == "/texts/42/read?juan=3"
     )
 
 
 def test_build_url_with_anchor_appends_anchor_param() -> None:
     assert (
         build_reader_url(_p("cbeta", "T0001", juan=3, anchor="p0001a01"), text_id=42)
-        == "/reader?text=42&juan=3&anchor=p0001a01"
+        == "/texts/42/read?juan=3&anchor=p0001a01"
     )
 
 

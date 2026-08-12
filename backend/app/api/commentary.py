@@ -21,29 +21,90 @@ _NO_DATA = (
 )
 
 
-async def _reader_urls(db: AsyncSession, work_ids: list[str]) -> dict[str, tuple]:
-    """CBETA 书号 → (urn, 绝对阅读链接)。一次查库，查不到的留空。
-
-    注疏多半收在卍续藏、藏外等丛书里，未必都在 fojin 的语料内——查不到就
-    老实留 None，不要拼一个点不开的链接。
+# 行标 → 卷号。不要求精确命中，取同一页上最靠近的那条索引行。
+#
+# 为什么不精确匹配：2026-08-12 拿本包 4,230 条注疏锚点对生产索引量过一次，
+# 精确命中只有 6.6%，而且是双峰的——大正藏那几部 99%，卍續藏几乎全 0%。
+# 原因是 text_line_anchors 里 X 部的 <lb> 混着两个版本存（同一卷里 0448–0455
+# 与 0523–0537 两套页码按字符位置交错），行的切法和对齐时用的那份不是同一套。
+# 只认精确匹配的话，这个功能对 93% 的注疏等于没做。
+#
+# 限定同页，是为了不跨版本乱跳：一行的卷次必定等于同页另一行的卷次，而隔了
+# 几十页的「最近邻」很可能是另一个版本的页码，那种猜法会把人送到错的卷。
+# 同页找不到就退回书级——宁可少给，不给错的。
+_JUAN_OF_LINE = sql_text(
     """
-    want = {w: svc.to_cbeta_id(w) for w in work_ids}
+    SELECT DISTINCT ON (w.tid, w.ref)
+           w.tid, w.ref, a.juan_num, a.line_ref
+      FROM unnest(CAST(:tids AS int[]), CAST(:refs AS text[])) AS w(tid, ref)
+      JOIN text_line_anchors a
+        ON a.text_id = w.tid
+       AND left(a.line_ref, 4) = left(w.ref, 4)
+     ORDER BY w.tid, w.ref,
+              (a.line_ref > w.ref),                                   -- 先取不越过目标的
+              CASE WHEN a.line_ref <= w.ref THEN a.line_ref END DESC,  -- 其中最靠后的
+              a.line_ref ASC                                           -- 都在目标之后就取最早的
+    """
+)
+
+
+async def _locate(
+    db: AsyncSession, targets: list[tuple[str, str | None]]
+) -> dict[tuple[str, str | None], tuple[str | None, str | None]]:
+    """(CBETA 书号, 行标) → (urn, 绝对阅读链接)，能落到行就落到行。
+
+    两次查库，与结果条数无关：先把书号换成 text_id，再一次把所有行标换成卷号。
+
+    退化是分层的，每层都比上一层保守：同页找不到索引行就只给卷级，书不在语料
+    里就连链接都不给。注疏多半收在卍续藏、藏外等丛书里，未必都在 fojin 的语料
+    内——查不到就老实留 None，不要拼一个点不开的链接。
+    """
+    if not targets:
+        return {}
+
+    want = {w: svc.to_cbeta_id(w) for w, _ in targets}
     ids = [c for c in want.values() if c]
     if not ids:
-        return {}
+        return {t: (None, None) for t in targets}
+
     rows = (
         await db.execute(
             sql_text("SELECT cbeta_id, id FROM buddhist_texts WHERE cbeta_id = ANY(:ids)"),
             {"ids": ids},
         )
     ).fetchall()
-    by_cbeta = {r[0]: r[1] for r in rows}
-    out = {}
-    for w, c in want.items():
-        tid = by_cbeta.get(c)
-        out[w] = (
-            build_urn(c) if c else None,
-            absolute_reader_url(reader_path(tid)) if tid else None,
+    text_ids = {r[0]: r[1] for r in rows}
+
+    # 行标 → (卷号, 该卷里最靠近的索引行)，一次问完。
+    pairs = {
+        (text_ids[want[w]], ref)
+        for w, anchor in targets
+        if want.get(w) in text_ids and (ref := svc.line_ref(anchor))
+    }
+    located: dict[tuple[int, str], tuple[int, str]] = {}
+    if pairs:
+        tids, refs = zip(*sorted(pairs), strict=True)
+        for tid, ref, juan, near in await db.execute(
+            _JUAN_OF_LINE, {"tids": list(tids), "refs": list(refs)}
+        ):
+            located[(tid, ref)] = (juan, near)
+
+    out: dict[tuple[str, str | None], tuple[str | None, str | None]] = {}
+    for work, anchor in targets:
+        cbeta = want.get(work)
+        if not cbeta:
+            out[(work, anchor)] = (None, None)
+            continue
+        tid = text_ids.get(cbeta)
+        ref = svc.line_ref(anchor)
+        juan, near = located.get((tid, ref), (None, None)) if tid and ref else (None, None)
+        # 滚动落点用索引里真有的那一行，不用 anchor 本身——指一行页面上不存在
+        # 的行，阅读器什么也不会做，看起来就像链接坏了。
+        # URN 里的锚点则跟规范走，带 p。
+        at = f"p{near}" if near else None
+        out[(work, anchor)] = (
+            build_urn(cbeta, juan, at),
+            absolute_reader_url(reader_path(tid, juan, at)) if tid else None,
         )
     return out
 
@@ -79,16 +140,20 @@ async def passage(
         if not line:
             continue
         span, hits, total = pkg.passage(line, limit)
-        urls = await _reader_urls(db, [h["work"] for h in hits])
-        base_cbeta = svc.to_cbeta_id(pkg.meta["base_work"])
-        base_urls = await _reader_urls(db, [pkg.meta["base_work"]])
+        base_work = pkg.meta["base_work"]
+        # 经文侧锚到这一段的第一行——读者点过去，落在他问的那句上。
+        base_key = (base_work, span[0] if span else None)
+        located = await _locate(
+            db, [(h["work"], h["anchor"]) for h in hits] + [base_key]
+        )
+        base_urn, base_url = located.get(base_key, (None, None))
         return PassageCommentaries(
             query=q,
             matched=True,
-            base_work=pkg.meta["base_work"],
+            base_work=base_work,
             base_title=pkg.meta.get("base_title"),
-            base_urn=build_urn(base_cbeta) if base_cbeta else None,
-            base_reader_url=base_urls.get(pkg.meta["base_work"], (None, None))[1],
+            base_urn=base_urn,
+            base_reader_url=base_url,
             passage="".join(pkg.text.get(x, "") for x in span),
             line_from=span[0] if span else None,
             line_to=span[-1] if span else None,
@@ -102,8 +167,8 @@ async def passage(
                     base_line=h["base_line"],
                     score=h["score"],
                     same_as=(pkg.comms.get(h["work"], {}) or {}).get("same_as"),
-                    urn=urls.get(h["work"], (None, None))[0],
-                    reader_url=urls.get(h["work"], (None, None))[1],
+                    urn=located.get((h["work"], h["anchor"]), (None, None))[0],
+                    reader_url=located.get((h["work"], h["anchor"]), (None, None))[1],
                 )
                 for h in hits
             ],
@@ -115,7 +180,10 @@ async def passage(
                 f"本段共 {total} 家注，已全部返回。",
                 "覆盖不完整：一部注疏实际所注，约一半没有被对齐出来——列出的注家"
                 "不等于全部注过这句的人。",
-                "注文截到该注疏的下一处牒文为止，最多 4 行；要读全文请循 anchor 回原书。",
+                "注文截到该注疏的下一处牒文为止，最多 4 行；要读全文请点 reader_url，"
+                "它落在这条注所在的那一卷、同页最近的一行上（卍续藏诸书的行号"
+                "索引与对齐所用的不是同一套，落点可能差一两行）。要引用请用 anchor，"
+                "那是这条注真正的出处。",
                 "原文出自 CBETA（CC BY-NC-SA 4.0，非营利使用）。",
             ],
         )
