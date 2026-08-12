@@ -91,3 +91,10 @@
 唵	an1	seed	oṃ，咒語起首字；pypinyin 作 an3
 吽	hong1	seed	hūṃ；pypinyin 作 hou1
 悉曇	xi1 tan2	seed	siddhaṃ
+# ── 由合成音实听发现：pypinyin 读对、但 TTS 模型读错 ────────────
+# ⚠️ 结构性教训：入不入词典**不能**以 pypinyin 对错为准 —— 模型有自己的 G2P。
+#    佛教术语一律收，全部发给 TTS。
+行深般若波羅蜜多	xing2 shen1 bo1 re3 bo1 luo2 mi4 duo1	seed	⚠️ 整体入词典是为提示模型当作一个词连读，不只是纠音
+觀自在菩薩	guan1 zi4 zai4 pu2 sa4	seed
+罣礙	gua4 ai4	seed	⚠️ MiniMax 读成 gao4 ai4；pypinyin 本身是对的
+顛倒	dian1 dao3	seed	pypinyin 作 dian1 dao4
