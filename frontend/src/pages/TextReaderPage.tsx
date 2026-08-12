@@ -692,7 +692,13 @@ export default function TextReaderPage() {
         if (tries++ < 60) raf = requestAnimationFrame(attempt);
         return;
       }
-      el.scrollIntoView({ block: "center", behavior: "smooth" });
+      // Instant, not smooth. Measured on prod: a smooth scrollIntoView to this
+      // line left .reader-container at scrollTop 0 even six seconds later,
+      // while the same call without `behavior` landed it at 23,315 — a juan is
+      // tens of thousands of pixels tall and the smooth path never completes
+      // over that distance in this container. Instant is also what a deep link
+      // wants: arrive at the line, don't animate past everything before it.
+      el.scrollIntoView({ block: "center" });
       const p = el.closest("p");
       if (p) {
         p.classList.add("cbeta-line-flash");
