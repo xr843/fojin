@@ -769,7 +769,18 @@ export default function TextReaderPage() {
     clear();
     const line = el.closest("p") ?? el;
     line.classList.add("cbeta-line-playing");
-    line.scrollIntoView({ block: "center", behavior: "smooth" });
+
+    // 只在该行滚出视野时才滚 —— 逐句跟随时每句都重新居中会晃得难受。
+    //
+    // ⚠️ 瞬时，不要 behavior:"smooth"。#1173 在生产上实测过：平滑
+    // scrollIntoView 到某一行，六秒后 .reader-container 的 scrollTop 仍是 0，
+    // 而去掉 behavior 的同一调用落到了 23,315 —— 一卷有几万像素高，
+    // 平滑路径在这个容器里根本走不完。
+    const box = line.getBoundingClientRect();
+    const view = root.getBoundingClientRect();
+    if (box.top < view.top || box.bottom > view.bottom) {
+      line.scrollIntoView({ block: "center" });
+    }
   }, [
     audioPlayer.cueIndex,
     audioPlayer.track,
