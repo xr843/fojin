@@ -71,3 +71,4 @@ data/
 
 # Local research notes — internal strategy snapshots, not for publication
 docs/research/
+backend/out/
