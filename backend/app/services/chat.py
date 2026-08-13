@@ -268,6 +268,22 @@ async def _save_messages(
     return assistant_msg.id
 
 
+def _thinking_params_for_request(
+    model: str, *, message: str, master_id: str | None, text_id: int | None,
+) -> dict:
+    """按请求形态选思考档：meta 问题直接关，其余走配置档。
+
+    meta 问题（你是谁 / 你好 / hello …，判定与 _prepare_chat 的跳过 RAG 分支
+    完全同一条）不检索、META_INTRO_PROMPT 明令禁止引用 —— 没有任何引文保真度
+    可损失，而上游默认档会为一句自我介绍跑几十秒推理。生产会话列表里这类
+    问题占比可观（游客首次试探几乎都是它），关掉思考等于把这批请求从
+    30-180s 拉回几秒，且质量无从受损。
+    """
+    if _is_meta_question(message) and not master_id and not text_id:
+        return thinking_params(model, "off")
+    return configured_thinking_params(model)
+
+
 async def _generate_session_title(
     api_url: str, api_key: str, model: str, message: str, answer: str,
     *, provider: str | None = None,
@@ -576,7 +592,7 @@ async def send_message(
                 headers={"Authorization": f"Bearer {k}"},
                 json={"model": m, "messages": llm_messages, "temperature": 0.7,
                       "max_tokens": _with_reasoning_headroom(m, 8000 if page_content else 2000),
-                      **configured_thinking_params(m)},
+                      **_thinking_params_for_request(m, message=message, master_id=master_id, text_id=text_id)},
             )
             resp.raise_for_status()
             return resp.json()["choices"][0]["message"]["content"]
@@ -985,7 +1001,7 @@ async def send_message_stream(
                 headers={"Authorization": f"Bearer {k}"},
                 json={"model": m, "messages": llm_messages, "temperature": 0.7,
                       "max_tokens": _with_reasoning_headroom(m, 8000 if page_content else 2000), "stream": True,
-                      **configured_thinking_params(m)},
+                      **_thinking_params_for_request(m, message=message, master_id=master_id, text_id=text_id)},
             ) as resp:
                 resp.raise_for_status()
                 async for line in resp.aiter_lines():

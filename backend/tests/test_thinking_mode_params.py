@@ -157,7 +157,7 @@ def _prepare_chat_return():
     )
 
 
-async def _run_stream_capturing_body(effort: str) -> dict:
+async def _run_stream_capturing_body(effort: str, message: str = "測試") -> dict:
     captured: dict = {}
     with patch("app.services.chat._prepare_chat", new_callable=AsyncMock,
                return_value=_prepare_chat_return()), \
@@ -168,7 +168,7 @@ async def _run_stream_capturing_body(effort: str) -> dict:
         from app.services.chat import send_message_stream
 
         async for _ in send_message_stream(
-            user_id=1, message="測試", sessionmaker=_FakeSessionmaker(),
+            user_id=1, message=message, sessionmaker=_FakeSessionmaker(),
         ):
             pass
     return captured
@@ -189,3 +189,35 @@ class TestAnswerPathHonoursSetting:
         body = await _run_stream_capturing_body("low")
         assert body.get("thinking") == {"type": "enabled"}
         assert body.get("reasoning_effort") == "low"
+
+
+class TestMetaQuestionDisablesThinking:
+    """meta 问题（你是谁/你好，不走 RAG、禁止引用）一律关思考。
+
+    这批请求没有任何引文保真度可损失（META_INTRO_PROMPT 明令不引经文），
+    而上游默认档会为一句自我介绍跑几十秒推理 —— 生产会话列表里游客首次
+    试探几乎全是这类问题。判定必须与 _prepare_chat 跳过 RAG 的分支同一条
+    （_is_meta_question + 无 master + 无 text_id），不能各写一份。
+    """
+
+    @pytest.mark.asyncio
+    async def test_meta_question_gets_thinking_disabled(self):
+        body = await _run_stream_capturing_body("", message="你是谁")
+        assert body.get("thinking") == {"type": "disabled"}, (
+            f"meta 问题仍在跑默认档推理，请求体={json.dumps(body, ensure_ascii=False)[:200]}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_configured_effort_does_not_override_meta_off(self):
+        """就算配置了档位，meta 问题也保持关闭 —— off 比 low 更快且同样无损。
+
+        注意「你好 / hello」**不是** meta 问题（不在 _META_KEYWORDS 里，走完整
+        RAG 路径）—— 要不要把问候也归进来是改答案行为的另一个决定，不在这里做。
+        """
+        body = await _run_stream_capturing_body("low", message="介绍你自己")
+        assert body.get("thinking") == {"type": "disabled"}
+
+    @pytest.mark.asyncio
+    async def test_normal_question_is_unaffected(self):
+        body = await _run_stream_capturing_body("", message="「般若」和智慧有什么不同？")
+        assert "thinking" not in body and "reasoning_effort" not in body
