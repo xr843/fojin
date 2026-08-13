@@ -44,6 +44,15 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_model: str = "gpt-4o-mini"
 
+    # 思考档位（只对 DeepSeek V4 生效，见 llm_client.thinking_params）。
+    # 空 = 不下发任何字段 = 上游默认（官方默认 high），与配置它之前的线上行为
+    # 逐字节相同。可选 off / low / high / max。
+    # ⚠️ 改这个值等于改答案：换默认档前必须跑 `python -m eval.run_eval
+    # --temperature 0` 比引用准确性与逐字保真度，见 answer-fidelity-is-the-bar。
+    # 它存在的直接原因是这个开关此前根本不存在 —— 2026-08-13 实测，默认档下同一
+    # 个问题的首个正文字在 77-188 秒之间，而 low 档 16-29 秒、关闭 1 秒。
+    chat_reasoning_effort: str = ""
+
     # LLM fallback — platform secondary model used when the primary provider
     # fails before any tokens have been streamed. Leave empty to disable.
     llm_fallback_api_url: str = ""

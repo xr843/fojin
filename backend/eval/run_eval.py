@@ -31,6 +31,7 @@ from app.config import settings
 from app.database import async_session
 from app.services.chat import _build_llm_messages
 from app.services.citation_guard import _norm_title
+from app.services.llm_client import _with_reasoning_headroom, configured_thinking_params
 from app.services.quote_verifier import iter_quote_citations
 from app.services.rag_retrieval import retrieve_rag_context
 from eval.faithfulness import (
@@ -55,6 +56,33 @@ logger = logging.getLogger(__name__)
 EVAL_DIR = Path(__file__).parent
 TEST_SET_PATH = EVAL_DIR / "test_set.json"
 REPORTS_DIR = EVAL_DIR / "reports"
+
+# 重推理模型（deepseek-v4*）单题实测总耗时 91.9s / 197.8s，60 秒会让整份报告
+# 变成 90 条 [ERROR]。300 秒留足余量，反正 eval 是离线跑的，慢不要紧、错才要紧。
+EVAL_LLM_TIMEOUT_S = 300
+
+# eval 的答案预算与生产同口径（生产是 2000，reader 模式 8000）。
+_EVAL_ANSWER_TOKENS = 2000
+
+
+def build_eval_llm_body(model: str, messages: list[dict], temperature: float) -> dict:
+    """eval 调用 LLM 的请求体 —— 独立成函数是为了能被单测钉住。
+
+    2026-08-13 在生产机上照抄改动前的参数实跑（真实提示词、deepseek-v4-pro）：
+    ``timeout=60, max_tokens=2000`` → 30.2 秒后拿到 **正文 0 字**、推理 2,686 字、
+    ``finish=length``。推理与可见答案共用同一个 max_tokens，2000 全被推理吃掉，
+    与 #1095 修的生产故障同源，只是这次躲在 eval 里 —— 而 eval 不会报错，它会
+    安静地产出一份「90 道题全空」的报告，然后我们拿它去比较档位。
+    """
+    return {
+        "model": model,
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": _with_reasoning_headroom(model, _EVAL_ANSWER_TOKENS),
+        # 让 eval 能按 CHAT_REASONING_EFFORT 跑不同档位，否则 high / low 的
+        # 引用准确性没法对比 —— 而那正是换默认档的唯一依据。
+        **configured_thinking_params(model),
+    }
 
 
 def load_test_set() -> dict:
@@ -172,11 +200,11 @@ async def run_single_question(
 
     t1 = time.monotonic()
     try:
-        async with httpx.AsyncClient(timeout=60) as client:
+        async with httpx.AsyncClient(timeout=EVAL_LLM_TIMEOUT_S) as client:
             resp = await client.post(
                 f"{api_url}/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}"},
-                json={"model": model, "messages": llm_messages, "temperature": temperature, "max_tokens": 2000},
+                json=build_eval_llm_body(model, llm_messages, temperature),
             )
             resp.raise_for_status()
             answer = resp.json()["choices"][0]["message"]["content"]
