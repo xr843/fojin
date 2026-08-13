@@ -5,6 +5,9 @@ import { findCueIndex } from "./cues";
 import { trackAudio } from "./telemetry";
 import { AudioPlayerContext, type AudioPlayerState, type AudioTrack } from "./useAudioPlayback";
 
+/** 同一次拖动内 audio_seek 的最小间隔。见 seek() 里的说明。 */
+const SEEK_TRACK_GAP_MS = 2000;
+
 /**
  * 读诵播放器。挂在 Layout 层，持有全站唯一的 <audio>。
  *
@@ -20,6 +23,7 @@ export default function AudioPlayerProvider({ children }: { children: ReactNode 
   // 已记过 audio_play 的曲目键。暂停后续播会再次触发 play 事件，
   // 不去重的话「有多少人开始听」会被续播灌水。
   const playedRef = useRef<string | null>(null);
+  const lastSeekTrackedRef = useRef(0);
   const [track, setTrack] = useState<AudioTrack | null>(null);
   const [playing, setPlaying] = useState(false);
   const [cueIndex, setCueIndex] = useState(-1);
@@ -64,7 +68,15 @@ export default function AudioPlayerProvider({ children }: { children: ReactNode 
     (ms: number) => {
       const el = audioRef.current;
       if (el) el.currentTime = ms / 1000;
-      if (track) trackAudio("audio_seek", track.textId, track.juanNum);
+      if (!track) return;
+      // ⚠️ antd Slider 的 onChange 在拖动过程中连发 —— 生产实测一次
+      //    mousedown→mousemove→mouseup 就发了 2 条，真人横拖整条进度条会发
+      //    几十条。不节流的话 audio_seek 会把 open/play/complete 全淹没，
+      //    Umami 面板上看起来像"用户主要在拖进度条"。
+      const now = Date.now();
+      if (now - lastSeekTrackedRef.current < SEEK_TRACK_GAP_MS) return;
+      lastSeekTrackedRef.current = now;
+      trackAudio("audio_seek", track.textId, track.juanNum);
     },
     [track],
   );
