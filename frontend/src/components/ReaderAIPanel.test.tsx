@@ -95,7 +95,8 @@ describe("ReaderAIPanel", () => {
     await ask(container);
     cb!.onReasoning?.({ chars: 9, text: "先定位這一卷的科判，" });
     cb!.onReasoning?.({ chars: 18, text: "再看窺基怎麼說。" });
-    await screen.findByText(/先定位這一卷的科判，再看窺基怎麼說。/);
+    // 打字机逐字吐出（约 33ms/字，18 字 ≈ 0.6s），放宽默认 1s 超时
+    await screen.findByText(/先定位這一卷的科判，再看窺基怎麼說。/, undefined, { timeout: 3000 });
     expect(container.querySelector(".chat-reasoning-excerpt")).not.toBeNull();
 
     cb!.onToken("此卷明五識身相應地。");

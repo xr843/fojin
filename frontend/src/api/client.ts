@@ -1815,7 +1815,8 @@ export interface ChatRetrieval {
   titles: string[];
 }
 
-/** 推理模型思考阶段的进度帧（后端按约 1 次/秒节流聚合）。
+/** 推理模型思考阶段的进度帧（后端按约 4 帧/秒节流聚合，见
+ *  REASONING_EMIT_INTERVAL_S；前端 ReasoningExcerpt 打字机再平滑成逐字流）。
  *
  *  `text` 是这一帧聚合的推理文本片段（后端单帧封顶、保尾弃头）。
  *  2026-08-13 决定发文本（推翻本文件更早「只发字数」的注释）：削推理档位换

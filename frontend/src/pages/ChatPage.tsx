@@ -47,6 +47,7 @@ import {
   RailSettingsIcon,
 } from "../components/RailIcons";
 import DraggableModal from "../components/DraggableModal";
+import ReasoningExcerpt from "../components/ReasoningExcerpt";
 import { getMasters } from "../api/client";
 import type { CitationTarget } from "../components/CitationDrawer";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -466,20 +467,10 @@ function MessageBubbleInner({
                   </span>
                   <span className="chat-thinking-dots"><span /><span /><span /></span>
                 </div>
-                {/* 思考过程片段活窗。只在哨兵分支里渲染 —— 正文一到（content 被
-                    换掉）整块随分支消失，这是渲染层的保险；onToken 另清
-                    reasoningText，两道各自独立。aria-hidden：读屏用户听
-                    「已思考 N 秒」就够了，逐秒变动的中间结论只会淹没读屏。 */}
-                {m.reasoningText ? (
-                  <div className="chat-reasoning-excerpt" aria-hidden="true">
-                    <span className="chat-reasoning-excerpt-label">
-                      {t("chat.reasoning_excerpt_label")}
-                    </span>
-                    <div className="chat-reasoning-excerpt-clip">
-                      <div className="chat-reasoning-excerpt-text">{m.reasoningText}</div>
-                    </div>
-                  </div>
-                ) : null}
+                {/* 思考过程片段活窗（打字机组件）。只在哨兵分支里渲染 —— 正文
+                    一到（content 被换掉）整块随分支消失，这是渲染层的保险；
+                    onToken 另清 reasoningText，两道各自独立。 */}
+                {m.reasoningText ? <ReasoningExcerpt text={m.reasoningText} /> : null}
               </>
             ) : m.content === REQUEST_FAILED_SENTINEL ? (
               t("chat.request_failed")
@@ -1333,9 +1324,10 @@ export default function ChatPage() {
             const next = { ...m };
             if (next.reasoningSince == null) next.reasoningSince = Date.now();
             if (r.text) {
-              // 保尾截断：显示的是「正在想什么」的活窗，不是完整思考记录。
-              // 截尾同时消解跨 fallback 拼接 —— 旧模型的推理很快滚出窗口。
-              next.reasoningText = ((next.reasoningText ?? "") + r.text).slice(-1200);
+              // 全量累加、不截尾：打字机组件按前缀吐字，截尾会让前缀失配、
+              // 整窗重排跳动。上限由推理预算天然封顶（≤ 数万字，流结束即清），
+              // 显示端的活窗高度由 CSS clip 管。
+              next.reasoningText = (next.reasoningText ?? "") + r.text;
             }
             return next;
           }),

@@ -106,8 +106,11 @@ logger = logging.getLogger(__name__)
 LLM_STREAM_HEARTBEAT_INTERVAL_S = 25.0
 
 # 推理进度事件的最小间隔。推理模型可产出数千 token 的 reasoning_content，逐块
-# 转发等于把 SSE 流量放大数倍；按秒聚合后一帧带一段文本，量级与正文相当。
-REASONING_EMIT_INTERVAL_S = 1.0
+# 转发等于把 SSE 流量放大数倍；聚合后一帧带一段文本，量级与正文相当。
+# 0.25s（原 1.0s）：前端打字机以帧为节拍吐字，1 秒一帧的输入让追赶步进忽快
+# 忽慢；0.25s 一帧约 10-20 字，吐字近匀速。帧头开销 ~70 B × 4 帧/秒，三分钟
+# 的重推理也只多 ~50 KB，相对正文可忽略。
+REASONING_EMIT_INTERVAL_S = 0.25
 
 # 单个 reasoning 帧携带文本的上限，超出时**保尾弃头**。上游可能在一次网络读里
 # 灌进上千字（重推理模型的常态），不封顶等于把单帧放大几十倍；而显示端要的是
