@@ -12,6 +12,7 @@ import {
   ApartmentOutlined,
   DatabaseOutlined,
   BookOutlined,
+  SoundOutlined,
   FileTextOutlined,
   MenuOutlined,
   DashboardOutlined,
@@ -99,6 +100,11 @@ export default function Layout() {
     { icon: <ApartmentOutlined />, label: t("nav.kg"), path: "/kg" },
     { icon: <GlobalOutlined />, label: t("nav.geo"), path: "/map" },
     { icon: <BookOutlined />, label: t("nav.collections"), path: "/collections" },
+    // 在线读诵(/read-aloud)。**刻意放进导航，也刻意可随时撤下** ——
+    // 此前它只有阅读页工具栏一个入口，触达接近零；不给曝光，三个月后
+    // 收到的数据只会证明"没人找得到"，而那件事我们已经知道了。
+    // 若三个月后播放数仍 <50/月，先撤这一行，再决定后续。
+    { icon: <SoundOutlined />, label: t("nav.readaloud"), path: "/read-aloud" },
     // 开放数据(/exports)暂不对外公开：后端路由由 ENABLE_OPEN_DATA_EXPORTS 控制，
     // 默认关闭（未鉴权、无限流，单次 kg.json 达 50MB/60s）。前端入口与路由一并撤下，
     // 重新放出时需同时打开后端开关并恢复 App.tsx 里的 /exports 路由。

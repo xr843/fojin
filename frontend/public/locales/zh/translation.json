@@ -1547,5 +1547,14 @@
   "xiaojin.menu_quit": "退出小津",
   "xiaojin.speaking_as": "正以 {{name}} 的口吻作答",
   "xiaojin.recall": "唤回小津",
-  "admin_dashboard.trends.series.anonymous_messages": "游客消息数"
+  "admin_dashboard.trends.series.anonymous_messages": "游客消息数",
+  "nav.readaloud": "读诵",
+  "readaloud.title": "在线读诵",
+  "readaloud.subtitle": "边看经文边听，逐句高亮跟随，可锁屏收听。",
+  "readaloud.seo_title": "在线读诵 — 佛经音频逐句跟随 | 佛津 FoJin",
+  "readaloud.seo_desc": "在线收听佛经，音频与经文逐句对齐、读到哪高亮到哪，手机可锁屏收听。目前为 AI 语音合成，非真人录音。",
+  "readaloud.synthetic_notice": "以下音频均由 AI 语音合成（MiniMax Speech），非法师真人读诵。经文文本依 CBETA 电子佛典。",
+  "readaloud.empty": "暂无可收听的经典",
+  "readaloud.juan_count": "{{n}} 卷",
+  "readaloud.juan": "第 {{n}} 卷"
 }

@@ -17,8 +17,9 @@ import {
   HomeOutlined,
   BookOutlined,
   ExportOutlined,
+  SoundOutlined,
 } from "@ant-design/icons";
-import { getTextDetail } from "../api/client";
+import { getTextDetail, getAvailableAudio } from "../api/client";
 import { useTranslation } from "react-i18next";
 import { buildCbetaReadUrl } from "../utils/sourceUrls";
 import { getLastPosition } from "../utils/readingHistory";
@@ -45,6 +46,16 @@ export default function TextDetailPage() {
     queryFn: () => getTextDetail(Number(id)),
     enabled: !!id,
   });
+
+  // 与 /read-aloud 索引页共用同一份缓存（目录很小，第一期只有一部经），
+  // 所以这里不是额外一次请求。详情页访客比阅读页还多（90 天 1,355 vs 1,132），
+  // 有音频却不在这里露出，等于白丢两成触达。
+  const { data: audioCatalog } = useQuery({
+    queryKey: ["audioCatalog"],
+    queryFn: getAvailableAudio,
+    staleTime: 5 * 60 * 1000,
+  });
+  const audioItem = audioCatalog?.items.find((it) => it.text_id === Number(id));
 
   useEffect(() => {
     if (text && id) {
@@ -218,6 +229,16 @@ export default function TextDetailPage() {
               style={{ background: "var(--fj-accent)", borderColor: "var(--fj-accent)", color: "var(--fj-on-accent)" }}
             >
               {t("textDetail.readOnCbeta")}
+            </Button>
+          )}
+          {audioItem && (
+            <Button
+              icon={<SoundOutlined />}
+              onClick={() =>
+                navigate(`/texts/${text.id}/read?juan=${audioItem.juans[0]?.juan_num ?? 1}`)
+              }
+            >
+              {t("reader.audio.button")}
             </Button>
           )}
           <BookmarkButton textId={text.id} />

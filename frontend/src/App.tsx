@@ -33,6 +33,7 @@ const DictionaryPage = lazy(() => import("./pages/DictionaryPage"));
 const SutraLandingPage = lazy(() => import("./pages/SutraLandingPage"));
 const WorkDetailPage = lazy(() => import("./pages/WorkDetailPage"));
 const CollectionsPage = lazy(() => import("./pages/CollectionsPage"));
+const ReadAloudPage = lazy(() => import("./pages/ReadAloudPage"));
 const CrossCanonPage = lazy(() => import("./pages/CrossCanonPage"));
 const TopicsPage = lazy(() => import("./pages/TopicsPage"));
 const AdminDashboardPage = lazy(() => import("./pages/AdminDashboardPage"));
@@ -71,6 +72,7 @@ function App() {
             <Route path="/texts/:id" element={<TextDetailPage />} />
             <Route path="/texts/:id/read" element={<TextReaderPage />} />
             <Route path="/sources" element={<SourcesPage />} />
+            <Route path="/read-aloud" element={<ReadAloudPage />} />
             <Route path="/collections" element={<CollectionsPage />} />
             <Route path="/collections/:collectionId" element={<CollectionsPage />} />
             <Route path="/cross-canon" element={<CrossCanonPage />} />

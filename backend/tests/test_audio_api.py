@@ -72,6 +72,51 @@ async def test_endpoint_404_when_no_audio(client) -> None:
         texts_api.get_juan_audio = original
 
 
+async def test_catalog_endpoint_returns_grouped_items(client) -> None:
+    """索引页与经典详情页共用这一个端点，形状必须稳定。"""
+    from app.api import audio as audio_api
+
+    original = audio_api.list_available_audio
+    audio_api.list_available_audio = AsyncMock(
+        return_value=[
+            {
+                "text_id": 9,
+                "title_zh": "般若波羅蜜多心經",
+                "translator": "玄奘",
+                "dynasty": "唐",
+                "taisho_id": "T0251",
+                "engine": "minimax",
+                "juan_count": 1,
+                "total_duration_ms": 101_363,
+                "juans": [{"juan_num": 1, "duration_ms": 101_363, "url": "/audio/9/1-7891dd17.mp3"}],
+            }
+        ]
+    )
+    try:
+        resp = await client.get("/api/audio/available")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["total"] == 1
+        assert body["items"][0]["title_zh"] == "般若波羅蜜多心經"
+        assert body["items"][0]["juans"][0]["url"] == "/audio/9/1-7891dd17.mp3"
+    finally:
+        audio_api.list_available_audio = original
+
+
+async def test_catalog_endpoint_is_empty_not_404_when_nothing_available(client) -> None:
+    """空目录回 200 + 空数组。404 会让索引页显示成「页面不存在」。"""
+    from app.api import audio as audio_api
+
+    original = audio_api.list_available_audio
+    audio_api.list_available_audio = AsyncMock(return_value=[])
+    try:
+        resp = await client.get("/api/audio/available")
+        assert resp.status_code == 200
+        assert resp.json() == {"total": 0, "items": []}
+    finally:
+        audio_api.list_available_audio = original
+
+
 async def test_endpoint_returns_payload_when_audio_exists(client) -> None:
     """有音频时回 200，且 text_id/juan_num 由路径参数带回。"""
     from app.api import texts as texts_api
