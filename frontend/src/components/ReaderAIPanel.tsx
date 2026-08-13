@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { isNearBottom } from "../utils/scrollBottom";
+import ReasoningExcerpt from "./ReasoningExcerpt";
 import { Input, Button, message, Spin, Tooltip } from "antd";
 import {
   SendOutlined,
@@ -144,16 +145,9 @@ function ReaderThinking({ m, t }: { m: ChatMessageItem; t: TFunction }) {
               : t("reader.ai.thinking")}
         </span>
       </div>
-      {/* 思考片段活窗：本组件只在 content===THINKING_SENTINEL 时被挂载，
-          正文一到整个组件卸载 —— 销毁时机与 ChatPage 同一套。 */}
-      {m.reasoningText ? (
-        <div className="chat-reasoning-excerpt" aria-hidden="true">
-          <span className="chat-reasoning-excerpt-label">{t("chat.reasoning_excerpt_label")}</span>
-          <div className="chat-reasoning-excerpt-clip">
-            <div className="chat-reasoning-excerpt-text">{m.reasoningText}</div>
-          </div>
-        </div>
-      ) : null}
+      {/* 思考片段活窗（打字机组件）：本组件只在 content===THINKING_SENTINEL
+          时被挂载，正文一到整个组件卸载 —— 销毁时机与 ChatPage 同一套。 */}
+      {m.reasoningText ? <ReasoningExcerpt text={m.reasoningText} /> : null}
     </>
   );
 }
@@ -299,8 +293,9 @@ export default function ReaderAIPanel({
             const next = { ...m };
             if (!next.reasoningSince) next.reasoningSince = Date.now();
             if (r.text) {
-              // 思考片段活窗（保尾截断），与 ChatPage 同一套约束与销毁时机。
-              next.reasoningText = ((next.reasoningText ?? "") + r.text).slice(-1200);
+              // 全量累加、不截尾（打字机按前缀吐字，截尾会让前缀失配），
+              // 与 ChatPage 同一套约束与销毁时机。
+              next.reasoningText = (next.reasoningText ?? "") + r.text;
             }
             return next;
           }),

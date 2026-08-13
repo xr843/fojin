@@ -446,6 +446,15 @@ em {
   white-space: pre-wrap;
   word-break: break-word;
 }
+.chat-reasoning-caret {
+  display: inline-block;
+  margin-left: 1px;
+  opacity: 0.6;
+  animation: chat-caret-blink 1s steps(1) infinite;
+}
+@keyframes chat-caret-blink {
+  50% { opacity: 0; }
+}
 
 /* 「回到底部」悬浮按钮。锚点 sticky 在滚动视口下沿、height:0 不占布局空间；
    按钮相对锚点绝对定位向上撑出，所以不需要给滚动容器加 position:relative 的

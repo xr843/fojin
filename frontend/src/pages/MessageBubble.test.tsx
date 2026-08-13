@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, afterEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import type { Components } from "react-markdown";
 import i18n from "../i18n";
 import zhHantTranslation from "../../public/locales/zh-Hant/translation.json";
@@ -99,7 +99,7 @@ describe("MessageBubble", () => {
     expect(document.querySelector(".chat-thinking")).not.toBeNull();
   });
 
-  it("哨兵 + reasoningText → 渲染思考片段活窗（带非回答标签）", () => {
+  it("哨兵 + reasoningText → 渲染思考片段活窗（带非回答标签）", async () => {
     renderBubble({
       m: msg({
         content: "正在检索经文并生成回答...",
@@ -108,7 +108,11 @@ describe("MessageBubble", () => {
     });
     const excerpt = document.querySelector(".chat-reasoning-excerpt");
     expect(excerpt).not.toBeNull();
-    expect(excerpt!.textContent).toContain("先查《心經》的出處");
+    // 打字机逐字吐出（约 33ms/字），等它追平
+    await waitFor(
+      () => expect(excerpt!.textContent).toContain("先查《心經》的出處"),
+      { timeout: 3000 },
+    );
     // 必须带「非回答」标签 —— 中间结论不能被当成答案读
     expect(document.querySelector(".chat-reasoning-excerpt-label")).not.toBeNull();
   });

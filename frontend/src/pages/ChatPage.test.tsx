@@ -330,9 +330,13 @@ describe("ChatPage 首屏结构", () => {
     // jsdom 测不到布局，这里锁的是「跟滚被触发」这个行为本身。
     await waitFor(() => expect(scrollSpy).toHaveBeenCalled());
     scrollSpy.mockRestore();
-    // 两帧文本按序拼接显示（活窗）
-    expect(container.querySelector(".chat-reasoning-excerpt")!.textContent)
-      .toContain("先查《心經》的出處，再對比《大般若經》。");
+    // 两帧文本按序拼接、由打字机逐字吐出（约 33ms/字，20 字 ≈ 0.7s，放宽超时）
+    await waitFor(
+      () =>
+        expect(container.querySelector(".chat-reasoning-excerpt")!.textContent)
+          .toContain("先查《心經》的出處，再對比《大般若經》。"),
+      { timeout: 3000 },
+    );
     // content 仍是哨兵（等待 UI 还在）
     expect(container.querySelector(".chat-thinking")).not.toBeNull();
 
