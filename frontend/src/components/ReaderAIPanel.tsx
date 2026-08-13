@@ -124,25 +124,37 @@ function ReaderThinking({ m, t }: { m: ChatMessageItem; t: TFunction }) {
   }, [reasoningSince]);
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#8b7355", flexWrap: "wrap" }}>
-      <Spin size="small" />
-      <span>
-        {m.retrieval && (
-          <>
-            {t("chat.retrieved_hint", { n: m.retrieval.count })}
-            {m.retrieval.titles.map((title) => (
-              <span key={title} className="chat-retrieved-title">{t("chat.retrieved_title", { title })}</span>
-            ))}
-            <span className="chat-retrieved-sep">·</span>
-          </>
-        )}
-        {reasoningSince
-          ? `${t("chat.reasoning_hint")}${t("chat.thinking_seconds", { n: seconds })}`
-          : m.retrieval
-            ? t("chat.generating")
-            : t("reader.ai.thinking")}
-      </span>
-    </div>
+    <>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#8b7355", flexWrap: "wrap" }}>
+        <Spin size="small" />
+        <span>
+          {m.retrieval && (
+            <>
+              {t("chat.retrieved_hint", { n: m.retrieval.count })}
+              {m.retrieval.titles.map((title) => (
+                <span key={title} className="chat-retrieved-title">{t("chat.retrieved_title", { title })}</span>
+              ))}
+              <span className="chat-retrieved-sep">·</span>
+            </>
+          )}
+          {reasoningSince
+            ? `${t("chat.reasoning_hint")}${t("chat.thinking_seconds", { n: seconds })}`
+            : m.retrieval
+              ? t("chat.generating")
+              : t("reader.ai.thinking")}
+        </span>
+      </div>
+      {/* 思考片段活窗：本组件只在 content===THINKING_SENTINEL 时被挂载，
+          正文一到整个组件卸载 —— 销毁时机与 ChatPage 同一套。 */}
+      {m.reasoningText ? (
+        <div className="chat-reasoning-excerpt" aria-hidden="true">
+          <span className="chat-reasoning-excerpt-label">{t("chat.reasoning_excerpt_label")}</span>
+          <div className="chat-reasoning-excerpt-clip">
+            <div className="chat-reasoning-excerpt-text">{m.reasoningText}</div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
 
@@ -241,7 +253,8 @@ export default function ReaderAIPanel({
           prev.map((m) => {
             if (m.id !== assistantId) return m;
             const current = m.content === THINKING_SENTINEL ? "" : m.content;
-            return { ...m, content: current + content };
+            // 思考片段随首个 token 销毁（渲染层另有哨兵分支这道保险）。
+            return { ...m, content: current + content, reasoningText: null };
           }),
         );
         scrollToBottom();
@@ -279,14 +292,22 @@ export default function ReaderAIPanel({
           prev.map((m) => (m.id === assistantId ? { ...m, retrieval: info } : m)),
         );
       },
-      onReasoning: () => {
+      onReasoning: (r) => {
         setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId && !m.reasoningSince
-              ? { ...m, reasoningSince: Date.now() }
-              : m,
-          ),
+          prev.map((m) => {
+            if (m.id !== assistantId) return m;
+            const next = { ...m };
+            if (!next.reasoningSince) next.reasoningSince = Date.now();
+            if (r.text) {
+              // 思考片段活窗（保尾截断），与 ChatPage 同一套约束与销毁时机。
+              next.reasoningText = ((next.reasoningText ?? "") + r.text).slice(-1200);
+            }
+            return next;
+          }),
         );
+        // 与 ChatPage 同一条修补：活窗撑高气泡，不跟滚就整段等待期不可见
+        // （.reader-ai-messages 是小滚动盒，第一轮问答后必然可滚）。
+        scrollToBottom();
       },
       onSessionId: (newSessionId: number) => {
         if (!sessionId) setSessionId(newSessionId);

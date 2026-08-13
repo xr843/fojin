@@ -1815,13 +1815,21 @@ export interface ChatRetrieval {
   titles: string[];
 }
 
-/** 推理模型思考阶段的活性信号（后端按约 1 次/秒节流）。不含推理原文：那里面
- *  全是会被模型自己推翻的中间结论，摆在答案位置上是拿答案真实性冒险。
+/** 推理模型思考阶段的进度帧（后端按约 1 次/秒节流聚合）。
+ *
+ *  `text` 是这一帧聚合的推理文本片段（后端单帧封顶、保尾弃头）。
+ *  2026-08-13 决定发文本（推翻本文件更早「只发字数」的注释）：削推理档位换
+ *  速度已被 90 题 eval 证否（low 档逐字保真度 −12.9pp），等待的 30-180 秒砍
+ *  不掉，能改的只有等待的感受。原注释担心的「中间结论摆在答案位置」由三条
+ *  护栏顶住：只渲染进等待区、带「非回答」标签、首个 token 一到整块销毁 ——
+ *  **绝不写进 content**（空转兜底按哨兵身份判断，这条有承重测试）。
  *
  *  `chars` **仅作活性信号，不要当字数显示** —— 它跨 fallback 累加（主模型失败
- *  切备用模型时不重置），所以不等于「本次推理的字数」。目前无消费者。 */
+ *  切备用模型时不重置），所以不等于「本次推理的字数」。text 同理跨 fallback
+ *  相邻，但显示端是滚动活窗且随答案销毁，混排无害。 */
 export interface ChatReasoning {
   chars: number;
+  text?: string;
 }
 
 export interface ChatMessageItem {
@@ -1836,6 +1844,9 @@ export interface ChatMessageItem {
   retrieval?: ChatRetrieval | null;
   /** 首个推理信号到达的时刻（epoch ms），用于渲染「已思考 N 秒」。同样不持久化。 */
   reasoningSince?: number | null;
+  /** 等待期「思考过程片段」活窗的内容（保尾截断）。只在 content 仍是哨兵时
+   *  渲染，首个 token 一到即清空 —— 绝不持久化、绝不混进 content。 */
+  reasoningText?: string | null;
 }
 
 export interface SharedQA {
@@ -2077,7 +2088,12 @@ export function sendChatMessageStream(
               callbacks.onSources(event.sources);
               break;
             case "reasoning":
-              callbacks?.onReasoning?.({ chars: event.chars });
+              // 显式重建对象（不透传整个 event）：字段白名单在这里。text 旧后端
+              // 没有 —— 滚动部署期间保持可选。
+              callbacks?.onReasoning?.({
+                chars: event.chars,
+                text: typeof event.text === "string" ? event.text : undefined,
+              });
               break;
             case "retrieved":
               callbacks?.onRetrieved?.({

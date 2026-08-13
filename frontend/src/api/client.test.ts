@@ -264,6 +264,28 @@ describe("sendChatMessageStream", () => {
     expect(callbacks.onDone).toHaveBeenCalledTimes(1);
   });
 
+  it("reasoning 帧的 text 要透传给 onReasoning —— 等待区「思考过程片段」的原料", async () => {
+    // ⚠️ 这是全站唯一走真实 processChunk 的 reasoning 用例：页面级测试全部
+    // mock 掉 sendChatMessageStream，测不到这一层。此前这里重建对象只取
+    // chars，text 在此处被静默丢弃的话，上层测试照样全绿。
+    const { sendChatMessageStream } = await import("./client");
+    const onReasoning = vi.fn();
+    const callbacks = {
+      onToken: vi.fn(), onSources: vi.fn(), onSessionId: vi.fn(),
+      onError: vi.fn(), onDone: vi.fn(), onReasoning,
+    };
+
+    const promise = sendChatMessageStream("hello", undefined, null, callbacks);
+    const xhr = MockStreamXHR.instances[0];
+    xhr.responseText =
+      'data: {"type": "reasoning", "chars": 12, "text": "先看《心經》這一段"}\n\n' +
+      'data: {"type": "done"}\n\n';
+    xhr.onprogress?.();
+    await promise;
+
+    expect(onReasoning).toHaveBeenCalledWith({ chars: 12, text: "先看《心經》這一段" });
+  });
+
   it("流上收到 401：清身份 + 报出原因，但不硬跳登录页丢掉整段对话", async () => {
     // 承重条。这里曾经是 window.location.href = "/login" 且 return（连 onDone
     // 都不调，Promise 永不 settle —— 因为反正整页要重载）。代价是用户刚打完的

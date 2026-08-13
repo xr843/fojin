@@ -300,6 +300,55 @@ describe("ChatPage 首屏结构", () => {
     expect(container.querySelector(".chat-thinking")).not.toBeNull();
   });
 
+  // 思考过程片段：等待期显示推理文本活窗。两条承重不变式：
+  //   1. 文本只进等待区（.chat-reasoning-excerpt），content 仍是哨兵；
+  //   2. 首个 token 一到，整块销毁 —— 被模型自己推翻的中间结论不能留在屏幕上，
+  //      更不能混进答案正文。
+  it("思考片段: reasoning.text 显示在等待区，首个 token 到达后整块销毁", async () => {
+    let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+    vi.mocked(sendChatMessageStream).mockImplementation(
+      async (_m, _s, _mid, callbacks) => { cb = callbacks; },
+    );
+    const { container } = await renderEmpty();
+    fireEvent.click(container.querySelector(".chat-hero-card")!);
+    await waitFor(() => expect(cb).toBeDefined());
+
+    // 放掉发送时 scrollToBottom(true) 的 100ms 定时器，再清零计数 —— 下面要
+    // 单独断言「reasoning 事件本身触发跟滚」。
+    await new Promise((r) => setTimeout(r, 150));
+    const scrollSpy = vi.spyOn(Element.prototype, "scrollIntoView");
+    scrollSpy.mockClear();
+
+    cb!.onReasoning?.({ chars: 9, text: "先查《心經》的出處，" });
+    cb!.onReasoning?.({ chars: 21, text: "再對比《大般若經》。" });
+
+    await waitFor(() => {
+      expect(container.querySelector(".chat-reasoning-excerpt")).not.toBeNull();
+    });
+    // 活窗把气泡撑高 ~100px，而钉底发生在发送时 —— reasoning 必须自己跟滚，
+    // 否则已可滚动的对话里活窗整段等待期落在折叠线以下（对抗审查实锤）。
+    // jsdom 测不到布局，这里锁的是「跟滚被触发」这个行为本身。
+    await waitFor(() => expect(scrollSpy).toHaveBeenCalled());
+    scrollSpy.mockRestore();
+    // 两帧文本按序拼接显示（活窗）
+    expect(container.querySelector(".chat-reasoning-excerpt")!.textContent)
+      .toContain("先查《心經》的出處，再對比《大般若經》。");
+    // content 仍是哨兵（等待 UI 还在）
+    expect(container.querySelector(".chat-thinking")).not.toBeNull();
+
+    cb!.onToken?.("「色不異空」出自《心經》。");
+
+    await waitFor(() => {
+      // 正文一到，思考片段整块销毁
+      expect(container.querySelector(".chat-reasoning-excerpt")).toBeNull();
+    });
+    // 推理文本绝不在答案正文里
+    const bubbles = container.querySelectorAll(".chat-markdown, .markdown-body");
+    const answerText = Array.from(bubbles).map((b) => b.textContent).join("");
+    expect(answerText).not.toContain("先查《心經》");
+    expect(screen.getByText(/色不異空/)).toBeInTheDocument();
+  });
+
   // P0 的核心不变式，也是本轮唯一能自动挡住「存量定时器把用户拽回底部」的断言。
   // 守卫在「调用时」判过一次，但真正的 scrollIntoView 在 100ms 后才执行；若不在
   // 触发时复判，用户在流式中途上滚后，存量定时器仍会把视口拽回底部，而那次程序化

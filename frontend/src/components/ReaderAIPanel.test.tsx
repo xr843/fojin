@@ -88,6 +88,22 @@ describe("ReaderAIPanel", () => {
     expect(await screen.findByText(/正在推敲经文/)).toBeInTheDocument();
   });
 
+  it("b: reasoning.text 显示为思考片段活窗，token 一到整块销毁", async () => {
+    // 阅读页是全站等待最长的一条路（300s 超时、常态 90-180s）——
+    // 思考片段在这里的价值最大。约束与 ChatPage 相同：只进等待区，不碰 content。
+    const { container } = renderPanel();
+    await ask(container);
+    cb!.onReasoning?.({ chars: 9, text: "先定位這一卷的科判，" });
+    cb!.onReasoning?.({ chars: 18, text: "再看窺基怎麼說。" });
+    await screen.findByText(/先定位這一卷的科判，再看窺基怎麼說。/);
+    expect(container.querySelector(".chat-reasoning-excerpt")).not.toBeNull();
+
+    cb!.onToken("此卷明五識身相應地。");
+    await screen.findByText(/此卷明五識身相應地/);
+    expect(container.querySelector(".chat-reasoning-excerpt")).toBeNull();
+    expect(container.textContent).not.toContain("科判");
+  });
+
   // 承重点：进度事件绝不能写进 content —— 一旦写进去，下面那条空转兜底就失效了
   // （它按哨兵的身份判断）。这正是 ChatPage 当初立的同一条约束。
   it("b 承重点: 进度事件之后仍能落到失败兜底", async () => {
