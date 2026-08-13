@@ -48,6 +48,10 @@ DEFAULT_API = "https://fojin.app/api"
 #    且报错里看不出是被挡的。
 _UA = {"User-Agent": "fojin-audio-pipeline/1.0"}
 
+# mono 32 kHz 的口语，64k 与 128k 听感无差，体积减半（心經 1.6 MB → 793 KB）。
+# 长经差别更要命：壇經一卷 134 分钟，128k 要 63 MB。
+DEFAULT_BITRATE = "64k"
+
 
 def log(*a: object) -> None:
     print(f"[{time.strftime('%H:%M:%S')}]", *a, flush=True)
@@ -64,7 +68,7 @@ def wav_ms(path: Path) -> int:
         return int(w.getnframes() / w.getframerate() * 1000)
 
 
-def concat_to_mp3(parts: list[Path], out_path: Path) -> None:
+def concat_to_mp3(parts: list[Path], out_path: Path, bitrate: str = DEFAULT_BITRATE) -> None:
     """WAV 分片无损拼接后一次性编码为 MP3。"""
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, encoding="utf-8") as fh:
@@ -74,31 +78,23 @@ def concat_to_mp3(parts: list[Path], out_path: Path) -> None:
     try:
         subprocess.run(
             ["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", lst,
-             "-c:a", "libmp3lame", "-b:a", "128k", "-ar", "32000", "-ac", "1", str(out_path)],
+             "-c:a", "libmp3lame", "-b:a", bitrate, "-ar", "32000", "-ac", "1", str(out_path)],
             check=True, capture_output=True,
         )
     finally:
         Path(lst).unlink(missing_ok=True)
 
 
-def build_juan(cfg: dict, text_id: int, juan: int, api_base: str, out_root: Path, key: str) -> dict:
-    raw = fetch_juan(api_base, text_id, juan)
-    if not raw:
-        raise RuntimeError(f"text_id={text_id} juan={juan} 无正文")
+def synth_hash_of(cfg: dict, raw: str, pron: list[str]) -> str:
+    """**合成身份** —— 只由影响波形的参数决定，给 ``.parts`` 目录命名。
 
-    segs = split_content(raw)
-    pron = to_minimax_dict(text=raw.replace("\n", ""))
+    ⚠️ 字段名与取值必须与 2026-08-12 之前的单层 fingerprint **逐字节一致**。
+    动一个字，已合成的 WAV 分片就会失联、断点续传落空、重新调 API ——
+    而 MiniMax 是非确定性的（实测同句同参数三次 8.01/8.82/9.30 秒，
+    极差 14.8%），重合成等于把使用者逐轮听审通过的版本扔掉重赌。
 
-    # ⚠️ hash 必须覆盖**正文 + 所有影响成品的配置**，不能只 hash 正文。
-    #
-    # 文件名带 hash 前 8 位是为了「重生成 = 新 URL」，从而绕开 Cloudflare
-    # 边缘缓存跨部署存活。但若只 hash 正文，那么「改了词典重新合成」这种
-    # 最常见的重生成场景 URL 不变 —— 边缘缓存会一直供旧音频，而 max-age
-    # 是一年。实测就发生过：补了「般羅/罣礙」重新合成，hash 纹丝不动。
-    #
-    # 另外 MiniMax 合成是**非确定性**的（实测同句同参数 3 次：8.01/8.82/9.30 秒，
-    # 极差 14.8%），所以就算配置全同，重跑也会得到不同音频 —— 这更需要
-    # 「配置变了就换 URL」，而不是指望音频本身可复现。
+    刻意**不含任何编码参数**：换码率不该让人重新付费合成。
+    """
     fingerprint = json.dumps(
         {
             "text": raw,
@@ -110,11 +106,47 @@ def build_juan(cfg: dict, text_id: int, juan: int, api_base: str, out_root: Path
         },
         ensure_ascii=False, sort_keys=True,
     )
-    content_hash = hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()
-    hash8 = content_hash[:8]
-    log(f"[{text_id}/{juan}] {len(raw)} 字 → {len(segs)} 段，词典 {len(pron)} 条，hash={hash8}")
+    return hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()
 
-    work = out_root / str(text_id) / f"{juan}-{hash8}.parts"
+
+def content_hash_of(synth_hash: str, cfg: dict) -> str:
+    """**成品身份** —— 合成身份叠上编码参数，给 mp3 命名，也是入库的 content_hash。
+
+    文件名带它的前 8 位，是为了「重生成 = 新 URL」。``/audio/`` 段发的是
+    ``Cache-Control: immutable, max-age=31536000``，同名文件在 Cloudflare
+    边缘能活一年 —— 编码参数变了却不换名，等于改了个寂寞。
+    """
+    fingerprint = json.dumps(
+        {
+            "synth": synth_hash,
+            "bitrate": cfg.get("bitrate", DEFAULT_BITRATE),
+            "format": cfg.get("audio_format", "mp3"),
+        },
+        ensure_ascii=False, sort_keys=True,
+    )
+    return hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()
+
+
+def build_juan(
+    cfg: dict, text_id: int, juan: int, api_base: str, out_root: Path,
+    key: str | None, no_synth: bool = False,
+) -> dict:
+    raw = fetch_juan(api_base, text_id, juan)
+    if not raw:
+        raise RuntimeError(f"text_id={text_id} juan={juan} 无正文")
+
+    segs = split_content(raw)
+    pron = to_minimax_dict(text=raw.replace("\n", ""))
+
+    # 两层哈希，各管一件事，理由见 synth_hash_of / content_hash_of 的文档串。
+    synth_hash = synth_hash_of(cfg, raw, pron)
+    content_hash = content_hash_of(synth_hash, cfg)
+    hash8 = content_hash[:8]
+    bitrate = cfg.get("bitrate", DEFAULT_BITRATE)
+    log(f"[{text_id}/{juan}] {len(raw)} 字 → {len(segs)} 段，词典 {len(pron)} 条，"
+        f"synth={synth_hash[:8]} content={hash8} @{bitrate}")
+
+    work = out_root / str(text_id) / f"{juan}-{synth_hash[:8]}.parts"
     work.mkdir(parents=True, exist_ok=True)
 
     parts: list[Path] = []
@@ -124,6 +156,15 @@ def build_juan(cfg: dict, text_id: int, juan: int, api_base: str, out_root: Path
     for i, seg in enumerate(segs):
         part = work / f"{i:04d}.wav"
         if not part.exists():          # 断点续传：重跑不重复付费
+            if no_synth:
+                # 保险丝。只想换编码却触发了合成，说明 synth_hash 算错了 ——
+                # 放任下去会用一份新赌出来的音频顶掉已听审通过的版本。
+                raise RuntimeError(
+                    f"--no-synth 模式下缺分片 {part}；synth_hash 可能变了，"
+                    f"检查 synth_hash_of 的字段是否被改动"
+                )
+            if not key:
+                raise RuntimeError("需要 API key 才能合成；只重编码请加 --no-synth")
             info = synthesize(
                 normalize_for_tts(seg.text),
                 part,
@@ -143,7 +184,7 @@ def build_juan(cfg: dict, text_id: int, juan: int, api_base: str, out_root: Path
             log(f"  …{i + 1}/{len(segs)} 段，累计 {elapsed / 1000:.0f}s")
 
     audio_path = out_root / str(text_id) / f"{juan}-{hash8}.mp3"
-    concat_to_mp3(parts, audio_path)
+    concat_to_mp3(parts, audio_path, bitrate)
 
     meta = {
         "text_id": text_id,
@@ -155,8 +196,10 @@ def build_juan(cfg: dict, text_id: int, juan: int, api_base: str, out_root: Path
         "duration_ms": elapsed,
         "byte_size": audio_path.stat().st_size,
         "audio_format": "mp3",
+        "bitrate": bitrate,
         "char_count": len(raw),
         "content_hash": content_hash,
+        "synth_hash": synth_hash,
         "cues": cues,
     }
     (out_root / str(text_id) / f"{juan}-{hash8}.cues.json").write_text(
@@ -167,14 +210,14 @@ def build_juan(cfg: dict, text_id: int, juan: int, api_base: str, out_root: Path
     return meta
 
 
-def load_key(key_file: str | None) -> str:
+def load_key(key_file: str | None, required: bool = True) -> str | None:
     if key_file:
         for line in Path(key_file).read_text(encoding="utf-8-sig").splitlines():
             line = line.strip()
             if line:
                 return (line.split("=", 1)[1] if "=" in line else line).strip("\"'")
     key = os.environ.get("MINIMAX_API_KEY")
-    if not key:
+    if not key and required:
         sys.exit("需要 MINIMAX_API_KEY 环境变量，或 --key-file 指向密钥文件")
     return key
 
@@ -185,16 +228,22 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", default="out/audio")
     ap.add_argument("--api-base", default=DEFAULT_API)
     ap.add_argument("--key-file", help="密钥文件（每行 KEY 或 NAME=KEY）；不给则读环境变量")
+    ap.add_argument(
+        "--no-synth", action="store_true",
+        help="只用已有 WAV 分片重新编码，缺任何一片就报错。换码率时用它 —— "
+             "既省掉 API key，也防止哈希算错时静默重新合成顶掉已听审的版本。",
+    )
     args = ap.parse_args(argv)
 
     cfg = yaml.safe_load(Path(args.manifest).read_text(encoding="utf-8"))
-    key = load_key(args.key_file)
+    key = load_key(args.key_file, required=not args.no_synth)
     out_root = Path(args.out)
     done = 0
     for entry in cfg["texts"]:
         for juan in entry["juans"]:
             try:
-                build_juan(cfg, entry["text_id"], juan, args.api_base, out_root, key)
+                build_juan(cfg, entry["text_id"], juan, args.api_base, out_root,
+                           key, no_synth=args.no_synth)
                 done += 1
             except Exception as exc:
                 log(f"✗ text_id={entry['text_id']} juan={juan}: {type(exc).__name__}: {exc}")
