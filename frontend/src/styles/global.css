@@ -418,6 +418,35 @@ em {
   opacity: 0.5;
 }
 
+/* 思考过程片段活窗（等待期专用，正文一到整块销毁）。
+   clip 层的 column-reverse 是「贴住最新内容」的关键：单个子元素比容器高时，
+   flex 从底边开始排，溢出被裁掉的是**头部** —— 无 JS 即得「始终显示尾部」。 */
+.chat-reasoning-excerpt {
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-left: 2px solid var(--fj-border);
+  color: var(--fj-ink-muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.chat-reasoning-excerpt-label {
+  display: block;
+  font-size: 11px;
+  opacity: 0.75;
+  letter-spacing: 0.4px;
+  margin-bottom: 2px;
+}
+.chat-reasoning-excerpt-clip {
+  max-height: 5.1em; /* ≈3 行 */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column-reverse;
+}
+.chat-reasoning-excerpt-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* 「回到底部」悬浮按钮。锚点 sticky 在滚动视口下沿、height:0 不占布局空间；
    按钮相对锚点绝对定位向上撑出，所以不需要给滚动容器加 position:relative 的
    外层包裹（那会扰动空状态的撑高块 flex 链）。 */

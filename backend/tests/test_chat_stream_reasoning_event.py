@@ -169,6 +169,57 @@ async def test_reasoning_events_are_throttled():
 
 
 @pytest.mark.anyio
+async def test_reasoning_frames_carry_the_text_excerpt():
+    """推理帧要带上文本增量 —— 等待期「思考过程片段」的原料。
+
+    2026-08-13 定案：削推理档位换速度已被 90 题 eval 证否（逐字保真度 −12.9pp），
+    等待的 30-180 秒砍不掉，能改的只有等待的感受。推理文本是现成的可读中文，
+    此前整条丢掉、只发一个字数 —— 现在随帧带出去，但只准进等待区，绝不进正文。
+    """
+    events = await _run([
+        {"reasoning_content": "先看《心經》這一段，"},
+        {"reasoning_content": "但也可能該引《大般若經》。"},
+        {"content": "「色不異空」出自《心經》。"},
+    ])
+
+    reasoning_frames = [e for e in events if e.get("type") == "reasoning"]
+    assert reasoning_frames, "没有 reasoning 事件"
+    for f in reasoning_frames:
+        assert isinstance(f.get("text"), str) and f["text"], (
+            f"推理帧缺少 text 字段（前端等待区没有原料可显示）: {f!r}"
+        )
+    joined = "".join(f["text"] for f in reasoning_frames)
+    assert "先看《心經》這一段，" in joined, f"推理文本没有透传: {joined!r}"
+
+    # 承重不变式：文本走 reasoning 帧，绝不混进 token 正文
+    tokens = "".join(e["content"] for e in events if e.get("type") == "token")
+    assert tokens == "「色不異空」出自《心經》。", f"答案正文被污染: {tokens!r}"
+
+
+@pytest.mark.anyio
+async def test_reasoning_text_frame_is_capped_keeping_the_tail():
+    """单帧文本要封顶且保尾部 —— 显示的是「正在想什么」的活窗，不是完整记录。
+
+    上游可能在一次网络读里灌进上千字（重推理模型的常态），不封顶等于把 SSE 帧
+    放大几十倍；封头不封尾则显示的永远是最旧的想法。
+    """
+    from app.services.chat import REASONING_TEXT_FRAME_MAX_CHARS
+
+    big = "前面的推理。" * 800 + "最新落点在《心經》"
+    events = await _run([{"reasoning_content": big}, {"content": "答案。"}])
+
+    frames = [e for e in events if e.get("type") == "reasoning"]
+    assert frames, "没有 reasoning 事件"
+    for f in frames:
+        assert len(f["text"]) <= REASONING_TEXT_FRAME_MAX_CHARS, (
+            f"单帧 {len(f['text'])} 字，超出 {REASONING_TEXT_FRAME_MAX_CHARS} 封顶"
+        )
+    assert frames[0]["text"].endswith("最新落点在《心經》"), (
+        f"封顶截掉了尾部（最新的想法）: ...{frames[0]['text'][-40:]!r}"
+    )
+
+
+@pytest.mark.anyio
 async def test_phase2_log_records_reasoning_volume_and_model(caplog):
     """phase-2 日志必须带上推理字符数与模型名。
 
@@ -188,3 +239,11 @@ async def test_phase2_log_records_reasoning_volume_and_model(caplog):
     assert line is not None, "phase-2 计时日志没打出来"
     assert "reasoning=10 chars" in line, f"日志缺少推理字符数: {line}"
     assert "model=deepseek-v4-pro" in line, f"日志缺少模型名: {line}"
+    # reader 标记：page_content 决定 max_tokens 2000/8000，没有它日志里量不出
+    # reader 模式占比（2026-08-13 排查延迟时的观测缺口）。
+    assert "reader=False" in line, f"日志缺少 reader 标记: {line}"
+
+    # 流式路径的 prep 计时同为该次排查的缺口 —— 此前只有非流式的
+    # "TIMING: _prepare_chat"，/chat/stream 的 prep 一直量不到。
+    assert any("TIMING: stream prep took" in r.getMessage() for r in caplog.records), \
+        "流式路径缺少 prep 计时日志"

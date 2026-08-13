@@ -106,8 +106,19 @@ logger = logging.getLogger(__name__)
 LLM_STREAM_HEARTBEAT_INTERVAL_S = 25.0
 
 # 推理进度事件的最小间隔。推理模型可产出数千 token 的 reasoning_content，逐块
-# 转发等于把 SSE 流量放大数倍，而前端只用它显示一个「已思考 N 秒」的活性信号。
+# 转发等于把 SSE 流量放大数倍；按秒聚合后一帧带一段文本，量级与正文相当。
 REASONING_EMIT_INTERVAL_S = 1.0
+
+# 单个 reasoning 帧携带文本的上限，超出时**保尾弃头**。上游可能在一次网络读里
+# 灌进上千字（重推理模型的常态），不封顶等于把单帧放大几十倍；而显示端要的是
+# 「正在想什么」的活窗 —— 最新的想法在尾部。
+#
+# 为什么现在发文本了（2026-08-13，推翻同日更早「只发字数」的决定）：削推理档位
+# 换速度已被 90 题 eval 证否（low 档逐字保真度 −12.9pp），等待的 30-180 秒是买
+# 质量的钱、砍不掉，能改的只有等待的感受。护栏不变：文本只进前端**等待区**并
+# 带「非回答」标签，正文一到整块销毁；此处它绝不写进 full_answer（见下方消费
+# 循环的白名单注释），所以答案真实性的不变式原样成立。
+REASONING_TEXT_FRAME_MAX_CHARS = 2000
 
 # Fixed backoff before a single same-provider retry of a transient
 # pre-first-token stream failure (see _stream_attempt). Kept short: the goal
@@ -816,6 +827,7 @@ async def send_message_stream(
     # detached ORM attribute is read after the session closes.
     chat_session_id = 0
     pending_attachment_ids: list[int] = []
+    _prep_t0 = _time.monotonic()
     async with sessionmaker() as db_prep:
         try:
             # Production SSE path: resolve the user from the raw token inside
@@ -889,6 +901,15 @@ async def send_message_stream(
         )
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
         return
+
+    # 流式路径此前没有 prep 计时（send_message 的 "TIMING: _prepare_chat" 只在
+    # 非流式路径打）—— 2026-08-13 排查延迟时这一环量不到，只能拿 rag_retrieval
+    # 的 TIMING 当代理。reader 标记同理：page_content 决定 max_tokens 2000/8000，
+    # 但日志里此前无从分辨 reader 模式占比。
+    logger.info(
+        "TIMING: stream prep took %.2fs (reader=%s)",
+        _time.monotonic() - _prep_t0, bool(page_content),
+    )
 
     (
         _chat_session, api_url, api_key, model, is_byok, provider,
@@ -1041,6 +1062,10 @@ async def send_message_stream(
     received_first_token = False
     reasoning_chars = 0
     last_reasoning_emit = 0.0
+    # 本秒尚未发出的推理文本。fallback 切换时**不清空**（与 reasoning_chars 同一
+    # 口径）—— 两个模型的推理在显示端可能相邻，但显示的是滚动活窗且答案一到就
+    # 整块销毁，混排无害；清了反而让切换那一秒的窗口空白。
+    pending_reasoning = ""
     phase2_start = _time.monotonic()
     try:
         for idx, (att_url, att_key, att_model, att_provider, is_fb) in enumerate(attempts):
@@ -1061,14 +1086,19 @@ async def send_message_stream(
                         # 也绝不置 received_first_token（否则下方的空回复兜底失效，
                         # 用户会永远卡在假的「正在检索…」上且没有重试按钮）。
                         reasoning_chars += len(content)
+                        pending_reasoning += content
                         now = _time.monotonic()
-                        # 节流：推理可达 4000 token，逐块转发等于把 SSE 流量放大
-                        # 数倍，而前端只显示一个数字。
+                        # 节流：按秒聚合成一帧。帧里带上这一秒的推理文本（保尾
+                        # 封顶），给前端等待区当「思考过程片段」显示 —— 它只进
+                        # 独立的 reasoning 帧，绝不进 full_answer / token。
                         if now - last_reasoning_emit >= REASONING_EMIT_INTERVAL_S:
                             last_reasoning_emit = now
+                            frame_text = pending_reasoning[-REASONING_TEXT_FRAME_MAX_CHARS:]
+                            pending_reasoning = ""
                             yield (
                                 "data: "
-                                + json.dumps({"type": "reasoning", "chars": reasoning_chars},
+                                + json.dumps({"type": "reasoning", "chars": reasoning_chars,
+                                              "text": frame_text},
                                              ensure_ascii=False)
                                 + "\n\n"
                             )
@@ -1147,13 +1177,14 @@ async def send_message_stream(
     # 2026-08-01 那次排查因此得先去翻 Prometheus 的 model 标签才知道用的是哪个。
     logger.info(
         "chat/stream phase-2 LLM done in %.2fs (%d chars, reasoning=%d chars, "
-        "session_id=%s, provider=%s, model=%s)",
+        "session_id=%s, provider=%s, model=%s, reader=%s)",
         _time.monotonic() - phase2_start,
         len(full_answer),
         reasoning_chars,
         chat_session_id,
         provider,
         model,
+        bool(page_content),
     )
 
     # Empty-completion guard: the stream finished without ever producing an

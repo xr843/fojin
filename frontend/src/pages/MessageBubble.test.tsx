@@ -99,6 +99,29 @@ describe("MessageBubble", () => {
     expect(document.querySelector(".chat-thinking")).not.toBeNull();
   });
 
+  it("哨兵 + reasoningText → 渲染思考片段活窗（带非回答标签）", () => {
+    renderBubble({
+      m: msg({
+        content: "正在检索经文并生成回答...",
+        reasoningText: "先查《心經》的出處",
+      }),
+    });
+    const excerpt = document.querySelector(".chat-reasoning-excerpt");
+    expect(excerpt).not.toBeNull();
+    expect(excerpt!.textContent).toContain("先查《心經》的出處");
+    // 必须带「非回答」标签 —— 中间结论不能被当成答案读
+    expect(document.querySelector(".chat-reasoning-excerpt-label")).not.toBeNull();
+  });
+
+  it("正文已开始时，残留的 reasoningText 绝不渲染", () => {
+    // onToken 会清 reasoningText，但渲染层不能依赖那个清理 —— 两道保险各自独立。
+    renderBubble({
+      m: msg({ content: "「色不異空」出自《心經》。", reasoningText: "殘留的推理" }),
+    });
+    expect(document.querySelector(".chat-reasoning-excerpt")).toBeNull();
+    expect(document.body.textContent).not.toContain("殘留的推理");
+  });
+
   it("renders follow-up suggestions and fires onSuggestionClick", () => {
     const { onSuggestionClick } = renderBubble({
       m: msg({ content: "答案正文\n[追问] 什么是阿赖耶识" }),

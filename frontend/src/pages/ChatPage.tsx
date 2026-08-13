@@ -435,36 +435,52 @@ function MessageBubbleInner({
         }}>
           {m.role === "assistant" ? (
             m.content === THINKING_SENTINEL ? (
-              <div className="chat-thinking">
-                {/* 收进单个 span：.chat-thinking 是 inline-flex，为「一句短文案 +
-                    三个点」设计的；多段内容直接铺进去会各自变成 flex 项，被挤成
-                    竖排窄列。包一层后它仍只有两个 flex 项，内部按正常文本流换行。 */}
-                {/* 三段独立组合，不要把推理嵌进检索分支里 —— 生产上 retrieved
-                    确实总先于 reasoning 到达，但那是时序巧合而非契约，任一方缺席
-                    时另一方都应照常显示。 */}
-                <span className="chat-thinking-text">
-                  {m.retrieval && (
-                    <>
-                      {t("chat.retrieved_hint", { n: m.retrieval.count })}
-                      {m.retrieval.titles.map((tt) => (
-                        <span key={tt} className="chat-retrieved-title">
-                          {t("chat.retrieved_title", { title: tt })}
-                        </span>
-                      ))}
-                      <span className="chat-retrieved-sep">·</span>
-                    </>
-                  )}
-                  {/* 括号并在翻译值里，不写死在这里 —— 全角（）是 U+FF08/FF09，
-                      落在半宽全宽形式区，i18n 扫描器的 CJK 正则结构上扫不到它，
-                      门禁绿灯不能当作「英文界面没问题」的证据。英文值自带半角括号。 */}
-                  {reasoningSince
-                    ? `${t("chat.reasoning_hint")}${t("chat.thinking_seconds", { n: thinkingSeconds })}`
-                    : m.retrieval
-                      ? t("chat.generating")
-                      : t("chat.thinking")}
-                </span>
-                <span className="chat-thinking-dots"><span /><span /><span /></span>
-              </div>
+              <>
+                <div className="chat-thinking">
+                  {/* 收进单个 span：.chat-thinking 是 inline-flex，为「一句短文案 +
+                      三个点」设计的；多段内容直接铺进去会各自变成 flex 项，被挤成
+                      竖排窄列。包一层后它仍只有两个 flex 项，内部按正常文本流换行。 */}
+                  {/* 三段独立组合，不要把推理嵌进检索分支里 —— 生产上 retrieved
+                      确实总先于 reasoning 到达，但那是时序巧合而非契约，任一方缺席
+                      时另一方都应照常显示。 */}
+                  <span className="chat-thinking-text">
+                    {m.retrieval && (
+                      <>
+                        {t("chat.retrieved_hint", { n: m.retrieval.count })}
+                        {m.retrieval.titles.map((tt) => (
+                          <span key={tt} className="chat-retrieved-title">
+                            {t("chat.retrieved_title", { title: tt })}
+                          </span>
+                        ))}
+                        <span className="chat-retrieved-sep">·</span>
+                      </>
+                    )}
+                    {/* 括号并在翻译值里，不写死在这里 —— 全角（）是 U+FF08/FF09，
+                        落在半宽全宽形式区，i18n 扫描器的 CJK 正则结构上扫不到它，
+                        门禁绿灯不能当作「英文界面没问题」的证据。英文值自带半角括号。 */}
+                    {reasoningSince
+                      ? `${t("chat.reasoning_hint")}${t("chat.thinking_seconds", { n: thinkingSeconds })}`
+                      : m.retrieval
+                        ? t("chat.generating")
+                        : t("chat.thinking")}
+                  </span>
+                  <span className="chat-thinking-dots"><span /><span /><span /></span>
+                </div>
+                {/* 思考过程片段活窗。只在哨兵分支里渲染 —— 正文一到（content 被
+                    换掉）整块随分支消失，这是渲染层的保险；onToken 另清
+                    reasoningText，两道各自独立。aria-hidden：读屏用户听
+                    「已思考 N 秒」就够了，逐秒变动的中间结论只会淹没读屏。 */}
+                {m.reasoningText ? (
+                  <div className="chat-reasoning-excerpt" aria-hidden="true">
+                    <span className="chat-reasoning-excerpt-label">
+                      {t("chat.reasoning_excerpt_label")}
+                    </span>
+                    <div className="chat-reasoning-excerpt-clip">
+                      <div className="chat-reasoning-excerpt-text">{m.reasoningText}</div>
+                    </div>
+                  </div>
+                ) : null}
+              </>
             ) : m.content === REQUEST_FAILED_SENTINEL ? (
               t("chat.request_failed")
             ) : (
@@ -1261,7 +1277,9 @@ export default function ChatPage() {
           prev.map((m) => {
             if (m.id !== assistantId) return m;
             const current = m.content === THINKING_SENTINEL ? "" : m.content;
-            return { ...m, content: current + content };
+            // reasoningText 随首个 token 销毁：被模型自己推翻的中间结论
+            // 不能留在屏幕上（渲染层另有一道保险，两道各自独立）。
+            return { ...m, content: current + content, reasoningText: null };
           }),
         );
         scrollToBottom();
@@ -1304,18 +1322,29 @@ export default function ChatPage() {
       onSearching: (_searchMsg: string) => {
         // 搜索状态由初始占位符 "正在检索经文并生成回答..." 显示，不覆盖 content
       },
-      onReasoning: () => {
-        // 只当作活性信号：把等待期文案换成「正在推敲经文…（已思考 N 秒）」。
-        // 秒数由前端自己计时，后端只负责证明「还在推进」——静态文案在 7-13 秒里
-        // 读起来像卡死，一个在动的计数器才说明系统活着。
+      onReasoning: (r) => {
+        // 计时（已思考 N 秒）+ 思考片段活窗。等待的 30-180 秒是买质量的钱
+        // （削档已被 90 题 eval 证否），能改的只有等待的感受 —— 推理文本是
+        // 现成的可读中文，此前整条丢掉。
         // 与 onRetrieved 同一条承重约束：只写独立字段，绝不碰 content。
         setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId && m.reasoningSince == null
-              ? { ...m, reasoningSince: Date.now() }
-              : m,
-          ),
+          prev.map((m) => {
+            if (m.id !== assistantId) return m;
+            const next = { ...m };
+            if (next.reasoningSince == null) next.reasoningSince = Date.now();
+            if (r.text) {
+              // 保尾截断：显示的是「正在想什么」的活窗，不是完整思考记录。
+              // 截尾同时消解跨 fallback 拼接 —— 旧模型的推理很快滚出窗口。
+              next.reasoningText = ((next.reasoningText ?? "") + r.text).slice(-1200);
+            }
+            return next;
+          }),
         );
+        // 活窗把气泡向下撑高 ~100px，而钉底发生在发送时 —— 不跟滚的话，已可
+        // 滚动的对话里活窗整段等待期落在折叠线以下，token 一到又被销毁，用户
+        // 从头到尾看不见它（对抗审查实锤的失效场景）。scrollToBottom 非 force
+        // 自带「贴底才跟随 + 触发时复判」，用户上滚重读时不会被拽回。
+        scrollToBottom();
       },
       onRetrieved: (retrieval) => {
         // 只写独立字段。绝不能写进 content —— THINKING_SENTINEL 是按身份比较的
