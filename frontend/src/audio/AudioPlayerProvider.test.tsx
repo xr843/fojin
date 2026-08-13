@@ -98,6 +98,27 @@ describe("AudioPlayerProvider 埋点", () => {
     expect(track).toHaveBeenCalledWith("audio_seek", { text_id: 9, juan_num: 1 });
   });
 
+  it("一次拖动只记一条 —— antd Slider 的 onChange 连发，不节流会淹没其他事件", async () => {
+    // 生产实测：仅仅 mousedown→mousemove→mouseup 就发了 2 条；
+    // 真人横拖整条进度条会发几十条，audio_seek 会把 open/play/complete 全压下去。
+    await start();
+    const jump = screen.getByText("jump");
+    await userEvent.click(jump);
+    await userEvent.click(jump);
+    await userEvent.click(jump);
+    expect(track.mock.calls.filter((c) => c[0] === "audio_seek")).toHaveLength(1);
+  });
+
+  it("隔开足够久的两次拖动记两条 —— 节流不能把真实的第二次跳播吃掉", async () => {
+    const now = vi.spyOn(Date, "now");
+    now.mockReturnValue(1_000_000);
+    await start();
+    await userEvent.click(screen.getByText("jump"));
+    now.mockReturnValue(1_000_000 + 5_000);
+    await userEvent.click(screen.getByText("jump"));
+    expect(track.mock.calls.filter((c) => c[0] === "audio_seek")).toHaveLength(2);
+  });
+
   it("没有曲目时 seek 不记事件", async () => {
     render(
       <AudioPlayerProvider>
