@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo, type ReactNode } fro
 import { useTranslation } from "react-i18next";
 
 import { findCueIndex } from "./cues";
+import { trackAudio } from "./telemetry";
 import { AudioPlayerContext, type AudioPlayerState, type AudioTrack } from "./useAudioPlayback";
 
 /**
@@ -16,6 +17,9 @@ import { AudioPlayerContext, type AudioPlayerState, type AudioTrack } from "./us
 export default function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // 已记过 audio_play 的曲目键。暂停后续播会再次触发 play 事件，
+  // 不去重的话「有多少人开始听」会被续播灌水。
+  const playedRef = useRef<string | null>(null);
   const [track, setTrack] = useState<AudioTrack | null>(null);
   const [playing, setPlaying] = useState(false);
   const [cueIndex, setCueIndex] = useState(-1);
@@ -56,10 +60,14 @@ export default function AudioPlayerProvider({ children }: { children: ReactNode 
     else el.pause();
   }, [track]);
 
-  const seek = useCallback((ms: number) => {
-    const el = audioRef.current;
-    if (el) el.currentTime = ms / 1000;
-  }, []);
+  const seek = useCallback(
+    (ms: number) => {
+      const el = audioRef.current;
+      if (el) el.currentTime = ms / 1000;
+      if (track) trackAudio("audio_seek", track.textId, track.juanNum);
+    },
+    [track],
+  );
 
   const setRate = useCallback((r: number) => {
     const el = audioRef.current;
@@ -79,15 +87,27 @@ export default function AudioPlayerProvider({ children }: { children: ReactNode 
     setPlaying(false);
     setCueIndex(-1);
     setPositionMs(0);
+    // 关掉播放器再重开同一卷算一次新的收听
+    playedRef.current = null;
   }, []);
 
   // 播放状态与 cue 跟随
   useEffect(() => {
     const el = audioRef.current;
     if (!el) return;
-    const onPlay = () => setPlaying(true);
+    const onPlay = () => {
+      setPlaying(true);
+      if (!track) return;
+      const key = `${track.textId}/${track.juanNum}`;
+      if (playedRef.current === key) return;   // 续播不重复记
+      playedRef.current = key;
+      trackAudio("audio_play", track.textId, track.juanNum);
+    };
     const onPause = () => setPlaying(false);
-    const onEnded = () => setPlaying(false);
+    const onEnded = () => {
+      setPlaying(false);
+      if (track) trackAudio("audio_complete", track.textId, track.juanNum);
+    };
     const onTime = () => {
       const ms = Math.round(el.currentTime * 1000);
       setPositionMs(ms);

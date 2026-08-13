@@ -21,6 +21,7 @@ import {
   DownloadOutlined,
   SoundOutlined,
 } from "@ant-design/icons";
+import { trackAudio } from "../audio/telemetry";
 import { useAudioPlayer } from "../audio/useAudioPlayback";
 import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBookmark, addBookmark, removeBookmark, searchDictionaryGrouped, getJuanApparatus, getJuanLineAnchors, getJuanAudio, type ApparatusEntryItem } from "../api/client";
 import { useAuthStore } from "../stores/authStore";
@@ -956,7 +957,9 @@ export default function TextReaderPage() {
                     : "default"
                 }
                 icon={<SoundOutlined />}
-                onClick={() =>
+                onClick={() => {
+                  // 意图信号：点了按钮 ≠ 听完，两个数的比值才是转化率
+                  trackAudio("audio_open", Number(textId), juanNum);
                   audioPlayer.play({
                     textId: Number(textId),
                     juanNum,
@@ -965,8 +968,8 @@ export default function TextReaderPage() {
                       n: juanNum,
                     }),
                     audio: audioData,
-                  })
-                }
+                  });
+                }}
               >
                 {t("reader.audio.button")}
               </Button>
