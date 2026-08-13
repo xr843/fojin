@@ -75,6 +75,17 @@ SYSTEM_PROMPT = (
 )
 
 
+# 与 backend 2026-08-13 四臂 eval 的 D 臂逐字相同 —— 改这段文字等于作废那次
+# eval 的结论，改前必须重跑（工具在 /data/eval-effort 的方法论，见 memory
+# reasoning-effort-eval-verdict）。
+CITATION_DISCIPLINE_SUFFIX = (
+    "\n\n## 引文纪律（最高优先级重申）\n"
+    "- 引号「」与【《经名》第N卷】只用于能从检索片段中**逐字复制**的内容；"
+    "记不清逐字原文就转述，不加引号、不标【】。\n"
+    "- 宁可少引、不可错引：每个要点最多引 1 条最贴切的原文。\n"
+    "- 不确定时选择不引用——转述并说明依据即可。"
+)
+
 META_INTRO_PROMPT = (
     "你是小津（XiaoJin）——佛津（FoJin）平台内置的佛教古籍研习 AI 助手。\n\n"
     "当用户询问你是谁、你能做什么、请你自我介绍时，严格按以下格式回复，"
@@ -291,6 +302,16 @@ def _build_llm_messages(
         enhanced_prompt = master.system_prompt
     else:
         enhanced_prompt = _classify_and_enhance_prompt(message)
+        # 引文纪律收尾重申 —— 只加在与 2026-08-13 四臂 eval（90 题 × 4）完全相同
+        # 的路径上：普通 RAG 问答（无祖师、无 meta、无阅读页上下文）。那次 D 臂
+        # （默认档 + 本后缀）三个忠实度指标齐升：逐字 90.2%→94.7%、卷号
+        # 94.4%→98.0%、全验证 80.6%→84.4%，配对 1:4，延迟同量级；代价是引文
+        # 总数 −30%（355→250）—— 按「答案不得有错误信息」的最高准则，引得更
+        # 克制但更准是正确的方向。祖师/阅读页路径未测过，不扩散。
+        # 放在**系统提示词末尾**是有意的：与 eval 的注入位置一致，且离生成
+        # 最近的指令服从率最高（规则 4b/4c 讲过同样的事，但排在 2,000 字外）。
+        if not _is_meta_question(message) and not reading_context:
+            enhanced_prompt += CITATION_DISCIPLINE_SUFFIX
 
     # Enhance with reading context when user is asking from the reader page.
     # Only the reading-mode *instructions* go into the system prompt; the
