@@ -138,6 +138,58 @@ def _with_reasoning_headroom(model: str | None, max_tokens: int) -> int:
     return max_tokens + _REASONING_HEADROOM_TOKENS if _is_reasoning_model(model) else max_tokens
 
 
+# 思考档位。**与 _is_reasoning_model 是两个不同的名单，不要合并**：那个名单管
+# 「要不要留推理额度」，宁可多算（o1/o3/*-thinking 都算上，多留额度无害）；这个
+# 名单管「往请求体里塞私有字段」，只能少算 —— 除 Anthropic 外的七家共用同一个
+# OpenAI 兼容 body builder，把 DeepSeek 的字段发给 OpenAI / Gemini 会被 400 拒掉，
+# 那位自带 Key 的用户直接问不出话。所以这里只列**官方文档写明支持**的型号。
+# 见 api-docs.deepseek.com/guides/thinking_mode/
+_THINKING_CAPABLE_MARKERS = ("deepseek-v4",)
+
+# 官方接受的档位。"off" 是我们这侧的叫法，映射到 thinking.type=disabled；
+# 不要用 Anthropic 格式的 reasoning.effort=none，DeepSeek 的兼容端点不认。
+_THINKING_EFFORTS = ("low", "high", "max")
+
+
+def thinking_params(model: str | None, effort: str | None) -> dict:
+    """DeepSeek V4 思考档位对应的请求体字段；不适用时返回空 dict。
+
+    ``effort`` 取值：``None``/``""`` 不发任何字段（= 上游默认，官方默认是 high）、
+    ``"off"`` 关闭思考、``"low"``/``"high"``/``"max"`` 显式指定档位。
+
+    为什么默认是「什么都不发」而不是显式 high：默认必须与配置这个开关之前的线上
+    行为逐字节相同，否则开关本身就成了一次未经 eval 的答案改动。
+
+    2026-08-13 生产实测，同一条真实提示词、同一模型 deepseek-v4-pro，各跑两次 ——
+    首个正文字：不带参数 77.1s / 187.9s，low 档 29.3s / 15.7s，关闭 1.0s / 1.2s。
+    等待时间几乎全是隐藏推理（正文要等推理吐完才开始流）。
+    """
+    if not effort:
+        return {}
+    m = (model or "").lower()
+    if not any(k in m for k in _THINKING_CAPABLE_MARKERS):
+        return {}
+    e = effort.strip().lower()
+    if e == "off":
+        return {"thinking": {"type": "disabled"}}
+    if e in _THINKING_EFFORTS:
+        return {"thinking": {"type": "enabled"}, "reasoning_effort": e}
+    # 非法值当作没配：.env 里一个笔误不该让全站每一次问答都吃 400。
+    logger.warning(
+        "未知的思考档位 %r，已忽略（可选：off / %s）", effort, " / ".join(_THINKING_EFFORTS)
+    )
+    return {}
+
+
+def configured_thinking_params(model: str | None) -> dict:
+    """正式问答用的档位 —— 取自 ``settings.chat_reasoning_effort``。
+
+    单独一个函数而不是让 chat.py 直接读 settings：调用点有三处（流式、非流式、
+    eval），读配置的口径必须只有一份，否则迟早会有一处忘了跟着改。
+    """
+    return thinking_params(model, settings.chat_reasoning_effort)
+
+
 def _build_anthropic_body(model: str, messages: list[dict], *, temperature: float = 0.7,
                           max_tokens: int = 2000, stream: bool = False) -> dict:
     system, user_messages = _convert_messages_for_anthropic(messages)
@@ -147,6 +199,29 @@ def _build_anthropic_body(model: str, messages: list[dict], *, temperature: floa
     if stream:
         body["stream"] = True
     return body
+
+
+async def read_error_body(exc: Exception, limit: int = 500) -> str:
+    """取上游错误响应的正文；**流式响应必须先 aread**，否则 .text 抛 ResponseNotRead。
+
+    2026-08-13：流式路径的 except 块直接取 ``exc.response.text``，于是错误处理器
+    自己崩了，401 / 429 / 5xx 一律掉进最外层 ``except Exception``，用户永远只看到
+    「抱歉，AI 服务暂时不可用」，归因码也全成了 internal。
+
+    读完 body 还有第二个好处：``_byok_error_message`` 靠 body 里的关键词分辨
+    「模型 ID 不存在」「余额不足」「Key 无效」—— 读不到 body 时它只能一律回落到
+    「Key 无效」，等于把三种配置错误说成同一种。
+
+    ⚠️ 非流式响应（``client.post``）本来就已读，aread 是幂等的空操作，安全。
+    """
+    resp = getattr(exc, "response", None)
+    if resp is None:
+        return "N/A"
+    try:
+        await resp.aread()
+        return resp.text[:limit]
+    except Exception:
+        return "N/A"
 
 
 def _byok_error_message(exc: Exception, status: int | None) -> str:

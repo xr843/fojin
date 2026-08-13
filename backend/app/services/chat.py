@@ -74,6 +74,9 @@ from app.services.llm_client import (  # noqa: F401
     _resolve_llm_config,
     _resolve_with_model_override,
     _with_reasoning_headroom,
+    configured_thinking_params,
+    read_error_body,
+    thinking_params,
 )
 from app.services.llm_cost import record_llm_cost
 from app.services.master_profiles import get_master
@@ -274,7 +277,13 @@ async def _generate_session_title(
                 resp = await client.post(
                     f"{api_url}/chat/completions",
                     headers={"Authorization": f"Bearer {api_key}"},
-                    json={"model": model, "messages": messages, "temperature": 0.3, "max_tokens": _with_reasoning_headroom(model, 64)},
+                    json={"model": model, "messages": messages, "temperature": 0.3,
+                          "max_tokens": _with_reasoning_headroom(model, 64),
+                          # 标题一律关思考：给一个 5-10 字的标题跑上游默认的最高档
+                          # 推理是纯等待（实测同档位在正式问答上要 77-188 秒），而
+                          # 标题不进答案，关掉没有质量风险。留着 max_tokens 的推理
+                          # 额度是因为「关不掉的模型」仍要防 #1095 那种推理饿死正文。
+                          **thinking_params(model, "off")},
                 )
                 resp.raise_for_status()
                 title = resp.json()["choices"][0]["message"]["content"].strip().strip("\"'《》")
@@ -551,7 +560,9 @@ async def send_message(
             resp = await client.post(
                 f"{u}/chat/completions",
                 headers={"Authorization": f"Bearer {k}"},
-                json={"model": m, "messages": llm_messages, "temperature": 0.7, "max_tokens": _with_reasoning_headroom(m, 8000 if page_content else 2000)},
+                json={"model": m, "messages": llm_messages, "temperature": 0.7,
+                      "max_tokens": _with_reasoning_headroom(m, 8000 if page_content else 2000),
+                      **configured_thinking_params(m)},
             )
             resp.raise_for_status()
             return resp.json()["choices"][0]["message"]["content"]
@@ -949,7 +960,8 @@ async def send_message_stream(
                 "POST", f"{u}/chat/completions",
                 headers={"Authorization": f"Bearer {k}"},
                 json={"model": m, "messages": llm_messages, "temperature": 0.7,
-                      "max_tokens": _with_reasoning_headroom(m, 8000 if page_content else 2000), "stream": True},
+                      "max_tokens": _with_reasoning_headroom(m, 8000 if page_content else 2000), "stream": True,
+                      **configured_thinking_params(m)},
             ) as resp:
                 resp.raise_for_status()
                 async for line in resp.aiter_lines():
@@ -1097,7 +1109,11 @@ async def send_message_stream(
                     continue
                 # Final attempt failed — surface the error
                 if is_byok and status in (400, 401, 403, 404, 422, 429):
-                    resp_body = exc.response.text[:500] if isinstance(exc, httpx.HTTPStatusError) and exc.response else "N/A"
+                    # ⚠️ 必须先 aread 再读 body：这里的响应是流式且未读的，直接取
+                    # .text 会抛 ResponseNotRead —— 那样**错误处理器自己崩掉**，
+                    # 掉进最外层 except，用户拿到通用的「AI 服务暂时不可用」，
+                    # 归因码也退化成 internal。2026-08-13 生产实证。
+                    resp_body = await read_error_body(exc)
                     logger.warning("BYOK LLM stream HTTP %s: %s | url=%s model=%s", status, resp_body, att_url, att_model)
                     error_msg = _byok_error_message(exc, status)
                     error_code = "byok_config"
@@ -1106,7 +1122,7 @@ async def send_message_stream(
                     error_msg = "抱歉，AI 服务响应超时，请稍后重试。"
                     error_code = "upstream_timeout"
                 elif isinstance(exc, httpx.HTTPStatusError):
-                    resp_body = exc.response.text[:500] if exc.response else "N/A"
+                    resp_body = await read_error_body(exc)  # 同上：流式 body 要先 aread
                     logger.warning("LLM stream returned HTTP %s: %s | url=%s model=%s", status, resp_body, att_url, att_model)
                     error_msg = f"抱歉，AI 服务返回错误（HTTP {status}），请稍后重试。"
                     # status 进 code：上游 429（限流）和 5xx（挂了）要分开看，
