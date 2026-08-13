@@ -653,3 +653,48 @@
 :root[data-theme="dark"] .sources-cap-chip-remote { border-left-color: #5cdbd3; }
 :root[data-theme="dark"] .sources-cap-chip-iiif   { border-left-color: #b37feb; }
 :root[data-theme="dark"] .sources-cap-chip-api    { border-left-color: #ffb266; }
+
+/* ── 读诵索引页 ───────────────────────────────────────────────── */
+.readaloud-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.readaloud-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--fj-border, rgba(0, 0, 0, 0.08));
+}
+.readaloud-item-main {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.readaloud-item-main a {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+.readaloud-meta {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.85rem;
+  color: var(--fj-ink-muted, #8a8078);
+}
+.readaloud-item-side {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+/* 多卷时的卷次直达。单卷不渲染，避免只有一颗按钮的空行。 */
+.readaloud-juans {
+  flex: 1 1 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 4px;
+  font-size: 0.88rem;
+}
+.readaloud-juan-dur {
+  color: var(--fj-ink-muted, #8a8078);
+}

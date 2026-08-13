@@ -1547,5 +1547,14 @@
   "xiaojin.menu_quit": "Quit XiaoJin",
   "xiaojin.speaking_as": "Speaking as {{name}}",
   "xiaojin.recall": "Bring back XiaoJin",
-  "admin_dashboard.trends.series.anonymous_messages": "Guest messages"
+  "admin_dashboard.trends.series.anonymous_messages": "Guest messages",
+  "nav.readaloud": "Listen",
+  "readaloud.title": "Listen to Sutras",
+  "readaloud.subtitle": "Follow along as you read — the current line highlights, and playback continues on a locked screen.",
+  "readaloud.seo_title": "Listen to Sutras — line-synced Buddhist audio | FoJin",
+  "readaloud.seo_desc": "Listen to Buddhist scriptures with audio aligned to the text line by line, and keep listening with the screen locked. Currently AI-synthesised speech, not a human recording.",
+  "readaloud.synthetic_notice": "All audio here is AI-synthesised speech (MiniMax Speech), not a monastic's recitation. Texts follow the CBETA digital canon.",
+  "readaloud.empty": "No recordings available yet",
+  "readaloud.juan_count": "{{n}} fascicle(s)",
+  "readaloud.juan": "Fascicle {{n}}"
 }

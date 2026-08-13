@@ -8,6 +8,10 @@ model: speech-2.8-hd
 voice_id: Chinese (Mandarin)_Lyrical_Voice   # 抒情男声，使用者从 4 个候选中选定
 lang: zh
 speed: 1.0
+# mono 32 kHz 的口语，64k 与 128k 听感无差、体积减半（心經 1.6 MB → 793 KB）。
+# 改这里会换 content_hash 即换 URL（绕开 Cloudflare 一年期边缘缓存），
+# 但**不会**换 synth_hash —— 已合成的 WAV 分片照用，不重新付费。
+bitrate: 64k
 
 texts:
   - text_id: 9

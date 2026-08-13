@@ -54,7 +54,15 @@ log "① 产物 → 生产仓库 backend/out/（gitignored，容器内可见）"
 ssh $SSH_OPTS "$VPS" "mkdir -p $REPO_OUT &&
   sudo install -d -o \$(id -un) -g \$(id -gn) -m 755 /srv/fojin $STATIC_DIR"
 # 只传 mp3 与 cues.json，**不传 *.parts/**（逐句 WAV 分片，几百个大文件）
-rsync -av $DRY --include='*/' --include='*.mp3' --include='*.cues.json' \
+#
+# ⚠️ 这一步必须 --delete，第③步必须**不** --delete —— 两个目录的性质相反：
+#   * 这里（仓库 out/）是**入库暂存区**，必须与本地一模一样。留着过时的
+#     cues.json 会让同一卷进来两份，import 先删后插、谁赢取决于文件名
+#     字典序。实测踩过：重编码到 64k 后 `1-7891dd17` 与 `1-ba9307ad` 并存，
+#     字典序 7<b，**旧的最后处理反而赢**，线上静默退回 128k 且日志显示成功。
+#   * /srv/fojin/audio/（第③步）是**对外静态目录**，旧文件要留着 ——
+#     已经打开页面的用户手里还攥着旧 URL，删了他们正在听的就断了。
+rsync -av --delete $DRY --include='*/' --include='*.mp3' --include='*.cues.json' \
   --exclude='*' --prune-empty-dirs -e "ssh $SSH_OPTS" \
   "$LOCAL_OUT" "$VPS:$REPO_OUT"
 

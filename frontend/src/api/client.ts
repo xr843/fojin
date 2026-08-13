@@ -655,6 +655,36 @@ export interface AudioCue {
   kind: string;
 }
 
+export interface AudioCatalogJuan {
+  juan_num: number;
+  duration_ms: number;
+  url: string;
+}
+
+export interface AudioCatalogItem {
+  text_id: number;
+  title_zh: string;
+  translator: string | null;
+  dynasty: string | null;
+  taisho_id: string | null;
+  /** "minimax" | "human" —— 标注必须跟着变，不能让人以为机器读的是法师读的 */
+  engine: string;
+  juan_count: number;
+  total_duration_ms: number;
+  juans: AudioCatalogJuan[];
+}
+
+export interface AudioCatalogResponse {
+  total: number;
+  items: AudioCatalogItem[];
+}
+
+/** 有读诵音频的经。总量按设计就很小，索引页与经典详情页共用同一份缓存。 */
+export async function getAvailableAudio(): Promise<AudioCatalogResponse> {
+  const { data } = await api.get<AudioCatalogResponse>("/audio/available");
+  return data;
+}
+
 export interface TextAudioResponse {
   text_id: number;
   juan_num: number;

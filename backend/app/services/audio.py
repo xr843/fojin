@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.audio import TextAudio
+from app.models.text import BuddhistText
 
 
 def build_audio_payload(audio: TextAudio) -> dict:
@@ -51,3 +52,57 @@ async def get_juan_audio(
     )
     audio = (await session.execute(stmt)).scalar_one_or_none()
     return build_audio_payload(audio) if audio else None
+
+
+def group_audio_by_text(rows: list[tuple]) -> list[dict]:
+    """``[(TextAudio, BuddhistText), …]`` → 按经聚合的目录项。
+
+    音频按**卷**存，索引页按**经**列 —— 使用者找的是「哪部经能听」。
+    排序用总时长升序而非 text_id：短经先上是这个功能的现实
+    （心經 1.7 分钟 vs 壇經一卷 134 分钟），让人一眼看到能听完的那几部。
+    """
+    by_text: dict[int, dict] = {}
+    for audio, text in rows:
+        item = by_text.setdefault(
+            audio.text_id,
+            {
+                "text_id": audio.text_id,
+                "title_zh": text.title_zh,
+                "translator": text.translator,
+                "dynasty": text.dynasty,
+                "taisho_id": text.taisho_id,
+                "engine": audio.engine,
+                "juans": [],
+            },
+        )
+        item["juans"].append(
+            {
+                "juan_num": audio.juan_num,
+                "duration_ms": audio.duration_ms,
+                "url": f"/audio/{audio.audio_path}",
+            }
+        )
+
+    items = []
+    for item in by_text.values():
+        item["juans"].sort(key=lambda j: j["juan_num"])
+        item["juan_count"] = len(item["juans"])
+        item["total_duration_ms"] = sum(j["duration_ms"] for j in item["juans"])
+        items.append(item)
+    items.sort(key=lambda it: (it["total_duration_ms"], it["text_id"]))
+    return items
+
+
+async def list_available_audio(session: AsyncSession, lang: str = "zh") -> list[dict]:
+    """有读诵音频的经的完整目录。
+
+    音频总量按设计就很小（第一期一部，扩到十部也不过十行），所以不分页 ——
+    前端一次取回，索引页与经典详情页共用同一份缓存。
+    """
+    stmt = (
+        select(TextAudio, BuddhistText)
+        .join(BuddhistText, BuddhistText.id == TextAudio.text_id)
+        .where(TextAudio.lang == lang)
+        .order_by(TextAudio.text_id, TextAudio.juan_num)
+    )
+    return group_audio_by_text(list((await session.execute(stmt)).all()))
