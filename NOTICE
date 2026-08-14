@@ -55,24 +55,43 @@ IMPORTANT — the CC license does NOT cover CBETA's "Category B" collections
 --------------------------------------------------------------------------------
 84000: Translating the Words of the Buddha             66.3M chars, 23.8%
 https://84000.co
-License: CC BY-NC-ND 4.0  (verified: https://84000.co/documents/terms-of-use)
+License: CC BY-NC-ND 4.0
+  (verified: https://84000.co/documents/terms-of-use — that page is marked
+   DRAFT, dated 2026-05-15; re-check before relying on it.)
   Attribution must name "84000" itself — crediting only the translator or the
-  translation group does NOT satisfy it. Non-commercial only. NO DERIVATIVES:
-  the translations must not be modified.
-  84000's translation metadata and glossary are released separately under the
-  more permissive CC BY, which does allow adaptation and commercial use.
+  translation group does NOT satisfy it. Non-commercial only. NO DERIVATIVES.
+  The terms enumerate specifics that go well beyond the bare CC label:
+    permitted  — "Reading and printing for personal use"; "Posting for free
+                 download"; "Publishing a complete translation online or in
+                 print with ancillary notes"; and, explicitly,
+                 "Use as training data in machine learning environments".
+    prohibited — "Publishing excerpts without express permission";
+                 "Publishing translations without footnotes"; any commercial use.
+  84000's translation metadata and glossary are released separately under
+  CC BY 4.0, which does allow adaptation and commercial use.
 Usage: Tibetan-English translations imported from publicly available TEI XML,
   served verbatim.
+⚠️ UNRESOLVED COMPLIANCE QUESTION (raised 2026-08-13, not yet answered):
+  FoJin surfaces retrieved passages as excerpts — search snippets, the chat
+  citation panel, and RAG context all show partial text. Read literally, that
+  is "publishing excerpts", which these terms prohibit without express
+  permission. Note this is a *license term*, not a preference, and 84000 is
+  23.8% of the local corpus. Resolve by one of: obtaining written permission;
+  restricting 84000 content to whole-text reading only; or confirming with
+  84000 that citation-style excerpts are out of scope. Do not treat the ML
+  clause above as covering this — it permits training, not republication.
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
 GRETIL (Göttingen Register of Electronic Texts in Indian Languages)
 https://gretil.sub.uni-goettingen.de                    32.5M chars, 11.7%
-License: NOT STATED. Checked 2026-08-13 — GRETIL publishes no license, terms of
-  use, or copyright page. It is an aggregator whose individual e-texts come from
-  many contributors on varying terms, some of which it flags as restricted.
-  Treat per-text terms as unknown; contact gretil@sub.uni-goettingen.de before
-  any redistribution.
+License: NOT STATED — no license, terms-of-use or copyright statement was found
+  on GRETIL's main index page, and no dedicated terms page could be located
+  (checked 2026-08-13; this is a negative finding from a page-level check, not a
+  confirmation from GRETIL that none exists). GRETIL is an aggregator whose
+  individual e-texts come from many contributors on varying terms, some of which
+  it flags as restricted. Treat per-text terms as unknown; contact
+  gretil@sub.uni-goettingen.de before any redistribution.
 Usage: Sanskrit Buddhist e-texts downloaded and indexed locally.
 --------------------------------------------------------------------------------
 
