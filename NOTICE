@@ -16,84 +16,175 @@ Users and deployers are responsible for complying with each data source's
 license when using FoJin.
 
 --------------------------------------------------------------------------------
-CBETA (Chinese Buddhist Electronic Text Association)
+How to read this file  (last verified: 2026-08-13)
+--------------------------------------------------------------------------------
+Under Apache-2.0 §4(d) this NOTICE travels with every redistribution of FoJin,
+so a wrong license here propagates to every downstream fork and deployment.
+Two rules therefore govern this file:
+
+  1. Only state a license that has been verified against the rights holder's
+     own authoritative statement, and cite that statement so the next person
+     can re-check it.
+  2. Where no license is stated by the source, say exactly that. Do NOT
+     substitute a vague phrase such as "academic open access" — that is not a
+     license, tells a downstream user nothing about attribution, commercial
+     use or derivatives, and gives false confidence.
+
+Character counts below are live production figures (GET /api/sources/stats and
+GET /api/dictionary/sources), not estimates. Sources listed as metadata- or
+link-only are verified to hold 0 characters of local text.
+
+--------------------------------------------------------------------------------
+Texts stored locally  (only these four hold full text)
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+CBETA (Chinese Buddhist Electronic Text Association)          169.4M chars, 60.8%
 https://cbeta.org
-License: CC BY-NC-SA 4.0 (non-commercial, share-alike)
+License: CC BY-NC-SA 4.0  (verified: https://www.cbeta.org/copyright.php)
+  Attribution required; commercial use prohibited; derivatives must be shared
+  under the same license and must not alter the substantive content.
 Usage: Full text of the Chinese Buddhist Canon imported and indexed locally.
-Note: Commercial use requires separate authorization from CBETA.
+IMPORTANT — the CC license does NOT cover CBETA's "Category B" collections
+  (印順法師佛學著作集, 呂澂佛學著作集 and similar modern authored works); those
+  require separate permission from the copyright holders.
+  Verified 2026-08-13: FoJin has NOT imported any Category B text — searches for
+  印順 / 呂澂 / 妙雲集 return 0 results. Keep it that way, or obtain permission.
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
-SuttaCentral
-https://suttacentral.net
-License: CC0 (public domain) for Pali texts; CC BY-SA for translations
-Usage: Pali root texts and English translations imported via public REST API.
---------------------------------------------------------------------------------
-
---------------------------------------------------------------------------------
-84000: Translating the Words of the Buddha
+84000: Translating the Words of the Buddha             66.3M chars, 23.8%
 https://84000.co
-License: CC BY-NC-ND 4.0 (non-commercial, no derivatives)
-Usage: Tibetan-English translations imported from publicly available TEI XML.
-Note: Content must not be modified. Commercial use is not permitted.
+License: CC BY-NC-ND 4.0  (verified: https://84000.co/documents/terms-of-use)
+  Attribution must name "84000" itself — crediting only the translator or the
+  translation group does NOT satisfy it. Non-commercial only. NO DERIVATIVES:
+  the translations must not be modified.
+  84000's translation metadata and glossary are released separately under the
+  more permissive CC BY, which does allow adaptation and commercial use.
+Usage: Tibetan-English translations imported from publicly available TEI XML,
+  served verbatim.
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
 GRETIL (Göttingen Register of Electronic Texts in Indian Languages)
-https://gretil.sub.uni-goettingen.de
-License: Academic open access
+https://gretil.sub.uni-goettingen.de                    32.5M chars, 11.7%
+License: NOT STATED. Checked 2026-08-13 — GRETIL publishes no license, terms of
+  use, or copyright page. It is an aggregator whose individual e-texts come from
+  many contributors on varying terms, some of which it flags as restricted.
+  Treat per-text terms as unknown; contact gretil@sub.uni-goettingen.de before
+  any redistribution.
 Usage: Sanskrit Buddhist e-texts downloaded and indexed locally.
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
-DSBC (Digital Sanskrit Buddhist Canon)
-https://www.dsbcproject.org
-License: Academic open access
-Usage: Sanskrit texts downloaded and indexed locally.
+SuttaCentral                                            10.5M chars, 3.8%
+https://suttacentral.net
+License: CC0 1.0 (public domain dedication) — for the Pali root texts AND for
+  the translations.
+  Verified against the rights holder's own statement:
+  https://github.com/suttacentral/bilara-data/blob/published/LICENSE.md
+  "All translations created in Bilara and supported by SuttaCentral are
+   dedicated to the Public Domain by means of the Creative Commons Public
+   Domain (CC0) license."
+  (A previous version of this file wrongly recorded the translations as CC BY-SA.
+   CC0 imposes no attribution or share-alike obligation; FoJin attributes
+   anyway, as a courtesy rather than a requirement.)
+Usage: Pali root texts and English translations imported via the public REST
+  API (rate-limited), plus the Pali glossary and text-parallel mappings.
+Note: SuttaCentral's founder has publicly requested — separately from, and not
+  as a condition of, the CC0 license — that its texts not be used in AI or
+  chatbot applications. See https://discourse.suttacentral.net/t/33374 . This is
+  a request, not a license term; anyone redeploying FoJin should decide for
+  themselves how to answer it.
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
-BDRC (Buddhist Digital Resource Center)
-https://bdrc.io
-License: Varies by work; metadata queries via public SPARQL endpoint
-Usage: IIIF manifest references only; no content stored locally.
+Metadata / link-only sources  (verified 0 characters of local text)
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+DSBC (Digital Sanskrit Buddhist Canon), University of the West
+https://www.dsbcproject.org
+License: NOT an open license.
+  (verified: https://www.dsbcproject.org/pages/usage-policy)
+  Permits "noncommercial educational and research purposes" and "review,
+  indexing and word search purposes only"; states that "reproduction of DSBC
+  contents without permission is prohibited"; copyright remains with the
+  original holders cited in each text.
+Usage: link/metadata only — verified 2026-08-13 to hold 0 characters locally.
+  An earlier version of this file described DSBC as "academic open access" with
+  texts "downloaded and indexed locally". Both were wrong. Do not import DSBC
+  full text without written permission.
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
 SAT Daizōkyō Text Database (University of Tokyo)
 https://21dzk.l.u-tokyo.ac.jp/SAT/
-License: Academic open access
-Usage: Metadata mapping and IIIF manifest links only; no content stored locally.
+License: not stated by the source; unverified.
+Usage: metadata mapping and IIIF manifest links only; 0 characters stored
+  locally (verified 2026-08-13).
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+BDRC (Buddhist Digital Resource Center)
+https://bdrc.io
+License: varies by work; metadata queried via the public SPARQL endpoint.
+Usage: IIIF manifest references only; no content stored locally.
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
 MITRA / Dharmamitra (Sebastian Nehrdich & Kurt Keutzer, UC Berkeley)
 https://github.com/dharmamitra/mitra-parallel — arXiv:2601.06400
-License: CC BY-SA 4.0 (attribution, share-alike)
+License: UNVERIFIED. Checked 2026-08-13 — the repository states no license;
+  v2/README.md defers to the root README, which contains no license section.
+  An earlier version of this file asserted CC BY-SA 4.0; that could not be
+  confirmed from the source and should be re-checked with the authors before
+  any redistribution of the alignment data.
 Usage: Sentence-level Sanskrit/Tibetan ↔ Buddhist-Chinese parallel passages
-imported into the mitra_alignments table and surfaced in the reader's
-cross-canon parallel panel. The Chinese side is anchored to local CBETA chunks
-by verbatim substring match; the Sanskrit/Tibetan side is stored inline.
-Note: Derived alignment data is share-alike — redistribution must remain CC BY-SA 4.0.
+  imported into the mitra_alignments table and surfaced in the reader's
+  cross-canon parallel panel. The Chinese side is anchored to local CBETA
+  chunks by verbatim substring match; the Sanskrit/Tibetan side is stored
+  inline.
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
 Dictionary Sources
 --------------------------------------------------------------------------------
-- DDB (Digital Dictionary of Buddhism) — CC BY-NC-SA
-- SuttaCentral Glossary — CC0
-- NCPED (New Concise Pali-English Dictionary) — Academic open access
-- NTI Buddhist Dictionary — Academic open access
-- Edgerton BHS Dictionary — Public domain
-- Monier-Williams Sanskrit Dictionary — Public domain
+FoJin carries 39 dictionary sources totalling roughly 740,000 entries. The live
+inventory is GET /api/dictionary/sources. Licenses verified so far:
+
+- NTI Reader Buddhist Dictionary (161,054 entries) — CC BY-SA 3.0
+    Attribution + share-alike. Verified:
+    https://github.com/alexamies/buddhist-dictionary/blob/master/license.txt
+    ("The Creative Commons Attribution-Share Alike 3.0 License … applies to the
+     content in the Chinese-English dictionary and other text files.")
+    NOTE: this is FoJin's single largest dictionary and an earlier version of
+    this file described it as "academic open access", which is not a license
+    and understated a real share-alike obligation.
+- Digital Pāḷi Dictionary / DPD (88,785 entries) — CC BY-NC-SA 4.0
+    Verified: https://github.com/digitalpalidictionary/dpd-db (README, License)
+    Attribution + non-commercial + share-alike. Not listed at all in the
+    previous version of this file.
+- SuttaCentral glossary (5,841 entries) and NCPED (20,759 entries) — CC0,
+    under SuttaCentral's licensing above. NCPED ships inside
+    suttacentral/sc-data/dictionaries and is not a separately licensed work.
+- 84000 glossary (25,356 entries) — CC BY, per 84000's terms above.
+
+PENDING AUDIT — the remaining sources have NOT been license-verified and must
+not be assumed open. Several are certainly under active copyright (e.g.
+佛光大辭典 32,132 entries, 中華佛教百科全書 6,359 entries), and the Cologne
+Digital Sanskrit Lexicon family (cdsl-mw 32,116 / cdsl-apte 34,882 /
+cdsl-bhs 17,807) carries CDSL's own terms rather than being simple public
+domain, as an earlier version of this file implied for Monier-Williams and
+Edgerton. Tracking issue: see repository issues.
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
-All Other Sources (398+)
+All Other Sources
 --------------------------------------------------------------------------------
-FoJin provides search redirect links to 398+ additional Buddhist digital
-archives worldwide. No content from these sources is downloaded or stored.
-Users are redirected to the original platforms to access content.
+FoJin provides search redirect links to the remaining sources of its 617-source
+directory. No content from these sources is downloaded or stored; users are
+redirected to the original platforms.
 --------------------------------------------------------------------------------
 
 For questions about data usage and licensing, please open an issue at:
