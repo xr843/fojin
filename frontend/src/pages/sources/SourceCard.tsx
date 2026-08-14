@@ -66,7 +66,7 @@ export default function SourceCard({ source: s, searchQuery }: SourceCardProps) 
   const distributions = (s.distributions || []).filter((d) => d.is_active).slice(0, 5);
   // Only offer the "搜索" button when we have a registered direct-search template
   // for this source. The previous Google site: fallback produced empty results
-  // for download mirrors and un-indexed sites (e.g. archive.cbetaonline.cn),
+  // for download mirrors and un-indexed sites (e.g. cbeta.org/ebooks),
   // misleading users. If a source lacks a template, the button is hidden.
   const searchUrl = searchQuery ? buildSearchUrl(s.code, searchQuery) : null;
 
