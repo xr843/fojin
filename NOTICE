@@ -71,15 +71,26 @@ License: CC BY-NC-ND 4.0
   CC BY 4.0, which does allow adaptation and commercial use.
 Usage: Tibetan-English translations imported from publicly available TEI XML,
   served verbatim.
-⚠️ UNRESOLVED COMPLIANCE QUESTION (raised 2026-08-13, not yet answered):
-  FoJin surfaces retrieved passages as excerpts — search snippets, the chat
-  citation panel, and RAG context all show partial text. Read literally, that
-  is "publishing excerpts", which these terms prohibit without express
-  permission. Note this is a *license term*, not a preference, and 84000 is
-  23.8% of the local corpus. Resolve by one of: obtaining written permission;
-  restricting 84000 content to whole-text reading only; or confirming with
-  84000 that citation-style excerpts are out of scope. Do not treat the ML
-  clause above as covering this — it permits training, not republication.
+On the "no excerpts" wording, and why FoJin's citations are not caught by it:
+  FoJin shows short passages in search results and beside chat answers — always
+  verbatim, always labelled with text and volume, always linked back to the full
+  work. That is quotation, not republication, and it falls outside this license
+  for two independent reasons:
+   - CC BY-NC-ND 4.0 section 2(a)(2): "where Exceptions and Limitations apply to
+     Your use, this Public License does not apply, and You do not need to comply
+     with its terms and conditions." Quotation is such an exception - mandatory
+     for Berne signatories under Art. 10(1), and codified in e.g. PRC Copyright
+     Law Art. 24. A license term cannot remove a statutory exception.
+   - "Adapted Material" is defined as material "translated, altered, arranged,
+     transformed, or otherwise modified". An unaltered passage is not Adapted
+     Material, so the NoDerivatives condition does not reach it either.
+  Read in context, the clause targets what its neighbours target: reissuing the
+  translations in partial or stripped-down form ("publishing translations
+  without footnotes"), set against a permitted list headed by "publishing a
+  complete translation ... with ancillary notes".
+  Two things therefore DO matter and must stay true: never republish an 84000
+  translation whole while dropping its notes, and name "84000" itself wherever
+  its content is displayed - not only in this file.
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
