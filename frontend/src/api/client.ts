@@ -1,5 +1,5 @@
 import axios from "axios";
-import { useAuthStore } from "../stores/authStore";
+import { markSessionExpired, useAuthStore } from "../stores/authStore";
 import i18n from "../i18n";
 import type {
   TextId,
@@ -55,7 +55,14 @@ api.interceptors.response.use(
       error.response?.status === 401 &&
       !error.config?.url?.startsWith("/auth/")
     ) {
+      // Mark *before* logout: logout() clears the flag (a deliberate sign-out is
+      // not an expiry) and wipes `user`, after which nothing downstream can tell
+      // "your session died" from "you were never signed in". /chat/quota answers
+      // 200-with-guest-numbers rather than 401, so without this marker the chat
+      // page silently shows a guest quota to someone who still believes they are
+      // signed in — and their questions really are being counted as a guest's.
       useAuthStore.getState().logout();
+      markSessionExpired();
     }
     return Promise.reject(error);
   },
@@ -2167,6 +2174,10 @@ export function sendChatMessageStream(
           // 把原因说明白就够了：他可以直接重发（走游客配额），或者点页面上那个
           // 会先把对话暂存下来的登录入口（goLoginKeepingTranscript）。
           useAuthStore.getState().logout();
+          // 同上：logout() 会清掉这个标记，所以必须在其后置位。下面那句
+          // onError 只是一次性的行内提示，滚上去就看不见了；标记留下来，
+          // 页面上的常驻横幅才能继续说明"你现在是游客身份"。
+          markSessionExpired();
           callbacks.onError(i18n.t("chat.stream.sessionExpired"), "unauthorized");
           callbacks.onDone();
           resolve();

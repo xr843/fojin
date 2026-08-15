@@ -7,7 +7,7 @@ import { HelmetProvider } from "react-helmet-async";
 import { MemoryRouter, useLocation } from "react-router";
 import { message } from "antd";
 import ChatPage from "./ChatPage";
-import { useAuthStore } from "../stores/authStore";
+import { markSessionExpired, useAuthStore } from "../stores/authStore";
 import { uploadChatAttachment } from "../api/chatAttachments";
 import {
   getApiKeyStatus,
@@ -147,6 +147,8 @@ afterEach(() => {
   useAuthStore.setState({ token: null, user: null });
   // 侧栏收起状态持久化在 localStorage —— 不清的话它会泄漏到后面的用例里
   localStorage.removeItem("fojin.chat.sidebarCollapsed");
+  // 会话过期标记同理：留着会让后面每个用例都以为登录态刚死掉
+  sessionStorage.clear();
 });
 
 /** 等空状态首屏就绪（建议卡片到位）后再断言结构。 */
@@ -839,6 +841,34 @@ describe("额度提醒", () => {
   it("登录态正常时，额度提醒照常工作（不因这次修复被误伤）", async () => {
     loggedIn({ limit: 200, used: 185, remaining: 15, has_byok: false, authenticated: true });
     expect(await screen.findByText(/今日免费额度快用完了，剩余 15 次/)).toBeInTheDocument();
+    expect(screen.queryByText(/登录状态已过期/)).toBeNull();
+  });
+
+  // 上一版修复漏掉的那一格：401 拦截器的处理是 logout()，user 当场被清空。
+  // 只判 `user && !authenticated` 的话，横幅最多在 401 到达前闪一下 ——
+  // 实测手工把 token 改坏后进 /chat，两条横幅一条都不出现。
+  it("承重点: 401 已清掉 user，过期提示仍必须在", async () => {
+    useAuthStore.setState({ token: null, user: null });   // 拦截器登出后的真实状态
+    markSessionExpired();
+    loggedIn({ limit: 10, used: 2, remaining: 8, has_byok: false, authenticated: false });
+    expect(await screen.findByText(/登录状态已过期/)).toBeInTheDocument();
+  });
+
+  it("过期者不该再被劝「登录后额度更多」——他刚才就是登录状态", async () => {
+    useAuthStore.setState({ token: null, user: null });
+    markSessionExpired();
+    loggedIn({ limit: 10, used: 2, remaining: 8, has_byok: false, authenticated: false });
+    await screen.findByText(/登录状态已过期/);
+    expect(screen.queryByText(/每日免费/)).toBeNull();
+  });
+
+  it("真游客（没置位过期标记）照旧看到常规游客提示", async () => {
+    useAuthStore.setState({ token: null, user: null });
+    vi.mocked(getApiKeyStatus).mockResolvedValue({
+      has_api_key: false, provider: null, model: null, key_preview: null,
+    });
+    loggedIn({ limit: 10, used: 2, remaining: 8, has_byok: false, authenticated: false });
+    expect(await screen.findByText(/每日免费/)).toBeInTheDocument();
     expect(screen.queryByText(/登录状态已过期/)).toBeNull();
   });
 

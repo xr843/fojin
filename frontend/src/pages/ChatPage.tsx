@@ -74,7 +74,7 @@ import {
   uploadChatAttachment,
   type ChatAttachmentMeta,
 } from "../api/chatAttachments";
-import { useAuthStore, type UserProfile } from "../stores/authStore";
+import { sessionExpired, useAuthStore, type UserProfile } from "../stores/authStore";
 
 // 登录用户的额度提示只在快用完时出现。常驻一个「今日剩余 198 次」是纯噪音 ——
 // 而毫无预警地撞上上限、直接吃一个错误，才是真正会让人懵的那种体验。
@@ -869,6 +869,13 @@ export default function ChatPage() {
     queryKey: ["chatQuota", user?.id ?? "anon"],
     queryFn: getChatQuota,
   });
+
+  // sessionStorage 本身不是响应式的，但它被置位的那一刻 401 拦截器刚调过
+  // logout()，store 一变本组件就会重渲染 —— 借这个时机重读即可。挂在
+  // [user, quota] 上而不是在渲染里直接读，是为了不让 React Compiler 面对一个
+  // 每次渲染结果都可能不同的裸调用。
+  const [expired, setExpired] = useState(sessionExpired);
+  useEffect(() => { setExpired(sessionExpired()); }, [user, quota]);
 
   const filteredSessions = useMemo(
     () => sessions?.filter((s) => !sessionFilter || (s.title || "").includes(sessionFilter)),
@@ -1946,20 +1953,24 @@ export default function ChatPage() {
                 }
               />
             </DraggableModal>
-            {!user && !keyStatus?.has_api_key && quota && quota.remaining >= 0 && (
+            {/* 过期者此刻确实是游客，但对他说「登录后额度更多」是答非所问 ——
+                他刚才就是登录状态。这一条让位给下面那句过期说明。 */}
+            {!user && !expired && !keyStatus?.has_api_key && quota && quota.remaining >= 0 && (
               <Alert
                 message={<span>{t("chat.quota_info", { limit: quota.limit, remaining: quota.remaining })}<a onClick={() => navigate("/login")}>{t("chat.login")}</a>{t("chat.login_quota_hint")}</span>}
                 type={quota.remaining <= 2 ? "warning" : "info"} showIcon closable
                 style={{ marginBottom: 8, fontSize: 12 }}
               />
             )}
-            {/* 本地还存着 user，后端却说没认证 —— 只可能是 token 过期了。
-                此时后端返回的是匿名配额，拿它去渲染任何「剩余 N 次」都是编造：
-                实测有用户今日只用 1 次（真实剩余 199）却被告知剩 10 次。
-                更要紧的是 /chat/stream 走的是同一套鉴权，过期后配额降为按 IP
-                共享的 10 次、会话不再存进账号 —— 所以这里必须让用户知道。
-                不自动登出：会把正在输入的内容和上下文一起清掉。 */}
-            {user && quota && !quota.authenticated && (
+            {/* 「登录态是自己死的」这件事，只能靠标记传下来：401 拦截器会先
+                logout() 把 user 清空，此后 user==null 与「从没登录过」完全一样。
+                这里不能只判 user —— 实测那样横幅只在 401 到达前闪一下就没了。
+
+                为什么必须说出来：/chat/quota 对过期 token 返回的是 200 + 游客
+                数字（不是 401），而 /chat/stream 走同一套鉴权，过期后配额降为
+                按 IP 共享的 10 次、会话不再存进账号。用户以为自己登着录，实际
+                提问正被算作游客、历史正在丢。 */}
+            {(expired || (user && quota && !quota.authenticated)) && (
               <Alert
                 message={
                   <span>
