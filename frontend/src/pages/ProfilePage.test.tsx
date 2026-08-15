@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, useLocation } from "react-router";
 import type { ReactNode } from "react";
@@ -151,6 +151,34 @@ describe("ProfilePage", () => {
     await screen.findByText(/Adding your own AI API key lifts the platform/);
     // 兜底文案里一个具体次数都不该出现
     expect(container.textContent).not.toMatch(/\d+\s*(free questions|次)/);
+  });
+
+  // 与 /chat 上那个 bug 同源（#1196）：后端对**过期 token** 返回的是游客配额
+  // （limit 10），与"没带 token"一模一样。这个页面只有登录用户看得到，把那个
+  // 10 填进「每日 N 次」，等于告诉一个上限 200 的人他只有 10 次——恰好是上面
+  // 那段注释当初要消灭的硬编码 10。
+  it("承重点: token 过期时不得把游客上限（10）当成本人上限报出来", async () => {
+    useAuthStore.setState({
+      token: "expired-but-still-in-localstorage",
+      user: {
+        id: 1, username: "reader", email: "reader@example.com", display_name: null,
+        role: "user", is_active: true, created_at: "2026-01-10T00:00:00Z",
+      },
+    });
+    // 后端此刻返回的就是这个：游客配额 + authenticated=false
+    vi.mocked(getChatQuota).mockResolvedValue({
+      limit: 10, used: 0, remaining: 10, has_byok: false, authenticated: false,
+    });
+    const { container } = renderPage(<ProfilePage />, "/profile?tab=apikey");
+
+    // 必须等 quota 真的落地再断言。只 findByText 兜底文案的话，初始渲染
+    // （quota 还是 undefined）就已经匹配上了——断言在 query 解析前跑完，
+    // 无论有没有修复都绿。实测过：撤掉修复时这条不会红。
+    await waitFor(() => expect(vi.mocked(getChatQuota)).toHaveBeenCalled());
+    await waitFor(() => {
+      expect(container.textContent).toMatch(/Adding your own AI API key lifts the platform/);
+      expect(container.textContent).not.toMatch(/free questions a day/);
+    });
   });
 
   // ── 从 /chat 来的返回入口 ──────────────────────────────────────────
