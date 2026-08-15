@@ -28,16 +28,40 @@ interface AuthState {
  */
 export const SESSION_EXPIRED_KEY = "fojin.auth.expired";
 
+// sessionStorage is not reactive, so components read it through
+// useSyncExternalStore — the supported way to subscribe React to an external
+// mutable source. The earlier shape (useState + an effect that re-read on every
+// [user, quota] change) piggybacked on unrelated re-renders and tripped
+// react-hooks/set-state-in-effect; this fires exactly when the value changes.
+const listeners = new Set<() => void>();
+
+function notify(): void {
+  listeners.forEach((l) => l());
+}
+
+export function subscribeSessionExpired(onChange: () => void): () => void {
+  listeners.add(onChange);
+  return () => { listeners.delete(onChange); };
+}
+
 export function markSessionExpired(): void {
   try { sessionStorage.setItem(SESSION_EXPIRED_KEY, "1"); } catch { /* ignore */ }
+  notify();
 }
 
 export function clearSessionExpired(): void {
   try { sessionStorage.removeItem(SESSION_EXPIRED_KEY); } catch { /* ignore */ }
+  notify();
 }
 
+/** getSnapshot for useSyncExternalStore — a primitive, so Object.is is enough. */
 export function sessionExpired(): boolean {
   try { return sessionStorage.getItem(SESSION_EXPIRED_KEY) === "1"; } catch { return false; }
+}
+
+/** getServerSnapshot — the prerender worker has no session to have lost. */
+export function sessionExpiredServer(): boolean {
+  return false;
 }
 
 export const useAuthStore = create<AuthState>()(

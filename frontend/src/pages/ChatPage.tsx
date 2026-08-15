@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo, useEffect, lazy, Suspense, memo, type ReactNode } from "react";
+import { useState, useRef, useCallback, useMemo, useEffect, useSyncExternalStore, lazy, Suspense, memo, type ReactNode } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
@@ -74,7 +74,13 @@ import {
   uploadChatAttachment,
   type ChatAttachmentMeta,
 } from "../api/chatAttachments";
-import { sessionExpired, useAuthStore, type UserProfile } from "../stores/authStore";
+import {
+  sessionExpired,
+  sessionExpiredServer,
+  subscribeSessionExpired,
+  useAuthStore,
+  type UserProfile,
+} from "../stores/authStore";
 
 // 登录用户的额度提示只在快用完时出现。常驻一个「今日剩余 198 次」是纯噪音 ——
 // 而毫无预警地撞上上限、直接吃一个错误，才是真正会让人懵的那种体验。
@@ -870,12 +876,14 @@ export default function ChatPage() {
     queryFn: getChatQuota,
   });
 
-  // sessionStorage 本身不是响应式的，但它被置位的那一刻 401 拦截器刚调过
-  // logout()，store 一变本组件就会重渲染 —— 借这个时机重读即可。挂在
-  // [user, quota] 上而不是在渲染里直接读，是为了不让 React Compiler 面对一个
-  // 每次渲染结果都可能不同的裸调用。
-  const [expired, setExpired] = useState(sessionExpired);
-  useEffect(() => { setExpired(sessionExpired()); }, [user, quota]);
+  // 登录态是否"自己死掉了"。存在 sessionStorage 里（见 authStore），用
+  // useSyncExternalStore 订阅——这是 React 读取外部可变源的正规做法，置位那一刻
+  // 就重渲染，不必蹭别的 state 变化。
+  const expired = useSyncExternalStore(
+    subscribeSessionExpired,
+    sessionExpired,
+    sessionExpiredServer,
+  );
 
   const filteredSessions = useMemo(
     () => sessions?.filter((s) => !sessionFilter || (s.title || "").includes(sessionFilter)),
