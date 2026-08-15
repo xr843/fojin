@@ -1,7 +1,7 @@
 import { readFileSync } from "fs";
 import { resolve } from "path";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HelmetProvider } from "react-helmet-async";
 import { MemoryRouter, useLocation } from "react-router";
@@ -131,7 +131,7 @@ beforeEach(() => {
     has_api_key: true, provider: "deepseek", model: null, key_preview: null,
   });
   vi.mocked(getChatQuota).mockResolvedValue({
-    limit: 10, used: 0, remaining: 10, has_byok: true,
+    limit: 10, used: 0, remaining: 10, has_byok: true, authenticated: true,
   });
   useAuthStore.setState({
     token: "t",
@@ -774,8 +774,11 @@ describe("会话与 URL", () => {
 // ── 额度将尽提醒（登录用户此前什么都看不到）────────────────────────────
 
 describe("额度提醒", () => {
-  function loggedIn(quota: { limit: number; used: number; remaining: number; has_byok: boolean }) {
-    vi.mocked(getChatQuota).mockResolvedValue(quota);
+  function loggedIn(quota: {
+    limit: number; used: number; remaining: number; has_byok: boolean; authenticated?: boolean;
+  }) {
+    // 默认 true：这批用例测的是「后端认得这个人」时的额度提醒。
+    vi.mocked(getChatQuota).mockResolvedValue({ authenticated: true, ...quota });
     return renderPage();
   }
 
@@ -804,6 +807,67 @@ describe("额度提醒", () => {
     loggedIn({ limit: 200, used: 500, remaining: -1, has_byok: true });
     await screen.findByText("「三毒」指的是哪三种毒？");
     expect(screen.queryByText(/额度快用完/)).toBeNull();
+  });
+
+  // ── 用户实拍复现（2026-08-15）──────────────────────────────────────
+  //
+  // 症状：登录用户进入 /chat 就看到「今日免费额度快用完了，剩余 10 次」，
+  // 重新登录也不消失。查库：该用户当日只用了 1 次，按登录上限 200 真实剩余
+  // 199；当天全站最高用量 3 次，没有任何人接近上限。
+  //
+  // 机制：JWT 只有 8 小时且无续期，resolve_optional_user 对过期 token 静默
+  // 返回 None，/chat/quota 于是落到匿名分支返回 limit 10。而前端的 user 存在
+  // 持久化 store 里，token 过期了 user 对象还在 —— 于是用「登录用户」的横幅
+  // 渲染了「游客」的数字。10 恰好是匿名满额（10-0），不是巧合。
+  it("回归: token 过期时不得把游客额度当成本人余额报出去", async () => {
+    // 后端此刻返回的就是匿名配额：authenticated=false，remaining=10。
+    loggedIn({ limit: 10, used: 0, remaining: 10, has_byok: false, authenticated: false });
+    expect(await screen.findByText(/登录状态已过期/)).toBeInTheDocument();
+    // 承重断言：那句编造的余额必须消失。只断言"出现过期提示"的话，
+    // 一个把两条横幅同时显示的实现照样能过。
+    expect(screen.queryByText(/额度快用完/)).toBeNull();
+  });
+
+  it("回归: 过期提示只给「本地有 user」的人看，游客不该看到", async () => {
+    // 游客同样拿到 authenticated=false，但他没过期——他本来就没登录过。
+    useAuthStore.setState({ token: null, user: null });
+    loggedIn({ limit: 10, used: 8, remaining: 2, has_byok: false, authenticated: false });
+    await screen.findByText("「三毒」指的是哪三种毒？");
+    expect(screen.queryByText(/登录状态已过期/)).toBeNull();
+  });
+
+  it("登录态正常时，额度提醒照常工作（不因这次修复被误伤）", async () => {
+    loggedIn({ limit: 200, used: 185, remaining: 15, has_byok: false, authenticated: true });
+    expect(await screen.findByText(/今日免费额度快用完了，剩余 15 次/)).toBeInTheDocument();
+    expect(screen.queryByText(/登录状态已过期/)).toBeNull();
+  });
+
+  // 用户原话是「即便登录后也会出现」——这一条就是那个"即便"。
+  // queryKey 若是常量 ["chatQuota"]，登录前后是同一个 key，配上全局 5 分钟
+  // staleTime，登录后照旧吃登录前缓存的游客额度，不会重新取。
+  it("回归: 登录后必须重新取额度，不能沿用登录前的游客缓存", async () => {
+    useAuthStore.setState({ token: null, user: null });
+    vi.mocked(getChatQuota)
+      .mockResolvedValueOnce({ limit: 10, used: 0, remaining: 10, has_byok: false, authenticated: false })
+      .mockResolvedValue({ limit: 200, used: 1, remaining: 199, has_byok: false, authenticated: true });
+
+    renderPage();
+    await screen.findByText("「三毒」指的是哪三种毒？");
+    const callsAsGuest = vi.mocked(getChatQuota).mock.calls.length;
+
+    act(() => {
+      useAuthStore.setState({
+        token: "fresh",
+        user: {
+          id: 42, username: "reader", email: "r@example.com", display_name: null,
+          role: "user", is_active: true, created_at: "2026-01-01T00:00:00Z",
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(vi.mocked(getChatQuota).mock.calls.length).toBeGreaterThan(callsAsGuest);
+    });
   });
 });
 

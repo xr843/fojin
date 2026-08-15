@@ -860,8 +860,13 @@ export default function ChatPage() {
     enabled: !!user,
   });
 
+  // The key carries the user id so logging in or out refetches instead of
+  // serving the other identity's cached answer. With a constant key and the
+  // global 5-minute staleTime, a guest quota fetched before login stayed fresh
+  // across the login and drove the logged-in banner — this is why the wrong
+  // "剩余 10 次" survived signing in.
   const { data: quota, refetch: refetchQuota } = useQuery({
-    queryKey: ["chatQuota"],
+    queryKey: ["chatQuota", user?.id ?? "anon"],
     queryFn: getChatQuota,
   });
 
@@ -1948,9 +1953,34 @@ export default function ChatPage() {
                 style={{ marginBottom: 8, fontSize: 12 }}
               />
             )}
+            {/* 本地还存着 user，后端却说没认证 —— 只可能是 token 过期了。
+                此时后端返回的是匿名配额，拿它去渲染任何「剩余 N 次」都是编造：
+                实测有用户今日只用 1 次（真实剩余 199）却被告知剩 10 次。
+                更要紧的是 /chat/stream 走的是同一套鉴权，过期后配额降为按 IP
+                共享的 10 次、会话不再存进账号 —— 所以这里必须让用户知道。
+                不自动登出：会把正在输入的内容和上下文一起清掉。 */}
+            {user && quota && !quota.authenticated && (
+              <Alert
+                message={
+                  <span>
+                    {t("chat.session_expired")}
+                    {/* 复用游客 CTA 的那条路：先暂存当前对话再跳登录。过期期间
+                        发出的消息本来就没进账号，直接 navigate 会当场销毁它们。
+                        returnTo 也在同一个函数里写好（sessionStorage，见 LoginPage）。 */}
+                    <a onClick={goLoginKeepingTranscript}>
+                      {t("chat.session_expired_action")}
+                    </a>
+                  </span>
+                }
+                type="warning" showIcon closable
+                style={{ marginBottom: 8, fontSize: 12 }}
+              />
+            )}
             {/* 登录用户此前在这里什么都看不到 —— 撞到上限是毫无预警的。
-                remaining 对自带 Key 的用户是 -1，所以 >= 0 已经把他们排除掉了。 */}
-            {user && quota && quota.remaining >= 0 && quota.remaining <= LOW_QUOTA_THRESHOLD && (
+                remaining 对自带 Key 的用户是 -1，所以 >= 0 已经把他们排除掉了。
+                authenticated 这一项不能省：token 过期时后端回的是匿名配额，
+                少了它就会把游客的 10 次当成这位登录用户的余额报出去。 */}
+            {user && quota && quota.authenticated && quota.remaining >= 0 && quota.remaining <= LOW_QUOTA_THRESHOLD && (
               <Alert
                 message={
                   <span>

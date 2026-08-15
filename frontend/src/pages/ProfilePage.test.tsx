@@ -70,7 +70,7 @@ describe("ProfilePage", () => {
       key_preview: null,
     });
     vi.mocked(getChatQuota).mockResolvedValue({
-      limit: 200, used: 3, remaining: 197, has_byok: false,
+      limit: 200, used: 3, remaining: 197, has_byok: false, authenticated: true,
     });
     vi.mocked(getBookmarks).mockResolvedValue({ total: 0, page: 1, size: 20, items: [] });
     vi.mocked(getHistory).mockResolvedValue({ total: 0, page: 1, size: 20, items: [] });
@@ -130,7 +130,7 @@ describe("ProfilePage", () => {
       },
     });
     vi.mocked(getChatQuota).mockResolvedValue({
-      limit: 999, used: 0, remaining: 999, has_byok: false,   // 故意取一个不可能写死的值
+      limit: 999, used: 0, remaining: 999, has_byok: false, authenticated: true,   // 故意取一个不可能写死的值
     });
     renderPage(<ProfilePage />, "/profile?tab=apikey");
 
