@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     jwt_secret_key: str = os.environ.get("JWT_SECRET_KEY", _DEFAULT_JWT_SECRET)
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 8  # 8 hours
+    # Sliding renewal (app/services/token_renewal.py): an authenticated request
+    # past the token's half-life gets a fresh token back, so an active reader is
+    # never logged out mid-use. This caps how long that chain may run — after it,
+    # they sign in again. Not a substitute for revocation: changing a password
+    # bumps password_version and kills every existing token immediately.
+    jwt_absolute_max_days: int = 30
 
     # BYOK API key encryption — independent of jwt_secret_key so rotating
     # one doesn't silently destroy the other (see P0-1 audit).  Must be a

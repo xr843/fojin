@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HelmetProvider } from "react-helmet-async";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
@@ -169,20 +169,26 @@ describe("CollectionsPage", () => {
       });
     });
 
+    // 这两条的「另一种字形不存在」用 screen 断言过，即对**整个 document**
+    // 断言——包含上一个用例可能还没拆干净的那棵树。满负载跑全量时实测会红：
+    // 文档里繁简两棵同时在，于是「繁体在」通过、「简体不在」失败。
+    // 限定在自己这次渲染的容器内，断言才是在说这次渲染的事。
     it("folds catalog titles to simplified for 中文简体 readers", async () => {
       await i18n.changeLanguage("zh");
-      renderPage();
+      const { container } = renderPage();
+      const view = within(container);
 
-      expect(await screen.findByText("瑜伽师地论")).toBeInTheDocument();
-      expect(screen.queryByText("瑜伽師地論")).not.toBeInTheDocument();
+      expect(await view.findByText("瑜伽师地论")).toBeInTheDocument();
+      expect(view.queryByText("瑜伽師地論")).not.toBeInTheDocument();
     });
 
     it("keeps catalog titles traditional for 繁體 readers", async () => {
       await i18n.changeLanguage("zh-Hant");
-      renderPage();
+      const { container } = renderPage();
+      const view = within(container);
 
-      expect(await screen.findByText("瑜伽師地論")).toBeInTheDocument();
-      expect(screen.queryByText("瑜伽师地论")).not.toBeInTheDocument();
+      expect(await view.findByText("瑜伽師地論")).toBeInTheDocument();
+      expect(view.queryByText("瑜伽师地论")).not.toBeInTheDocument();
     });
   });
 

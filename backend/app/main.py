@@ -11,11 +11,14 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import settings
+from app.core.auth import create_access_token, decode_token_claims
+from app.core.deps import RENEWABLE_STATE_ATTR
 from app.core.elasticsearch import close_es, get_es, init_es
 from app.core.exceptions import FoJinError, fojin_error_to_http
 from app.core.rate_limit import RateLimitMiddleware
 from app.core.version import get_deploy_identity
 from app.database import engine as async_engine
+from app.services.token_renewal import original_issued_at, should_renew
 
 try:
     from app.services.dianjin import get_dianjin_client
@@ -54,7 +57,7 @@ else:
     _app_logger.propagate = False
 
 logger = logging.getLogger(__name__)
-from datetime import UTC
+from datetime import UTC, datetime
 
 from app.api import (
     admin,
@@ -332,6 +335,8 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
+    # 自定义响应头默认对 JS 不可见；不暴露的话跨源部署下续期头会被静默丢弃。
+    expose_headers=["X-Renewed-Token"],
 )
 app.add_middleware(RateLimitMiddleware)
 # GZip handled by nginx — removed from backend to avoid compressing SSE streams
@@ -406,8 +411,59 @@ class LastActiveMiddleware(BaseHTTPMiddleware):
         return response
 
 
+RENEWED_TOKEN_HEADER = "X-Renewed-Token"
+
+
+class TokenRenewalMiddleware(BaseHTTPMiddleware):
+    """Hand back a fresh token when the current one is past its half-life.
+
+    An 8-hour JWT with no refresh means a returning reader is silently demoted
+    to a guest — quota drops from 200/day to an IP-shared 10/day and their
+    conversation stops being saved to their account, with nothing said. Sliding
+    renewal keeps an *active* session alive without a refresh-token store; idle
+    tokens still age out.
+
+    Only acts on requests that actually authenticated: the auth dependency sets
+    ``RENEWABLE_STATE_ATTR`` after its ``password_version`` check, so a token
+    whose session the user revoked (by changing their password) is never
+    renewed. Deciding from the signature alone here would have re-armed exactly
+    the sessions revocation exists to kill.
+
+    Failures are swallowed. A missed renewal costs the reader nothing today —
+    the token is still valid, that is the precondition for renewing at all — so
+    it must never turn a working response into an error.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        renewable = getattr(request.state, RENEWABLE_STATE_ATTR, None)
+        if renewable is None:
+            return response
+        try:
+            token, user_id, pwd_v = renewable
+            claims = decode_token_claims(token)
+            if claims is None:
+                return response
+            now = datetime.now(UTC)
+            if not should_renew(
+                claims,
+                now=now,
+                expire_minutes=settings.jwt_expire_minutes,
+                absolute_max_days=settings.jwt_absolute_max_days,
+            ):
+                return response
+            began = original_issued_at(claims, expire_minutes=settings.jwt_expire_minutes)
+            response.headers[RENEWED_TOKEN_HEADER] = create_access_token(
+                user_id, pwd_v, original_issued_at=began
+            )
+        except Exception:
+            logging.getLogger("app.auth").warning("token renewal skipped", exc_info=True)
+        return response
+
+
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(LastActiveMiddleware)
+app.add_middleware(TokenRenewalMiddleware)
 
 
 @app.exception_handler(FoJinError)

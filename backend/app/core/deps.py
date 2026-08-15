@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,8 +9,22 @@ from app.models.user import User
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
+# Key on request.state where a *successfully authenticated* request leaves what
+# TokenRenewalMiddleware needs to mint a replacement. Only ever set after the
+# password_version check has passed, so renewal can never resurrect a session
+# the user revoked by changing their password. `scope["state"]` is shared
+# between the dependency's Request and the middleware's (verified, not assumed).
+RENEWABLE_STATE_ATTR = "fojin_renewable_token"
+
+
+def _mark_renewable(request: Request | None, token: str, user: User) -> None:
+    if request is None:
+        return
+    setattr(request.state, RENEWABLE_STATE_ATTR, (token, user.id, user.password_version))
+
 
 async def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> User:
@@ -28,6 +42,7 @@ async def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="用户不存在或已禁用")
     if user.password_version != token_pwd_v:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="凭证已失效，请重新登录")
+    _mark_renewable(request, credentials.credentials, user)
     return user
 
 
@@ -57,7 +72,12 @@ async def resolve_optional_user(token: str | None, db: AsyncSession) -> User | N
 
 
 async def get_optional_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> User | None:
-    return await resolve_optional_user(credentials.credentials if credentials else None, db)
+    token = credentials.credentials if credentials else None
+    user = await resolve_optional_user(token, db)
+    if user is not None and token:
+        _mark_renewable(request, token, user)
+    return user
