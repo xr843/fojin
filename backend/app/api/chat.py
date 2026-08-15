@@ -302,7 +302,22 @@ async def chat_quota(
 ):
     """Get daily chat quota for the current user or anonymous visitor.
 
-    获取当前用户或匿名用户的每日问答配额。"""
+    获取当前用户或匿名用户的每日问答配额。
+
+    ``authenticated`` exists because the two branches below are otherwise
+    indistinguishable to the caller, and that ambiguity shipped a user-visible
+    lie. ``get_optional_user`` returns ``None`` for a *missing* token and for an
+    expired or otherwise invalid one alike (see ``resolve_optional_user``), so a
+    logged-in reader whose 8-hour JWT had quietly expired fell through to the
+    anonymous branch and was served ``limit: 10``. The client still had the user
+    object in its persisted store, so it rendered the *logged-in* low-quota
+    warning around the *anonymous* number — a reader with 199 of 200 questions
+    left was told 10 remained. The same expiry silently demotes them on
+    ``/chat/stream`` too (IP-shared quota, session not saved to their account),
+    which is the part worth surfacing.
+
+    With this flag the client can tell "you are a guest" from "your session
+    expired" and say so, instead of inventing a quota."""
     from datetime import date
 
     if user:
@@ -314,9 +329,12 @@ async def chat_quota(
             "used": used,
             "remaining": limit - used if not has_byok else -1,
             "has_byok": has_byok,
+            "authenticated": True,
         }
 
-    # Anonymous user — check Redis by IP
+    # Anonymous user — check Redis by IP. Also reached by a logged-in client
+    # whose token expired; `authenticated: False` is the only signal that says
+    # which of the two happened.
     client_ip = _get_client_ip(request)
     redis = getattr(request.app.state, "redis", None)
     used = await get_anonymous_quota_used(redis, client_ip)
@@ -326,6 +344,7 @@ async def chat_quota(
         "used": used,
         "remaining": limit - used,
         "has_byok": False,
+        "authenticated": False,
     }
 
 

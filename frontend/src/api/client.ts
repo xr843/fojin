@@ -1902,6 +1902,15 @@ export interface ChatQuota {
   used: number;
   remaining: number;
   has_byok: boolean;
+  /**
+   * Whether the backend actually recognised a logged-in user for this request.
+   * `false` covers both "no token sent" and "token sent but expired/invalid" —
+   * the backend cannot tell those apart either, but the *client* can: if it
+   * still holds a user in its persisted store and gets `false` back, the
+   * session expired. Without this the expired case is indistinguishable from
+   * being a guest, and the UI renders a logged-in banner around a guest quota.
+   */
+  authenticated: boolean;
 }
 
 export async function getChatQuota(): Promise<ChatQuota> {

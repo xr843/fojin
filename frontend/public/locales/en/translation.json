@@ -1531,6 +1531,8 @@
   "profile.byok_description_generic": "Adding your own AI API key lifts the platform's free daily limit, but the usage is billed to your key. Keys are stored with AES encryption and used only for AI API calls.",
   "chat.quota_low": "Your free daily quota is running low — {{remaining}} left.",
   "chat.quota_low_action": "Add your own API key to lift the limit",
+  "chat.session_expired": "Your session has expired — questions now count against the guest quota and are not saved to your account. ",
+  "chat.session_expired_action": "Sign in again",
   "chat.configure_other_models": "Use another provider…",
   "xiaojin.open": "Ask XiaoJin",
   "xiaojin.close": "Close",
