@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { useAuthStore, type UserProfile } from "./authStore";
+import { markSessionExpired, sessionExpired, useAuthStore, type UserProfile } from "./authStore";
 
 const mockUser: UserProfile = {
   id: 1,
@@ -69,5 +69,47 @@ describe("authStore", () => {
     useAuthStore.getState().setAuth("admin-token", adminUser);
 
     expect(useAuthStore.getState().user?.role).toBe("admin");
+  });
+});
+
+// ── 「登录态是自己死的」这个事实必须活过 logout ────────────────────────
+//
+// 401 拦截器的处理是 logout()，而 logout() 会把 user 清空 —— 此后
+// user==null 与「从没登录过」完全一样。实测正是如此：手工把 token 改坏后
+// 进 /chat，两条横幅一条都不出现，因为 user 已经被抹了。所以到期这件事得
+// 单独留一个标记，否则页面没法告诉用户"你现在是游客身份在提问"。
+
+describe("会话过期标记", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    useAuthStore.setState({ token: null, user: null });
+  });
+
+  it("置位后可读到", () => {
+    expect(sessionExpired()).toBe(false);
+    markSessionExpired();
+    expect(sessionExpired()).toBe(true);
+  });
+
+  it("承重点: 重新登录会清掉标记——否则修好了提示还在", () => {
+    markSessionExpired();
+    useAuthStore.getState().setAuth("fresh-token", mockUser);
+    expect(sessionExpired()).toBe(false);
+  });
+
+  it("承重点: 主动登出不算过期——它清标记，只有 401 那条路才置位", () => {
+    useAuthStore.getState().setAuth("t", mockUser);
+    markSessionExpired();
+    useAuthStore.getState().logout();
+    expect(sessionExpired()).toBe(false);
+  });
+
+  it("顺序敏感: 401 路径必须先 logout 再置位，反过来会被自己清掉", () => {
+    // 复现 client.ts 拦截器里的真实调用顺序。
+    useAuthStore.getState().setAuth("dead-token", mockUser);
+    useAuthStore.getState().logout();
+    markSessionExpired();
+    expect(sessionExpired()).toBe(true);
+    expect(useAuthStore.getState().user).toBeNull();
   });
 });
