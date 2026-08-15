@@ -519,6 +519,7 @@
   "sutra_landing.data_provided_by": "經文資料由",
   "sutra_landing.provided": "提供",
   "textDetail.notFound": "經典未找到",
+  "text.source_label": "來源：",
   "textDetail.pageTitle": "{{title}} — 佛津",
   "textDetail.metaTranslator": "{{translator}}譯",
   "textDetail.seoDescription": "{{details}} — 佛津佛教古籍數字資源平臺",

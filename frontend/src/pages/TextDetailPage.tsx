@@ -27,6 +27,7 @@ import BookmarkButton from "../components/BookmarkButton";
 import { RelatedTextsStandalone as RelatedTexts } from "../components/RelatedTexts";
 import OtherVersions from "../components/OtherVersions";
 import CrossCanonEntry from "../components/CrossCanonEntry";
+import SourceAttribution from "../components/SourceAttribution";
 import CitationGenerator from "../components/CitationGenerator";
 import { addViewHistory } from "../utils/history";
 
@@ -151,13 +152,16 @@ export default function TextDetailPage() {
           <Title level={3} style={{ marginBottom: 4 }}>
             {text.title_zh}
           </Title>
-          <Space style={{ marginBottom: 16 }}>
+          <Space style={{ marginBottom: 8 }}>
             <Tag color="blue">{text.cbeta_id}</Tag>
             {text.taisho_id && text.taisho_id !== text.cbeta_id && (
               <Tag>{text.taisho_id}</Tag>
             )}
             {text.category && <Tag color="geekblue">{text.category}</Tag>}
           </Space>
+          {/* 数据源署名。上面那些标签是**藏经**与分类，不是来源 ——
+              CBETA(CC BY-NC-SA) 与 84000 都把署名列为许可条件。 */}
+          <SourceAttribution textId={text.id} />
 
           <Descriptions column={1} bordered size="small">
             {text.translator && (

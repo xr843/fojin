@@ -519,6 +519,7 @@
   "sutra_landing.data_provided_by": "Scripture data provided by",
   "sutra_landing.provided": "",
   "textDetail.notFound": "Text not found",
+  "text.source_label": "Source: ",
   "textDetail.pageTitle": "{{title}} — FoJin",
   "textDetail.metaTranslator": "translated by {{translator}}",
   "textDetail.seoDescription": "{{details}} — FoJin Buddhist Classics Digital Resource Platform",
