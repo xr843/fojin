@@ -182,6 +182,10 @@ frontend_changed=false
 backend_changed=false
 mcp_changed=false
 backend_image_changed=false
+# Set by either alembic path (the no-restart `upgrade head` below, or a migration
+# riding along with app code that entrypoint.sh applies on restart). Drives the
+# sources-cache bust — see the call after the backend section.
+migrations_applied=false
 
 # Frontend
 if [ -z "$FE_BASE" ]; then
@@ -252,6 +256,11 @@ elif [ "$BE_BASE" != "$NEW_REV" ]; then
       log "backend 依赖/Dockerfile 改动 — 升级为 rebuild image。"
       backend_image_changed=true
     fi
+    # A migration riding along with app code is applied by entrypoint.sh when the
+    # replica restarts below — still a migration, so the cache bust must fire too.
+    if echo "$BE_DIFF" | grep -q '^backend/alembic/'; then
+      migrations_applied=true
+    fi
   elif echo "$BE_DIFF" | grep -q '^backend/'; then
     # Pure scripts/tests/eval/alembic change — log but don't restart.
     log "backend/ 仅有 scripts/tests/eval/alembic 改动 — 跳过 restart（不影响 uvicorn，也不杀正在跑的脚本）。"
@@ -266,6 +275,7 @@ elif [ "$BE_BASE" != "$NEW_REV" ]; then
       log "检测到 alembic 迁移改动 — 运行 alembic upgrade head（容器不重启）。"
       docker compose exec -T backend alembic upgrade head \
         || fail "alembic upgrade head 失败 — 迁移未应用，请人工处理。"
+      migrations_applied=true
     fi
     # Still bump the marker so we don't keep re-evaluating the same untouched
     # diff every cron tick — otherwise the next deploy.sh run will see the same
@@ -341,6 +351,21 @@ if $backend_changed; then
   echo "$NEW_REV" > "$BACKEND_RESTART_MARKER"
 else
   log "Backend unchanged — skip."
+fi
+
+# --- 4b. 迁移改了数据但 /api/sources 走 30 分钟 Redis 缓存 -------------------
+# GET /api/sources serves a cached payload (sources:list:v3, TTL 1800s). The
+# health-check cron busts that key after every run, but a migration had no way
+# to — so a data-source change (which in this repo IS a migration, not an admin
+# edit) landed in Postgres and stayed invisible to readers for up to 30 minutes,
+# looking exactly like a migration that matched zero rows. Observed on 0178:
+# `alembic current` said 0178, psql showed the new values, and /api/sources kept
+# serving the old list. Best-effort — the TTL still expires on its own, so a
+# failure here must not fail the deploy.
+if $migrations_applied; then
+  log "迁移已应用 — 失效 /api/sources 列表缓存。"
+  docker compose exec -T backend python scripts/bust_sources_cache.py \
+    || log "WARNING: 清缓存失败（非致命，最迟 30 分钟后 TTL 自然过期）。"
 fi
 
 # --- 5. 健康检查 -------------------------------------------------------------
