@@ -211,13 +211,23 @@ async def test_cert_failure_with_healthy_leaf_is_low_confidence(monkeypatch):
     assert "looks_valid" in v["detail"]
 
 
-async def test_cert_failure_with_expired_leaf_is_high_confidence(monkeypatch):
-    # 台大的情形：叶证书确实已过期，全网一致，可以放心报出去。
+async def test_cert_failure_with_expired_leaf_is_still_low_confidence(monkeypatch):
+    """叶证书确实过期，也不能提升为 high——「全网一致」这个前提是错的。
+
+    2026-08-15 实测：拿到哪张叶证书取决于从哪里拨号。新加坡 VPS 上
+    www.cnki.net 收到的是 *.cdn.myqcloud.com、www.palitext.com 是
+    *.stackcp.com，而 youfun.litphil.sinica.edu.tw 被判「已过期」时，别处
+    的 leaf 有效期到 2026-10-28。复读 leaf 走的是同一个点位，所以它证明的
+    是「这个边缘节点喂了什么」，不是站点有问题。
+
+    status 和 detail 不变——运维仍要知道看到的是哪种证书问题，变的只是
+    「敢不敢拿去给读者打红标」。
+    """
     monkeypatch.setattr(hc, "_read_leaf_facts", lambda host, port: (PAST, ["www.example.org"]))
     client = FakeClient(httpx.ConnectError("[SSL: CERTIFICATE_VERIFY_FAILED] certificate has expired"))
     v = await hc.probe(client, FakeClient(), "src", URL)
     assert v["status"] == "cert_invalid"
-    assert v["confidence"] == "high"
+    assert v["confidence"] == "low"
     assert "expired" in v["detail"]
 
 

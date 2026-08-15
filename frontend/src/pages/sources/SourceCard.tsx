@@ -70,8 +70,16 @@ export default function SourceCard({ source: s, searchQuery }: SourceCardProps) 
   // misleading users. If a source lacks a template, the button is hidden.
   const searchUrl = searchQuery ? buildSearchUrl(s.code, searchQuery) : null;
 
+  // Badge only on verdicts that hold outside the prober's own vantage. The cron
+  // runs from a single VPS: a timeout there, a DNS miss, or a CDN edge handing
+  // back its own default certificate are facts about the probe, not the site —
+  // 0172 added health_confidence for exactly this and the badge was never wired
+  // to it, so every low-confidence verdict has been telling readers that live
+  // institutions (Bodleian, Princeton, CNKI …) are broken.
   const health =
-    s.health_status && s.health_status !== "ok" ? HEALTH_BADGE[s.health_status] : null;
+    s.health_status && s.health_status !== "ok" && s.health_confidence === "high"
+      ? HEALTH_BADGE[s.health_status]
+      : null;
   const healthCheckedAt = s.health_checked_at
     ? new Date(s.health_checked_at).toLocaleDateString("zh-CN")
     : null;

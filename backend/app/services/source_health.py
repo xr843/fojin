@@ -163,10 +163,16 @@ def classify_cert(
     the world sees — interception, a stale trust store, a geo-routed edge — and
     the source is fine.
 
-    Expiry is checked before hostname because it is the harder, wholly
-    vantage-independent fact. ``CERT_UNKNOWN`` means the leaf could not be read
-    at all (e.g. the server aborts the handshake before sending one), so nothing
-    was re-verified and nothing may be claimed.
+    Expiry is checked before hostname because it is the harder fact *about the
+    leaf in hand* — but it is **not** vantage-independent, as this docstring
+    once claimed. Which leaf you are handed depends on where you dial from (see
+    the CDN-default-cert cases in :func:`probe_confidence`), so this verdict
+    describes one edge, never the source — which is why no cert verdict is
+    allowed to reach ``high`` confidence.
+
+    ``CERT_UNKNOWN`` means the leaf could not be read at all (e.g. the server
+    aborts the handshake before sending one), so nothing was re-verified and
+    nothing may be claimed.
     """
     if not_after is None:
         return CERT_UNKNOWN
@@ -190,18 +196,39 @@ def probe_confidence(*, status: str, error: str | None, cert: str | None) -> str
     ``low`` ones are recorded for operators but say as much about the probe
     environment as about the site.
 
-    high — the server answered with an HTTP status (same everywhere), the leaf
-    cert was independently re-checked and is genuinely expired or genuinely
-    issued for another name, or the host resolves into non-public space.
+    high — the server answered with an HTTP status (the origin spoke, and a code
+    it chose to return is the same everywhere), or the host resolves into
+    non-public space (a fact the prober establishes from DNS alone).
 
-    low — timeouts, dropped connections and DNS failures (all routinely caused
-    by a datacenter IP being blocked or by the VPS's resolver), plus any cert
-    rejection the re-check could not corroborate.
+    low — everything the prober cannot separate from its own vantage: timeouts,
+    dropped connections, DNS failures (all routinely caused by a datacenter IP
+    being blocked or by the VPS's resolver), **and every TLS rejection**.
+
+    On certs this deliberately reverses 0172, which promoted a cert fault to
+    ``high`` once a re-read of the leaf corroborated it. The re-read dials the
+    same host from the same machine, so it can only confirm what *this* vantage
+    is served — never that the fault exists anywhere else. A 2026-08-15 audit
+    found the gap is not theoretical; from the Singapore VPS, with SNI sent and
+    a valid chain:
+
+        www.cnki.net      -> CN = *.cdn.myqcloud.com   (Tencent CDN default)
+        www.palitext.com  -> CN = *.stackcp.com        (host's default)
+        cbc.dila.edu.tw   -> CN = dazangthings.nz
+
+    while a second vantage is served each site's own, in-date certificate. Both
+    cert families are affected — youfun.litphil.sinica.edu.tw was recorded
+    "expired" against a leaf valid to 2026-10-28 elsewhere — so neither
+    CERT_EXPIRED nor CERT_HOSTNAME_MISMATCH survives as evidence about the
+    *source*. A CDN edge answering for a name it holds no certificate for is a
+    fact about that edge; badging it tells a reader in another region that a
+    live institution is broken.
+
+    ``cert`` is therefore no longer consulted here. It is still recorded in
+    ``health_detail`` — an operator wants to know which cert fault was seen —
+    and stays in the signature so callers and the detail line are unchanged.
     """
     if error is None:
         return CONFIDENCE_HIGH
-    if error == SSL_ERROR:
-        return CONFIDENCE_HIGH if cert in (CERT_EXPIRED, CERT_HOSTNAME_MISMATCH) else CONFIDENCE_LOW
     if error == HOST_NON_PUBLIC:
         return CONFIDENCE_HIGH
     return CONFIDENCE_LOW

@@ -19,6 +19,7 @@ from app.services.source_health import (
     HOST_DNS_UNRESOLVED,
     HOST_NON_PUBLIC,
     HOST_PUBLIC,
+    SSL_CHAIN_INCOMPLETE,
     SSL_ERROR,
     _ip_is_blocked,
     classify_cert,
@@ -444,18 +445,33 @@ def test_confidence_high_for_http_status_verdicts():
     assert probe_confidence(status="unreachable", error=None, cert=None) == CONFIDENCE_HIGH
 
 
-def test_confidence_high_for_independently_confirmed_cert_faults():
-    assert probe_confidence(status="cert_invalid", error=SSL_ERROR, cert=CERT_EXPIRED) == CONFIDENCE_HIGH
-    assert probe_confidence(status="cert_invalid", error=SSL_ERROR, cert=CERT_HOSTNAME_MISMATCH) == CONFIDENCE_HIGH
+def test_confidence_low_for_every_cert_verdict_however_well_corroborated():
+    """证书判词一律不可外推——复读 leaf 和探测走的是同一个点位。
+
+    这条推翻了 0172 的设计。2026-08-15 实测：从新加坡 VPS 正确发送 SNI、链
+    校验通过的前提下，www.cnki.net 收到的是 *.cdn.myqcloud.com、
+    www.palitext.com 是 *.stackcp.com、cbc.dila.edu.tw 是 dazangthings.nz，
+    而换一个点位拿到的都是各站自己的有效证书。「过期」一类同样中招：
+    youfun.litphil.sinica.edu.tw 被判过期，别处 leaf 有效期到 2026-10-28。
+    所以 leaf 复读只能证明「这个点位被喂了什么」，不能证明站点有问题。
+    """
+    for cert in (CERT_EXPIRED, CERT_HOSTNAME_MISMATCH, CERT_LOOKS_VALID, CERT_UNKNOWN):
+        verdict = probe_confidence(status="cert_invalid", error=SSL_ERROR, cert=cert)
+        assert verdict == CONFIDENCE_LOW, f"cert={cert} 不该被当作跨点位证据"
 
 
-def test_confidence_low_when_cert_looks_fine_but_handshake_failed():
-    # CNKI / 遊方：OpenSSL 拒了，但独立复核证书是好的 → 是探测点的问题。
-    assert probe_confidence(status="cert_invalid", error=SSL_ERROR, cert=CERT_LOOKS_VALID) == CONFIDENCE_LOW
+def test_confidence_high_survives_only_for_origin_answered_and_non_public():
+    """收窄之后 high 只剩两类，别让谁不小心把证书类再加回来。
 
-
-def test_confidence_low_for_cert_we_could_not_recheck():
-    assert probe_confidence(status="cert_invalid", error=SSL_ERROR, cert=CERT_UNKNOWN) == CONFIDENCE_LOW
+    这两类的共同点是「不依赖探测点」：源站自己回了一个状态码，或主机名解析
+    进非公网地址（探测机自己就能定的事实，也正是 SSRF 该拦的）。
+    """
+    for status in ("ok", "degraded", "unreachable"):
+        assert probe_confidence(status=status, error=None, cert=None) == CONFIDENCE_HIGH
+    assert probe_confidence(status="unreachable", error=HOST_NON_PUBLIC, cert=None) == CONFIDENCE_HIGH
+    # 其余一律 low —— 含 0172 曾放行的两种证书判词。
+    for err in (SSL_ERROR, SSL_CHAIN_INCOMPLETE, HOST_DNS_UNRESOLVED, "timeout", "connect", "read"):
+        assert probe_confidence(status="unreachable", error=err, cert=CERT_EXPIRED) == CONFIDENCE_LOW, err
 
 
 def test_confidence_low_for_timeout_and_dns():

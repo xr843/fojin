@@ -57,6 +57,7 @@ function source(o: Partial<DataSource> = {}): DataSource {
     health_status: "ok",
     health_checked_at: null,
     health_detail: null,
+    health_confidence: "high",
     distributions: [],
     ...o,
   };
