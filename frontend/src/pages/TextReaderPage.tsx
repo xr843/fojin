@@ -26,6 +26,7 @@ import { useAudioPlayer } from "../audio/useAudioPlayback";
 import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBookmark, addBookmark, removeBookmark, searchDictionaryGrouped, getJuanApparatus, getJuanLineAnchors, getJuanAudio, type ApparatusEntryItem } from "../api/client";
 import { useAuthStore } from "../stores/authStore";
 import CitationGenerator from "../components/CitationGenerator";
+import SourceAttribution from "../components/SourceAttribution";
 import AnnotationPanel from "../components/AnnotationPanel";
 import { ReaderDictPopover } from "../components/ReaderDictPopover";
 import { DICT_POPOVER_INIT, MAX_WORD_LEN, type DictPopoverState } from "../components/ReaderDictPopover.types";
@@ -858,6 +859,11 @@ export default function TextReaderPage() {
             </Tooltip>
           )}
         </Typography.Title>
+
+        {/* 数据源署名。上面的徽章是**藏经名**（大正藏 / 甘珠尔 / 巴利三藏），
+            不是来源 —— CBETA(CC BY-NC-SA) 与 84000 都把署名列为许可条件，
+            而 84000 的条款明确「只写译者不写 84000 本身不算数」。 */}
+        <SourceAttribution textId={textId} />
 
         <div className="reader-nav">
           <Select

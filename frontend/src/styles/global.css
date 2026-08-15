@@ -446,6 +446,29 @@ em {
   white-space: pre-wrap;
   word-break: break-word;
 }
+/* 数据源署名 —— 文本页上「这段文字从哪来」。CBETA 与 84000 把署名列为许可
+   条件，所以它必须可见；但它是出处信息不是正文，所以排版上刻意收敛。 */
+.source-attribution {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--fj-ink-muted);
+}
+.source-attribution-label {
+  opacity: 0.8;
+}
+.source-attribution a {
+  color: var(--fj-ink-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.source-attribution a:hover {
+  color: var(--fj-highlight);
+}
+.source-attribution-sep {
+  margin: 0 6px;
+  opacity: 0.5;
+}
+
 .chat-reasoning-caret {
   display: inline-block;
   margin-left: 1px;
