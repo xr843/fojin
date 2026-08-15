@@ -25,7 +25,13 @@ from app.services.source import (
 router = APIRouter(prefix="/sources", tags=["sources"])
 
 SOURCES_LIST_CACHE_KEY = "sources:list:v3"  # v3: + health_detail (0136)
-SOURCES_LIST_CACHE_TTL = 1800  # 30 min; data only changes on manual admin edits
+# 30 min. Two writers change these rows and BOTH must invalidate the key, or a
+# change stays invisible for up to a full TTL: scripts/health_check_sources.py
+# busts it after each run, and deploy.sh runs scripts/bust_sources_cache.py
+# after `alembic upgrade head` — migrations, not an admin UI, are how data
+# sources are edited here (CLAUDE.md). Bumping the key version counts as a third
+# writer: update both scripts if this constant changes.
+SOURCES_LIST_CACHE_TTL = 1800
 
 _sources_list_adapter = TypeAdapter(list[DataSourceResponse])
 
