@@ -115,8 +115,11 @@ export default function ProfilePage() {
   // 额度上限从接口取，不写死在翻译文件里。此前 profile.byok_description 里硬编码
   // 的「每日 10 次」是匿名用户的限额，而这个页面只有登录用户看得到（他们的实际
   // 上限是 200）—— 数字与 FREE_DAILY_LIMIT_USER 各写一处，迟早再次漂移。
+  // 键里带上用户身份：常量键在登录/登出之间不变，会把上一个身份的答案继续
+  // 端给下一个（全局 staleTime 5 分钟）。/chat 上正是这个缺陷让登录用户看到了
+  // 游客的「剩余 10 次」。
   const { data: quota } = useQuery({
-    queryKey: ["chat-quota"],
+    queryKey: ["chat-quota", user?.id ?? "anon"],
     queryFn: getChatQuota,
     enabled: !!token,
   });
@@ -365,7 +368,12 @@ export default function ProfilePage() {
                   <Space direction="vertical" size="middle" style={{ width: "100%" }}>
                     <Alert
                       message="Bring Your Own Key (BYOK)"
-                      description={quota
+                      // 后端对**过期 token** 返回的是游客配额（limit 10），
+                      // 与"没带 token"一模一样。这个页面只有登录用户看得到，
+                      // 把那个 10 填进「每日 N 次」，等于告诉一个上限 200 的人
+                      // 他只有 10 次 —— 恰好是上面那段注释当初要消灭的硬编码。
+                      // 分不清就用不带数字的那句，宁可少说也不要说错。
+                      description={quota?.authenticated
                         ? t("profile.byok_description", { limit: quota.limit })
                         : t("profile.byok_description_generic")}
                       type="info"
