@@ -293,6 +293,14 @@ export interface DataSource {
   health_checked_at: string | null;
   /** Latest-probe context: redirect target for `moved`, failure reason otherwise, null when ok. */
   health_detail: string | null;
+  /**
+   * Whether the verdict holds beyond the prober's own vantage. The cron runs
+   * from one VPS, where a timeout, a DNS miss or a CDN edge serving its default
+   * certificate says more about the probe than about the site — so only `high`
+   * may be shown to a reader as a fault of the source. See
+   * `app/services/source_health.probe_confidence`.
+   */
+  health_confidence: "high" | "low";
   distributions: SourceDistribution[];
 }
 
