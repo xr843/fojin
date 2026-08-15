@@ -1,7 +1,7 @@
 import { afterEach, describe, it, expect, beforeEach, vi } from "vitest";
 import axios from "axios";
 import type { AxiosError, InternalAxiosRequestConfig, AxiosResponse } from "axios";
-import { useAuthStore } from "../stores/authStore";
+import { useAuthStore, type UserProfile } from "../stores/authStore";
 import { api } from "./client";
 import i18n from "../i18n";
 import enTranslation from "../../public/locales/en/translation.json";
@@ -30,6 +30,20 @@ const responseErrorInterceptor = realInterceptor<(e: AxiosError) => Promise<neve
   api.interceptors.response,
   "rejected",
 );
+
+const responseOkInterceptor = realInterceptor<(r: AxiosResponse) => AxiosResponse>(
+  api.interceptors.response,
+  "fulfilled",
+);
+
+function makeResponse(headers: Record<string, string>): AxiosResponse {
+  return { status: 200, statusText: "OK", data: {}, headers, config: makeConfig() } as AxiosResponse;
+}
+
+const SOMEONE: UserProfile = {
+  id: 7, username: "reader", email: "r@example.com", display_name: null,
+  role: "user", is_active: true, created_at: "2026-01-01T00:00:00Z",
+};
 
 function makeConfig(url: string = "/test"): InternalAxiosRequestConfig {
   return {
@@ -308,5 +322,46 @@ describe("sendChatMessageStream", () => {
     expect(window.location.href).toBe("/chat");
     expect(callbacks.onError).toHaveBeenCalledWith(expect.any(String), "unauthorized");
     expect(callbacks.onDone).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+// ── 滑动续期：后端过半程时用 X-Renewed-Token 发回新证 ──────────────────
+//
+// 没有这条，8 小时 JWT 无续期意味着活跃用户每天被踢下线一次（实测 52% 的
+// chat 会话会撞到登录态失效）。
+
+describe("响应拦截器 - 滑动续期", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useAuthStore.setState({ token: "old-token", user: SOMEONE });
+  });
+
+  it("收到 X-Renewed-Token 时换掉本地 token", () => {
+    responseOkInterceptor(makeResponse({ "x-renewed-token": "brand-new-token" }));
+    expect(useAuthStore.getState().token).toBe("brand-new-token");
+  });
+
+  it("承重点: 只换 token，user 不能被动过", () => {
+    responseOkInterceptor(makeResponse({ "x-renewed-token": "brand-new-token" }));
+    expect(useAuthStore.getState().user).toEqual(SOMEONE);
+  });
+
+  it("没有这个头时保持原样——绝大多数响应都不带它，这是常态不是异常", () => {
+    responseOkInterceptor(makeResponse({}));
+    expect(useAuthStore.getState().token).toBe("old-token");
+  });
+
+  it("承重点: 本地没有 user 时不接受续期——否则会造出一个只有 token 的半截身份", () => {
+    useAuthStore.setState({ token: null, user: null });
+    responseOkInterceptor(makeResponse({ "x-renewed-token": "brand-new-token" }));
+    expect(useAuthStore.getState().token).toBeNull();
+  });
+
+  it("错误响应上带的续期头也照收（比如一次 404）", () => {
+    const err = makeAxiosError(404);
+    (err.response as AxiosResponse).headers = { "x-renewed-token": "from-a-404" };
+    void responseErrorInterceptor(err).catch(() => {});
+    expect(useAuthStore.getState().token).toBe("from-a-404");
   });
 });

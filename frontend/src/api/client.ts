@@ -48,9 +48,29 @@ api.interceptors.request.use((config) => {
 // 清掉身份之后交给路由自己判断：ProtectedRoute 见 user 为空会跳登录并顺手写
 // returnTo；而 /texts、/dictionary、/chat 这些公开页原地降级成游客继续看。
 // 令牌失效的意思是「我不再认识你」，不是「你不能待在这个页面」。
+// 滑动续期：后端在 token 过半程时用 X-Renewed-Token 发回一张新的（见
+// app/main.py TokenRenewalMiddleware）。这里换掉本地那张，活跃用户就不会再
+// 每 8 小时被踢下线一次。只换 token 不动 user —— 身份没变，变的只是凭证。
+// 收不到这个头是完全正常的（token 还在前半程 / 这次请求没认证），不是错误。
+const RENEWED_TOKEN_HEADER = "x-renewed-token";
+
+function adoptRenewedToken(headers: unknown): void {
+  const fresh = (headers as Record<string, string> | undefined)?.[RENEWED_TOKEN_HEADER];
+  if (!fresh) return;
+  const { user } = useAuthStore.getState();
+  // 没有 user 就不该有可续的会话；此时写 token 会造出一个半截身份。
+  if (!user) return;
+  useAuthStore.getState().setAuth(fresh, user);
+}
+
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    adoptRenewedToken(response.headers);
+    return response;
+  },
   (error) => {
+    // 4xx/5xx 上也可能带着续期头（比如一次 404）——照收，别浪费。
+    adoptRenewedToken(error.response?.headers);
     if (
       error.response?.status === 401 &&
       !error.config?.url?.startsWith("/auth/")
