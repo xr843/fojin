@@ -291,14 +291,25 @@ def shape_parallels(data: Any) -> dict[str, Any]:
 
     ``source="mitra-parallel"`` rows are inline foreign (Skt/Tib) sentences from
     MITRA with text_id 0 — no fojin work to cite, so they stay urn=None but keep
-    their ``original_preview``/``original_lang`` text."""
+    their ``original_preview``/``original_lang`` text.
+
+    We also emit ``source_chunks`` — the Chinese text of each chunk that has
+    parallels, keyed by the same index ``aligns_source_chunk`` refers to.
+    Without it that field is a bare integer with no referent: a caller holding a
+    passage cannot tell which chunk it falls in, so it cannot narrow 600+
+    fascicle-wide parallels down to the ones facing its passage. Only chunks
+    that actually carry parallels are emitted; the rest would be dead weight."""
     d = data if isinstance(data, dict) else {}
     out: list[dict[str, Any]] = []
+    source_chunks: list[dict[str, Any]] = []
     for entry in _as_list(d, "entries"):
         if not isinstance(entry, dict):
             continue
         src_chunk = entry.get("chunk_index")
-        for p in _as_list(entry, "parallels"):
+        entry_parallels = _as_list(entry, "parallels")
+        if entry_parallels:
+            source_chunks.append({"chunk_index": src_chunk, "text": entry.get("chunk_text")})
+        for p in entry_parallels:
             if not isinstance(p, dict):
                 continue
             out.append(
@@ -326,6 +337,7 @@ def shape_parallels(data: Any) -> dict[str, Any]:
             "total_chunks": d.get("total_chunks"),
             "chunks_with_parallels": d.get("chunks_with_parallels"),
         },
+        "source_chunks": source_chunks,
         "parallels": out,
     }
 

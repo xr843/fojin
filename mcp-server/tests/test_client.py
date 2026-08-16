@@ -85,6 +85,43 @@ def test_shape_parallels_flattens_real_envelope():
     assert out["parallels"][1]["original_preview"] == "skt sentence"
 
 
+def test_shape_parallels_emits_source_chunks_so_a_passage_can_be_narrowed():
+    """A juan returns parallels for the whole fascicle — T1579.42 returns 685.
+
+    A caller holding one passage needs the few facing that passage, and
+    `aligns_source_chunk` alone cannot get it there: it is a bare index with no
+    referent. `source_chunks` supplies the Chinese text per index, which is what
+    makes narrowing possible at all.
+    """
+    data = {
+        "text_id": 43, "juan_num": 42, "total_chunks": 4, "chunks_with_parallels": 2,
+        "entries": [
+            {"chunk_index": 0, "chunk_text": "云何菩薩善士精進", "parallels": [
+                {"text_id": 0, "juan_num": 0, "chunk_index": 0, "lang": "bo",
+                 "chunk_text": "bo A", "confidence": 1.0, "source": "mitra-parallel"},
+            ]},
+            {"chunk_index": 1, "chunk_text": "無所棄捨精進", "parallels": []},
+            {"chunk_index": 2, "chunk_text": "若於界差別", "parallels": [
+                {"text_id": 0, "juan_num": 0, "chunk_index": 0, "lang": "sa",
+                 "chunk_text": "sa B", "confidence": 0.9, "source": "mitra-parallel"},
+            ]},
+        ],
+    }
+    out = shape_parallels(data)
+
+    # 没有平行段的 chunk 不进来——它对调用方是死重量
+    assert out["source_chunks"] == [
+        {"chunk_index": 0, "text": "云何菩薩善士精進"},
+        {"chunk_index": 2, "text": "若於界差別"},
+    ]
+
+    # 端到端：拿一段原文 → 定位 chunk → 只留面向它的平行段
+    passage = "若於界差別"
+    hit = next(c for c in out["source_chunks"] if passage in (c["text"] or ""))
+    facing = [p for p in out["parallels"] if p["aligns_source_chunk"] == hit["chunk_index"]]
+    assert [p["text"] for p in facing] == ["sa B"]
+
+
 def test_shape_parallels_tolerates_empty():
     assert shape_parallels({})["parallels"] == []
     assert shape_parallels({"entries": []})["parallels"] == []
