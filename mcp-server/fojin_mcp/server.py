@@ -140,8 +140,16 @@ async def get_parallels(text_id: int, juan_num: int) -> dict:
     """Cross-canon parallel passages aligned to a fascicle.
 
     fojin's alignment moat: given a Chinese fascicle, returns the aligned
-    Pali/Tibetan/Sanskrit parallels (each with its own `urn`) so you can compare
-    how a passage is rendered across traditions.
+    Pali/Tibetan/Sanskrit parallels so you can compare how a passage is
+    rendered across traditions.
+
+    A fascicle returns parallels for the *whole* juan — often hundreds. To
+    narrow them to one passage, match the passage against `source_chunks[].text`
+    and keep the parallels whose `aligns_source_chunk` equals that chunk_index.
+
+    `urn` is filled for parallels that are fojin works; rows with
+    `source="mitra-parallel"` are inline Skt/Tib sentences with no fojin work to
+    cite, so they carry `original_preview` instead and stay `urn: null`.
     """
     return await _call("get_parallels", lambda c: c.get_parallels(text_id, juan_num))
 
