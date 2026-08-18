@@ -648,7 +648,7 @@ export default function ChatPage() {
   // 判成不可保留（见 PR #1077 里踩过的 4 个 lint error）。
   const [searchParams, setSearchParams] = useSearchParams();
   const { t, i18n } = useTranslation();
-  const { user } = useAuthStore();
+  const { user, token } = useAuthStore();
   // 不带 context 的 ?q= 是这个输入框的**初值**，不是一次副作用。
   //
   // 在此之前它被彻底丢掉：下面那个 effect 的守卫是
@@ -871,8 +871,19 @@ export default function ChatPage() {
   // global 5-minute staleTime, a guest quota fetched before login stayed fresh
   // across the login and drove the logged-in banner — this is why the wrong
   // "剩余 10 次" survived signing in.
+  //
+  // `token` is in the key for a second reason, found the hard way (user 638,
+  // 2026-08-18): the id alone separates 游客 from 本人, but NOT 本人-with-a-dead
+  // -ticket from 本人-who-just-signed-back-in. /chat/quota answers an expired
+  // token with 200 + `authenticated: false` rather than 401, so that "you are a
+  // guest" reply gets cached under the *user's* key; signing in again produced
+  // the identical key and the 5-minute staleTime served it straight back —
+  // the 「登录状态已过期」 banner outlived the very login that fixed it. The
+  // quota answer is only true for the credential it was fetched with, so the
+  // credential belongs in the key. A renewed token (#1198) changes it too and
+  // costs one extra 2ms fetch per rotation; that is the right trade.
   const { data: quota, refetch: refetchQuota } = useQuery({
-    queryKey: ["chatQuota", user?.id ?? "anon"],
+    queryKey: ["chatQuota", user?.id ?? "anon", token ?? "anon"],
     queryFn: getChatQuota,
   });
 

@@ -108,8 +108,10 @@ function LocationProbe() {
   return <span data-testid="loc">{loc.pathname + loc.search}</span>;
 }
 
-function renderPage(entry = "/chat") {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function renderPage(entry = "/chat", injected?: QueryClient) {
+  // 默认客户端的 staleTime 是 0（任何情况都会重取）。要复现「缓存活过登录」
+  // 这类缺陷，必须由用例注入一个带生产 staleTime 的客户端。
+  const client = injected ?? new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <HelmetProvider>
       <QueryClientProvider client={client}>
@@ -898,6 +900,53 @@ describe("额度提醒", () => {
     await waitFor(() => {
       expect(vi.mocked(getChatQuota).mock.calls.length).toBeGreaterThan(callsAsGuest);
     });
+  });
+
+  // ── 用户实拍复现（2026-08-18，user 638 / 显示名 CFFF）──────────────────
+  //
+  // 症状：登录成功、右上角挂着自己的名字，/chat 却顶着「登录状态已过期，当前
+  // 提问按游客额度计算」。生产日志佐证她不是在瞎说：35 分钟内登录了三次
+  // （08:43:30 / 08:47:29 / 08:55:12 CST），而截图那一刻（09:16:01）的 10 秒后
+  // `last_active_at` 又被顶了一次 —— 那个中间件只在 `verify_token` 通过时才写库，
+  // 所以她当时握着的是一张**有效**票。横幅在说谎。
+  //
+  // 机制：/chat/quota 对过期 token 不 401，而是 200 + `authenticated: false`
+  // （#1196 有意立的契约）。这份「你是游客」的回答被缓存进 ["chatQuota", 638]。
+  // 她重新登录后仍是同一个 id，**queryKey 一模一样**，5 分钟 staleTime 内直接
+  // 命中缓存、不重取 —— 横幅于是活过了那次成功登录。
+  //
+  // #1196 把常量 key 换成带 user id，只区分得开「游客 ↔ 本人」，区分不开
+  // 「本人·票已死 ↔ 本人·刚换票」。同一个人，同一个 key。
+  it("回归: 同一人重新登录后，过期期间的缓存不得让过期横幅活下来", async () => {
+    // ⚠️ 必须按生产值（main.tsx:23）建客户端。harness 默认 staleTime=0，
+    // 任何情况都会重取 —— 这个缺陷就是这么从门禁底下溜过去的。
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: 5 * 60 * 1000 } },
+    });
+    const READER = {
+      id: 638, username: "reader", email: "r@example.com", display_name: "CFFF",
+      role: "user", is_active: true, created_at: "2026-01-01T00:00:00Z",
+    };
+
+    // 阶段一：票已经死了，但本地 store 里的 user 还在（persist 存着）。
+    useAuthStore.setState({ token: "dead", user: READER });
+    vi.mocked(getChatQuota).mockResolvedValue({
+      limit: 10, used: 0, remaining: 10, has_byok: false, authenticated: false,
+    });
+    const first = renderPage("/chat", client);
+    expect(await screen.findByText(/登录状态已过期/)).toBeInTheDocument();
+    first.unmount();
+
+    // 阶段二：她重新登录成功，后端从此认得她。走 setAuth——真实登录路径。
+    vi.mocked(getChatQuota).mockResolvedValue({
+      limit: 200, used: 1, remaining: 199, has_byok: false, authenticated: true,
+    });
+    act(() => { useAuthStore.getState().setAuth("fresh", READER); });
+    renderPage("/chat", client);
+
+    // 承重断言：登录成功之后，这句话不能还在。
+    await screen.findByText("「三毒」指的是哪三种毒？");
+    expect(screen.queryByText(/登录状态已过期/)).toBeNull();
   });
 });
 

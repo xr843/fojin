@@ -119,7 +119,11 @@ export default function ProfilePage() {
   // 端给下一个（全局 staleTime 5 分钟）。/chat 上正是这个缺陷让登录用户看到了
   // 游客的「剩余 10 次」。
   const { data: quota } = useQuery({
-    queryKey: ["chat-quota", user?.id ?? "anon"],
+  // 键里还要带上 token：光有 id 区分不开「本人·票已死」和「本人·刚重新登录」。
+  // /chat/quota 对过期票回的是 200 + authenticated:false（不是 401），那份「你是
+  // 游客」的答案会被缓存到本人名下；重新登录后 id 没变、键没变，5 分钟内继续端
+  // 旧答案，上限又变回 10。同 ChatPage，见 2026-08-18 user 638 的实拍。
+    queryKey: ["chat-quota", user?.id ?? "anon", token ?? "anon"],
     queryFn: getChatQuota,
     enabled: !!token,
   });
