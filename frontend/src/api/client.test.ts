@@ -1,7 +1,7 @@
 import { afterEach, describe, it, expect, beforeEach, vi } from "vitest";
 import axios from "axios";
 import type { AxiosError, InternalAxiosRequestConfig, AxiosResponse } from "axios";
-import { useAuthStore, type UserProfile } from "../stores/authStore";
+import { markSessionExpired, useAuthStore, type UserProfile } from "../stores/authStore";
 import { api } from "./client";
 import i18n from "../i18n";
 import enTranslation from "../../public/locales/en/translation.json";
@@ -184,6 +184,45 @@ describe("响应拦截器 - 401 自动登出", () => {
     expect(useAuthStore.getState().token).toBe("existing-token");
   });
 
+  // ── 旧票的 401 不许杀掉新会话（2026-08-18 user 638 的第二条成因）─────────
+  //
+  // 票过期那一刻，页面上往往有好几个请求同时在飞（sessions / notifications /
+  // quota）。用户看到横幅、马上重新登录成功，而那些**用旧票发出去的**请求这时
+  // 才陆续回来 401 —— 拦截器不问这个 401 属于哪张票，一律 logout()，把她刚换
+  // 到手的新会话当场清掉，并置位「登录状态已过期」。表现就是「登录成功 → 又
+  // 被踢 → 再登」的循环（她 35 分钟内登录了三次）。
+  //
+  // 判据只认「这个请求带的票 ≠ 现在手里的票」。没带票的请求维持原行为。
+  it("承重点: 用旧票发出的请求晚回 401，不得清掉已经换新的会话", async () => {
+    sessionStorage.clear();   // 本 describe 前面的用例会留下过期标记
+    useAuthStore.setState({ token: "new-token", user: SOMEONE });
+    localStorage.setItem("fojin-auth", JSON.stringify({ state: { token: "new-token" } }));
+
+    const error = makeAxiosError(401, "/chat/sessions");
+    error.config!.headers.Authorization = "Bearer old-token";   // 旧票发出去的
+
+    await expect(responseErrorInterceptor(error)).rejects.toBeTruthy();
+
+    expect(useAuthStore.getState().token).toBe("new-token");
+    expect(useAuthStore.getState().user).not.toBeNull();
+    expect(sessionStorage.getItem("fojin.auth.expired")).toBeNull();
+  });
+
+  // 反向对照：票**没换**时的 401 必须照旧登出，否则上面那条会把真过期也放行。
+  it("对照: 当前这张票自己吃了 401，仍然必须登出并置位过期标记", async () => {
+    sessionStorage.clear();
+    useAuthStore.setState({ token: "cur-token", user: SOMEONE });
+    localStorage.setItem("fojin-auth", JSON.stringify({ state: { token: "cur-token" } }));
+
+    const error = makeAxiosError(401, "/chat/sessions");
+    error.config!.headers.Authorization = "Bearer cur-token";
+
+    await expect(responseErrorInterceptor(error)).rejects.toBeTruthy();
+
+    expect(useAuthStore.getState().user).toBeNull();
+    expect(sessionStorage.getItem("fojin.auth.expired")).toBe("1");
+  });
+
   it("错误始终被 reject 传递", async () => {
     const error = makeAxiosError(401, "/search");
 
@@ -202,6 +241,40 @@ describe("axios 实例配置", () => {
   it("超时设置为 15 秒", async () => {
     const clientModule = await import("./client");
     expect(clientModule.default.defaults.timeout).toBe(15000);
+  });
+});
+
+describe("getChatQuota - 过期标记自愈", () => {
+  // 标记只有 setAuth/logout 会清，而它活得过重载、也活得过浏览器恢复标签页。
+  // 服务端说 authenticated:true 就等于当场推翻了它，必须就地抹掉，否则它会
+  // 一直躺在 sessionStorage 里等着下一次误导 UI。
+  it("服务端说认得这张票时，抹掉残留的过期标记", async () => {
+    const { api, getChatQuota } = await import("./client");
+    markSessionExpired();
+    expect(sessionStorage.getItem("fojin.auth.expired")).toBe("1");
+
+    const spy = vi.spyOn(api, "get").mockResolvedValueOnce({
+      data: { limit: 200, used: 1, remaining: 199, has_byok: false, authenticated: true },
+    } as AxiosResponse);
+    await getChatQuota();
+    spy.mockRestore();
+
+    expect(sessionStorage.getItem("fojin.auth.expired")).toBeNull();
+  });
+
+  // 反向对照：服务端说不认识时，标记必须原样留着——否则 #1197 那条「你的登录
+  // 刚死」和「你本来就是游客」的区分当场失效。
+  it("对照: 服务端说不认识时，标记必须原样保留", async () => {
+    const { api, getChatQuota } = await import("./client");
+    markSessionExpired();
+
+    const spy = vi.spyOn(api, "get").mockResolvedValueOnce({
+      data: { limit: 10, used: 0, remaining: 10, has_byok: false, authenticated: false },
+    } as AxiosResponse);
+    await getChatQuota();
+    spy.mockRestore();
+
+    expect(sessionStorage.getItem("fojin.auth.expired")).toBe("1");
   });
 });
 

@@ -864,6 +864,20 @@ describe("额度提醒", () => {
     expect(screen.queryByText(/每日免费/)).toBeNull();
   });
 
+  // 标记没有任何自愈机制：全项目只有 setAuth/logout 会清它，而 sessionStorage
+  // 活得过页面重载，也活得过浏览器「恢复上次标签页」。于是一条残留标记能在一个
+  // **完全有效**的会话上长期挂着假横幅，而且重新登录也未必碰得到它（比如登录
+  // 发生在另一个标签页）。
+  //
+  // 服务端刚刚说「我认得你」（authenticated: true），本地那条「你的登录死了」
+  // 到此就是被推翻的陈旧事实。新鲜的服务端真相必须压过它。
+  it("承重点: 服务端说认得这个人时，残留的过期标记必须自愈", async () => {
+    markSessionExpired();                       // 上一次会话死掉时留下的
+    loggedIn({ limit: 200, used: 1, remaining: 199, has_byok: false, authenticated: true });
+    await screen.findByText("「三毒」指的是哪三种毒？");
+    expect(screen.queryByText(/登录状态已过期/)).toBeNull();
+  });
+
   it("真游客（没置位过期标记）照旧看到常规游客提示", async () => {
     useAuthStore.setState({ token: null, user: null });
     vi.mocked(getApiKeyStatus).mockResolvedValue({

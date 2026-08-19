@@ -1,5 +1,5 @@
 import axios from "axios";
-import { markSessionExpired, useAuthStore } from "../stores/authStore";
+import { clearSessionExpired, markSessionExpired, useAuthStore } from "../stores/authStore";
 import i18n from "../i18n";
 import type {
   TextId,
@@ -71,9 +71,20 @@ api.interceptors.response.use(
   (error) => {
     // 4xx/5xx 上也可能带着续期头（比如一次 404）——照收，别浪费。
     adoptRenewedToken(error.response?.headers);
+    // 票过期那一刻页面上常有好几个请求在飞。用户看到横幅、马上重新登录成功，
+    // 而那些**用旧票发出去的**请求这时才陆续回 401 —— 不加判别地 logout()，会把
+    // 她刚换到手的新会话当场清掉，再置位「登录状态已过期」，表现为「登录成功 →
+    // 又被踢 → 再登」的循环（2026-08-18 user 638 实测 35 分钟内登录三次）。
+    // 只有「这个请求带的票 ≠ 现在手里的票」才判定为陈旧；没带票的维持原行为。
+    const sentAuth = error.config?.headers?.Authorization;
+    const currentToken = useAuthStore.getState().token;
+    const staleCredential =
+      typeof sentAuth === "string" && !!currentToken && sentAuth !== `Bearer ${currentToken}`;
+
     if (
       error.response?.status === 401 &&
-      !error.config?.url?.startsWith("/auth/")
+      !error.config?.url?.startsWith("/auth/") &&
+      !staleCredential
     ) {
       // Mark *before* logout: logout() clears the flag (a deliberate sign-out is
       // not an expiry) and wipes `user`, after which nothing downstream can tell
@@ -1942,6 +1953,11 @@ export interface ChatQuota {
 
 export async function getChatQuota(): Promise<ChatQuota> {
   const { data } = await api.get<ChatQuota>("/chat/quota");
+  // 服务端刚认下了当前这张票，本地那条「你的登录死了」到此就是被推翻的陈旧事实。
+  // 这个自愈是必需的：标记存在 sessionStorage，活得过页面重载、也活得过浏览器
+  // 「恢复上次标签页」，而全项目只有 setAuth/logout 会清它 —— 一条残留标记能在
+  // 一个完全有效的会话上长期挂着假横幅，且在别的标签页重新登录也碰不到它。
+  if (data.authenticated) clearSessionExpired();
   return data;
 }
 

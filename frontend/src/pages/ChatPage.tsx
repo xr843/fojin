@@ -1989,7 +1989,13 @@ export default function ChatPage() {
                 数字（不是 401），而 /chat/stream 走同一套鉴权，过期后配额降为
                 按 IP 共享的 10 次、会话不再存进账号。用户以为自己登着录，实际
                 提问正被算作游客、历史正在丢。 */}
-            {(expired || (user && quota && !quota.authenticated)) && (
+            {/* 判据只有一个：**服务端此刻说不认识这张票**。`expired` 标记只负责在
+                这个前提下区分「你的登录刚死」和「你本来就是游客」，它自己没有
+                宣布过期的权力——它存在 sessionStorage 里，活得过页面重载、也活得过
+                浏览器「恢复上次标签页」，而全项目只有 setAuth/logout 会清它。让它
+                单独驱动横幅，一条残留标记就能在一个完全有效的会话上长期说谎
+                （2026-08-18 user 638 反复看到的正是这个）。 */}
+            {quota && !quota.authenticated && (expired || !!user) && (
               <Alert
                 message={
                   <span>
