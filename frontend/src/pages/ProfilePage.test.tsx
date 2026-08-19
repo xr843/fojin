@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, useLocation } from "react-router";
 import type { ReactNode } from "react";
@@ -30,8 +30,10 @@ function LocationProbe() {
   return <span data-testid="loc">{loc.pathname + loc.search}</span>;
 }
 
-function renderPage(ui: ReactNode, initialPath = "/profile") {
-  const client = new QueryClient({
+function renderPage(ui: ReactNode, initialPath = "/profile", injected?: QueryClient) {
+  // 默认 staleTime 是 0（任何情况都重取）。要复现「缓存活过登录」这类缺陷，
+  // 用例必须自己注入一个带生产 staleTime 的客户端，并跨两次渲染复用它。
+  const client = injected ?? new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(
@@ -178,6 +180,42 @@ describe("ProfilePage", () => {
     await waitFor(() => {
       expect(container.textContent).toMatch(/Adding your own AI API key lifts the platform/);
       expect(container.textContent).not.toMatch(/free questions a day/);
+    });
+  });
+
+  // 上一条只覆盖了「票死着」的那一刻。真实反馈（2026-08-18，user 638）是**重新
+  // 登录之后它还在**：过期期间那份 authenticated:false 被缓存到本人 id 名下，
+  // 重登后 id 没变、queryKey 没变，5 分钟 staleTime 内继续端旧答案 —— 上限又
+  // 变回 10。#1199 给键加 user id 只隔开了「游客↔本人」，隔不开「本人·票已死
+  // ↔ 本人·刚重新登录」。
+  it("回归: 同一人重新登录后，不得继续沿用过期期间缓存的游客上限", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: 5 * 60 * 1000 } },
+    });
+    const READER = {
+      id: 638, username: "reader", email: "reader@example.com", display_name: null,
+      role: "user", is_active: true, created_at: "2026-01-10T00:00:00Z",
+    };
+
+    // 阶段一：票已死，后端回游客配额，这份答案进了缓存。
+    useAuthStore.setState({ token: "dead", user: READER });
+    vi.mocked(getChatQuota).mockResolvedValue({
+      limit: 10, used: 0, remaining: 10, has_byok: false, authenticated: false,
+    });
+    const first = renderPage(<ProfilePage />, "/profile?tab=apikey", client);
+    await waitFor(() => expect(vi.mocked(getChatQuota)).toHaveBeenCalled());
+    first.unmount();
+
+    // 阶段二：重新登录成功——同一个人。
+    vi.mocked(getChatQuota).mockResolvedValue({
+      limit: 200, used: 1, remaining: 199, has_byok: false, authenticated: true,
+    });
+    act(() => { useAuthStore.getState().setAuth("fresh", READER); });
+    const { container } = renderPage(<ProfilePage />, "/profile?tab=apikey", client);
+
+    // 承重断言：必须看到真实上限 200，而不是缓存里那个 10。
+    await waitFor(() => {
+      expect(container.textContent).toMatch(/200 free questions a day/);
     });
   });
 
