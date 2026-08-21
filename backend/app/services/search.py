@@ -176,8 +176,25 @@ _SUTRA_ABBREV: dict[str, str] = {
     # precise_retrieval._TITLE_ALIASES and rag_retrieval._ROOT_SUTRA_ALIASES
     # both resolve the same abbreviation to T0670, so the one word 楞伽经
     # reached a different sutra depending on which door the reader came in.
-    # Aligned on T0670 — the recension Chan transmits and the one usually
-    # meant unqualified. All three still rank; this is a boost, not a filter.
+    #
+    # Aligned on T0670, and the corpus decides it rather than taste. Each
+    # translation divides into differently-named chapters, so a commentary
+    # betrays its base text by which chapter names it quotes. 一切佛語心品
+    # occurs in T0670 and in neither other translation; 羅婆那王勸請品 only in
+    # T0672 (摩羅耶山 appears in all three and discriminates nothing). Counting
+    # those markers across the 22 楞伽 commentaries this corpus holds:
+    #
+    #   T0670  13 commentaries (智旭 義疏, 德清 觀楞伽經記, 通潤 合轍, 正受
+    #                           集註, 圅昰 心印, 宗泐 註解, 員珂 會譯 …)
+    #   T0672   1 commentary   (寶臣 注大乘入楞伽經 — says so in its title)
+    #   T0671   0
+    #
+    # So the recension the Chinese commentarial tradition actually reads —
+    # and the one Chan transmits (cf. T2837 楞伽師資記) — is T0670, while the
+    # translation this table used to boost has no commentary built on it at
+    # all. Reader demand cannot settle it: all three have ~0 reads.
+    #
+    # All three still rank; this is a `should` boost, not a filter.
     "楞伽经": "楞伽阿跋多羅寶經", "楞伽經": "楞伽阿跋多羅寶經",
     "维摩经": "維摩詰所說經", "維摩經": "維摩詰所說經",
     "地藏经": "地藏菩薩本願經", "地藏經": "地藏菩薩本願經",
