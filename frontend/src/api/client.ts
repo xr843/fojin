@@ -1894,6 +1894,12 @@ export interface ChatMessageItem {
   /** 等待期「思考过程片段」活窗的内容（保尾截断）。只在 content 仍是哨兵时
    *  渲染，首个 token 一到即清空 —— 绝不持久化、绝不混进 content。 */
   reasoningText?: string | null;
+  /** 从按下发送到第一个正文字到达的毫秒数。等待的绝大部分花在这一段（生产实测
+   *  24-180 秒），所以它和总耗时分开报。空回复（一个 token 都没来）时为 null。 */
+  firstTokenMs?: number | null;
+  /** 从按下发送到流结束的毫秒数。它的存在与否同时充当「这条是本次会话生成的」
+   *  标记 —— 历史消息读回来时为空，不会显示一个没人计过的时间。 */
+  totalMs?: number | null;
 }
 
 export interface SharedQA {

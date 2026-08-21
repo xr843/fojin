@@ -8,6 +8,7 @@ import Markdown, { defaultUrlTransform, type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import { CITATION_URL_SCHEME, injectCitationLinks } from "../utils/citationLinks";
+import { formatResponseSeconds } from "../utils/responseTiming";
 import { localizeHan } from "../utils/hanScript";
 import { quoteCheckDetail } from "../utils/trustDetail";
 import { isNearBottom } from "../utils/scrollBottom";
@@ -22,6 +23,7 @@ import {
   MenuFoldOutlined,
   DownloadOutlined,
   StopOutlined,
+  ClockCircleOutlined,
   CopyOutlined,
   ReloadOutlined,
   LikeOutlined,
@@ -567,7 +569,29 @@ function MessageBubbleInner({
         </div>
         {/* Action buttons outside bubble */}
         {m.content !== THINKING_SENTINEL && !isStreaming && (
-          <div style={{ marginTop: 4, display: "flex", gap: 4 }}>
+          <div style={{ marginTop: 4, display: "flex", gap: 4, alignItems: "center" }}>
+            {/* 响应耗时。只对本次会话生成的回答显示：totalMs 的有无就是那个判据，
+                历史消息读回来时为空。失败的回答不显示 —— 给一句「请求失败」标上
+                用了多少秒，是拿噪音充信息。 */}
+            {m.role === "assistant" && m.totalMs != null
+              && m.content !== REQUEST_FAILED_SENTINEL && (
+              <Tooltip title={t("chat.timing.tooltip")}>
+                <span
+                  style={{
+                    color: "var(--fj-ink-muted)", fontSize: 12,
+                    marginRight: 4, whiteSpace: "nowrap",
+                    fontVariantNumeric: "tabular-nums", cursor: "default",
+                  }}
+                >
+                  <ClockCircleOutlined style={{ marginRight: 4 }} />
+                  {m.firstTokenMs != null && (
+                    <>{t("chat.timing.first_token", { n: formatResponseSeconds(m.firstTokenMs) })}
+                      {" · "}</>
+                  )}
+                  {t("chat.timing.total", { n: formatResponseSeconds(m.totalMs) })}
+                </span>
+              </Tooltip>
+            )}
             <Tooltip title={t("chat.copy")}>
               <Button
                 type="text" size="small" icon={<CopyOutlined />}
@@ -1292,9 +1316,17 @@ export default function ChatPage() {
     let tokenCount = 0;
     let sawError = false;
 
+    // 响应耗时。和上面两个计数同理放在闭包里：每次发送要一份全新的，且绝不能在
+    // setMessages 的 updater 里读时钟（StrictMode 下 updater 会跑两遍）。
+    // Date.now() 只在回调里读、从不在渲染期读 —— 渲染期读时钟会被 React
+    // Compiler 判为不纯（「已思考 N 秒」那处 :412 已经栽过一次）。
+    const startedAt = Date.now();
+    let firstTokenMs: number | null = null;
+
     await sendChatMessageStream(msg, sessionId, masterId, {
       onToken: (content: string) => {
         tokenCount += 1;
+        if (firstTokenMs === null) firstTokenMs = Date.now() - startedAt;
         setMessages((prev) =>
           prev.map((m) => {
             if (m.id !== assistantId) return m;
@@ -1440,12 +1472,18 @@ export default function ChatPage() {
         // sentinel so the existing retry button renders (mirrors onError). When
         // the backend already sent an `error`, onError ran first and the content
         // is no longer THINKING_SENTINEL, so this is a no-op — safe either way.
+        // 同一次 map 里盖上耗时：totalMs 的有无就是「这条是本次会话生成的」，
+        // 历史消息读回来时为空，于是不会显示一个没人计过的时间。失败与空回复
+        // 也照记 —— 渲染层负责不给失败哨兵显示耗时，判据留在一处就够了。
+        const totalMs = Date.now() - startedAt;
         setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId && m.content === THINKING_SENTINEL
+          prev.map((m) => {
+            if (m.id !== assistantId) return m;
+            const settled = m.content === THINKING_SENTINEL
               ? { ...m, content: REQUEST_FAILED_SENTINEL }
-              : m,
-          ),
+              : m;
+            return { ...settled, firstTokenMs, totalMs };
+          }),
         );
         // Clear attachment chips only after successful stream completion.
         // On error the chips stay so the user can retry without re-uploading.
