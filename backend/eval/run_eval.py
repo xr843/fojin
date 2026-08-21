@@ -388,6 +388,14 @@ def generate_report(results: list[dict], tag: str = "") -> str:
     )
     overall_pct = round(overall / 12 * 100, 1)
 
+    # A --no-llm run judges nothing, so every score list is empty and `avg`
+    # returns 0 — which rendered as "综合得分: 0.0%" over a table of zeros. The
+    # nightly gate runs --no-llm, so that is what every recent report says, and
+    # it reads as "the system scored zero" rather than "this run measured no
+    # answers". Same principle the faithfulness section already applies: a note
+    # instead of misleading zeros.
+    judged = any(all_scores[dim] for dim in all_scores)
+
     # Deterministic retrieval metrics (no LLM judge involved).
     retr_agg = aggregate([r["retrieval_metrics"] for r in results if r.get("retrieval_metrics")])
     graded = sum(
@@ -408,13 +416,21 @@ def generate_report(results: list[dict], tag: str = "") -> str:
         f"# AI Chat 评测报告{' — ' + tag if tag else ''}",
         "", f"**日期**: {now}", f"**题目数**: {total}",
         f"**模型**: {results[0].get('model', 'unknown') if results else 'N/A'}",
-        f"**综合得分**: {overall_pct}%",
+        f"**综合得分**: {overall_pct}%" if judged
+        else "**综合得分**: —（本次为 --no-llm 检索评测，未生成回答）",
         "", "## 总体评分", "",
+    ]
+    lines += [
         "| 维度 | 平均分 | 满分 |", "|------|--------|------|",
         f"| 检索相关性 | {avg(all_scores['retrieval_relevance'])} | 3 |",
         f"| 引用准确性 | {avg(all_scores['citation_accuracy'])} | 3 |",
         f"| 回答完整性 | {avg(all_scores['answer_completeness'])} | 3 |",
         f"| 无编造 | {avg(all_scores['no_hallucination'])} | 1 |",
+    ] if judged else [
+        "*本次为 --no-llm 检索评测，未生成回答，故无评分数据。"
+        "下面的检索指标是确定性的，不依赖 LLM 评审。*",
+    ]
+    lines += [
         "", "## 检索指标（确定性，对照黄金来源）", "",
         f"*基于 {graded}/{total} 道有黄金来源标注的题目*",
         "",
@@ -440,20 +456,27 @@ def generate_report(results: list[dict], tag: str = "") -> str:
 
     lines += _faithfulness_section(faith_agg)
 
-    lines += [
-        "## 分类得分", "",
-        "| 分类 | 题数 | 检索 | 引用 | 完整 | 无编造 |",
-        "|------|------|------|------|------|--------|",
-    ]
-
-    for cat in ["term_explanation", "source_lookup", "historical", "comparative", "practice", "out_of_scope"]:
-        if cat in categories:
-            c = categories[cat]
-            lines.append(
-                f"| {cat_names.get(cat, cat)} | {c['count']} "
-                f"| {avg(c['retrieval_relevance'])} | {avg(c['citation_accuracy'])} "
-                f"| {avg(c['answer_completeness'])} | {avg(c['no_hallucination'])} |"
-            )
+    lines += ["## 分类得分", ""]
+    if judged:
+        lines += [
+            "| 分类 | 题数 | 检索 | 引用 | 完整 | 无编造 |",
+            "|------|------|------|------|------|--------|",
+        ]
+        for cat in ["term_explanation", "source_lookup", "historical", "comparative", "practice", "out_of_scope"]:
+            if cat in categories:
+                c = categories[cat]
+                lines.append(
+                    f"| {cat_names.get(cat, cat)} | {c['count']} "
+                    f"| {avg(c['retrieval_relevance'])} | {avg(c['citation_accuracy'])} "
+                    f"| {avg(c['answer_completeness'])} | {avg(c['no_hallucination'])} |"
+                )
+    else:
+        #题数 still carries information without an LLM judge; the four score
+        # columns do not.
+        lines += ["| 分类 | 题数 |", "|------|------|"]
+        for cat in ["term_explanation", "source_lookup", "historical", "comparative", "practice", "out_of_scope"]:
+            if cat in categories:
+                lines.append(f"| {cat_names.get(cat, cat)} | {categories[cat]['count']} |")
 
     total_time = sum(r.get("timing", {}).get("total_s", 0) for r in results)
     avg_time = round(total_time / total, 1) if total else 0
