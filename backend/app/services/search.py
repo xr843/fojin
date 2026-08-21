@@ -159,6 +159,57 @@ async def fetch_related_translations(
     return dict(result_map)
 
 
+# Expand common sutra abbreviations to full titles. Module-level so the
+# cross-module consistency test can read it: this table and
+# precise_retrieval._TITLE_ALIASES must not send the same abbreviation to
+# two different sutras (they did, for 楞伽经).
+_SUTRA_ABBREV: dict[str, str] = {
+    "金刚经": "金剛般若波羅蜜經", "金剛經": "金剛般若波羅蜜經",
+    "心经": "般若波羅蜜多心經", "心經": "般若波羅蜜多心經",
+    "法华经": "妙法蓮華經", "法華經": "妙法蓮華經",
+    "华严经": "大方廣佛華嚴經", "華嚴經": "大方廣佛華嚴經",
+    "楞严经": "大佛頂如來密因修證了義諸菩薩萬行首楞嚴經", "楞嚴經": "大佛頂如來密因修證了義諸菩薩萬行首楞嚴經",
+    "圆觉经": "大方廣圓覺修多羅了義經", "圓覺經": "大方廣圓覺修多羅了義經",
+    # 楞伽經 has three Chinese translations — T0670 楞伽阿跋多羅寶經
+    # (求那跋陀羅, 4卷), T0671 入楞伽經 (菩提流支, 10卷), T0672 大乘入楞伽經
+    # (實叉難陀, 7卷). This table used to boost T0671 while
+    # precise_retrieval._TITLE_ALIASES and rag_retrieval._ROOT_SUTRA_ALIASES
+    # both resolve the same abbreviation to T0670, so the one word 楞伽经
+    # reached a different sutra depending on which door the reader came in.
+    #
+    # Aligned on T0670, and the corpus decides it rather than taste. Each
+    # translation divides into differently-named chapters, so a commentary
+    # betrays its base text by which chapter names it quotes. 一切佛語心品
+    # occurs in T0670 and in neither other translation; 羅婆那王勸請品 only in
+    # T0672 (摩羅耶山 appears in all three and discriminates nothing). Counting
+    # those markers across the 22 楞伽 commentaries this corpus holds:
+    #
+    #   T0670  13 commentaries (智旭 義疏, 德清 觀楞伽經記, 通潤 合轍, 正受
+    #                           集註, 圅昰 心印, 宗泐 註解, 員珂 會譯 …)
+    #   T0672   1 commentary   (寶臣 注大乘入楞伽經 — says so in its title)
+    #   T0671   0
+    #
+    # So the recension the Chinese commentarial tradition actually reads —
+    # and the one Chan transmits (cf. T2837 楞伽師資記) — is T0670, while the
+    # translation this table used to boost has no commentary built on it at
+    # all. Reader demand cannot settle it: all three have ~0 reads.
+    #
+    # All three still rank; this is a `should` boost, not a filter.
+    "楞伽经": "楞伽阿跋多羅寶經", "楞伽經": "楞伽阿跋多羅寶經",
+    "维摩经": "維摩詰所說經", "維摩經": "維摩詰所說經",
+    "地藏经": "地藏菩薩本願經", "地藏經": "地藏菩薩本願經",
+    "药师经": "藥師琉璃光如來本願功德經", "藥師經": "藥師琉璃光如來本願功德經",
+    "阿弥陀经": "佛說阿彌陀經", "阿彌陀經": "佛說阿彌陀經",
+    "无量寿经": "佛說無量壽經", "無量壽經": "佛說無量壽經",
+    "涅盘经": "大般涅槃經", "涅槃經": "大般涅槃經",
+    "般若经": "大般若波羅蜜多經", "般若經": "大般若波羅蜜多經",
+    "长阿含经": "長阿含經", "长阿含經": "長阿含經",
+    "中阿含经": "中阿含經", "杂阿含经": "雜阿含經",
+    "增一阿含经": "增壹阿含經",
+    "坛经": "六祖大師法寶壇經", "壇經": "六祖大師法寶壇經",
+}
+
+
 async def search_texts(
     es: AsyncElasticsearch,
     query: str,
@@ -175,28 +226,7 @@ async def search_texts(
     must = []
     filter_clauses = []
 
-    # Expand common sutra abbreviations to full titles
-    ABBREV = {
-        "金刚经": "金剛般若波羅蜜經", "金剛經": "金剛般若波羅蜜經",
-        "心经": "般若波羅蜜多心經", "心經": "般若波羅蜜多心經",
-        "法华经": "妙法蓮華經", "法華經": "妙法蓮華經",
-        "华严经": "大方廣佛華嚴經", "華嚴經": "大方廣佛華嚴經",
-        "楞严经": "大佛頂如來密因修證了義諸菩薩萬行首楞嚴經", "楞嚴經": "大佛頂如來密因修證了義諸菩薩萬行首楞嚴經",
-        "圆觉经": "大方廣圓覺修多羅了義經", "圓覺經": "大方廣圓覺修多羅了義經",
-        "楞伽经": "入楞伽經", "楞伽經": "入楞伽經",
-        "维摩经": "維摩詰所說經", "維摩經": "維摩詰所說經",
-        "地藏经": "地藏菩薩本願經", "地藏經": "地藏菩薩本願經",
-        "药师经": "藥師琉璃光如來本願功德經", "藥師經": "藥師琉璃光如來本願功德經",
-        "阿弥陀经": "佛說阿彌陀經", "阿彌陀經": "佛說阿彌陀經",
-        "无量寿经": "佛說無量壽經", "無量壽經": "佛說無量壽經",
-        "涅盘经": "大般涅槃經", "涅槃經": "大般涅槃經",
-        "般若经": "大般若波羅蜜多經", "般若經": "大般若波羅蜜多經",
-        "长阿含经": "長阿含經", "长阿含經": "長阿含經",
-        "中阿含经": "中阿含經", "杂阿含经": "雜阿含經",
-        "增一阿含经": "增壹阿含經",
-        "坛经": "六祖大師法寶壇經", "壇經": "六祖大師法寶壇經",
-    }
-    full_title = ABBREV.get(query.strip())
+    full_title = _SUTRA_ABBREV.get(query.strip())
 
     if query:
         must.append(
