@@ -270,9 +270,21 @@ async def get_juan_alignment(
     )).fetchone()
     total_chunks = int(total_row[0]) if total_row else 0
 
+    # The reader panel is a serving path, so it takes the same MITRA quality
+    # gate as every other serving path (services.mitra_gate). Without it this
+    # endpoint listed a chunk as "has parallels" on the strength of rows the
+    # citation drawer and the RAG context both refuse to show, so opening the
+    # panel could offer a chunk whose parallels then came back empty.
+    mitra_pred, mitra_params = mitra_score_predicate("ma.mitra_e_score")
+    mitra_gate_sql = f" AND {mitra_pred}" if mitra_pred else ""
+    # Same gate, unqualified column: the batched fetch below selects from
+    # mitra_alignments without an alias. Both share the one :min_score bind.
+    _inner_pred, _ = mitra_score_predicate("mitra_e_score")
+    mitra_inner_gate_sql = f" AND {_inner_pred}" if _inner_pred else ""
+
     # Get chunks that have alignments (either direction)
     rows = (await db.execute(
-        sql_text("""
+        sql_text(f"""
             SELECT DISTINCT te.chunk_index, te.chunk_text
             FROM text_embeddings te
             WHERE te.text_id = :tid AND te.juan_num = :juan
@@ -290,11 +302,12 @@ async def get_juan_alignment(
                     SELECT 1 FROM mitra_alignments ma
                     WHERE ma.text_id = te.text_id AND ma.juan_num = te.juan_num
                     AND ma.chunk_index = te.chunk_index
+                    {mitra_gate_sql}
                 )
             )
             ORDER BY te.chunk_index
         """),
-        {"tid": text_id, "juan": juan_num},
+        {"tid": text_id, "juan": juan_num, **mitra_params},
     )).fetchall()
 
     chunk_list = [(int(r[0]), r[1]) for r in rows]
@@ -405,8 +418,12 @@ async def get_juan_alignment(
     # Batched MITRA cross-lingual parallels, capped per chunk (mirrors the
     # single-chunk endpoint's MITRA_CHUNK_LIMIT and foreign_lang, id ordering).
     mitra_by_src: dict[int, list] = {}
+    # Gate inside the window function, not outside it: filtering after
+    # ROW_NUMBER would spend the per-chunk budget on rows that then get
+    # dropped, so a chunk with 50 sub-threshold rows would come back empty
+    # while its passing rows sat at rank 51.
     mitra_rows = (await db.execute(
-        sql_text("""
+        sql_text(f"""
             SELECT chunk_index, foreign_text, foreign_lang, confidence
             FROM (
                 SELECT chunk_index, foreign_text, foreign_lang, confidence,
@@ -415,11 +432,13 @@ async def get_juan_alignment(
                        ) AS rn
                 FROM mitra_alignments
                 WHERE text_id = :tid AND juan_num = :juan AND chunk_index = ANY(:cidxs)
+                {mitra_inner_gate_sql}
             ) t
             WHERE rn <= :mlimit
             ORDER BY chunk_index, rn
         """),
-        {"tid": text_id, "juan": juan_num, "cidxs": cidxs, "mlimit": MITRA_CHUNK_LIMIT},
+        {"tid": text_id, "juan": juan_num, "cidxs": cidxs, "mlimit": MITRA_CHUNK_LIMIT,
+         **mitra_params},
     )).fetchall()
     for chunk_index, foreign_text, foreign_lang, conf in mitra_rows:
         mitra_by_src.setdefault(chunk_index, []).append(
