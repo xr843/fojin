@@ -418,8 +418,14 @@ describe("remaining page i18n", () => {
   it("renders home visitor tip in the active UI language", async () => {
     renderWithProviders(<HomePage />);
 
-    expect(screen.getByText(/Search and browse freely, no account needed/)).toBeInTheDocument();
+    // Assert against the en bundle rather than a copied string: this test is
+    // about *which language* renders, and pinning the wording here means every
+    // copy edit breaks a test that was never about the wording. The zh check
+    // below is what keeps it from passing vacuously.
+    const enTip = enTranslation["home.guest_tip.before"].trim();
+    expect(screen.getByText(new RegExp(enTip.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))).toBeInTheDocument();
     expect(screen.getByText("Sign in")).toBeInTheDocument();
+    expect(screen.queryByText(/无需注册/)).not.toBeInTheDocument();
 
     await waitFor(() => expect(document.head.querySelectorAll('link[rel="alternate"]').length).toBeGreaterThan(0));
     const alternates = new Map(
