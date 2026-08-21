@@ -94,6 +94,29 @@ class Settings(BaseSettings):
     mitra_min_score: float = 0.30
     enable_mitra_score_gate: bool = True
 
+    # Canonical-tier prior on RAG results: demote 卍續藏 (cbeta_id "X…", which
+    # is almost entirely commentary) below the root canons before the top-5 cut.
+    # X is 200K of the 425K Chinese chunks, and commentary is terser texts'
+    # natural competitor — it repeats the root's vocabulary at higher term
+    # density, so both vector search and the cross-encoder reward it. 「五蕴是
+    # 什么」 came back with four 心經注疏 and no root sutra.
+    #
+    # Measured on production (2026-08-21, 90-question eval, retrieval only):
+    #   Hit@5 0.342 → 0.384 · lenient Hit@5 0.466 → 0.534 · MRR 0.214 → 0.230
+    #   passage-type Hit@5 0.270 → 0.317 · attribution unchanged at 0.800
+    # The curve saturates at 0.55 and is flat from there to dropping X outright,
+    # so the value below buys the whole effect; anything lower only distorts
+    # scores further. Average X chunks in the served five: 2.24 → 0.79.
+    #
+    # ⚠️ Default OFF. It reorders 71 of 90 served contexts, and the ruler that
+    # measured it has only 2 卍續藏 titles among 89 gold sources — so it cannot
+    # see the case this prior would hurt (a reader asking what a commentator
+    # said). Turn it on together with an LLM-arm faithfulness run, not before.
+    # Never applies in master-persona mode: a Chan master's scoped corpus IS
+    # 語錄 (古尊宿語錄 is an X text), and demoting it there is simply wrong.
+    enable_canonical_prior: bool = False
+    canonical_prior_penalty: float = 0.55
+
     # Sentence-level 逐句对读 read path (Phase 4 Package C). Gates
     # GET /alignment/sentences/{text_id}/{juan_num}, which serves the future
     # reader's sentence-by-sentence parallel view out of ``sentence_alignments``.

@@ -740,6 +740,48 @@ async def _api_rerank(query: str, results: list[dict]) -> list[dict]:
         return _keyword_rerank(query, results)
 
 
+def _is_continued_canon(result: dict) -> bool:
+    """卍續藏 (X…) — the canon that is almost entirely commentary.
+
+    Keyed on ``cbeta_id``, never on ``buddhist_texts.category``: that column has
+    6,318 NULLs and is not trustworthy for tiering.
+    """
+    return (result.get("cbeta_id") or "").startswith("X")
+
+
+def apply_canonical_prior(results: list[dict], *, scoped: bool = False) -> list[dict]:
+    """Rank root-canon chunks above 卍續藏 commentary, config permitting.
+
+    ``scoped=True`` (master-persona mode, i.e. a caller-supplied
+    ``scope_text_ids``) returns the input untouched: that corpus was chosen
+    deliberately and is frequently 語錄 — 古尊宿語錄 is itself an X text — so
+    demoting it would fight the very selection the persona depends on. The rule
+    lives here rather than at the call site so it is covered by a unit test
+    instead of by reading.
+
+    Commentary out-competes the text it comments on: it restates the root's
+    vocabulary at higher term density, so both the vector search and the
+    cross-encoder score it higher. Left alone, 「五蕴是什么」 comes back with four
+    心經注疏 and no 心經. See ``settings.enable_canonical_prior`` for the measured
+    effect and for why it ships off.
+
+    Sorts on a derived key rather than rewriting ``score``: the score travels to
+    the client on every ChatSource, and a penalised value there would misreport
+    similarity to the reader. Ordering is identical either way — scaling one
+    group by a constant and re-sorting is the same permutation. Python's sort is
+    stable, so chunks that tie keep the reranker's ordering, and nothing is
+    dropped: this only re-ranks, so a query whose only good evidence is a
+    commentary still gets that commentary.
+    """
+    if scoped or not settings.enable_canonical_prior:
+        return results
+    penalty = settings.canonical_prior_penalty
+    return sorted(
+        results,
+        key=lambda r: -(r["score"] * penalty if _is_continued_canon(r) else r["score"]),
+    )
+
+
 async def _rerank(query: str, results: list[dict]) -> list[dict]:
     """Rerank results using API cross-encoder if configured, else keyword-based."""
     if not results:
@@ -987,6 +1029,11 @@ async def retrieve_rag_context(
 
         # Rerank filtered results
         reranked = await _rerank(query, filtered)
+
+        # Canonical-tier prior — must run BEFORE the cut, since its whole job is
+        # to let a root sutra sitting at rank 6-15 take a served slot from the
+        # commentary above it.
+        reranked = apply_canonical_prior(reranked, scoped=bool(scope_text_ids))
 
         # Cap at MAX_CONTEXT_CHUNKS (fewer but more relevant after reranking)
         search_results = reranked[:MAX_CONTEXT_CHUNKS]
