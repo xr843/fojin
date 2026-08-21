@@ -1323,13 +1323,22 @@ export default function ChatPage() {
     const startedAt = Date.now();
     let firstTokenMs: number | null = null;
 
+    // 这条回答在 messages 里的 id 会**在流中途变**：后端在 done 之前先发
+    // message_id（services/chat.py:1356 → :1361），onMessageId 用真实的
+    // chat_messages.id 换掉 Date.now() 占位符。所以任何在 message_id 之后还要
+    // 找到这条消息的回调，都必须认这个活变量，不能再认 assistantId ——
+    // 2026-08-21 响应耗时上线当天就栽在这里：onDone 按占位符去找，匹配不上，
+    // 耗时一个字都没写进去。而游客不落库、收不到 message_id，id 一直是占位符，
+    // 所以以游客身份怎么试都是好的，只有登录用户看不到。
+    let liveAssistantId = assistantId;
+
     await sendChatMessageStream(msg, sessionId, masterId, {
       onToken: (content: string) => {
         tokenCount += 1;
         if (firstTokenMs === null) firstTokenMs = Date.now() - startedAt;
         setMessages((prev) =>
           prev.map((m) => {
-            if (m.id !== assistantId) return m;
+            if (m.id !== liveAssistantId) return m;
             const current = m.content === THINKING_SENTINEL ? "" : m.content;
             // reasoningText 随首个 token 销毁：被模型自己推翻的中间结论
             // 不能留在屏幕上（渲染层另有一道保险，两道各自独立）。
@@ -1345,14 +1354,14 @@ export default function ChatPage() {
         // re-introduce the hallucination we just stripped.
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === assistantId ? { ...m, content: correctedAnswer } : m,
+            m.id === liveAssistantId ? { ...m, content: correctedAnswer } : m,
           ),
         );
       },
       onSources: (sources: ChatSource[]) => {
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === assistantId ? { ...m, sources } : m,
+            m.id === liveAssistantId ? { ...m, sources } : m,
           ),
         );
         // Prefetch each citation's chunk context so the drawer opens instantly.
@@ -1369,7 +1378,7 @@ export default function ChatPage() {
       onTrustStatus: (trustStatus: ChatTrustStatus) => {
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === assistantId ? { ...m, trust_status: trustStatus } : m,
+            m.id === liveAssistantId ? { ...m, trust_status: trustStatus } : m,
           ),
         );
       },
@@ -1383,7 +1392,7 @@ export default function ChatPage() {
         // 与 onRetrieved 同一条承重约束：只写独立字段，绝不碰 content。
         setMessages((prev) =>
           prev.map((m) => {
-            if (m.id !== assistantId) return m;
+            if (m.id !== liveAssistantId) return m;
             const next = { ...m };
             if (next.reasoningSince == null) next.reasoningSince = Date.now();
             if (r.text) {
@@ -1406,7 +1415,7 @@ export default function ChatPage() {
         // 哨兵，onDone 里「流结束但从未收到 token → 转失败哨兵」的兜底靠它；
         // 一旦 content 被顶掉，用户会永远卡在假的「正在检索…」上且没有重试按钮。
         setMessages((prev) =>
-          prev.map((m) => (m.id === assistantId ? { ...m, retrieval } : m)),
+          prev.map((m) => (m.id === liveAssistantId ? { ...m, retrieval } : m)),
         );
       },
       onMessageId: (realId: number) => {
@@ -1415,8 +1424,12 @@ export default function ChatPage() {
         // correct row. Without this, every freshly-streamed message
         // would PUT feedback to a nonexistent id, which is why
         // production feedback rate is currently zero.
+        // 旧 id 先捕获进 updater 的闭包再改活变量：updater 是延后执行的，
+        // 若先改了活变量，它会去找一个还不存在的 id。
+        const placeholderId = liveAssistantId;
+        liveAssistantId = realId;
         setMessages((prev) =>
-          prev.map((m) => (m.id === assistantId ? { ...m, id: realId } : m)),
+          prev.map((m) => (m.id === placeholderId ? { ...m, id: realId } : m)),
         );
       },
       onSessionId: (newSessionId: number) => {
@@ -1448,7 +1461,7 @@ export default function ChatPage() {
         message.error(errMsg);
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === assistantId && m.content === THINKING_SENTINEL
+            m.id === liveAssistantId && m.content === THINKING_SENTINEL
               ? { ...m, content: REQUEST_FAILED_SENTINEL }
               : m,
           ),
@@ -1478,7 +1491,7 @@ export default function ChatPage() {
         const totalMs = Date.now() - startedAt;
         setMessages((prev) =>
           prev.map((m) => {
-            if (m.id !== assistantId) return m;
+            if (m.id !== liveAssistantId) return m;
             const settled = m.content === THINKING_SENTINEL
               ? { ...m, content: REQUEST_FAILED_SENTINEL }
               : m;
