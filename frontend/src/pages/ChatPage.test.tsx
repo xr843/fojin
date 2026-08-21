@@ -283,6 +283,31 @@ describe("ChatPage 首屏结构", () => {
     });
   });
 
+  // 响应耗时必须在**登录用户**身上也成立。这是它上线当天就挂掉的地方：
+  // 后端在 done 之前先发 message_id（chat.py:1356 → :1361），onMessageId 把消息 id
+  // 从 Date.now() 占位符换成真实的 chat_messages.id；而 onDone 里仍按占位符去找那条
+  // 消息，于是再也匹配不上，耗时一个字都没写进去。
+  //
+  // 游客不落库、收不到 message_id，id 一直是占位符 —— 所以以游客身份怎么试都是好的。
+  // 这条用例的关键就是**先发 message_id 再发 done**，复刻登录用户的真实顺序。
+  it("响应耗时: message_id 换过 id 之后，onDone 仍要把耗时记到那条消息上", async () => {
+    let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+    vi.mocked(sendChatMessageStream).mockImplementation(
+      async (_m, _s, _mid, callbacks) => { cb = callbacks; },
+    );
+    const { container } = await renderEmpty();
+    fireEvent.click(container.querySelector(".chat-hero-card")!);
+    await waitFor(() => expect(cb).toBeDefined());
+
+    cb!.onToken("《药师经》以东方净琉璃世界为依报。");
+    cb!.onMessageId?.(31337);   // ← 登录用户才有的这一步
+    cb!.onDone();
+
+    await waitFor(() => {
+      expect(screen.getByText(/共 \d/)).toBeInTheDocument();
+    });
+  });
+
   // 推理进度：把此前被丢弃的 reasoning 增量用作「仍在推进」的实证。
   // 与 retrieved 同一条承重约束 —— 只写独立字段，绝不碰 content（哨兵一旦被顶掉，
   // onDone 的空回复兜底就失效）。
