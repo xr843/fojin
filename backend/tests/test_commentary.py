@@ -49,6 +49,14 @@ def _pkg(tmp_path, notes):
     return d
 
 
+def _passage(pkg, quote, limit):
+    """读者划一段 → 各家注。locate 决定他划到了哪几行，passage 据此排序。"""
+    loc = pkg.locate(quote)
+    assert loc is not None, f"划选未命中: {quote}"
+    core, i0, i1 = loc
+    return pkg.passage(core, i0, i1, limit)
+
+
 def _note(work, base_line, anchor, score, text):
     return {"work": work, "base_line": base_line, "anchor": anchor,
             "score": score, "text": text}
@@ -105,7 +113,7 @@ def test_simplified_query_matches_traditional_source(loaded):
 def test_passage_merges_neighbouring_lines(loaded):
     """注家把牒文锚在同一段的不同行上；只看锚点那一行会把一段的注切碎。"""
     pkg = svc.packages()[0]
-    span, hits, total = pkg.passage("T08n0235_p0749c22", 10)
+    span, hits, total = _passage(pkg, "不應住色生心，不應住聲、香、味、觸、法生心，應無所住而生其心。", 10)
     assert len(span) >= 4
     # c21 上的两家 + c22 上的一家，跨行合并后都在
     assert {h["work"] for h in hits} == {"F03n0100", "ZW10n0081", "X24n0461"}
@@ -115,7 +123,7 @@ def test_passage_merges_neighbouring_lines(loaded):
 def test_one_entry_per_commentary_keeping_best_anchor(loaded):
     """同一部书段内多处锚点只算一家，否则「有几家注」会被答成「有几条对齐」。"""
     pkg = svc.packages()[0]
-    _, hits, _ = pkg.passage("T08n0235_p0749c22", 10)
+    _, hits, _ = _passage(pkg, "不應住色生心，不應住聲、香、味、觸、法生心，應無所住而生其心。", 10)
     f = [h for h in hits if h["work"] == "F03n0100"]
     assert len(f) == 1
     assert f[0]["score"] == 1.0            # 留置信度高的那个锚点
@@ -125,15 +133,19 @@ def test_one_entry_per_commentary_keeping_best_anchor(loaded):
 def test_limit_reports_the_true_total(loaded):
     """截断时必须能看出被截断了——列出三家不能让人以为只有三家。"""
     pkg = svc.packages()[0]
-    _, hits, total = pkg.passage("T08n0235_p0749c22", 2)
+    _, hits, total = _passage(pkg, "不應住色生心，不應住聲、香、味、觸、法生心，應無所住而生其心。", 2)
     assert len(hits) == 2
     assert total == 3
 
 
 def test_tier_orders_before_score(loaded):
-    """A 档在前：质检档次比单条置信度更能说明这部书可不可信。"""
+    """A 档在前：质检档次比单条置信度更能说明这部书可不可信。
+
+    档次只在「读者划到的那几行」内部比 —— 所以这里划的是 c21+c22 两行，
+    三家注都落在划选内。跨越划选边界时另有更强的次序，见下面那条测试。
+    """
     pkg = svc.packages()[0]
-    _, hits, _ = pkg.passage("T08n0235_p0749c22", 10)
+    _, hits, _ = _passage(pkg, "不應住色生心，不應住聲、香、味、觸、法生心，應無所住而生其心。", 10)
     assert hits[-1]["work"] == "X24n0461"   # 唯一的 C 档排最后
 
 
@@ -298,3 +310,70 @@ async def test_juan_lookup_against_a_real_corpus():
             _JUAN_OF_LINE, {"tids": [12400], "refs": ["9999z99"]}
         )).all()
     assert rows == []
+
+
+def test_locate_covers_the_whole_selection_not_just_its_start(loaded):
+    """划选跨几行就该收几行 —— 只认起点会把读者没划的上文也当成正题。"""
+    pkg = svc.packages()[0]
+    core, i0, i1 = pkg.locate(
+        "不應住色生心，不應住聲、香、味、觸、法生心，應無所住而生其心。"
+    )
+    assert core == {"T08n0235_p0749c21", "T08n0235_p0749c22"}
+    assert pkg.ids[i0] == "T08n0235_p0749c21"
+    assert pkg.ids[i1] == "T08n0235_p0749c22"
+
+
+def test_boundary_line_grazed_by_a_few_chars_is_not_core(loaded):
+    """读者几乎不会正好停在 CBETA 行末；末尾沾到的那一两个字不算他在问它。
+
+    不设这道门槛的话，下一句的注家会挤满名额 —— 生产 44 例抽样里实测撞到 1 例。
+    """
+    pkg = svc.packages()[0]
+    core, _, _ = pkg.locate("觸、法生心，應無所住而生其心。「須")
+    assert "T08n0235_p0749c23" not in core
+    assert core == {"T08n0235_p0749c22"}
+
+
+@pytest.fixture()
+def upstream_is_better_graded(tmp_path, monkeypatch):
+    """上文两家是 A 档，读者划的那一行只有一家 C 档 —— 次序该听谁的。"""
+    notes = [
+        _note("F03n0100", "T08n0235_p0749c20", "F03n0100_p0334b01", 1.0, "註上文一"),
+        _note("ZW10n0081", "T08n0235_p0749c21", "ZW10n0081_p0073a01", 1.0, "註上文二"),
+        _note("X24n0461", "T08n0235_p0749c22", "X24n0461_p0546b12", 1.0, "註本句"),
+    ]
+    d = _pkg(tmp_path, notes)
+    monkeypatch.setattr(svc, "PACKAGE_DIR", d)
+    svc.packages.cache_clear()
+    yield
+    svc.packages.cache_clear()
+
+
+def test_notes_on_the_selected_line_outrank_upstream_ones(upstream_is_better_graded):
+    """读者划哪句，就先给注那句的 —— 哪怕它档次更低。
+
+    这是这个功能此前最大的毛病：窗口向前多放三行，而上文的注按档次/置信度
+    排在前面，于是读者划 A 段、看到的是 B 段的注。生产 44 例抽样里，注文与
+    划选对得上的只有 27%，其中 15 例八家全部答非所问。
+    """
+    pkg = svc.packages()[0]
+    _, hits, _ = _passage(pkg, "應無所住而生其心", 10)
+    # X24n0461 是 C 档，另外两家是 A 档；但只有它注的是读者划的这一行。
+    assert hits[0]["work"] == "X24n0461"
+    assert hits[0]["base_line"] == "T08n0235_p0749c22"
+    # 上文那两家仍然给，但退到后面当兜底 —— 对齐锚点有偏移，全砍掉会有段取不到注。
+    assert {h["work"] for h in hits[1:]} == {"F03n0100", "ZW10n0081"}
+
+
+def test_a_books_anchor_on_the_selected_line_beats_its_own_higher_scored_one(loaded):
+    """一部书在段内多处有锚点时，给读者看它注**这一句**的那条。
+
+    F03n0100 在 c21 的锚点置信度更高（1.0 vs 0.8），但读者划的是 c22；
+    注 c21 的那条再准，也不是他问的问题。
+    """
+    pkg = svc.packages()[0]
+    _, hits, _ = _passage(pkg, "應無所住而生其心", 10)
+    f = [h for h in hits if h["work"] == "F03n0100"]
+    assert len(f) == 1
+    assert f[0]["base_line"] == "T08n0235_p0749c22"
+    assert f[0]["score"] == 0.8

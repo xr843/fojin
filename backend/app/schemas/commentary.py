@@ -19,6 +19,11 @@ class CommentaryHit(BaseModel):
     note: str
     anchor: str
     base_line: str
+    # 这家注的是哪一句经 —— 一段里各家牒的句子不同，不给出来读者无从判断
+    # 眼前这条是不是在回答他划的那句。
+    base_text: str | None = None
+    # 该注锚定的行是否落在读者划选范围内。False = 窗口边缘的兜底结果。
+    on_selection: bool = True
     score: float
     # 同一部书的另一版本（牒句分布几乎重合），例如玄宗御注收在两部藏经里。
     # 只标不合并——藏掉一部 CBETA 书对要按版本查证的人更糟。
