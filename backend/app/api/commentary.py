@@ -136,13 +136,15 @@ async def passage(
     """
     pkgs = svc.packages()
     for pkg in pkgs:
-        line = pkg.find(q)
-        if not line:
+        loc = pkg.locate(q)
+        if not loc:
             continue
-        span, hits, total = pkg.passage(line, limit)
+        core, i0, i1 = loc
+        span, hits, total = pkg.passage(core, i0, i1, limit)
         base_work = pkg.meta["base_work"]
-        # 经文侧锚到这一段的第一行——读者点过去，落在他问的那句上。
-        base_key = (base_work, span[0] if span else None)
+        # 经文侧锚到**读者划的第一行**，不是窗口的第一行——窗口向前多放了几行
+        # 上文，锚在那里会把点进来的人送到他划的那句之前。
+        base_key = (base_work, pkg.ids[i0] if i0 is not None else None)
         located = await _locate(
             db, [(h["work"], h["anchor"]) for h in hits] + [base_key]
         )
@@ -165,6 +167,8 @@ async def passage(
                     note=h["text"],
                     anchor=h["anchor"],
                     base_line=h["base_line"],
+                    base_text=pkg.text.get(h["base_line"]),
+                    on_selection=h["base_line"] in core,
                     score=h["score"],
                     same_as=(pkg.comms.get(h["work"], {}) or {}).get("same_as"),
                     urn=located.get((h["work"], h["anchor"]), (None, None))[0],

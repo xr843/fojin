@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from collections import Counter
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
@@ -32,6 +33,11 @@ PACKAGE_DIR = Path("/data/commentary")
 # 读得完；超出时如实标 truncated，绝不假装这就是全部。
 DEFAULT_LIMIT = 8
 MAX_LIMIT = 50
+
+# 读者划选的首尾常常只沾到一行的几个字（几乎没人正好停在 CBETA 行末）。
+# 这样的边界行不算「他在问这一行」——否则下一句的注家会挤满名额，把他真正
+# 划的那句的注家顶出去。实测：不设这道门槛时 44 例里有 1 例被下一句占满。
+_CORE_MIN_CHARS = 6
 
 # CBETA 书号 → fojin 的 cbeta_id：T08n0235 → T0235、X24n0461 → X0461。
 _WORK_ID = re.compile(r"^([A-Z]+)\d*n(\w+)$")
@@ -70,6 +76,7 @@ class Package:
     text: dict = field(default_factory=dict)
     _flat: str = ""
     _owner: list[str] = field(default_factory=list)
+    _len: dict = field(default_factory=dict)
 
     @classmethod
     def load(cls, path: Path) -> Package:
@@ -89,6 +96,7 @@ class Package:
             t = normalise_for_match(ln["text"])
             parts.append(t)
             pkg._owner.extend([ln["id"]] * len(t))
+            pkg._len[ln["id"]] = len(t)
         pkg._flat = "".join(parts)
         return pkg
 
@@ -100,26 +108,65 @@ class Package:
         p = self._flat.find(needle)
         return self._owner[p] if p >= 0 else None
 
-    def passage(self, center: str, limit: int) -> tuple[list[str], list[dict], int]:
+    def locate(self, quote: str) -> tuple[set[str], int, int] | None:
+        """读者划选实质覆盖了哪几行 —— (行号集合, 起始下标, 结束下标)。
+
+        ``find`` 只给起点，丢掉了划选的长度。读者划一整段（常有七八行）时，
+        只按起点行前后取窗口，会把他没划到的上文也算进来，而上文的注家按
+        置信度排序往往排在前面，于是他划 A 段、看到的却是 B 段的注。
+        """
+        needle = normalise_for_match(quote)
+        if not needle:
+            return None
+        p = self._flat.find(needle)
+        if p < 0:
+            return None
+        covered = Counter(self._owner[p:p + len(needle)])
+        core = {
+            ln for ln, n in covered.items()
+            if n >= min(_CORE_MIN_CHARS, max(1, self._len.get(ln, 1)) // 2)
+        }
+        if not core:  # 划选比一行还短时，门槛会把唯一那行也筛掉
+            core = {self._owner[p]}
+        idx = [self.pos[x] for x in core if x in self.pos]
+        if not idx:
+            return None
+        return core, min(idx), max(idx)
+
+    def passage(
+        self, core: set[str], i0: int, i1: int, limit: int
+    ) -> tuple[list[str], list[dict], int]:
         """(段内各行, 去重后的各家注, 本段总家数)。
 
         同一部注疏常在段内多行都有锚点（牒文分几处引），按行列会让它重复出现，
-        把「有几家注」答成「有几条对齐」。按注疏去重，保留置信度最高的锚点。
+        把「有几家注」答成「有几条对齐」。按注疏去重，保留最贴题的那个锚点。
+
+        ``core`` 是读者实际划到的行；窗口仍向两侧各放 ``passage_radius`` 行，
+        因为对齐锚点本身有偏移，只认 core 会让一些段一家都取不到。但 core 内的
+        注**永远排在**窗口边缘的注之前 —— 边缘只是兜底，不该顶替正题。
         """
-        i = self.pos.get(center)
-        if i is None:
+        if i0 is None:
             return [], [], 0
         r = self.meta.get("passage_radius", 3)
-        span = self.ids[max(0, i - r): i + r + 1]
+        span = self.ids[max(0, i0 - r): i1 + r + 1]
+
+        def pick(n: dict) -> tuple[int, float]:
+            """同一部书取哪个锚点：先看是不是落在读者划的行上，再看置信度。"""
+            return (0 if n["base_line"] in core else 1, -n["score"])
+
         best: dict[str, dict] = {}
         for bl in span:
             for n in self.by_line.get(bl, ()):
-                if n["work"] not in best or n["score"] > best[n["work"]]["score"]:
+                if n["work"] not in best or pick(n) < pick(best[n["work"]]):
                     best[n["work"]] = n
         order = {"A": 0, "B": 1, "C": 2}
         ranked = sorted(
             best.values(),
-            key=lambda n: (order.get(self.comms.get(n["work"], {}).get("tier"), 9), -n["score"]),
+            key=lambda n: (
+                0 if n["base_line"] in core else 1,
+                order.get(self.comms.get(n["work"], {}).get("tier"), 9),
+                -n["score"],
+            ),
         )
         return span, ranked[:limit], len(ranked)
 
