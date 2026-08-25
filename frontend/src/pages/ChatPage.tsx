@@ -83,6 +83,7 @@ import {
   useAuthStore,
   type UserProfile,
 } from "../stores/authStore";
+import type { TextId } from "../types/branded";
 
 // 登录用户的额度提示只在快用完时出现。常驻一个「今日剩余 198 次」是纯噪音 ——
 // 而毫无预警地撞上上限、直接吃一个错误，才是真正会让人懵的那种体验。
@@ -345,7 +346,7 @@ interface MessageBubbleProps {
   onShare: (m: ChatMessageItem) => void;
   onRetry: (m: ChatMessageItem) => void;
   onFeedback: (m: ChatMessageItem, dir: "up" | "down") => void;
-  onSourceClick: (source: ChatSource) => void;
+  onSourceClick: (source: ChatSource, phase?: "retrieved") => void;
 }
 
 /** One chat message row, memoised on (m, isStreaming, sending, user). A streaming
@@ -456,11 +457,25 @@ function MessageBubbleInner({
                     {m.retrieval && (
                       <>
                         {t("chat.retrieved_hint", { n: m.retrieval.count })}
-                        {m.retrieval.titles.map((tt) => (
-                          <span key={tt} className="chat-retrieved-title">
-                            {t("chat.retrieved_title", { title: tt })}
-                          </span>
-                        ))}
+                        {/* 有 refs（新后端）就给可点 chip：等答案的同时先读原文。
+                            点开走 onSourceClick 的 retrieved 相位 —— 与流末的「参考经文」
+                            同一条抽屉。旧后端没有 refs 时退回纯文本经名。 */}
+                        {m.retrieval.refs && m.retrieval.refs.length > 0
+                          ? m.retrieval.refs.map((r) => (
+                              <SourceChipButton
+                                key={`${r.text_id}:${r.juan_num}`}
+                                label={t("reader.citation.title_with_juan", { title: localizeHan(r.title_zh ?? "", lang), n: r.juan_num })}
+                                onClick={() => onSourceClick(
+                                  { text_id: r.text_id as TextId, juan_num: r.juan_num, chunk_index: r.chunk_index ?? undefined, chunk_text: "", score: 0, title_zh: r.title_zh ?? undefined },
+                                  "retrieved",
+                                )}
+                              />
+                            ))
+                          : m.retrieval.titles.map((tt) => (
+                              <span key={tt} className="chat-retrieved-title">
+                                {t("chat.retrieved_title", { title: tt })}
+                              </span>
+                            ))}
                         <span className="chat-retrieved-sep">·</span>
                       </>
                     )}
@@ -513,21 +528,11 @@ function MessageBubbleInner({
                   <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
                     <span style={{ fontSize: 12, color: "var(--fj-ink-muted)" }}>{t("chat.reference_sources")}</span>
                     {sourceChips.map((s) => (
-                      <button
+                      <SourceChipButton
                         key={`${s.text_id}:${s.juan_num}`}
-                        type="button"
+                        label={t("reader.citation.title_with_juan", { title: localizeHan(s.title_zh ?? "", lang), n: s.juan_num })}
                         onClick={() => onSourceClick(s)}
-                        style={{
-                          display: "inline-flex", alignItems: "center", gap: 4,
-                          padding: "3px 10px", borderRadius: 12,
-                          border: "1px solid rgba(176,141,87,0.5)", background: "rgba(176,141,87,0.06)",
-                          color: "var(--fj-ink-muted)", fontSize: 12, lineHeight: 1.6, cursor: "pointer", transition: "all 0.2s",
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(176,141,87,0.16)"; e.currentTarget.style.color = "var(--fj-accent)"; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(176,141,87,0.06)"; e.currentTarget.style.color = "var(--fj-ink-muted)"; }}
-                      >
-                        {t("reader.citation.title_with_juan", { title: localizeHan(s.title_zh ?? "", lang), n: s.juan_num })}
-                      </button>
+                      />
                     ))}
                   </div>
                 )}
@@ -653,6 +658,26 @@ function MessageBubbleInner({
         )}
       </div>
     </div>
+  );
+}
+
+/** 经文 chip：流末「参考经文」行与等待期 retrieved.refs 共用一个样子、一条抽屉。 */
+function SourceChipButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 4,
+        padding: "3px 10px", borderRadius: 12,
+        border: "1px solid rgba(176,141,87,0.5)", background: "rgba(176,141,87,0.06)",
+        color: "var(--fj-ink-muted)", fontSize: 12, lineHeight: 1.6, cursor: "pointer", transition: "all 0.2s",
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(176,141,87,0.16)"; e.currentTarget.style.color = "var(--fj-accent)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(176,141,87,0.06)"; e.currentTarget.style.color = "var(--fj-ink-muted)"; }}
+    >
+      {label}
+    </button>
   );
 }
 
@@ -1555,11 +1580,12 @@ export default function ChatPage() {
     }
   }, [messages, handleSendMessage]);
 
-  const handleSourceClick = useCallback((s: ChatSource) => {
+  const handleSourceClick = useCallback((s: ChatSource, phase?: "retrieved") => {
     // Behavioural signal, mirroring inline citation clicks: opening a source
     // from the persistent list is engagement with / trust in the retrieved text.
+    // phase=retrieved：答案还没来、用户先点开了原文 —— 单独可分，别混进流末的点击。
     if (typeof umami !== "undefined") {
-      umami.track("source_click", { text_id: s.text_id });
+      umami.track("source_click", phase ? { text_id: s.text_id, phase } : { text_id: s.text_id });
     }
     const chunkIndex = s.chunk_index ?? -1;
     if (chunkIndex < 0) {

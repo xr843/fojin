@@ -262,6 +262,59 @@ describe("ChatPage 首屏结构", () => {
     expect(container.querySelector(".chat-thinking")).not.toBeNull();
   });
 
+  // 等待期先给原文：首字前常等 30–180 秒，而检索 2–3 秒就完成了。retrieved.refs
+  // 渲染成可点 chip，点开即引文抽屉 —— 用户等答案的同时先读经。承重约束不变：
+  // refs 只进 retrieval 字段，content 仍是哨兵；m.sources 仍为 null（不喂
+  // injectCitationLinks，否则会在残缺的流式文本上改写经名）。
+  it("等待期: retrieved.refs 渲染成可点 chip，点开引文抽屉，content 仍是哨兵", async () => {
+    let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+    vi.mocked(sendChatMessageStream).mockImplementation(
+      async (_m, _s, _mid, callbacks) => { cb = callbacks; },
+    );
+    const { container } = await renderEmpty();
+    fireEvent.click(container.querySelector(".chat-hero-card")!);
+    await waitFor(() => expect(cb).toBeDefined());
+
+    cb!.onRetrieved?.({
+      count: 5,
+      titles: ["般若波羅蜜多心經", "大智度論"],
+      refs: [
+        { text_id: 9, juan_num: 1, chunk_index: 3, title_zh: "般若波羅蜜多心經" },
+        { text_id: 1509, juan_num: 43, chunk_index: 12, title_zh: "大智度論" },
+      ],
+    });
+
+    const chip = await screen.findByRole("button", { name: /般若波罗蜜多心经/ });
+    expect(container.querySelector(".chat-thinking")).not.toBeNull();
+    expect(container.querySelector(".chat-thinking")!.contains(chip)).toBe(true);
+
+    fireEvent.click(chip);
+    await waitFor(() => {
+      expect(container.querySelector(".chat-citation-panel")).not.toBeNull();
+    });
+    // 哨兵未被顶掉；参考经文行（依赖 m.sources）此时不该出现
+    expect(container.querySelector(".chat-thinking")).not.toBeNull();
+    expect(screen.queryByText("参考经文")).toBeNull();
+  });
+
+  // 旧后端副本（滚动部署期间）不带 refs：退回纯文本经名，不能因为 refs 缺席而不显示。
+  it("等待期: 没有 refs 时仍显示纯文本经名", async () => {
+    let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+    vi.mocked(sendChatMessageStream).mockImplementation(
+      async (_m, _s, _mid, callbacks) => { cb = callbacks; },
+    );
+    const { container } = await renderEmpty();
+    fireEvent.click(container.querySelector(".chat-hero-card")!);
+    await waitFor(() => expect(cb).toBeDefined());
+
+    cb!.onRetrieved?.({ count: 2, titles: ["般若波羅蜜多心經"] });
+    await waitFor(() => {
+      expect(screen.getByText(/已检索 2 部经典/)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/般若波羅蜜多心經/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /般若波羅蜜多心經/ })).toBeNull();
+  });
+
   // 上一条验的是症状（哨兵没被顶掉），这一条验真正的后果：哨兵一旦被改写，
   // onDone 里「流结束却从未收到 token → 转失败哨兵」的兜底就失效，用户会永远
   // 卡在假的「正在检索…」上、且没有重试按钮。这条不依赖 .chat-thinking 这个

@@ -373,6 +373,32 @@ describe("sendChatMessageStream", () => {
     expect(onReasoning).toHaveBeenCalledWith({ chars: 12, text: "先看《心經》這一段" });
   });
 
+  it("retrieved 帧的 refs 要透传给 onRetrieved —— 等待期可点原文 chip 的原料", async () => {
+    // 同 reasoning.text：页面级测试全部 mock 掉 sendChatMessageStream，只有这里
+    // 走真实 processChunk。旧后端不带 refs 时要落成 undefined 而不是抛错。
+    const { sendChatMessageStream } = await import("./client");
+    const onRetrieved = vi.fn();
+    const callbacks = {
+      onToken: vi.fn(), onSources: vi.fn(), onSessionId: vi.fn(),
+      onError: vi.fn(), onDone: vi.fn(), onRetrieved,
+    };
+
+    const promise = sendChatMessageStream("hello", undefined, null, callbacks);
+    const xhr = MockStreamXHR.instances[0];
+    xhr.responseText =
+      'data: {"type": "retrieved", "count": 2, "titles": ["心經"], "refs": [{"text_id": 9, "juan_num": 1, "chunk_index": 3, "title_zh": "心經"}]}\n\n' +
+      'data: {"type": "retrieved", "count": 1, "titles": ["法華經"]}\n\n' +
+      'data: {"type": "done"}\n\n';
+    xhr.onprogress?.();
+    await promise;
+
+    expect(onRetrieved).toHaveBeenNthCalledWith(1, {
+      count: 2, titles: ["心經"],
+      refs: [{ text_id: 9, juan_num: 1, chunk_index: 3, title_zh: "心經" }],
+    });
+    expect(onRetrieved).toHaveBeenNthCalledWith(2, { count: 1, titles: ["法華經"], refs: undefined });
+  });
+
   it("流上收到 401：清身份 + 报出原因，但不硬跳登录页丢掉整段对话", async () => {
     // 承重条。这里曾经是 window.location.href = "/login" 且 return（连 onDone
     // 都不调，Promise 永不 settle —— 因为反正整页要重载）。代价是用户刚打完的
