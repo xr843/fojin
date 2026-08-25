@@ -541,6 +541,21 @@ export async function getSearchSuggestions(q: string): Promise<string[]> {
   return data.suggestions;
 }
 
+export type SearchSuggestionType = "title" | "term" | "question";
+export interface SearchSuggestionItem {
+  value: string;
+  type: SearchSuggestionType;
+}
+export interface SearchSuggestResponse {
+  suggestions: string[];
+  /** 带 type 的联想（首页分组用）。旧后端副本不带，消费方用 homeSuggest.itemsFromSuggestResponse 兜底。 */
+  items?: SearchSuggestionItem[];
+}
+export async function getSearchSuggestItems(q: string): Promise<SearchSuggestResponse> {
+  const { data } = await api.get<SearchSuggestResponse>("/search/suggest", { params: { q } });
+  return data;
+}
+
 export interface CbetaRedirect {
   text_id: number;
   cbeta_id: string;
