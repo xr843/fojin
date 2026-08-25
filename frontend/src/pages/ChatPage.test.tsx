@@ -22,7 +22,7 @@ import {
   deleteChatSession,
   type ChatSessionItem,
 } from "../api/client";
-import type { ChatSessionId } from "../types/branded";
+import type { ChatSessionId, TextId } from "../types/branded";
 
 // 只替换 message，其余 antd 组件保持真实。
 // 为什么不能靠"页面上有没有出现错误文案"来断言：antd v5 的静态 message 在
@@ -306,6 +306,47 @@ describe("ChatPage 首屏结构", () => {
     await waitFor(() => {
       expect(screen.getByText(/共 \d/)).toBeInTheDocument();
     });
+  });
+
+  // 可点引文 / 「引用已校验」/ 「参考经文」必须在**登录用户**流结束时就在，而不是刷新后。
+  // 生产实锤（2026-08-25，会话 2987 + 直读 SSE 复核）：trust_status → sources →
+  // message_id → done 四帧落在同一个 XHR chunk、同一个同步 tick 里到达。onSources /
+  // onTrustStatus 的 setMessages updater 是延后执行的，执行时才读 liveAssistantId，
+  // 而 onMessageId 已在同一 tick 把它改成真 id —— updater 去找一个此刻还不存在的
+  // id，sources 与 trust_status 静默丢弃；刷新后从库里读回来才有。
+  //
+  // 游客不落库、不发 message_id，活变量永不改名 —— 以游客身份怎么试都是好的。
+  // 这条用例的关键是四帧**同步连发**（中间不 await），复刻真实到达顺序与时序。
+  it("引文/信任行/参考经文: 与 message_id 同一 tick 到达时不得丢失", async () => {
+    let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+    vi.mocked(sendChatMessageStream).mockImplementation(
+      async (_m, _s, _mid, callbacks) => { cb = callbacks; },
+    );
+    const { container } = await renderEmpty();
+    fireEvent.click(container.querySelector(".chat-hero-card")!);
+    await waitFor(() => expect(cb).toBeDefined());
+
+    // 最后一批 token 与收尾四帧同一个 chunk —— 先来一个 token，让 fiber 带着
+    // 未渲染的更新，后面的 updater 才会像生产那样被真正延后。
+    cb!.onToken("「應無所住而生其心」出自【《金剛般若波羅蜜經》第1卷】。");
+    cb!.onTrustStatus?.({
+      state: "verified", citation_count: 1, source_count: 1,
+      citation_mutation_count: 0, quote_mutation_count: 0, quote_checked_count: 1,
+    });
+    cb!.onSources([{
+      text_id: 235 as TextId, juan_num: 1, chunk_index: 3,
+      chunk_text: "應無所住而生其心", score: 0.9, title_zh: "金剛般若波羅蜜經",
+    }]);
+    cb!.onMessageId?.(31338);   // ← 登录用户才有的这一步，改名发生在这里
+    cb!.onDone();
+
+    await waitFor(() => {
+      expect(screen.getByText("参考经文")).toBeInTheDocument();
+    });
+    expect(screen.getByText(/引用已校验/)).toBeInTheDocument();
+    // 内联引文（精确文案）与「参考经文」chip 各一个按钮，两者都要在。
+    expect(screen.getByRole("button", { name: "【《金刚般若波罗蜜经》第1卷】" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /金刚般若波罗蜜经/ })).toHaveLength(2);
   });
 
   // 推理进度：把此前被丢弃的 reasoning 增量用作「仍在推进」的实证。
