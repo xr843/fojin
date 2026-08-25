@@ -18,7 +18,8 @@ import { useTranslation } from "react-i18next";
 import { InfoCircleOutlined, CloseOutlined } from "@ant-design/icons";
 import SourceSelector from "../components/SourceSelector";
 import XiaojinPet from "../components/XiaojinPet";
-import { getStats, getSources, getFilters, getSearchSuggestions, getHomeShowcase } from "../api/client";
+import { getStats, getSources, getFilters, getSearchSuggestItems, getHomeShowcase } from "../api/client";
+import { askQueryFrom, buildHomeSuggestOptions, itemsFromSuggestResponse, type SuggestGroup } from "./homeSuggest";
 import { getLocalizedCollections } from "../data/collections";
 import { getLangName } from "../utils/sourceUrls";
 import { getReadingHistory } from "../utils/readingHistory";
@@ -103,8 +104,10 @@ export default function HomePage() {
     return [0, 1, 2].map((i) => cols[(start + i) % cols.length]).join(" · ");
   }, [i18n.language, rand.col]);
 
-  // 搜索联想：复用 SearchPage 已有的 /search/suggest 接口与防抖模式
-  const [acOptions, setAcOptions] = useState<{ value: string }[]>([]);
+  // 搜索联想：复用 SearchPage 已有的 /search/suggest 接口与防抖模式。
+  // 后端按 type 排好序，这里分组显示（经名 / 词条 / 热门问题），末尾固定一行「问小津」
+  // —— 首页主输入框此前只会搜索，而产品核心是问答（见 homeSuggest.ts）。
+  const [acOptions, setAcOptions] = useState<SuggestGroup[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const fetchSuggestions = useCallback((value: string) => {
@@ -115,13 +118,14 @@ export default function HomePage() {
     }
     debounceRef.current = setTimeout(async () => {
       try {
-        const suggestions = await getSearchSuggestions(value);
-        setAcOptions(suggestions.map((s) => ({ value: s })));
+        const data = await getSearchSuggestItems(value);
+        setAcOptions(buildHomeSuggestOptions(itemsFromSuggestResponse(data), value, t));
       } catch {
-        setAcOptions([]);
+        // 联想挂了也要留「问小津」这一行 —— 它不依赖后端
+        setAcOptions(buildHomeSuggestOptions([], value, t));
       }
     }, 300);
-  }, []);
+  }, [t]);
 
   const handleSearch = (q?: string) => {
     const term = (q ?? query).trim();
@@ -185,12 +189,21 @@ export default function HomePage() {
             <div className="search-combo-divider" />
             <AutoComplete
               className="search-combo-ac"
-              options={acOptions}
+              options={acOptions.map((g) => ({ label: t(g.label), options: g.options }))}
               value={query}
               onChange={setQuery}
               onSearch={fetchSuggestions}
-              onSelect={(value: string) => handleSearch(value)}
-              popupMatchSelectWidth={280}
+              onSelect={(value: string) => {
+                const ask = askQueryFrom(value);
+                if (ask) {
+                  // 用户已按下「问小津」—— 等同于在 /chat 里按回车（send=1 深链契约）
+                  setQuery(ask);
+                  navigate(`/chat?q=${encodeURIComponent(ask)}&send=1`);
+                  return;
+                }
+                handleSearch(value);
+              }}
+              popupMatchSelectWidth={320}
             >
               <input
                 ref={inputRef}

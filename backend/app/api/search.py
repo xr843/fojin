@@ -12,6 +12,7 @@ from app.models.dictionary import DictionaryEntry
 from app.models.hot_question import HotQuestion
 from app.schemas.text import CrossLanguageSearchResponse, SearchResponse, SemanticSearchResponse
 from app.services.search import (
+    _SUTRA_ABBREV,
     get_aggregations,
     get_suggestions,
     search_content,
@@ -50,6 +51,58 @@ async def search(
     return await search_texts(es, q, page, size, dynasty, category, lang, sources, sort, db=db)
 
 
+def _alias_titles(q: str) -> list[str]:
+    """别名前缀命中的正典经名：「金刚」「金刚经」→ 金剛般若波羅蜜經。去重保序，至多 3。
+
+    表是 services/search.py 的 _SUTRA_ABBREV —— 与问答检索、搜索共用一张，别再抄一份。
+    """
+    q = q.strip()
+    if not q:
+        return []
+    out: list[str] = []
+    for alias, title in _SUTRA_ABBREV.items():
+        if alias.startswith(q) and title not in out:
+            out.append(title)
+        if len(out) >= 3:
+            break
+    return out
+
+
+async def _dict_suggestions(db: AsyncSession, q: str) -> tuple[list[str], list[str]]:
+    """辞典词头：(精确命中, 前缀命中≤5)。300k+ 词头，只查前缀。"""
+    try:
+        stmt = (
+            select(DictionaryEntry.headword)
+            .where(DictionaryEntry.headword.ilike(f"{q}%"))
+            .group_by(DictionaryEntry.headword)
+            .order_by(func.length(DictionaryEntry.headword), DictionaryEntry.headword)
+            .limit(6)
+        )
+        rows = await db.execute(stmt)
+        heads = [r[0] for r in rows.all() if r[0]]
+    except Exception:
+        return [], []
+    exact = [h for h in heads if h == q]
+    prefix = [h for h in heads if h != q][:5]
+    return exact, prefix
+
+
+async def _hot_question_suggestions(db: AsyncSession, q: str) -> list[str]:
+    """精选问题（200 条人工策展）里含关键词的，至多 3 条。"""
+    try:
+        stmt = (
+            select(HotQuestion.display_text)
+            .where(HotQuestion.is_active.is_(True))
+            .where(HotQuestion.display_text.ilike(f"%{q}%"))
+            .order_by(HotQuestion.sort_order.asc())
+            .limit(3)
+        )
+        rows = await db.execute(stmt)
+        return [r[0] for r in rows.all() if r[0]]
+    except Exception:
+        return []
+
+
 @router.get("/search/suggest")
 async def search_suggest(
     q: str = Query(..., min_length=1, max_length=200, description="搜索建议关键词"),
@@ -57,70 +110,46 @@ async def search_suggest(
 ):
     """Return autocomplete suggestions across multiple sources.
 
-    Sources merged in priority order:
-    1. ES title prefix matches (existing behavior — sutra titles & translators)
-    2. Dictionary headword exact + prefix matches (300k+ unique headwords —
-       captures terminology queries like "苦谛" / "般若")
-    3. hot_questions display_text substring matches (200 curated prompts —
-       steers users toward known-answerable questions)
+    Ranking (2026-08-25 — before this, dictionary headwords sorted by length
+    always came first, so "金刚" produced 金刚/金刚石/金刚砂/金刚宝石 and the
+    site's most-searched sutra 《金刚经》 was not in the list at all):
 
-    Each source has its own quota; the response returns up to ~10
-    deduplicated suggestions total. All three lookups run in parallel.
+    1. canonical titles whose alias starts with the query (services/search.py
+       ``_SUTRA_ABBREV`` — shared with retrieval and search)
+    2. exact dictionary headword ("苦" still surfaces the entry 苦 first)
+    3. ES title prefix matches (sutra titles & translators)
+    4. dictionary prefix headwords (金刚石 …)
+    5. hot_questions containing the query
 
-    根据输入返回搜索建议（自动补全），整合经文标题、辞典词头与精选问题。"""
+    Each item carries a ``type`` (title / term / question) so the homepage can
+    group the dropdown; ``suggestions`` stays a flat string list for the search
+    page. Deduplicated, at most 10.
+
+    根据输入返回搜索建议（自动补全）：正典经名 > 精确词头 > 经名 > 前缀词头 > 精选问题。"""
     es = get_es()
 
-    async def _dict_prefix() -> list[str]:
-        try:
-            stmt = (
-                select(DictionaryEntry.headword)
-                .where(DictionaryEntry.headword.ilike(f"{q}%"))
-                .group_by(DictionaryEntry.headword)
-                .order_by(func.length(DictionaryEntry.headword), DictionaryEntry.headword)
-                .limit(5)
-            )
-            rows = await db.execute(stmt)
-            return [r[0] for r in rows.all() if r[0]]
-        except Exception:
-            return []
-
-    async def _hot_q_match() -> list[str]:
-        try:
-            stmt = (
-                select(HotQuestion.display_text)
-                .where(HotQuestion.is_active.is_(True))
-                .where(HotQuestion.display_text.ilike(f"%{q}%"))
-                .order_by(HotQuestion.sort_order.asc())
-                .limit(3)
-            )
-            rows = await db.execute(stmt)
-            return [r[0] for r in rows.all() if r[0]]
-        except Exception:
-            return []
-
-    es_suggestions, dict_suggestions, hot_suggestions = await asyncio.gather(
+    es_titles, (dict_exact, dict_prefix), hot = await asyncio.gather(
         get_suggestions(es, q),
-        _dict_prefix(),
-        _hot_q_match(),
-        return_exceptions=False,
+        _dict_suggestions(db, q),
+        _hot_question_suggestions(db, q),
     )
 
     seen: set[str] = set()
-    merged: list[str] = []
-    # Order: dict (most specific) > es titles > hot questions.
-    # Users searching "苦" want the dictionary entry first, not a sutra
-    # whose title begins with 苦.
-    for source_list in (dict_suggestions, es_suggestions, hot_suggestions):
-        for s in source_list:
-            if s and s not in seen:
-                seen.add(s)
-                merged.append(s)
-            if len(merged) >= 10:
-                break
-        if len(merged) >= 10:
-            break
+    items: list[dict[str, str]] = []
 
-    return {"suggestions": merged}
+    def _add(values: list[str], kind: str) -> None:
+        for v in values:
+            if v and v not in seen and len(items) < 10:
+                seen.add(v)
+                items.append({"value": v, "type": kind})
+
+    _add(_alias_titles(q), "title")
+    _add(dict_exact, "term")
+    _add(es_titles, "title")
+    _add(dict_prefix, "term")
+    _add(hot, "question")
+
+    return {"suggestions": [i["value"] for i in items], "items": items}
 
 
 @router.get("/search/cross-language", response_model=CrossLanguageSearchResponse)
