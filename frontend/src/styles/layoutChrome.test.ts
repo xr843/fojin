@@ -54,4 +54,11 @@ describe("布局铬高度 token", () => {
     );
     expect(shell).not.toMatch(/120px/);
   });
+
+  it("手机空态放开外壳高度（height:auto），有对话后才锁高钉底", () => {
+    const m = CSS.match(/@media \(max-width: 768px\)\s*\{[\s\S]*?\.chat-shell\.chat-shell--empty\s*\{([^}]*)\}/);
+    expect(m, ".chat-shell.chat-shell--empty rule missing from the ≤768px block").not.toBeNull();
+    expect(m![1]).toMatch(/height:\s*auto/);
+    expect(m![1]).toMatch(/min-height:\s*calc\(100dvh - var\(--fj-header-h\)/);
+  });
 });

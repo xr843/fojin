@@ -176,6 +176,23 @@ describe("ChatPage 首屏结构", () => {
     expect(shell.style.height).toBe("");
   });
 
+  // 手机空态：外壳锁高 + 建议卡片/横幅/输入框把消息区挤到 52px，标题在里面被裁掉
+  // 下半截、副标题整个不见（2026-08-25 Playwright 390px 生产实测）。空态时给外壳打
+  // 上 chat-shell--empty，≤768px 的 CSS 据此放开高度；有对话后去掉，恢复锁高钉底。
+  it("空态外壳带 chat-shell--empty，发出第一条消息后去掉", async () => {
+    let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+    vi.mocked(sendChatMessageStream).mockImplementation(
+      async (_m, _s, _mid, callbacks) => { cb = callbacks; },
+    );
+    const { container } = await renderEmpty();
+    const shell = container.querySelector(".chat-shell") as HTMLElement;
+    expect(shell.classList.contains("chat-shell--empty")).toBe(true);
+
+    fireEvent.click(container.querySelector(".chat-hero-card")!);
+    await waitFor(() => expect(cb).toBeDefined());
+    expect(shell.classList.contains("chat-shell--empty")).toBe(false);
+  });
+
   it("空状态渲染出标题与建议卡片（脚手架自检）", async () => {
     const { container } = await renderEmpty();
     expect(screen.getByText("小津 佛典问答")).toBeInTheDocument();
