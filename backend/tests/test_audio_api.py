@@ -141,3 +141,31 @@ async def test_endpoint_returns_payload_when_audio_exists(client) -> None:
         assert body["cues"][0]["kind"] == "head"
     finally:
         texts_api.get_juan_audio = original
+
+
+async def test_juan_content_reports_has_audio(client) -> None:
+    """读经接口带 has_audio —— 前端据此决定要不要再请求 /audio。
+
+    此前阅读器每换一卷都无条件打一次 /audio，而只有心經有音频：其余 10,531 部
+    每卷一个 404（2026-08-25 走查实测）。
+    """
+    from app.api import texts as texts_api
+    from app.schemas.text import JuanContentResponse
+
+    content = JuanContentResponse(
+        text_id=9, cbeta_id="T0251", title_zh="般若波羅蜜多心經", juan_num=1,
+        total_juans=1, content="觀自在菩薩", char_count=5,
+    )
+    orig_content, orig_has = texts_api.get_juan_content, texts_api.has_juan_audio
+    texts_api.get_juan_content = AsyncMock(return_value=content)
+    try:
+        texts_api.has_juan_audio = AsyncMock(return_value=True)
+        resp = await client.get("/api/texts/9/juans/1")
+        assert resp.status_code == 200
+        assert resp.json()["has_audio"] is True
+
+        texts_api.has_juan_audio = AsyncMock(return_value=False)
+        resp = await client.get("/api/texts/9/juans/1")
+        assert resp.json()["has_audio"] is False
+    finally:
+        texts_api.get_juan_content, texts_api.has_juan_audio = orig_content, orig_has

@@ -66,7 +66,7 @@ export default function ResearchPage() {
         {/* 品牌后缀用 app.name（短名）而非 app.title：后者是首页专用的完整主张句，
             拼进来会变成「研究助手 — 佛津 FoJin — 佛经 AI 问答，每句引用可点开核对原文」。
             DictionaryPage 等页面用的就是 app.name，这里跟齐。 */}
-        <title>{t("research.title")} — {t("app.name")}</title>
+        <title>{`${t("research.title")} — ${t("app.name")}`}</title>
       </Helmet>
 
       <header className="rp-header">

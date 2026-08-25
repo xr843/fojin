@@ -236,7 +236,7 @@ export default function DictionaryPage() {
   return (
     <div className="dict-page">
       <Helmet>
-        <title>{t("nav.dictionary")} - {t("app.name")}</title>
+        <title>{`${t("nav.dictionary")} - ${t("app.name")}`}</title>
       </Helmet>
 
       {/* Header */}

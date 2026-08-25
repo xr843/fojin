@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import { Card, Form, Input, Button, Typography, Tabs, Divider, message, Space } from "antd";
 import { UserOutlined, LockOutlined, MailOutlined, GithubOutlined, GoogleOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
+import { Helmet } from "react-helmet-async";
 import axios from "axios";
 import { useAuthStore } from "../stores/authStore";
 import api from "../api/client";
@@ -127,6 +128,9 @@ export default function LoginPage() {
         padding: 24,
       }}
     >
+      <Helmet>
+        <title>{`${t("auth.login")} - ${t("app.name")}`}</title>
+      </Helmet>
       <Card style={{ width: 420 }}>
         <Title level={3} style={{ textAlign: "center", marginBottom: 24 }}>
           {t("app.name")}

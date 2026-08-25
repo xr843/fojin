@@ -205,6 +205,8 @@ export interface JuanContentResponse {
   char_count: number;
   prev_juan: number | null;
   next_juan: number | null;
+  /** 本卷有读诵音频才为 true；旧后端副本不带这个字段（滚动部署期间）→ 当 false。 */
+  has_audio?: boolean;
   // Base-edition (底本) — derived from cbeta_id prefix by the backend.
   // canon is the machine code (taisho / xuzang / pali / kangyur / gretil);
   // canon_label is the Chinese display string (大正藏 / 卍续藏 / …).
