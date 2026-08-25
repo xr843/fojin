@@ -15,6 +15,13 @@ already in the database.
 Why it matters beyond cosmetics: each junk headword is a /dict/ page crawlers index,
 and every crawl costs a reverse-index lookup against a 276MB TOASTed column.
 
+2026-08-25 second pass — named entities. 佛光大辞典「般若」 shows ``praj&ntilde;ā`` in
+prod: those rows came through import_mdict.py, whose hand-rolled decoder only knew
+amp/quot/#39/nbsp/lt/gt, so every other named entity was stored verbatim.
+decode_entities() is the backfill's single entry point: numeric → named → numeric
+again (a double-escaped ``&amp;#X4E98;`` needs two rounds). Only ``;``-terminated
+names that HTML5 defines are touched; a bare ``&`` or an unknown ``&foo;`` stays.
+
 Usage:
     python -m scripts.fix_dict_html_entities              # dry run (default)
     python -m scripts.fix_dict_html_entities --write      # apply
@@ -27,6 +34,7 @@ import argparse
 import asyncio
 import re
 import sys
+from html.entities import html5
 
 # app.database is imported inside main() on purpose: importing it builds the
 # async engine, and decode_numeric_entities() is a pure function that its tests
@@ -79,10 +87,53 @@ def decode_numeric_entities(s: str) -> str:
     return _NUMERIC_REF.sub(_repl, s)
 
 
-SELECT_SQL = """
+# Named references: ``&ntilde;`` — a ``;``-terminated name. Names without the
+# semicolon are deliberately NOT matched (``&ntilde`` is legal HTML too, but here
+# we only repair the shape we know is broken).
+_NAMED_REF = re.compile(r"&([A-Za-z][A-Za-z0-9]{1,31});")
+
+
+def decode_named_entities(s: str) -> str:
+    """Replace ``;``-terminated named references HTML5 defines; leave the rest."""
+    if not s:
+        return s
+
+    def _repl(m: re.Match[str]) -> str:
+        decoded = html5.get(m.group(1) + ";", m.group(0))
+        # &nbsp; → plain space, same as the importers do; a U+00A0 inside a
+        # definition body only confuses search and copy-paste.
+        return " " if decoded == "\xa0" else decoded
+
+    return _NAMED_REF.sub(_repl, s)
+
+
+def decode_entities(s: str) -> str:
+    """Numeric → named → numeric, repeated until stable (max 3 rounds).
+
+    Two rounds are needed for buddhaspace's double-escaped ``&amp;#X4E98;``:
+    the named pass turns it into ``&#X4E98;`` and the numeric pass finishes it.
+    Unsafe numeric references are still refused by decode_numeric_entities().
+    """
+    out = s
+    for _ in range(3):
+        nxt = decode_numeric_entities(decode_named_entities(decode_numeric_entities(out)))
+        if nxt == out:
+            break
+        out = nxt
+    return out
+
+
+# Postgres regex (``~``) mirrors _NAMED_REF; the LIKE keeps the numeric shape.
+_BROKEN_ROWS_WHERE = """
+    WHERE headword LIKE '%&#%' OR definition LIKE '%&#%'
+       OR headword ~ '&[A-Za-z][A-Za-z0-9]{1,31};'
+       OR definition ~ '&[A-Za-z][A-Za-z0-9]{1,31};'
+"""
+
+SELECT_SQL = f"""
     SELECT id, headword, definition
     FROM dictionary_entries
-    WHERE headword LIKE '%&#%' OR definition LIKE '%&#%'
+    {_BROKEN_ROWS_WHERE}
     ORDER BY id
 """
 
@@ -116,8 +167,8 @@ async def main() -> int:
         planned = []
         skipped = []
         for row_id, headword, definition in rows:
-            new_head = decode_numeric_entities(headword or "")
-            new_def = decode_numeric_entities(definition or "")
+            new_head = decode_entities(headword or "")
+            new_def = decode_entities(definition or "")
             if new_head == (headword or "") and new_def == (definition or ""):
                 # Nothing decodable — a leftover unsafe reference, or a stray '&#'
                 # that is not a character reference at all.
@@ -166,13 +217,10 @@ async def main() -> int:
 
         left = (
             await session.execute(
-                text(
-                    "SELECT count(*) FROM dictionary_entries "
-                    "WHERE headword LIKE '%&#%' OR definition LIKE '%&#%'"
-                )
+                text(f"SELECT count(*) FROM dictionary_entries {_BROKEN_ROWS_WHERE}")
             )
         ).scalar()
-        print(f"[verify] 仍含 '&#' 的行: {left}")
+        print(f"[verify] 仍含实体（数字或命名）的行: {left}")
     return 0
 
 
