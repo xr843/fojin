@@ -281,11 +281,15 @@
 /* ---------- 卡片网格 ---------- */
 .sources-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  /* min(320px, 100%)：列宽下限不得超过容器，否则窄容器里轨道比容器还宽。 */
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
   gap: 12px;
 }
 
 .source-card {
+  /* 网格项的自动最小尺寸是 min-content；卡片顶行是 nowrap 的英文名，会把轨道撑到
+     500px+。归零后由 .source-card-name-en 自己 ellipsis。 */
+  min-width: 0;
   background: var(--fj-surface);
   border: 1px solid var(--fj-border);
   border-radius: 8px;
@@ -626,7 +630,10 @@
   }
 
   .sources-grid {
-    grid-template-columns: 1fr;
+    /* 不能写 1fr：它等于 minmax(auto, 1fr)，最小值取卡片 min-content（504px），
+       单列轨道反而比 390px 视口宽，布局视口被撑到 608px、描述文字在右缘被裁
+       （2026-08-25 Playwright 生产实测）。 */
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .sources-title {
