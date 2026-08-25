@@ -67,3 +67,16 @@ describe("页脚的「唤回小津」", () => {
     expect(screen.queryByText("唤回小津")).not.toBeInTheDocument();
   });
 });
+
+describe("布局铬高度走 token", () => {
+  // 顶栏 52 / 页脚 50 / 内容区内边距 24×2 曾各自写死在内联样式与 ChatPage 的 calc()
+  // 里，合起来 150，而 ChatPage 以为是 120 —— 于是 /chat 文档比视口高 30px，发送后
+  // 贴底把导航栏滚出视口。高度只能来自 global.css 的 token，内联样式只许引用它。
+  it("顶栏与页脚的高度引用 --fj-header-h / --fj-footer-h，而不是裸数字", () => {
+    const { container } = renderLayout();
+    const header = container.querySelector(".ant-layout-header") as HTMLElement;
+    const footer = container.querySelector(".ant-layout-footer") as HTMLElement;
+    expect(header.style.height).toBe("var(--fj-header-h)");
+    expect(footer.style.height).toBe("var(--fj-footer-h)");
+  });
+});

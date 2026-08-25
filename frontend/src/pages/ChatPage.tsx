@@ -1696,11 +1696,7 @@ export default function ChatPage() {
           「移动端把引用面板铺满宽度」的规则结构上不可能生效为「堆叠」，面板
           只会在同一行里把对话列挤成 0 宽。给它一个类名，断点才改得动
           flex-direction。 */}
-      <div className="chat-shell" style={{
-        display: "flex",
-        height: "calc(100vh - 120px)",
-        gap: 16,
-      }}>
+      <div className="chat-shell">
 
         {/* Mobile sidebar drawer (logged in only) */}
         {user && sidebarOpen && (

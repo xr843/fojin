@@ -166,6 +166,16 @@ const FOLLOWING = 4; // Node.DOCUMENT_POSITION_FOLLOWING
 const CONTAINED_BY = 16; // Node.DOCUMENT_POSITION_CONTAINED_BY
 
 describe("ChatPage 首屏结构", () => {
+  // 外壳高度曾写死 calc(100vh - 120px)，而布局铬实际 150px：文档比视口高 30px，
+  // 发送后自动贴底把导航栏滚出视口。高度必须由 global.css 的 .chat-shell 按 token
+  // 计算，内联样式不许再给一个数字。
+  it("对话外壳不再内联写死高度（交给 .chat-shell 的 token 计算）", async () => {
+    const { container } = await renderEmpty();
+    const shell = container.querySelector(".chat-shell") as HTMLElement;
+    expect(shell).not.toBeNull();
+    expect(shell.style.height).toBe("");
+  });
+
   it("空状态渲染出标题与建议卡片（脚手架自检）", async () => {
     const { container } = await renderEmpty();
     expect(screen.getByText("小津 佛典问答")).toBeInTheDocument();
