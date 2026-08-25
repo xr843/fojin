@@ -732,7 +732,9 @@
 
   .kg-toolbar-main .ant-input-search {
     max-width: none;
-    flex: 1;
+    /* 独占一行。写 flex: 1（basis 0%）会和「全部类型」110px、「深度」120px 同排
+       挤在一行，只剩 86px，减去搜索按钮后输入框 1px 宽（2026-08-25 生产实测）。 */
+    flex: 1 1 100%;
     min-width: 0;
   }
 
