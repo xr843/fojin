@@ -1331,20 +1331,27 @@ export default function ChatPage() {
     // 耗时一个字都没写进去。而游客不落库、收不到 message_id，id 一直是占位符，
     // 所以以游客身份怎么试都是好的，只有登录用户看不到。
     let liveAssistantId = assistantId;
+    // 所有「改这条回答」的 setMessages 都必须走这里：id 在**回调时**捕获，而不是在
+    // updater 里读活变量。updater 是延后执行的 —— trust_status / sources / message_id
+    // / done 常落在同一个 XHR chunk、同一个同步 tick 里到达，等 updater 跑起来时
+    // onMessageId 已经把 liveAssistantId 改成真 id，而消息本身还挂着占位符；在
+    // updater 里比较活变量就会去找一个此刻不存在的 id，把 sources 与 trust_status
+    // 静默丢掉（生产实锤：登录用户流结束时引文不可点、无信任行，刷新后才有）。
+    const patchLive = (patch: (m: ChatMessageItem) => ChatMessageItem) => {
+      const id = liveAssistantId;
+      setMessages((prev) => prev.map((m) => (m.id === id ? patch(m) : m)));
+    };
 
     await sendChatMessageStream(msg, sessionId, masterId, {
       onToken: (content: string) => {
         tokenCount += 1;
         if (firstTokenMs === null) firstTokenMs = Date.now() - startedAt;
-        setMessages((prev) =>
-          prev.map((m) => {
-            if (m.id !== liveAssistantId) return m;
-            const current = m.content === THINKING_SENTINEL ? "" : m.content;
-            // reasoningText 随首个 token 销毁：被模型自己推翻的中间结论
-            // 不能留在屏幕上（渲染层另有一道保险，两道各自独立）。
-            return { ...m, content: current + content, reasoningText: null };
-          }),
-        );
+        patchLive((m) => {
+          const current = m.content === THINKING_SENTINEL ? "" : m.content;
+          // reasoningText 随首个 token 销毁：被模型自己推翻的中间结论
+          // 不能留在屏幕上（渲染层另有一道保险，两道各自独立）。
+          return { ...m, content: current + content, reasoningText: null };
+        });
         scrollToBottom();
       },
       onCitationCorrection: (correctedAnswer: string) => {
@@ -1352,18 +1359,10 @@ export default function ChatPage() {
         // arrive after `citation_correction`. If that contract is ever
         // broken, a late chunk would append to the corrected answer and
         // re-introduce the hallucination we just stripped.
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === liveAssistantId ? { ...m, content: correctedAnswer } : m,
-          ),
-        );
+        patchLive((m) => ({ ...m, content: correctedAnswer }));
       },
       onSources: (sources: ChatSource[]) => {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === liveAssistantId ? { ...m, sources } : m,
-          ),
-        );
+        patchLive((m) => ({ ...m, sources }));
         // Prefetch each citation's chunk context so the drawer opens instantly.
         for (const s of sources) {
           if (s.text_id == null || s.juan_num == null || s.chunk_index == null) continue;
@@ -1376,11 +1375,7 @@ export default function ChatPage() {
         }
       },
       onTrustStatus: (trustStatus: ChatTrustStatus) => {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === liveAssistantId ? { ...m, trust_status: trustStatus } : m,
-          ),
-        );
+        patchLive((m) => ({ ...m, trust_status: trustStatus }));
       },
       onSearching: (_searchMsg: string) => {
         // 搜索状态由初始占位符 "正在检索经文并生成回答..." 显示，不覆盖 content
@@ -1390,20 +1385,17 @@ export default function ChatPage() {
         // （削档已被 90 题 eval 证否），能改的只有等待的感受 —— 推理文本是
         // 现成的可读中文，此前整条丢掉。
         // 与 onRetrieved 同一条承重约束：只写独立字段，绝不碰 content。
-        setMessages((prev) =>
-          prev.map((m) => {
-            if (m.id !== liveAssistantId) return m;
-            const next = { ...m };
-            if (next.reasoningSince == null) next.reasoningSince = Date.now();
-            if (r.text) {
-              // 全量累加、不截尾：打字机组件按前缀吐字，截尾会让前缀失配、
-              // 整窗重排跳动。上限由推理预算天然封顶（≤ 数万字，流结束即清），
-              // 显示端的活窗高度由 CSS clip 管。
-              next.reasoningText = (next.reasoningText ?? "") + r.text;
-            }
-            return next;
-          }),
-        );
+        patchLive((m) => {
+          const next = { ...m };
+          if (next.reasoningSince == null) next.reasoningSince = Date.now();
+          if (r.text) {
+            // 全量累加、不截尾：打字机组件按前缀吐字，截尾会让前缀失配、
+            // 整窗重排跳动。上限由推理预算天然封顶（≤ 数万字，流结束即清），
+            // 显示端的活窗高度由 CSS clip 管。
+            next.reasoningText = (next.reasoningText ?? "") + r.text;
+          }
+          return next;
+        });
         // 活窗把气泡向下撑高 ~100px，而钉底发生在发送时 —— 不跟滚的话，已可
         // 滚动的对话里活窗整段等待期落在折叠线以下，token 一到又被销毁，用户
         // 从头到尾看不见它（对抗审查实锤的失效场景）。scrollToBottom 非 force
@@ -1414,9 +1406,7 @@ export default function ChatPage() {
         // 只写独立字段。绝不能写进 content —— THINKING_SENTINEL 是按身份比较的
         // 哨兵，onDone 里「流结束但从未收到 token → 转失败哨兵」的兜底靠它；
         // 一旦 content 被顶掉，用户会永远卡在假的「正在检索…」上且没有重试按钮。
-        setMessages((prev) =>
-          prev.map((m) => (m.id === liveAssistantId ? { ...m, retrieval } : m)),
-        );
+        patchLive((m) => ({ ...m, retrieval }));
       },
       onMessageId: (realId: number) => {
         // Replace the in-flight Date.now() placeholder with the real
@@ -1459,12 +1449,8 @@ export default function ChatPage() {
           });
         }
         message.error(errMsg);
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === liveAssistantId && m.content === THINKING_SENTINEL
-              ? { ...m, content: REQUEST_FAILED_SENTINEL }
-              : m,
-          ),
+        patchLive((m) =>
+          m.content === THINKING_SENTINEL ? { ...m, content: REQUEST_FAILED_SENTINEL } : m,
         );
       },
       onDone: () => {
@@ -1489,15 +1475,12 @@ export default function ChatPage() {
         // 历史消息读回来时为空，于是不会显示一个没人计过的时间。失败与空回复
         // 也照记 —— 渲染层负责不给失败哨兵显示耗时，判据留在一处就够了。
         const totalMs = Date.now() - startedAt;
-        setMessages((prev) =>
-          prev.map((m) => {
-            if (m.id !== liveAssistantId) return m;
-            const settled = m.content === THINKING_SENTINEL
-              ? { ...m, content: REQUEST_FAILED_SENTINEL }
-              : m;
-            return { ...settled, firstTokenMs, totalMs };
-          }),
-        );
+        patchLive((m) => {
+          const settled = m.content === THINKING_SENTINEL
+            ? { ...m, content: REQUEST_FAILED_SENTINEL }
+            : m;
+          return { ...settled, firstTokenMs, totalMs };
+        });
         // Clear attachment chips only after successful stream completion.
         // On error the chips stay so the user can retry without re-uploading.
         if (attachmentIdsForSend.length > 0) {
