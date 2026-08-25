@@ -879,3 +879,10 @@
 @media (max-width: 640px) {
   .reader-audio-progress, .reader-audio-meta, .reader-audio-time { display: none; }
 }
+
+/* ── 窄屏 AI 抽屉：≤1024px 时 AI 面板不再内联（见 TextReaderPage 的 narrow 分支） ── */
+.reader-ai-drawer .ant-drawer-body {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}

@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Helmet } from "react-helmet-async";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Typography, Spin, Button, Select, Breadcrumb, Row, Col, message, Tooltip, Tag, Popover, Dropdown } from "antd";
+import { Typography, Spin, Button, Select, Breadcrumb, Row, Col, message, Tooltip, Tag, Popover, Dropdown, Drawer } from "antd";
 import { getLastPosition, recordReading } from "../utils/readingHistory";
 import {
   HomeOutlined,
@@ -24,6 +24,7 @@ import {
 import { trackAudio } from "../audio/telemetry";
 import { useAudioPlayer } from "../audio/useAudioPlayback";
 import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBookmark, addBookmark, removeBookmark, searchDictionaryGrouped, getJuanApparatus, getJuanLineAnchors, getJuanAudio, type ApparatusEntryItem } from "../api/client";
+import { isNarrowViewport, useNarrowViewport } from "../hooks/useNarrowViewport";
 import { useAuthStore } from "../stores/authStore";
 import CitationGenerator from "../components/CitationGenerator";
 import SourceAttribution from "../components/SourceAttribution";
@@ -246,7 +247,12 @@ export default function TextReaderPage() {
   const readerContentRef = useRef<HTMLDivElement>(null);
 
   // AI panel state
-  const [aiPanelOpen, setAiPanelOpen] = useState(true);
+  // 窄屏（≤1024px，与 reader.css 的 Tablet 断点同值）默认收起：内联侧栏在列布局里
+  // 会把经文挤进一个 178px 的滚动盒、一行都不露（2026-08-25 Playwright 390px 实测），
+  // 用户得先发现并关掉 AI 面板才能读经。惰性初值而不是 effect 里 setState ——
+  // react-hooks/set-state-in-effect 会红。
+  const narrow = useNarrowViewport();
+  const [aiPanelOpen, setAiPanelOpen] = useState(() => !isNarrowViewport());
   const [aiPanelWidth, setAiPanelWidth] = useState(420);
   const [aiSelectedText, setAiSelectedText] = useState<string | undefined>();
   const isDraggingRef = useRef(false);
@@ -801,8 +807,23 @@ export default function TextReaderPage() {
     });
   };
 
+  // 关闭态的入口：两种形态（内联 / 抽屉）共用同一颗浮动按钮。
+  const aiFab = (
+    <Tooltip title={t("reader.ai.title")} placement="left">
+      <Button
+        className="reader-ai-fab"
+        type="primary"
+        shape="circle"
+        size="large"
+        icon={<RobotOutlined />}
+        onClick={() => setAiPanelOpen(true)}
+        aria-label={t("reader.ai.title")}
+      />
+    </Tooltip>
+  );
+
   return (
-    <div className={`reader-with-sidebar${aiPanelOpen || parallelPanelOpen ? " reader-ai-active" : ""}`}>
+    <div className={`reader-with-sidebar${!narrow && (aiPanelOpen || parallelPanelOpen) ? " reader-ai-active" : ""}`}>
     <div className={`reader-container${compareLang ? " reader-bilingual" : ""}`}>
       <Helmet>
         <title>
@@ -1186,8 +1207,31 @@ export default function TextReaderPage() {
       </>
     )}
 
-    {/* AI 解读：最右侧内联面板 + 拖拽分割条 */}
-    {aiPanelOpen ? (
+    {/* AI 解读：宽屏是最右侧内联面板 + 拖拽分割条；窄屏改底部抽屉 —— 内联侧栏在
+        列布局里会把经文挤到看不见（.reader-ai-active 锁高 + 侧栏 60vh），抽屉盖在
+        经文之上、随手可关，经文始终留在正常文档流里。 */}
+    {narrow ? (
+      <>
+        <Drawer
+          placement="bottom"
+          height="62vh"
+          open={aiPanelOpen}
+          onClose={() => setAiPanelOpen(false)}
+          title={<span className="reader-ai-sidebar-title"><RobotOutlined /> {t("reader.ai.title")}</span>}
+          rootClassName="reader-ai-drawer"
+        >
+          <ReaderAIPanel
+            textId={textId}
+            juanNum={juanNum}
+            textTitle={content?.title_zh || textDetail?.title_zh || ""}
+            juanContent={content?.content}
+            selectedText={aiSelectedText}
+            onSelectedTextConsumed={handleSelectedTextConsumed}
+          />
+        </Drawer>
+        {!aiPanelOpen && aiFab}
+      </>
+    ) : aiPanelOpen ? (
       <>
         <div className="reader-ai-divider" onMouseDown={handleDragStart} />
         <div className="reader-ai-sidebar" style={{ width: aiPanelWidth }}>
@@ -1206,17 +1250,7 @@ export default function TextReaderPage() {
         </div>
       </>
     ) : (
-      <Tooltip title={t("reader.ai.title")} placement="left">
-        <Button
-          className="reader-ai-fab"
-          type="primary"
-          shape="circle"
-          size="large"
-          icon={<RobotOutlined />}
-          onClick={() => setAiPanelOpen(true)}
-          aria-label={t("reader.ai.title")}
-        />
-      </Tooltip>
+      aiFab
     )}
 
     {/* 回到顶部：落点由 backTopStyle 动态计算（让开 AI 面板与 AI FAB） */}
