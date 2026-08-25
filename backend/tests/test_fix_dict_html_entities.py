@@ -16,8 +16,7 @@ so the backfill can never rewrite a legitimate ``&`` in a definition body.
 """
 
 import pytest
-
-from scripts.fix_dict_html_entities import decode_numeric_entities
+from scripts.fix_dict_html_entities import SELECT_SQL, decode_entities, decode_numeric_entities
 
 
 def test_decodes_uppercase_hex_reference():
@@ -96,3 +95,57 @@ def test_importer_strip_html_no_longer_manufactures_the_bad_string():
     assert _strip_html("<p>&#X4E98;以</p>") == "亘以"
     # Ordinary named entities still decode.
     assert _strip_html("<p>A &amp; B</p>") == "A & B"
+
+
+# ---------------------------------------------------------------------------
+# 命名实体（2026-08-25）：佛光大辞典「般若」条释义显示 ``praj&ntilde;ā``。这批词条
+# 来自 mdict 导入器，它只手工替换了 amp/quot/#39/nbsp/lt/gt 六个，其余命名实体原样
+# 落库。decode_entities() 是给回填脚本用的总入口：数字 → 命名 → 再数字（双重转义
+# ``&amp;#X4E98;`` 要两轮），只认带分号的、HTML5 认识的名字。
+# ---------------------------------------------------------------------------
+
+
+def test_decodes_named_entity_seen_in_prod():
+    assert decode_entities("praj&ntilde;ā") == "prajñā"
+    assert decode_entities("Prajñāpāramitā &mdash; 般若") == "Prajñāpāramitā — 般若"
+
+
+def test_named_pass_also_handles_markup_entities():
+    # 释义正文里存的 ``&lt;`` 在页面上就显示成 ``&lt;``（前端按纯文本渲染），一样是错的。
+    # 生产实数（2026-08-25）：10,596 行受影响，&amp; 12,109 处、&rarr; 1,749、&ntilde; 1,068。
+    assert decode_entities("A &amp; B") == "A & B"
+    assert decode_entities("&lt;tag&gt; &quot;q&quot;") == '<tag> "q"'
+    assert decode_entities("参见 &rarr; 般若") == "参见 → 般若"
+
+
+def test_nbsp_becomes_a_plain_space_like_the_importers_do():
+    assert decode_entities("a&nbsp;b") == "a b"
+    assert "\xa0" not in decode_entities("a&nbsp;b")
+
+
+def test_double_escaped_numeric_reference_needs_two_rounds():
+    # buddhaspace 的老病：``&amp;#X4E98;`` —— 先解成 ``&#X4E98;`` 再解成字。
+    assert decode_entities("&amp;#X4E98;以") == "亘以"
+
+
+def test_bare_ampersand_and_unknown_names_are_left_alone():
+    assert decode_entities("A & B") == "A & B"
+    assert decode_entities("&foo;") == "&foo;"
+    # 没有分号的不碰：``&ntilde`` 在 HTML 里也合法，但这里只修确定坏了的形态。
+    assert decode_entities("&ntilde") == "&ntilde"
+    assert decode_entities("") == ""
+
+
+def test_named_pass_keeps_unsafe_numeric_refusal():
+    assert decode_entities("&#XD800;x") == "&#XD800;x"
+
+
+def test_decode_entities_is_idempotent():
+    once = decode_entities("praj&ntilde;ā &amp;#X4E98;")
+    assert decode_entities(once) == once == "prajñā 亘"
+
+
+def test_select_sql_finds_named_entities_too():
+    """回填 SELECT 只查 '&#' 会漏掉 ``&ntilde;`` 这类行 —— 修脚本却查不出行等于没修。"""
+    assert "&[A-Za-z][A-Za-z0-9]{1,31};" in SELECT_SQL
+    assert "LIKE '%&#%'" in SELECT_SQL

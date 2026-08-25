@@ -16,6 +16,7 @@ import json
 import os
 import re
 import sys
+from html import unescape
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -35,9 +36,10 @@ def strip_html(html_str: str) -> str:
     s = re.sub(r"</(p|div|li|tr|h[1-6])>", "\n", s, flags=re.IGNORECASE)
     # Remove all remaining tags
     s = re.sub(r"<[^>]+>", "", s)
-    # Decode common HTML entities
-    s = s.replace("&nbsp;", " ").replace("&lt;", "<").replace("&gt;", ">")
-    s = s.replace("&amp;", "&").replace("&quot;", '"').replace("&#39;", "'")
+    # Decode ALL HTML entities. The old hand-rolled six replacements left every
+    # other named entity verbatim — 佛光大辞典 shipped ``praj&ntilde;ā`` to prod
+    # (see scripts/fix_dict_html_entities.py). &nbsp; keeps mapping to a plain space.
+    s = unescape(s).replace("\xa0", " ")
     # Normalize whitespace: collapse multiple spaces on same line, strip trailing
     lines = [line.strip() for line in s.split("\n")]
     s = "\n".join(line for line in lines if line)
