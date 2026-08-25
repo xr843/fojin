@@ -54,6 +54,20 @@ async def get_juan_audio(
     return build_audio_payload(audio) if audio else None
 
 
+async def has_juan_audio(session: AsyncSession, text_id: int, juan_num: int, lang: str = "zh") -> bool:
+    """本卷有没有音频 —— 读经接口把它带给前端，没有就别再请求 /audio 吃 404。"""
+    stmt = (
+        select(TextAudio.id)
+        .where(
+            TextAudio.text_id == text_id,
+            TextAudio.juan_num == juan_num,
+            TextAudio.lang == lang,
+        )
+        .limit(1)
+    )
+    return (await session.execute(stmt)).scalar_one_or_none() is not None
+
+
 def group_audio_by_text(rows: list[tuple]) -> list[dict]:
     """``[(TextAudio, BuddhistText), …]`` → 按经聚合的目录项。
 

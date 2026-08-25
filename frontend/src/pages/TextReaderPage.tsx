@@ -656,7 +656,8 @@ export default function TextReaderPage() {
   const { data: audioData } = useQuery({
     queryKey: ["juanAudio", textId, juanNum],
     queryFn: () => getJuanAudio(Number(textId), juanNum),
-    enabled: !!textId,
+    // 只有本卷真有音频才问：此前每换一卷都无条件请求，只有心經有音频，其余全是 404。
+    enabled: !!textId && content?.has_audio === true,
     staleTime: 3600000,
     retry: false,
   });

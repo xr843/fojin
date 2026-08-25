@@ -82,6 +82,8 @@ class JuanContentResponse(BaseModel):
     lang: str = "lzh"
     prev_juan: int | None = None
     next_juan: int | None = None
+    # 本卷是否有读诵音频。前端据此决定要不要请求 /audio —— 没有就不问，省一个 404。
+    has_audio: bool = False
     # Reader-side base-edition (底本) declaration. Same provenance as
     # TextResponseBase.canon — derived from cbeta_id prefix.
     canon: str | None = None

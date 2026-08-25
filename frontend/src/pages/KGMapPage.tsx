@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Checkbox, Spin, Empty, Tooltip, Switch, AutoComplete } from "antd";
 import { GlobalOutlined, BarChartOutlined, SearchOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
+import { Helmet } from "react-helmet-async";
 import * as OpenCC from "opencc-js";
 import DeckGLMap from "../components/kg-map/DeckGLMap";
 import { typeColorCss } from "../components/kg-map/typeColors";
@@ -136,6 +137,9 @@ export default function KGMapPage() {
 
   return (
     <div className="kg-map-page">
+      <Helmet>
+        <title>{`${t("geo.title")} - ${t("app.name")}`}</title>
+      </Helmet>
       {/* Header */}
       <div className="kg-map-header">
         <GlobalOutlined />

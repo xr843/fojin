@@ -14,7 +14,7 @@ from app.models.source import DataSource
 from app.models.text import BuddhistText
 from app.models.user import ReadingHistory, User
 from app.schemas.text import JuanContentResponse, JuanLanguagesResponse, JuanListResponse, TextResponseBase
-from app.services.audio import get_juan_audio
+from app.services.audio import get_juan_audio, has_juan_audio
 from app.services.content import (
     get_juan_apparatus,
     get_juan_content,
@@ -215,6 +215,8 @@ async def read_juan(
     result = await get_juan_content(db, text_id, juan_num, lang=lang)
     if result is None:
         raise TextNotFoundError(text_id=text_id)
+    # 只有心經有音频；此前阅读器每换一卷都无条件打一次 /audio，其余卷全是 404。
+    result.has_audio = await has_juan_audio(db, text_id, juan_num)
 
     # Record reading history for logged-in users
     if user is not None:

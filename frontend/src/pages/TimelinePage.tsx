@@ -37,7 +37,7 @@ export default function TimelinePage() {
   return (
     <>
       <Helmet>
-        <title>{t("timeline.title", "时间线")} - FoJin</title>
+        <title>{`${t("timeline.title", "时间线")} - FoJin`}</title>
       </Helmet>
       <div className="timeline-container">
         <div className="timeline-header">
