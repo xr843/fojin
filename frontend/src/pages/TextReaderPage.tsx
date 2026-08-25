@@ -20,11 +20,22 @@ import {
   VerticalAlignTopOutlined,
   DownloadOutlined,
   SoundOutlined,
+  ExportOutlined,
 } from "@ant-design/icons";
 import { trackAudio } from "../audio/telemetry";
 import { useAudioPlayer } from "../audio/useAudioPlayback";
 import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBookmark, addBookmark, removeBookmark, searchDictionaryGrouped, getJuanApparatus, getJuanLineAnchors, getJuanAudio, type ApparatusEntryItem } from "../api/client";
 import { isNarrowViewport, useNarrowViewport } from "../hooks/useNarrowViewport";
+
+const AI_PANEL_PREF_KEY = "fojin.reader.aiPanel";
+function readAiPanelPref(): "open" | "closed" | null {
+  try {
+    const v = localStorage.getItem(AI_PANEL_PREF_KEY);
+    return v === "open" || v === "closed" ? v : null;
+  } catch {
+    return null;
+  }
+}
 import { useAuthStore } from "../stores/authStore";
 import CitationGenerator from "../components/CitationGenerator";
 import SourceAttribution from "../components/SourceAttribution";
@@ -252,7 +263,17 @@ export default function TextReaderPage() {
   // 用户得先发现并关掉 AI 面板才能读经。惰性初值而不是 effect 里 setState ——
   // react-hooks/set-state-in-effect 会红。
   const narrow = useNarrowViewport();
-  const [aiPanelOpen, setAiPanelOpen] = useState(() => !isNarrowViewport());
+  // 桌面记住上次的开合：默认开着 420px 的面板，每次进阅读页都要重新关一次，是噪音。
+  // 只在宽屏读写 —— 窄屏的「默认关」是布局所迫，不是用户的选择，不该写进偏好。
+  const [aiPanelOpen, setAiPanelOpen] = useState(() => !isNarrowViewport() && readAiPanelPref() !== "closed");
+  useEffect(() => {
+    if (narrow) return;
+    try {
+      localStorage.setItem(AI_PANEL_PREF_KEY, aiPanelOpen ? "open" : "closed");
+    } catch {
+      /* 隐私模式等：记不住就算了 */
+    }
+  }, [aiPanelOpen, narrow]);
   const [aiPanelWidth, setAiPanelWidth] = useState(420);
   const [aiSelectedText, setAiSelectedText] = useState<string | undefined>();
   const isDraggingRef = useRef(false);
@@ -1029,6 +1050,8 @@ export default function TextReaderPage() {
                 }
               >
                 {t("reader.kabc.button")}
+                {/* 外链标识：它去的是东国大学 KABC，不是站内面板 —— 别让它长得像「跨藏对照」 */}
+                <ExportOutlined style={{ fontSize: 11, marginLeft: 2, opacity: 0.7 }} />
               </Button>
             </Tooltip>
           )}
