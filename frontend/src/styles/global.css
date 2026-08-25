@@ -1,6 +1,14 @@
 @import './fonts.css';
 
 :root {
+  /* 布局铬高度：顶栏 / 页脚 / 内容区上下内边距。任何页面要「铺满视口减去铬」都
+     从这三枚 token 算，Layout 的内联样式也只许引用它们 —— 2026-08-25 之前 /chat
+     自己写死 calc(100vh - 120px)，而实际 52 + 24×2 + 50 = 150，文档比视口高 30px，
+     发送后贴底把导航栏滚出视口。数字分居两处就一定会漂。 */
+  --fj-header-h:      52px;
+  --fj-footer-h:      50px;
+  --fj-content-pad-y: 24px;
+  --fj-content-pad-x: 32px;
   --fj-bg:        #f8f5ef;
   --fj-bg-alt:    #f0ebe2;
   --fj-ink:       #2b2318;
@@ -969,6 +977,13 @@ em {
   .chat-shell {
     flex-direction: column;
   }
+  /* 空态：外壳锁高时，建议卡片 + 配额横幅 + 输入框把消息区挤到 52px，标题在里面
+     被裁掉下半截、副标题整个不见（2026-08-25 Playwright 390px 生产实测）。空态没有
+     消息可滚，放开高度让整页滚动即可；有对话后 ChatPage 去掉这个类，恢复锁高钉底。 */
+  .chat-shell.chat-shell--empty {
+    height: auto;
+    min-height: calc(100dvh - var(--fj-header-h) - var(--fj-footer-h) - 2 * var(--fj-content-pad-y));
+  }
   /* 行内样式只给了 minWidth:0；换成纵向后要限制的是高度，否则对话列会按内容
      撑开，把面板顶出视口。 */
   .chat-main-column {
@@ -992,12 +1007,22 @@ em {
 
 /* ========== Layout Content ========== */
 .layout-content-inner {
-  padding: 24px 32px;
+  padding: var(--fj-content-pad-y) var(--fj-content-pad-x);
+}
+
+/* /chat 的外壳：铺满视口减去铬。100dvh 那份给手机 —— 地址栏收放时 100vh 是固定的
+   大值，会多出一截溢出；不支持 dvh 的浏览器落到上一行的 100vh。 */
+.chat-shell {
+  display: flex;
+  gap: 16px;
+  height: calc(100vh - var(--fj-header-h) - var(--fj-footer-h) - 2 * var(--fj-content-pad-y));
+  height: calc(100dvh - var(--fj-header-h) - var(--fj-footer-h) - 2 * var(--fj-content-pad-y));
 }
 
 @media (max-width: 768px) {
-  .layout-content-inner {
-    padding: 12px 10px;
+  :root {
+    --fj-content-pad-y: 12px;
+    --fj-content-pad-x: 10px;
   }
 }
 

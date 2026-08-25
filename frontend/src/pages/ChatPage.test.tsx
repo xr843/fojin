@@ -166,6 +166,33 @@ const FOLLOWING = 4; // Node.DOCUMENT_POSITION_FOLLOWING
 const CONTAINED_BY = 16; // Node.DOCUMENT_POSITION_CONTAINED_BY
 
 describe("ChatPage 首屏结构", () => {
+  // 外壳高度曾写死 calc(100vh - 120px)，而布局铬实际 150px：文档比视口高 30px，
+  // 发送后自动贴底把导航栏滚出视口。高度必须由 global.css 的 .chat-shell 按 token
+  // 计算，内联样式不许再给一个数字。
+  it("对话外壳不再内联写死高度（交给 .chat-shell 的 token 计算）", async () => {
+    const { container } = await renderEmpty();
+    const shell = container.querySelector(".chat-shell") as HTMLElement;
+    expect(shell).not.toBeNull();
+    expect(shell.style.height).toBe("");
+  });
+
+  // 手机空态：外壳锁高 + 建议卡片/横幅/输入框把消息区挤到 52px，标题在里面被裁掉
+  // 下半截、副标题整个不见（2026-08-25 Playwright 390px 生产实测）。空态时给外壳打
+  // 上 chat-shell--empty，≤768px 的 CSS 据此放开高度；有对话后去掉，恢复锁高钉底。
+  it("空态外壳带 chat-shell--empty，发出第一条消息后去掉", async () => {
+    let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+    vi.mocked(sendChatMessageStream).mockImplementation(
+      async (_m, _s, _mid, callbacks) => { cb = callbacks; },
+    );
+    const { container } = await renderEmpty();
+    const shell = container.querySelector(".chat-shell") as HTMLElement;
+    expect(shell.classList.contains("chat-shell--empty")).toBe(true);
+
+    fireEvent.click(container.querySelector(".chat-hero-card")!);
+    await waitFor(() => expect(cb).toBeDefined());
+    expect(shell.classList.contains("chat-shell--empty")).toBe(false);
+  });
+
   it("空状态渲染出标题与建议卡片（脚手架自检）", async () => {
     const { container } = await renderEmpty();
     expect(screen.getByText("小津 佛典问答")).toBeInTheDocument();

@@ -104,3 +104,16 @@ test("chat page renders its input box", async ({ page }) => {
     page.locator("textarea, [contenteditable='true']").first()
   ).toBeVisible({ timeout: 20_000 });
 });
+
+test("chat page chrome fits the viewport — the header must not scroll away", async ({ page }) => {
+  // 2026-08-25: .chat-shell was sized with a hard-coded calc(100vh - 120px) while the
+  // real chrome (header 52 + content padding 48 + footer 50) is 150px, so the document
+  // was 30px taller than the viewport and the auto scroll-to-bottom after sending
+  // pushed the navigation bar half out of view on every conversation.
+  await page.goto("/chat");
+  await expect(page.locator(".chat-shell")).toBeVisible({ timeout: 20_000 });
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollHeight - window.innerHeight
+  );
+  expect(overflow, "document taller than viewport by (px)").toBeLessThanOrEqual(0);
+});

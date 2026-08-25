@@ -204,8 +204,8 @@ export default function Layout() {
           background: headerBg,
           backdropFilter: isHome ? "blur(12px)" : undefined,
           padding: "0 32px",
-          height: 52,
-          lineHeight: "52px",
+          height: "var(--fj-header-h)",
+          lineHeight: "var(--fj-header-h)",
           borderBottom: `1px solid rgba(217,208,193,0.5)`,
           position: isHome ? "sticky" : undefined,
           top: 0,
@@ -404,6 +404,9 @@ export default function Layout() {
           background: pageBg,
           borderTop: "1px solid rgba(217,208,193,0.5)",
           padding: "16px 32px",
+          // 16 + 18 + 16 = 50，与 --fj-footer-h 同值；写死行高是为了让 token 可信。
+          height: "var(--fj-footer-h)",
+          lineHeight: "18px",
         }}
       >
         {t("footer.copyright")}
