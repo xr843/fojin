@@ -154,3 +154,35 @@ async def test_no_retrieved_event_when_nothing_retrieved():
     events = await _run_stream([])
     types = [e.get("type") for e in events]
     assert "retrieved" not in types, f"零召回不该发 retrieved；实际: {types}"
+
+
+@pytest.mark.anyio
+async def test_retrieved_carries_light_refs_for_early_source_chips():
+    """等待期（首字前常 30–180 秒）就能点开原文：``retrieved`` 带轻量 ``refs``。
+
+    ``refs`` 只有定位字段（text_id / juan_num / chunk_index / title_zh），**没有**
+    chunk_text —— 完整 ``sources`` 仍是最后一个数据事件（见上一条用例），前端也不会
+    把 refs 喂给 injectCitationLinks。按 (text_id, juan_num) 去重、保持召回顺序、
+    至多 8 条。
+    """
+    events = await _run_stream(_sources())
+    retrieved = next(e for e in events if e.get("type") == "retrieved")
+
+    refs = retrieved["refs"]
+    assert [(r["text_id"], r["juan_num"]) for r in refs] == [(1, 1), (2, 403), (3, 1), (4, 1)]
+    assert [r["title_zh"] for r in refs] == ["心经", "大般若经", "华严经", "法华经"]
+    for r in refs:
+        assert set(r) == {"text_id", "juan_num", "chunk_index", "title_zh"}, r
+    assert "chunk_text" not in json.dumps(retrieved, ensure_ascii=False)
+
+
+@pytest.mark.anyio
+async def test_retrieved_refs_capped_at_eight():
+    many = [
+        ChatSource(text_id=i, juan_num=1, chunk_text="x", score=0.5, title_zh=f"经{i}")
+        for i in range(1, 13)
+    ]
+    events = await _run_stream(many)
+    retrieved = next(e for e in events if e.get("type") == "retrieved")
+    assert len(retrieved["refs"]) == 8
+    assert retrieved["count"] == 12

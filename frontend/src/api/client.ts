@@ -1858,9 +1858,19 @@ export async function runResearch(question: string, maxSteps = 3): Promise<Resea
 
 /** 检索完成、生成尚未开始时的轻量进度信息。只用于等待期提示，与答案下方的
  *  完整 `sources` 列表是两回事（后者仍在答案之后才发）。 */
+/** retrieved.refs 的一条：等待期可点开原文的定位字段。没有 chunk_text —— 它不是 ChatSource。 */
+export interface ChatRetrievalRef {
+  text_id: number;
+  juan_num: number;
+  chunk_index?: number | null;
+  title_zh?: string | null;
+}
+
 export interface ChatRetrieval {
   count: number;
   titles: string[];
+  /** 旧后端副本（滚动部署期间）不带；缺席时前端退回纯文本经名。 */
+  refs?: ChatRetrievalRef[];
 }
 
 /** 推理模型思考阶段的进度帧（后端按约 4 帧/秒节流聚合，见
@@ -2168,6 +2178,7 @@ export function sendChatMessageStream(
               callbacks?.onRetrieved?.({
                 count: event.count,
                 titles: Array.isArray(event.titles) ? event.titles : [],
+                refs: Array.isArray(event.refs) ? event.refs : undefined,
               });
               break;
             case "trust_status":

@@ -954,6 +954,28 @@ async def send_message_stream(
         for _s in sources:
             if _s.title_zh and _s.title_zh not in _seen_titles:
                 _seen_titles.append(_s.title_zh)
+        # refs：等待期就能点开原文的定位字段（首字前常等 30–180 秒，而检索 2–3 秒
+        # 就完成了）。只带 text_id / juan_num / chunk_index / title_zh，**不带 chunk_text**
+        # —— 它不是 sources：前端把它存在 retrieval 字段里、不喂 injectCitationLinks，
+        # 上面那两条「不提前发 sources」的理由都不受影响。按 (text_id, juan_num) 去重、
+        # 保持召回顺序、至多 8 条。
+        _refs: list[dict] = []
+        _seen_ref_keys: set[tuple[int, int]] = set()
+        for _s in sources:
+            _key = (_s.text_id, _s.juan_num)
+            if _key in _seen_ref_keys:
+                continue
+            _seen_ref_keys.add(_key)
+            _refs.append(
+                {
+                    "text_id": _s.text_id,
+                    "juan_num": _s.juan_num,
+                    "chunk_index": _s.chunk_index,
+                    "title_zh": _s.title_zh,
+                }
+            )
+            if len(_refs) >= 8:
+                break
         yield (
             "data: "
             + json.dumps(
@@ -963,6 +985,7 @@ async def send_message_stream(
                     # 只取前 3 部：召回通常 5-8 部，全列会把等待提示撑得比答案还长。
                     # count 仍是全量数字，所以「已检索 8 部经典：《A》《B》《C》」诚实。
                     "titles": _seen_titles[:3],
+                    "refs": _refs,
                 },
                 ensure_ascii=False,
             )
