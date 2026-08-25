@@ -111,6 +111,12 @@
   line-break: strict; /* CJK 标点禁则：句号逗号不出现在行首，左引号不出现在行尾 */
   color: var(--fj-ink);
   padding: 20px 0;
+  /* 行宽（measure）：2026-08-25 实测 18px 字号下一行 76 个字（AI 面板开着时），
+     Sefaria / SuttaCentral / 84000 都压在 38–45 字。42em 以正文字号为基，
+     字号增减、面板开合都跟着变；居中，两侧留白。双语对照的半宽列本就窄于此值。 */
+  max-width: 42em;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* ── CBETA-style typography ── */
