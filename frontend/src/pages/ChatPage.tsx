@@ -133,7 +133,10 @@ function parseFollowUps(content: string): { cleanContent: string; suggestions: s
 // display sites render t("chat.thinking") / t("chat.request_failed") instead,
 // so the stored sentinel survives a UI language switch.
 const THINKING_SENTINEL = "正在检索经文并生成回答..."; // i18n-exempt
-/** 一次发送的来源。空 = 用户主动提的新问题（记 "chat"）；其余是派生动作，各记各的事件。 */
+/** 一次发送的来源。空 = 用户主动提的新问题（记 "chat"）；其余是派生动作，各记各的事件。
+ *
+ *  CHAT_EVENTS —— /chat 的埋点目录与四个产品 KPI（核对率 / 隔天回访率 / 重发率 / 截断率）
+ *  的定义在 docs/OBSERVABILITY.md「产品 KPI」一节。改事件名或新增事件先改那张表。 */
 type SendOrigin = "retry" | "continue" | "regenerate";
 
 const REQUEST_FAILED_SENTINEL = "请求失败，请重试"; // i18n-exempt

@@ -83,3 +83,44 @@ sum by (model) (rate(fojin_llm_estimated_cost_usd_total{byok="false"}[6h]))
   `_handler_label` 前先跑 `tests/test_metrics.py`。
 - 新增业务指标：在 `app/core/metrics.py` 定义（模块级单例，自动进默认
   registry / `/metrics` 输出），在调用点打点，测试模式照抄 `test_metrics.py`。
+
+# 产品 KPI（Umami 事件）
+
+Prometheus 量的是系统；下面这四个数量的是产品。定位（2026-08-27 拍板）：佛津是佛教文本的
+「研读会话」——会话是笔记本、引文抽屉是阅读器、引文是可信度、注疏是深度、贴原文是入口。
+评估任何 /chat 改动先问「它让一次研读会话更顺吗」，看这四个数，不看 PV。
+
+数据在 Umami 的 Postgres 里（`docker exec -i fojin-postgres psql -U fojin -d umami`）。
+⚠️ 该实例还托管另一个站，**每条查询都要 `website_id = 'c757a04c-82e0-4f53-a720-830b0e1a7287'`**。
+⚠️ Umami v2 的 `session_id` 是「访客 × 月」指纹，不是一次访问；`distinct_id` 全空。
+
+## /chat 事件目录
+
+| 事件 | 何时打 | 备注 |
+|---|---|---|
+| `chat` | 用户主动提的新问题 | `question` 存前 30 字。**重试 / 重新生成 / 续写不打**（各记各的），否则分母虚高 |
+| `chat_retry` | 失败气泡上点「重试」 | 可靠性信号，不是对答案不满 |
+| `chat_regenerate` | 最后一条回答上点「重新生成」 | 对答案不满的信号；后端替换旧的那对 |
+| `answer_truncated` | 收到 `truncated` 帧（finish_reason=length/max_tokens） | 上限 2000 tokens 不够用的证据 |
+| `answer_continue` | 截断提示上点「继续写完」 | 续写请求带中断处结尾 80 字 |
+| `chat_stream_error` | 流失败 | `stage`=no_token/mid_stream/empty_done，`reason`=后端 code；用户手动停止（cancelled）**不记** |
+| `citation_click` | 点答案里的内联引文 | `text_id` |
+| `source_click` | 点「参考经文」chip / 等待期 chip | `phase=retrieved` 是等答案时先读原文 |
+| `chat_copy` | 复制回答 | 有用信号 |
+
+## 四个 KPI
+
+| KPI | 定义 | 口径备注 |
+|---|---|---|
+| **核对率** | 打过 `citation_click` 或 `source_click` 的访客 ÷ 打过 `chat` 的访客（也可按事件数：核对事件 ÷ 回答数） | 点过引文的人问得深 2.6×，这是产品核心承诺被用上的比例 |
+| **隔天回访率** | 同一 `session_id` 在 ≥2 个不同日期打过 `chat` 的访客 ÷ 打过 `chat` 的访客 | `session_id` 按月重置，只能算月内；基线 12.5%（2026-08） |
+| **重发率** | 同一访客 30 分钟内原样重发同一 `question`（中间没有 `chat_retry`/`chat_regenerate`）÷ `chat` | 基线 9%（222/2,4xx，2026-08）；有了「重新生成」后应降 |
+| **截断率** | 客户端：`answer_truncated` ÷ (`chat` + `answer_continue` + `chat_regenerate`)。**服务端更准**：`docker logs fojin-backend` 里 `answer truncated` 行数 ÷ `phase-2 LLM done` 行数（后者每条回答都写 `finish_reason=`） | 2026-08-27 起才有数；一周后据此定 max_tokens 该不该从 2000 上调（R2b） |
+
+服务端截断率一行命令（生产）：
+
+```bash
+docker logs fojin-backend --since 168h 2>&1 | grep -c "answer truncated"
+docker logs fojin-backend --since 168h 2>&1 | grep -c "phase-2 LLM done"
+# 按 reader 模式分开看：grep "answer truncated" | grep -c "reader=True"
+```
