@@ -974,6 +974,8 @@
   "chat.truncated_hint": "回答因長度上限中斷，未寫完",
   "chat.continue": "繼續寫完",
   "chat.continue_prompt": "上一條回答沒有寫完，請從中斷處接著寫，不要重複已寫的內容。中斷處的結尾是：「{{tail}}」",
+  "chat.regenerate": "重新生成",
+  "chat.expected_wait": "上次首字約 {{n}} 秒",
   "chat.retrieved_title": "《{{title}}》",
   "chat.generating": "正在生成回答",
   "chat.reasoning_hint": "正在推敲經文",

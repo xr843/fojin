@@ -1700,3 +1700,100 @@ describe("答案截断 → 「继续写完」", () => {
     expect(screen.queryByRole("button", { name: "继续写完" })).toBeNull();
   });
 });
+
+describe("重新生成与等待预期", () => {
+  /** 30 天里约 88 次「隔一会儿把同一问题原样再发」前面没有失败也没有重试——
+   *  用户对答案不满意，而界面上没有「重新生成」。等待预期：首字要等 24-180 秒，
+   *  用户不知道该等多久，等不及就手动停止再发（记成断流）。 */
+  function withUmami() {
+    const track = vi.fn();
+    (window as Window & { umami?: { track: typeof track } }).umami = { track };
+    (globalThis as unknown as { umami: unknown }).umami = { track };
+    return track;
+  }
+
+  async function startSend() {
+    let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+    vi.mocked(sendChatMessageStream).mockImplementation(
+      async (_m, _s, _mid, cbs) => { cb = cbs; },
+    );
+    vi.mocked(getChatSessionMessages).mockResolvedValue({
+      total: 0, page: 1, size: 50, messages: [],
+    } as never);
+    const { container } = renderPage();
+    await waitFor(() => expect(screen.getByText("「三毒」指的是哪三种毒？")).toBeInTheDocument());
+    fireEvent.click(container.querySelector(".chat-hero-card")!);
+    await waitFor(() => expect(cb).toBeDefined());
+    const calls = vi.mocked(sendChatMessageStream).mock.calls;
+    return { cb: cb!, firstMsg: calls[calls.length - 1][0] };
+  }
+
+  afterEach(() => {
+    delete (window as Window & { umami?: unknown }).umami;
+    delete (globalThis as unknown as { umami?: unknown }).umami;
+    localStorage.removeItem("fojin.chat.firstTokenMs");
+  });
+
+  it("完成的回答带「重新生成」：同一问题以 regenerate 重发、旧问答从视图移除，记 chat_regenerate 且不重复记 chat", async () => {
+    const track = withUmami();
+    const { cb, firstMsg } = await startSend();
+    cb.onToken!("答案甲：贪、嗔、痴。");
+    cb.onDone!();
+    await waitFor(() => expect(document.querySelector(".anticon-redo")).toBeTruthy());
+    const btn = document.querySelector(".anticon-redo")!.closest("button")!;
+    const sendsBefore = vi.mocked(sendChatMessageStream).mock.calls.length;
+    fireEvent.click(btn);
+    await waitFor(() =>
+      expect(vi.mocked(sendChatMessageStream).mock.calls.length).toBe(sendsBefore + 1),
+    );
+    const call = vi.mocked(sendChatMessageStream).mock.calls[sendsBefore];
+    expect(call[0]).toBe(firstMsg);
+    expect(call[4]).toMatchObject({ regenerate: true });
+    expect(screen.queryByText("答案甲：贪、嗔、痴。")).toBeNull();
+    // 旧的那对被移除、新的那对刚发出：问题气泡只剩一份
+    expect(screen.getAllByText(firstMsg)).toHaveLength(1);
+    const names = track.mock.calls.map((c) => c[0]);
+    expect(names.filter((n) => n === "chat")).toHaveLength(1);
+    expect(names.filter((n) => n === "chat_regenerate")).toHaveLength(1);
+  });
+
+  it("只有最后一条回答带「重新生成」", async () => {
+    // 不做「从中间某条分叉」：那要把后面的历史一起作废，语义复杂而用户没有这个需求。
+    vi.mocked(getChatSessions).mockResolvedValue([
+      { id: 3 as ChatSessionId, title: "会话 3", pinned: false, created_at: new Date().toISOString() },
+    ]);
+    vi.mocked(getChatSessionMessages).mockResolvedValue({
+      total: 4, page: 1, size: 50,
+      messages: [
+        { id: 1, role: "user", content: "问一", sources: null, created_at: "2026-08-27T00:00:00Z" },
+        { id: 2, role: "assistant", content: "答一", sources: null, created_at: "2026-08-27T00:00:01Z" },
+        { id: 3, role: "user", content: "问二", sources: null, created_at: "2026-08-27T00:00:02Z" },
+        { id: 4, role: "assistant", content: "答二", sources: null, created_at: "2026-08-27T00:00:03Z" },
+      ],
+    });
+    renderPage("/chat?s=3");
+    await screen.findByText("答二");
+    const redo = document.querySelectorAll(".anticon-redo");
+    expect(redo).toHaveLength(1);
+    let el: HTMLElement | null = redo[0].parentElement;
+    while (el && !el.textContent?.includes("答二")) el = el.parentElement;
+    expect(el?.textContent).not.toContain("答一");
+  });
+
+  it("有历史首字样本时，等待期显示「上次首字约 N 秒」；首字到达后样本被记录", async () => {
+    localStorage.setItem("fojin.chat.firstTokenMs", JSON.stringify([38000, 42000, 40000]));
+    withUmami();
+    const { cb } = await startSend();
+    expect(await screen.findByText("上次首字约 40 秒")).toBeInTheDocument();
+    cb.onToken!("答");
+    await waitFor(() => expect(screen.queryByText("上次首字约 40 秒")).toBeNull());
+    expect(JSON.parse(localStorage.getItem("fojin.chat.firstTokenMs")!)).toHaveLength(4);
+  });
+
+  it("没有样本时不显示等待预期", async () => {
+    withUmami();
+    await startSend();
+    await waitFor(() => expect(document.querySelector(".chat-thinking")).toBeTruthy());
+    expect(screen.queryByText(/上次首字约/)).toBeNull();
+  });
+});

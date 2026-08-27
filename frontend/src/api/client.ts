@@ -2134,6 +2134,8 @@ export interface ChatStreamOptions {
   hotQuestionId?: number | null;
   modelId?: string | null;
   attachmentIds?: number[] | null;
+  /** 「重新生成」：后端把本会话最后一轮从上下文里去掉，新答案落库时替换旧的那对。 */
+  regenerate?: boolean;
 }
 
 export function sendChatMessageStream(
@@ -2149,6 +2151,7 @@ export function sendChatMessageStream(
     hotQuestionId,
     modelId,
     attachmentIds,
+    regenerate,
   } = options;
   return new Promise<void>((resolve) => {
     // Get auth token from localStorage (same pattern as axios interceptor)
@@ -2313,6 +2316,7 @@ export function sendChatMessageStream(
       master_id: masterId,
       ...(modelId ? { model_id: modelId } : {}),
       ...(hotQuestionId != null ? { hot_question_id: hotQuestionId } : {}),
+      ...(regenerate ? { regenerate: true } : {}),
       ...(attachmentIds && attachmentIds.length > 0
         ? { attachment_ids: attachmentIds }
         : {}),

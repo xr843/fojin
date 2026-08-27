@@ -26,6 +26,7 @@ import {
   ClockCircleOutlined,
   CopyOutlined,
   ReloadOutlined,
+  RedoOutlined,
   LikeOutlined,
   LikeFilled,
   DislikeOutlined,
@@ -83,6 +84,7 @@ import {
   useAuthStore,
   type UserProfile,
 } from "../stores/authStore";
+import { expectedFirstTokenSeconds, recordFirstTokenMs } from "../utils/firstTokenStats";
 import type { TextId } from "../types/branded";
 
 // 登录用户的额度提示只在快用完时出现。常驻一个「今日剩余 198 次」是纯噪音 ——
@@ -132,7 +134,7 @@ function parseFollowUps(content: string): { cleanContent: string; suggestions: s
 // so the stored sentinel survives a UI language switch.
 const THINKING_SENTINEL = "正在检索经文并生成回答..."; // i18n-exempt
 /** 一次发送的来源。空 = 用户主动提的新问题（记 "chat"）；其余是派生动作，各记各的事件。 */
-type SendOrigin = "retry" | "continue";
+type SendOrigin = "retry" | "continue" | "regenerate";
 
 const REQUEST_FAILED_SENTINEL = "请求失败，请重试"; // i18n-exempt
 
@@ -343,12 +345,17 @@ interface MessageBubbleProps {
   m: ChatMessageItem;
   isStreaming: boolean;
   sending: boolean;
+  /** 只有最后一条回答可以「重新生成」：从中间分叉要作废后面的历史，语义复杂而没人需要。 */
+  isLast?: boolean;
+  /** 本机最近几次首字耗时的中位数（秒）；null = 没有样本，等待期不显示预期。 */
+  expectedFirstTokenS?: number | null;
   user: UserProfile | null;
   markdownComponents: Components;
   onSuggestionClick: (q: string) => void;
   onShare: (m: ChatMessageItem) => void;
   onRetry: (m: ChatMessageItem) => void;
   onContinue: (m: ChatMessageItem) => void;
+  onRegenerate: (m: ChatMessageItem) => void;
   onFeedback: (m: ChatMessageItem, dir: "up" | "down") => void;
   onSourceClick: (source: ChatSource, phase?: "retrieved") => void;
 }
@@ -360,8 +367,8 @@ interface MessageBubbleProps {
     react-markdown render) re-ran for every historical message on every token,
     which was the dominant "越聊越卡" jank in long conversations. */
 function MessageBubbleInner({
-  m, isStreaming, sending, user, markdownComponents,
-  onSuggestionClick, onShare, onRetry, onContinue, onFeedback, onSourceClick,
+  m, isStreaming, sending, user, markdownComponents, isLast = false, expectedFirstTokenS = null,
+  onSuggestionClick, onShare, onRetry, onContinue, onRegenerate, onFeedback, onSourceClick,
 }: MessageBubbleProps) {
   // Read t here (not as a prop): on a mid-conversation language switch, i18next's
   // subscription re-renders the bubble — which memo does NOT block, since memo
@@ -494,6 +501,14 @@ function MessageBubbleInner({
                   </span>
                   <span className="chat-thinking-dots"><span /><span /><span /></span>
                 </div>
+                {/* 等待预期：本机最近几次首字耗时的中位数。首字要等 24-180 秒，不知道
+                    该等多久的人等不及就手动停止再发（记成断流）。没有样本不显示 ——
+                    宁可不说，也不编一个「通常 1-2 分钟」。 */}
+                {expectedFirstTokenS != null && (
+                  <div className="chat-wait-expectation">
+                    {t("chat.expected_wait", { n: expectedFirstTokenS })}
+                  </div>
+                )}
                 {/* 思考过程片段活窗（打字机组件）。只在哨兵分支里渲染 —— 正文
                     一到（content 被换掉）整块随分支消失，这是渲染层的保险；
                     onToken 另清 reasoningText，两道各自独立。 */}
@@ -669,6 +684,18 @@ function MessageBubbleInner({
                 />
               </Tooltip>
             )}
+            {/* 「重新生成」只给最后一条成功的回答。图标用 Redo 而不是 Reload：Reload
+                是失败重试的图标，测试按 .anticon-reload 找它，两者不能撞。 */}
+            {m.role === "assistant" && isLast && m.content !== REQUEST_FAILED_SENTINEL && (
+              <Tooltip title={t("chat.regenerate")}>
+                <Button
+                  type="text" size="small" icon={<RedoOutlined />}
+                  style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
+                  disabled={sending}
+                  onClick={() => onRegenerate(m)}
+                />
+              </Tooltip>
+            )}
           </div>
         )}
       </div>
@@ -702,7 +729,9 @@ export const MessageBubble = memo(
     prev.m === next.m &&
     prev.isStreaming === next.isStreaming &&
     prev.sending === next.sending &&
-    prev.user === next.user,
+    prev.user === next.user &&
+    prev.isLast === next.isLast &&
+    prev.expectedFirstTokenS === next.expectedFirstTokenS,
 );
 
 export default function ChatPage() {
@@ -764,6 +793,10 @@ export default function ChatPage() {
     return [];
   });
   const [sending, setSending] = useState(false);
+  // 等待预期：本机最近几次首字耗时的中位数；每次首字到达后更新。
+  const [expectedFirstTokenS, setExpectedFirstTokenS] = useState<number | null>(
+    () => expectedFirstTokenSeconds(),
+  );
   // 游客转化钩子：游客拿到第一条 AI 回复后提示"登录可保存历史"。
   // 数据背景：月 730 chat 用户 vs 65 注册——多数游客不知道对话会丢。
   // 关闭后 14 天静默（localStorage）。
@@ -1387,7 +1420,11 @@ export default function ChatPage() {
     await sendChatMessageStream(msg, sessionId, masterId, {
       onToken: (content: string) => {
         tokenCount += 1;
-        if (firstTokenMs === null) firstTokenMs = Date.now() - startedAt;
+        if (firstTokenMs === null) {
+          firstTokenMs = Date.now() - startedAt;
+          recordFirstTokenMs(firstTokenMs);
+          setExpectedFirstTokenS(expectedFirstTokenSeconds());
+        }
         patchLive((m) => {
           const current = m.content === THINKING_SENTINEL ? "" : m.content;
           // reasoningText 随首个 token 销毁：被模型自己推翻的中间结论
@@ -1539,6 +1576,7 @@ export default function ChatPage() {
     }, {
       signal: abortController.signal,
       hotQuestionId,
+      regenerate: options?.origin === "regenerate",
       // Only send model_id when the user has explicitly picked a non-default
       // model. Treating the default as "no override" lets _resolve_llm_config
       // pick the platform default for whatever LLM_API_URL is configured —
@@ -1584,6 +1622,18 @@ export default function ChatPage() {
       setMessages((prev) => prev.filter((x) => x.id !== m.id && x.id !== userMsg.id));
       handleSendMessage(userMsg.content, { origin: "retry" });
     }
+  }, [messages, handleSendMessage]);
+
+  const handleRegenerateMessage = useCallback((m: ChatMessageItem) => {
+    const idx = messages.findIndex((x) => x.id === m.id);
+    const userMsg = idx > 0 ? messages[idx - 1] : null;
+    if (!userMsg || userMsg.role !== "user") return;
+    // 对答案不满意才会点：30 天里约 88 次「隔一会儿原样再发同一问题」就是没有这个
+    // 按钮的代价。替换而不是追加 —— 后端把旧的那对从上下文里去掉（否则模型多半
+    // 照抄），新答案落库时删旧的；游客不落库，只在视图里替换。
+    if (typeof umami !== "undefined") umami.track("chat_regenerate");
+    setMessages((prev) => prev.filter((x) => x.id !== m.id && x.id !== userMsg.id));
+    handleSendMessage(userMsg.content, { origin: "regenerate" });
   }, [messages, handleSendMessage]);
 
   const handleContinueMessage = useCallback((m: ChatMessageItem) => {
@@ -1964,18 +2014,21 @@ export default function ChatPage() {
                 </div>
               </div>
             )}
-            {messages.map((m) => (
+            {messages.map((m, i) => (
               <MessageBubble
                 key={m.id}
                 m={m}
                 isStreaming={streamingId === m.id}
                 sending={sending}
+                isLast={i === messages.length - 1}
+                expectedFirstTokenS={expectedFirstTokenS}
                 user={user}
                 markdownComponents={markdownComponents}
                 onSuggestionClick={handleSendMessage}
                 onShare={handleShareMessage}
                 onRetry={handleRetryMessage}
                 onContinue={handleContinueMessage}
+                onRegenerate={handleRegenerateMessage}
                 onFeedback={handleFeedbackMessage}
                 onSourceClick={handleSourceClick}
               />

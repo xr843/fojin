@@ -50,6 +50,7 @@ function renderBubble(overrides: Partial<ChatMessageItem>) {
       onShare={noop}
       onRetry={noop}
       onContinue={noop}
+      onRegenerate={noop}
       onFeedback={noop}
       onSourceClick={noop}
     />,

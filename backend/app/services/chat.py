@@ -5,7 +5,7 @@ import time as _time
 from datetime import UTC, datetime
 
 import httpx
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import resolve_optional_user
@@ -239,6 +239,46 @@ async def _get_text_title(db: AsyncSession, text_id: int) -> str | None:
 
 
 
+def _last_exchange_ids(history: list) -> set[int]:
+    """本会话最后一轮问答的 id：最后一条 assistant + 它之前最近的一条 user。
+
+    按 id 而不是 created_at 判先后 —— 一轮问答的两行是同一次提交写入的，时间戳
+    可能相同，靠它排序会把 user/assistant 的先后弄反。还没有任何回答时返回空集。
+    """
+    by_id = sorted(history, key=lambda m: m.id)
+    for i in range(len(by_id) - 1, -1, -1):
+        if by_id[i].role != "assistant":
+            continue
+        ids = {by_id[i].id}
+        for j in range(i - 1, -1, -1):
+            if by_id[j].role == "user":
+                ids.add(by_id[j].id)
+                break
+        return ids
+    return set()
+
+
+def _history_for_context(history: list, regenerate: bool) -> list:
+    """「重新生成」时把最后一轮从 LLM 上下文里去掉：带着上一个（不满意的）答案，
+    模型多半照抄。"""
+    if not regenerate:
+        return history
+    drop = _last_exchange_ids(history)
+    return [m for m in history if m.id not in drop]
+
+
+async def _delete_last_exchange(db: AsyncSession, session_id: int) -> None:
+    """删掉最后一轮问答的两行。不 commit —— 与随后 _save_messages 的写入同一事务，
+    新答案没存成，旧的也不会丢。子表（反馈、诊断）靠外键 ON DELETE CASCADE。"""
+    ids = _last_exchange_ids(await get_history(db, session_id))
+    if ids:
+        await db.execute(
+            delete(ChatMessage).where(
+                ChatMessage.id.in_(ids), ChatMessage.session_id == session_id,
+            )
+        )
+
+
 async def _save_messages(
     db: AsyncSession, session_id: int, message: str, answer: str, sources: list[ChatSource]
 ) -> int | None:
@@ -442,6 +482,7 @@ async def _prepare_chat(
     hot_question_id: int | None = None,
     model_id: str | None = None,
     attachment_ids: list[int] | None = None,
+    regenerate: bool = False,
 ) -> tuple[ChatSession | None, str, str, str, bool, str, list[ChatSource], list[dict[str, str]], list[ChatAttachment]]:
     """Shared setup for send_message and send_message_stream.
 
@@ -491,6 +532,7 @@ async def _prepare_chat(
 
     # Fetch history first so we can use previous context for RAG retrieval
     history = await get_history(db, chat_session.id) if chat_session else []
+    history = _history_for_context(history, regenerate)
 
     # Extract last user message from history for context-aware retrieval
     prev_user_msg = None
@@ -804,6 +846,7 @@ async def send_message_stream(
     hot_question_id: int | None = None,
     model_id: str | None = None,
     attachment_ids: list[int] | None = None,
+    regenerate: bool = False,
     # token: production SSE path passes the raw bearer token; the user is then
     # resolved INSIDE the prep-phase session (see Phase-1 below) instead of via
     # Depends(get_optional_user), which would pin a PG connection for the whole
@@ -873,7 +916,7 @@ async def send_message_stream(
                 text_id=text_id, juan_num=juan_num,
                 selected_text=selected_text, page_content=page_content,
                 hot_question_id=hot_question_id, model_id=model_id,
-                attachment_ids=attachment_ids,
+                attachment_ids=attachment_ids, regenerate=regenerate,
             )
             # Capture the ORM rows' plain scalar values WHILE the instances
             # are still bound to db_prep. On block exit, close() rolls back the
@@ -1369,6 +1412,10 @@ async def send_message_stream(
         save_start = _time.monotonic()
         try:
             async with sessionmaker() as db_save:
+                # 「重新生成」= 替换：旧的那对随新答案同一事务删掉。失败答案不落库，
+                # 旧的也留着 —— 点一下重新生成不能把原答案弄丢。
+                if regenerate and not _is_failed_answer(corrected_answer):
+                    await _delete_last_exchange(db_save, chat_session_id)
                 assistant_msg_id = await _save_messages(
                     db_save, chat_session_id, message, corrected_answer, sources
                 )
