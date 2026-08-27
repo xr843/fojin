@@ -131,6 +131,9 @@ function parseFollowUps(content: string): { cleanContent: string; suggestions: s
 // display sites render t("chat.thinking") / t("chat.request_failed") instead,
 // so the stored sentinel survives a UI language switch.
 const THINKING_SENTINEL = "正在检索经文并生成回答..."; // i18n-exempt
+/** 一次发送的来源。空 = 用户主动提的新问题（记 "chat"）；其余是派生动作，各记各的事件。 */
+type SendOrigin = "retry";
+
 const REQUEST_FAILED_SENTINEL = "请求失败，请重试"; // i18n-exempt
 
 // rehype-sanitize's defaultSchema strips any <a href> whose protocol is not
@@ -1280,14 +1283,16 @@ export default function ChatPage() {
 
   const handleSendMessage = useCallback(async (
     text: string,
-    options?: { hotQuestionId?: number | null },
+    options?: { hotQuestionId?: number | null; origin?: SendOrigin },
   ) => {
     const msg = text.trim();
     if (!msg || sending) return;
     const hotQuestionId = options?.hotQuestionId ?? null;
 
-    // Umami: track chat question (truncated to 30 chars for privacy)
-    if (typeof umami !== "undefined") {
+    // Umami: 只有用户主动发的新问题才记 "chat"（问题截前 30 字）。重试走的是同一条
+    // 函数，此前也无条件记一次 —— 30 天里 94 次 chat_retry 每次都把「提问数」多灌
+    // 一次，而重发率、断流率的分母正是 chat。派生动作各记各的事件（见 CHAT_EVENTS）。
+    if (typeof umami !== "undefined" && !options?.origin) {
       umami.track("chat", { question: msg.slice(0, 30) });
     }
 
@@ -1559,7 +1564,7 @@ export default function ChatPage() {
         umami.track("chat_retry");
       }
       setMessages((prev) => prev.filter((x) => x.id !== m.id && x.id !== userMsg.id));
-      handleSendMessage(userMsg.content);
+      handleSendMessage(userMsg.content, { origin: "retry" });
     }
   }, [messages, handleSendMessage]);
 

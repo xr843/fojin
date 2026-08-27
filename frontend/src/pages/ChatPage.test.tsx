@@ -1283,6 +1283,26 @@ describe("断流埋点 chat_stream_error", () => {
     expect(errEvents(track)).toEqual([]);
   });
 
+  it("失败后点「重试」→ chat 只计一次、chat_retry 计一次（重试不再重复灌 chat）", async () => {
+    // 承重：重试走的是同一个 handleSendMessage，而它无条件打 "chat"。于是 30 天里
+    // 94 次 chat_retry 每一次都把「提问数」多灌一次；而「重发率」「断流率」的分母
+    // 正是 chat —— 这一条不拦住，R7 的四个 KPI 里两个都是脏的。
+    const track = withUmami();
+    const cb = await startSend();
+    cb.onError!("上游 503", "upstream_http_503");
+    cb.onDone!();
+    await waitFor(() => expect(document.querySelector(".anticon-reload")).toBeTruthy());
+    const retryBtn = document.querySelector(".anticon-reload")!.closest("button")!;
+    const sendsBefore = vi.mocked(sendChatMessageStream).mock.calls.length;
+    fireEvent.click(retryBtn);
+    await waitFor(() =>
+      expect(vi.mocked(sendChatMessageStream).mock.calls.length).toBe(sendsBefore + 1),
+    );
+    const names = track.mock.calls.map((c) => c[0]);
+    expect(names.filter((n) => n === "chat")).toHaveLength(1);
+    expect(names.filter((n) => n === "chat_retry")).toHaveLength(1);
+  });
+
   it("旧后端的 error 帧没有 code 时，reason 记为 unknown 而不是丢字段", async () => {
     // 滚动部署期间前端先上、后端还是旧副本，会收到不带 code 的 error 帧。
     // 让它落进一个显式的桶，别变成 undefined —— 那样 Umami 里这一维直接消失，
