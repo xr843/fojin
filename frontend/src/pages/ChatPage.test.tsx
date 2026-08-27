@@ -1625,3 +1625,78 @@ describe("?q= 深链的发送契约", () => {
     expect(screen.getByTestId("loc").textContent).toBe("/chat");
   });
 });
+
+describe("答案截断 → 「继续写完」", () => {
+  /** 普通问答 max_tokens=2000，贴长段求白话翻译会被截断（生产样本：「你还没翻译完呢」）。
+   *  后端现在发 truncated 帧；前端要把它变成一个能一键续写的按钮，并把截断记成事件。 */
+  function withUmami() {
+    const track = vi.fn();
+    (window as Window & { umami?: { track: typeof track } }).umami = { track };
+    (globalThis as unknown as { umami: unknown }).umami = { track };
+    return track;
+  }
+
+  async function startSend() {
+    let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+    vi.mocked(sendChatMessageStream).mockImplementation(
+      async (_m, _s, _mid, cbs) => { cb = cbs; },
+    );
+    vi.mocked(getChatSessionMessages).mockResolvedValue({
+      total: 0, page: 1, size: 50, messages: [],
+    } as never);
+    const { container } = renderPage();
+    await waitFor(() => expect(screen.getByText("「三毒」指的是哪三种毒？")).toBeInTheDocument());
+    fireEvent.click(container.querySelector(".chat-hero-card")!);
+    await waitFor(() => expect(cb).toBeDefined());
+    return cb!;
+  }
+
+  afterEach(() => {
+    delete (window as Window & { umami?: unknown }).umami;
+    delete (globalThis as unknown as { umami?: unknown }).umami;
+  });
+
+  const ANSWER = "色不异空，空不异色，色即是空，空即是色。受想行识，亦复如是。舍利子，是诸法空相，不生不灭，不垢不净，不增不减。是故空中无色，无受想行识，无眼耳鼻舌身意";
+
+  it("truncated 帧 → 流结束后出现「继续写完」与提示，并记一次 answer_truncated", async () => {
+    const track = withUmami();
+    const cb = await startSend();
+    cb.onToken!(ANSWER);
+    cb.onTruncated!("length");
+    cb.onDone!();
+    expect(await screen.findByRole("button", { name: "继续写完" })).toBeInTheDocument();
+    expect(screen.getByText("回答因长度上限中断，未写完")).toBeInTheDocument();
+    expect(track.mock.calls.filter((c) => c[0] === "answer_truncated")).toHaveLength(1);
+  });
+
+  it("点「继续写完」→ 发一条带上回答结尾的续写请求；记 answer_continue、不重复记 chat", async () => {
+    // 承重：游客不落库、没有服务端历史，「继续」两个字对模型毫无上下文；
+    // 把中断处的结尾带上，登录/游客都能接得上。
+    const track = withUmami();
+    const cb = await startSend();
+    cb.onToken!(ANSWER);
+    cb.onTruncated!("length");
+    cb.onDone!();
+    const btn = await screen.findByRole("button", { name: "继续写完" });
+    const sendsBefore = vi.mocked(sendChatMessageStream).mock.calls.length;
+    fireEvent.click(btn);
+    await waitFor(() =>
+      expect(vi.mocked(sendChatMessageStream).mock.calls.length).toBe(sendsBefore + 1),
+    );
+    const [msg] = vi.mocked(sendChatMessageStream).mock.calls[sendsBefore];
+    expect(msg).toContain(ANSWER.slice(-40));
+    expect(msg).toContain("不要重复");
+    const names = track.mock.calls.map((c) => c[0]);
+    expect(names.filter((n) => n === "chat")).toHaveLength(1);
+    expect(names.filter((n) => n === "answer_continue")).toHaveLength(1);
+  });
+
+  it("没有 truncated 帧的正常回答不出现「继续写完」", async () => {
+    withUmami();
+    const cb = await startSend();
+    cb.onToken!("色不异空。");
+    cb.onDone!();
+    await waitFor(() => expect(document.querySelector(".anticon-copy")).toBeTruthy());
+    expect(screen.queryByRole("button", { name: "继续写完" })).toBeNull();
+  });
+});

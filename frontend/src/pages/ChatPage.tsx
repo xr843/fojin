@@ -132,7 +132,7 @@ function parseFollowUps(content: string): { cleanContent: string; suggestions: s
 // so the stored sentinel survives a UI language switch.
 const THINKING_SENTINEL = "正在检索经文并生成回答..."; // i18n-exempt
 /** 一次发送的来源。空 = 用户主动提的新问题（记 "chat"）；其余是派生动作，各记各的事件。 */
-type SendOrigin = "retry";
+type SendOrigin = "retry" | "continue";
 
 const REQUEST_FAILED_SENTINEL = "请求失败，请重试"; // i18n-exempt
 
@@ -348,6 +348,7 @@ interface MessageBubbleProps {
   onSuggestionClick: (q: string) => void;
   onShare: (m: ChatMessageItem) => void;
   onRetry: (m: ChatMessageItem) => void;
+  onContinue: (m: ChatMessageItem) => void;
   onFeedback: (m: ChatMessageItem, dir: "up" | "down") => void;
   onSourceClick: (source: ChatSource, phase?: "retrieved") => void;
 }
@@ -360,7 +361,7 @@ interface MessageBubbleProps {
     which was the dominant "越聊越卡" jank in long conversations. */
 function MessageBubbleInner({
   m, isStreaming, sending, user, markdownComponents,
-  onSuggestionClick, onShare, onRetry, onFeedback, onSourceClick,
+  onSuggestionClick, onShare, onRetry, onContinue, onFeedback, onSourceClick,
 }: MessageBubbleProps) {
   // Read t here (not as a prop): on a mid-conversation language switch, i18next's
   // subscription re-renders the bubble — which memo does NOT block, since memo
@@ -575,6 +576,17 @@ function MessageBubbleInner({
             m.content
           )}
         </div>
+        {/* 被 max_tokens 截断的回答：一句提示 + 一键续写。只在流结束后显示；失败哨兵不显示。
+            按钮文案保持四个字 —— antd 会给恰好两个汉字的按钮插空格，按名字找按钮会恒假。 */}
+        {m.role === "assistant" && m.truncated && !isStreaming
+          && m.content !== REQUEST_FAILED_SENTINEL && (
+          <div className="chat-truncated">
+            <span>{t("chat.truncated_hint")}</span>
+            <Button size="small" disabled={sending} onClick={() => onContinue(m)}>
+              {t("chat.continue")}
+            </Button>
+          </div>
+        )}
         {/* Action buttons outside bubble */}
         {m.content !== THINKING_SENTINEL && !isStreaming && (
           <div style={{ marginTop: 4, display: "flex", gap: 4, alignItems: "center" }}>
@@ -1459,6 +1471,12 @@ export default function ChatPage() {
           if (user) refetchSessions();
         }
       },
+      onTruncated: () => {
+        // 截断是产品缺陷的信号（普通问答上限 2000 tokens，对贴长段求白话翻译不够），
+        // 单独记一档；分母是 chat + answer_continue。上限先不动，量一周再定（R2b）。
+        if (typeof umami !== "undefined") umami.track("answer_truncated");
+        patchLive((m) => ({ ...m, truncated: true }));
+      },
       onError: (errMsg: string, code?: string) => {
         sawError = true;
         // mid_stream 与 no_token 必须分开：后者前端已能自愈（转失败哨兵 + 给出
@@ -1567,6 +1585,16 @@ export default function ChatPage() {
       handleSendMessage(userMsg.content, { origin: "retry" });
     }
   }, [messages, handleSendMessage]);
+
+  const handleContinueMessage = useCallback((m: ChatMessageItem) => {
+    // 带上中断处的结尾：游客不落库、没有服务端历史，光说「继续」模型接不上；
+    // 登录用户虽有历史，结尾也帮模型对准断点、少重复。按钮随即收起，免得连点两次
+    // 发出两条一样的续写 —— 续写若失败，失败气泡自带重试。
+    if (typeof umami !== "undefined") umami.track("answer_continue");
+    const tail = parseFollowUps(m.content).cleanContent.trimEnd().slice(-80);
+    setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, truncated: false } : x)));
+    handleSendMessage(t("chat.continue_prompt", { tail }), { origin: "continue" });
+  }, [handleSendMessage, t]);
 
   const handleSourceClick = useCallback((s: ChatSource, phase?: "retrieved") => {
     // Behavioural signal, mirroring inline citation clicks: opening a source
@@ -1947,6 +1975,7 @@ export default function ChatPage() {
                 onSuggestionClick={handleSendMessage}
                 onShare={handleShareMessage}
                 onRetry={handleRetryMessage}
+                onContinue={handleContinueMessage}
                 onFeedback={handleFeedbackMessage}
                 onSourceClick={handleSourceClick}
               />

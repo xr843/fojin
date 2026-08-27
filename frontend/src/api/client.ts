@@ -1927,6 +1927,9 @@ export interface ChatMessageItem {
   /** 从按下发送到流结束的毫秒数。它的存在与否同时充当「这条是本次会话生成的」
    *  标记 —— 历史消息读回来时为空，不会显示一个没人计过的时间。 */
   totalMs?: number | null;
+  /** 后端 truncated 帧：答案被 max_tokens 截断。只在本次会话内有效，不持久化 ——
+   *  刷新后「继续写完」消失，与耗时同一口径。 */
+  truncated?: boolean;
 }
 
 export interface SharedQA {
@@ -2084,6 +2087,9 @@ export interface StreamCallbacks {
   onSearching?: (message: string) => void;
   /** 检索完成、生成开始之前触发一次。用于把等待期的静态文案换成实际召回的经典。 */
   onRetrieved?: (retrieval: ChatRetrieval) => void;
+  /** 答案被上游 max_tokens 截断（finish_reason=length / max_tokens）。流本身仍正常结束；
+   *  消费方据此渲染「继续写完」。reason 原样透传，旧帧没带时为 "unknown"。 */
+  onTruncated?: (reason: string) => void;
   /** 推理模型思考期间按约 1 次/秒触发。用于证明「仍在推进」而非卡死。 */
   onReasoning?: (reasoning: ChatReasoning) => void;
   /**
@@ -2195,6 +2201,9 @@ export function sendChatMessageStream(
                 titles: Array.isArray(event.titles) ? event.titles : [],
                 refs: Array.isArray(event.refs) ? event.refs : undefined,
               });
+              break;
+            case "truncated":
+              callbacks?.onTruncated?.(typeof event.reason === "string" ? event.reason : "unknown");
               break;
             case "trust_status":
               callbacks?.onTrustStatus?.(event.trust_status);

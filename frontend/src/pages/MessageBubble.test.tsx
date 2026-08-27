@@ -61,6 +61,7 @@ function renderBubble(props: Partial<React.ComponentProps<typeof MessageBubble>>
       onSuggestionClick={onSuggestionClick}
       onShare={onShare}
       onRetry={onRetry}
+      onContinue={vi.fn()}
       onFeedback={onFeedback}
       onSourceClick={onSourceClick}
       {...props}
@@ -80,7 +81,7 @@ describe("MessageBubble", () => {
       <MessageBubble
         m={msg({ content: "正在生成" })} isStreaming sending user={null}
         markdownComponents={markdownComponents}
-        onSuggestionClick={vi.fn()} onShare={vi.fn()} onRetry={vi.fn()} onFeedback={vi.fn()} onSourceClick={vi.fn()}
+        onSuggestionClick={vi.fn()} onShare={vi.fn()} onRetry={vi.fn()} onContinue={vi.fn()} onFeedback={vi.fn()} onSourceClick={vi.fn()}
       />,
     );
     expect(container.textContent).toContain("▌");

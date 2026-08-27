@@ -699,6 +699,12 @@ async def send_message(
     )
 
 
+# 上游告知「因长度上限停下」的 finish_reason：OpenAI 系是 length，Anthropic 是 max_tokens。
+# 命中即向前端发 truncated 帧（渲染「继续写完」），并单独记一行日志；phase-2 那行日志
+# 对每条回答都写 finish_reason，两者相除就是截断率。见 tests/test_chat_stream_truncated_event.py。
+TRUNCATED_FINISH_REASONS = frozenset({"length", "max_tokens"})
+
+
 async def _interleave_heartbeat(inner_gen, heartbeat_interval: float):
     """Wrap an async generator so heartbeat markers interleave during idle gaps.
 
@@ -726,7 +732,7 @@ async def _interleave_heartbeat(inner_gen, heartbeat_interval: float):
 
     async def _producer():
         try:
-            # inner_gen 自己给出 kind（"content" / "reasoning"），这里只透传。
+            # inner_gen 自己给出 kind（"content" / "reasoning" / "finish"），这里只透传。
             # 推理增量必须与正文分道：它绝不能进 full_answer，也不能置
             # received_first_token —— 见下方消费端的注释。
             async for item in inner_gen:
@@ -737,7 +743,7 @@ async def _interleave_heartbeat(inner_gen, heartbeat_interval: float):
                 if (
                     not isinstance(item, tuple)
                     or len(item) != 2
-                    or item[0] not in ("content", "reasoning")
+                    or item[0] not in ("content", "reasoning", "finish")
                 ):
                     # 取值也要查，不只查形状：队列用 "done"/"error" 作哨兵，
                     # inner_gen 若产出 ("done", None) 会被消费端当作流正常结束，
@@ -745,7 +751,7 @@ async def _interleave_heartbeat(inner_gen, heartbeat_interval: float):
                     # 形状错了至少会报 ValueError，取值撞了则完全无声。
                     raise TypeError(
                         f"_interleave_heartbeat 的 inner_gen 必须产出 "
-                        f'("content"|"reasoning", text)，收到 {item!r:.80}'
+                        f'("content"|"reasoning"|"finish", text)，收到 {item!r:.80}'
                     )
                 await queue.put(item)
             await queue.put(("done", None))
@@ -1014,6 +1020,11 @@ async def send_message_stream(
                             content = chunk.get("delta", {}).get("text", "")
                             if content:
                                 yield "content", content
+                        elif event_type == "message_delta":
+                            # 收尾块：stop_reason=max_tokens 即被长度上限截断
+                            stop = chunk.get("delta", {}).get("stop_reason")
+                            if stop:
+                                yield "finish", stop
                         elif event_type == "message_stop":
                             break
                     except (json.JSONDecodeError, KeyError):
@@ -1035,18 +1046,25 @@ async def send_message_stream(
                         break
                     try:
                         chunk = json.loads(payload)
-                        delta = chunk.get("choices", [{}])[0].get("delta", {})
+                        choice = chunk.get("choices", [{}])[0]
+                        delta = choice.get("delta", {})
                         content = delta.get("content", "")
                         if content:
                             yield "content", content
-                            continue
-                        # 推理模型（deepseek-v4-* 等）在思考阶段发的是
-                        # reasoning_content，此前这些块因 content 为空被整个丢弃
-                        # —— 用户在 7–13 秒里只看到一句静态占位符，而服务端一直
-                        # 在收数据。作为独立 kind 吐出去，供上游发进度事件。
-                        reasoning = delta.get("reasoning_content", "")
-                        if reasoning:
-                            yield "reasoning", reasoning
+                        else:
+                            # 推理模型（deepseek-v4-* 等）在思考阶段发的是
+                            # reasoning_content，此前这些块因 content 为空被整个丢弃
+                            # —— 用户在 7–13 秒里只看到一句静态占位符，而服务端一直
+                            # 在收数据。作为独立 kind 吐出去，供上游发进度事件。
+                            reasoning = delta.get("reasoning_content", "")
+                            if reasoning:
+                                yield "reasoning", reasoning
+                        # finish_reason 通常随一个 delta 为空的收尾块到达，但也有上游把它
+                        # 挂在最后一个正文块上 —— 所以不能放在 content 分支之后用 continue
+                        # 跳过。length 表示被 max_tokens 截断（见 TRUNCATED_FINISH_REASONS）。
+                        finish = choice.get("finish_reason")
+                        if finish:
+                            yield "finish", finish
                     except (json.JSONDecodeError, IndexError, KeyError):
                         continue
 
@@ -1103,6 +1121,7 @@ async def send_message_stream(
     full_answer = ""
     received_first_token = False
     reasoning_chars = 0
+    finish_reason: str | None = None
     last_reasoning_emit = 0.0
     # 本秒尚未发出的推理文本。fallback 切换时**不清空**（与 reasoning_chars 同一
     # 口径）—— 两个模型的推理在显示端可能相邻，但显示的是滚动活窗且答案一到就
@@ -1144,6 +1163,11 @@ async def send_message_stream(
                                              ensure_ascii=False)
                                 + "\n\n"
                             )
+                        continue
+                    if kind == "finish":
+                        # 只记录，不改流程：该不该发 truncated 要等正文收完再看
+                        # （中途断流时这个 kind 根本不会到，finish_reason 保持 None）。
+                        finish_reason = content
                         continue
                     if kind != "content":
                         # 白名单落地，不是黑名单。本轮引入了 kind 命名空间，而
@@ -1217,9 +1241,11 @@ async def send_message_stream(
     # 「reasoning 把预算吃光了」—— 没有这两个数就分不清是模型选得不对、上游抽风、
     # 还是预算不够。而 provider 分不出 pro 和 flash（两者都是 deepseek），
     # 2026-08-01 那次排查因此得先去翻 Prometheus 的 model 标签才知道用的是哪个。
+    # finish_reason 也别删：它是截断率的分母字段（每条回答都写），分子是下面那行
+    # "answer truncated"。上限该不该从 2000 往上调，只看这两个数。
     logger.info(
         "chat/stream phase-2 LLM done in %.2fs (%d chars, reasoning=%d chars, "
-        "session_id=%s, provider=%s, model=%s, reader=%s)",
+        "session_id=%s, provider=%s, model=%s, reader=%s, finish_reason=%s)",
         _time.monotonic() - phase2_start,
         len(full_answer),
         reasoning_chars,
@@ -1227,6 +1253,7 @@ async def send_message_stream(
         provider,
         model,
         bool(page_content),
+        finish_reason,
     )
 
     # Empty-completion guard: the stream finished without ever producing an
@@ -1248,6 +1275,16 @@ async def send_message_stream(
         yield _error_frame(empty_msg, "empty_completion")
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
         return
+
+    # 被 max_tokens 截断：告诉前端「没写完」，让它渲染「继续写完」。上限本身不动 ——
+    # 先量一周截断率（这行是分子，phase-2 那行是分母）再定该不该调、调到多少。
+    if finish_reason in TRUNCATED_FINISH_REASONS:
+        logger.info(
+            "chat/stream answer truncated (finish_reason=%s, chars=%d, session_id=%s, "
+            "provider=%s, model=%s, reader=%s)",
+            finish_reason, len(full_answer), chat_session_id, provider, model, bool(page_content),
+        )
+        yield f"data: {json.dumps({'type': 'truncated', 'reason': finish_reason})}\n\n"
 
     # Citation guard: rewrite any 【《X》第N卷】 not anchored in the
     # retrieved sources. The user has already seen the raw stream; we

@@ -399,6 +399,30 @@ describe("sendChatMessageStream", () => {
     expect(onRetrieved).toHaveBeenNthCalledWith(2, { count: 1, titles: ["法華經"], refs: undefined });
   });
 
+  it("truncated 帧 → onTruncated(reason)；没带 reason 的旧帧落成 unknown", async () => {
+    // 后端在答案被 max_tokens 截断时发 {"type":"truncated","reason":"length"}。
+    // 消费方据此渲染「继续写完」——帧丢了就等于截断不可见，用户只看到一句没写完的话。
+    const { sendChatMessageStream } = await import("./client");
+    const onTruncated = vi.fn();
+    const callbacks = {
+      onToken: vi.fn(), onSources: vi.fn(), onSessionId: vi.fn(),
+      onError: vi.fn(), onDone: vi.fn(), onTruncated,
+    };
+
+    const promise = sendChatMessageStream("hello", undefined, null, callbacks);
+    const xhr = MockStreamXHR.instances[0];
+    xhr.responseText =
+      'data: {"type": "token", "content": "色不异空"}\n\n' +
+      'data: {"type": "truncated", "reason": "length"}\n\n' +
+      'data: {"type": "truncated"}\n\n' +
+      'data: {"type": "done"}\n\n';
+    xhr.onprogress?.();
+    await promise;
+
+    expect(onTruncated).toHaveBeenNthCalledWith(1, "length");
+    expect(onTruncated).toHaveBeenNthCalledWith(2, "unknown");
+  });
+
   it("流上收到 401：清身份 + 报出原因，但不硬跳登录页丢掉整段对话", async () => {
     // 承重条。这里曾经是 window.location.href = "/login" 且 return（连 onDone
     // 都不调，Promise 永不 settle —— 因为反正整页要重载）。代价是用户刚打完的
