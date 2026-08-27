@@ -252,6 +252,22 @@ em {
   gap: 3px;
   margin-left: 4px;
 }
+/* 等待预期：思考行下面一行小字 */
+.chat-wait-expectation {
+  margin-top: 4px;
+  color: var(--fj-ink-muted);
+  font-size: 12px;
+}
+/* 被 max_tokens 截断的回答：提示 + 「继续写完」，紧贴气泡下沿、在操作行之上 */
+.chat-truncated {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+  color: var(--fj-ink-muted);
+  font-size: 12px;
+}
 .chat-thinking-dots span {
   width: 5px;
   height: 5px;

@@ -5,7 +5,7 @@ import time as _time
 from datetime import UTC, datetime
 
 import httpx
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import resolve_optional_user
@@ -239,6 +239,46 @@ async def _get_text_title(db: AsyncSession, text_id: int) -> str | None:
 
 
 
+def _last_exchange_ids(history: list) -> set[int]:
+    """本会话最后一轮问答的 id：最后一条 assistant + 它之前最近的一条 user。
+
+    按 id 而不是 created_at 判先后 —— 一轮问答的两行是同一次提交写入的，时间戳
+    可能相同，靠它排序会把 user/assistant 的先后弄反。还没有任何回答时返回空集。
+    """
+    by_id = sorted(history, key=lambda m: m.id)
+    for i in range(len(by_id) - 1, -1, -1):
+        if by_id[i].role != "assistant":
+            continue
+        ids = {by_id[i].id}
+        for j in range(i - 1, -1, -1):
+            if by_id[j].role == "user":
+                ids.add(by_id[j].id)
+                break
+        return ids
+    return set()
+
+
+def _history_for_context(history: list, regenerate: bool) -> list:
+    """「重新生成」时把最后一轮从 LLM 上下文里去掉：带着上一个（不满意的）答案，
+    模型多半照抄。"""
+    if not regenerate:
+        return history
+    drop = _last_exchange_ids(history)
+    return [m for m in history if m.id not in drop]
+
+
+async def _delete_last_exchange(db: AsyncSession, session_id: int) -> None:
+    """删掉最后一轮问答的两行。不 commit —— 与随后 _save_messages 的写入同一事务，
+    新答案没存成，旧的也不会丢。子表（反馈、诊断）靠外键 ON DELETE CASCADE。"""
+    ids = _last_exchange_ids(await get_history(db, session_id))
+    if ids:
+        await db.execute(
+            delete(ChatMessage).where(
+                ChatMessage.id.in_(ids), ChatMessage.session_id == session_id,
+            )
+        )
+
+
 async def _save_messages(
     db: AsyncSession, session_id: int, message: str, answer: str, sources: list[ChatSource]
 ) -> int | None:
@@ -442,6 +482,7 @@ async def _prepare_chat(
     hot_question_id: int | None = None,
     model_id: str | None = None,
     attachment_ids: list[int] | None = None,
+    regenerate: bool = False,
 ) -> tuple[ChatSession | None, str, str, str, bool, str, list[ChatSource], list[dict[str, str]], list[ChatAttachment]]:
     """Shared setup for send_message and send_message_stream.
 
@@ -491,6 +532,7 @@ async def _prepare_chat(
 
     # Fetch history first so we can use previous context for RAG retrieval
     history = await get_history(db, chat_session.id) if chat_session else []
+    history = _history_for_context(history, regenerate)
 
     # Extract last user message from history for context-aware retrieval
     prev_user_msg = None
@@ -699,6 +741,12 @@ async def send_message(
     )
 
 
+# 上游告知「因长度上限停下」的 finish_reason：OpenAI 系是 length，Anthropic 是 max_tokens。
+# 命中即向前端发 truncated 帧（渲染「继续写完」），并单独记一行日志；phase-2 那行日志
+# 对每条回答都写 finish_reason，两者相除就是截断率。见 tests/test_chat_stream_truncated_event.py。
+TRUNCATED_FINISH_REASONS = frozenset({"length", "max_tokens"})
+
+
 async def _interleave_heartbeat(inner_gen, heartbeat_interval: float):
     """Wrap an async generator so heartbeat markers interleave during idle gaps.
 
@@ -726,7 +774,7 @@ async def _interleave_heartbeat(inner_gen, heartbeat_interval: float):
 
     async def _producer():
         try:
-            # inner_gen 自己给出 kind（"content" / "reasoning"），这里只透传。
+            # inner_gen 自己给出 kind（"content" / "reasoning" / "finish"），这里只透传。
             # 推理增量必须与正文分道：它绝不能进 full_answer，也不能置
             # received_first_token —— 见下方消费端的注释。
             async for item in inner_gen:
@@ -737,7 +785,7 @@ async def _interleave_heartbeat(inner_gen, heartbeat_interval: float):
                 if (
                     not isinstance(item, tuple)
                     or len(item) != 2
-                    or item[0] not in ("content", "reasoning")
+                    or item[0] not in ("content", "reasoning", "finish")
                 ):
                     # 取值也要查，不只查形状：队列用 "done"/"error" 作哨兵，
                     # inner_gen 若产出 ("done", None) 会被消费端当作流正常结束，
@@ -745,7 +793,7 @@ async def _interleave_heartbeat(inner_gen, heartbeat_interval: float):
                     # 形状错了至少会报 ValueError，取值撞了则完全无声。
                     raise TypeError(
                         f"_interleave_heartbeat 的 inner_gen 必须产出 "
-                        f'("content"|"reasoning", text)，收到 {item!r:.80}'
+                        f'("content"|"reasoning"|"finish", text)，收到 {item!r:.80}'
                     )
                 await queue.put(item)
             await queue.put(("done", None))
@@ -798,6 +846,7 @@ async def send_message_stream(
     hot_question_id: int | None = None,
     model_id: str | None = None,
     attachment_ids: list[int] | None = None,
+    regenerate: bool = False,
     # token: production SSE path passes the raw bearer token; the user is then
     # resolved INSIDE the prep-phase session (see Phase-1 below) instead of via
     # Depends(get_optional_user), which would pin a PG connection for the whole
@@ -867,7 +916,7 @@ async def send_message_stream(
                 text_id=text_id, juan_num=juan_num,
                 selected_text=selected_text, page_content=page_content,
                 hot_question_id=hot_question_id, model_id=model_id,
-                attachment_ids=attachment_ids,
+                attachment_ids=attachment_ids, regenerate=regenerate,
             )
             # Capture the ORM rows' plain scalar values WHILE the instances
             # are still bound to db_prep. On block exit, close() rolls back the
@@ -1014,6 +1063,11 @@ async def send_message_stream(
                             content = chunk.get("delta", {}).get("text", "")
                             if content:
                                 yield "content", content
+                        elif event_type == "message_delta":
+                            # 收尾块：stop_reason=max_tokens 即被长度上限截断
+                            stop = chunk.get("delta", {}).get("stop_reason")
+                            if stop:
+                                yield "finish", stop
                         elif event_type == "message_stop":
                             break
                     except (json.JSONDecodeError, KeyError):
@@ -1035,18 +1089,25 @@ async def send_message_stream(
                         break
                     try:
                         chunk = json.loads(payload)
-                        delta = chunk.get("choices", [{}])[0].get("delta", {})
+                        choice = chunk.get("choices", [{}])[0]
+                        delta = choice.get("delta", {})
                         content = delta.get("content", "")
                         if content:
                             yield "content", content
-                            continue
-                        # 推理模型（deepseek-v4-* 等）在思考阶段发的是
-                        # reasoning_content，此前这些块因 content 为空被整个丢弃
-                        # —— 用户在 7–13 秒里只看到一句静态占位符，而服务端一直
-                        # 在收数据。作为独立 kind 吐出去，供上游发进度事件。
-                        reasoning = delta.get("reasoning_content", "")
-                        if reasoning:
-                            yield "reasoning", reasoning
+                        else:
+                            # 推理模型（deepseek-v4-* 等）在思考阶段发的是
+                            # reasoning_content，此前这些块因 content 为空被整个丢弃
+                            # —— 用户在 7–13 秒里只看到一句静态占位符，而服务端一直
+                            # 在收数据。作为独立 kind 吐出去，供上游发进度事件。
+                            reasoning = delta.get("reasoning_content", "")
+                            if reasoning:
+                                yield "reasoning", reasoning
+                        # finish_reason 通常随一个 delta 为空的收尾块到达，但也有上游把它
+                        # 挂在最后一个正文块上 —— 所以不能放在 content 分支之后用 continue
+                        # 跳过。length 表示被 max_tokens 截断（见 TRUNCATED_FINISH_REASONS）。
+                        finish = choice.get("finish_reason")
+                        if finish:
+                            yield "finish", finish
                     except (json.JSONDecodeError, IndexError, KeyError):
                         continue
 
@@ -1103,6 +1164,7 @@ async def send_message_stream(
     full_answer = ""
     received_first_token = False
     reasoning_chars = 0
+    finish_reason: str | None = None
     last_reasoning_emit = 0.0
     # 本秒尚未发出的推理文本。fallback 切换时**不清空**（与 reasoning_chars 同一
     # 口径）—— 两个模型的推理在显示端可能相邻，但显示的是滚动活窗且答案一到就
@@ -1144,6 +1206,11 @@ async def send_message_stream(
                                              ensure_ascii=False)
                                 + "\n\n"
                             )
+                        continue
+                    if kind == "finish":
+                        # 只记录，不改流程：该不该发 truncated 要等正文收完再看
+                        # （中途断流时这个 kind 根本不会到，finish_reason 保持 None）。
+                        finish_reason = content
                         continue
                     if kind != "content":
                         # 白名单落地，不是黑名单。本轮引入了 kind 命名空间，而
@@ -1217,9 +1284,11 @@ async def send_message_stream(
     # 「reasoning 把预算吃光了」—— 没有这两个数就分不清是模型选得不对、上游抽风、
     # 还是预算不够。而 provider 分不出 pro 和 flash（两者都是 deepseek），
     # 2026-08-01 那次排查因此得先去翻 Prometheus 的 model 标签才知道用的是哪个。
+    # finish_reason 也别删：它是截断率的分母字段（每条回答都写），分子是下面那行
+    # "answer truncated"。上限该不该从 2000 往上调，只看这两个数。
     logger.info(
         "chat/stream phase-2 LLM done in %.2fs (%d chars, reasoning=%d chars, "
-        "session_id=%s, provider=%s, model=%s, reader=%s)",
+        "session_id=%s, provider=%s, model=%s, reader=%s, finish_reason=%s)",
         _time.monotonic() - phase2_start,
         len(full_answer),
         reasoning_chars,
@@ -1227,6 +1296,7 @@ async def send_message_stream(
         provider,
         model,
         bool(page_content),
+        finish_reason,
     )
 
     # Empty-completion guard: the stream finished without ever producing an
@@ -1248,6 +1318,16 @@ async def send_message_stream(
         yield _error_frame(empty_msg, "empty_completion")
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
         return
+
+    # 被 max_tokens 截断：告诉前端「没写完」，让它渲染「继续写完」。上限本身不动 ——
+    # 先量一周截断率（这行是分子，phase-2 那行是分母）再定该不该调、调到多少。
+    if finish_reason in TRUNCATED_FINISH_REASONS:
+        logger.info(
+            "chat/stream answer truncated (finish_reason=%s, chars=%d, session_id=%s, "
+            "provider=%s, model=%s, reader=%s)",
+            finish_reason, len(full_answer), chat_session_id, provider, model, bool(page_content),
+        )
+        yield f"data: {json.dumps({'type': 'truncated', 'reason': finish_reason})}\n\n"
 
     # Citation guard: rewrite any 【《X》第N卷】 not anchored in the
     # retrieved sources. The user has already seen the raw stream; we
@@ -1332,6 +1412,10 @@ async def send_message_stream(
         save_start = _time.monotonic()
         try:
             async with sessionmaker() as db_save:
+                # 「重新生成」= 替换：旧的那对随新答案同一事务删掉。失败答案不落库，
+                # 旧的也留着 —— 点一下重新生成不能把原答案弄丢。
+                if regenerate and not _is_failed_answer(corrected_answer):
+                    await _delete_last_exchange(db_save, chat_session_id)
                 assistant_msg_id = await _save_messages(
                     db_save, chat_session_id, message, corrected_answer, sources
                 )

@@ -399,6 +399,50 @@ describe("sendChatMessageStream", () => {
     expect(onRetrieved).toHaveBeenNthCalledWith(2, { count: 1, titles: ["法華經"], refs: undefined });
   });
 
+  it("truncated 帧 → onTruncated(reason)；没带 reason 的旧帧落成 unknown", async () => {
+    // 后端在答案被 max_tokens 截断时发 {"type":"truncated","reason":"length"}。
+    // 消费方据此渲染「继续写完」——帧丢了就等于截断不可见，用户只看到一句没写完的话。
+    const { sendChatMessageStream } = await import("./client");
+    const onTruncated = vi.fn();
+    const callbacks = {
+      onToken: vi.fn(), onSources: vi.fn(), onSessionId: vi.fn(),
+      onError: vi.fn(), onDone: vi.fn(), onTruncated,
+    };
+
+    const promise = sendChatMessageStream("hello", undefined, null, callbacks);
+    const xhr = MockStreamXHR.instances[0];
+    xhr.responseText =
+      'data: {"type": "token", "content": "色不异空"}\n\n' +
+      'data: {"type": "truncated", "reason": "length"}\n\n' +
+      'data: {"type": "truncated"}\n\n' +
+      'data: {"type": "done"}\n\n';
+    xhr.onprogress?.();
+    await promise;
+
+    expect(onTruncated).toHaveBeenNthCalledWith(1, "length");
+    expect(onTruncated).toHaveBeenNthCalledWith(2, "unknown");
+  });
+
+  it("regenerate 选项 → 请求体带 regenerate:true；普通提问不带这个字段", async () => {
+    // 后端据此把本会话最后一轮问答从上下文里去掉、并在新答案落库时替换旧的那对。
+    // 字段只在 true 时出现：旧后端的 ChatRequest 对未知字段是忽略的，但没必要多发。
+    const { sendChatMessageStream } = await import("./client");
+    const callbacks = {
+      onToken: vi.fn(), onSources: vi.fn(), onSessionId: vi.fn(),
+      onError: vi.fn(), onDone: vi.fn(),
+    };
+    const p1 = sendChatMessageStream("再答一次", 7, null, callbacks, { regenerate: true });
+    const p2 = sendChatMessageStream("普通提问", 7, null, callbacks);
+    const [x1, x2] = MockStreamXHR.instances;
+    for (const x of [x1, x2]) {
+      x.responseText = 'data: {"type": "done"}\n\n';
+      x.onprogress?.();
+    }
+    await Promise.all([p1, p2]);
+    expect(JSON.parse(x1.send.mock.calls[0][0])).toMatchObject({ message: "再答一次", session_id: 7, regenerate: true });
+    expect(JSON.parse(x2.send.mock.calls[0][0])).not.toHaveProperty("regenerate");
+  });
+
   it("流上收到 401：清身份 + 报出原因，但不硬跳登录页丢掉整段对话", async () => {
     // 承重条。这里曾经是 window.location.href = "/login" 且 return（连 onDone
     // 都不调，Promise 永不 settle —— 因为反正整页要重载）。代价是用户刚打完的

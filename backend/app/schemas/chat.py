@@ -36,6 +36,10 @@ class ChatRequest(BaseModel):
     # the LLM for the matching hot-question prompt template, keeping the
     # natural display_text in history/RAG.
     hot_question_id: int | None = None
+    # 「重新生成」：同一问题再答一次，替换本会话最后一轮问答 —— 拼上下文时去掉
+    # 那一轮（否则模型多半照抄上一个答案），新答案成功落库时删旧的那对。
+    # 只对最后一轮生效；不做从中间分叉。
+    regenerate: bool = False
     # Per-message model override — id from llm_catalog.CATALOG (e.g. "deepseek:v4-pro").
     # Unknown ids fall back gracefully so stale localStorage doesn't break chat.
     model_id: str | None = None
