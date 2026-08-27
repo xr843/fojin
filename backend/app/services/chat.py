@@ -1319,8 +1319,12 @@ async def send_message_stream(
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
         return
 
-    # 被 max_tokens 截断：告诉前端「没写完」，让它渲染「继续写完」。上限本身不动 ——
-    # 先量一周截断率（这行是分子，phase-2 那行是分母）再定该不该调、调到多少。
+    # 被 max_tokens 截断：告诉前端「没写完」，让它渲染「继续写完」。
+    # ⚠️ 别把上面的 2000 当成真实上限：_with_reasoning_headroom 给推理模型再加 24000，
+    # 所以 deepseek-v4-* 的实际额度是 26000（推理与正文共用）。2026-08-27 实测生产
+    # 答案长度无截断悬崖、最长 12,883 字 —— 这条分支在默认模型下几乎不会走到，真正
+    # 会撞上限的是 BYOK 选了非推理模型（额度就是 2000）或推理吃光预算的情况。
+    # 详见 docs/OBSERVABILITY.md「上限的真实数字」。
     if finish_reason in TRUNCATED_FINISH_REASONS:
         logger.info(
             "chat/stream answer truncated (finish_reason=%s, chars=%d, session_id=%s, "
