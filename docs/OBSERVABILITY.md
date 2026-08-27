@@ -115,7 +115,7 @@ Prometheus 量的是系统；下面这四个数量的是产品。定位（2026-0
 | **核对率** | 打过 `citation_click` 或 `source_click` 的访客 ÷ 打过 `chat` 的访客（也可按事件数：核对事件 ÷ 回答数） | 点过引文的人问得深 2.6×，这是产品核心承诺被用上的比例 |
 | **隔天回访率** | 同一 `session_id` 在 ≥2 个不同日期打过 `chat` 的访客 ÷ 打过 `chat` 的访客 | `session_id` 按月重置，只能算月内；基线 12.5%（2026-08） |
 | **重发率** | 同一访客 30 分钟内原样重发同一 `question`（中间没有 `chat_retry`/`chat_regenerate`）÷ `chat` | 基线 9%（222/2,4xx，2026-08）；有了「重新生成」后应降 |
-| **截断率** | 客户端：`answer_truncated` ÷ (`chat` + `answer_continue` + `chat_regenerate`)。**服务端更准**：`docker logs fojin-backend` 里 `answer truncated` 行数 ÷ `phase-2 LLM done` 行数（后者每条回答都写 `finish_reason=`） | 2026-08-27 起才有数；一周后据此定 max_tokens 该不该从 2000 上调（R2b） |
+| **截断率** | 客户端：`answer_truncated` ÷ (`chat` + `answer_continue` + `chat_regenerate`)。**服务端更准**：`docker logs fojin-backend` 里 `answer truncated` 行数 ÷ `phase-2 LLM done` 行数（后者每条回答都写 `finish_reason=`） | 2026-08-27 起才有数。⚠️ 见下方「上限的真实数字」——默认模型下预期接近 0 |
 
 服务端截断率一行命令（生产）：
 
@@ -124,3 +124,23 @@ docker logs fojin-backend --since 168h 2>&1 | grep -c "answer truncated"
 docker logs fojin-backend --since 168h 2>&1 | grep -c "phase-2 LLM done"
 # 按 reader 模式分开看：grep "answer truncated" | grep -c "reader=True"
 ```
+
+## ⚠️ 上限的真实数字（别拿 2000 当上限）
+
+`chat.py` 里写的是 `max_tokens = 2000`（reader 模式 8000），但 `_with_reasoning_headroom`
+会给**推理模型**（模型名含 `deepseek-v4` / `reasoner` / `thinking` / `o1` / `o3`）再加
+`_REASONING_HEADROOM_TOKENS = 24000`。所以：
+
+| 谁 | 真实上限（推理 + 正文共用） |
+|---|---|
+| 平台默认 & DeepSeek BYOK（v4-pro / v4-flash） | **26000 tokens** |
+| reader 模式（带 page_content）+ 推理模型 | 32000 tokens |
+| BYOK 选了非推理模型（qwen / kimi / glm / doubao / gpt / claude / gemini） | **2000 tokens** |
+
+2026-08-27 生产实测：60 天 3,605 条回答的长度分布平滑衰减、**没有截断悬崖**，最长
+12,883 字；一条 4,517 字的长答案 `finish_reason=stop`。所以「长答案被 2000 截断」对
+默认模型**不成立**，真正会撞上限的是非推理 BYOK 模型，以及推理吃光预算的情况
+（2026-08-01 flash 事故：11,826 字符推理把当时 6000 的总额度顶穿，正文 0 字）。
+
+改上限前先看 `finish_reason=length` 的实际行数，别看「答案不以句末标点结尾」这类代理指标
+（它量的是引文括号 / 列表项收尾，不是截断）。
