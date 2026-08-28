@@ -29,13 +29,22 @@ class Settings(BaseSettings):
     # JWT
     jwt_secret_key: str = os.environ.get("JWT_SECRET_KEY", _DEFAULT_JWT_SECRET)
     jwt_algorithm: str = "HS256"
-    jwt_expire_minutes: int = 60 * 8  # 8 hours
+    # 30 days. This is the *idle* budget: sliding renewal only fires while a
+    # token is still alive, so the real rule readers experience is "away longer
+    # than this and you sign in again". At 8 hours that meant every overnight
+    # return — measured on prod (90 days, 159 signed-in users): 42% of returns
+    # landed on a dead token and 45% of users were logged out at least once,
+    # with 400 of those returns in the 8-24h band alone. 30 days covers 99% of
+    # them. The cost is a longer window for a stolen localStorage token, which
+    # is why /auth/logout-all exists (see app/services/auth.py).
+    jwt_expire_minutes: int = 60 * 24 * 30
     # Sliding renewal (app/services/token_renewal.py): an authenticated request
     # past the token's half-life gets a fresh token back, so an active reader is
     # never logged out mid-use. This caps how long that chain may run — after it,
-    # they sign in again. Not a substitute for revocation: changing a password
-    # bumps password_version and kills every existing token immediately.
-    jwt_absolute_max_days: int = 30
+    # they sign in again. Not a substitute for revocation: changing a password or
+    # calling /auth/logout-all bumps password_version and kills every existing
+    # token immediately.
+    jwt_absolute_max_days: int = 90
 
     # BYOK API key encryption — independent of jwt_secret_key so rotating
     # one doesn't silently destroy the other (see P0-1 audit).  Must be a

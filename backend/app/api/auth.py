@@ -24,7 +24,12 @@ from app.schemas.user import (
     UserProfile,
     UserRegister,
 )
-from app.services.auth import change_user_password, login_user, register_user
+from app.services.auth import (
+    change_user_password,
+    login_user,
+    register_user,
+    revoke_all_sessions,
+)
 from app.services.oauth import (
     github_authorize_url,
     github_callback,
@@ -199,6 +204,28 @@ async def change_password(
         client_ip=client_ip,
         user_agent=user_agent,
     )
+
+
+@router.post("/logout-all", response_model=TokenResponse)
+async def logout_all_devices(
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """退出当前账号在所有设备上的登录，返回一张给当前设备用的新 JWT。
+
+    Tokens live 30 days and cannot be revoked individually (no server-side
+    session store), so this is the escape hatch for "I left myself signed in
+    somewhere". Deliberately requires no password: someone who wants to secure
+    a session they can no longer reach should not have to stop and remember a
+    password first — and holding a valid token already proves as much as the
+    password would.
+
+    The current device is not logged out: it swaps in the returned token.
+    """
+    client_ip = get_real_client_ip(request, default=None)
+    user_agent = request.headers.get("user-agent")
+    return await revoke_all_sessions(db, user, client_ip=client_ip, user_agent=user_agent)
 
 
 @router.get("/me", response_model=UserProfile)

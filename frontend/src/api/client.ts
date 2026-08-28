@@ -2374,6 +2374,21 @@ export async function changePassword(payload: {
   return data;
 }
 
+/**
+ * Sign out of every device, and get back a token for this one.
+ *
+ * Tokens live 30 days and there is no server-side session store, so this is
+ * the only way to end a session you can no longer reach (a library computer, a
+ * phone you no longer have) short of changing your password. The backend bumps
+ * ``password_version``, which 401s every outstanding token on its next call.
+ * The returned token is minted at the new version — swap it in, or this device
+ * logs itself out too.
+ */
+export async function logoutAllDevices(): Promise<ChangePasswordResponse> {
+  const { data } = await api.post<ChangePasswordResponse>("/auth/logout-all");
+  return data;
+}
+
 export default api;
 
 // Text Versions (aggregated view)

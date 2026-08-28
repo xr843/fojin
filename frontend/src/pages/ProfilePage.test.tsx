@@ -12,6 +12,7 @@ import {
   getBookmarks,
   getChatQuota,
   getHistory,
+  logoutAllDevices,
 } from "../api/client";
 
 vi.mock("../api/client", () => ({
@@ -22,6 +23,7 @@ vi.mock("../api/client", () => ({
   saveApiKey: vi.fn(),
   deleteApiKey: vi.fn(),
   changePassword: vi.fn(),
+  logoutAllDevices: vi.fn(),
 }));
 
 /** 把当前 URL 渲染出来，好断言返回按钮跳去了哪。 */
@@ -255,6 +257,63 @@ describe("ProfilePage", () => {
   });
 
   // s 来自地址栏，是可被随意编辑的输入。非数字不该被原样拼进跳转目标。
+  // ── 退出所有设备 ────────────────────────────────────────────────
+  //
+  // token 现在活 30 天且没有服务端会话表，唯一的吊销手段就是 password_version。
+  // 这个按钮是长寿命 token 的安全对冲，所以它的两条承重行为都要钉住：真的调了
+  // 接口，以及**把返回的新 token 存下来**——不存的话，这台设备会被自己踢掉。
+
+  function signedIn() {
+    useAuthStore.setState({
+      token: "old-token",
+      user: {
+        id: 1,
+        username: "reader",
+        email: "reader@example.com",
+        display_name: null,
+        role: "user",
+        is_active: true,
+        created_at: "2026-01-10T00:00:00Z",
+      },
+    });
+  }
+
+  async function openSecurityTabAndConfirmLogoutAll() {
+    fireEvent.click(screen.getByRole("tab", { name: /Account security/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Sign out everywhere" }));
+    // Popconfirm 的确认键与触发键同名，取弹层里那一个（后出现的）。
+    const buttons = await screen.findAllByRole("button", { name: "Sign out everywhere" });
+    await act(async () => {
+      fireEvent.click(buttons[buttons.length - 1]);
+    });
+  }
+
+  it("退出所有设备：调用接口并换上返回的新 token（否则当前设备被自己踢掉）", async () => {
+    signedIn();
+    vi.mocked(logoutAllDevices).mockResolvedValue({
+      access_token: "token-at-new-version",
+      token_type: "bearer",
+    });
+
+    renderPage(<ProfilePage />);
+    await openSecurityTabAndConfirmLogoutAll();
+
+    await waitFor(() => expect(logoutAllDevices).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(useAuthStore.getState().token).toBe("token-at-new-version"));
+    expect(useAuthStore.getState().user?.id).toBe(1);
+  });
+
+  it("退出所有设备失败时不动本地 token —— 别把还能用的登录状态弄丢", async () => {
+    signedIn();
+    vi.mocked(logoutAllDevices).mockRejectedValue(new Error("boom"));
+
+    renderPage(<ProfilePage />);
+    await openSecurityTabAndConfirmLogoutAll();
+
+    await waitFor(() => expect(logoutAllDevices).toHaveBeenCalledTimes(1));
+    expect(useAuthStore.getState().token).toBe("old-token");
+  });
+
   it("?s= 不是数字时退回 /chat，不把脏值拼进 URL", () => {
     loginAndRender("/profile?tab=apikey&from=chat&s=../../evil");
     fireEvent.click(screen.getByRole("button", { name: /Back to AI Q&A/ }));

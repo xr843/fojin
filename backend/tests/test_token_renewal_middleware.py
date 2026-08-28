@@ -18,6 +18,13 @@ from app.main import RENEWED_TOKEN_HEADER, TokenRenewalMiddleware
 
 pytestmark = pytest.mark.anyio
 
+# 这些用例判的是"过没过半程"，不是"还剩几小时"。写成寿命的比例，改
+# jwt_expire_minutes 时它们才继续测原来那件事——写死 7h/1h 的版本在寿命
+# 从 8 小时改到 30 天时会静默变成"两张都过了半程"。
+FULL_LIFE = timedelta(minutes=settings.jwt_expire_minutes)
+PAST_HALFWAY = FULL_LIFE * 0.25  # 只剩四分之一 → 该续
+STILL_FRESH = FULL_LIFE * 0.9  # 还剩九成 → 不该续
+
 
 class FakeUser:
     def __init__(self, user_id=1, password_version=0):
@@ -27,7 +34,7 @@ class FakeUser:
 
 
 def _token(*, expires_in: timedelta, user_id=1, pwd_v=0, oit: datetime | None = None) -> str:
-    """直接签一张任意寿命的 token —— create_access_token 只会签 8 小时的。"""
+    """直接签一张任意寿命的 token —— create_access_token 只会签满寿命的。"""
     now = datetime.now(UTC)
     payload = {
         "sub": str(user_id),
@@ -82,26 +89,26 @@ async def _get(monkeypatch, *, token: str, resolves_to: FakeUser | None):
 
 
 async def test_half_expired_token_comes_back_renewed(monkeypatch):
-    resp = await _get(monkeypatch, token=_token(expires_in=timedelta(hours=1)), resolves_to=FakeUser())
+    resp = await _get(monkeypatch, token=_token(expires_in=PAST_HALFWAY), resolves_to=FakeUser())
     assert resp.status_code == 200
     fresh = resp.headers.get(RENEWED_TOKEN_HEADER)
     assert fresh, "过半程的请求应当带回一张新 token"
     claims = decode_token_claims(fresh)
     assert claims is not None
     # 新 token 寿命是满的，但会话起点保持不变
-    assert claims["exp"] > (datetime.now(UTC) + timedelta(hours=7)).timestamp()
+    assert claims["exp"] > (datetime.now(UTC) + STILL_FRESH).timestamp()
     assert claims["sub"] == "1"
 
 
 async def test_fresh_token_is_left_alone(monkeypatch):
-    resp = await _get(monkeypatch, token=_token(expires_in=timedelta(hours=7)), resolves_to=FakeUser())
+    resp = await _get(monkeypatch, token=_token(expires_in=STILL_FRESH), resolves_to=FakeUser())
     assert resp.status_code == 200
     assert RENEWED_TOKEN_HEADER not in resp.headers
 
 
 async def test_anonymous_request_gets_no_token(monkeypatch):
     """没认证成功就没有续期凭据——中间件应当什么都不做。"""
-    resp = await _get(monkeypatch, token=_token(expires_in=timedelta(hours=1)), resolves_to=None)
+    resp = await _get(monkeypatch, token=_token(expires_in=PAST_HALFWAY), resolves_to=None)
     assert resp.status_code == 200
     assert RENEWED_TOKEN_HEADER not in resp.headers
 
@@ -113,7 +120,7 @@ async def test_revoked_session_is_never_renewed(monkeypatch):
     如果中间件只凭签名判断——这是最容易写出来的版本——改密码这个吊销手段就被
     绕过了：旧会话会在每次请求里自动拿到一张全新的 token，永远吊销不掉。
     """
-    stale = _token(expires_in=timedelta(hours=1), pwd_v=0)
+    stale = _token(expires_in=PAST_HALFWAY, pwd_v=0)
     resp = await _get(monkeypatch, token=stale, resolves_to=FakeUser(password_version=1))
     assert resp.status_code == 200
     assert resp.json()["user"] is None, "pwd_v 不匹配时本就不该认证成功"
@@ -124,7 +131,7 @@ async def test_session_past_absolute_cap_stops_renewing(monkeypatch):
     ancient = datetime.now(UTC) - timedelta(days=settings.jwt_absolute_max_days + 1)
     resp = await _get(
         monkeypatch,
-        token=_token(expires_in=timedelta(hours=1), oit=ancient),
+        token=_token(expires_in=PAST_HALFWAY, oit=ancient),
         resolves_to=FakeUser(),
     )
     assert resp.status_code == 200
@@ -133,10 +140,10 @@ async def test_session_past_absolute_cap_stops_renewing(monkeypatch):
 
 async def test_renewed_token_keeps_the_original_session_start(monkeypatch):
     """续期链必须一直带着原始 oit，否则上限每次都重新计时 = 没有上限。"""
-    began = datetime.now(UTC) - timedelta(days=10)
+    began = datetime.now(UTC) - timedelta(days=settings.jwt_absolute_max_days // 2)
     resp = await _get(
         monkeypatch,
-        token=_token(expires_in=timedelta(hours=1), oit=began),
+        token=_token(expires_in=PAST_HALFWAY, oit=began),
         resolves_to=FakeUser(),
     )
     fresh = resp.headers[RENEWED_TOKEN_HEADER]

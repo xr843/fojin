@@ -415,7 +415,7 @@ cd backend && pytest tests/ -q
 - Memory/CPU limits per container
 - CSP, X-Frame-Options, X-Content-Type-Options headers
 - Query length limits on all search parameters
-- JWT with 8h expiry, production requires strong secret
+- JWT with a 30-day idle budget (sliding renewal, capped 90 days from sign-in); `POST /api/auth/logout-all` revokes every outstanding token. Production requires a strong secret
 
 ### Self-hosting privacy defaults
 
