@@ -9,11 +9,12 @@ from datetime import UTC, datetime, timedelta
 
 import jwt
 import pytest
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 
 from app.config import settings
 from app.core.auth import create_access_token, decode_token_claims
-from app.core.deps import get_current_user, get_optional_user
+from app.core.deps import clear_renewable, get_current_user, get_optional_user
+from app.database import get_db
 from app.main import RENEWED_TOKEN_HEADER, TokenRenewalMiddleware
 
 pytestmark = pytest.mark.anyio
@@ -155,3 +156,70 @@ async def test_login_token_starts_a_new_session_clock():
     """真正登录签发的 token，oit 就是现在——不该继承任何旧起点。"""
     claims = decode_token_claims(create_access_token(1, 0))
     assert abs(claims["oit"] - datetime.now(UTC).timestamp()) < 5
+
+
+# ── 吊销自身凭证的接口不得带回续期票 ─────────────────────────────────
+#
+# 鉴权依赖在**接口体跑之前**就把续期凭据（含**旧的** password_version）盖进
+# request.state；接口随后 bump 了版本。中间件照单签发 = 一张签发即作废的票，
+# 塞进 X-Renewed-Token 让客户端换上。前端因为随后会用响应体里的票覆盖而侥幸
+# 无恙，但「靠别处纠正才对」不是能依赖的性质：别的客户端照收就是当场登出。
+
+
+def _revoking_app(*, clear: bool):
+    """最小的「吊销自身凭证」接口，可选择调不调 clear_renewable。"""
+    user = FakeUser(password_version=3)
+    app = FastAPI()
+    app.add_middleware(TokenRenewalMiddleware)
+
+    @app.post("/revoke")
+    async def revoke(request: Request, _=Depends(get_current_user)):
+        if clear:
+            clear_renewable(request)
+        user.password_version += 1  # change_user_password / revoke_all_sessions 做的事
+        return {"version": user.password_version}
+
+    class _Result:
+        def scalar_one_or_none(self):
+            return user
+
+    class _Session:
+        async def execute(self, *a, **k):
+            return _Result()
+
+    async def _fake_db():
+        yield _Session()
+
+    app.dependency_overrides[get_db] = _fake_db
+    return app, user
+
+
+async def _post_revoke(*, clear: bool):
+    import httpx
+
+    app, user = _revoking_app(clear=clear)
+    token = _token(expires_in=PAST_HALFWAY, pwd_v=3)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://t") as c:
+        resp = await c.post("/revoke", headers={"Authorization": f"Bearer {token}"})
+    return resp, user
+
+
+async def test_revoking_endpoint_emits_no_renewed_token():
+    resp, user = await _post_revoke(clear=True)
+    assert resp.status_code == 200
+    assert user.password_version == 4
+    assert RENEWED_TOKEN_HEADER not in resp.headers
+
+
+async def test_without_clearing_the_renewed_token_would_be_born_dead():
+    """反向对照：不清凭据时，发出去的票签在**旧**版本上。
+
+    不是在测产品行为，是在证明上一条真的挡住了什么 —— 少了它，
+    「没有这个头」可能只是因为压根没走到续期分支。
+    """
+    resp, user = await _post_revoke(clear=False)
+    stale = resp.headers.get(RENEWED_TOKEN_HEADER)
+    assert stale, "这张票本该被签出来，否则上一条用例是恒真的"
+    assert decode_token_claims(stale)["pwd_v"] == 3
+    assert user.password_version == 4  # 签发的版本已经不存在了

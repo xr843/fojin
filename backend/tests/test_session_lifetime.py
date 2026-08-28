@@ -122,3 +122,4 @@ async def test_revoke_all_sessions_is_audited_in_the_same_transaction():
     assert len(rows[0].outcome) <= 40  # column width
     # One commit: the audit row rides the same transaction as the bump.
     assert session.commit.await_count == 1
+
