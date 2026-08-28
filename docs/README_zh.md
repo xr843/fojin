@@ -302,7 +302,7 @@ cd backend && pytest tests/ -q
 - 每个容器内存/CPU 上限
 - CSP、X-Frame-Options、X-Content-Type-Options 头
 - 所有搜索参数有长度限制
-- JWT 8 小时过期，生产强 secret 必填
+- JWT 闲置 30 天过期（滑动续期，自登录起最长 90 天）；`POST /api/auth/logout-all` 可一次吊销全部 token。生产强 secret 必填
 
 ## 贡献
 

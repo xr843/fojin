@@ -113,8 +113,11 @@ class PasswordChangeAudit(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    # 'success' | 'wrong_old_password' | 'same_as_old' (VARCHAR for
-    # extensibility — see migration 0127).
+    # 'success' | 'wrong_old_password' | 'same_as_old' |
+    # 'revoke_all_sessions' (VARCHAR for extensibility — see migration 0127).
+    # The last one is not a password change: it records a password_version bump
+    # from /auth/logout-all, so every reason the version moved lands in one
+    # table.
     outcome: Mapped[str] = mapped_column(String(40), nullable=False)
     via: Mapped[str] = mapped_column(String(20), nullable=False, server_default="self")
     ip: Mapped[str | None] = mapped_column(String(64), nullable=True)

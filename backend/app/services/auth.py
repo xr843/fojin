@@ -122,6 +122,48 @@ async def change_user_password(
     return TokenResponse(access_token=token)
 
 
+async def revoke_all_sessions(
+    db: AsyncSession,
+    user: User,
+    client_ip: str | None = None,
+    user_agent: str | None = None,
+) -> TokenResponse:
+    """Invalidate every token this user holds, and hand back a fresh one.
+
+    The counterweight to a long token lifetime. fojin keeps no server-side
+    session store, so a token that leaks (localStorage is readable by any XSS)
+    is valid until it expires — 30 days now, not 8 hours. ``password_version``
+    is the only revocation lever there is, and until now the only way to pull it
+    was to change your password, which is a poor fit for "I signed in on a
+    library computer".
+
+    Bumping the version alone is enough: ``get_current_user`` compares the
+    token's ``pwd_v`` against the user's on every request, so all outstanding
+    tokens 401 on their next call, including any the renewal middleware minted.
+    The password itself is untouched — ``password_changed_at`` deliberately
+    stays put so it keeps meaning what it says.
+
+    The caller's own session is exempted the only way it can be: by returning a
+    token minted at the new version, which the client swaps in. Anything else
+    would log the user out of the device they just used to secure the account.
+    """
+    user.password_version = (user.password_version or 0) + 1
+    await _record_password_audit(
+        db, user.id, "revoke_all_sessions", "self", client_ip, user_agent, commit=False
+    )
+    await db.commit()
+    await db.refresh(user)
+
+    logger.info(
+        "revoke_all_sessions user_id=%s new_version=%s ip=%s",
+        user.id,
+        user.password_version,
+        client_ip,
+    )
+
+    return TokenResponse(access_token=create_access_token(user.id, user.password_version))
+
+
 async def _record_password_audit(
     db: AsyncSession,
     user_id: int,

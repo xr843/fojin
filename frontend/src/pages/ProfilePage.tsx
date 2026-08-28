@@ -2,11 +2,11 @@ import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
-import { Typography, Card, Tabs, List, Tag, Empty, Spin, Descriptions, Button, Space, Pagination, Input, Select, message, Alert, Form } from "antd";
+import { Typography, Card, Tabs, List, Tag, Empty, Spin, Descriptions, Button, Space, Pagination, Input, Select, message, Alert, Form, Popconfirm, Divider } from "antd";
 import { BookOutlined, HistoryOutlined, UserOutlined, ReadOutlined, KeyOutlined, DeleteOutlined, CheckCircleOutlined, LockOutlined, ArrowLeftOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../stores/authStore";
-import { getBookmarks, getHistory, getApiKeyStatus, getChatQuota, saveApiKey, deleteApiKey, changePassword } from "../api/client";
+import { getBookmarks, getHistory, getApiKeyStatus, getChatQuota, saveApiKey, deleteApiKey, changePassword, logoutAllDevices } from "../api/client";
 
 const { Title } = Typography;
 
@@ -104,6 +104,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [pwForm] = Form.useForm();
   const [changingPw, setChangingPw] = useState(false);
+  const [loggingOutAll, setLoggingOutAll] = useState(false);
 
   const defaultTab = searchParams.get("tab") || "profile";
   const dateLocale = uiDateLocale(i18n.language);
@@ -193,6 +194,22 @@ export default function ProfilePage() {
       }
     } finally {
       setChangingPw(false);
+    }
+  };
+
+  const handleLogoutAll = async () => {
+    if (!user) return;
+    setLoggingOutAll(true);
+    try {
+      // The new token must be stored, not discarded: the version bump we just
+      // asked for kills the token this very request was made with.
+      const { access_token } = await logoutAllDevices();
+      setAuth(access_token, user);
+      message.success(t("profile.logout_all_done"));
+    } catch {
+      message.error(t("profile.logout_all_failed"));
+    } finally {
+      setLoggingOutAll(false);
     }
   };
 
@@ -544,6 +561,26 @@ export default function ProfilePage() {
                         </Button>
                       </Form.Item>
                     </Form>
+                    <Divider style={{ margin: 0 }} />
+                    <div>
+                      <Title level={5} style={{ marginTop: 0 }}>
+                        {t("profile.logout_all_title")}
+                      </Title>
+                      <div style={{ color: "#6b6257", marginBottom: 12 }}>
+                        {t("profile.logout_all_description")}
+                      </div>
+                      <Popconfirm
+                        title={t("profile.logout_all_title")}
+                        description={t("profile.logout_all_confirm")}
+                        okText={t("profile.logout_all_ok")}
+                        cancelText={t("common.cancel")}
+                        onConfirm={handleLogoutAll}
+                      >
+                        <Button danger loading={loggingOutAll}>
+                          {t("profile.logout_all_button")}
+                        </Button>
+                      </Popconfirm>
+                    </div>
                   </Space>
                 </Card>
               ),
