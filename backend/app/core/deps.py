@@ -23,6 +23,25 @@ def _mark_renewable(request: Request | None, token: str, user: User) -> None:
     setattr(request.state, RENEWABLE_STATE_ATTR, (token, user.id, user.password_version))
 
 
+def clear_renewable(request: Request) -> None:
+    """Cancel this request's renewal credential.
+
+    For endpoints that revoke the very token they were called with — anything
+    that bumps ``password_version``. The auth dependency stamps the credential
+    (including the *old* version) before the endpoint body runs, so without
+    this the middleware happily mints a replacement at a version that no longer
+    exists: a token that is dead the moment it is signed, handed back in
+    ``X-Renewed-Token`` for the client to adopt.
+
+    The frontend survives it by overwriting with the token in the response body
+    a beat later, but "correct only because something else corrects it" is not
+    a property to rely on — and any other client that honours the header would
+    simply be logged out.
+    """
+    if hasattr(request.state, RENEWABLE_STATE_ATTR):
+        delattr(request.state, RENEWABLE_STATE_ATTR)
+
+
 async def get_current_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),

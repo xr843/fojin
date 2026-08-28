@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.core.client_ip import get_real_client_ip
 from app.core.crypto import decrypt_api_key, encrypt_api_key
-from app.core.deps import get_current_user
+from app.core.deps import clear_renewable, get_current_user
 from app.core.url_security import normalize_public_https_url
 from app.database import get_db
 from app.models.user import User
@@ -194,6 +194,10 @@ async def change_password(
     前端应立刻用返回的新 token 替换本地存储的旧 token。
     同一用户在其他设备上的所有旧 JWT 都会在下一次请求时变成 401。
     """
+    # The version bump below kills the token this request carried; the renewal
+    # middleware would otherwise hand back a replacement signed at the old
+    # version — dead on arrival. The fresh token is in the response body.
+    clear_renewable(request)
     client_ip = get_real_client_ip(request, default=None)
     user_agent = request.headers.get("user-agent")
     return await change_user_password(
@@ -223,6 +227,7 @@ async def logout_all_devices(
 
     The current device is not logged out: it swaps in the returned token.
     """
+    clear_renewable(request)  # same reason as change-password above
     client_ip = get_real_client_ip(request, default=None)
     user_agent = request.headers.get("user-agent")
     return await revoke_all_sessions(db, user, client_ip=client_ip, user_agent=user_agent)
