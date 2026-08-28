@@ -112,6 +112,14 @@ services:
       ES_USER: ${ES_USER:-elastic}
       ES_PASSWORD: ${ES_PASSWORD:-}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env (32+ chars)}
+      # Session lifetime. These were documented in .env.example but never
+      # forwarded here, so setting them in .env did nothing and the code
+      # default silently won — verified on prod, where .env said
+      # JWT_EXPIRE_MINUTES=480 and the container had no such variable at all.
+      # Defaults mirror app/config.py so wiring them up changes nothing on its
+      # own; a .env that sets them now actually takes effect.
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-43200}
+      JWT_ABSOLUTE_MAX_DAYS: ${JWT_ABSOLUTE_MAX_DAYS:-90}
       # P0-1: BYOK encryption key, independent of JWT_SECRET_KEY.
       API_KEY_ENCRYPTION_KEY: ${API_KEY_ENCRYPTION_KEY:?Set API_KEY_ENCRYPTION_KEY in .env (Fernet.generate_key() output)}
       # Drives the production fail-fast block in app/config.py.
@@ -194,6 +202,11 @@ services:
       ES_USER: ${ES_USER:-elastic}
       ES_PASSWORD: ${ES_PASSWORD:-}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env (32+ chars)}
+      # Must match backend: the two replicas sit behind one nginx, so a reader's
+      # requests alternate between them. A token minted by one is renewed by the
+      # other.
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-43200}
+      JWT_ABSOLUTE_MAX_DAYS: ${JWT_ABSOLUTE_MAX_DAYS:-90}
       API_KEY_ENCRYPTION_KEY: ${API_KEY_ENCRYPTION_KEY:?Set API_KEY_ENCRYPTION_KEY in .env (Fernet.generate_key() output)}
       FOJIN_ENV: ${FOJIN_ENV:-production}
       APP_VERSION: ${APP_VERSION:-}
