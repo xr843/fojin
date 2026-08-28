@@ -59,6 +59,14 @@ def test_absolute_cap_outlives_the_idle_budget():
     ) * 1.5
 
 
+def test_logout_all_is_rate_limited_like_a_password_change():
+    """It invalidates every token the account holds — the default 200/min
+    bucket is no bucket at all for that."""
+    from app.core.rate_limit import STRICT_PATHS
+
+    assert STRICT_PATHS.get("/api/auth/logout-all") == STRICT_PATHS["/api/auth/change-password"]
+
+
 @pytest.mark.anyio
 async def test_revoke_all_sessions_bumps_version_and_returns_a_live_token():
     session = MagicMock()
