@@ -34,7 +34,7 @@ export default function DashboardPage() {
   if (!data) {
     return (
       <div className="dashboard-container" style={{ textAlign: "center", paddingTop: 80 }}>
-        <Empty description={t("common.noData")} />
+        <Empty description={t("activity.noData")} />
       </div>
     );
   }
