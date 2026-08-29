@@ -573,7 +573,11 @@ export default function ProfilePage() {
                         title={t("profile.logout_all_title")}
                         description={t("profile.logout_all_confirm")}
                         okText={t("profile.logout_all_ok")}
-                        cancelText={t("common.cancel")}
+                        cancelText={t("auth.cancel")}
+                        // 请求在飞时禁掉确认键：连点两次会连着 bump 两次
+                        // password_version，两个响应乱序到达就可能把先回来的
+                        // （已被第二次作废的）票留在本地。
+                        okButtonProps={{ loading: loggingOutAll }}
                         onConfirm={handleLogoutAll}
                       >
                         <Button danger loading={loggingOutAll}>

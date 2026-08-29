@@ -288,6 +288,20 @@ describe("ProfilePage", () => {
     });
   }
 
+  it("确认弹层的两个按钮都是译文，不是原始键名", async () => {
+    // 上线时这里写的是 t("common.cancel")，而这个键不存在 —— i18next 把
+    // 缺失键原样渲染，线上真的显示了一个写着「common.cancel」的按钮。
+    // typecheck / lint / 其余用例全绿，只有真去看渲染结果才看得见。
+    signedIn();
+    renderPage(<ProfilePage />);
+
+    fireEvent.click(screen.getByRole("tab", { name: /Account security/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Sign out everywhere" }));
+
+    expect(await screen.findByRole("button", { name: "Cancel" })).toBeInTheDocument();
+    expect(screen.queryByText(/^[a-z_]+\.[a-zA-Z_]+$/)).not.toBeInTheDocument();
+  });
+
   it("退出所有设备：调用接口并换上返回的新 token（否则当前设备被自己踢掉）", async () => {
     signedIn();
     vi.mocked(logoutAllDevices).mockResolvedValue({
