@@ -9,6 +9,7 @@
 |----|--------|----------|--------|
 | **确定性检索指标** | Recall@K / Hit@K / MRR / Precision@K，对照每题黄金来源，繁简折叠匹配经名（+可选卷号） | 只需语料库 DB（不需 LLM） | prod / cron，可做回归门 |
 | **确定性引用忠实度** | 「每一句都能点回原典」的可度量版：重放线上引用守卫 + 引文核验 + 可信状态管线，算 `citation_grounding_rate` / `verified_rate_of_cited` + 可信状态分布 | DB + LLM key（需生成回答） | prod / cron，可做回归门 |
+| **生产答案回放** | 线上已服务答案的真实忠实度：serve 时诊断（原始答案真值）+ 回放补测卷号准确率与覆盖缺口 | 只需业务 DB（**不需 LLM**） | prod，按月或改动前后 |
 | **LLM-as-judge** | 检索相关性 / 引用准确性 / 回答完整性 / 无编造（语义打分） | DB + LLM key | prod / 人工 |
 | **指标逻辑单测** | `retrieval_metrics.py` / `faithfulness.py` 的纯函数单测 | 无（纯逻辑） | **CI 自动跑**（`tests/test_retrieval_metrics.py` / `tests/test_faithfulness.py`） |
 
@@ -155,3 +156,53 @@ python -m eval.from_feedback --window-days 90 --limit 200
 - `test_set.json` — 黄金评测集
 - `ALIGNMENT_EVAL.md` + `alignment_metrics.py` / `build_alignment_gold.py` / `run_alignment_eval.py` /
   `run_alignment_regression.sh` / `alignment_gold.sample.jsonl` — 跨藏对齐质量评测（独立黄金集与回归门）
+
+## 生产答案回放（`replay_production.py`）——不烧 token 的那把尺子
+
+题库量的是 90 道精选题；这个量的是**用户真正拿到的答案**。零 LLM 调用，因为答案早已生成并
+连同当时的 `sources` 存在 `chat_messages` 里。
+
+```bash
+# 最近 30 天线上真实忠实度（1,427 条约 106 秒）
+python -m eval.replay_production --window-days 30 --tag monthly
+
+# 改护栏前后的受控对照：同一批答案跑两遍
+python -m eval.replay_production --window-days 30 --tag before
+#   ...改 citation_guard / quote_verifier...
+python -m eval.replay_production --ids-from eval/reports/replay-<ts>-before.json \
+    --baseline eval/reports/replay-<ts>-before.json --tag after
+```
+
+### ⚠️ 为什么忠实度**不能**靠回放算
+
+`chat_messages.content` 存的是护栏**处理后**的答案。`verify_quoted_content` 把不逐字的引文
+降级成散文（去掉引号），它自己的 docstring 写明这是幂等的——「a downgraded passage carries
+no quote marks, so a second pass is a no-op」。所以回放存文必然报 100% 干净，无论模型当时多糟。
+
+**2026-09-01 实测 300 条：回放报 0 次引文降级、0 次引用纠正；serve 时诊断表记录的是 203 次和 43 次。**
+
+原始答案的质量只能读 `chat_answer_diagnostics`（护栏在改写**之前**把要改什么写下来了）。
+本工具因此分成两节：A 节读诊断表，B/C 节才是回放——回放只负责护栏从没碰过的东西。
+
+### ⛔ 它不是每日门
+
+生产日均约 47.5 条答案，`verbatim_quote_rate` 的分母更窄（约 25 条/天）。p≈0.8 时日粒度标准误
+约 8 个百分点，周粒度约 3，月粒度约 1.5。**日序列全是噪声，设阈值会天天误报。**
+按月跑，或在改动前后成对跑。每日的确定性检索门（`run_regression.sh`）照旧，两者不合并。
+
+### 基线（2026-09-01，最近 30 天，1,427 条）
+
+| 指标 | 值 | 分母 | 来源 |
+|------|-----|------|------|
+| `citation_grounding_rate` | 98.9% | 2,810 条引用 | serve 诊断 |
+| `verified_rate_of_cited` | 61.7% | 962 条有引用回答 | serve 诊断 |
+| `verbatim_quote_rate` | **79.9%** | 757 条含可核验引文回答 | serve 诊断 |
+| `fascicle_accuracy_rate` | **96.0%** | 1,695 条可解析卷号引文 | **回放**（护栏盲区） |
+| 核验覆盖率 | **67.8%** | 967 / 1,427 | 回放 |
+
+> 对照 2026-07-09 题库基线的 `verbatim_quote_rate` 56.6% —— **口径不同，不可直接比**：
+> 那是 90 题题库、这是生产全量，且中间护栏行为从「加警告」改成了「降级引文」。
+
+> **覆盖率 67.8% 是所有 A 节比率的真实分母上限。** 另外 460 条（32.2%）答案不含 `【《` 标记，
+> `verify_quoted_content` 首行早退、整条不核验——它们不是「核验通过」，是「从没被看过」。
+> 这批答案的存文因此是**原始**的，是唯一能靠回放查清的一批。
