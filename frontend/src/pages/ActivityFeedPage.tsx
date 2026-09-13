@@ -275,7 +275,6 @@ function AcademicTab() {
             { value: "tricycle", label: "Tricycle" },
             { value: "iabs", label: "IABS" },
             { value: "jbe", label: "J. Buddhist Ethics" },
-            { value: "suttacentral_forum", label: "SuttaCentral Forum" },
           ]}
         />
         <span className="filter-label">{t("activity.filterCategory")}:</span>

@@ -143,7 +143,7 @@ canon's license. Representative sources (authoritative values live on
 | Source | SPDX | Commercial | Notes |
 | --- | --- | --- | --- |
 | CBETA (中華電子佛典協會) | `CC-BY-NC-SA-4.0` | No | Commercial use needs separate CBETA authorization. Caps combined exports to non-commercial. |
-| SuttaCentral | `CC0-1.0` (Pāli) / `CC-BY-SA` (translations) | Yes | Public-domain Pāli root texts. |
+| SuttaCentral | `CC0-1.0` | Yes | Pāli root texts and translations alike — see [bilara-data `LICENSE.md`](https://github.com/suttacentral/bilara-data/blob/published/LICENSE.md). |
 | 84000 | `CC-BY-NC-ND-4.0` | No | No-derivatives ceiling; treat as reference-only. |
 | MITRA / Dharmamitra | `CC-BY-SA-4.0` | Yes (SA) | Sanskrit/Tibetan ↔ Chinese; see [`mitra-license.md`](mitra-license.md). |
 

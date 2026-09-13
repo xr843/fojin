@@ -46,6 +46,16 @@ logger = logging.getLogger(__name__)
 #   lions_roar       403 from the VPS regardless of UA (IP block)
 #   accesstoinsight  frozen archive site; rss.xml serves HTML, content stopped
 #                    updating years ago
+#
+# Removed 2026-09-13 — not a reachability problem, a licensing one:
+#   suttacentral_forum  discourse.suttacentral.net/latest.rss. Forum posts are not
+#                       SuttaCentral's CC0 dedication: the forum ToS §3 licenses
+#                       them CC BY-NC-SA 3.0, copyright staying with each poster.
+#                       Discourse also puts the whole first post in <description>,
+#                       so this stored near-full copies (256 in prod, median 941
+#                       chars) and showed them without the license notice
+#                       BY 3.0 §4(a) requires. Stored rows deleted by alembic 0179;
+#                       pinned by tests/test_suttacentral_usage_hygiene.py.
 FEED_REGISTRY: list[dict] = [
     {
         "name": "bdrc_news",
@@ -71,17 +81,11 @@ FEED_REGISTRY: list[dict] = [
         "category": "paper",
         "language": "en",
     },
-    # Added 2026-06-11, both verified reachable from the VPS with real items:
+    # Added 2026-06-11, verified reachable from the VPS with real items:
     {
         "name": "jbe",  # Journal of Buddhist Ethics — peer-reviewed OA journal
         "url": "https://blogs.dickinson.edu/buddhistethics/feed/",
         "category": "paper",
-        "language": "en",
-    },
-    {
-        "name": "suttacentral_forum",  # Discourse "latest" — EBT scholarship community
-        "url": "https://discourse.suttacentral.net/latest.rss",
-        "category": "community",
         "language": "en",
     },
 ]
@@ -370,7 +374,7 @@ async def main() -> None:
         "--source",
         type=str,
         default=None,
-        help="Only fetch a specific feed source (e.g. suttacentral_forum)",
+        help="Only fetch a specific feed source (e.g. tricycle)",
     )
     parser.add_argument(
         "--stats",
