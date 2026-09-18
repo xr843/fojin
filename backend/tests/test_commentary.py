@@ -10,6 +10,8 @@ import sys
 from unittest.mock import MagicMock
 
 import pytest
+import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
 
 if "elasticsearch" not in sys.modules:
     _es = MagicMock()
@@ -377,3 +379,218 @@ def test_a_books_anchor_on_the_selected_line_beats_its_own_higher_scored_one(loa
     assert len(f) == 1
     assert f[0]["base_line"] == "T08n0235_p0749c22"
     assert f[0]["score"] == 0.8
+
+
+# ---------------------------------------------------------------- 反查
+#
+# 正查（经文 → 各家注）回答不了读注疏的人真正的问题。90 天 Umami 实测：被点开
+# 的引文里注疏 93 次、论本文 28 次 —— 他们在读注疏，而读注疏最难的是不知道眼前
+# 这段在解释哪一句论。索引方向是反的，数据本身双向都有（每条对齐两端都带行号）。
+
+
+@pytest.fixture()
+def reverse_loaded(tmp_path, monkeypatch):
+    notes = [
+        _note("F03n0100", "T08n0235_p0749c20", "F03n0100_p0334b10", 1.0, "牒是故須菩提"),
+        _note("F03n0100", "T08n0235_p0749c21", "F03n0100_p0334b14", 0.9, "牒不應住色生心"),
+        _note("F03n0100", "T08n0235_p0749c22", "F03n0100_p0334c02", 0.8, "牒應無所住"),
+        # 同一部书在同一句论文上的第二处锚点，置信更低 —— 去重后应只留上面那条
+        _note("F03n0100", "T08n0235_p0749c22", "F03n0100_p0334c05", 0.5, "同句第二处"),
+        _note("X24n0461", "T08n0235_p0749c23", "X24n0461_p0546b12", 1.0, "别的书"),
+    ]
+    d = _pkg(tmp_path, notes)
+    monkeypatch.setattr(svc, "PACKAGE_DIR", d)
+    svc.packages.cache_clear()
+    yield
+    svc.packages.cache_clear()
+
+
+def test_reverse_maps_a_run_of_commentary_lines_to_the_base_lines_it_quotes(reverse_loaded):
+    pkg = svc.packages()[0]
+    hits = pkg.source("F03n0100", "0334b10", "0334b14", 8)
+    assert [h["base_line"] for h in hits] == [
+        "T08n0235_p0749c20",
+        "T08n0235_p0749c21",
+    ]
+
+
+def test_reverse_excludes_anchors_outside_the_cited_lines(reverse_loaded):
+    """读者看的是注疏的这一块，不是整部书 —— 区间外的锚点不能算。"""
+    pkg = svc.packages()[0]
+    hits = pkg.source("F03n0100", "0334b14", "0334b99", 8)
+    assert [h["base_line"] for h in hits] == ["T08n0235_p0749c21"]
+
+
+def test_reverse_keeps_the_best_anchor_per_base_line(reverse_loaded):
+    """一部注疏常在同一句论文上牒好几处；按论文句去重，留最贴的那处。"""
+    pkg = svc.packages()[0]
+    hits = pkg.source("F03n0100", "0334c01", "0334c09", 8)
+    assert len(hits) == 1
+    assert hits[0]["score"] == 0.8
+
+
+def test_reverse_never_mixes_in_another_book(reverse_loaded):
+    pkg = svc.packages()[0]
+    hits = pkg.source("F03n0100", "0000a01", "9999z99", 8)
+    assert {h["work"] for h in hits} == {"F03n0100"}
+
+
+def test_reverse_returns_base_lines_in_reading_order(reverse_loaded):
+    """按论文的行序给，不按置信度 —— 读者要的是「这块注依次讲了哪几句」。"""
+    pkg = svc.packages()[0]
+    hits = pkg.source("F03n0100", "0000a01", "9999z99", 8)
+    order = [pkg.pos[h["base_line"]] for h in hits]
+    assert order == sorted(order)
+
+
+def test_find_commentary_resolves_a_fojin_book_id(reverse_loaded):
+    """抽屉手里只有 fojin 的书号（F0100），包里写的是 CBETA 全号（F03n0100）。"""
+    assert svc.find_commentary("F0100") == [(svc.packages()[0], "F03n0100")]
+    assert svc.find_commentary("T0001") == []
+
+
+# ------------------------------------------------- 反查端点：字符位置 → 行标
+
+
+def _anchors(*pairs):
+    return [{"char_offset": o, "line_ref": r} for o, r in pairs]
+
+
+def test_span_lines_starts_at_the_line_the_quote_begins_in():
+    """锚点标的是一行的起点，落在行中间的字属于上一行。"""
+    from app.api.commentary import _span_lines
+
+    a = _anchors((0, "0460b04"), (17, "0460b05"), (34, "0460b06"))
+    assert _span_lines(a, 20, 30) == ("0460b05", "0460b05")
+
+
+def test_span_lines_covers_every_line_the_quote_touches():
+    from app.api.commentary import _span_lines
+
+    a = _anchors((0, "0460b04"), (17, "0460b05"), (34, "0460b06"), (51, "0460b07"))
+    assert _span_lines(a, 5, 40) == ("0460b04", "0460b06")
+
+
+def test_span_lines_falls_back_to_the_first_line_before_any_anchor():
+    """卷首 <lb> 之前的那几个字没有锚点——退到首行，不要整次查询作废。"""
+    from app.api.commentary import _span_lines
+
+    a = _anchors((10, "0460b04"), (27, "0460b05"))
+    assert _span_lines(a, 0, 5) == ("0460b04", "0460b04")
+
+
+def test_span_lines_gives_up_when_the_juan_has_no_anchors():
+    from app.api.commentary import _span_lines
+
+    assert _span_lines([], 0, 10) is None
+
+
+# ------------------------------------------------- 反查端点：整条链路
+
+
+class _ReverseResult:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def scalar(self):
+        return self._rows[0][0] if self._rows else None
+
+    def fetchall(self):
+        return self._rows
+
+    def all(self):
+        return self._rows
+
+    def __iter__(self):
+        return iter(self._rows)
+
+
+class _ReverseDB:
+    """按 SQL 片段作答的假会话。真库不在测试环境里，但这条链路值得整条走一遍：
+    参数名、schema、退化分支接错了，单测各自都还是绿的。"""
+
+    def __init__(self, juan_content, chunk, anchors):
+        self.juan_content, self.chunk, self.anchors = juan_content, chunk, anchors
+
+    async def execute(self, stmt, params=None):
+        s = str(stmt)
+        if "FROM buddhist_texts WHERE id" in s:
+            return _ReverseResult([("F0100",)])
+        if "text_embeddings" in s:
+            return _ReverseResult([(self.chunk,)])
+        if "text_contents" in s:
+            return _ReverseResult([(self.juan_content,)])
+        if "text_line_anchors" in s and "unnest" not in s:
+            return _ReverseResult([(a["char_offset"], a["line_ref"]) for a in self.anchors])
+        if "cbeta_id = ANY" in s:
+            return _ReverseResult([("T0235", 7)])
+        if "unnest" in s:          # _JUAN_OF_LINE
+            return _ReverseResult([(7, "0749c21", 1, "0749c21")])
+        raise AssertionError(f"没想到的查询: {s[:60]}")
+
+
+@pytest_asyncio.fixture
+async def source_client(reverse_loaded):
+    from fastapi import FastAPI
+
+    from app.api import commentary as api
+    from app.database import get_db
+
+    content = "注文甲" * 10 + "注文乙" * 10
+    db = _ReverseDB(
+        juan_content=content,
+        chunk=content[5:35],
+        # 注疏自己的行：这块引文横跨 b10–b14，正是 fixture 里两条锚点所在
+        anchors=[{"char_offset": o, "line_ref": r} for o, r in
+                 ((0, "0334b10"), (15, "0334b12"), (30, "0334b14"), (45, "0334c02"))],
+    )
+
+    async def fake_db():
+        yield db
+
+    app = FastAPI()
+    app.include_router(api.router, prefix="/api")
+    app.dependency_overrides[get_db] = fake_db
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+
+
+@pytest.mark.asyncio
+async def test_source_endpoint_answers_which_lines_this_commentary_explains(source_client):
+    r = await source_client.get("/api/commentary/source?text_id=99&juan=1&chunk_index=0")
+    assert r.status_code == 200
+    d = r.json()
+    assert d["matched"] is True
+    assert d["work"] == "F03n0100"
+    assert d["base_work"] == "T08n0235"
+    # 这块注文牒了两句论 —— 按论文行序给，不按置信度
+    assert [p["base_line"] for p in d["passages"]] == [
+        "T08n0235_p0749c20",
+        "T08n0235_p0749c21",
+    ]
+    # 被牒那行 ± 1 行，够读成一句话
+    assert "不應住色生心" in d["passages"][1]["base_text"]
+    assert d["passages"][0]["reader_url"]
+
+
+@pytest.mark.asyncio
+async def test_source_endpoint_says_so_when_the_book_has_no_alignment(source_client, monkeypatch):
+    """没有对齐数据 ≠ 这部书没在注任何东西。接口必须把这两件事分开说。"""
+    monkeypatch.setattr(svc, "find_commentary", lambda cbeta: [])
+    r = await source_client.get("/api/commentary/source?text_id=99&juan=1&chunk_index=0")
+    d = r.json()
+    assert d["matched"] is False
+    assert any("不等于" in c for c in d["caveats"])
+
+
+@pytest.mark.asyncio
+async def test_corpus_carries_fojin_text_ids(source_client):
+    """抽屉手里只有 text_id。没有这一列，它只能对每条引文都试一次反查。"""
+    r = await source_client.get("/api/commentary/corpus")
+    assert r.status_code == 200
+    d = r.json()
+    assert [c["cbeta_id"] for c in d["commentaries"]] == ["F0100", "X0461"]
+    # 假库里只有 T0235 这一部，所以注疏侧查不到 —— 查不到就留 None，不要瞎填
+    assert d["sutras"][0]["text_id"] == 7
+    assert all(c["text_id"] is None for c in d["commentaries"])

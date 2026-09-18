@@ -4,11 +4,30 @@ import { useTranslation } from "react-i18next";
 import { BookOutlined, ArrowRightOutlined, CloseOutlined, GlobalOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
-import { getChunkContext, getChunkAlignment, type ChunkContextItem, type ParallelPair } from "../api/client";
+import {
+  getChunkContext,
+  getChunkAlignment,
+  getCommentaryCorpus,
+  getCommentarySource,
+  type ChunkContextItem,
+  type ParallelPair,
+} from "../api/client";
 import { findQuoteSpans } from "../utils/citationMatch";
 import { localizeHan } from "../utils/hanScript";
 import { reflowText } from "../utils/textReflow";
 import { hasDisplayConfidence } from "../utils/parallelDisplay";
+
+/** 后端给的是绝对地址（agent 与外部引用也要用这条），站内跳转只能用 path —— 直接
+ *  把绝对地址交给 <Link> 会当成站内相对路径拼接，点出去是一个不存在的页面。 */
+function readerPath(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url, window.location.origin);
+    return u.pathname + u.search + u.hash;
+  } catch {
+    return null;
+  }
+}
 
 export interface CitationTarget {
   textId: number;
@@ -336,6 +355,39 @@ export default function CitationDrawer({ target, onClose }: Props) {
     retry: false,
   });
 
+  // 经注对读语料表。读注疏的人最多（90 天里被点开的引文，注疏 93 次 / 论本文
+  // 28 次），但他不知道眼前这段在牒哪一句。语料只覆盖少数几部书，所以先取这张
+  // 表在本地判定，避免为每一条引文都打一次注定落空的请求。
+  const { data: corpus } = useQuery({
+    queryKey: ["commentary-corpus"],
+    queryFn: getCommentaryCorpus,
+    staleTime: 24 * 60 * 60 * 1000,
+    retry: false,
+  });
+
+  const isAlignedCommentary = !!corpus?.commentaries?.some(
+    (c) => c.text_id != null && c.text_id === target?.textId,
+  );
+
+  const { data: source } = useQuery({
+    queryKey: ["commentary-source", target?.textId, target?.juanNum, target?.chunkIndex],
+    queryFn: () => getCommentarySource(target!.textId, target!.juanNum, target!.chunkIndex),
+    enabled: target !== null && isAlignedCommentary,
+    staleTime: 15 * 60 * 1000,
+    // 附带信息，拿不到就不显示——不要因为它失败而影响正文对照。
+    retry: false,
+  });
+
+  // 埋点：这功能上线时定了杀死条件（30 天内展开不足 20 次就停止扩语料），
+  // 没有这两个事件就无从判定。按 target + 是否命中触发一次，面板重渲染不重复计。
+  const shown = source?.matched && (source.passages.length ?? 0) > 0;
+  useEffect(() => {
+    if (!shown || !target) return;
+    if (typeof umami !== "undefined") {
+      umami.track("commentary_source", { text_id: target.textId, lines: source?.total ?? 0 });
+    }
+  }, [shown, target, source?.total]);
+
   const dedupedChunks = useMemo(
     () =>
       data
@@ -510,6 +562,65 @@ export default function CitationDrawer({ target, onClose }: Props) {
               />
             ) : (
               <div lang="zh-Hans">{lzhBody}</div>
+            )}
+
+            {source?.matched && source.passages.length > 0 && (
+              <div
+                data-testid="commentary-source"
+                style={{
+                  marginTop: 16,
+                  paddingTop: 12,
+                  borderTop: "1px solid var(--fj-border)",
+                }}
+              >
+                <div style={{ fontSize: 12, color: "var(--fj-ink-muted)", marginBottom: 8 }}>
+                  {t("reader.citation.source_title", {
+                    title: localizeHan(source.base_title || "", i18n.language),
+                    n: source.total,
+                  })}
+                </div>
+                {source.passages.map((p) => {
+                  const path = readerPath(p.reader_url);
+                  return (
+                    <div key={p.base_line} style={{ marginBottom: 10 }}>
+                      <div
+                        lang="zh-Hans"
+                        style={{ fontSize: 15, lineHeight: 1.9, color: "var(--fj-ink)" }}
+                      >
+                        {localizeHan(p.base_text || "", i18n.language)}
+                      </div>
+                      {path && (
+                        <Link
+                          to={path}
+                          onClick={() => {
+                            if (typeof umami !== "undefined" && target) {
+                              umami.track("commentary_source_open", {
+                                text_id: target.textId,
+                              });
+                            }
+                            onClose();
+                          }}
+                          style={{ fontSize: 12 }}
+                        >
+                          {t("reader.citation.source_open")}
+                        </Link>
+                      )}
+                    </div>
+                  );
+                })}
+                {source.truncated && (
+                  <div style={{ fontSize: 12, color: "var(--fj-ink-muted)" }}>
+                    {t("reader.citation.source_truncated", {
+                      n: source.total - source.passages.length,
+                    })}
+                  </div>
+                )}
+                {/* 覆盖不完整是这份数据的事实，不写出来读者会把「这里没有」读成
+                    「这段没在解释任何一句」。 */}
+                <div style={{ fontSize: 11, color: "var(--fj-ink-muted)", marginTop: 6 }}>
+                  {t("reader.citation.source_caveat")}
+                </div>
+              </div>
             )}
           </>
         )}

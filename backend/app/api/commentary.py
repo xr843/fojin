@@ -10,8 +10,15 @@ from sqlalchemy import text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.schemas.commentary import CommentaryHit, CorpusInfo, PassageCommentaries
+from app.schemas.commentary import (
+    CommentaryHit,
+    CommentarySource,
+    CommentarySourcePassage,
+    CorpusInfo,
+    PassageCommentaries,
+)
 from app.services import commentary as svc
+from app.services.content import get_juan_line_anchors
 from app.services.urn import absolute_reader_url, build_urn, reader_path
 
 router = APIRouter(prefix="/commentary", tags=["commentary"])
@@ -110,11 +117,34 @@ async def _locate(
 
 
 @router.get("/corpus", response_model=CorpusInfo)
-async def corpus():
-    """哪些经有经注对读数据。"""
+async def corpus(db: AsyncSession = Depends(get_db)):
+    """哪些经有经注对读数据。
+
+    每条都带上 fojin 的 ``text_id``：调用方（抽屉）手里只有 text_id，没有它就得
+    为每一条引文都试一次查询，而绝大多数引文并不在这个语料里。
+    """
     sutras = svc.available()
+    commentaries = svc.available_commentaries()
+    want = {svc.to_cbeta_id(s["base_work"]) for s in sutras}
+    want |= {c["cbeta_id"] for c in commentaries}
+    ids: dict[str, int] = {}
+    if cbeta_ids := [c for c in want if c]:
+        ids = {
+            r[0]: r[1]
+            for r in (
+                await db.execute(
+                    sql_text("SELECT cbeta_id, id FROM buddhist_texts WHERE cbeta_id = ANY(:ids)"),
+                    {"ids": cbeta_ids},
+                )
+            ).fetchall()
+        }
+    for s in sutras:
+        s["text_id"] = ids.get(svc.to_cbeta_id(s["base_work"]))
+    for c in commentaries:
+        c["text_id"] = ids.get(c["cbeta_id"])
     return CorpusInfo(
         sutras=sutras,
+        commentaries=commentaries,
         caveats=[_NO_DATA] if not sutras else [
             "对齐由程序产出、非人工校订；tier A/B/C 是该部注疏的质检档次。",
             "覆盖不完整：一部注疏实际所注，约一半没有被对齐出来。列出的注家"
@@ -199,5 +229,160 @@ async def passage(
             "已装载的经里没有这一句 —— 见 available_sutras。注意区分两件事："
             "「这部经还没有经注数据」不等于「这句话没人注过」。",
             "定位是逐字的（简繁通吃，忽略标点），不做模糊匹配；引文有异文就会找不到。",
+        ],
+    )
+
+
+_CHUNK = sql_text(
+    "SELECT chunk_text FROM text_embeddings "
+    "WHERE text_id = :tid AND juan_num = :juan AND chunk_index = :idx LIMIT 1"
+)
+
+# 同一卷可能有多语种正文；反查只在汉文原文上成立（行号索引也建在它上面）。
+_CONTENT = sql_text(
+    "SELECT content FROM text_contents WHERE text_id = :tid AND juan_num = :juan "
+    "ORDER BY CASE WHEN lang = 'lzh' THEN 0 ELSE 1 END LIMIT 1"
+)
+
+
+def _span_lines(anchors: list[dict], start: int, end: int) -> tuple[str, str] | None:
+    """字符区间 [start, end) 落在哪几行 —— 返回首尾行标。
+
+    起点取**不越过它**的最后一个锚点：锚点标的是一行的起始位置，落在行中间的
+    字属于上一个锚点那一行。终点同理，取仍在区间内的最后一行。
+    """
+    if not anchors:
+        return None
+    lo = None
+    for a in anchors:
+        if a["char_offset"] <= start:
+            lo = a["line_ref"]
+        else:
+            break
+    hi = lo
+    for a in anchors:
+        if a["char_offset"] < end:
+            hi = a["line_ref"]
+        else:
+            break
+    # 引文落在第一个锚点之前（卷首无 <lb> 的那几个字）时退到首行，不放弃整次查询。
+    return (lo or anchors[0]["line_ref"], hi or anchors[0]["line_ref"])
+
+
+@router.get("/source", response_model=CommentarySource)
+async def source(
+    text_id: int = Query(..., description="注疏在 fojin 的书 id"),
+    juan: int = Query(..., ge=1),
+    chunk_index: int | None = Query(None, ge=0, description="引文块序号；与 q 二选一"),
+    q: str | None = Query(None, min_length=2, max_length=500, description="注文原文片段"),
+    limit: int = Query(svc.DEFAULT_LIMIT, ge=1, le=svc.MAX_LIMIT),
+    db: AsyncSession = Depends(get_db),
+):
+    """这段注文在解释哪一句 —— 正查的反方向。
+
+    为什么要有它：读注疏的人最难的是不知道眼前这段在牒哪一句经/论。正查按经文
+    行建索引，回答不了；而对齐数据本来两端都带行号，缺的只是反向索引。
+
+    定位不靠文本匹配，靠行号：注文片段在本卷正文里的字符位置 → `text_line_anchors`
+    的 CBETA 行标 → 包里锚在这几行上的对齐条目。包里只存了每条注的头 400 字，
+    拿它做匹配会漏掉大半部书。
+    """
+
+    def empty(*caveats: str) -> CommentarySource:
+        return CommentarySource(
+            matched=False, text_id=text_id, juan=juan, chunk_index=chunk_index,
+            caveats=list(caveats),
+        )
+
+    if not svc.packages():
+        return empty(_NO_DATA)
+
+    cbeta_id = (
+        await db.execute(
+            sql_text("SELECT cbeta_id FROM buddhist_texts WHERE id = :tid"), {"tid": text_id}
+        )
+    ).scalar()
+    if not cbeta_id:
+        return empty("没有这部书。")
+
+    found = svc.find_commentary(cbeta_id)
+    if not found:
+        return empty(
+            f"{cbeta_id} 不在经注对齐数据里，因此无法反查它注的是哪一句。"
+            "这不等于它没有注释对象——可查的注疏见 /api/commentary/corpus 的 commentaries。"
+        )
+    pkg, work = found[0]
+
+    quote = q
+    if quote is None:
+        if chunk_index is None:
+            return empty("需要 chunk_index 或 q 之一，用来定位你在读哪一块注文。")
+        quote = (
+            await db.execute(_CHUNK, {"tid": text_id, "juan": juan, "idx": chunk_index})
+        ).scalar()
+        if not quote:
+            return empty("这一卷里没有这个引文块。")
+
+    content = (
+        await db.execute(_CONTENT, {"tid": text_id, "juan": juan})
+    ).scalar()
+    if not content:
+        return empty("这一卷没有正文。")
+    at = content.find(quote)
+    if at < 0:
+        # 引文块出自同一份正文，找不到通常意味着正文被重新导入过（异文/换底本）。
+        return empty("这段注文在本卷正文里定位不到，无法换算成行号。")
+
+    anchors = await get_juan_line_anchors(db, text_id, juan)
+    span = _span_lines(anchors, at, at + len(quote))
+    if not span:
+        return empty("这一卷没有 CBETA 行号索引，无法反查。")
+    line_from, line_to = span
+
+    hits = pkg.source(work, line_from, line_to, limit)
+    total = len(pkg.source(work, line_from, line_to, svc.MAX_LIMIT))
+    base_work = pkg.meta["base_work"]
+    located = await _locate(db, [(base_work, h["base_line"]) for h in hits])
+    meta = pkg.comms.get(work) or {}
+
+    def around(base_line: str) -> str:
+        i = pkg.pos.get(base_line)
+        if i is None:
+            return pkg.text.get(base_line, "")
+        return "".join(pkg.text.get(x, "") for x in pkg.ids[max(0, i - 1): i + 2])
+
+    return CommentarySource(
+        matched=bool(hits),
+        text_id=text_id,
+        juan=juan,
+        chunk_index=chunk_index,
+        work=work,
+        work_title=meta.get("title"),
+        tier=meta.get("tier"),
+        line_from=line_from,
+        line_to=line_to,
+        base_work=base_work,
+        base_title=pkg.meta.get("base_title"),
+        passages=[
+            CommentarySourcePassage(
+                base_line=h["base_line"],
+                base_text=around(h["base_line"]),
+                note=h["text"],
+                anchor=h["anchor"],
+                score=h["score"],
+                urn=located.get((base_work, h["base_line"]), (None, None))[0],
+                reader_url=located.get((base_work, h["base_line"]), (None, None))[1],
+            )
+            for h in hits
+        ],
+        total=total,
+        truncated=total > len(hits),
+        caveats=[
+            f"这块注文（{line_from}–{line_to}）牒到 {total} 句，返回 {len(hits)} 句。"
+            if hits else
+            "这块注文里没有对齐出来的牒文。覆盖不完整：一部注疏实际所注，约一半"
+            "没有被对齐出来——「这里没有」不等于「这段没在解释任何一句」。",
+            "base_text 给的是被牒那一行及前后各一行；要读上下文请点 reader_url。",
+            "原文出自 CBETA（CC BY-NC-SA 4.0，非营利使用）。",
         ],
     )

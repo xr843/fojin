@@ -71,6 +71,11 @@ class Package:
     lines: list[dict]
     comms: dict
     by_line: dict = field(default_factory=dict)
+    # 反向：注疏书号 → [(该注在自己书里的行标, note)]，按行标排序。
+    # 正查问「这句经谁注过」，反查问「这段注在解释哪一句」——读注疏的人问的是
+    # 后者，而 by_line 只按经文行建索引，答不了。数据本来就双向（每条对齐两端
+    # 都带行号），缺的只是这个索引。
+    by_anchor: dict = field(default_factory=dict)
     ids: list[str] = field(default_factory=list)
     pos: dict = field(default_factory=dict)
     text: dict = field(default_factory=dict)
@@ -86,8 +91,13 @@ class Package:
         pkg.pos = {x: i for i, x in enumerate(pkg.ids)}
         pkg.text = {ln["id"]: ln["text"] for ln in pkg.lines}
         pkg.by_line = {}
+        pkg.by_anchor = {}
         for n in d["notes"]:
             pkg.by_line.setdefault(n["base_line"], []).append(n)
+            if ref := line_ref(n["anchor"]):
+                pkg.by_anchor.setdefault(n["work"], []).append((ref, n))
+        for rows in pkg.by_anchor.values():
+            rows.sort(key=lambda r: r[0])
         # 全经拼接 + 每个字属于哪一行。CBETA 一行才十来个字，稍长的句子必然
         # 跨行，逐行匹配是找不到的。归一化用 quote_verifier 那一份 —— 全站
         # 「同一句经文」只能有一个定义，顺带让简体查询也能命中繁体原文。
@@ -169,6 +179,72 @@ class Package:
             ),
         )
         return span, ranked[:limit], len(ranked)
+
+    def source(self, work: str, ref_from: str, ref_to: str, limit: int) -> list[dict]:
+        """一段注文（注疏自己的行标区间）在解释论的哪几句。
+
+        行标形如 ``0334b14``：页四位补零、栏 a/b/c、行两位，所以字符串比较就是
+        行序，不必解析。区间两端都含——读者看到的那一块注文，首尾两行的牒文
+        同样是他在读的。
+
+        按论文行去重：一部注疏常把同一句论的牒文分成几处（先牒后释、或科判里
+        再牒一次），逐锚点列出来会让「这块注讲了几句论」答成「这块注有几个锚
+        点」。同一句留置信度最高的那处。
+
+        结果按论文行序，不按置信度——读者要的是「这块注依次讲了哪几句」，那是
+        一条顺着读下去的线，按分数排会打乱它。
+
+        逐条扫而不用二分：单部注疏最多一千多条，查一次的代价远小于一次 DB 往返，
+        换来的是这段逻辑一眼能看懂。
+        """
+        best: dict[str, dict] = {}
+        for ref, n in self.by_anchor.get(work, ()):
+            if ref < ref_from or ref > ref_to:
+                continue
+            cur = best.get(n["base_line"])
+            if cur is None or n["score"] > cur["score"]:
+                best[n["base_line"]] = n
+        ordered = sorted(best.values(), key=lambda n: self.pos.get(n["base_line"], 1 << 30))
+        return ordered[:limit]
+
+
+def available_commentaries() -> list[dict]:
+    """能反查的注疏清单（fojin 书号 + 它注的是哪一部）。
+
+    只列有锚点的——包里的 ``commentaries`` 段是书目，而没有锚点的书反查必然空手，
+    列出来等于给一个点了没反应的入口。
+    """
+    out = []
+    for pkg in packages():
+        for work, rows in pkg.by_anchor.items():
+            meta = pkg.comms.get(work) or {}
+            out.append({
+                "cbeta_id": to_cbeta_id(work),
+                "work": work,
+                "title": meta.get("title"),
+                "tier": meta.get("tier"),
+                "anchors": len(rows),
+                "base_work": pkg.meta.get("base_work"),
+                "base_title": pkg.meta.get("base_title"),
+            })
+    return out
+
+
+def find_commentary(cbeta_id: str) -> list[tuple[Package, str]]:
+    """fojin 书号 → 装着这部注疏的包和它在包里的全号。
+
+    抽屉手里只有 fojin 的 ``cbeta_id``（``T1821``），包里写的是 CBETA 全号
+    （``T41n1821``，带册号）。同一部注疏可能出现在多个包里（它注了不止一部经），
+    所以返回列表而不是单值。
+    """
+    if not cbeta_id:
+        return []
+    return [
+        (pkg, work)
+        for pkg in packages()
+        for work in pkg.by_anchor
+        if to_cbeta_id(work) == cbeta_id
+    ]
 
 
 @lru_cache(maxsize=1)

@@ -8,6 +8,8 @@ import CitationDrawer, { type CitationTarget } from "./CitationDrawer";
 import {
   getChunkContext,
   getChunkAlignment,
+  getCommentaryCorpus,
+  getCommentarySource,
   type ChunkContextItem,
 } from "../api/client";
 
@@ -48,10 +50,14 @@ afterAll(() => {
 vi.mock("../api/client", () => ({
   getChunkContext: vi.fn(),
   getChunkAlignment: vi.fn(),
+  getCommentaryCorpus: vi.fn(),
+  getCommentarySource: vi.fn(),
 }));
 
 const mockContext = vi.mocked(getChunkContext);
 const mockAlignment = vi.mocked(getChunkAlignment);
+const mockCorpus = vi.mocked(getCommentaryCorpus);
+const mockSource = vi.mocked(getCommentarySource);
 
 const TARGET: CitationTarget = {
   textId: 1558,
@@ -80,6 +86,8 @@ function renderDrawer(overrides: Partial<React.ComponentProps<typeof CitationDra
 beforeEach(() => {
   vi.clearAllMocks();
   mockAlignment.mockResolvedValue({ parallels: [] } as never);
+  // 默认：这部书不在经注对齐语料里，抽屉不该去问反查。
+  mockCorpus.mockResolvedValue({ sutras: [], commentaries: [], caveats: [] } as never);
 });
 
 // 语言是 i18n 单例上的全局状态：切过 zh-Hant 的用例必须还原，否则会漏进同一
@@ -492,5 +500,102 @@ describe("CitationDrawer — Esc 关闭", () => {
     } finally {
       wrap.remove();
     }
+  });
+});
+
+
+// ------------------------------------------------ 注疏反查（这段注在解释哪一句）
+
+describe("注疏反查", () => {
+  const CORPUS = {
+    sutras: [],
+    commentaries: [
+      { cbeta_id: "T1821", work: "T41n1821", title: "俱舍論記", tier: "A",
+        anchors: 900, base_work: "T29n1558", base_title: "阿毘達磨俱舍論", text_id: 1558 },
+    ],
+    caveats: [],
+  };
+
+  beforeEach(() => {
+    mockContext.mockResolvedValue({
+      text_id: 1558, juan_num: 16, title_zh: "俱舍論記",
+      center_chunk_index: 7, radius: 2,
+      chunks: [chunk(7, "論曰：如是已說隨眠并纏", true)],
+      has_more_before: false, has_more_after: false,
+    } as never);
+  });
+
+  it("读注疏时，显示它在解释的那几句论文", async () => {
+    mockCorpus.mockResolvedValue(CORPUS as never);
+    mockSource.mockResolvedValue({
+      matched: true, text_id: 1558, juan: 16, chunk_index: 7,
+      work: "T41n1821", work_title: "俱舍論記", tier: "A",
+      line_from: "0272a10", line_to: "0272b05",
+      base_work: "T29n1558", base_title: "阿毘達磨俱舍論",
+      passages: [{
+        base_line: "T29n1558_p0108b21", base_text: "異合說，如示黑耳與吉祥俱",
+        note: "論「是故定有四有為相」，結也。", anchor: "T41n1821_p0272a14", score: 1.0,
+        urn: "fojin:cbeta/T1558.16#p0108b21",
+        reader_url: "https://fojin.app/texts/38/read?juan=16&anchor=p0108b21",
+      }],
+      total: 1, truncated: false, caveats: [],
+    } as never);
+
+    renderDrawer();
+
+    expect(await screen.findByTestId("commentary-source")).toBeTruthy();
+    expect(screen.getByText(/異合說|异合说/)).toBeTruthy();
+    // 后端给的是绝对地址；站内跳转必须退化成 path，否则点出去是不存在的页面
+    const link = screen.getByRole("link", { name: /去读这句原文|去讀這句原文/ });
+    expect(link.getAttribute("href")).toBe("/texts/38/read?juan=16&anchor=p0108b21");
+  });
+
+  it("书不在对齐语料里时，根本不去问反查", async () => {
+    renderDrawer();
+    await screen.findByText(/論曰|论曰/);
+    expect(mockSource).not.toHaveBeenCalled();
+  });
+
+  it("展开与点开都打点——没有它，30 天后的杀死条件无从判定", async () => {
+    const track = vi.fn();
+    (globalThis as unknown as { umami: { track: typeof track } }).umami = { track };
+    mockCorpus.mockResolvedValue(CORPUS as never);
+    mockSource.mockResolvedValue({
+      matched: true, text_id: 1558, juan: 16, chunk_index: 7,
+      work: "T41n1821", work_title: "俱舍論記", tier: "A",
+      line_from: "0272a10", line_to: "0272b05",
+      base_work: "T29n1558", base_title: "阿毘達磨俱舍論",
+      passages: [{
+        base_line: "T29n1558_p0108b21", base_text: "異合說，如示黑耳與吉祥俱",
+        note: "結也。", anchor: "T41n1821_p0272a14", score: 1.0, urn: null,
+        reader_url: "https://fojin.app/texts/38/read?juan=16&anchor=p0108b21",
+      }],
+      total: 1, truncated: false, caveats: [],
+    } as never);
+
+    renderDrawer();
+    await screen.findByTestId("commentary-source");
+    await waitFor(() =>
+      expect(track).toHaveBeenCalledWith("commentary_source", { text_id: 1558, lines: 1 }),
+    );
+
+    fireEvent.click(screen.getByRole("link", { name: /去读这句原文|去讀這句原文/ }));
+    expect(track).toHaveBeenCalledWith("commentary_source_open", { text_id: 1558 });
+    delete (globalThis as unknown as { umami?: unknown }).umami;
+  });
+
+  it("这块注文没有对齐出牒文时，不显示空面板", async () => {
+    mockCorpus.mockResolvedValue(CORPUS as never);
+    mockSource.mockResolvedValue({
+      matched: false, text_id: 1558, juan: 16, chunk_index: 7,
+      work: null, work_title: null, tier: null, line_from: null, line_to: null,
+      base_work: null, base_title: null, passages: [], total: 0, truncated: false,
+      caveats: ["这块注文里没有对齐出来的牒文。"],
+    } as never);
+
+    renderDrawer();
+    await screen.findByText(/論曰|论曰/);
+    await waitFor(() => expect(mockSource).toHaveBeenCalled());
+    expect(screen.queryByTestId("commentary-source")).toBeNull();
   });
 });
