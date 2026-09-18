@@ -582,3 +582,15 @@ async def test_source_endpoint_says_so_when_the_book_has_no_alignment(source_cli
     d = r.json()
     assert d["matched"] is False
     assert any("不等于" in c for c in d["caveats"])
+
+
+@pytest.mark.asyncio
+async def test_corpus_carries_fojin_text_ids(source_client):
+    """抽屉手里只有 text_id。没有这一列，它只能对每条引文都试一次反查。"""
+    r = await source_client.get("/api/commentary/corpus")
+    assert r.status_code == 200
+    d = r.json()
+    assert [c["cbeta_id"] for c in d["commentaries"]] == ["F0100", "X0461"]
+    # 假库里只有 T0235 这一部，所以注疏侧查不到 —— 查不到就留 None，不要瞎填
+    assert d["sutras"][0]["text_id"] == 7
+    assert all(c["text_id"] is None for c in d["commentaries"])
