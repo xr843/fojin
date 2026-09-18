@@ -117,12 +117,34 @@ async def _locate(
 
 
 @router.get("/corpus", response_model=CorpusInfo)
-async def corpus():
-    """哪些经有经注对读数据。"""
+async def corpus(db: AsyncSession = Depends(get_db)):
+    """哪些经有经注对读数据。
+
+    每条都带上 fojin 的 ``text_id``：调用方（抽屉）手里只有 text_id，没有它就得
+    为每一条引文都试一次查询，而绝大多数引文并不在这个语料里。
+    """
     sutras = svc.available()
+    commentaries = svc.available_commentaries()
+    want = {svc.to_cbeta_id(s["base_work"]) for s in sutras}
+    want |= {c["cbeta_id"] for c in commentaries}
+    ids: dict[str, int] = {}
+    if cbeta_ids := [c for c in want if c]:
+        ids = {
+            r[0]: r[1]
+            for r in (
+                await db.execute(
+                    sql_text("SELECT cbeta_id, id FROM buddhist_texts WHERE cbeta_id = ANY(:ids)"),
+                    {"ids": cbeta_ids},
+                )
+            ).fetchall()
+        }
+    for s in sutras:
+        s["text_id"] = ids.get(svc.to_cbeta_id(s["base_work"]))
+    for c in commentaries:
+        c["text_id"] = ids.get(c["cbeta_id"])
     return CorpusInfo(
         sutras=sutras,
-        commentaries=svc.available_commentaries(),
+        commentaries=commentaries,
         caveats=[_NO_DATA] if not sutras else [
             "对齐由程序产出、非人工校订；tier A/B/C 是该部注疏的质检档次。",
             "覆盖不完整：一部注疏实际所注，约一半没有被对齐出来。列出的注家"

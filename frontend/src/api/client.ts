@@ -2622,3 +2622,77 @@ export async function getMasters(): Promise<MasterProfile[]> {
   const { data } = await api.get<{ masters: MasterProfile[] }>("/chat/masters");
   return data.masters;
 }
+
+// --- 经注对读（Commentary） ---
+//
+// 抽屉用两条：corpus 说「哪些书有数据」（每条带 fojin text_id，所以判定在本地
+// 做，不必为每条引文都试一次），source 回答「这段注在解释哪一句」。
+
+export interface CommentaryCorpusSutra {
+  base_work: string;
+  base_title: string | null;
+  commentary_count: number | null;
+  line_coverage_pct: number | null;
+  text_id: number | null;
+}
+
+export interface CommentaryCorpusCommentary {
+  cbeta_id: string | null;
+  work: string;
+  title: string | null;
+  tier: string | null;
+  anchors: number;
+  base_work: string | null;
+  base_title: string | null;
+  text_id: number | null;
+}
+
+export interface CommentaryCorpus {
+  sutras: CommentaryCorpusSutra[];
+  commentaries: CommentaryCorpusCommentary[];
+  caveats: string[];
+}
+
+export async function getCommentaryCorpus(): Promise<CommentaryCorpus> {
+  const { data } = await api.get<CommentaryCorpus>("/commentary/corpus");
+  return data;
+}
+
+export interface CommentarySourcePassage {
+  base_line: string;
+  base_text: string | null;
+  note: string;
+  anchor: string;
+  score: number;
+  urn: string | null;
+  reader_url: string | null;
+}
+
+export interface CommentarySource {
+  matched: boolean;
+  text_id: number;
+  juan: number;
+  chunk_index: number | null;
+  work: string | null;
+  work_title: string | null;
+  tier: string | null;
+  line_from: string | null;
+  line_to: string | null;
+  base_work: string | null;
+  base_title: string | null;
+  passages: CommentarySourcePassage[];
+  total: number;
+  truncated: boolean;
+  caveats: string[];
+}
+
+export async function getCommentarySource(
+  textId: TextId | number,
+  juanNum: number,
+  chunkIndex: number,
+): Promise<CommentarySource> {
+  const { data } = await api.get<CommentarySource>("/commentary/source", {
+    params: { text_id: textId, juan: juanNum, chunk_index: chunkIndex },
+  });
+  return data;
+}
