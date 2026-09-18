@@ -378,6 +378,16 @@ export default function CitationDrawer({ target, onClose }: Props) {
     retry: false,
   });
 
+  // 埋点：这功能上线时定了杀死条件（30 天内展开不足 20 次就停止扩语料），
+  // 没有这两个事件就无从判定。按 target + 是否命中触发一次，面板重渲染不重复计。
+  const shown = source?.matched && (source.passages.length ?? 0) > 0;
+  useEffect(() => {
+    if (!shown || !target) return;
+    if (typeof umami !== "undefined") {
+      umami.track("commentary_source", { text_id: target.textId, lines: source?.total ?? 0 });
+    }
+  }, [shown, target, source?.total]);
+
   const dedupedChunks = useMemo(
     () =>
       data
@@ -580,7 +590,18 @@ export default function CitationDrawer({ target, onClose }: Props) {
                         {localizeHan(p.base_text || "", i18n.language)}
                       </div>
                       {path && (
-                        <Link to={path} onClick={onClose} style={{ fontSize: 12 }}>
+                        <Link
+                          to={path}
+                          onClick={() => {
+                            if (typeof umami !== "undefined" && target) {
+                              umami.track("commentary_source_open", {
+                                text_id: target.textId,
+                              });
+                            }
+                            onClose();
+                          }}
+                          style={{ fontSize: 12 }}
+                        >
                           {t("reader.citation.source_open")}
                         </Link>
                       )}

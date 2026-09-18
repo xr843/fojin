@@ -556,6 +556,34 @@ describe("注疏反查", () => {
     expect(mockSource).not.toHaveBeenCalled();
   });
 
+  it("展开与点开都打点——没有它，30 天后的杀死条件无从判定", async () => {
+    const track = vi.fn();
+    (globalThis as unknown as { umami: { track: typeof track } }).umami = { track };
+    mockCorpus.mockResolvedValue(CORPUS as never);
+    mockSource.mockResolvedValue({
+      matched: true, text_id: 1558, juan: 16, chunk_index: 7,
+      work: "T41n1821", work_title: "俱舍論記", tier: "A",
+      line_from: "0272a10", line_to: "0272b05",
+      base_work: "T29n1558", base_title: "阿毘達磨俱舍論",
+      passages: [{
+        base_line: "T29n1558_p0108b21", base_text: "異合說，如示黑耳與吉祥俱",
+        note: "結也。", anchor: "T41n1821_p0272a14", score: 1.0, urn: null,
+        reader_url: "https://fojin.app/texts/38/read?juan=16&anchor=p0108b21",
+      }],
+      total: 1, truncated: false, caveats: [],
+    } as never);
+
+    renderDrawer();
+    await screen.findByTestId("commentary-source");
+    await waitFor(() =>
+      expect(track).toHaveBeenCalledWith("commentary_source", { text_id: 1558, lines: 1 }),
+    );
+
+    fireEvent.click(screen.getByRole("link", { name: /去读这句原文|去讀這句原文/ }));
+    expect(track).toHaveBeenCalledWith("commentary_source_open", { text_id: 1558 });
+    delete (globalThis as unknown as { umami?: unknown }).umami;
+  });
+
   it("这块注文没有对齐出牒文时，不显示空面板", async () => {
     mockCorpus.mockResolvedValue(CORPUS as never);
     mockSource.mockResolvedValue({
