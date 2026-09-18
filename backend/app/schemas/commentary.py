@@ -8,7 +8,13 @@ wrote is not aligned — so a response that reads as exhaustive would be a lie.
 
 from pydantic import BaseModel
 
-__all__ = ["CommentaryHit", "CorpusInfo", "PassageCommentaries"]
+__all__ = [
+    "CommentaryHit",
+    "CommentarySource",
+    "CommentarySourcePassage",
+    "CorpusInfo",
+    "PassageCommentaries",
+]
 
 
 class CommentaryHit(BaseModel):
@@ -52,8 +58,46 @@ class PassageCommentaries(BaseModel):
     caveats: list[str] = []
 
 
+class CommentarySourcePassage(BaseModel):
+    """一段注文牒到的一句经/论。"""
+
+    base_line: str
+    # 被牒的那一行及其前后各一行 —— CBETA 一行才十来个字，单给一行多半是半句话。
+    base_text: str | None = None
+    note: str
+    anchor: str
+    score: float
+    urn: str | None = None
+    reader_url: str | None = None
+
+
+class CommentarySource(BaseModel):
+    """这段注文在解释哪一句 —— 正查（经文→各家注）的反方向。"""
+
+    matched: bool
+    text_id: int
+    juan: int
+    chunk_index: int | None = None
+    # 注疏侧：这块注文是谁的、落在它自己书里的哪几行。
+    work: str | None = None
+    work_title: str | None = None
+    tier: str | None = None
+    line_from: str | None = None
+    line_to: str | None = None
+    # 经论侧：它注的是哪一部。
+    base_work: str | None = None
+    base_title: str | None = None
+    passages: list[CommentarySourcePassage] = []
+    total: int = 0
+    truncated: bool = False
+    caveats: list[str] = []
+
+
 class CorpusInfo(BaseModel):
     """哪些经有经注对读数据 —— 问之前先知道能问什么。"""
 
     sutras: list[dict] = []
+    # 哪些注疏可以反查（fojin 书号），抽屉据此决定要不要问。放在这里是为了让
+    # 前端一次取到、就地判断，而不是每开一条引文都去试一次反查接口。
+    commentaries: list[dict] = []
     caveats: list[str] = []
