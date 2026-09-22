@@ -245,6 +245,30 @@ _CONTENT = sql_text(
 )
 
 
+def _locate_ignoring_whitespace(content: str, quote: str) -> tuple[int, int] | None:
+    """引文块在本卷正文里的字符区间，忽略换行位置的差异。
+
+    ``text_embeddings.chunk_text`` 与 ``text_contents.content`` 出自同一份正文，
+    但**换行位置不同** —— CBETA 的硬换行在两处存法不一样。所以精确子串匹配
+    ``content.find(quote)`` 会大面积假阴性：2026-09-22 在生产上抽 160 条俱舍系
+    注疏引文实测，**95% 走到「定位不到」**，反查对二十分之十九的引文是哑的，
+    而且失败是静默的（界面只说定位不到）。改成这里的忽略空白定位后，端点给出
+    结果的比例 **5% → 36%**。
+
+    返回的是**原文**偏移而非去空白后的偏移：下游 ``_span_lines`` 要拿它去比
+    ``text_line_anchors`` 的 ``char_offset``，那套下标建在原文上。
+    """
+    kept = [i for i, ch in enumerate(content) if not ch.isspace()]
+    flat = "".join(content[i] for i in kept)
+    needle = "".join(ch for ch in quote if not ch.isspace())
+    if not needle:
+        return None
+    at = flat.find(needle)
+    if at < 0:
+        return None
+    return kept[at], kept[at + len(needle) - 1] + 1
+
+
 def _span_lines(anchors: list[dict], start: int, end: int) -> tuple[str, str] | None:
     """字符区间 [start, end) 落在哪几行 —— 返回首尾行标。
 
@@ -328,13 +352,15 @@ async def source(
     ).scalar()
     if not content:
         return empty("这一卷没有正文。")
-    at = content.find(quote)
-    if at < 0:
-        # 引文块出自同一份正文，找不到通常意味着正文被重新导入过（异文/换底本）。
+    located = _locate_ignoring_whitespace(content, quote)
+    if located is None:
+        # 引文块出自同一份正文，连忽略空白都找不到，通常意味着正文被重新导入过
+        # （异文/换底本）。只差换行位置的那一类已由 _locate_ignoring_whitespace 兜住。
         return empty("这段注文在本卷正文里定位不到，无法换算成行号。")
+    at, at_end = located
 
     anchors = await get_juan_line_anchors(db, text_id, juan)
-    span = _span_lines(anchors, at, at + len(quote))
+    span = _span_lines(anchors, at, at_end)
     if not span:
         return empty("这一卷没有 CBETA 行号索引，无法反查。")
     line_from, line_to = span

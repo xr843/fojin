@@ -594,3 +594,58 @@ async def test_corpus_carries_fojin_text_ids(source_client):
     # 假库里只有 T0235 这一部，所以注疏侧查不到 —— 查不到就留 None，不要瞎填
     assert d["sutras"][0]["text_id"] == 7
     assert all(c["text_id"] is None for c in d["commentaries"])
+
+
+# --- 引文块与正文只差换行位置 -------------------------------------------------
+
+
+@pytest_asyncio.fixture
+async def rewrapped_source_client(reverse_loaded):
+    """生产实况：chunk_text 与 text_contents 的 content 出自同一份正文，
+    但换行位置不同（CBETA 的硬换行两处存法不一样）。
+
+    2026-09-22 在生产上抽 160 条注疏引文实测：精确子串 ``content.find(quote)``
+    对其中 **95%** 返回 -1，端点一路退到「定位不到」—— 也就是说反查对二十分之
+    十九的引文是哑的，而且失败是静默的。改成忽略空白定位后覆盖率 5% → 36%。
+    """
+    from fastapi import FastAPI
+
+    from app.api import commentary as api
+    from app.database import get_db
+
+    raw = "注文甲" * 10 + "注文乙" * 10
+    # 正文在这两处断行，引文块在另一处断行 —— 两边都是同一段字，只是换行不同。
+    content = raw[:12] + "\n" + raw[12:28] + "\n\n" + raw[28:]
+    quote_raw = raw[5:35]
+    chunk = quote_raw[:7] + "\n" + quote_raw[7:]
+    assert chunk not in content, "这个 fixture 必须造出精确匹配找不到的情形"
+
+    db = _ReverseDB(
+        juan_content=content,
+        chunk=chunk,
+        anchors=[{"char_offset": o, "line_ref": r} for o, r in
+                 ((0, "0334b10"), (15, "0334b12"), (30, "0334b14"), (45, "0334c02"))],
+    )
+
+    async def fake_db():
+        yield db
+
+    app = FastAPI()
+    app.include_router(api.router, prefix="/api")
+    app.dependency_overrides[get_db] = fake_db
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+
+
+@pytest.mark.asyncio
+async def test_source_locates_a_chunk_whose_line_breaks_differ_from_the_juan(
+    rewrapped_source_client,
+):
+    r = await rewrapped_source_client.get(
+        "/api/commentary/source?text_id=99&juan=1&chunk_index=0"
+    )
+    assert r.status_code == 200
+    d = r.json()
+    assert d["matched"] is True, d["caveats"]
+    assert d["passages"], "换行位置不同不该让反查退化成空结果"
