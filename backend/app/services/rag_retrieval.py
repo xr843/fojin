@@ -782,6 +782,54 @@ def apply_canonical_prior(results: list[dict], *, scoped: bool = False) -> list[
     )
 
 
+def _has_cjk(text: str) -> bool:
+    """Whether the string contains a CJK ideograph (same range as _cjk_overlap)."""
+    return any("一" <= c <= "鿿" for c in text or "")
+
+
+def drop_uncitable_foreign_sources(query: str, results: list[dict]) -> list[dict]:
+    """汉文提问时，丢掉拿不出汉文引用的外语主来源。
+
+    答案用 ``【《经名》第N卷】`` 引用。pi/bo/sa 的 6,349 部文本**无一**有汉字题名
+    （lzh 的 4,182 部则全部有），所以它们进了主来源就只能产出
+    ``【《Toh 134 (Kangyur)》第1卷】`` 这种对读者毫无用处的引用——生产 60 天实测
+    71 条回答里真的出现了，另有 222 条（7.1%）五条引用全是这类条目。
+
+    这不是跨藏对读：那条路走 ``parallel_chunks`` / ``mitra_parallels`` 两个独立字段，
+    挂在 lzh 主来源上，不经过这里。这里挡的是「中文检索失败后拿外语条目冒充出处」。
+
+    根因在索引层（HNSW 图对部分查询够不到真正的最近邻，lzh 臂返回 0 行），
+    **但这条护栏与索引怎么修无关**：检索失败时系统不该假装成功。全部被丢掉时
+    返回空列表，让上层走诚实的无来源路径（prompt_builder 不拼检索块、
+    trust_state 记 no_sources），而不是让模型对着藏文编号编出处。
+
+    非汉文提问（英文问巴利经典）原样返回——那时 SuttaCentral 条目正是该给的东西。
+    """
+    if not results or not _has_cjk(query):
+        return results
+    kept = [r for r in results if (r.get("lang") or "lzh") == "lzh"]
+    if len(kept) == len(results):
+        return results
+    if not kept:
+        # 埋点：没有它就只能靠翻库抽样，看不到真实发生率。WARNING 而非 INFO —— 这
+        # 一条代表「这次提问的检索完全失败了」，是要被计数和告警的，不是流水账。
+        logger.warning(
+            "uncitable_foreign_only: 汉文提问的主来源全是无汉文题名的外语条目，已全部丢弃 "
+            "(query=%r, dropped=%d, langs=%s, titles=%s)",
+            query[:60],
+            len(results),
+            sorted({(r.get("lang") or "?") for r in results}),
+            [(r.get("title_zh") or "")[:24] for r in results[:5]],
+        )
+    else:
+        logger.info(
+            "uncitable_foreign_partial: 丢掉 %d 条无汉文题名的外语来源，保留 %d 条汉文",
+            len(results) - len(kept),
+            len(kept),
+        )
+    return kept
+
+
 async def _rerank(query: str, results: list[dict]) -> list[dict]:
     """Rerank results using API cross-encoder if configured, else keyword-based."""
     if not results:
@@ -1006,6 +1054,18 @@ async def retrieve_rag_context(
                 _vsearch(PARALLEL_BO_K, ["bo"]),
                 _ssearch(),
             )
+            # 根因埋点：汉文提问而 lzh 臂一行都没返回 —— 这不是「语料里没有」，而是
+            # HNSW 图对这条 query 够不到汉文区域（2026-09-22 实测：ef_search 从 100
+            # 提到 1000 也一行不出，而精确扫描的真正最近邻是 0.596 的《釋門正統》)。
+            # 下游的 drop_uncitable_foreign_sources 只在「有外语来源被丢掉」时打点，
+            # 三条臂全空时它拿到空列表直接早退，所以真实发生率只能在这里数。
+            if not lzh_hits and _has_cjk(search_query):
+                logger.warning(
+                    "lzh_arm_empty: 汉文提问的中文检索臂返回 0 行 (query=%r, pi=%d, bo=%d)",
+                    query[:60],
+                    len(pi_hits),
+                    len(bo_hits),
+                )
             text_results = _merge_with_alignment_sync(lzh_hits, pi_hits, bo_hits)
         else:
             text_results = await similarity_search(
@@ -1034,6 +1094,13 @@ async def retrieve_rag_context(
         # to let a root sutra sitting at rank 6-15 take a served slot from the
         # commentary above it.
         reranked = apply_canonical_prior(reranked, scoped=bool(scope_text_ids))
+
+        # 汉文提问不得拿无汉文题名的外语条目当主来源 —— 必须在截断**之前**，
+        # 否则外语条目先占掉 top-5 的格子，排在第 6 位往后的汉文来源永远上不来。
+        # 判语言用 search_query（含 prev_query）而非 query：多轮会话里的追问可能一个
+        # 汉字都没有（「ok?」），但整场对话是中文的，答案也是中文的。检索 embedding
+        # 本来就是用 search_query 生成的，护栏与它同源才不会出现「埋点报了没拦住」。
+        reranked = drop_uncitable_foreign_sources(search_query, reranked)
 
         # Cap at MAX_CONTEXT_CHUNKS (fewer but more relevant after reranking)
         search_results = reranked[:MAX_CONTEXT_CHUNKS]
