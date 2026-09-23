@@ -1,6 +1,6 @@
 {
   "version": "1.4",
-  "description": "FoJin AI Chat evaluation test set — 90 questions across 6 categories | retrieval_type: attribution (来源身份即答案，查表问题) / passage (义理内容，相似度问题) / advisory (无特定典籍可依，只评答案质量) | gold_sources[].relevance: 2=正解, 1=等价可接受来源 —— strict 指标只认 2，lenient 认 1 和 2 | v1.4: 补录 37 条等价来源（仅 relevance=1，严格口径与 v1.3 逐题相同），补录规则与对称裁决要求见 eval/README.md",
+  "description": "FoJin AI Chat evaluation test set — 90 questions across 6 categories | retrieval_type: attribution (来源身份即答案，查表问题) / passage (义理内容，相似度问题) / advisory (无特定典籍可依，只评答案质量) | gold_sources[].relevance: 2=正解, 1=等价可接受来源 —— strict 指标只认 2，lenient 认 1 和 2 | v1.4: 补录 43 条等价来源（仅 relevance=1，严格口径与 v1.3 逐题相同），补录规则与对称裁决要求见 eval/README.md",
   "created": "2026-04-01",
   "questions": [
     {
@@ -1206,6 +1206,14 @@
         {
           "title": "大唐西域記",
           "relevance": 1
+        },
+        {
+          "title": "根本說一切有部毘奈耶雜事",
+          "relevance": 1
+        },
+        {
+          "title": "大唐大慈恩寺三藏法師傳",
+          "relevance": 1
         }
       ]
     },
@@ -1232,6 +1240,10 @@
         },
         {
           "title": "淨土聖賢錄",
+          "relevance": 1
+        },
+        {
+          "title": "淨土往生傳",
           "relevance": 1
         }
       ]
@@ -1320,6 +1332,10 @@
         },
         {
           "title": "大乘莊嚴經論",
+          "relevance": 1
+        },
+        {
+          "title": "攝大乘論釋",
           "relevance": 1
         }
       ]
@@ -1897,6 +1913,10 @@
         {
           "title": "(重雕補註)禪苑清規",
           "relevance": 1
+        },
+        {
+          "title": "天台智者大師禪門口訣",
+          "relevance": 1
         }
       ]
     },
@@ -2140,6 +2160,10 @@
         },
         {
           "title": "金剛般若波羅蜜經",
+          "relevance": 1
+        },
+        {
+          "title": "無量義經",
           "relevance": 1
         }
       ]
