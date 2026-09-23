@@ -4,6 +4,8 @@ import type { StyleSpecification } from "maplibre-gl";
 import DeckGL from "@deck.gl/react";
 import { ScatterplotLayer, ArcLayer } from "@deck.gl/layers";
 import type { PickingInfo } from "@deck.gl/core";
+import { setWorkerUrl } from "maplibre-gl";
+import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -11,6 +13,16 @@ import { escapeHtml } from "../../utils/sanitize";
 import { useEffectiveTheme } from "../../hooks/useTheme";
 import { typeColors } from "./typeColors";
 import type { KGGeoEntity, KGLineageArc } from "../../api/client";
+
+// maplibre 6 拆出了独立的 worker 模块，运行时按 `import.meta.url` 的兄弟路径去取
+// `maplibre-gl-worker.mjs`。打包后主包是 `assets/maplibre-gl-<hash>.js`，而没有任何
+// 静态 import 指向那个 worker，vite 不会产出它 —— 于是 404、地图初始化失败、整个
+// 路由崩进 RouteErrorBoundary。这正是 2026-09-22 的事故（#1239 → 回滚 #1249）。
+//
+// 用官方的 `setWorkerUrl` 接管这次解析，URL 来自 vite 的 worker 打包管线
+// （`?worker&url`），所以 worker 自己那条 `./maplibre-gl-shared.mjs` 依赖也会被一起
+// 打进去，且带内容哈希。必须在任何 Map 实例化之前调用，故置于模块顶层。
+setWorkerUrl(maplibreWorkerUrl);
 
 const INITIAL_VIEW_STATE = {
   longitude: 115,
