@@ -31,6 +31,10 @@ _CASES = [
     # Real key failure — 401 AND an auth signal in the body
     ("Invalid API key provided", 401, "API Key 无效"),
     ("api key 无效", 401, "API Key 无效"),
+    # Fixed-temperature rejection (Kimi Code coding endpoint etc.) — 400 AND
+    # "temperature" in the body; must beat the generic HTTP-400 fallback
+    ('{"error": {"message": "invalid temperature: only 1 is allowed for this model"}}', 400, "temperature"),
+    ("invalid temperature", 400, "temperature"),
     # Status-only fallbacks (body didn't match any signal)
     ("something opaque", 401, "401（认证失败）"),
     ("not found here", 404, "404"),
@@ -65,3 +69,11 @@ def test_byok_error_message_401_without_auth_signal_is_not_key_invalid():
     msg = _byok_error_message(_status_error("upstream hiccup", 401), 401)
     assert "401（认证失败）" in msg
     assert msg != "您的 API Key 无效或已过期，请在个人中心重新配置。"
+
+
+def test_byok_error_message_temperature_branch_requires_400():
+    # "temperature" in a non-400 body must NOT trigger the temperature hint —
+    # the branch is gated on status == 400.
+    msg = _byok_error_message(_status_error("temperature exploded", 500), 500)
+    assert "HTTP 500" in msg
+    assert "不接受自定义 temperature" not in msg

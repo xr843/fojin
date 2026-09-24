@@ -30,6 +30,15 @@ const PROVIDER_MODELS: Record<string, Array<{ value: string; label: string; hint
     { value: "kimi-k3", label: "Kimi K3", hintKey: "profile.modelHint.flagship" },
     { value: "kimi-k2.6", label: "Kimi K2.6", hintKey: "profile.modelHint.midrange" },
   ],
+  // Kimi Code 会员订阅端点（OpenAI 兼容，走会员额度，不接受自定义 temperature ——
+  // 后端对 kimi_code 不携带该字段）。模型 ID 以官方文档为准：
+  // https://www.kimi.com/code/docs/en/
+  kimi_code: [
+    { value: "kimi-for-coding", label: "K2.8 Preview", hintKey: "profile.modelHint.main" },
+    { value: "kimi-for-coding-highspeed", label: "K2.7 Code HighSpeed", hintKey: "profile.modelHint.economy_fast" },
+    { value: "k3", label: "K3", hintKey: "profile.modelHint.flagship" },
+    { value: "k3-256k", label: "K3 256K", hintKey: "profile.modelHint.quota_saver" },
+  ],
   zhipu: [
     { value: "glm-5.2", label: "GLM-5.2", hintKey: "profile.modelHint.flagship" },
     { value: "glm-5.1", label: "GLM-5.1", hintKey: "profile.modelHint.midrange" },
@@ -67,6 +76,7 @@ const PROVIDERS = [
   { value: "dashscope", labelKey: "profile.provider.dashscope" },
   { value: "zhipu", labelKey: "profile.provider.zhipu" },
   { value: "moonshot", labelKey: "profile.provider.moonshot" },
+  { value: "kimi_code", labelKey: "profile.provider.kimi_code" },
   { value: "doubao", labelKey: "profile.provider.doubao" },
   { value: "minimax", labelKey: "profile.provider.minimax" },
   { value: "stepfun", labelKey: "profile.provider.stepfun" },

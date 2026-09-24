@@ -27,6 +27,11 @@ PROVIDER_URLS = {
     "dashscope": "https://dashscope.aliyuncs.com/compatible-mode/v1",
     "zhipu": "https://open.bigmodel.cn/api/paas/v4",
     "moonshot": "https://api.moonshot.cn/v1",
+    # Kimi Code 会员订阅 Key（sk-kimi- 前缀）只在 coding 端点有效，开放平台
+    # api.moonshot.cn 对它一律回 401（issue #1253）。模型 ID 见
+    # https://www.kimi.com/code/docs/en/ （k3 / k3-256k / kimi-for-coding /
+    # kimi-for-coding-highspeed，OpenAI 兼容）。
+    "kimi_code": "https://api.kimi.com/coding/v1",
     "doubao": "https://ark.cn-beijing.volces.com/api/v3",
     "minimax": "https://api.minimax.chat/v1",
     "stepfun": "https://api.stepfun.com/v1",
@@ -53,6 +58,8 @@ PROVIDER_DEFAULT_MODELS = {
     "dashscope": "qwen3.7-plus",
     "zhipu": "glm-5.2",
     "moonshot": "kimi-k3",
+    # 默认取会员门槛最低的 kimi-for-coding（Andante 档可用）；k3 要 Moderato 及以上。
+    "kimi_code": "kimi-for-coding",
     "doubao": "doubao-seed-2-1-pro-260628",   # 1.5 已落后两代
     "minimax": "MiniMax-Text-01",
     "stepfun": "step-1-8k",
@@ -72,6 +79,24 @@ PROVIDER_DEFAULT_MODELS = {
 
 # Anthropic uses a different API format; detect by provider or URL
 ANTHROPIC_API_VERSION = "2023-06-01"
+
+# Kimi Code 会员端点只接受 temperature=1 或不携带 —— 我们固定发 0.7/0.3，它回
+# 400 "invalid temperature: only 1 is allowed for this model"（issue #1253 实测
+# 2026-09-24）。preset provider 和「自定义」填该端点两种路径都要覆盖，所以按
+# provider 或 URL 双重判定。不携带而不是发 temperature=1：1 是端点当前的实现
+# 细节，不携带才是协议上"用上游默认"的稳妥写法。
+_NO_TEMPERATURE_PROVIDERS = frozenset({"kimi_code"})
+_NO_TEMPERATURE_URL_MARKERS = ("api.kimi.com/coding", "api.kimi.ai/coding")
+
+
+def openai_temperature_kwargs(provider: str | None, api_url: str, temperature: float) -> dict:
+    """端点不接受固定采样温度时返回空 dict，否则返回 {"temperature": t}。
+
+    调用方 ``**`` 展开进 OpenAI 兼容请求体；返回空 dict 即不携带该字段。
+    """
+    if provider in _NO_TEMPERATURE_PROVIDERS or any(m in api_url for m in _NO_TEMPERATURE_URL_MARKERS):
+        return {}
+    return {"temperature": temperature}
 
 
 def _is_anthropic(api_url: str, provider: str | None = None) -> bool:
@@ -258,6 +283,13 @@ def _byok_error_message(exc: Exception, status: int | None) -> str:
                     "authentication", "unauthorized", "api key 无效", "key 无效")
     if status == 401 and any(sig in body_low for sig in (s.lower() for s in auth_signals)):
         return "您的 API Key 无效或已过期，请在个人中心重新配置。"
+
+    # Fixed-temperature rejection — e.g. Kimi Code coding endpoint only accepts
+    # temperature=1 or the field omitted (issue #1253). With the kimi_code preset
+    # we omit it; this branch covers users pointing a "custom" provider at such
+    # an endpoint (and any other upstream with the same restriction).
+    if status == 400 and "temperature" in body_low:
+        return "AI 服务返回 400：该模型不接受自定义 temperature 值（部分端点仅允许固定采样温度），请改用该服务商的推荐预设配置。"
 
     # Status-only fallbacks (couldn't recognize body, but status hints at cause)
     if status == 401:
