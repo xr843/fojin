@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { searchContent, submitFeedback } from "../api/client";
 import { sanitizeHighlight } from "../utils/sanitize";
 import { buildReaderUrl } from "../utils/sourceUrls";
-import { similarQuery, similarQueryChars, SIMILAR_QUERY_MIN, type SelectionContext } from "./ReaderSelectionExtras.types";
+import { similarQuery, similarQueryChars, snippetOf, SIMILAR_QUERY_MIN, type SelectionContext } from "./ReaderSelectionExtras.types";
 
 const SIMILAR_SHOW = 6;
 
@@ -59,10 +59,10 @@ export function SimilarPassages({ text, context }: { text: string; context: Sele
               {h.dynasty ? ` · ${h.dynasty}` : ""}
             </span>
           </div>
-          {h.highlight[0] && (
+          {snippetOf(h.highlight) && (
             <div
               className="reader-similar-snippet"
-              dangerouslySetInnerHTML={{ __html: `…${sanitizeHighlight(h.highlight[0])}…` }}
+              dangerouslySetInnerHTML={{ __html: `…${sanitizeHighlight(snippetOf(h.highlight)!)}…` }}
             />
           )}
         </Link>

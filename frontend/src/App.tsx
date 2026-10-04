@@ -19,7 +19,7 @@ const antdLocales: Record<string, typeof zhCN> = { zh: zhCN, en: enUS, ja: jaJP,
 import HomePage from "./pages/HomePage";
 const SearchPage = lazy(() => import("./pages/SearchPage"));
 const TextDetailPage = lazy(() => import("./pages/TextDetailPage"));
-const TextReaderPage = lazy(() => import("./pages/TextReaderPage"));
+const TextReaderRoute = lazy(() => import("./pages/TextReaderRoute"));
 
 const SourcesPage = lazy(() => import("./pages/SourcesPage"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
@@ -70,7 +70,7 @@ function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/texts/:id" element={<TextDetailPage />} />
-            <Route path="/texts/:id/read" element={<TextReaderPage />} />
+            <Route path="/texts/:id/read" element={<TextReaderRoute />} />
             <Route path="/sources" element={<SourcesPage />} />
             <Route path="/read-aloud" element={<ReadAloudPage />} />
             <Route path="/collections" element={<CollectionsPage />} />
