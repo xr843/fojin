@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReaderDictPopover } from "./ReaderDictPopover";
-import { similarQuery, SIMILAR_QUERY_MAX, type SelectionContext } from "./ReaderSelectionExtras.types";
+import { similarQuery, snippetOf, SIMILAR_QUERY_MAX, type SelectionContext } from "./ReaderSelectionExtras.types";
 import type { DictPopoverState } from "./ReaderDictPopover.types";
 import { searchContent, submitFeedback, type ContentSearchResponse } from "../api/client";
 
@@ -164,5 +164,15 @@ describe("划词浮层：报错", () => {
     fireEvent.click(screen.getByRole("button", { name: "提交勘误" }));
     expect(await screen.findByText("提交失败，请稍后再试")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "提交勘误" })).not.toBeDisabled();
+  });
+});
+
+describe("snippetOf 出处摘要", () => {
+  it("优先取含命中标记的片段，而不是落在卷首题名上的首个片段", () => {
+    expect(snippetOf(["四分律卷第二十一 姚秦罽賓三藏", "佛<em>在舍衛國</em>祇樹"])).toBe("佛<em>在舍衛國</em>祇樹");
+  });
+  it("都没有命中标记时退回首个片段；空数组返回 null", () => {
+    expect(snippetOf(["甲", "乙"])).toBe("甲");
+    expect(snippetOf([])).toBeNull();
   });
 });

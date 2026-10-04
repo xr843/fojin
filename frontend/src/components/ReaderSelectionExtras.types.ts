@@ -30,3 +30,11 @@ export function similarQuery(text: string): string {
 export function similarQueryChars(q: string): number {
   return q.replace(/ /g, "").length;
 }
+
+/**
+ * 摘要取第一个含命中标记的片段：ES 的首个高亮片段可能落在卷首题名/译者行上
+ * （「四分律卷第二十一 / 姚秦罽賓三藏佛陀耶舍」），读者看不出这条为什么算出处。
+ */
+export function snippetOf(highlight: string[]): string | null {
+  return highlight.find((h) => h.includes("<em>")) ?? highlight[0] ?? null;
+}
