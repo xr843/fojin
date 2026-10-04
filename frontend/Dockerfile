@@ -9,7 +9,11 @@ ENV VITE_UMAMI_WEBSITE_ID=$VITE_UMAMI_WEBSITE_ID
 
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm install
+# 生产 VPS 到 npm 源的链路时好时坏（2026-10-04 单次元数据请求 12-13 s，
+# 连续两次部署死在 ECONNRESET），默认 2 次重试撑不住。加大重试与退避，
+# 并关掉 audit/fund 两次额外的网络往返。
+RUN npm install --fetch-retries=6 --fetch-retry-mintimeout=20000 \
+    --fetch-retry-maxtimeout=180000 --no-audit --no-fund
 COPY . .
 RUN npm run build
 
