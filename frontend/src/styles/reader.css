@@ -350,6 +350,17 @@
 .reader-similar-snippet em { font-style: normal; color: var(--fj-accent, #8b6914); font-weight: 600; }
 .reader-similar-all { display: inline-block; margin-top: 6px; font-size: 11px; color: var(--fj-accent, #8b6914); }
 
+.reader-vernacular { max-height: 260px; overflow-y: auto; }
+.reader-vernacular-text { font-size: 13px; line-height: 1.7; color: var(--fj-ink, #333); white-space: pre-wrap; }
+.reader-vernacular-uncertain { margin-top: 4px; font-size: 11.5px; color: #d48806; }
+.reader-vernacular-label {
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--fj-border, #eee);
+  font-size: 10.5px;
+  color: var(--fj-ink-muted, #999);
+}
+
 .reader-report-form { display: flex; flex-direction: column; gap: 6px; }
 .reader-report-where { font-size: 11px; color: var(--fj-ink-muted, #999); }
 .reader-report-note {

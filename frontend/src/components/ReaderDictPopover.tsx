@@ -5,10 +5,10 @@ import { useTranslation } from "react-i18next";
 import { MessageOutlined } from "@ant-design/icons";
 import type { DictGroupedSearchResponse, DictEntry } from "../api/client";
 import { MAX_WORD_LEN, type DictPopoverState } from "./ReaderDictPopover.types";
-import { ReportErrorForm, SimilarPassages } from "./ReaderSelectionExtras";
+import { ReportErrorForm, SimilarPassages, VernacularPanel } from "./ReaderSelectionExtras";
 import type { SelectionContext } from "./ReaderSelectionExtras.types";
 
-type PopoverMode = "dict" | "similar" | "report";
+type PopoverMode = "dict" | "vernacular" | "similar" | "report";
 
 /** 中文释义类辞典优先（释义信息量大），多语对照类短释义靠后 */
 const HIGH_QUALITY_SOURCES = [
@@ -53,7 +53,7 @@ export function ReaderDictPopover({
   const mode: PopoverMode = modeFor.text === state.text ? modeFor.mode : "dict";
   const setMode = (m: PopoverMode) => {
     setModeFor({ text: state.text, mode: m });
-    if (m !== "dict" && typeof umami !== "undefined") {
+    if ((m === "similar" || m === "report") && typeof umami !== "undefined") {
       umami.track(m === "similar" ? "reader_similar" : "reader_report_open", { id: context?.textId ?? 0 });
     }
   };
@@ -102,6 +102,12 @@ export function ReaderDictPopover({
         </button>
       </div>
 
+      {mode === "vernacular" && context && (
+        <div className="reader-dict-popover-body">
+          <VernacularPanel text={state.text} context={context} />
+        </div>
+      )}
+
       {mode === "similar" && context && (
         <div className="reader-dict-popover-body">
           <SimilarPassages text={state.text} context={context} />
@@ -146,6 +152,13 @@ export function ReaderDictPopover({
         </button>
         {context && (
           <>
+            <button
+              type="button"
+              className={`reader-dict-popover-tab${mode === "vernacular" ? " is-active" : ""}`}
+              onClick={() => setMode(mode === "vernacular" ? "dict" : "vernacular")}
+            >
+              {t("reader.vernacular.button")}
+            </button>
             <button
               type="button"
               className={`reader-dict-popover-tab${mode === "similar" ? " is-active" : ""}`}

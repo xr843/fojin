@@ -1242,6 +1242,27 @@ export async function markAllNotificationsRead(): Promise<void> {
   await api.patch("/notifications/read-all");
 }
 
+// --- Reader: AI 白话 ---
+
+export interface VernacularResponse {
+  translation: string;
+  /** 模型自认没把握 */
+  uncertain: boolean;
+  model: string;
+  prompt_version: string;
+  cached: boolean;
+}
+
+export async function getVernacular(payload: {
+  text_id: number;
+  sentence: string;
+  before: string;
+  after: string;
+}): Promise<VernacularResponse> {
+  const { data } = await api.post<VernacularResponse>("/reader/vernacular", payload, { timeout: 45000 });
+  return data;
+}
+
 // --- Feedback ---
 
 export async function submitFeedback(payload: {

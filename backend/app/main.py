@@ -80,6 +80,7 @@ from app.api import (
     knowledge_graph,
     notification,
     og,
+    reader,
     relations,
     research,
     rss,
@@ -577,6 +578,7 @@ app.include_router(source_suggestions.router, prefix="/api")
 
 # Feedback
 app.include_router(feedback.router, prefix="/api")
+app.include_router(reader.router, prefix="/api")
 
 # Admin dashboard
 app.include_router(admin.router, prefix="/api")

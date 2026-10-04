@@ -3,17 +3,27 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReaderDictPopover } from "./ReaderDictPopover";
-import { similarQuery, snippetOf, SIMILAR_QUERY_MAX, type SelectionContext } from "./ReaderSelectionExtras.types";
+import {
+  contextAround,
+  similarQuery,
+  snippetOf,
+  SIMILAR_QUERY_MAX,
+  VERNACULAR_MAX_CHARS,
+  type SelectionContext,
+} from "./ReaderSelectionExtras.types";
 import type { DictPopoverState } from "./ReaderDictPopover.types";
-import { searchContent, submitFeedback, type ContentSearchResponse } from "../api/client";
+import { getVernacular, searchContent, submitFeedback, type ContentSearchResponse } from "../api/client";
+import { AxiosError, type AxiosResponse } from "axios";
 
 vi.mock("../api/client", () => ({
   searchContent: vi.fn(),
   submitFeedback: vi.fn(),
+  getVernacular: vi.fn(),
 }));
 
 const mockSearch = vi.mocked(searchContent);
 const mockFeedback = vi.mocked(submitFeedback);
+const mockVern = vi.mocked(getVernacular);
 
 const CTX: SelectionContext = {
   textId: 7,
@@ -68,6 +78,7 @@ function renderPopover(o: { text?: string; context?: SelectionContext; loggedIn?
 beforeEach(() => {
   mockSearch.mockReset();
   mockFeedback.mockReset();
+  mockVern.mockReset();
 });
 
 describe("similarQuery 全藏出处检索词", () => {
@@ -174,5 +185,66 @@ describe("snippetOf 出处摘要", () => {
   it("都没有命中标记时退回首个片段；空数组返回 null", () => {
     expect(snippetOf(["甲", "乙"])).toBe("甲");
     expect(snippetOf([])).toBeNull();
+  });
+});
+
+describe("contextAround 白话语境", () => {
+  const JUAN = "如是我聞：一時，佛在舍衛國\n祇樹給孤獨園，與大比丘眾千二百五十人俱。爾時，世尊食時";
+  it("忽略空白定位选文（DOM 选区与原文硬换行位置不同）", () => {
+    const { before, after } = contextAround(JUAN, "佛在舍衛國祇樹\n給孤獨園", 5);
+    expect(before).toBe("聞：一時，");
+    expect(after).toBe("，與大比丘");
+  });
+  it("找不到或没有原文时返回空语境，而不是乱取", () => {
+    expect(contextAround(JUAN, "原文裡沒有這句")).toEqual({ before: "", after: "" });
+    expect(contextAround(undefined, "佛在舍衛國")).toEqual({ before: "", after: "" });
+  });
+});
+
+describe("划词浮层：白话", () => {
+  const JUAN = "前文甲乙丙。過去心不可得，現在心不可得，未來心不可得。後文丁戊己。";
+  const SEL = "過去心不可得，現在心不可得，未來心不可得。";
+  const ctx = { ...CTX, juanText: JUAN };
+
+  it("带语境请求，展示译文与「仅供参考」标签", async () => {
+    mockVern.mockResolvedValue({
+      translation: "过去的心找不到，现在的心找不到，未来的心也找不到。",
+      uncertain: false, model: "deepseek-v4-flash", prompt_version: "v1", cached: false,
+    });
+    renderPopover({ text: SEL, context: ctx });
+    fireEvent.click(screen.getByRole("button", { name: "白话" }));
+    expect(await screen.findByText("过去的心找不到，现在的心找不到，未来的心也找不到。")).toBeInTheDocument();
+    expect(screen.getByText(/AI 白话释义 · 仅供参考，以原文为准/)).toBeInTheDocument();
+    expect(mockVern).toHaveBeenCalledWith({ text_id: 7, sentence: SEL, before: "前文甲乙丙。", after: "後文丁戊己。" });
+    expect(screen.queryByText(/没有把握/)).toBeNull();
+  });
+
+  it("模型自认没把握时提示对照原文", async () => {
+    mockVern.mockResolvedValue({ translation: "某译文", uncertain: true, model: "m", prompt_version: "v1", cached: true });
+    renderPopover({ text: SEL, context: ctx });
+    fireEvent.click(screen.getByRole("button", { name: "白话" }));
+    expect(await screen.findByText(/没有把握，请对照原文与注疏/)).toBeInTheDocument();
+  });
+
+  it("选文超长不发请求（后端会 422）", () => {
+    renderPopover({ text: "字".repeat(VERNACULAR_MAX_CHARS + 1), context: ctx });
+    fireEvent.click(screen.getByRole("button", { name: "白话" }));
+    expect(screen.getByText(/选得太长了/)).toBeInTheDocument();
+    expect(mockVern).not.toHaveBeenCalled();
+  });
+
+  it("额度用完（429）与其它失败给出不同提示", async () => {
+    const err429 = new AxiosError("quota", "ERR", undefined, undefined, { status: 429 } as AxiosResponse);
+    mockVern.mockRejectedValueOnce(err429);
+    renderPopover({ text: SEL, context: ctx });
+    fireEvent.click(screen.getByRole("button", { name: "白话" }));
+    expect(await screen.findByText(/今日 AI 白话次数已用完/)).toBeInTheDocument();
+  });
+
+  it("非额度失败：通用失败提示", async () => {
+    mockVern.mockRejectedValueOnce(new Error("503"));
+    renderPopover({ text: SEL, context: ctx });
+    fireEvent.click(screen.getByRole("button", { name: "白话" }));
+    expect(await screen.findByText(/白话释义暂时不可用/)).toBeInTheDocument();
   });
 });
