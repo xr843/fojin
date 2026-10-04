@@ -321,76 +321,6 @@
   text-decoration: underline;
 }
 
-/* 全藏出处 / 报错：与「问小津」同一行的文字按钮 */
-.reader-dict-popover-footer { flex-wrap: wrap; }
-.reader-dict-popover-tab {
-  border: none;
-  background: none;
-  cursor: pointer;
-  padding: 0;
-  font-size: 11px;
-  color: var(--fj-ink-muted, #999);
-  font-family: inherit;
-}
-.reader-dict-popover-tab:hover,
-.reader-dict-popover-tab.is-active { color: var(--fj-accent, #8b6914); }
-.reader-dict-popover-tab.is-active { font-weight: 600; }
-
-.reader-similar-list { max-height: 260px; overflow-y: auto; }
-.reader-similar-item {
-  display: block;
-  padding: 5px 0;
-  border-bottom: 1px dashed var(--fj-border, #eee);
-  color: inherit !important;
-}
-.reader-similar-item:hover { background: var(--fj-hover, rgba(139, 105, 20, 0.06)); text-decoration: none !important; }
-.reader-similar-title { font-size: 12.5px; font-weight: 600; color: var(--fj-ink, #333); }
-.reader-similar-meta { margin-left: 6px; font-size: 10.5px; font-weight: 400; color: var(--fj-ink-muted, #999); }
-.reader-similar-snippet { font-size: 12px; line-height: 1.5; color: var(--fj-ink, #555); word-break: break-word; }
-.reader-similar-snippet em { font-style: normal; color: var(--fj-accent, #8b6914); font-weight: 600; }
-.reader-similar-all { display: inline-block; margin-top: 6px; font-size: 11px; color: var(--fj-accent, #8b6914); }
-
-.reader-vernacular { max-height: 260px; overflow-y: auto; }
-.reader-vernacular-text { font-size: 13px; line-height: 1.7; color: var(--fj-ink, #333); white-space: pre-wrap; }
-.reader-vernacular-uncertain { margin-top: 4px; font-size: 11.5px; color: #d48806; }
-.reader-vernacular-label {
-  margin-top: 6px;
-  padding-top: 4px;
-  border-top: 1px dashed var(--fj-border, #eee);
-  font-size: 10.5px;
-  color: var(--fj-ink-muted, #999);
-}
-
-.reader-report-form { display: flex; flex-direction: column; gap: 6px; }
-.reader-report-where { font-size: 11px; color: var(--fj-ink-muted, #999); }
-.reader-report-note {
-  width: 100%;
-  font-size: 12.5px;
-  font-family: inherit;
-  padding: 4px 6px;
-  border: 1px solid var(--fj-border, #ddd);
-  border-radius: 4px;
-  background: transparent;
-  color: inherit;
-  resize: vertical;
-}
-.reader-report-submit {
-  align-self: flex-end;
-  border: none;
-  border-radius: 4px;
-  padding: 3px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  background: var(--fj-accent, #8b6914);
-  color: #fff;
-  font-family: inherit;
-}
-.reader-report-submit:disabled { opacity: 0.6; cursor: default; }
-.reader-report-error { font-size: 11.5px; color: #cf1322; }
-.reader-report-link {
-  border: none; background: none; padding: 0; cursor: pointer;
-  font-size: 12px; color: var(--fj-accent, #8b6914); font-family: inherit;
-}
 
 /* ── AI FAB button ── */
 .reader-ai-fab {
@@ -964,16 +894,5 @@
   padding: 0;
 }
 
-/* 引文抽屉：经文下方的「白话 / 全藏出处」 */
-.drawer-passage-actions {
-  margin-top: 12px;
-  padding: 8px 10px;
-  border: 1px solid var(--fj-border, #eee);
-  border-radius: 6px;
-  background: var(--fj-bg-elevated, rgba(139, 105, 20, 0.03));
-}
-.drawer-passage-actions-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-.drawer-passage-actions-target { font-size: 12px; color: var(--fj-ink-muted, #999); flex: 1 1 auto; min-width: 0; }
-.drawer-passage-actions .reader-dict-popover-tab { font-size: 12.5px; color: var(--fj-accent, #8b6914); }
-.drawer-passage-actions-panel { margin-top: 8px; }
-.drawer-passage-actions-hint { font-size: 12px; color: var(--fj-ink-muted, #999); }
+/* 划词浮层底栏按钮多了（问小津/白话/全藏出处/报错），允许换行 */
+.reader-dict-popover-footer { flex-wrap: wrap; }

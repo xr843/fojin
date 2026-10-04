@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { SimilarPassages, VernacularPanel } from "./ReaderSelectionExtras";
 import { drawerTargetText, type SelectionContext } from "./ReaderSelectionExtras.types";
+import "../styles/selectionExtras.css";
 
 type Mode = "vernacular" | "similar";
 
