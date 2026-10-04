@@ -1157,6 +1157,7 @@ export default function TextReaderPage() {
                 title: content.title_zh,
                 cbetaId: content.cbeta_id,
                 lineRef: lineLocator?.ref ?? null,
+                juanText: content.content,
               }
             : undefined
         }

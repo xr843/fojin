@@ -3,10 +3,19 @@ import { Link } from "react-router";
 import { Spin } from "antd";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { searchContent, submitFeedback } from "../api/client";
+import axios from "axios";
+import { getVernacular, searchContent, submitFeedback } from "../api/client";
 import { sanitizeHighlight } from "../utils/sanitize";
 import { buildReaderUrl } from "../utils/sourceUrls";
-import { similarQuery, similarQueryChars, snippetOf, SIMILAR_QUERY_MIN, type SelectionContext } from "./ReaderSelectionExtras.types";
+import {
+  contextAround,
+  similarQuery,
+  similarQueryChars,
+  snippetOf,
+  SIMILAR_QUERY_MIN,
+  VERNACULAR_MAX_CHARS,
+  type SelectionContext,
+} from "./ReaderSelectionExtras.types";
 
 const SIMILAR_SHOW = 6;
 
@@ -156,6 +165,54 @@ export function ReportErrorForm({
       >
         {mutation.isPending ? t("reader.report.sending") : t("reader.report.submit")}
       </button>
+    </div>
+  );
+}
+
+/**
+ * 「白话」：选文的 AI 白话释义。始终带「AI · 仅供参考，以原文为准」标签——
+ * 评测（eval/vernacular/GATE.md）里阿毘达磨论颂三个模型全错过，白话只是读经的拐杖。
+ */
+export function VernacularPanel({ text, context }: { text: string; context: SelectionContext }) {
+  const { t } = useTranslation();
+  const sentence = text.trim();
+  const tooLong = sentence.length > VERNACULAR_MAX_CHARS;
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["reader-vernacular", context.textId, context.juanNum, sentence],
+    queryFn: async () => {
+      const { before, after } = contextAround(context.juanText, sentence);
+      const res = await getVernacular({ text_id: context.textId, sentence, before, after });
+      track("reader_vernacular", { id: context.textId, cached: res.cached ? 1 : 0 });
+      return res;
+    },
+    enabled: !tooLong && sentence.length > 0,
+    staleTime: Infinity,
+    retry: false,
+  });
+
+  if (tooLong) {
+    return <div className="reader-dict-popover-empty">{t("reader.vernacular.too_long", { n: VERNACULAR_MAX_CHARS })}</div>;
+  }
+  if (isLoading) {
+    return (
+      <div className="reader-dict-popover-empty">
+        <Spin size="small" /> {t("reader.vernacular.loading")}
+      </div>
+    );
+  }
+  if (error || !data) {
+    const quota = axios.isAxiosError(error) && error.response?.status === 429;
+    return (
+      <div className="reader-dict-popover-empty">
+        {quota ? t("reader.vernacular.quota") : t("reader.vernacular.failed")}
+      </div>
+    );
+  }
+  return (
+    <div className="reader-vernacular">
+      <div className="reader-vernacular-text">{data.translation}</div>
+      {data.uncertain && <div className="reader-vernacular-uncertain">{t("reader.vernacular.uncertain")}</div>}
+      <div className="reader-vernacular-label">{t("reader.vernacular.label")}</div>
     </div>
   );
 }

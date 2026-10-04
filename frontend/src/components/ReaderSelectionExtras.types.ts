@@ -6,6 +6,8 @@ export interface SelectionContext {
   cbetaId: string;
   /** CBETA 页栏行（如 0748c24）；没有行锚的文本为 null */
   lineRef: string | null;
+  /** 本卷原文，「白话」用它给模型取前后文 */
+  juanText?: string;
 }
 
 /** 全藏出处的检索词上限：太长的选区要求太多小句同时命中，几乎必然落空 */
@@ -37,4 +39,27 @@ export function similarQueryChars(q: string): number {
  */
 export function snippetOf(highlight: string[]): string | null {
   return highlight.find((h) => h.includes("<em>")) ?? highlight[0] ?? null;
+}
+
+/** 白话选文上限，与后端 VernacularRequest.sentence 的 max_length 一致，超了会 422 */
+export const VERNACULAR_MAX_CHARS = 200;
+/** 送给模型判断语境的前后文字数 */
+export const VERNACULAR_CONTEXT_CHARS = 150;
+
+/**
+ * 在整卷原文里定位选文，取前后文。忽略空白比对：DOM 里的选区带换行、
+ * 原文按 CBETA 行硬换行，两边空白位置对不上。找不到就返回空语境——
+ * 模型仍能只凭选文翻译，只是少了消歧依据。
+ */
+export function contextAround(
+  full: string | undefined,
+  selected: string,
+  n: number = VERNACULAR_CONTEXT_CHARS,
+): { before: string; after: string } {
+  if (!full) return { before: "", after: "" };
+  const flat = full.replace(/\s+/g, "");
+  const sel = selected.replace(/\s+/g, "");
+  const i = sel ? flat.indexOf(sel) : -1;
+  if (i < 0) return { before: "", after: "" };
+  return { before: flat.slice(Math.max(0, i - n), i), after: flat.slice(i + sel.length, i + sel.length + n) };
 }
