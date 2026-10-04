@@ -59,7 +59,7 @@ export function SimilarPassages({ text, context }: { text: string; context: Sele
           key={`${h.text_id}-${h.juan_num}`}
           className="reader-similar-item"
           to={buildReaderUrl(h.text_id, h.juan_num)}
-          onClick={() => track("reader_similar_open", { from: context.textId, to: h.text_id })}
+          onClick={() => track("reader_similar_open", { from: context.textId, to: h.text_id, surface: context.surface ?? "reader" })}
         >
           <div className="reader-similar-title">
             {h.title_zh}
@@ -182,7 +182,7 @@ export function VernacularPanel({ text, context }: { text: string; context: Sele
     queryFn: async () => {
       const { before, after } = contextAround(context.juanText, sentence);
       const res = await getVernacular({ text_id: context.textId, sentence, before, after });
-      track("reader_vernacular", { id: context.textId, cached: res.cached ? 1 : 0 });
+      track("reader_vernacular", { id: context.textId, cached: res.cached ? 1 : 0, surface: context.surface ?? "reader" });
       return res;
     },
     enabled: !tooLong && sentence.length > 0,
