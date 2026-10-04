@@ -177,6 +177,7 @@ async def content_search(
     size: int = Query(20, ge=1, le=100, description="每页数量"),
     sources: str | None = Query(None, description="数据源筛选，逗号分隔"),
     lang: str | None = Query(None, description="语言筛选 (lzh/pi/en)"),
+    phrase: bool = Query(False, description="出处模式：按标点切句，每句短语匹配且全部命中"),
 ):
     """Full-text content search across scripture bodies with keyword highlighting.
 
@@ -184,7 +185,7 @@ async def content_search(
     es = get_es()
     gaiji_normalizer = getattr(request.app.state, "gaiji_normalizer", None)
     return await search_content(
-        es, q, page, size, sources, lang, gaiji_normalizer=gaiji_normalizer
+        es, q, page, size, sources, lang, gaiji_normalizer=gaiji_normalizer, phrase=phrase
     )
 
 

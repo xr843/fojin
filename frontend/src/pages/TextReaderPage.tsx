@@ -1148,6 +1148,18 @@ export default function TextReaderPage() {
         state={dictPopover}
         onClose={closeDictPopover}
         onAsk={handleAskXiaojin}
+        loggedIn={!!user}
+        context={
+          content
+            ? {
+                textId,
+                juanNum,
+                title: content.title_zh,
+                cbetaId: content.cbeta_id,
+                lineRef: lineLocator?.ref ?? null,
+              }
+            : undefined
+        }
       />
       {lineLocator && content && (
         <div
