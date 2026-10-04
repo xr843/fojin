@@ -3,14 +3,24 @@
 // so we parse its JSON and fail on any advisory NOT in the waiver list below.
 import { execSync } from "node:child_process";
 
-// Currently empty: every production advisory is fixed upstream, so the gate is a
-// plain `npm audit --omit=dev`. The waiver mechanism is kept because npm gives us
-// no other way to accept a single advisory — add an entry only with a comment
-// stating why it is not exposed here and what release would let us drop it.
+// Add an entry only with a comment stating why it is not exposed here and what
+// would let us drop it. npm gives us no other way to accept a single advisory.
+//
+// Waived: GHSA-jrc7-96c5-q579 (maplibre-gl <=6.4.0, critical, "XSS Sanitizer
+//   Bypass in DOM.sanitize() via Live NamedNodeMap Removal Skip"). The flaw is in
+//   maplibre's own Popup HTML sanitizer. FoJin never uses maplibre's Popup or
+//   setHTML: the only maplibre usage is react-map-gl's <Map>/MapRef, a style
+//   type and the CSS (components/kg-map/DeckGLMap.tsx); the map popup is our own
+//   React component (MapEntityPopup.tsx, antd, no raw HTML). Not reachable.
+//   The fix needs maplibre 6.x, which takes two compatibility changes and cannot
+//   be fully verified locally (MapTiler key rejects localhost) — that upgrade is
+//   PR #1251. Drop this waiver when #1251 (or any maplibre >= 6.12) lands.
+//   Waived 2026-10-04 so the audit gate turns green and NEW advisories surface
+//   again: while it stayed red for days it hid reachable pyjwt/pypdf issues.
 //
 // Previously waived: GHSA-qwww-vcr4-c8h2 (React Router "RSC Mode CSRF"), dropped
 // when react-router 8.3.0 shipped the fix — see the v8 upgrade PR.
-const WAIVED = new Set([]);
+const WAIVED = new Set(["GHSA-jrc7-96c5-q579"]);
 
 let json;
 try {
