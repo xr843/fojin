@@ -85,3 +85,47 @@ def test_htm_extension_also_works():
     raw = b"<p>hi</p>"
     text = parse_attachment(raw, "page.htm", "text/html")
     assert "hi" in text
+
+
+def _minimal_pdf(pages: list[str]) -> bytes:
+    """手工拼一个最小的合法 PDF（标准 Helvetica 字体、xref 偏移精确），
+    让解析测试真正跑一遍 pypdf，而不是只测扩展名分派——升级 pypdf 时
+    这是唯一能证明「还能读出字」的用例。"""
+    objs: list[bytes] = []
+    n_pages = len(pages)
+    kids = " ".join(f"{3 + 2 * i} 0 R" for i in range(n_pages))
+    objs.append(b"<< /Type /Catalog /Pages 2 0 R >>")
+    objs.append(f"<< /Type /Pages /Kids [{kids}] /Count {n_pages} >>".encode())
+    font_id = 3 + 2 * n_pages
+    for i, text in enumerate(pages):
+        content_id = 4 + 2 * i
+        objs.append(
+            f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] "
+            f"/Resources << /Font << /F1 {font_id} 0 R >> >> /Contents {content_id} 0 R >>".encode()
+        )
+        stream = f"BT /F1 12 Tf 20 100 Td ({text}) Tj ET".encode()
+        objs.append(b"<< /Length %d >>\nstream\n" % len(stream) + stream + b"\nendstream")
+    objs.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+
+    out = bytearray(b"%PDF-1.4\n")
+    offsets = []
+    for i, body in enumerate(objs, start=1):
+        offsets.append(len(out))
+        out += f"{i} 0 obj\n".encode() + body + b"\nendobj\n"
+    xref_at = len(out)
+    out += f"xref\n0 {len(objs) + 1}\n0000000000 65535 f \n".encode()
+    out += b"".join(f"{o:010d} 00000 n \n".encode() for o in offsets)
+    out += f"trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\nstartxref\n{xref_at}\n%%EOF\n".encode()
+    return bytes(out)
+
+
+def test_pdf_real_parse_extracts_text_per_page():
+    text = parse_attachment(_minimal_pdf(["Prajna paramita", "Heart Sutra"]), "x.pdf", "application/pdf")
+    assert "Prajna paramita" in text
+    assert "Heart Sutra" in text
+    assert "\f" in text  # 分页符保留，模型能看出页界
+
+
+def test_pdf_garbage_raises_value_error():
+    with pytest.raises(ValueError):
+        parse_attachment(b"%PDF-1.4\nnot really a pdf", "x.pdf", "application/pdf")

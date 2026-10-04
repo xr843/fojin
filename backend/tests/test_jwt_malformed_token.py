@@ -29,6 +29,8 @@ HEADER = _b64(json.dumps({"alg": "HS256", "typ": "JWT"}))
         "a.b.c",
         "not-a-jwt",
     ],
+    # 默认 id 会是整条 20 万字符的 token，把测试日志撑爆
+    ids=["deep-header", "deep-payload", "garbage-segments", "no-dots"],
 )
 def test_malformed_unsigned_token_is_rejected_not_raised(token):
     assert verify_token(token) is None
