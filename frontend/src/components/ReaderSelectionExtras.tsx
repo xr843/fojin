@@ -16,6 +16,7 @@ import {
   VERNACULAR_MAX_CHARS,
   type SelectionContext,
 } from "./ReaderSelectionExtras.types";
+import "../styles/selectionExtras.css";
 
 const SIMILAR_SHOW = 6;
 
