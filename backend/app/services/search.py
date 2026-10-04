@@ -1,4 +1,5 @@
 import logging
+import re
 from collections import defaultdict
 
 from elasticsearch import AsyncElasticsearch
@@ -374,6 +375,27 @@ async def search_texts(
     return SearchResponse(total=total, page=page, size=size, results=results, suggestion=suggestion)
 
 
+# 出处检索的小句切分：标点/空白处断开。cjk_content 是二元组分词，标点两侧
+# 不会产生跨标点的二元组（「有為法，如夢」里没有「法如」），所以带标点的
+# 整句做短语匹配必然落空，必须逐句匹配。
+_CLAUSE_SPLIT = re.compile(r"[\s\W_]+")
+PHRASE_MIN_CLAUSE = 2
+PHRASE_MAX_CLAUSES = 8
+
+
+def _phrase_clauses(query: str) -> list[dict]:
+    """Split a passage at punctuation into ≥2-char clauses, one match_phrase each.
+
+    All clauses must hit (bool.must) — this finds where a passage is quoted
+    or re-translated elsewhere, instead of every juan that merely shares
+    a character or two with it (the plain ``match`` behavior)."""
+    clauses = [c for c in _CLAUSE_SPLIT.split(query) if len(c) >= PHRASE_MIN_CLAUSE]
+    return [
+        {"match_phrase": {"content": {"query": c, "analyzer": "cjk_content"}}}
+        for c in clauses[:PHRASE_MAX_CLAUSES]
+    ]
+
+
 async def search_content(
     es: AsyncElasticsearch,
     query: str,
@@ -382,6 +404,7 @@ async def search_content(
     sources: str | None = None,
     lang: str | None = None,
     gaiji_normalizer: GaijiNormalizer | None = None,
+    phrase: bool = False,
 ) -> dict:
     """Search full-text content in Elasticsearch.
 
@@ -390,9 +413,19 @@ async def search_content(
     character (composition expressions and PUA codepoints), so that
     searches like "款" also match passages encoded as "[肄-聿+欠]".
     Passing ``None`` preserves the pre-1.3c2 behavior exactly.
+
+    ``phrase=True`` is the reader's 「全藏出处」 mode: the query is a passage,
+    split at punctuation and every clause matched as a phrase (no gaiji
+    expansion — the clauses come verbatim from displayed text).
     """
     if not query:
         return {"total": 0, "page": page, "size": size, "results": []}
+
+    if phrase:
+        must = _phrase_clauses(query)
+        if not must:
+            return {"total": 0, "page": page, "size": size, "results": []}
+        return await _run_content_search(es, {"bool": {"must": must}}, page, size, sources, lang)
 
     primary_clause: dict = {
         "match": {
@@ -419,6 +452,17 @@ async def search_content(
     else:
         content_query = primary_clause
 
+    return await _run_content_search(es, content_query, page, size, sources, lang)
+
+
+async def _run_content_search(
+    es: AsyncElasticsearch,
+    content_query: dict,
+    page: int,
+    size: int,
+    sources: str | None,
+    lang: str | None,
+) -> dict:
     # Wrap in bool query if sources or lang filter is present
     filter_clauses = []
     if sources:

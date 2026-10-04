@@ -773,6 +773,8 @@ export async function searchContent(params: {
   size?: number;
   sources?: string;
   lang?: string;
+  /** 出处模式：q 按空格/标点切句，每句短语匹配且全部命中（阅读器「全藏出处」） */
+  phrase?: boolean;
 }): Promise<ContentSearchResponse> {
   const { data } = await api.get<ContentSearchResponse>("/search/content", { params });
   return data;
