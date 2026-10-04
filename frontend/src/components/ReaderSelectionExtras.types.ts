@@ -8,6 +8,30 @@ export interface SelectionContext {
   lineRef: string | null;
   /** 本卷原文，「白话」用它给模型取前后文 */
   juanText?: string;
+  /** 从哪里触发：阅读页划词 / 对话引文抽屉——埋点据此分开计数，30 天复查要用 */
+  surface?: "reader" | "drawer";
+}
+
+/** 最终落到读者面前的那段原文最多取这么长，超出就截掉，免得「白话」拿到整段 */
+export const DRAWER_TARGET_MAX = 200;
+
+/**
+ * 抽屉里「白话 / 全藏出处」作用于哪段文字：读者在抽屉里另选了文字就用选区，
+ * 否则用定位到的被引那句（取原文片段，不用模型复述的引文——后者可能是转述）。
+ * 多段命中（省略号缩写的引文）取首尾之间的连续原文；空白一律去掉。
+ */
+export function drawerTargetText(
+  passage: string,
+  quoteSpans: [number, number][],
+  selection: string,
+): { text: string; from: "selection" | "quote" } | null {
+  const sel = selection.replace(/\s+/g, "");
+  if (sel.length >= 2) return { text: sel.slice(0, DRAWER_TARGET_MAX), from: "selection" };
+  if (quoteSpans.length === 0) return null;
+  const lo = Math.min(...quoteSpans.map(([a]) => a));
+  const hi = Math.max(...quoteSpans.map(([, b]) => b));
+  const q = passage.slice(lo, hi).replace(/\s+/g, "");
+  return q ? { text: q.slice(0, DRAWER_TARGET_MAX), from: "quote" } : null;
 }
 
 /** 全藏出处的检索词上限：太长的选区要求太多小句同时命中，几乎必然落空 */
