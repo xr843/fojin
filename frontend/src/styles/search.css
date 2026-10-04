@@ -488,3 +488,18 @@
     margin-left: 8px;
   }
 }
+
+/* 「问小津」：查到出处之后，直接把这句话交给 AI 解释（/chat 深链） */
+.s-ask-ai {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px 10px;
+  margin: -4px auto 12px;
+  max-width: 760px;
+  font-size: 13px;
+}
+.s-ask-ai a { color: var(--fj-accent, #8b6914); font-weight: 500; }
+.s-ask-ai a:hover { text-decoration: underline; }
+.s-ask-ai-hint { color: var(--fj-ink-muted, #999); font-size: 12px; }

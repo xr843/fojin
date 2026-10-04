@@ -8,13 +8,14 @@ import {
   Pagination, Empty, Checkbox, Input, Tag, Button, Tabs, Result, Select, Typography, Skeleton, AutoComplete, Alert,
 } from "antd";
 import {
-  SearchOutlined, VerticalAlignTopOutlined, CloseOutlined,
+  SearchOutlined, VerticalAlignTopOutlined, CloseOutlined, MessageOutlined,
 } from "@ant-design/icons";
 import { searchTexts, searchContent, searchDictionary, searchCrossLanguage, searchSemantic, searchUnified, searchParallelSentences, getSources, getSearchSuggestions, searchDictionaryGrouped, getCbetaRedirect } from "../api/client";
 import type { DictGroupedSearchResponse } from "../api/client";
 import { hasDirectSearchUrl } from "../utils/sourceUrls";
 import { addSearchHistory, getSearchHistory, type SearchHistoryItem } from "../utils/history";
 import { localizedSourceName } from "../utils/sourceName";
+import { askAiKind, buildAskAiUrl } from "../utils/searchAskAi";
 import { ResultCard, ExternalSourcesSection, DictCard, ContentCard, CrossLangCard, SemanticCard, UnifiedResults } from "../components/search";
 import ParallelSentenceCard from "../components/search/ParallelSentenceCard";
 import "../styles/search.css";
@@ -314,6 +315,10 @@ export default function SearchPage() {
   const pageTitle = query ? t("search.page_title", { query }) : t("search.page_title_default");
   const pageDesc = query ? t("search.page_desc", { query }) : t("search.page_desc_default");
 
+  const askKind = askAiKind(query);
+  const askQuestion =
+    askKind === "passage" ? t("search.ask_ai.passage_q") : t("search.ask_ai.term_q", { term: query.trim() });
+
   return (
     <div className="s-page">
       <Helmet>
@@ -385,6 +390,20 @@ export default function SearchPage() {
             : t("search.subtitle_content")}
         </div>
       </div>
+
+      {askKind && (
+        <div className="s-ask-ai">
+          <Link
+            to={buildAskAiUrl(query, askKind, askQuestion)}
+            onClick={() => {
+              if (typeof umami !== "undefined") umami.track("search_ask_ai", { kind: askKind, tab });
+            }}
+          >
+            <MessageOutlined /> {askKind === "passage" ? t("search.ask_ai.passage_label") : t("search.ask_ai.term_label", { term: query.trim() })}
+          </Link>
+          <span className="s-ask-ai-hint">{t("search.ask_ai.hint")}</span>
+        </div>
+      )}
 
       {query.length === 0 ? (
         <div style={{ marginTop: 80, textAlign: "center" }}>
