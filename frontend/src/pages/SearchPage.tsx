@@ -113,8 +113,6 @@ export default function SearchPage() {
   // Cross-lingual (MITRA) foreign-language filter: all | sa | bo. Local state
   // (like the parallel query's non-paginated shape) — not URL-driven.
   const [parallelLang, setParallelLang] = useState<string>("all");
-  const [dynasty] = useState<string>();
-  const [category] = useState<string>();
   const [showTop, setShowTop] = useState(false);
   const [regionFilter, setRegionFilter] = useState<Set<string>>(new Set());
   const [institutionFilter, setInstitutionFilter] = useState<Set<string>>(new Set());
@@ -138,8 +136,8 @@ export default function SearchPage() {
   };
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["search", query, page, dynasty, category, selectedSources, sortBy, langFilter],
-    queryFn: () => searchTexts({ q: query, page, size: 20, dynasty, category, sources: selectedSources || undefined, sort: sortBy !== "relevance" ? sortBy : undefined, lang: langFilter || undefined }),
+    queryKey: ["search", query, page, selectedSources, sortBy, langFilter],
+    queryFn: () => searchTexts({ q: query, page, size: 20, sources: selectedSources || undefined, sort: sortBy !== "relevance" ? sortBy : undefined, lang: langFilter || undefined }),
     enabled: query.length > 0 && tab === "catalog",
   });
 
@@ -156,14 +154,14 @@ export default function SearchPage() {
   });
 
   const { data: crossLangData, isLoading: crossLangLoading } = useQuery({
-    queryKey: ["searchCrossLang", query, page, dynasty, category, selectedSources],
-    queryFn: () => searchCrossLanguage({ q: query, page, size: 20, dynasty, category, sources: selectedSources || undefined }),
+    queryKey: ["searchCrossLang", query, page, selectedSources],
+    queryFn: () => searchCrossLanguage({ q: query, page, size: 20, sources: selectedSources || undefined }),
     enabled: query.length > 0 && tab === "catalog",
   });
 
   const { data: semanticData, isLoading: semanticLoading } = useQuery({
-    queryKey: ["searchSemantic", query, selectedSources, langFilter, dynasty, category],
-    queryFn: () => searchSemantic({ q: query, size: 20, dynasty, category, lang: langFilter || undefined, sources: selectedSources || undefined }),
+    queryKey: ["searchSemantic", query, selectedSources, langFilter],
+    queryFn: () => searchSemantic({ q: query, size: 20, lang: langFilter || undefined, sources: selectedSources || undefined }),
     enabled: query.length > 0 && tab === "content",
   });
 

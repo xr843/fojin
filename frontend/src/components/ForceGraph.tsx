@@ -3,6 +3,7 @@ import * as d3 from "d3";
 import { useTranslation } from "react-i18next";
 import { CompressOutlined } from "@ant-design/icons";
 import { escapeHtml } from "../utils/sanitize";
+import { prettifySource } from "../utils/kgProvenance";
 
 interface GraphNode {
   id: number;
@@ -276,7 +277,7 @@ export default function ForceGraph({
           : d.predicate;
         const parts = [`<strong>${escapeHtml(label)}</strong>`];
         if (d.provenance)
-          parts.push(`<span style="color:var(--fj-ink-muted)">${escapeHtml(t("kg.tooltip_source"))}: ${escapeHtml(d.provenance)}</span>`);
+          parts.push(`<span style="color:var(--fj-ink-muted)">${escapeHtml(t("kg.tooltip_source"))}: ${escapeHtml(prettifySource(t, d.provenance))}</span>`);
         if (d.evidence)
           parts.push(`<span style="color:var(--fj-ink-muted)">${escapeHtml(t("kg.tooltip_evidence"))}: ${escapeHtml(d.evidence)}</span>`);
         if (d.confidence < 1)
