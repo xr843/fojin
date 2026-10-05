@@ -1306,6 +1306,8 @@
   "reader.apparatus.corrector": "（{{resp}} 校）",
   "reader.apparatus.note": "校注",
   "reader.lineref.copy_citation": "复制引用",
+  "reader.lineref.sat_page": "SAT 原页",
+  "reader.lineref.sat_page_tip": "在 SAT 大正藏数据库（東京大学）打开这一行，可切换「版面画像」看原书页",
   "reader.lineref.copy_link": "复制链接",
   "reader.lineref.copied": "已复制",
   "reader.lineref.citation": "《{{title}}》卷{{juan}}（CBETA {{id}}, {{ref}}）",

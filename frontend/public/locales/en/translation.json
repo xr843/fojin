@@ -1306,6 +1306,8 @@
   "reader.apparatus.corrector": "(corr. {{resp}})",
   "reader.apparatus.note": "Apparatus note",
   "reader.lineref.copy_citation": "Copy citation",
+  "reader.lineref.sat_page": "SAT page",
+  "reader.lineref.sat_page_tip": "Open this line in the SAT Taishō database (Univ. of Tokyo); switch to the page image there",
   "reader.lineref.copy_link": "Copy link",
   "reader.lineref.copied": "Copied",
   "reader.lineref.citation": "{{title}} (CBETA {{id}}, fasc. {{juan}}, {{ref}})",

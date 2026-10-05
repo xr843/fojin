@@ -37,6 +37,7 @@ function readAiPanelPref(): "open" | "closed" | null {
   }
 }
 import { useAuthStore } from "../stores/authStore";
+import { satLineUrl } from "../utils/satUrls";
 import CitationGenerator from "../components/CitationGenerator";
 import SourceAttribution from "../components/SourceAttribution";
 import AnnotationPanel from "../components/AnnotationPanel";
@@ -1188,6 +1189,23 @@ export default function TextReaderPage() {
           >
             {t("reader.lineref.copy_link")}
           </button>
+          {(() => {
+            const satUrl = satLineUrl(content.cbeta_id, lineLocator.ref, juanNum);
+            return satUrl ? (
+              <a
+                className="cbeta-line-locator-link"
+                href={satUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={t("reader.lineref.sat_page_tip")}
+                onClick={() => {
+                  if (typeof umami !== "undefined") umami.track("reader_sat_open", { id: textId });
+                }}
+              >
+                {t("reader.lineref.sat_page")}
+              </a>
+            ) : null;
+          })()}
         </div>
       )}
       </div>

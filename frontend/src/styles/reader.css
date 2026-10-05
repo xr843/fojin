@@ -836,6 +836,17 @@
   cursor: pointer;
 }
 .cbeta-line-locator button:hover { background: rgba(255, 255, 255, 0.12); }
+/* 外链与两个按钮同一外观（SAT 只外链、不嵌影像——见 utils/satUrls.ts 的许可说明） */
+.cbeta-line-locator-link,
+.cbeta-line-locator-link:visited {
+  color: #fff;
+  padding: 1px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 4px;
+  font-size: 12px;
+  text-decoration: none;
+}
+.cbeta-line-locator-link:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
 
 /* Dark mode: dictionary popover was pinned to paper-white while its controls use
    ink tokens (light in dark) → unreadable. Flip the surface. */
