@@ -385,6 +385,7 @@ def build_research_agent(db: object, user: object | None) -> ResearchAgent:
         PROVIDER_DEFAULT_MODELS,
         _is_reasoning_model,
         _resolve_llm_config,
+        openai_temperature_kwargs,
     )
     from app.services.rag_retrieval import retrieve_rag_context
 
@@ -421,7 +422,7 @@ def build_research_agent(db: object, user: object | None) -> ResearchAgent:
                 json={
                     "model": model,
                     "messages": messages,
-                    "temperature": 0.5,
+                    **openai_temperature_kwargs(provider, api_url, 0.5),
                     "max_tokens": _SYNTHESIS_MAX_TOKENS,
                 },
             )
