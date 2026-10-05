@@ -1,9 +1,14 @@
+import { useState } from "react";
 import { Link } from "react-router";
 import { Spin } from "antd";
 import { useTranslation } from "react-i18next";
 import { MessageOutlined } from "@ant-design/icons";
 import type { DictGroupedSearchResponse, DictEntry } from "../api/client";
 import { MAX_WORD_LEN, type DictPopoverState } from "./ReaderDictPopover.types";
+import { ReportErrorForm, SimilarPassages, VernacularPanel } from "./ReaderSelectionExtras";
+import type { SelectionContext } from "./ReaderSelectionExtras.types";
+
+type PopoverMode = "dict" | "vernacular" | "similar" | "report";
 
 /** 中文释义类辞典优先（释义信息量大），多语对照类短释义靠后 */
 const HIGH_QUALITY_SOURCES = [
@@ -31,13 +36,27 @@ export function ReaderDictPopover({
   state,
   onClose,
   onAsk,
+  context,
+  loggedIn = false,
 }: {
   state: DictPopoverState;
   onClose: () => void;
   onAsk: (text: string) => void;
+  /** 划词所在经文位置；给了才显示「全藏出处」「报错」 */
+  context?: SelectionContext;
+  loggedIn?: boolean;
 }) {
   const { t } = useTranslation();
+  // 模式跟着选中文字走：换一段选区自动回到辞典模式
+  const [modeFor, setModeFor] = useState<{ text: string; mode: PopoverMode }>({ text: "", mode: "dict" });
   if (!state.visible) return null;
+  const mode: PopoverMode = modeFor.text === state.text ? modeFor.mode : "dict";
+  const setMode = (m: PopoverMode) => {
+    setModeFor({ text: state.text, mode: m });
+    if ((m === "similar" || m === "report") && typeof umami !== "undefined") {
+      umami.track(m === "similar" ? "reader_similar" : "reader_report_open", { id: context?.textId ?? 0 });
+    }
+  };
 
   const isWord = state.text.length > 0 && state.text.length <= MAX_WORD_LEN;
   const groups = orderedGroups(state.result);
@@ -83,7 +102,25 @@ export function ReaderDictPopover({
         </button>
       </div>
 
-      {isWord && (
+      {mode === "vernacular" && context && (
+        <div className="reader-dict-popover-body">
+          <VernacularPanel text={state.text} context={context} />
+        </div>
+      )}
+
+      {mode === "similar" && context && (
+        <div className="reader-dict-popover-body">
+          <SimilarPassages text={state.text} context={context} />
+        </div>
+      )}
+
+      {mode === "report" && context && (
+        <div className="reader-dict-popover-body">
+          <ReportErrorForm text={state.text} context={context} loggedIn={loggedIn} onDone={onClose} />
+        </div>
+      )}
+
+      {mode === "dict" && isWord && (
         <div className="reader-dict-popover-body">
           {state.loading ? (
             <div style={{ textAlign: "center", padding: 12 }}>
@@ -113,7 +150,32 @@ export function ReaderDictPopover({
           <MessageOutlined style={{ fontSize: 12, marginRight: 3 }} />
           {t("dict.ask_ai")}
         </button>
-        {isWord && (
+        {context && (
+          <>
+            <button
+              type="button"
+              className={`reader-dict-popover-tab${mode === "vernacular" ? " is-active" : ""}`}
+              onClick={() => setMode(mode === "vernacular" ? "dict" : "vernacular")}
+            >
+              {t("reader.vernacular.button")}
+            </button>
+            <button
+              type="button"
+              className={`reader-dict-popover-tab${mode === "similar" ? " is-active" : ""}`}
+              onClick={() => setMode(mode === "similar" ? "dict" : "similar")}
+            >
+              {t("reader.canonrefs.button")}
+            </button>
+            <button
+              type="button"
+              className={`reader-dict-popover-tab${mode === "report" ? " is-active" : ""}`}
+              onClick={() => setMode(mode === "report" ? "dict" : "report")}
+            >
+              {t("reader.report.button")}
+            </button>
+          </>
+        )}
+        {mode === "dict" && isWord && (
           <Link to={`/dictionary?q=${encodeURIComponent(state.text)}`} onClick={onClose}>
             {t("reader.dict.view_all")}
           </Link>

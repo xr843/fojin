@@ -73,6 +73,10 @@ class Settings(BaseSettings):
     llm_fallback_api_url: str = ""
     llm_fallback_api_key: str = ""
     llm_fallback_model: str = ""
+    # 阅读器「白话」所用模型，见 app/services/vernacular.py 与 eval/vernacular/GATE.md
+    vernacular_model: str = "deepseek-v4-flash"
+    # /chat：用户贴了经文时，把那段原文所在的检索块放进上下文第 1 位（passage_locator）
+    enable_paste_locate: bool = True
 
     # Embedding (can use a separate provider)
     embedding_api_url: str = ""  # Falls back to llm_api_url if empty
@@ -217,6 +221,8 @@ class Settings(BaseSettings):
     rate_limit_semantic: int = 20
     rate_limit_research: int = 10
     rate_limit_ai_diff: int = 10
+    # 阅读器「白话」：每次缓存未命中是一次平台 LLM 调用（flash 关思考，约 1 s）
+    rate_limit_vernacular: int = 20
     # Open-world quote verification: no paid inference, but each call is an
     # ES phrase search plus full-fascicle source reads — same cost class as
     # /api/search/content (30/min).

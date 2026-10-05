@@ -13,6 +13,7 @@ import {
   type ParallelPair,
 } from "../api/client";
 import { findQuoteSpans } from "../utils/citationMatch";
+import DrawerPassageActions from "./DrawerPassageActions";
 import { localizeHan } from "../utils/hanScript";
 import { reflowText } from "../utils/textReflow";
 import { hasDisplayConfidence } from "../utils/parallelDisplay";
@@ -399,6 +400,8 @@ export default function CitationDrawer({ target, onClose }: Props) {
         : [],
     [data],
   );
+  // 与 CitationBlocks 用同一份拼接正文，「白话 / 全藏出处」的被引句定位才一致
+  const stitchedText = useMemo(() => stitchChunks(dedupedChunks).text, [dedupedChunks]);
 
   // Group parallels by lang so each language becomes a tab.
   // Primary source (汉文) is always the first tab; additional langs appended.
@@ -444,7 +447,19 @@ export default function CitationDrawer({ target, onClose }: Props) {
             {t("reader.citation.before_context", { n: dedupedChunks[0].chunk_index })}
           </div>
         )}
-        <CitationBlocks chunks={dedupedChunks} quote={target?.quote} />
+        {target ? (
+          <DrawerPassageActions
+            textId={target.textId}
+            juanNum={target.juanNum}
+            title={target.titleZh || data?.title_zh || ""}
+            passage={stitchedText}
+            quoteSpans={findQuoteSpans(stitchedText, target.quote)}
+          >
+            <CitationBlocks chunks={dedupedChunks} quote={target.quote} />
+          </DrawerPassageActions>
+        ) : (
+          <CitationBlocks chunks={dedupedChunks} quote={undefined} />
+        )}
         {data?.has_more_after && (
           <div className="chat-citation-boundary-hint">
             {t("reader.citation.after_context", {

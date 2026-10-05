@@ -342,17 +342,78 @@ def _find_sources(
     return exact or title_only
 
 
+# 节引：「A……B」——省略号表示中间有删节，是古典引文的常规写法。归一化把省略号
+# 当标点剥掉，「AB」作为连续串在原文里必然找不到，于是一句正确的节引被降级成
+# 叙述。生产回放（2026-07-08 至 10-04，1,070 条降级里 438 条带省略号）：用整卷
+# 原文独立裁决，311 条（71%）各段都按顺序原样在所引那一卷里——是误降；118 条
+# 有一段原文没有，7 条顺序颠倒，这两类维持降级。真节引首尾跨度中位 68 字、97%
+# 在 450 字内，即落在一个检索片段里，所以只用检索片段核验就能救回绝大部分。
+_ELLIPSIS_RE = re.compile(r"…+|\.{3,}|⋯+")
+# 每一段至少这么长才算证据：两三个字的段在 500 字片段里随处可见，按序命中不说明
+# 什么。回放里真节引只有 10/311 有短于 4 字的段，宁可放弃它们。
+MIN_ELIDED_SEGMENT_CHARS = 4
+
+
+def _elided_segments(quote: str) -> list[str] | None:
+    """Normalised segments of an elided quote, or None when the quote is not
+    an elision we can verify segment-wise (no inner ellipsis, or a segment too
+    short to count as evidence). A leading/trailing-only ellipsis yields a
+    single segment and is left to the plain substring test, which already
+    ignores the stripped marks."""
+    if not _ELLIPSIS_RE.search(quote):
+        return None
+    segments = [seg for seg in (_normalise(p) for p in _ELLIPSIS_RE.split(quote)) if seg]
+    if len(segments) < 2:
+        return None
+    if any(len(seg) < MIN_ELIDED_SEGMENT_CHARS for seg in segments):
+        return None
+    return segments
+
+
+def _in_order(segments: list[str], haystack: str) -> bool:
+    pos = 0
+    for seg in segments:
+        i = haystack.find(seg, pos)
+        if i < 0:
+            return False
+        pos = i + len(seg)
+    return True
+
+
+def _elided_quote_verified(segments: list[str], candidates: list[ChatSource]) -> bool:
+    """Every segment present, in the quoted order, within one retrieved chunk —
+    or within the cited fascicle's retrieved chunks joined in reading order,
+    for the few elisions that straddle a chunk seam."""
+    texts = [_normalise(c.chunk_text) for c in candidates]
+    if any(_in_order(segments, t) for t in texts):
+        return True
+    by_juan: dict[tuple[int, int], list[ChatSource]] = {}
+    for c in candidates:
+        by_juan.setdefault((c.text_id, c.juan_num), []).append(c)
+    for chunks in by_juan.values():
+        if len(chunks) < 2:
+            continue
+        joined = "".join(_normalise(c.chunk_text) for c in sorted(chunks, key=lambda c: c.chunk_index))
+        if _in_order(segments, joined):
+            return True
+    return False
+
+
 def _quote_failure_reason(
     quote: str, title: str, juan: int | None, sources: list[ChatSource], *, blockquote: bool
 ) -> str | None:
     """Return a failure reason if ``quote`` is not verbatim in the cited source,
     else None (verified). Same detection as before — only the *action* changed
-    from flag-and-caveat to downgrade."""
+    from flag-and-caveat to downgrade. An elided quote (「A……B」) verifies when
+    each segment is verbatim and in order (see ``_elided_segments``)."""
     candidates = _find_sources(sources, title, juan)
     if not candidates:
         return "blockquote_not_in_source" if blockquote else "no_matching_source"
     normalised = _normalise(quote)
     if any(normalised in _normalise(c.chunk_text) for c in candidates):
+        return None
+    segments = _elided_segments(quote)
+    if segments is not None and _elided_quote_verified(segments, candidates):
         return None
     return "blockquote_not_in_source" if blockquote else "quote_not_in_source"
 

@@ -29,6 +29,7 @@ STRICT_PATHS: dict[str, int] = {
     "/api/search/semantic": settings.rate_limit_semantic,
     "/api/research/query": settings.rate_limit_research,
     "/api/alignment/ai-diff": settings.rate_limit_ai_diff,
+    "/api/reader/vernacular": settings.rate_limit_vernacular,
     # Open-world quote verification — ES phrase search + fascicle reads per
     # call; the hosted MCP endpoint fronts it with its own per-client window.
     "/api/verify/quote": settings.rate_limit_verify_quote,

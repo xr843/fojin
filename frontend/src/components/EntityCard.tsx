@@ -8,8 +8,8 @@ import {
 } from "@ant-design/icons";
 import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
-import type { TFunction } from "i18next";
 import type { EntityRelationItem } from "../api/client";
+import { prettifySource } from "../utils/kgProvenance";
 
 const TYPE_META: Record<string, { labelKey: string; className: string }> = {
   person:    { labelKey: "geo.type_person", className: "kg-type-tag kg-type-tag--person" },
@@ -56,27 +56,6 @@ const PROPERTY_LABEL_KEYS: Record<string, string> = {
   year_start: "entity.prop_year_start",
   year_end: "entity.prop_year_end",
 };
-
-/* Relation-source provenance labels. A relation's `source` records where
-   the assertion came from — an authoritative catalogue, auto-extracted
-   metadata, or hand-seeded data. Surfacing it lets a scholar judge how
-   much to trust an edge instead of taking every relation at face value. */
-const SOURCE_LABEL_KEYS: Record<string, string> = {
-  dila_catalog: "entity.source_dila_catalog",
-  dila: "entity.source_dila",
-  "auto:cbeta_metadata": "entity.source_cbeta_metadata",
-  "seed:lineage": "entity.source_seed_lineage",
-  "seed:person_place": "entity.source_seed_person_place",
-  "seed:school_affiliation": "entity.source_seed_school_affiliation",
-};
-
-function prettifySource(t: TFunction, source: string): string {
-  if (SOURCE_LABEL_KEYS[source]) return t(SOURCE_LABEL_KEYS[source]);
-  if (source.startsWith("seed:")) return t("entity.source_seed_generic");
-  if (source.startsWith("auto:")) return t("entity.source_auto_generic");
-  if (source.startsWith("dila")) return t("entity.source_dila");
-  return source;
-}
 
 interface Entity {
   id: number;

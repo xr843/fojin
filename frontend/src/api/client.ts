@@ -773,6 +773,8 @@ export async function searchContent(params: {
   size?: number;
   sources?: string;
   lang?: string;
+  /** 出处模式：q 按空格/标点切句，每句短语匹配且全部命中（阅读器「全藏出处」） */
+  phrase?: boolean;
 }): Promise<ContentSearchResponse> {
   const { data } = await api.get<ContentSearchResponse>("/search/content", { params });
   return data;
@@ -1238,6 +1240,27 @@ export async function markNotificationRead(id: number): Promise<void> {
 
 export async function markAllNotificationsRead(): Promise<void> {
   await api.patch("/notifications/read-all");
+}
+
+// --- Reader: AI 白话 ---
+
+export interface VernacularResponse {
+  translation: string;
+  /** 模型自认没把握 */
+  uncertain: boolean;
+  model: string;
+  prompt_version: string;
+  cached: boolean;
+}
+
+export async function getVernacular(payload: {
+  text_id: number;
+  sentence: string;
+  before: string;
+  after: string;
+}): Promise<VernacularResponse> {
+  const { data } = await api.post<VernacularResponse>("/reader/vernacular", payload, { timeout: 45000 });
+  return data;
 }
 
 // --- Feedback ---
