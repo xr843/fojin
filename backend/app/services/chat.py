@@ -75,6 +75,7 @@ from app.services.llm_client import (  # noqa: F401
     _resolve_with_model_override,
     _with_reasoning_headroom,
     configured_thinking_params,
+    openai_temperature_kwargs,
     read_error_body,
     thinking_params,
 )
@@ -347,7 +348,8 @@ async def _generate_session_title(
                 resp = await client.post(
                     f"{api_url}/chat/completions",
                     headers={"Authorization": f"Bearer {api_key}"},
-                    json={"model": model, "messages": messages, "temperature": 0.3,
+                    json={"model": model, "messages": messages,
+                          **openai_temperature_kwargs(provider, api_url, 0.3),
                           "max_tokens": _with_reasoning_headroom(model, 64),
                           # 标题一律关思考：给一个 5-10 字的标题跑上游默认的最高档
                           # 推理是纯等待（实测同档位在正式问答上要 77-188 秒），而
@@ -632,7 +634,8 @@ async def send_message(
             resp = await client.post(
                 f"{u}/chat/completions",
                 headers={"Authorization": f"Bearer {k}"},
-                json={"model": m, "messages": llm_messages, "temperature": 0.7,
+                json={"model": m, "messages": llm_messages,
+                      **openai_temperature_kwargs(p, u, 0.7),
                       "max_tokens": _with_reasoning_headroom(m, 8000 if page_content else 2000),
                       **_thinking_params_for_request(m, message=message, master_id=master_id, text_id=text_id)},
             )
@@ -1076,7 +1079,8 @@ async def send_message_stream(
             async with client_cm as client, client.stream(
                 "POST", f"{u}/chat/completions",
                 headers={"Authorization": f"Bearer {k}"},
-                json={"model": m, "messages": llm_messages, "temperature": 0.7,
+                json={"model": m, "messages": llm_messages,
+                      **openai_temperature_kwargs(p, u, 0.7),
                       "max_tokens": _with_reasoning_headroom(m, 8000 if page_content else 2000), "stream": True,
                       **_thinking_params_for_request(m, message=message, master_id=master_id, text_id=text_id)},
             ) as resp:
