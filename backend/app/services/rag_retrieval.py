@@ -13,11 +13,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app.config import settings
+from app.core.elasticsearch import get_es
 from app.core.metrics import timed_rag_retrieval
 from app.database import async_session
 from app.models.dictionary import DictionaryEntry
 from app.schemas.chat import ChatSource
 from app.services.embedding import generate_embedding, similarity_search, source_similarity_search
+from app.services.passage_locator import inject_located, locate_pasted_passage
 from app.services.precise_retrieval import try_precise_text_retrieval
 from app.services.urn import build_urn
 
@@ -44,6 +46,8 @@ RERANK_CANDIDATE_LIMIT = 32
 # attaches parallel_chunks to primary hits via alignment_pairs lookup.
 # Controlled by env var so it can be disabled in one place if needed.
 ENABLE_PARALLEL_RAG = settings.enable_parallel_rag if hasattr(settings, "enable_parallel_rag") else True
+# 贴原文定位（passage_locator）。上线依据见 eval/paste_locate/GATE.md。
+ENABLE_PASTE_LOCATE = settings.enable_paste_locate
 
 # Feed imported MITRA parallels (mitra_alignments, ~908K Skt/Tib↔汉 sentence
 # pairs, chunk-anchored on the 汉 side) into the LLM context alongside the
@@ -606,6 +610,13 @@ def _format_context_block(result: dict) -> str:
     knows it has cross-canon evidence available for the citation.
     """
     header = f"[出处: {_format_source_label(result)}]"
+    if result.get("located_quote"):
+        # 贴原文定位注入的块：逐字出现 ≠ 原始出处。佛典大量引用外典（儒道经典、诗文），
+        # 而原著不在语料里；不说明这一点，模型会把引用它的佛书说成它的出处。
+        header += (
+            f"\n[用户原文定位] 本段逐字包含用户消息中的「{result['located_quote']}」。"
+            "若该句另有更早的原始出处（如儒、道典籍或诗文），本书只是引用，不要把本书说成它的出处。"
+        )
     body = result["chunk_text"]
     parallels = result.get("parallel_chunks") or []
     mitra = result.get("mitra_parallels") or []
@@ -950,6 +961,28 @@ async def _lookup_dictionary_terms(db: AsyncSession, query: str) -> str:
 
 
 @timed_rag_retrieval
+async def _locate_pasted_passage_safe(query: str):
+    """Run the pasted-passage locator on its own session; never raise.
+
+    Runs concurrently with the query embedding, so it costs no added latency on
+    the common path. Any failure (ES hiccup, DB error) degrades to plain vector
+    retrieval — the locator only ever adds evidence, it never gates an answer."""
+    t0 = time.monotonic()
+    try:
+        async with async_session() as s:
+            located = await locate_pasted_passage(get_es(), s, query)
+    except Exception:
+        logger.warning("paste_locate failed; continuing with vector RAG", exc_info=True)
+        return None
+    if located is not None:
+        logger.info(
+            "paste_locate hit: %s 第%d卷 chunk %d, window %d 字 in %d text(s), %.2fs",
+            located.chunk.get("cbeta_id"), located.chunk["juan_num"], located.chunk["chunk_index"],
+            located.window_han, located.texts_with_window, time.monotonic() - t0,
+        )
+    return located
+
+
 async def retrieve_rag_context(
     db: AsyncSession,
     query: str,
@@ -1007,6 +1040,14 @@ async def retrieve_rag_context(
             "score": s.score,
         }) for s in precise)
         return precise, context_text
+
+    # 贴原文定位：用户贴了经文就把那段原文本身放进上下文（全库模式；祖师模式的
+    # 语料是刻意圈定的，不越界）。与 embedding 并行，见 _locate_pasted_passage_safe。
+    locate_task = (
+        asyncio.create_task(_locate_pasted_passage_safe(query))
+        if ENABLE_PASTE_LOCATE and not scope_text_ids
+        else None
+    )
 
     try:
         search_query = f"{prev_query} {query}" if prev_query else query
@@ -1119,6 +1160,14 @@ async def retrieve_rag_context(
             except Exception:
                 logger.warning("本经召回保底 injection failed; using un-injected results", exc_info=True)
 
+        # 贴原文定位放在最后：它是用户亲手给出的原文，排第 1 位，压过上面所有排序。
+        if locate_task is not None:
+            located = await locate_task
+            locate_task = None
+            if located is not None:
+                chunk = {**located.chunk, "located_quote": located.window_text[:60]}
+                search_results = inject_located(chunk, search_results, MAX_CONTEXT_CHUNKS)
+
         # Attach alignment parallels to sources (only if parallel mode on).
         # Query alignment_pairs for each primary hit; if found, inject the
         # aligned chunks' text into parallel_chunks for downstream use.
@@ -1171,6 +1220,10 @@ async def retrieve_rag_context(
     except Exception:
         logger.exception("Embedding/search failed, proceeding without RAG context")
         await db.rollback()
+    finally:
+        # 检索中途抛错时别留下悬空的定位任务
+        if locate_task is not None and not locate_task.done():
+            locate_task.cancel()
 
     logger.info("TIMING: Total RAG retrieval took %.2fs (results: %d)", time.monotonic() - t0, len(sources))
     return sources, context_text

@@ -75,6 +75,8 @@ class Settings(BaseSettings):
     llm_fallback_model: str = ""
     # 阅读器「白话」所用模型，见 app/services/vernacular.py 与 eval/vernacular/GATE.md
     vernacular_model: str = "deepseek-v4-flash"
+    # /chat：用户贴了经文时，把那段原文所在的检索块放进上下文第 1 位（passage_locator）
+    enable_paste_locate: bool = True
 
     # Embedding (can use a separate provider)
     embedding_api_url: str = ""  # Falls back to llm_api_url if empty
