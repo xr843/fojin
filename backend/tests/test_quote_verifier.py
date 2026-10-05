@@ -546,3 +546,83 @@ def test_count_checked_quotes_ignores_emphasis_and_short_fragments():
     src = _src(3, "瑜伽師地論", 3, "必与舍受相应。")
     answer = "「念」维持「寻」，论中说必与舍受相应【《瑜伽師地論》第3卷】。"
     assert count_checked_quotes(answer, [src]) == 0
+
+
+# ──────────────────────────────────────────────────────────────────────
+# 节引（「A……B」）——生产里 41% 的降级带省略号，其中 71% 是被误降的真节引
+# ──────────────────────────────────────────────────────────────────────
+
+_JINGANG = (
+    "佛告須菩提：諸菩薩摩訶薩應如是降伏其心：所有一切眾生之類，若卵生、若胎生、"
+    "若濕生、若化生，我皆令入無餘涅槃而滅度之。如是滅度無量無數無邊眾生，"
+    "實無眾生得滅度者。何以故？須菩提！若菩薩有我相、人相、眾生相、壽者相，即非菩薩。"
+)
+
+
+def _chunk(idx: int, text: str, *, text_id: int = 7, juan: int = 1) -> ChatSource:
+    return ChatSource(
+        text_id=text_id, juan_num=juan, chunk_index=idx, chunk_text=text,
+        score=0.9, title_zh="金剛般若波羅蜜經", lang="lzh",
+    )
+
+
+def _verify(quote: str, chunks: list[ChatSource]):
+    answer = f"经中说：「{quote}」【《金剛般若波羅蜜經》第1卷】"
+    return verify_quoted_content(answer, chunks)
+
+
+def test_elided_quote_in_order_is_verified_not_downgraded():
+    quote = "所有一切眾生之類……我皆令入無餘涅槃而滅度之"
+    out, muts = _verify(quote, [_chunk(0, _JINGANG)])
+    assert muts == []
+    assert f"「{quote}」" in out  # 引号保留，仍是逐字引文
+
+
+def test_elided_quote_accepts_ascii_and_midline_ellipsis_forms():
+    for mark in ("...", "⋯⋯", "…"):
+        quote = f"所有一切眾生之類{mark}我皆令入無餘涅槃而滅度之"
+        _, muts = _verify(quote, [_chunk(0, _JINGANG)])
+        assert muts == [], mark
+
+
+def test_elided_quote_with_a_fabricated_segment_is_still_downgraded():
+    quote = "所有一切眾生之類……皆當成就無上菩提之果"  # 第二段原文没有
+    out, muts = _verify(quote, [_chunk(0, _JINGANG)])
+    assert len(muts) == 1 and muts[0].reason == "quote_not_in_source"
+    assert "「" not in out.split("经中说：")[1].split("【")[0]
+
+
+def test_elided_quote_in_reversed_order_is_still_downgraded():
+    quote = "我皆令入無餘涅槃而滅度之……所有一切眾生之類"
+    _, muts = _verify(quote, [_chunk(0, _JINGANG)])
+    assert len(muts) == 1
+
+
+def test_elided_quote_with_a_too_short_segment_is_not_rescued():
+    # 第二段「須菩」只有 2 字、确实按序出现在片段里——短段随处可见，不算证据
+    quote = "所有一切眾生之類……須菩"
+    assert _JINGANG.index("須菩", _JINGANG.index("所有一切眾生之類")) > 0
+    _, muts = _verify(quote, [_chunk(0, _JINGANG)])
+    assert len(muts) == 1
+
+
+def test_elided_quote_straddling_two_chunks_of_the_cited_fascicle():
+    a, b = _JINGANG[:60], _JINGANG[60:]
+    quote = "所有一切眾生之類……實無眾生得滅度者"
+    assert "所有一切眾生之類" in a and "實無眾生得滅度者" in b
+    _, muts = _verify(quote, [_chunk(1, b), _chunk(0, a)])  # 检索返回顺序与阅读顺序相反
+    assert muts == []
+
+
+def test_elided_segments_from_two_different_texts_are_not_joined():
+    a, b = _JINGANG[:60], _JINGANG[60:]
+    quote = "所有一切眾生之類……實無眾生得滅度者"
+    _, muts = _verify(quote, [_chunk(0, a, text_id=7), _chunk(1, b, text_id=8)])
+    assert len(muts) == 1
+
+
+def test_elided_blockquote_is_verified_too():
+    answer = "> 所有一切眾生之類……\n> 我皆令入無餘涅槃而滅度之\n\n【《金剛般若波羅蜜經》第1卷】"
+    out, muts = verify_quoted_content(answer, [_chunk(0, _JINGANG)])
+    assert muts == []
+    assert out == answer
