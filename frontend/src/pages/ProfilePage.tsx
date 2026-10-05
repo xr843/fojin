@@ -441,6 +441,9 @@ export default function ProfilePage() {
                         style={{ width: "100%", marginTop: 4 }}
                       />
                     </div>
+                    {provider === "kimi_code" && (
+                      <Alert type="warning" showIcon message={t("profile.kimi_code_terms_notice")} />
+                    )}
                     {provider === "custom" && (
                       <div>
                         <Typography.Text strong>API Base URL</Typography.Text>

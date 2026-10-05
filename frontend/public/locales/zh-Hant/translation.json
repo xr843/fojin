@@ -348,6 +348,7 @@
   "profile.provider.zhipu": "智譜 AI (GLM)",
   "profile.provider.moonshot": "月之暗面 (Kimi)",
   "profile.provider.kimi_code": "Kimi Code (會員訂閱)",
+  "profile.kimi_code_terms_notice": "Kimi Code 會員額度按官方條款僅限個人互動式使用；佛津用你自己的 Key 從伺服器轉發請求，是否符合條款、是否會觸發風控由你自行判斷。",
   "profile.provider.doubao": "字節豆包 (Doubao)",
   "profile.provider.minimax": "MiniMax",
   "profile.provider.stepfun": "階躍星辰 (StepFun)",
