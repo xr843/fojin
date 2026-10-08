@@ -14,7 +14,7 @@ import { useMemo, useRef, useState, useEffect, useLayoutEffect } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { Spin, Empty, Tooltip, Drawer, List } from "antd";
-import { TYPE_COLORS } from "../ForceGraph";
+import { TYPE_COLORS } from "./graphPalette";
 import type { KGTimelineEntity } from "../../api/client";
 
 interface KGTimelineProps {

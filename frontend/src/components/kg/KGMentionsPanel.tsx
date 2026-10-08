@@ -11,7 +11,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Spin, Empty, Tag } from "antd";
-import { TYPE_COLORS, TYPE_LABEL_KEYS } from "../ForceGraph";
+import { TYPE_COLORS, TYPE_LABEL_KEYS } from "./graphPalette";
 import { getKGEntityMentions } from "../../api/client";
 import type { KGMentionItem } from "../../api/client";
 
