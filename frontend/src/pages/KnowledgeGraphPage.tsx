@@ -14,12 +14,13 @@ import {
   ProfileOutlined,
   FieldTimeOutlined,
 } from "@ant-design/icons";
-import ForceGraph, {
+import ForceGraph from "../components/ForceGraph";
+import {
   TYPE_COLORS,
   TYPE_LABEL_KEYS,
   PREDICATE_LABEL_KEYS,
   PREDICATE_COLORS,
-} from "../components/ForceGraph";
+} from "../components/kg/graphPalette";
 import EntityCard from "../components/EntityCard";
 import KGTimeline from "../components/kg/KGTimeline";
 import KGMentionsPanel from "../components/kg/KGMentionsPanel";
