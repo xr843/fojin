@@ -92,7 +92,8 @@ from app.services.prompt_builder import (  # noqa: F401
     _is_meta_question,
     _strip_followup_suggestions,
 )
-from app.services.quote_verifier import log_quote_mutations, verify_quoted_content
+from app.services.quote_fulljuan import load_full_juan_check
+from app.services.quote_verifier import juans_to_recheck, log_quote_mutations, verify_quoted_content
 from app.services.rag_retrieval import retrieve_rag_context
 
 logger = logging.getLogger(__name__)
@@ -695,8 +696,10 @@ async def send_message(
     answer, _citation_mutations = enforce_citation_whitelist(answer, sources)
     # Quote verifier runs after the citation guard so quotes attached
     # to citations the guard already stripped don't get double-flagged.
-    # See app/services/quote_verifier for the substring-match contract.
-    answer, _quote_mutations = verify_quoted_content(answer, sources)
+    # See app/services/quote_verifier for the substring-match contract;
+    # quote_fulljuan rechecks chunk misses against the whole cited fascicle.
+    full_juan_check = await load_full_juan_check(db, juans_to_recheck(answer, sources))
+    answer, _quote_mutations = verify_quoted_content(answer, sources, full_juan_check=full_juan_check)
     trust_status = build_trust_status(
         answer,
         sources,
@@ -1362,8 +1365,20 @@ async def send_message_stream(
     )
     corrected_answer, _citation_mutations = enforce_citation_whitelist(full_answer, sources)
     # Quote verifier runs after citation_guard so flagged-and-stripped
-    # citations don't carry their quotes into a second annotation.
-    corrected_answer, _quote_mutations = verify_quoted_content(corrected_answer, sources)
+    # citations don't carry their quotes into a second annotation. Chunk
+    # misses are rechecked against the whole cited fascicle (fresh session,
+    # same reason as the persist phase below — none is held across the stream).
+    full_juan_check = None
+    recheck_juans = juans_to_recheck(corrected_answer, sources)
+    if recheck_juans:
+        try:
+            async with sessionmaker() as db_fj:
+                full_juan_check = await load_full_juan_check(db_fj, recheck_juans)
+        except Exception:
+            logger.warning("chat/stream: quote full-juan fallback skipped", exc_info=True)
+    corrected_answer, _quote_mutations = verify_quoted_content(
+        corrected_answer, sources, full_juan_check=full_juan_check
+    )
     trust_status = build_trust_status(
         corrected_answer,
         sources,
