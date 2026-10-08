@@ -37,7 +37,7 @@ from elasticsearch import AsyncElasticsearch
 from sqlalchemy import text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.quote_verifier import _STRIP_PUNCT_RE, _t2s
+from app.services.quote_verifier import _STRIP_PUNCT_RE, _t2s, fold_variants
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +76,7 @@ def _norm_char(ch: str) -> str:
     hit = _CHAR_MAP.get(cp)
     if hit is None:
         folded = unicodedata.normalize("NFKC", ch)
-        folded = _t2s.convert(folded) if folded else folded
+        folded = fold_variants(_t2s.convert(folded)) if folded else folded
         hit = _STRIP_PUNCT_RE.sub("", folded).lower()
         _CHAR_MAP[cp] = hit
     return hit

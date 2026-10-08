@@ -50,7 +50,7 @@ don't get double-flagged.
 import logging
 import re
 import unicodedata
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 
@@ -65,6 +65,26 @@ logger = logging.getLogger(__name__)
 # in the reader's script is localisation, not a fidelity loss, so a script
 # mismatch must not by itself fail verification.
 _t2s = OpenCC("t2s")
+
+# 异体字归并 —— 接在繁→简之后。OpenCC t2s 不碰这些字（虗/徧/煖/祇… 原样输出），
+# 于是模型写「虚空」而 CBETA 作「虗空」，一句一字不差的引文就被判成伪造降级。
+# 生产回放（2026-07-10 至 10-07，被降级的单段引文）：与所引整卷相似度 ≥0.85 的 133 条
+# 里，约 30 条唯一差别就是下面这些字。只收「同一个字的不同写法」：曾/甞、伸/申、
+# 辨/辯、賴/棃 这类回放里也出现过的是不同的字或不同的译音，一律不收——那是原文
+# 真的不同。逐字 1→1 映射，归一化前后长度不变，下游按位置回指原文的地方不受影响。
+_VARIANT_FOLD = str.maketrans({
+    "虗": "虚", "徧": "遍", "煖": "暖", "煗": "暖", "竝": "并", "著": "着",
+    "瞋": "嗔", "祇": "只", "秖": "只", "秪": "只", "衹": "只", "婬": "淫",
+    "沈": "沉", "麁": "粗", "麄": "粗", "麤": "粗", "葢": "盖", "繇": "由",
+    "玅": "妙", "挍": "校", "柰": "奈", "黙": "默", "瞖": "翳", "劒": "剑",
+    "劔": "剑", "劎": "剑", "戹": "厄", "隣": "邻", "雑": "杂", "彊": "强",
+    "蕰": "蕴",
+})
+
+
+def fold_variants(s: str) -> str:
+    """Map each variant form to one canonical character (1→1, length-preserving)."""
+    return s.translate(_VARIANT_FOLD)
 
 
 # Minimum length of a quoted segment we'll subject to verification.
@@ -232,12 +252,13 @@ def _normalise(s: str) -> str:
       2. 繁→简 fold so a simplified-Chinese quote matches a traditional
          CBETA source — without this every quote in a 简体 answer of a
          繁体 source false-fails, drowning the answer in ⚠️ notices
-      3. Strip every punctuation and whitespace character so that an
+      3. Fold 异体字 (``_VARIANT_FOLD``) — 虗/虚, 徧/遍 … are one character
+      4. Strip every punctuation and whitespace character so that an
          LLM that drops a comma doesn't false-positive
-      4. Lowercase (no effect on CJK but covers stray Latin)
+      5. Lowercase (no effect on CJK but covers stray Latin)
     """
     s = unicodedata.normalize("NFKC", s)
-    s = _t2s.convert(s)
+    s = fold_variants(_t2s.convert(s))
     s = _STRIP_PUNCT_RE.sub("", s)
     return s.lower()
 
@@ -354,15 +375,16 @@ _ELLIPSIS_RE = re.compile(r"…+|\.{3,}|⋯+")
 MIN_ELIDED_SEGMENT_CHARS = 4
 
 
-def _elided_segments(quote: str) -> list[str] | None:
+def _elided_segments(quote: str, normalise: Callable[[str], str] = _normalise) -> list[str] | None:
     """Normalised segments of an elided quote, or None when the quote is not
     an elision we can verify segment-wise (no inner ellipsis, or a segment too
     short to count as evidence). A leading/trailing-only ellipsis yields a
     single segment and is left to the plain substring test, which already
-    ignores the stripped marks."""
+    ignores the stripped marks. ``normalise`` lets the whole-fascicle fallback
+    use its per-character normaliser."""
     if not _ELLIPSIS_RE.search(quote):
         return None
-    segments = [seg for seg in (_normalise(p) for p in _ELLIPSIS_RE.split(quote)) if seg]
+    segments = [seg for seg in (normalise(p) for p in _ELLIPSIS_RE.split(quote)) if seg]
     if len(segments) < 2:
         return None
     if any(len(seg) < MIN_ELIDED_SEGMENT_CHARS for seg in segments):
@@ -399,13 +421,26 @@ def _elided_quote_verified(segments: list[str], candidates: list[ChatSource]) ->
     return False
 
 
+# 整卷兜底的判定函数：(引文原文, 候选检索片段, 所引卷号) → 是否在所引那一卷全文里。
+# 由 quote_fulljuan 读库后构造；verifier 本身保持纯函数、不碰数据库。
+FullJuanCheck = Callable[[str, list[ChatSource], int], bool]
+
+
 def _quote_failure_reason(
-    quote: str, title: str, juan: int | None, sources: list[ChatSource], *, blockquote: bool
+    quote: str,
+    title: str,
+    juan: int | None,
+    sources: list[ChatSource],
+    *,
+    blockquote: bool,
+    full_juan_check: FullJuanCheck | None = None,
 ) -> str | None:
     """Return a failure reason if ``quote`` is not verbatim in the cited source,
     else None (verified). Same detection as before — only the *action* changed
     from flag-and-caveat to downgrade. An elided quote (「A……B」) verifies when
-    each segment is verbatim and in order (see ``_elided_segments``)."""
+    each segment is verbatim and in order (see ``_elided_segments``). When the
+    retrieved chunks don't contain it, ``full_juan_check`` (if given) gets the
+    last word against the whole cited fascicle."""
     candidates = _find_sources(sources, title, juan)
     if not candidates:
         return "blockquote_not_in_source" if blockquote else "no_matching_source"
@@ -415,7 +450,31 @@ def _quote_failure_reason(
     segments = _elided_segments(quote)
     if segments is not None and _elided_quote_verified(segments, candidates):
         return None
+    if full_juan_check is not None and juan is not None and full_juan_check(quote, candidates, juan):
+        return None
     return "blockquote_not_in_source" if blockquote else "quote_not_in_source"
+
+
+def juans_to_recheck(answer: str, sources: list[ChatSource]) -> list[tuple[int, int]]:
+    """``(text_id, juan)`` of every cited fascicle holding an inline quote that
+    fails against the retrieved chunks — what ``quote_fulljuan`` should load.
+    Only quotes whose cited title *was* retrieved (there are candidates) and
+    that name a fascicle qualify: the fallback widens the haystack within the
+    cited fascicle, it never accepts a quote from a text the answer didn't
+    retrieve. Order-preserving, deduplicated."""
+    if not answer or "【《" not in answer:
+        return []
+    keys: dict[tuple[int, int], None] = {}
+    for m in _QUOTE_CITATION_RE.finditer(answer):
+        quote = _matched_quote(m).strip()
+        if len(quote) < MIN_QUOTE_CHARS or not m.group("juan"):
+            continue
+        juan = int(m.group("juan"))
+        if _quote_failure_reason(quote, m.group("title"), juan, sources, blockquote=False) != "quote_not_in_source":
+            continue
+        for c in _find_sources(sources, m.group("title"), juan):
+            keys.setdefault((c.text_id, juan), None)
+    return list(keys)
 
 
 def _windowed_ratio(needle: str, haystack: str) -> float:
@@ -477,7 +536,10 @@ def _classify_failure(
 
 
 def verify_quoted_content(
-    answer: str, sources: list[ChatSource]
+    answer: str,
+    sources: list[ChatSource],
+    *,
+    full_juan_check: FullJuanCheck | None = None,
 ) -> tuple[str, list[QuoteMutation]]:
     """Downgrade quoted segments that aren't verbatim in the cited source.
 
@@ -503,7 +565,9 @@ def verify_quoted_content(
             return m.group(0)
         title = m.group("title")
         juan = int(m.group("juan")) if m.group("juan") else None
-        reason = _quote_failure_reason(quote, title, juan, sources, blockquote=False)
+        reason = _quote_failure_reason(
+            quote, title, juan, sources, blockquote=False, full_juan_check=full_juan_check
+        )
         if reason is None:
             return m.group(0)
         similarity, bucket = _classify_failure(quote, title, juan, sources)
