@@ -21,6 +21,7 @@ from app.schemas.text import (
 )
 from app.services.embedding import generate_embedding
 from app.services.gaiji import GaijiNormalizer, expand_for_query
+from app.services.passage_locator import fast_normalise
 from app.services.rag_retrieval import MIN_RELEVANCE_SCORE
 
 logger = logging.getLogger(__name__)
@@ -381,19 +382,103 @@ async def search_texts(
 _CLAUSE_SPLIT = re.compile(r"[\s\W_]+")
 PHRASE_MIN_CLAUSE = 2
 PHRASE_MAX_CLAUSES = 8
+# 粗筛取多少部作品去逐字核对。前端只展示 6 部，粗筛的精确率实测约四成。
+PHRASE_CANDIDATE_WORKS = 30
+# 每多少个二元组允许丢一个：CBETA 原文每 17–20 字一个硬换行，换行处不生成二元组。
+PHRASE_BIGRAMS_PER_WRAP = 16
+
+
+def _phrase_clause_texts(query: str) -> list[str]:
+    return [c for c in _CLAUSE_SPLIT.split(query) if len(c) >= PHRASE_MIN_CLAUSE][:PHRASE_MAX_CLAUSES]
 
 
 def _phrase_clauses(query: str) -> list[dict]:
-    """Split a passage at punctuation into ≥2-char clauses, one match_phrase each.
+    """Split a passage at punctuation into ≥2-char clauses, one recall clause each.
 
-    All clauses must hit (bool.must) — this finds where a passage is quoted
-    or re-translated elsewhere, instead of every juan that merely shares
-    a character or two with it (the plain ``match`` behavior)."""
-    clauses = [c for c in _CLAUSE_SPLIT.split(query) if len(c) >= PHRASE_MIN_CLAUSE]
-    return [
-        {"match_phrase": {"content": {"query": c, "analyzer": "cjk_content"}}}
-        for c in clauses[:PHRASE_MAX_CLAUSES]
-    ]
+    Not ``match_phrase``: stored CBETA text hard-wraps every 17–20 chars and
+    cjk_bigram makes no bigram across a newline, while the reader reflows those
+    lines, so a selection carries no newline. A clause that straddles a wrap
+    then has one bigram the index lacks, and the phrase query fails — measured
+    on 77 random 24–40-char passages, the passage's own juan came back for 26%.
+    Each clause is instead a bigram bag that may miss one bigram per wrap it can
+    span; ``_verified_phrase_hits`` then checks the text verbatim, because the
+    bag alone is only ~40% precise.
+    """
+    clauses = []
+    for c in _phrase_clause_texts(query):
+        if len(c) <= 2:
+            clauses.append({"match_phrase": {"content": {"query": c, "analyzer": "cjk_content"}}})
+            continue
+        allow = 1 + (len(c) - 1) // PHRASE_BIGRAMS_PER_WRAP
+        clauses.append(
+            {"match": {"content": {"query": c, "analyzer": "cjk_content", "minimum_should_match": f"-{allow}"}}}
+        )
+    return clauses
+
+
+async def _juan_bodies(es: AsyncElasticsearch, pairs: list[tuple[int, int]]) -> dict[tuple[int, int], str]:
+    if not pairs:
+        return {}
+    body = {
+        "query": {
+            "bool": {
+                "should": [
+                    {"bool": {"filter": [{"term": {"text_id": t}}, {"term": {"juan_num": j}}]}} for t, j in pairs
+                ],
+                "minimum_should_match": 1,
+            }
+        },
+        "size": len(pairs),
+        "_source": ["text_id", "juan_num", "content"],
+    }
+    resp = await es.search(index=CONTENT_INDEX_NAME, body=body, timeout="10s")
+    out = {}
+    for h in resp["hits"]["hits"]:
+        src = h.get("_source") or {}
+        out[(src.get("text_id"), src.get("juan_num"))] = src.get("content") or ""
+    return out
+
+
+async def _verified_phrase_hits(
+    es: AsyncElasticsearch, query: str, page: int, size: int, sources: str | None, lang: str | None
+) -> dict:
+    """「全藏出处」: bigram-bag recall, then keep only juans that contain every
+    clause verbatim (whitespace/punctuation/繁简/异体 insensitive)."""
+    empty = {"total": 0, "total_capped": False, "total_juans": 0, "page": page, "size": size, "results": []}
+    must = _phrase_clauses(query)
+    if not must:
+        return empty
+    cand = await _run_content_search(es, {"bool": {"must": must}}, 1, PHRASE_CANDIDATE_WORKS, sources, lang)
+    pairs = [(w["text_id"], mj["juan_num"]) for w in cand["results"] for mj in w["matched_juans"]]
+    bodies = {k: fast_normalise(v) for k, v in (await _juan_bodies(es, pairs)).items()}
+    needles = [fast_normalise(c) for c in _phrase_clause_texts(query)]
+
+    def contains_all(key: tuple[int, int]) -> bool:
+        body = bodies.get(key)
+        return body is not None and all(n in body for n in needles)
+
+    verified = []
+    for w in cand["results"]:
+        juans = [mj for mj in w["matched_juans"] if contains_all((w["text_id"], mj["juan_num"]))]
+        if not juans:
+            continue
+        verified.append({
+            **w,
+            "juan_num": juans[0]["juan_num"],
+            "highlight": juans[0]["highlight"],
+            "matched_juan_count": len(juans),
+            "matched_juans": juans,
+        })
+    return {
+        "total": len(verified),
+        # Only the top PHRASE_CANDIDATE_WORKS bag hits are checked; past that the
+        # true count is unknown, so say "at least" rather than a wrong number.
+        "total_capped": cand["total"] > PHRASE_CANDIDATE_WORKS,
+        "total_juans": sum(w["matched_juan_count"] for w in verified),
+        "page": page,
+        "size": size,
+        "results": verified[(page - 1) * size : page * size],
+    }
 
 
 async def search_content(
@@ -415,17 +500,15 @@ async def search_content(
     Passing ``None`` preserves the pre-1.3c2 behavior exactly.
 
     ``phrase=True`` is the reader's 「全藏出处」 mode: the query is a passage,
-    split at punctuation and every clause matched as a phrase (no gaiji
-    expansion — the clauses come verbatim from displayed text).
+    split at punctuation, and only juans containing every clause verbatim are
+    returned (no gaiji expansion — the clauses come verbatim from displayed
+    text). See ``_phrase_clauses`` for why that is not a phrase query.
     """
     if not query:
         return {"total": 0, "page": page, "size": size, "results": []}
 
     if phrase:
-        must = _phrase_clauses(query)
-        if not must:
-            return {"total": 0, "page": page, "size": size, "results": []}
-        return await _run_content_search(es, {"bool": {"must": must}}, page, size, sources, lang)
+        return await _verified_phrase_hits(es, query, page, size, sources, lang)
 
     primary_clause: dict = {
         "match": {

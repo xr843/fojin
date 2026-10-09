@@ -117,6 +117,17 @@ describe("划词浮层：全藏出处", () => {
     );
   });
 
+  it("后端只核对了前若干部时，总数显示为下限「N+」而不是一个确数", async () => {
+    mockSearch.mockResolvedValue({
+      total: 29,
+      total_capped: true,
+      results: [hit(12448, "金剛經注", 2)],
+    } as unknown as ContentSearchResponse);
+    renderPopover();
+    fireEvent.click(screen.getByRole("button", { name: "全藏出处" }));
+    expect(await screen.findByRole("link", { name: /查看全部（29\+ 部）/ })).toBeInTheDocument();
+  });
+
   it("只命中本经时提示未找到，而不是空白", async () => {
     mockSearch.mockResolvedValue({ total: 1, results: [hit(7, "本经")] } as unknown as ContentSearchResponse);
     renderPopover();

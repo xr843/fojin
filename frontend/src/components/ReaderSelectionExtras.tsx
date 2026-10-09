@@ -78,7 +78,7 @@ export function SimilarPassages({ text, context }: { text: string; context: Sele
         </Link>
       ))}
       <Link className="reader-similar-all" to={`/search?q=${encodeURIComponent(q)}`}>
-        {t("reader.canonrefs.view_all", { n: data.total })}
+        {t("reader.canonrefs.view_all", { n: data.total_capped ? `${data.total}+` : data.total })}
       </Link>
     </div>
   );
