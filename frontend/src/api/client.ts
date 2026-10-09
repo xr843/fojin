@@ -237,6 +237,8 @@ export interface ContentSearchHit {
 
 export interface ContentSearchResponse {
   total: number;
+  /** phrase mode only: more texts may match than were verified — show `total` as a lower bound */
+  total_capped?: boolean;
   total_juans: number;
   page: number;
   size: number;
