@@ -125,6 +125,16 @@ class Settings(BaseSettings):
     # measured it has only 2 卍續藏 titles among 89 gold sources — so it cannot
     # see the case this prior would hurt (a reader asking what a commentator
     # said). Turn it on together with an LLM-arm faithfulness run, not before.
+    #
+    # ⛔ That run was done (2026-10-09, prod, 90 questions, temp 0, all arms in
+    # the same window, plus an off-vs-off arm to measure noise). Retrieval gain
+    # reproduced (strict Hit@5 0.342 → 0.384), but fascicle accuracy of the
+    # answers' quotes fell in every comparison: −5.6 / −4.2 / −6.2 pp against an
+    # off-vs-off noise of 2.0 pp (paired per question 7 better : 15 worse), and
+    # the model quoted ~20% less. Verbatim rate: −4.6 pp in round 1, −1.0 pp in
+    # round 2. Better sources in the prompt did not make answers more faithful,
+    # so it stays off. Re-measure before reopening; a retrieval-only win is not
+    # enough.
     # Never applies in master-persona mode: a Chan master's scoped corpus IS
     # 語錄 (古尊宿語錄 is an X text), and demoting it there is simply wrong.
     enable_canonical_prior: bool = False
