@@ -28,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sqlalchemy import text as sql_text
 
 from app.config import settings
+from app.core.elasticsearch import close_es, init_es
 from app.database import async_session
 from app.services.chat import _build_llm_messages
 from app.services.citation_guard import _norm_title
@@ -571,6 +572,31 @@ def compare_baseline(
         return [], str(exc)
 
 
+async def _run_questions(questions: list[dict], args: argparse.Namespace, test_set: dict) -> list[dict]:
+    results = []
+    for i, q in enumerate(questions):
+        print(f"  [{i+1}/{len(questions)}] {q['id']}: {q['question'][:40]}...", end="", flush=True)
+        try:
+            result = await run_single_question(
+                q, skip_llm=args.no_llm, temperature=args.temperature,
+                test_set_version=test_set.get("version"),
+            )
+            results.append(result)
+            score = result["scores"]
+            t = result["timing"]["total_s"]
+            if score.get("answer_completeness", -1) >= 0:
+                print(f" done ({score['answer_completeness']}/3, {t}s)")
+            else:
+                print(f" skipped ({t}s)")
+        except Exception as exc:
+            print(f" ERROR: {exc}")
+            results.append({
+                "id": q["id"], "category": q["category"], "question": q["question"],
+                "answer": f"[ERROR] {exc}", "scores": {}, "timing": {"total_s": 0},
+            })
+    return results
+
+
 async def main():
     parser = argparse.ArgumentParser(description="Run AI Chat evaluation")
     parser.add_argument("--category", type=str, help="Only run questions from this category")
@@ -610,27 +636,14 @@ async def main():
     print(f"Model: {settings.llm_model or 'auto-detect'}")
     print(f"LLM generation: {'OFF' if args.no_llm else 'ON'}\n")
 
-    results = []
-    for i, q in enumerate(questions):
-        print(f"  [{i+1}/{len(questions)}] {q['id']}: {q['question'][:40]}...", end="", flush=True)
-        try:
-            result = await run_single_question(
-                q, skip_llm=args.no_llm, temperature=args.temperature,
-                test_set_version=test_set.get("version"),
-            )
-            results.append(result)
-            score = result["scores"]
-            t = result["timing"]["total_s"]
-            if score.get("answer_completeness", -1) >= 0:
-                print(f" done ({score['answer_completeness']}/3, {t}s)")
-            else:
-                print(f" skipped ({t}s)")
-        except Exception as exc:
-            print(f" ERROR: {exc}")
-            results.append({
-                "id": q["id"], "category": q["category"], "question": q["question"],
-                "answer": f"[ERROR] {exc}", "scores": {}, "timing": {"total_s": 0},
-            })
+    # The production retrieval path reaches ES (paste_locate, #1279). Without a
+    # client it logs a warning and silently falls back to vector-only, so the
+    # eval would measure a pipeline no reader gets.
+    await init_es()
+    try:
+        results = await _run_questions(questions, args, test_set)
+    finally:
+        await close_es()
 
     report = generate_report(results, tag=args.tag)
 
