@@ -760,6 +760,8 @@
   "search.recent_searches": "最近搜索：",
   "search.filter_region": "国家/地区",
   "search.filter_institution": "馆藏",
+  "search.filter_toggle": "筛选",
+  "search.filter_toggle_count": "筛选（已选 {{n}}）",
   "search.failed_title": "搜索失败",
   "search.failed_subtitle": "搜索服务暂时不可用，请稍后重试。",
   "search.retry": "重试",

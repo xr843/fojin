@@ -21,26 +21,29 @@ export default function ExternalCard({ source, query }: { source: DataSource; qu
       <span className="s-ext-row-name">{localizedSourceName(source)}</span>
       {source.region && <Tag style={{ fontSize: 11, margin: 0 }}>{t(`region.${source.region}`, source.region)}</Tag>}
       <span className="s-ext-row-spacer" />
-      <a
-        className="s-card-btn-primary"
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label={t("search.search_at_source_aria", { name: localizedSourceName(source), query })}
-      >
-        <LinkOutlined /> {t("search.search_at_source")}
-      </a>
-      {source.base_url && (
+      {/* 两个按钮包成一组：窄屏时整组另起一行左对齐，不再随站名长短时而同行时而拆行 */}
+      <span className="s-ext-row-actions">
         <a
-          className="s-card-btn"
-          href={source.base_url}
+          className="s-card-btn-primary"
+          href={url}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label={t("search.visit_homepage_aria", { name: localizedSourceName(source) })}
+          aria-label={t("search.search_at_source_aria", { name: localizedSourceName(source), query })}
         >
-          <EyeOutlined /> {t("search.visit_homepage")}
+          <LinkOutlined /> {t("search.search_at_source")}
         </a>
-      )}
+        {source.base_url && (
+          <a
+            className="s-card-btn"
+            href={source.base_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={t("search.visit_homepage_aria", { name: localizedSourceName(source) })}
+          >
+            <EyeOutlined /> {t("search.visit_homepage")}
+          </a>
+        )}
+      </span>
     </div>
   );
 }

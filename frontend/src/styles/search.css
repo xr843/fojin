@@ -83,6 +83,13 @@
   overflow-y: auto;
 }
 
+/* 还没滚到底时底部渐隐（data-more 由 SearchFilterSidebar 的 FilterScroll 维护）：
+   提示「下面还有」，并且不再把最后一行字齐刷刷横切成半截。滚到底时遮罩撤掉。 */
+.s-filter-scroll[data-more] {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent);
+}
+
 .s-filter-scroll::-webkit-scrollbar {
   width: 3px;
 }
@@ -319,6 +326,13 @@
   min-width: 8px;
 }
 
+.s-ext-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
 .s-ext-toggle {
   display: block;
   width: 100%;
@@ -336,6 +350,28 @@
 .s-ext-toggle:hover {
   border-color: var(--fj-gold);
   color: var(--fj-ink);
+}
+
+/* ---------- 语义片段（经文内文片段卡） ---------- */
+/* 外框与截断必须分两层：overflow:hidden 裁到 padding 盒，line-clamp 只截内容盒，
+   写在同一元素上第 5 行会从下内边距里露出半截。截断层无纵向内边距，盒高 = 整 4 行。 */
+.s-semantic-snippet {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: var(--fj-sand-light, #faf7f2);
+  border-left: 3px solid var(--fj-gold);
+  border-radius: 4px;
+}
+
+.s-semantic-snippet-text {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--fj-ink-light);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow: hidden;
 }
 
 /* ---------- 辞典释义 ---------- */
@@ -462,15 +498,47 @@
   .s-layout {
     flex-direction: column;
   }
+  /* 手机：结果优先。分面默认折叠成「筛选」按钮（SearchFilterSidebar 用同一断点），
+     展开后单列——两列各 160px 时馆藏长名折两行、计数错位。 */
   .s-sidebar {
     width: 100%;
     position: static;
-    display: flex;
-    gap: 16px;
-    overflow-x: auto;
+  }
+  .s-filter-panel {
+    margin-top: 8px;
+    padding: 12px 14px 4px;
+    background: var(--fj-card-bg);
+    border: 1px solid var(--fj-border);
+    border-radius: 8px;
   }
   .s-filter-group {
-    min-width: 160px;
+    margin-bottom: 16px;
+  }
+  .s-filter-scroll {
+    max-height: 240px;
+  }
+  .s-filter-item {
+    min-height: 40px;
+    padding: 4px 0;
+    font-size: 14px;
+  }
+  .s-filter-count {
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    min-width: 2em;
+    padding-right: 4px;
+    text-align: right;
+  }
+  /* 外部源：按钮组总是另起一行、左对齐，不再随站名长短时而同行时而拆行 */
+  .s-ext-row {
+    row-gap: 8px;
+  }
+  .s-ext-row-spacer {
+    display: none;
+  }
+  .s-ext-row-actions {
+    flex-basis: 100%;
+    gap: 8px;
   }
   .s-card-rank {
     width: 36px;
@@ -503,3 +571,57 @@
 .s-ask-ai a { color: var(--fj-accent, #8b6914); font-weight: 500; }
 .s-ask-ai a:hover { text-decoration: underline; }
 .s-ask-ai-hint { color: var(--fj-ink-muted, #999); font-size: 12px; }
+
+/* 「筛选」折叠按钮（只在手机断点渲染） */
+.s-filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 14px;
+  font-size: 14px;
+  color: var(--fj-ink-light);
+  background: var(--fj-card-bg);
+  border: 1px solid var(--fj-border);
+  border-radius: 20px;
+  cursor: pointer;
+}
+.s-filter-toggle.is-active {
+  color: var(--fj-highlight);
+  border-color: var(--fj-highlight);
+}
+.s-filter-toggle-caret {
+  font-size: 10px;
+}
+
+/* 手机：「问小津」从 19px 高的纯文字链接变成 ≥40px 的胶囊按钮（触控目标）。
+   文字用 --fj-highlight：浅色下与 --fj-accent 同值（观感不变），暗色下它是为文字调过的
+   那支（--fj-accent 暗色当文字只有 3.35:1）。 */
+@media (max-width: 768px) {
+  .s-ask-ai {
+    margin-top: 0;
+  }
+  .s-ask-ai a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 40px;
+    max-width: 100%;
+    padding: 6px 16px;
+    font-size: 14px;
+    line-height: 1.4;
+    color: var(--fj-highlight);
+    background: var(--fj-card-bg);
+    border: 1px solid var(--fj-highlight);
+    border-radius: 20px;
+    text-align: center;
+  }
+  .s-ask-ai a:hover {
+    text-decoration: none;
+  }
+  .s-ask-ai-hint {
+    flex-basis: 100%;
+    text-align: center;
+  }
+}

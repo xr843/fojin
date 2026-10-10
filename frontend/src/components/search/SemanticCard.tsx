@@ -47,24 +47,11 @@ export default function SemanticCard({ hit, rank }: { hit: SemanticSearchHit; ra
           </Tag>
         </div>
 
-        {/* 匹配文本片段 */}
-        <div
-          style={{
-            padding: "8px 12px",
-            background: "var(--fj-sand-light, #faf7f2)",
-            borderLeft: "3px solid var(--fj-gold)",
-            borderRadius: 4,
-            marginTop: 8,
-            fontSize: 13,
-            lineHeight: 1.8,
-            color: "var(--fj-ink-light)",
-            display: "-webkit-box",
-            WebkitLineClamp: 4,
-            WebkitBoxOrient: "vertical" as const,
-            overflow: "hidden",
-          }}
-        >
-          {hit.snippet}
+        {/* 匹配文本片段。外框（底色/金边/内边距）和截断分两层：overflow:hidden 裁到的是
+            padding 盒，line-clamp 只管内容盒——两者写在同一个元素上时，第 5 行会从下内边距
+            里露出 8px 半截字（生产 390px 实测）。截断层不带纵向内边距，盒高正好等于 4 行。 */}
+        <div className="s-semantic-snippet">
+          <div className="s-semantic-snippet-text">{hit.snippet}</div>
         </div>
 
         <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
