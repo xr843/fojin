@@ -784,10 +784,7 @@
   .home-feature-icon { font-size: 22px; }
   .home-feature-desc { display: none; }
 
-  /* 左右各让出小津的落脚处（54 宽 + 右距 14 + 间隙 8）：手机上小津默认停在页脚
-     正上方右侧，信任说明是首页最后一行内容，放大到 12px 后折成多行，不让开就会
-     钻到小津身下。对称留白保持居中。 */
-  .home-trust { margin-top: 16px; font-size: 12px; padding: 0 76px; text-wrap: balance; }
+  .home-trust { margin-top: 16px; font-size: 12px; text-wrap: balance; }
   .home-trust-link { white-space: nowrap; }
 }
 
