@@ -49,7 +49,37 @@ function truncate(text: string, max: number): string {
   return text.slice(0, max) + "...";
 }
 
-function EntryItem({ entry }: { entry: DictEntry }) {
+/** 语言码 → 显示身份。zh/lzh 都显示为「中文」，比较时算同一种语言。 */
+function langIdentity(lang: string): string {
+  return LANG_LABEL_KEYS[lang] ?? lang;
+}
+
+/**
+ * 分组里的词条该不该挂语言标签。分组标题只写了辞典名，所以语言标签只在它
+ * 说了标题没说的事时才有用：
+ *   - 分组内语言不唯一（如 DPD 同时命中巴利与英文词条）；
+ *   - 或分组内语言唯一、却不是该辞典的默认语言（如 84000 登记为藏/英，
+ *     命中的全是英文词条）。
+ * defaultLang：undefined = 辞典信息还在加载（先不挂，免得标签闪一下又消失）；
+ * null = 拿不到辞典信息（不猜，照常挂）。默认语言取登记的第一种语言。
+ */
+function groupNeedsLangTag(entries: DictEntry[], defaultLang: string | null | undefined): boolean {
+  const langs = new Set(entries.map((e) => langIdentity(e.lang)));
+  if (langs.size > 1) return true;
+  if (defaultLang === undefined) return false;
+  if (defaultLang === null) return true;
+  return !langs.has(langIdentity(defaultLang));
+}
+
+function EntryItem({
+  entry,
+  showLang,
+  showSource,
+}: {
+  entry: DictEntry;
+  showLang: boolean;
+  showSource: boolean;
+}) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 
@@ -75,13 +105,15 @@ function EntryItem({ entry }: { entry: DictEntry }) {
           {entry.reading && (
             <span className="dict-entry-reading">({entry.reading})</span>
           )}
-          <Tag
-            color={LANG_COLORS[entry.lang] || "default"}
-            style={{ fontSize: 11, marginLeft: 8 }}
-          >
-            {LANG_LABEL_KEYS[entry.lang] ? t(LANG_LABEL_KEYS[entry.lang]) : entry.lang}
-          </Tag>
-          {entry.source_name && (
+          {showLang && (
+            <Tag
+              color={LANG_COLORS[entry.lang] || "default"}
+              style={{ fontSize: 11, marginLeft: 8 }}
+            >
+              {LANG_LABEL_KEYS[entry.lang] ? t(LANG_LABEL_KEYS[entry.lang]) : entry.lang}
+            </Tag>
+          )}
+          {showSource && entry.source_name && (
             <Tag color="orange" style={{ fontSize: 11, marginLeft: 4 }}>
               {entry.source_name}
             </Tag>
@@ -116,11 +148,21 @@ function EntryItem({ entry }: { entry: DictEntry }) {
 
 const COLLAPSE_THRESHOLD = 3;
 
-function DictGroup({ group, defaultExpanded = false }: { group: DictGroupedResult; defaultExpanded?: boolean }) {
+function DictGroup({
+  group,
+  defaultLang,
+  defaultExpanded = false,
+}: {
+  group: DictGroupedResult;
+  defaultLang: string | null | undefined;
+  defaultExpanded?: boolean;
+}) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(defaultExpanded);
   const hasMore = group.entries.length > COLLAPSE_THRESHOLD;
   const visibleEntries = expanded ? group.entries : group.entries.slice(0, COLLAPSE_THRESHOLD);
+  // 按整组（不只是折叠后可见的前几条）判断，展开时标签不会忽然冒出来。
+  const showLang = groupNeedsLangTag(group.entries, defaultLang);
 
   return (
     <div className="dict-group">
@@ -134,7 +176,13 @@ function DictGroup({ group, defaultExpanded = false }: { group: DictGroupedResul
       </div>
       <div className="dict-entry-list">
         {visibleEntries.map((entry) => (
-          <EntryItem key={entry.id} entry={entry} />
+          <EntryItem
+            key={entry.id}
+            entry={entry}
+            showLang={showLang}
+            // 分组标题已写着辞典名；只有词条来源与分组不一致时才值得再标一次。
+            showSource={entry.source_code !== group.source_code && entry.source_name !== group.source_name}
+          />
         ))}
       </div>
       {hasMore && (
@@ -166,7 +214,7 @@ export default function DictionaryPage() {
   const [sourceFilter, setSourceFilter] = useState<string>(initialSource);
   const [page, setPage] = useState(1);
 
-  const { data: sources, isLoading: loadingSources } = useQuery({
+  const { data: sources, isLoading: loadingSources, isError: sourcesFailed } = useQuery({
     queryKey: ["dict-sources"],
     queryFn: getDictionarySources,
     staleTime: 300_000,
@@ -234,7 +282,7 @@ export default function DictionaryPage() {
     sourceFilter && sources ? sources.find((s) => s.code === sourceFilter) ?? null : null;
 
   return (
-    <div className="dict-page">
+    <div className={isSearching ? "dict-page dict-page--with-ask" : "dict-page"}>
       <Helmet>
         <title>{`${t("nav.dictionary")} - ${t("app.name")}`}</title>
       </Helmet>
@@ -382,7 +430,18 @@ export default function DictionaryPage() {
                 {t("dict.results_found_prefix")} <strong>{searchResult.total}</strong> {t("dict.results_found_suffix")}
               </div>
               {searchResult.groups.map((group) => (
-                <DictGroup key={group.source_code} group={group} defaultExpanded={!!sourceFilter} />
+                <DictGroup
+                  key={group.source_code}
+                  group={group}
+                  defaultLang={
+                    sources
+                      ? (sources.find((s) => s.code === group.source_code)?.languages[0] ?? null)
+                      : sourcesFailed
+                        ? null
+                        : undefined
+                  }
+                  defaultExpanded={!!sourceFilter}
+                />
               ))}
               {searchResult.page_size && (
                 <div style={{ textAlign: "center", padding: "16px 0" }}>
@@ -401,15 +460,17 @@ export default function DictionaryPage() {
             <Empty description={t("dict.no_results", { query })} />
           )}
 
-          {/* Ask AI floating button */}
+          {/* Ask AI floating button. 手机上缩成圆形图标按钮（见 dictionary.css），文字靠 aria-label/title 保留。 */}
           <div className="dict-ask-ai">
             <Button
               type="primary"
               icon={<RobotOutlined />}
+              aria-label={t("dict.ask_ai")}
+              title={t("dict.ask_ai")}
               style={{ background: "var(--fj-accent)", borderColor: "var(--fj-accent)" }}
               onClick={() => navigate(`/chat?q=${encodeURIComponent(query)}`)}
             >
-              {t("dict.ask_ai")}
+              <span className="dict-ask-ai-label">{t("dict.ask_ai")}</span>
             </Button>
           </div>
         </>

@@ -314,9 +314,41 @@
     padding: 10px 12px;
   }
 
+  /* 手机上「问小津」胶囊（96×44）盖住了词条正文右下角：「般若」首屏压住
+     15 个字、3 行。缩成 44×44 圆形图标按钮，文字留给 aria-label/title；
+     每条词条展开后还有贴着内容的「就某某问小津」出口，浮钮不必再写字。 */
   .dict-ask-ai {
-    right: 16px;
-    bottom: 16px;
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .dict-ask-ai .ant-btn {
+    width: 44px;
+    min-width: 44px;
+    padding: 0;
+    border-radius: 50%;
+  }
+
+  .dict-ask-ai .ant-btn .dict-ask-ai-label {
+    display: none;
+  }
+
+  /* 浮钮常驻右下角，内容底部留出「按钮高度 + 底距 + 间隙」，最后一条
+     词条/分页器能滚到按钮上方，而不是永远垫在它下面。 */
+  .dict-page--with-ask {
+    padding-bottom: calc(44px + 12px + 24px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* 清空按钮 antd 默认只有 12×12，手指点不中。视觉不变，用伪元素把命中区
+     扩到 32×32（伪元素的点击归属本元素，不挤占输入框宽度）。 */
+  .dict-search-box .ant-input-clear-icon {
+    position: relative;
+  }
+
+  .dict-search-box .ant-input-clear-icon::after {
+    content: "";
+    position: absolute;
+    inset: -10px;
   }
 }
 
