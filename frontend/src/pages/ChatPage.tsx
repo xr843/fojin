@@ -91,8 +91,12 @@ import { useNarrowViewport } from "../hooks/useNarrowViewport";
 // 登录用户的额度提示只在快用完时出现。常驻一个「今日剩余 198 次」是纯噪音 ——
 // 而毫无预警地撞上上限、直接吃一个错误，才是真正会让人懵的那种体验。
 const LOW_QUOTA_THRESHOLD = 20;
-/** 桌面侧栏展开宽度。任务要求 260–280；264 让 1280 屏的对话列留 936px。 */
-const SIDEBAR_EXPANDED_W = 264;
+/** 桌面侧栏展开宽度：≥1440px 加宽到 264（220 下会话标题只露约 8 个字），以下保持 220。
+ *  小屏不加宽是因为引文抽屉（默认 560px，用户常开着读）与侧栏并排时，1280 屏对话列只剩
+ *  约 400px，侧栏再宽 44px 就更挤；标题两行截断已能缓解小屏的辨认问题。 */
+const SIDEBAR_EXPANDED_W_WIDE = 264;
+const SIDEBAR_EXPANDED_W = 220;
+const SIDEBAR_WIDE_QUERY = "(min-width: 1440px)";
 
 const MAX_ATTACHMENTS = 5;
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
@@ -1711,6 +1715,9 @@ export default function ChatPage() {
   // 接了触控板/鼠标的 iPad 两者都报精细指针，那时多半也接了键盘，保留提示是对的。
   // 只改 placeholder 这一个 prop，不碰输入框节点 —— Tab 轮播的 effect 依赖节点同一性。
   const coarsePointer = useNarrowViewport("(pointer: coarse)");
+  // 同一个 matchMedia 包装，这里判的是「宽屏」而非窄屏。
+  const wideDesktop = useNarrowViewport(SIDEBAR_WIDE_QUERY);
+  const sidebarExpandedW = wideDesktop ? SIDEBAR_EXPANDED_W_WIDE : SIDEBAR_EXPANDED_W;
 
   // Attach native keydown listener to capture Tab before Ant Design / browser handles it
   useEffect(() => {
@@ -1858,9 +1865,8 @@ export default function ChatPage() {
         )}
 
         {/* Sidebar (desktop, logged in only) */}
-        {/* 展开宽 264（原 220）：220 下会话标题只露约 8 个字。加宽后 1280 宽屏的
-            对话列仍有 936px（内列 840 封顶），见 PR 描述里的实测表。 */}
-        {user && <div style={{ width: sidebarCollapsed ? 48 : SIDEBAR_EXPANDED_W, flexShrink: 0, display: "flex", flexDirection: "column", gap: 8, transition: "width 0.18s ease" }}
+        {/* 展开宽：≥1440px 为 264，以下 220（理由见 SIDEBAR_EXPANDED_W 注释）。 */}
+        {user && <div style={{ width: sidebarCollapsed ? 48 : sidebarExpandedW, flexShrink: 0, display: "flex", flexDirection: "column", gap: 8, transition: "width 0.18s ease" }}
              className="chat-sidebar"
              data-collapsed={sidebarCollapsed || undefined}>
           <Tooltip title={sidebarCollapsed ? t("chat.expand_sidebar") : t("chat.collapse_sidebar")} placement="right">
