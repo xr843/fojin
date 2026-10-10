@@ -10,7 +10,15 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { escapeHtml } from "../../utils/sanitize";
 import { useEffectiveTheme } from "../../hooks/useTheme";
 import { typeColors } from "./typeColors";
+import { collapseAttributionIfNarrow } from "./mapAttribution";
+import { useNarrowViewport } from "../../hooks/useNarrowViewport";
 import type { KGGeoEntity, KGLineageArc } from "../../api/client";
+
+/** Same breakpoint as the mobile block in kg-map.css. */
+const PHONE_QUERY = "(max-width: 768px)";
+/** Below this zoom every dot is clamped to radiusMinPixels (2.5 km ≪ 1 px), so on a
+ *  phone-width map 65k dots tile eastern China solid and bury the city labels. */
+const DENSE_ZOOM = 6;
 
 const INITIAL_VIEW_STATE = {
   longitude: 115,
@@ -71,6 +79,10 @@ export default function DeckGLMap({
   const [arcTooltip, setArcTooltip] = useState<ArcTooltipState | null>(null);
   const [viewState, setViewState] = useState<typeof INITIAL_VIEW_STATE & { transitionDuration?: number }>(INITIAL_VIEW_STATE);
   const mapRef = useRef<MapRef>(null);
+  const isPhone = useNarrowViewport(PHONE_QUERY);
+  // A boolean, not the raw zoom, so the layers below rebuild only when the
+  // threshold is crossed — not on every frame of a pinch.
+  const denseOverview = isPhone && viewState.zoom < DENSE_ZOOM;
 
   // Fly to focused entity when it changes (state adjusted during render so the
   // transition starts on the same commit, without an effect-driven extra pass)
@@ -244,7 +256,7 @@ export default function DeckGLMap({
         lineWidthMinPixels: 0.5,
         stroked: true,
         getRadius: 2500,
-        radiusMinPixels: 3,
+        radiusMinPixels: denseOverview ? 2 : 3,
         radiusMaxPixels: 9,
         pickable: true,
         autoHighlight: true,
@@ -310,7 +322,7 @@ export default function DeckGLMap({
     }
 
     return result;
-  }, [filteredEntities, filteredArcs, showArcs, handleHover, handleClick, focusEntity, pulseScale, TYPE_COLORS]);
+  }, [filteredEntities, filteredArcs, showArcs, handleHover, handleClick, focusEntity, pulseScale, TYPE_COLORS, denseOverview]);
 
   return (
     <>
@@ -319,10 +331,19 @@ export default function DeckGLMap({
         onViewStateChange={(e) => setViewState(e.viewState as typeof viewState)}
         controller
         layers={layers}
+        // Smaller dots on phones must not mean harder taps: let a fingertip
+        // within 8px pick the nearest dot. Desktop keeps exact mouse picking.
+        pickingRadius={isPhone ? 8 : 0}
         useDevicePixels={true}
         style={{ position: "absolute", inset: "0" }}
       >
-        {patchedStyle && <Map ref={mapRef} mapStyle={patchedStyle} />}
+        {patchedStyle && (
+          <Map
+            ref={mapRef}
+            mapStyle={patchedStyle}
+            onLoad={(e) => collapseAttributionIfNarrow(e.target)}
+          />
+        )}
       </DeckGL>
 
       {tooltip && (() => {
