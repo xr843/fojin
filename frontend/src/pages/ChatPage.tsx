@@ -91,6 +91,8 @@ import { useNarrowViewport } from "../hooks/useNarrowViewport";
 // 登录用户的额度提示只在快用完时出现。常驻一个「今日剩余 198 次」是纯噪音 ——
 // 而毫无预警地撞上上限、直接吃一个错误，才是真正会让人懵的那种体验。
 const LOW_QUOTA_THRESHOLD = 20;
+/** 桌面侧栏展开宽度。任务要求 260–280；264 让 1280 屏的对话列留 936px。 */
+const SIDEBAR_EXPANDED_W = 264;
 
 const MAX_ATTACHMENTS = 5;
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
@@ -283,7 +285,7 @@ function SessionRow({ s, active, onSelect, onRename, onTogglePin, onDelete }: Se
       // 选中/悬停的配色全部交给 CSS（见 .chat-session-row[data-active]）——
       // 行内 style 的优先级压过类选择器，留在这里会让 :hover 规则永远不生效。
       style={{
-        padding: "8px 6px 8px 12px",
+        padding: "7px 6px 7px 12px",
         borderRadius: 6,
         cursor: "pointer",
         fontSize: 13,
@@ -294,7 +296,10 @@ function SessionRow({ s, active, onSelect, onRename, onTogglePin, onDelete }: Se
       }}
       onClick={() => onSelect(s.id)}
     >
-      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+      {/* 标题最多两行（.chat-session-title 的 line-clamp）。单行时 220px 侧栏只露
+          约 8 个字，「《心经》「色不异空」与「…」」这类同前缀的会话彼此无法区分。
+          title 属性在悬停时给出全文，两行仍放不下的长标题靠它补齐。 */}
+      <span className="chat-session-title" title={s.title || undefined}>
         {pinned && (
           <PushpinFilled
             className="chat-session-pin-mark"
@@ -811,6 +816,9 @@ export default function ChatPage() {
       return Number.isFinite(ts) && Date.now() - ts < 14 * 86400_000;
     } catch { return false; }
   });
+  // 游客配额横幅被用户关掉了（本页内有效）。它和保存提示合并成一条之后，关闭必须
+  // 由这里显式记住：否则关掉合并横幅、保存提示消失的那一刻，配额那一半会当场复活。
+  const [guestQuotaClosed, setGuestQuotaClosed] = useState(false);
   const dismissSaveHint = useCallback(() => {
     setSaveHintDismissed(true);
     try { window.localStorage.setItem(SAVE_HINT_KEY, String(Date.now())); } catch { /* ignore */ }
@@ -1792,6 +1800,14 @@ export default function ChatPage() {
     URL.revokeObjectURL(url);
   }, [messages, sessions, sessionId, t, i18n.language]);
 
+  // 游客输入区横幅的两个来源（渲染处合成一条，见那里的注释）。
+  // 配额：过期者此刻确实是游客，但对他说「登录后额度更多」是答非所问 ——
+  // 他刚才就是登录状态，这一条让位给下面那句过期说明（!expired）。
+  const guestBannerQuota = !user && !expired && !keyStatus?.has_api_key && !!quota && quota.remaining >= 0
+    && !guestQuotaClosed;
+  const guestBannerSaveHint = !user && !sending && !saveHintDismissed
+    && messages.some((m) => m.role === "assistant" && m.content !== REQUEST_FAILED_SENTINEL);
+
   return (
     <>
       <Helmet><title>{t("chat.page_title")}</title></Helmet>
@@ -1809,7 +1825,7 @@ export default function ChatPage() {
           <>
             <div className="chat-sidebar-overlay" onClick={() => setSidebarOpen(false)} />
             <div className="chat-sidebar-drawer">
-              <Button icon={<PlusOutlined />} block onClick={() => { handleNewChat(); setSidebarOpen(false); }}>{t("chat.new_chat")}</Button>
+              <Button className="chat-sidebar-new" icon={<PlusOutlined />} block onClick={() => { handleNewChat(); setSidebarOpen(false); }}>{t("chat.new_chat")}</Button>
               <div className="chat-session-list" style={{ flex: 1, overflow: "auto", marginTop: 8 }}>
                 {groupedSessions.map((group) => (
                   <div key={group.label}>
@@ -1842,7 +1858,9 @@ export default function ChatPage() {
         )}
 
         {/* Sidebar (desktop, logged in only) */}
-        {user && <div style={{ width: sidebarCollapsed ? 48 : 220, flexShrink: 0, display: "flex", flexDirection: "column", gap: 8, transition: "width 0.18s ease" }}
+        {/* 展开宽 264（原 220）：220 下会话标题只露约 8 个字。加宽后 1280 宽屏的
+            对话列仍有 936px（内列 840 封顶），见 PR 描述里的实测表。 */}
+        {user && <div style={{ width: sidebarCollapsed ? 48 : SIDEBAR_EXPANDED_W, flexShrink: 0, display: "flex", flexDirection: "column", gap: 8, transition: "width 0.18s ease" }}
              className="chat-sidebar"
              data-collapsed={sidebarCollapsed || undefined}>
           <Tooltip title={sidebarCollapsed ? t("chat.expand_sidebar") : t("chat.collapse_sidebar")} placement="right">
@@ -1862,7 +1880,7 @@ export default function ChatPage() {
             <Button
               icon={sidebarCollapsed ? <RailNewChatIcon /> : <PlusOutlined />}
               type={sidebarCollapsed ? "text" : "default"}
-              className={sidebarCollapsed ? "chat-rail-btn" : undefined}
+              className={sidebarCollapsed ? "chat-rail-btn" : "chat-sidebar-new"}
               block={!sidebarCollapsed}
               onClick={handleNewChat}
               aria-label={t("chat.new_chat")}
@@ -1899,14 +1917,17 @@ export default function ChatPage() {
             </Tooltip>
           )}
           {!sidebarCollapsed && sessions && sessions.length > 5 && (
+            // 与上方「新对话」同高同圆角（.chat-sidebar-search）。原先 size="small"
+            // 只有 21px 高、12px 字，像一个裸输入框挂在 32px 按钮下面。
             <Input
               ref={sessionSearchRef}
+              className="chat-sidebar-search"
               placeholder={t("chat.search_sessions")}
-              size="small"
+              aria-label={t("chat.search_sessions_label")}
+              prefix={<RailSearchIcon />}
               allowClear
               value={sessionFilter}
               onChange={(e) => setSessionFilter(e.target.value)}
-              style={{ marginTop: 4, fontSize: 12 }}
             />
           )}
           {!sidebarCollapsed && <div className="chat-session-list" style={{ flex: 1, overflow: "auto", marginTop: 8 }}>
@@ -2089,25 +2110,37 @@ export default function ChatPage() {
             {/* 游客转化钩子：拿到第一条成功回复后提示保存历史（可关闭，14 天
                 静默）。固定在输入区上方而非消息流末尾：消息流尾部的 mount 受
                 scrollToBottom 时序影响可能落在视口外，用户永远看不到。
-                排除失败哨兵回复——在报错下面劝人"保存这段对话"很荒谬。 */}
-            {!user && !sending && !saveHintDismissed
-              && messages.some((m) => m.role === "assistant" && m.content !== REQUEST_FAILED_SENTINEL) && (
+                排除失败哨兵回复——在报错下面劝人"保存这段对话"很荒谬。
+
+                它与游客配额说明合成**一条**横幅：两条说的是同一件事（去登录），
+                只是理由不同；首答之后两条叠在一起，手机上约 130px 压缩消息区
+                （2026-10-10 生产 390px 实测）。两者都该出现时，一行里同时给出
+                剩余次数与「登录保存」；只有一方成立时显示那一方的原文案。
+                出现条件逐字沿用合并前的两条，没有改动。 */}
+            {guestBannerSaveHint || guestBannerQuota ? (
               <Alert
-                type="info"
+                type={guestBannerQuota && quota && quota.remaining <= 2 ? "warning" : "info"}
                 showIcon
                 closable
-                onClose={dismissSaveHint}
+                onClose={() => {
+                  if (guestBannerSaveHint) dismissSaveHint();
+                  if (guestBannerQuota) setGuestQuotaClosed(true);
+                }}
                 style={{ marginBottom: 8, fontSize: 12 }}
-                message={
+                message={guestBannerSaveHint ? (
                   <span>
-                    {t("chat.guest_save_hint")}
+                    {guestBannerQuota && quota
+                      ? t("chat.guest_quota_save_hint", { n: quota.remaining })
+                      : t("chat.guest_save_hint")}
                     <a onClick={goLoginKeepingTranscript} style={{ marginLeft: 4 }}>
                       {t("chat.guest_save_hint_cta")}
                     </a>
                   </span>
-                }
+                ) : (
+                  <span>{t("chat.quota_info", { limit: quota?.limit, remaining: quota?.remaining })}<a onClick={() => navigate("/login")}>{t("chat.login")}</a>{t("chat.login_quota_hint")}</span>
+                )}
               />
-            )}
+            ) : null}
             {/* 宗风 selector lives in the composer toolbar below (.chat-lineage-btn).
                 It used to be a grey <Select> reading "通用助手" — the 15 master
                 personas, this product's sharpest differentiator, hid inside it. It
@@ -2133,15 +2166,6 @@ export default function ChatPage() {
                 }
               />
             </DraggableModal>
-            {/* 过期者此刻确实是游客，但对他说「登录后额度更多」是答非所问 ——
-                他刚才就是登录状态。这一条让位给下面那句过期说明。 */}
-            {!user && !expired && !keyStatus?.has_api_key && quota && quota.remaining >= 0 && (
-              <Alert
-                message={<span>{t("chat.quota_info", { limit: quota.limit, remaining: quota.remaining })}<a onClick={() => navigate("/login")}>{t("chat.login")}</a>{t("chat.login_quota_hint")}</span>}
-                type={quota.remaining <= 2 ? "warning" : "info"} showIcon closable
-                style={{ marginBottom: 8, fontSize: 12 }}
-              />
-            )}
             {/* 「登录态是自己死的」这件事，只能靠标记传下来：401 拦截器会先
                 logout() 把 user 清空，此后 user==null 与「从没登录过」完全一样。
                 这里不能只判 user —— 实测那样横幅只在 401 到达前闪一下就没了。
