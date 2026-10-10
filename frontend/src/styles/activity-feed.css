@@ -82,20 +82,23 @@
   margin-top: 7px;
 }
 
+/* 类型色点（新经文绿 / 译本蓝 / 影像橙 / 结构红）是分类编码，四色都保留，但换成站点
+   语义 token（--fj-success / info / warning / danger）：随暗色切换，且对页面底色的
+   对比度都比原来写死的 antd 默认色高。 */
 .feed-item-dot.new_text {
-  background: #52c41a;
+  background: var(--fj-success);
 }
 
 .feed-item-dot.translation {
-  background: #1890ff;
+  background: var(--fj-info);
 }
 
 .feed-item-dot.scan {
-  background: #fa8c16;
+  background: var(--fj-warning);
 }
 
 .feed-item-dot.schema {
-  background: #f5222d;
+  background: var(--fj-danger);
 }
 
 .feed-item-dot.default {

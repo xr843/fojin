@@ -138,7 +138,7 @@ export default function SourceCard({ source: s, searchQuery }: SourceCardProps) 
           )}
           {s.supports_search && (
             <Tooltip title={t("sources.badge_searchable_tip")}>
-              <Tag color="blue" className="source-card-badge">
+              <Tag className="source-card-badge">
                 <SearchOutlined /> {t("sources.badge_searchable")}
               </Tag>
             </Tooltip>

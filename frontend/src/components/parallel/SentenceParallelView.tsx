@@ -95,7 +95,7 @@ function SentencePairCard({
         </Tag>
         {pair.side_b.title && <span>{pair.side_b.title}</span>}
         {badgeKey && (
-          <Tag color="blue" style={{ margin: 0 }}>
+          <Tag style={{ margin: 0 }}>
             {t(badgeKey)}
           </Tag>
         )}

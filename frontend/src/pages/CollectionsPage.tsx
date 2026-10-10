@@ -67,14 +67,15 @@ function TextItem({ text, cbetaMap }: { text: CollectionText; cbetaMap: Record<s
           <Link to={target!} aria-label={text.cbeta_id}>
             <Tag
               color={textId ? "green" : "volcano"}
-              style={{ fontSize: 10, margin: 0, lineHeight: "16px", padding: "0 4px", cursor: "pointer" }}
+              className="coll-text-tag"
+              style={{ cursor: "pointer" }}
             >
               {text.cbeta_id}
             </Tag>
           </Link>
         )}
         {textId && (
-          <Tag color="green" style={{ fontSize: 10, margin: 0, lineHeight: "16px", padding: "0 4px" }}>
+          <Tag color="green" className="coll-text-tag">
             {t("collections.indexed")}
           </Tag>
         )}
@@ -172,7 +173,7 @@ function CollectionCard({
           <span className="coll-card-title-row">
             <BookOutlined className="coll-card-icon" aria-hidden="true" />
             <span className="coll-card-name">{coll.name}</span>
-            <Tag style={{ fontSize: 11, marginLeft: 8 }}>{coll.tradition}</Tag>
+            <Tag className="coll-card-tradition">{coll.tradition}</Tag>
             <span className="coll-card-count">
               {t("collections.card_stats", { texts: coll.mainTexts.length + coll.commentaries.length, resources: totalResources })}
             </span>

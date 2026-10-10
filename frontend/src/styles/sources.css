@@ -162,10 +162,16 @@
   padding: 8px 12px;
   font-size: 13px;
   color: var(--fj-ink);
-  background: rgba(24, 144, 255, 0.08);
-  border-left: 3px solid #1890ff;
+  /* 金色淡底 + 金色左线：沿用本页英雄区的暖金色系（原为 antd 默认蓝 #1890ff）。 */
+  background: rgba(176, 141, 87, 0.08);
+  border-left: 3px solid var(--fj-gold);
   border-radius: 4px;
   line-height: 1.5;
+}
+
+/* 暗色下叠金色会把底提亮、正文对比度从 10.9 掉到 10.0；改为压暗一层，对比度不降。 */
+:root[data-theme="dark"] .sources-hero-search-result {
+  background: rgba(0, 0, 0, 0.18);
 }
 
 @media (max-width: 520px) {
@@ -302,10 +308,16 @@
   box-shadow: 0 2px 12px rgba(176, 141, 87, 0.08);
 }
 
+/* 顶行：图标 | 标题列 | 徽标组。标题列至少保留 150px，放不下时整组徽标落到下一行、
+   靠右排，组内再折行。原先只在 ≤768px 这样做（#1292）；≥769px 徽标组不收缩不折行，
+   英文 4–5 个徽标在平板 820 把标题列挤成 22px 宽的竖条、桌面 1440 挤到 48px
+   （2026-10-10 实测），所以提到所有宽度。 */
 .source-card-top {
   display: flex;
   align-items: flex-start;
+  flex-wrap: wrap;
   gap: 10px;
+  row-gap: 6px;
   margin-bottom: 8px;
 }
 
@@ -317,7 +329,7 @@
 }
 
 .source-card-titles {
-  flex: 1;
+  flex: 1 1 150px;
   min-width: 0;
 }
 
@@ -344,7 +356,14 @@
 .source-card-badges {
   display: flex;
   gap: 4px;
-  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: auto;
+  /* 落到自己那一行后整组宽度以卡片为限，组内徽标才会真的折行（否则 320 宽英文
+     伸出卡片 71px、页面横向溢出 27px）。 */
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .source-card-badge.ant-tag {
@@ -642,20 +661,7 @@
     font-size: 12px;
     line-height: 18px;
   }
-  /* 徽标放大后会更宽，原本就最窄只剩 76px 的标题列会被挤得更窄。允许顶行折行：
-     标题列至少保留 150px，放不下时整组徽标落到下一行、靠右排。 */
-  .source-card-top {
-    flex-wrap: wrap;
-    row-gap: 6px;
-  }
-  .source-card-titles {
-    flex: 1 1 150px;
-  }
-  .source-card-badges {
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    margin-left: auto;
-  }
+  /* 徽标放大后更宽，更多卡片会把徽标组折到下一行 —— 折行规则见上方 .source-card-top。 */
 
   .sources-grid {
     /* 不能写 1fr：它等于 minmax(auto, 1fr)，最小值取卡片 min-content（504px），

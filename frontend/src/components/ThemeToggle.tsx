@@ -9,6 +9,7 @@ export default function ThemeToggle() {
   const setMode = useThemeStore((s) => s.setMode);
   return (
     <Segmented
+      className="header-theme-toggle"
       size="small"
       value={mode}
       onChange={(v) => setMode(v as ThemeMode)}

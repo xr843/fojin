@@ -60,7 +60,7 @@ export default function OtherVersions({ textId }: { textId: number }) {
                 }
                 description={
                   <Text type="secondary">
-                    <Tag color="blue">{lang}</Tag>
+                    <Tag>{lang}</Tag>
                     {canon && <Tag>{canon}</Tag>}
                     {w.cbeta_id}
                   </Text>
