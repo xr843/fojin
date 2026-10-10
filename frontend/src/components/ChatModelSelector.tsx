@@ -145,7 +145,9 @@ export default function ChatModelSelector({ value, onChange, onConfigureKey }: C
   return (
     <Select
       size="small"
-      style={{ minWidth: 180 }}
+      // 最小宽度 180 写在 global.css 的 .chat-model-select 里而不是行内：
+      // 手机窄屏要把它放开，让发送钮能回到同一行；行内样式断点改不动。
+      className="chat-model-select"
       // 弹层不跟随触发器宽度：触发器只有 180px，跟随会把「通义千问 Qwen3.6 Plus」
       // 「Kimi K2.6（需配置 Key）」这类较长的标签截断。
       popupMatchSelectWidth={false}

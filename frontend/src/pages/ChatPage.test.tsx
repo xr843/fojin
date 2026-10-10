@@ -267,6 +267,41 @@ describe("ChatPage 首屏结构", () => {
     expect(list!.compareDocumentPosition(foot!) & FOLLOWING).toBeTruthy();
   });
 
+  // 输入框 placeholder 末尾的「⇥ Tab  ⇧⏎ 换行」是键盘提示，手机上没有这两个键，
+  // 390px 下它还会单独折出第二行（2026-10-10 生产实测）。主输入是手指
+  // （pointer: coarse）时只留建议问题本身；桌面保持原样。
+  describe("placeholder 键盘提示", () => {
+    const realMatchMedia = window.matchMedia;
+    afterEach(() => {
+      window.matchMedia = realMatchMedia;
+    });
+    function emulatePointer(coarse: boolean) {
+      window.matchMedia = ((query: string) => ({
+        matches: coarse && query === "(pointer: coarse)",
+        media: query, onchange: null,
+        addListener: () => {}, removeListener: () => {},
+        addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
+      })) as unknown as typeof window.matchMedia;
+    }
+
+    it("触屏：只留建议问题，不带 Tab / ⇧⏎ 提示", async () => {
+      emulatePointer(true);
+      const { container } = await renderEmpty();
+      const ta = container.querySelector("textarea")!;
+      await waitFor(() => expect(ta.placeholder).toContain("什么是四圣谛？"));
+      expect(ta.placeholder).toBe("什么是四圣谛？");
+    });
+
+    it("桌面：仍带 Tab / ⇧⏎ 提示", async () => {
+      emulatePointer(false);
+      const { container } = await renderEmpty();
+      const ta = container.querySelector("textarea")!;
+      await waitFor(() => expect(ta.placeholder).toContain("什么是四圣谛？"));
+      expect(ta.placeholder).toContain("⇥ Tab");
+      expect(ta.placeholder).toContain("⇧⏎");
+    });
+  });
+
   // P1 的承重约束。THINKING_SENTINEL 是按身份比较的哨兵：onDone 里「流结束但
   // 从未收到 token → 转失败哨兵」的兜底靠它。若实现把检索到的经名写进 content，
   // 那条兜底失效，用户会永远卡在假的「正在检索…」上且没有重试按钮。

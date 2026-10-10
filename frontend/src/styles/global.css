@@ -734,18 +734,78 @@ em {
 .chat-input-toolbar > .chat-input-spacer {
   flex: 1;
 }
-/* On narrow viewports the model selector + Send + "+" can squeeze the
-   spacer to zero and overflow to the right. Allow the toolbar to wrap
-   so the Send button drops to a second row below the model selector
-   instead of horizontally clipping. */
+.chat-model-select {
+  min-width: 180px;
+}
+/* 窄屏：发送钮留在工具行右端，输入卡片两行高（文本框 + 工具行）。
+   原先这里让工具栏 wrap、spacer 撑满 100% 把发送钮单独挤到第三行
+   （2026-10-10 生产 390px 实测：卡片 155px 高，工具栏 75px 里发送钮独占一行）。
+   不再 wrap：wrap 会在收缩之前先换行，模型选择器永远等不到被压窄的机会。
+   现在的分配：「＋」与宗风按钮不缩，发送钮收成 36px 仅图标圆钮（文字隐藏，
+   名字由 aria-label 给），剩下的宽度全给模型选择器 —— 它放开 180px 的
+   最小宽度、可以收窄，选中项过长时省略号截断，点开后的下拉弹层不跟随
+   触发器宽度（popupMatchSelectWidth=false），完整模型名照常可选。 */
 @media (max-width: 480px) {
   .chat-input-toolbar {
-    flex-wrap: wrap;
-    row-gap: 6px;
+    gap: 6px;
+  }
+  .chat-input-toolbar > .ant-btn:not(.chat-send-btn) {
+    flex-shrink: 0;
+  }
+  .chat-input-toolbar > .chat-model-select {
+    min-width: 0;
+    flex: 0 1 auto;
+  }
+  /* 选中项是 logo + 文字的 inline-flex：省略号要落在里层文字上才出得来。 */
+  .chat-model-select .ant-select-selection-item > span {
+    max-width: 100%;
+    vertical-align: top;
+  }
+  .chat-model-select .ant-select-selection-item > span > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .chat-input-toolbar > .chat-input-spacer {
-    flex-basis: 100%;
-    height: 0;
+    min-width: 0;
+  }
+  .chat-input-toolbar > .chat-send-btn.ant-btn {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: 50%;
+  }
+  .chat-input-toolbar > .chat-send-btn.ant-btn > span:not(.ant-btn-icon) {
+    display: none;
+  }
+}
+
+/* 输入区横幅（游客配额 / 登录过期 / 额度将尽 / 保存对话）里的链接和关闭钮在
+   手机上只有 24×17 与 12×12.5（2026-10-10 生产实测），手指点不准。视觉不变，
+   用绝对定位的伪元素把命中区撑到 ≥ 40×40：点在伪元素上就是点在元素本身。
+   不加 padding —— 那会把链接两侧的正文推开、改变横幅折行。按 pointer 精度
+   而不是宽度判：这是手指的问题，与屏宽无关。 */
+@media (pointer: coarse) {
+  .chat-main-column .ant-alert a,
+  .chat-main-column .ant-alert .ant-alert-close-icon {
+    position: relative;
+  }
+  .chat-main-column .ant-alert a::after,
+  .chat-main-column .ant-alert .ant-alert-close-icon::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: 40px;
+    transform: translate(-50%, -50%);
+  }
+  .chat-main-column .ant-alert .ant-alert-close-icon {
+    overflow: visible; /* antd 给关闭钮设了 overflow:hidden，会把伪元素裁回 12px（实测） */
+  }
+  .chat-main-column .ant-alert .ant-alert-close-icon::after {
+    width: 40px;
   }
 }
 
@@ -999,6 +1059,22 @@ em {
   .chat-shell.chat-shell--empty {
     height: auto;
     min-height: calc(100dvh - var(--fj-header-h) - var(--fj-footer-h) - 2 * var(--fj-content-pad-y));
+  }
+  /* 上一条的代价：外壳 height:auto 之后，.chat-msgs-empty 的 min-height:100% 对着
+     一个不定高的滚动容器解析不出来，lead 撑高块恒为 0；滚动容器按 flex:1 1 auto 分到的
+     那份剩余高度（390×844 实测 50.9px）于是全落在标题「下方」，加上滚动容器 16px 下内边距，
+     副标题与配额横幅之间空出 93px 的死区（2026-10-10 生产实测），而上方没有对称留白。
+     让滚动容器自己当 flex 列、内层 flex-grow 吃满它 —— flex 子项的尺寸在 flex 之后是确定的，
+     lead 就能像桌面那样把这份高度垫到标题上方，整组（标题/横幅/输入框/建议卡）贴在一起、
+     由 lead 与 trail 上下对称地居中。下内边距在空态没有用途（下面没有消息要留呼吸），去掉。
+     只在空态生效：有对话后外壳去掉 --empty，滚动容器回到原样。 */
+  .chat-shell--empty .chat-msgs-scroll {
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 0 !important; /* 压过行内的 padding: 16px 0 */
+  }
+  .chat-shell--empty .chat-msgs-empty {
+    flex: 1 0 auto;
   }
   /* 行内样式只给了 minWidth:0；换成纵向后要限制的是高度，否则对话列会按内容
      撑开，把面板顶出视口。 */
