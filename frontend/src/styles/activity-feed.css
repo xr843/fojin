@@ -87,7 +87,9 @@
 }
 
 .feed-item-dot.translation {
-  background: #1890ff;
+  /* 类型色点（新经文绿 / 译本蓝 / 影像橙 / 结构红）是分类编码，保留「蓝」这一类，
+     但换成站点 token：antd 默认 #1890ff 与暖色底不协调，--fj-info 随暗色切换。 */
+  background: var(--fj-info);
 }
 
 .feed-item-dot.scan {

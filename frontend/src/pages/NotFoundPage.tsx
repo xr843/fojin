@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link, useNavigate } from "react-router";
 import { Input } from "antd";
 import { DatabaseOutlined, FileTextOutlined, HomeOutlined, RobotOutlined } from "@ant-design/icons";
@@ -15,12 +16,36 @@ import "../styles/notfound.css";
  * 「此路不通」会逐字掉回宋体、一半毛笔一半宋体；为它再裁一份字体就是新增资源。
  *
  * nginx 对未知路由一律 try_files 回 index.html、状态码 200（软 404），而 index.html
- * 写死了 robots "index, follow"。这里补一条 noindex：两条 robots 并存时搜索引擎取
- * 更严的那条。
+ * 写死了 robots "index, follow"。见 useNoindex。
  */
+
+/**
+ * 把 index.html 那条 robots 就地改成 noindex，离开时还原。
+ *
+ * 不用 Helmet 再加一条：Helmet 只管带 data-rh 的标签，不会替换模板里那条，head 里
+ * 就并存「index, follow」与「noindex」两条（2026-10-10 生产实测）。也不能删模板里那条：
+ * 后端 seo.py 的 _inject_meta 是用正则**替换**它来给阅读页注入 "noindex, follow" 的，
+ * 删了阅读页的 noindex 就静默失效。
+ */
+function useNoindex() {
+  useEffect(() => {
+    const existing = document.head.querySelector<HTMLMetaElement>('meta[name="robots"]');
+    const previous = existing?.getAttribute("content") ?? null;
+    const meta = existing ?? document.head.appendChild(document.createElement("meta"));
+    const created = !existing;
+    meta.setAttribute("name", "robots");
+    meta.setAttribute("content", "noindex");
+    return () => {
+      if (created) meta.remove();
+      else if (previous !== null) meta.setAttribute("content", previous);
+    };
+  }, []);
+}
+
 export default function NotFoundPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  useNoindex();
 
   const onSearch = (value: string) => {
     const q = value.trim();
@@ -39,7 +64,6 @@ export default function NotFoundPage() {
     <div className="nf-page">
       <Helmet>
         <title>{`${t("notfound.doc_title")} - ${t("app.name")}`}</title>
-        <meta name="robots" content="noindex" />
       </Helmet>
       <div className="nf-bg" aria-hidden="true">
         <img src="/landscape-bg.webp" alt="" decoding="async" />

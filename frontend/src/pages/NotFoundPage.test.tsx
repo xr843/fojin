@@ -71,6 +71,29 @@ describe("NotFoundPage", () => {
     expect(document.title).toMatch(/FoJin|佛津/);
   });
 
+  // index.html 写死了一条 robots "index, follow"（后端 seo.py 的 _inject_meta 靠它当
+  // 替换锚点，不能删）。旧实现由 Helmet 再补一条 noindex，head 里两条并存（生产实测）。
+  it("leaves exactly one robots meta — noindex — and restores the page default on leave", async () => {
+    const shell = document.createElement("meta");
+    shell.setAttribute("name", "robots");
+    shell.setAttribute("content", "index, follow");
+    document.head.appendChild(shell);
+    try {
+      const { unmount } = renderNotFound();
+      const robots = () =>
+        Array.from(document.head.querySelectorAll("meta[name='robots']")).map((m) => m.getAttribute("content"));
+      await waitFor(() => expect(robots()).toEqual(["noindex"]));
+      // Helmet 的写入排在宏任务里：再等一拍，确认它没有补出第二条。
+      await new Promise((r) => setTimeout(r, 20));
+      expect(robots()).toEqual(["noindex"]);
+      unmount();
+      await new Promise((r) => setTimeout(r, 20));
+      expect(robots()).toEqual(["index, follow"]);
+    } finally {
+      shell.remove();
+    }
+  });
+
   it("offers the main sections as real links", () => {
     renderNotFound();
     const hrefs = screen

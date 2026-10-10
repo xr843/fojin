@@ -1361,6 +1361,7 @@
   "reader.loading": "載入中...",
   "reader.canon.tooltip": "本經所屬藏經（底本）— 據 CBETA 編號推導",
   "reader.juan.option": "第 {{n}} 卷 ({{chars}}字)",
+  "reader.juan.option_short": "第 {{n}} 卷",
   "reader.juan.first": "第 1 卷",
   "reader.nav.prev": "上一卷",
   "reader.nav.next": "下一卷",

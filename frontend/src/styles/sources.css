@@ -162,10 +162,16 @@
   padding: 8px 12px;
   font-size: 13px;
   color: var(--fj-ink);
-  background: rgba(24, 144, 255, 0.08);
-  border-left: 3px solid #1890ff;
+  /* 金色淡底 + 金色左线：沿用本页英雄区的暖金色系（原为 antd 默认蓝 #1890ff）。 */
+  background: rgba(176, 141, 87, 0.08);
+  border-left: 3px solid var(--fj-gold);
   border-radius: 4px;
   line-height: 1.5;
+}
+
+/* 暗色下叠金色会把底提亮、正文对比度从 10.9 掉到 10.0；改为压暗一层，对比度不降。 */
+:root[data-theme="dark"] .sources-hero-search-result {
+  background: rgba(0, 0, 0, 0.18);
 }
 
 @media (max-width: 520px) {
@@ -655,6 +661,13 @@
     flex-wrap: wrap;
     justify-content: flex-end;
     margin-left: auto;
+    /* 落到自己那一行后，整组宽度不得超过卡片：桌面的 flex-shrink: 0 会让它保持单行
+       max-content 宽，英文徽标（Local full text / Searchable / IIIF / API）在 320 宽
+       伸出卡片 71px、页面横向溢出 27px（2026-10-10 实测）。允许收缩并以 100% 封顶，
+       组内徽标才会真的折行。折行判据不变：标题列仍按 150px 基准先占位。 */
+    flex-shrink: 1;
+    min-width: 0;
+    max-width: 100%;
   }
 
   .sources-grid {

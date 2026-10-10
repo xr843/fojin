@@ -1062,10 +1062,17 @@ export default function TextReaderPage() {
         <SourceAttribution textId={textId} />
 
         <div className="reader-nav">
+          {/* 手机上选择框只有约 110–120px：「第 22 卷 (9,820字)」要 131px、英文要 175px，
+              会被截成「第 22 卷 (9,8…」。选中项只显示卷次，字数留在展开后的选项里 ——
+              字数是挑卷时才用得上的信息，认出「现在在哪一卷」只需卷次。下拉层默认与选择框
+              同宽，选项照样被截，所以手机上放宽到 232px（最长的「Fascicle 600 (12,345 chars)」
+              约 215px；传数字而非 false，保留虚拟滚动 —— 大般若經有 600 卷）。 */}
           <Select
             className="juan-select"
             value={juanNum}
             onChange={setJuanNum}
+            labelRender={phone ? ({ value }) => t("reader.juan.option_short", { n: value }) : undefined}
+            popupMatchSelectWidth={phone ? 232 : undefined}
             options={
               juanList?.juans.map((j) => ({
                 value: j.juan_num,

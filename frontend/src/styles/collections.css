@@ -350,6 +350,20 @@
   color: var(--fj-ink-muted, var(--fj-ink-muted));
   font-variant-numeric: tabular-nums;
 }
+/* 专题卡标题行的传承标签（禅宗 / 净土…）。不带色：与 #1300 收掉的 geekblue 一致。 */
+.coll-card-tradition.ant-tag {
+  font-size: 11px;
+  margin-left: 8px;
+}
+
+/* 手机字号下限 12px（桌面保持 11px 的紧凑注记）。层级不变：卡名 16px、计数 13px、
+   对照表经名 13px 都仍大于这两处 12px。 */
+@media (max-width: 768px) {
+  .cc-cbeta,
+  .coll-card-tradition.ant-tag {
+    font-size: 12px;
+  }
+}
 .cc-num {
   color: var(--fj-ink, var(--fj-ink));
 }

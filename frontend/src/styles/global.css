@@ -298,6 +298,27 @@ em {
   .header-hit--narrow::after {
     width: max(100%, 40px);
   }
+  /* 明 / 暗 / 跟随三段各只有 28×20。纵向扩到 44（顶栏 52 高装得下）；横向**扩不了**：
+     三段紧挨着，左边紧贴导航菜单按钮的命中区、右边隔 8px 就是语言按钮（320 宽时
+     菜单命中区右缘正好落在开关左缘，2026-10-10 实测），每段要 40 宽就得 120px，
+     而开关本身只有 88px。所以只把首尾两段吃进开关自带的 2px 内边距，三段互不重叠、
+     也不伸进邻居。伪元素绝对定位，不改开关的布局宽度，useNavFit 量到的数不变。
+     用 ::before —— antd 已把 ::after 用作悬停底色。 */
+  .header-theme-toggle .ant-segmented-item::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 44px;
+    transform: translateY(-50%);
+  }
+  .header-theme-toggle .ant-segmented-item:first-of-type::before {
+    left: -2px;
+  }
+  .header-theme-toggle .ant-segmented-item:last-of-type::before {
+    right: -2px;
+  }
 }
 
 /* ========== Chat Thinking Animation ========== */

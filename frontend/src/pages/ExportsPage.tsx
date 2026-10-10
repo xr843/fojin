@@ -90,7 +90,7 @@ export default function ExportsPage() {
         <Card size="small" style={{ marginBottom: 24 }}>
           <Space size="large">
             <span>
-              {t("exports.stats.texts")} <Tag color="blue">{t("exports.count.records", { n: stats.texts.toLocaleString() })}</Tag>
+              {t("exports.stats.texts")} <Tag>{t("exports.count.records", { n: stats.texts.toLocaleString() })}</Tag>
             </span>
             <span>
               {t("exports.stats.entities")} <Tag color="green">{t("exports.count.items", { n: stats.kg_entities.toLocaleString() })}</Tag>

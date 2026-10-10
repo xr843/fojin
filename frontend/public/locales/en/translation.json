@@ -1361,6 +1361,7 @@
   "reader.loading": "Loading...",
   "reader.canon.tooltip": "Source canon inferred from the CBETA identifier",
   "reader.juan.option": "Fascicle {{n}} ({{chars}} chars)",
+  "reader.juan.option_short": "Fascicle {{n}}",
   "reader.juan.first": "Fascicle 1",
   "reader.nav.prev": "Previous",
   "reader.nav.next": "Next",
