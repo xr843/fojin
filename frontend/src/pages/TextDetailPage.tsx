@@ -2,16 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router";
 import { Helmet } from "react-helmet-async";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Typography,
-  Descriptions,
-  Spin,
-  Button,
-  Space,
-  Card,
-  Tag,
-  Breadcrumb,
-} from "antd";
+import { Typography, Spin, Button, Card, Tag, Breadcrumb } from "antd";
 import {
   ReadOutlined,
   HomeOutlined,
@@ -28,6 +19,7 @@ import { RelatedTextsStandalone as RelatedTexts } from "../components/RelatedTex
 import OtherVersions from "../components/OtherVersions";
 import CrossCanonEntry from "../components/CrossCanonEntry";
 import SourceAttribution from "../components/SourceAttribution";
+import SameTitleTexts from "../components/SameTitleTexts";
 import CitationGenerator from "../components/CitationGenerator";
 import { addViewHistory } from "../utils/history";
 
@@ -81,6 +73,26 @@ export default function TextDetailPage() {
   }
 
   const cbetaUrl = text.cbeta_url || buildCbetaReadUrl(text.cbeta_id);
+  // 藏别标签：优先分类（与搜索结果卡同源），没有分类时用藏经名（GRETIL 等非汉文条目只有后者）。
+  const canonTag = text.category || text.canon_label || null;
+  // 定义列表只放标签没说过的事：典藏与标签相同就不写，经号已是标签，外文题名与标题相同也不写；
+  // 译者行不再拼朝代（朝代自有一行）。
+  const metaRows: [string, string][] = [];
+  if (text.translator) metaRows.push([t("textDetail.translator"), text.translator]);
+  if (text.dynasty) metaRows.push([t("textDetail.dynasty"), text.dynasty]);
+  if (text.fascicle_count) {
+    metaRows.push([t("textDetail.fascicles"), t("textDetail.fascicleCount", { count: text.fascicle_count })]);
+  }
+  if (text.subcategory && text.subcategory !== canonTag) {
+    metaRows.push([t("textDetail.collection"), text.subcategory]);
+  }
+  for (const [label, value] of [
+    [t("textDetail.sanskritTitle"), text.title_sa],
+    [t("textDetail.paliTitle"), text.title_pi],
+    [t("textDetail.tibetanTitle"), text.title_bo],
+  ] as const) {
+    if (value && value !== text.title_zh) metaRows.push([label, value]);
+  }
   const seoParts = [
     text.title_zh,
     text.translator ? t("textDetail.metaTranslator", { translator: text.translator }) : null,
@@ -139,78 +151,51 @@ export default function TextDetailPage() {
           })}
         </script>
       </Helmet>
-      <Space direction="vertical" size="large" style={{ width: "100%" }}>
-        <Breadcrumb
-          items={[
-            { title: <span style={{ cursor: "pointer" }} onClick={() => navigate("/")}><HomeOutlined /> {t("nav.home", "首页")}</span> },
-            { title: <span style={{ cursor: "pointer" }} onClick={() => navigate("/search")}>{t("nav.search", "搜索")}</span> },
-            { title: t("textDetail.breadcrumbDetails") },
-          ]}
-        />
+      <Breadcrumb
+        className="td-breadcrumb"
+        items={[
+          { title: <span style={{ cursor: "pointer" }} onClick={() => navigate("/")}><HomeOutlined /> {t("nav.home", "首页")}</span> },
+          { title: <span style={{ cursor: "pointer" }} onClick={() => navigate("/search")}>{t("nav.search", "搜索")}</span> },
+          { title: t("textDetail.breadcrumbDetails") },
+        ]}
+      />
 
-        <Card>
-          <Title level={3} style={{ marginBottom: 4 }}>
-            {text.title_zh}
-          </Title>
-          <Space style={{ marginBottom: 8 }}>
-            <Tag color="blue">{text.cbeta_id}</Tag>
-            {text.taisho_id && text.taisho_id !== text.cbeta_id && (
-              <Tag>{text.taisho_id}</Tag>
-            )}
-            {text.category && <Tag color="geekblue">{text.category}</Tag>}
-          </Space>
-          {/* 数据源署名。上面那些标签是**藏经**与分类，不是来源 ——
-              CBETA(CC BY-NC-SA) 与 84000 都把署名列为许可条件。 */}
-          <SourceAttribution textId={text.id} />
+      <Card className="td-header">
+        <Title level={3} className="td-title">
+          {text.title_zh}
+        </Title>
+        {/* 标签写法照搜索结果卡（ResultCard）：中性底色的小号 antd Tag。
+            经号与藏别已经在这里，下面的定义列表就不再重复这两项。 */}
+        <div className="td-tags">
+          <Tag title={t("textDetail.cbetaId")}>{text.cbeta_id}</Tag>
+          {text.taisho_id && text.taisho_id !== text.cbeta_id && (
+            <Tag>{text.taisho_id}</Tag>
+          )}
+          {canonTag && <Tag>{canonTag}</Tag>}
+        </div>
+        {/* 数据源署名。上面那些标签是**藏经**与分类，不是来源 ——
+            CBETA(CC BY-NC-SA) 与 84000 都把署名列为许可条件。 */}
+        <SourceAttribution textId={text.id} />
 
-          <Descriptions column={1} bordered size="small">
-            {text.translator && (
-              <Descriptions.Item label={t("textDetail.translator")}>
-                {text.dynasty ? `${text.dynasty} ` : ""}
-                {text.translator}
-              </Descriptions.Item>
-            )}
-            {text.dynasty && (
-              <Descriptions.Item label={t("textDetail.dynasty")}>
-                {text.dynasty}
-              </Descriptions.Item>
-            )}
-            {text.fascicle_count && (
-              <Descriptions.Item label={t("textDetail.fascicles")}>
-                {t("textDetail.fascicleCount", { count: text.fascicle_count })}
-              </Descriptions.Item>
-            )}
-            {text.subcategory && (
-              <Descriptions.Item label={t("textDetail.collection")}>
-                {text.subcategory}
-              </Descriptions.Item>
-            )}
-            {text.title_sa && (
-              <Descriptions.Item label={t("textDetail.sanskritTitle")}>
-                {text.title_sa}
-              </Descriptions.Item>
-            )}
-            {text.title_pi && (
-              <Descriptions.Item label={t("textDetail.paliTitle")}>
-                {text.title_pi}
-              </Descriptions.Item>
-            )}
-            {text.title_bo && (
-              <Descriptions.Item label={t("textDetail.tibetanTitle")}>
-                {text.title_bo}
-              </Descriptions.Item>
-            )}
-            <Descriptions.Item label={t("textDetail.cbetaId")}>
-              {text.cbeta_id}
-            </Descriptions.Item>
-          </Descriptions>
-        </Card>
+        {metaRows.length > 0 && (
+          <dl className="td-meta">
+            {metaRows.map(([label, value]) => (
+              <div key={label} className="td-meta-row">
+                <dt>{label}</dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
 
-        <Space wrap>
+        {/* 只有一颗主按钮：有本地全文时是「在线阅读 / 继续阅读」，没有时 CBETA 外链补位。
+            其余一律同款描边次级按钮——收藏组件默认是文字按钮，这里显式要描边款。 */}
+        <div className="td-actions">
           {text.has_content && (
             <Button
               type="primary"
               size="large"
+              className="td-primary"
               icon={<BookOutlined />}
               onClick={() =>
                 navigate(
@@ -225,18 +210,20 @@ export default function TextDetailPage() {
           )}
           {cbetaUrl && (
             <Button
+              type={text.has_content ? "default" : "primary"}
               size="large"
+              className={text.has_content ? undefined : "td-primary"}
               icon={<ReadOutlined />}
               href={cbetaUrl}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ background: "var(--fj-accent)", borderColor: "var(--fj-accent)", color: "var(--fj-on-accent)" }}
             >
               {t("textDetail.readOnCbeta")}
             </Button>
           )}
           {audioItem && (
             <Button
+              size="large"
               icon={<SoundOutlined />}
               onClick={() =>
                 navigate(`/texts/${text.id}/read?juan=${audioItem.juans[0]?.juan_num ?? 1}`)
@@ -245,29 +232,31 @@ export default function TextDetailPage() {
               {t("reader.audio.button")}
             </Button>
           )}
-          <BookmarkButton textId={text.id} />
+          <BookmarkButton textId={text.id} size="large" type="default" />
           <Button
-            type="text"
+            size="large"
             icon={<ExportOutlined />}
             onClick={() => setCitationOpen(true)}
           >
             {t("textDetail.exportCitation")}
           </Button>
-        </Space>
+        </div>
+      </Card>
 
-        <CitationGenerator
-          textId={text.id}
-          textData={text}
-          open={citationOpen}
-          onClose={() => setCitationOpen(false)}
-        />
+      <CitationGenerator
+        textId={text.id}
+        textData={text}
+        open={citationOpen}
+        onClose={() => setCitationOpen(false)}
+      />
 
+      {/* 下方各块各自判断有没有数据，没有就整块不渲染（不放空态占位）。 */}
+      <div className="td-sections">
         <CrossCanonEntry textId={text.id} />
-
         <OtherVersions textId={text.id} />
-
+        <SameTitleTexts textId={text.id} />
         <RelatedTexts textId={text.id} />
-      </Space>
+      </div>
     </div>
   );
 }

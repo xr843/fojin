@@ -1042,10 +1042,133 @@ em {
   }
 }
 
-/* ========== Text Detail Page Mobile ========== */
+/* ========== Text Detail Page (/texts/:id) ========== */
+/* 2026-10 整理：原先是一张 antd Descriptions 灰底表格 + 两枚 antd 默认蓝标签 + 三种
+   权重的按钮，下方约三分之二屏空白。现在是「题名卡（标签/署名/定义列表/按钮组）」
+   + 若干有数据才出现的区块。 */
 .text-detail-page {
-  max-width: 800px;
+  max-width: 880px;
   margin: 24px auto;
+}
+
+.text-detail-page .td-breadcrumb {
+  margin-bottom: 16px;
+}
+
+.text-detail-page .td-header .ant-card-body {
+  padding: 28px 32px 24px;
+}
+
+.text-detail-page .td-title.ant-typography {
+  font-family: "Noto Serif SC", "Source Han Serif", serif;
+  font-weight: 600;
+  font-size: 26px;
+  line-height: 1.35;
+  margin: 0 0 10px;
+  color: var(--fj-ink);
+  overflow-wrap: anywhere;
+}
+
+.text-detail-page .td-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.text-detail-page .td-tags .ant-tag {
+  margin: 0;
+  font-size: 12px;
+}
+
+/* 定义列表：左标签右值，无表格线。标签列取最长标签的宽度（max-content），
+   所以「CBETA 编号」「巴利文名」这类标签在手机上也不会折行。 */
+.text-detail-page .td-meta {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 20px;
+  row-gap: 8px;
+  margin: 16px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--fj-border);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.text-detail-page .td-meta-row {
+  display: contents;
+}
+.text-detail-page .td-meta dt {
+  color: var(--fj-ink-muted);
+  white-space: nowrap;
+}
+.text-detail-page .td-meta dd {
+  margin: 0;
+  color: var(--fj-ink);
+  overflow-wrap: anywhere;
+}
+
+.text-detail-page .td-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.text-detail-page .td-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+/* 两个旧组件自带外边距（跨藏入口 marginTop 16、其他版本 marginBottom 12），
+   在这里由容器的 gap 统一管间距。 */
+.text-detail-page .td-sections > * {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+.text-detail-page .td-sections .ant-card-head-title {
+  font-family: "Noto Serif SC", "Source Han Serif", serif;
+  font-weight: 600;
+}
+.text-detail-page .td-sections .ant-card-head-title .anticon {
+  color: var(--fj-gold);
+}
+
+.text-detail-page .td-section-hint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--fj-ink-muted);
+}
+.text-detail-page .td-grid-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 4px 24px;
+}
+.text-detail-page .td-grid-list li {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--fj-border);
+  min-width: 0;
+}
+.text-detail-page .td-item-title {
+  font-family: "Noto Serif SC", "Source Han Serif", serif;
+  font-size: 15px;
+  color: var(--fj-ink);
+  overflow-wrap: anywhere;
+}
+.text-detail-page a.td-item-title:hover {
+  color: var(--fj-highlight);
+}
+.text-detail-page .td-item-meta {
+  font-size: 12px;
+  color: var(--fj-ink-muted);
+}
+.text-detail-page .td-more {
+  margin-top: 8px;
+  padding-left: 0;
 }
 
 @media (max-width: 768px) {
@@ -1057,18 +1180,32 @@ em {
     border-radius: 6px;
   }
 
-  .text-detail-page .ant-descriptions {
+  .text-detail-page .td-header .ant-card-body {
+    padding: 18px 16px 16px;
+  }
+
+  .text-detail-page .td-title.ant-typography {
+    font-size: 22px;
+  }
+
+  .text-detail-page .td-meta {
     font-size: 13px;
+    column-gap: 14px;
   }
 
-  .text-detail-page .ant-space {
-    gap: 8px !important;
+  .text-detail-page .td-actions {
+    gap: 8px;
   }
 
-  .text-detail-page .ant-btn-lg {
+  .text-detail-page .td-actions .ant-btn-lg {
     height: 36px;
     font-size: 14px;
     padding: 4px 12px;
+  }
+
+  /* 手机上主按钮独占一行，次级按钮在下一行并排，层级一眼可辨。 */
+  .text-detail-page .td-actions .td-primary {
+    flex: 1 1 100%;
   }
 }
 
@@ -1077,18 +1214,9 @@ em {
     margin: 4px auto;
   }
 
-  .text-detail-page .ant-btn-lg {
+  .text-detail-page .td-actions .ant-btn-lg:not(.td-primary) {
     font-size: 13px;
     padding: 4px 10px;
-  }
-
-  .text-detail-page .ant-descriptions-item-label {
-    width: 70px !important;
-    padding: 6px 8px !important;
-  }
-
-  .text-detail-page .ant-descriptions-item-content {
-    padding: 6px 8px !important;
   }
 }
 

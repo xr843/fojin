@@ -9,6 +9,8 @@ import { addBookmark, removeBookmark, checkBookmark } from "../api/client";
 interface BookmarkButtonProps {
   textId: number;
   size?: "small" | "middle" | "large";
+  /** 默认文字按钮（搜索结果卡里与「查看详情」并排时要轻）；详情页的次级按钮组用 "default" 统一描边。 */
+  type?: "text" | "default";
 }
 
 interface ErrorResponse {
@@ -21,7 +23,7 @@ function getErrorDetail(err: unknown): string | undefined {
   return typeof detail === "string" ? detail : undefined;
 }
 
-export default function BookmarkButton({ textId, size }: BookmarkButtonProps) {
+export default function BookmarkButton({ textId, size, type = "text" }: BookmarkButtonProps) {
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
@@ -48,7 +50,7 @@ export default function BookmarkButton({ textId, size }: BookmarkButtonProps) {
 
   return (
     <Button
-      type="text"
+      type={type}
       size={size}
       icon={bookmarked ? <HeartFilled style={{ color: "#ff4d4f" }} /> : <HeartOutlined />}
       loading={mutation.isPending}
