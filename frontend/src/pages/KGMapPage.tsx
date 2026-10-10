@@ -168,19 +168,28 @@ export default function KGMapPage() {
             onChange={(vals) => setEntityTypes(vals as string[])}
             options={ENTITY_TYPE_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
           />
-          <Checkbox
-            checked={showArcs}
-            onChange={(e) => setShowArcs(e.target.checked)}
-          >
-            {t("geo.type_lineage")}
-          </Checkbox>
-          <span className="kg-map-filter-label">{t("geo.chinese_only")}:</span>
-          <Switch
-            size="small"
-            checked={chineseOnly}
-            onChange={setChineseOnly}
-          />
+          {/* display:contents on desktop (flex row unchanged); on phones this is
+              the second grid row, aligned under the type checkboxes. */}
+          <div className="kg-map-toolbar-toggles">
+            <Checkbox
+              checked={showArcs}
+              onChange={(e) => setShowArcs(e.target.checked)}
+            >
+              {t("geo.type_lineage")}
+            </Checkbox>
+            {/* <label> around the switch: tapping the words toggles it too, and
+                the switch gets an accessible name. */}
+            <label className="kg-map-switch-label">
+              <span className="kg-map-filter-label">{t("geo.chinese_only")}:</span>
+              <Switch
+                size="small"
+                checked={chineseOnly}
+                onChange={setChineseOnly}
+              />
+            </label>
+          </div>
           <AutoComplete
+            className="kg-map-search"
             value={searchQuery}
             options={searchOptions}
             onSearch={setSearchQuery}
@@ -188,7 +197,6 @@ export default function KGMapPage() {
             onSelect={handleSearchSelect}
             placeholder={t("geo.search_placeholder")}
             allowClear
-            style={{ width: 280, marginLeft: "auto" }}
             popupMatchSelectWidth={380}
             suffixIcon={<SearchOutlined style={{ color: "var(--fj-text-secondary)" }} />}
           />

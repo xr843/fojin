@@ -71,9 +71,41 @@
   color: var(--fj-ink-light);
 }
 
+/* Desktop: the wrapper vanishes from layout so the row stays one flex line. */
+.kg-map-toolbar-toggles {
+  display: contents;
+}
+
+.kg-map-switch-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.kg-map-search {
+  width: 280px;
+  margin-left: auto;
+}
+
 .kg-map-toolbar-row .ant-checkbox-checked .ant-checkbox-inner {
   background-color: var(--fj-accent);
   border-color: var(--fj-accent);
+}
+
+/* ---------- 地图控件层叠 ----------
+   @deck.gl/react 把 <Map> 包成 style="position:absolute; z-index:-1"
+   （evaluate-children 的 MAP_STYLE），整张 maplibre 地图——连同它的控件——
+   都成了 deck 画布之下的一层：散点画在归属栏上面，归属栏的 ⓘ 也点不到
+   （命中的是 deck 的视图层）。这里拆掉那层叠上下文，只把底图画布压回
+   deck 画布之下，控件角（maplibre 自带 z-index:2）于是浮在散点之上。
+   inline 样式只能用 !important 覆盖。 */
+.kg-map-container .maplibregl-map {
+  z-index: auto !important;
+}
+
+.kg-map-container .maplibregl-canvas {
+  z-index: -1;
 }
 
 /* ---------- 地图容器 ---------- */
@@ -365,8 +397,11 @@
     font-size: 17px;
   }
 
+  /* 224 = 顶栏 + 标题 + 两行筛选 + 整行搜索框；svh（地址栏展开时的小视口）
+     让地图底边与右下角的 ⓘ 在手机首屏内，不随地址栏伸缩而重排。 */
   .kg-map-container {
-    height: calc(100vh - 200px);
+    height: calc(100vh - 224px);
+    height: calc(100svh - 224px);
     min-height: 300px;
   }
 
@@ -374,12 +409,47 @@
     padding: 8px 10px;
   }
 
+  /* 手机：两列栅格——标签一列，控件一列。第二行（师承传线 / 纯中文）
+     落在控件列，与上一行复选框左对齐；搜索框独占整行。 */
   .kg-map-toolbar-row {
-    gap: 8px;
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    column-gap: 8px;
+    row-gap: 4px;
+  }
+
+  .kg-map-toolbar-row .ant-checkbox-group {
+    column-gap: 4px;
+  }
+
+  .kg-map-toolbar-toggles {
+    grid-column: 2;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 16px;
+  }
+
+  /* 触屏命中区 ≥ 32px 高：整个复选框（框 + 字）与「纯中文 + 开关」都可点 */
+  .kg-map-toolbar-row .ant-checkbox-wrapper,
+  .kg-map-switch-label {
+    min-height: 32px;
+    align-items: center;
   }
 
   .kg-map-toolbar-row .ant-checkbox-wrapper {
     font-size: 11px;
+  }
+
+  .kg-map-switch-label {
+    gap: 8px;
+  }
+
+  .kg-map-search {
+    grid-column: 1 / -1;
+    width: 100%;
+    margin-left: 0;
   }
 
   .kg-map-popup-container {
