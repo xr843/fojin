@@ -126,6 +126,7 @@ export default function NotificationBell() {
     >
       <Badge count={unreadCount} size="small" offset={[2, -2]}>
         <Button
+          className="header-hit header-hit--narrow"
           type="text"
           icon={<BellOutlined style={{ fontSize: 16, color: "var(--fj-ink-muted)" }} />}
           aria-label={t("a11y.button.notifications")}

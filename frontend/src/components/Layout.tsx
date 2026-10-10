@@ -1,4 +1,4 @@
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import { Layout as AntLayout, Typography, Button, Dropdown, Space, Drawer, Modal, Badge } from "antd";
 import { Outlet, useNavigate, useLocation } from "react-router";
 
@@ -33,6 +33,7 @@ import { useXiaojinStore } from "../stores/xiaojinStore";
 import { getAdminPendingSummary, type AdminPendingSummary } from "../api/client";
 import NotificationBell from "./NotificationBell";
 import CursorGlow from "./CursorGlow";
+import { useNavFit } from "../hooks/useNavFit";
 
 const { Header, Content, Footer } = AntLayout;
 
@@ -45,6 +46,20 @@ export default function Layout() {
   const xiaojinHidden = useXiaojinStore((st) => st.hidden);
   const recallXiaojin = useXiaojinStore((st) => st.show);
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // 导航放不下就收成汉堡（复用 ≤768px 的同一个抽屉）。判据见 useNavFit。
+  const headerRef = useRef<HTMLElement>(null);
+  const leftGroupRef = useRef<HTMLDivElement>(null);
+  const logoRef = useRef<HTMLElement>(null);
+  const navRef = useRef<HTMLDivElement>(null);
+  const actionsRef = useRef<HTMLDivElement>(null);
+  const navCollapsed = useNavFit({
+    header: headerRef,
+    leftGroup: leftGroupRef,
+    logo: logoRef,
+    nav: navRef,
+    actions: actionsRef,
+  });
 
   const handleLogout = () => {
     Modal.confirm({
@@ -197,6 +212,7 @@ export default function Layout() {
         {t("nav.skip_to_content")}
       </a>
       <Header
+        ref={headerRef}
         style={{
           display: "flex",
           alignItems: "center",
@@ -212,8 +228,10 @@ export default function Layout() {
           zIndex: 10,
         }}
       >
-        <Space size="large">
+        <Space size="large" ref={leftGroupRef}>
           <Typography.Title
+            ref={logoRef}
+            className="header-logo"
             level={5}
             style={{
               color: ink,
@@ -228,87 +246,94 @@ export default function Layout() {
           >
             {t("app.name")}
           </Typography.Title>
-          <div className="nav-desktop">
-            {navItems.map((item) =>
-              item.children ? (
-                <Dropdown
-                  key={item.path}
-                  // Menu items carry count badges and can be wider than the
-                  // trigger button; by default antd/rc-dropdown stretches the
-                  // popup's min-width to match the (narrower) trigger, which
-                  // pushed wide items into a horizontal scrollbar. Force a
-                  // generous min-width instead.
-                  overlayStyle={{ minWidth: 200 }}
-                  menu={{
-                    items: item.children.map((child) => ({
-                      key: child.path,
-                      // 角标必须是独立元素排在文字之后。用 <Badge> 包裹 label 会把
-                      // 计数绝对定位到子元素右上角 —— 数字一长(447/758)就压在文字上。
-                      label: child.count ? (
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 8,
-                            width: "100%",
-                          }}
-                        >
-                          <span>{child.label}</span>
-                          <Badge
-                            count={child.count}
-                            size="small"
-                            overflowCount={9999}
-                            style={{ marginLeft: "auto" }}
-                          />
-                        </span>
-                      ) : (
-                        child.label
-                      ),
-                      onClick: () => navigate(child.path),
-                    })),
-                  }}
-                >
-                  <Button
-                    type="text"
-                    icon={item.icon}
-                    style={{
-                      color: inkMuted,
-                      fontSize: 13,
-                      fontWeight: 400,
-                      fontFamily: '"Noto Serif SC", serif',
-                    }}
-                  >
-                    {item.label}
-                  </Button>
-                </Dropdown>
-              ) : (
-                <Button
-                  key={item.path}
-                  type="text"
-                  icon={item.icon}
-                  style={{
-                    color: inkMuted,
-                    fontSize: 13,
-                    fontWeight: 400,
-                    fontFamily: '"Noto Serif SC", serif',
-                  }}
-                  onClick={() => navigate(item.path)}
-                >
-                  {item.label}
-                </Button>
-              ),
-            )}
+          {/* 导航与汉堡共用一格：原先各占一个 Space 项，隐藏的那一项仍吃掉一份 24px
+              间距 —— 手机上站名与汉堡之间凭空多出 24px，是登录后 320 宽横向溢出的
+              一半原因（另一半见 global.css 的 .header-icon-btn）。 */}
+          <div className={navCollapsed ? "header-nav is-collapsed" : "header-nav"}>
+            <div className="nav-desktop-clip">
+              <div className="nav-desktop" ref={navRef}>
+                {navItems.map((item) =>
+                  item.children ? (
+                    <Dropdown
+                      key={item.path}
+                      // Menu items carry count badges and can be wider than the
+                      // trigger button; by default antd/rc-dropdown stretches the
+                      // popup's min-width to match the (narrower) trigger, which
+                      // pushed wide items into a horizontal scrollbar. Force a
+                      // generous min-width instead.
+                      overlayStyle={{ minWidth: 200 }}
+                      menu={{
+                        items: item.children.map((child) => ({
+                          key: child.path,
+                          // 角标必须是独立元素排在文字之后。用 <Badge> 包裹 label 会把
+                          // 计数绝对定位到子元素右上角 —— 数字一长(447/758)就压在文字上。
+                          label: child.count ? (
+                            <span
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 8,
+                                width: "100%",
+                              }}
+                            >
+                              <span>{child.label}</span>
+                              <Badge
+                                count={child.count}
+                                size="small"
+                                overflowCount={9999}
+                                style={{ marginLeft: "auto" }}
+                              />
+                            </span>
+                          ) : (
+                            child.label
+                          ),
+                          onClick: () => navigate(child.path),
+                        })),
+                      }}
+                    >
+                      <Button
+                        type="text"
+                        icon={item.icon}
+                        style={{
+                          color: inkMuted,
+                          fontSize: 13,
+                          fontWeight: 400,
+                          fontFamily: '"Noto Serif SC", serif',
+                        }}
+                      >
+                        {item.label}
+                      </Button>
+                    </Dropdown>
+                  ) : (
+                    <Button
+                      key={item.path}
+                      type="text"
+                      icon={item.icon}
+                      style={{
+                        color: inkMuted,
+                        fontSize: 13,
+                        fontWeight: 400,
+                        fontFamily: '"Noto Serif SC", serif',
+                      }}
+                      onClick={() => navigate(item.path)}
+                    >
+                      {item.label}
+                    </Button>
+                  ),
+                )}
+              </div>
+            </div>
+            <Button
+              className="nav-mobile-trigger header-hit"
+              type="text"
+              icon={<MenuOutlined />}
+              onClick={() => setDrawerOpen(true)}
+              style={{ color: inkMuted }}
+              aria-label={t("nav.open_menu")}
+            />
           </div>
-          <Button
-            className="nav-mobile-trigger header-hit"
-            type="text"
-            icon={<MenuOutlined />}
-            onClick={() => setDrawerOpen(true)}
-            style={{ color: inkMuted }}
-            aria-label={t("nav.open_menu")}
-          />
         </Space>
-        <Space>
+        <Space ref={actionsRef} className="header-actions">
           <ThemeToggle />
           <NotificationBell />
           <Dropdown
@@ -323,7 +348,7 @@ export default function Layout() {
             }}
           >
             <Button
-              className="header-hit"
+              className="header-hit header-icon-btn"
               type="text"
               icon={<GlobalOutlined />}
               style={{ color: inkMuted, fontSize: 13 }}
@@ -359,7 +384,7 @@ export default function Layout() {
               }}
             >
               <Button
-                className="header-hit"
+                className="header-hit header-icon-btn"
                 type="text"
                 icon={<UserOutlined />}
                 style={{ color: inkMuted, fontSize: 13 }}
@@ -449,7 +474,9 @@ export default function Layout() {
       <Drawer
         title={t("nav.drawer_title")}
         placement="left"
-        width="100%"
+        // 手机竖屏（≤480）仍是整屏；横屏手机、平板、窄笔记本上导航也会收进这个抽屉，
+        // 整屏铺开 800–1400px 宽只为放 7 个菜单项太空，限到 480。
+        width="min(100%, 480px)"
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
       >
