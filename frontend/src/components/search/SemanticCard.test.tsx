@@ -114,3 +114,12 @@ describe("SemanticCard 组件", () => {
     expect(screen.getByText("第7卷")).toBeInTheDocument();
   });
 });
+
+// 生产 /search?q=金剛經 上仅剩的 3 个 .ant-tag-geekblue 就是这里的来源标签（cbeta）。
+describe("SemanticCard 来源标签用中性色", () => {
+  it("不再有 antd 蓝色系 Tag", () => {
+    const { container } = renderCard(makeHit({ source_code: "cbeta" }));
+    expect(screen.getByText("cbeta")).toBeInTheDocument();
+    expect(container.querySelector(".ant-tag-blue, .ant-tag-geekblue")).toBeNull();
+  });
+});

@@ -92,3 +92,11 @@ describe("ContentCard 组件", () => {
     expect(screen.queryByText(/^#\d+$/)).not.toBeInTheDocument();
   });
 });
+
+describe("ContentCard 语种标签用中性色", () => {
+  it("非汉文语种标签不再是 antd 蓝色 Tag", () => {
+    const { container } = renderCard(makeHit({ lang: "en" }));
+    expect(screen.getByText("英文")).toBeInTheDocument();
+    expect(container.querySelector(".ant-tag-blue, .ant-tag-geekblue")).toBeNull();
+  });
+});

@@ -79,3 +79,43 @@ describe.each([
     expect(screen.queryByText(/排序/)).not.toBeInTheDocument();
   });
 });
+
+// 「其他语言版本 / 关联翻译」那排原是 antd Tag + onClick 跳转：Tag 是 <span>，Tab 到不了、
+// 回车也不触发，键盘用户进不去别的译本。改成真正的 <a href>，保留标签外观。
+// 英文界面「Classical Chinese - 佛說能斷金剛般若波羅蜜多經」又是 nowrap 的 Tag，
+// 在 320px 把整列撑出 22px（生产实测）——改成链接后必须允许折行。
+describe.each([
+  ["ResultCard", "其他语言版本:", (h: Partial<SearchHit>) => renderWithProviders(<ResultCard hit={makeHit(h)} />)],
+  ["CrossLangCard", "关联翻译:", (h: Partial<SearchHit>) => renderWithProviders(<CrossLangCard hit={makeCrossHit(h as Partial<CrossLanguageSearchHit>)} />)],
+])("%s 其他译本是可 Tab 的链接", (_name, label, renderIt) => {
+  const related = [
+    { id: 237 as TextId, lang: "lzh", title: "金剛能斷般若波羅蜜經" },
+    { id: 900 as TextId, lang: "en", title: "The Diamond Sutra" },
+  ];
+
+  it("每个译本是指向 /texts/{id} 的 <a>，不是带 onClick 的 Tag", () => {
+    const { container } = renderIt({ related_translations: related } as Partial<SearchHit>);
+    expect(screen.getByText(label)).toBeInTheDocument();
+    const row = container.querySelector(".s-card-translations")!;
+    expect(row.querySelector(".ant-tag")).toBeNull();
+    const links = [...row.querySelectorAll("a")];
+    expect(links.map((a) => a.getAttribute("href"))).toEqual(["/texts/237", "/texts/900"]);
+    expect(links[0]).toHaveTextContent("金剛能斷般若波羅蜜經");
+    for (const a of links) expect(a).toHaveClass("s-card-translation-link");
+  });
+});
+
+// antd 的 blue / geekblue 是全站色板之外的冷蓝（#1300 已在其它页清掉）；搜索结果卡上
+// 剩下的语种标签（非汉文）与来源标签改用中性默认 Tag。
+describe("搜索结果卡不再用 antd 蓝色系 Tag", () => {
+  it("ResultCard 非汉文语种标签是中性的", () => {
+    const { container } = renderWithProviders(<ResultCard hit={makeHit({ lang: "en" })} />);
+    expect(screen.getByText("英文")).toBeInTheDocument();
+    expect(container.querySelector(".ant-tag-blue, .ant-tag-geekblue")).toBeNull();
+  });
+
+  it("CrossLangCard 英文标签是中性的", () => {
+    const { container } = renderWithProviders(<CrossLangCard hit={makeCrossHit({ lang: "en" })} />);
+    expect(container.querySelector(".ant-tag-blue, .ant-tag-geekblue")).toBeNull();
+  });
+});

@@ -28,9 +28,41 @@
 
 /* ---------- 布局 ---------- */
 .s-layout {
+  position: relative; /* 「跳到结果」链接聚焦时以此定位 */
   display: flex;
   gap: 24px;
   align-items: flex-start;
+}
+
+/* 「跳到结果」：平时视觉隐藏（仍在 Tab 序列里、读屏可读），聚焦时浮在侧栏左上角。
+   不用 display:none / visibility:hidden——那样就 Tab 不到了。 */
+.s-skip-link {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 20;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  transition: none; /* antd 给 a 加了 color .3s 过渡：聚焦瞬间会先闪一下 antd 蓝 */
+}
+.s-skip-link:focus {
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip-path: none;
+  padding: 8px 14px;
+  font-size: 14px;
+  color: var(--fj-highlight);
+  background: var(--fj-card-bg);
+  border: 1px solid var(--fj-gold);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  text-decoration: none;
+  outline: 2px solid var(--fj-highlight);
+  outline-offset: 2px;
 }
 
 /* ---------- 左侧筛选 ---------- */
@@ -104,6 +136,10 @@
   flex: 1;
   min-width: 0;
 }
+/* 结果区 tabIndex=-1 只为接住「跳到结果」的焦点，不是交互控件：整块描边只会是一圈噪声 */
+.s-main:focus {
+  outline: none;
+}
 
 .s-result-header {
   display: flex;
@@ -168,6 +204,8 @@
   flex: 1;
   padding: 16px 20px;
   min-width: 0;
+  /* 梵巴转写长词（如 nānyatrānupūrvavihārasamāpattibhy…）在 320px 上一个词就比卡宽 */
+  overflow-wrap: break-word;
 }
 
 .s-card-title {
@@ -259,6 +297,32 @@
   border-left: 3px solid #d4a574;
 }
 
+/* 其他译本：真链接，外观是中性小标签（站点色板，不用 antd 彩色 Tag）。允许折行——
+   英文界面「Classical Chinese - 佛說能斷金剛般若波羅蜜多經」不折行时在 320px 撑出 22px。 */
+.s-card-translation-link {
+  display: inline-block;
+  max-width: 100%;
+  margin: 2px 6px 2px 0;
+  padding: 0 7px;
+  font-size: 11px;
+  line-height: 20px;
+  color: var(--fj-ink-light);
+  background: var(--fj-card-bg);
+  border: 1px solid var(--fj-border);
+  border-radius: 4px;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  transition: border-color 0.15s, color 0.15s;
+}
+.s-card-translation-link:hover {
+  color: var(--fj-highlight);
+  border-color: var(--fj-gold);
+}
+.s-card-translation-link:focus-visible {
+  outline: 2px solid var(--fj-highlight);
+  outline-offset: 1px;
+}
+
 .s-card-alt-titles {
   padding: 4px 0;
 }
@@ -319,41 +383,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.s-card-btn-primary,
-.s-card-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 12px;
-  font-size: 12px;
-  border-radius: 4px;
-  text-decoration: none;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.s-card-btn-primary {
-  background: var(--fj-accent);
-  color: var(--fj-on-accent);
-  border: 1px solid var(--fj-accent);
-}
-
-.s-card-btn-primary:hover {
-  background: #a03000;
-  color: #fff;
-}
-
-.s-card-btn {
-  background: var(--fj-card-bg);
-  color: var(--fj-ink-light);
-  border: 1px solid var(--fj-border);
-}
-
-.s-card-btn:hover {
-  border-color: var(--fj-gold);
-  color: var(--fj-ink);
-}
-
 /* ---------- 外部分隔线 ---------- */
 .s-ext-divider {
   text-align: center;
@@ -395,11 +424,35 @@
   min-width: 8px;
 }
 
+/* 两个入口是 .s-card-action 文字链接（与结果卡同一套），间距也取同一个值 */
 .s-ext-row-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 2px 16px;
+}
+
+/* 触屏命中区：外部源一屏十几行，按结果卡那样把每个入口实撑到 40px 高会让整区再长
+   一截（320px 英文两个入口折成两行时每行 +24px）。这里视觉保持 28px，用伪元素把
+   命中区上下各扩 6px 到 40px（与 global.css 顶栏/横幅同一手法，点在伪元素上就是点在
+   链接本身）；两入口折行时行距取 12px，上下两个命中区恰好相接、不重叠。 */
+@media (pointer: coarse) {
+  .s-ext-row-actions {
+    row-gap: 12px;
+  }
+  .s-ext-row-actions .s-card-action {
+    position: relative;
+    min-height: 28px;
+  }
+  .s-ext-row-actions .s-card-action::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 40px;
+    transform: translateY(-50%);
+  }
 }
 
 .s-ext-toggle {
@@ -441,15 +494,6 @@
   -webkit-line-clamp: 4;
   line-clamp: 4;
   overflow: hidden;
-}
-
-/* ---------- 辞典释义 ---------- */
-.s-dict-def {
-  line-height: 1.8;
-  font-size: 13px;
-  color: var(--fj-ink-light);
-  white-space: pre-wrap;
-  word-break: break-word;
 }
 
 /* ---------- 全文检索折叠卡片 ---------- */
@@ -564,8 +608,17 @@
 
 /* ---------- 响应式 ---------- */
 @media (max-width: 768px) {
+  /* 纵向排列时必须 stretch：桌面那条 align-items:flex-start 在列方向上让结果区按
+     内容「最小宽度」定宽，任何一处不折行的内容（英文译本标签、语种+排序两个下拉）
+     都会把整列撑出屏幕（生产 320px 英文实测结果区比容器宽 61px、整页横滚 35px）。 */
   .s-layout {
     flex-direction: column;
+    align-items: stretch;
+  }
+  /* 结果数 + 语种/排序两个下拉在 320px 一行放不下：允许下拉换到下一行 */
+  .s-result-header {
+    flex-wrap: wrap;
+    gap: 8px;
   }
   /* 手机：结果优先。分面默认折叠成「筛选」按钮（SearchFilterSidebar 用同一断点），
      展开后单列——两列各 160px 时馆藏长名折两行、计数错位。 */
@@ -607,7 +660,6 @@
   }
   .s-ext-row-actions {
     flex-basis: 100%;
-    gap: 8px;
   }
   /* 搜索 tab 移动端：缩小字号与间距，允许横向滚动 */
   .s-mode-bar .ant-tabs-nav-list {

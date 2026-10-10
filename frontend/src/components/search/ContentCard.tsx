@@ -30,7 +30,7 @@ export default function ContentCard({ hit }: { hit: ContentSearchHit }) {
           <Tag style={{ fontSize: 11 }}>{hit.cbeta_id}</Tag>
           {hit.translator && <Tag style={{ fontSize: 11 }}>{hit.dynasty ? `[${hit.dynasty}] ` : ""}{hit.translator}</Tag>}
           {hit.lang && hit.lang !== "lzh" && (
-            <Tag color="blue" style={{ fontSize: 11 }}>
+            <Tag style={{ fontSize: 11 }}>
               {LANG_KEYS[hit.lang] ? t(LANG_KEYS[hit.lang]) : hit.lang}
             </Tag>
           )}
