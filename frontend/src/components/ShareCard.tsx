@@ -15,6 +15,12 @@ interface ShareCardProps {
 }
 
 const CARD_WIDTH = 720;
+/* 卡片里的次要文字色。不能写 var(--fj-ink-muted)：这张卡是「纸」，底色写死 #f8f5ef，
+   不随主题变；暗色下 token 会变成 #c6bca6，压在浅纸上只有 1.73:1，截出来的图就花了
+   （html2canvas-pro 读的是计算后颜色，会原样烤进 PNG）。所以取 token 的浅色值字面量 ——
+   与站点 --fj-ink-muted 同一支（它就是旧 #9a8e7a 同色相加深到 AA 的结果）：
+   在卡底 #f8f5ef 上 2.96 → 4.94:1，出处框 #f0ebe2 上 2.71 → 4.53:1。 */
+const INK_MUTED = "#746958";
 const FALLBACK_SHARE_URL = "https://fojin.app/chat";
 
 function sanitizeFilenameSegment(text: string): string {
@@ -232,11 +238,11 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
               <div style={{ fontSize: 30, fontWeight: 700, letterSpacing: 4, color: "#8b2500" }}>
                 {t("shareCard.brand")}
               </div>
-              <div style={{ fontSize: 13, color: "#9a8e7a", marginTop: 4, letterSpacing: 1 }}>
+              <div style={{ fontSize: 13, color: INK_MUTED, marginTop: 4, letterSpacing: 1 }}>
                 {t("shareCard.subtitle")}
               </div>
             </div>
-            <div style={{ fontSize: 12, color: "#9a8e7a" }}>{formatDate(i18n.language)}</div>
+            <div style={{ fontSize: 12, color: INK_MUTED }}>{formatDate(i18n.language)}</div>
           </div>
 
           {/* Question */}
@@ -295,7 +301,7 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
               {answerText}
             </div>
             {truncated && (
-              <div style={{ fontSize: 12, color: "#9a8e7a", marginTop: 10, fontStyle: "italic" }}>
+              <div style={{ fontSize: 12, color: INK_MUTED, marginTop: 10, fontStyle: "italic" }}>
                 {t("shareCard.fullAnswerHint")}
               </div>
             )}
@@ -311,7 +317,7 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
                 marginBottom: 20,
               }}
             >
-              <div style={{ fontSize: 12, color: "#9a8e7a", marginBottom: 8, letterSpacing: 2 }}>
+              <div style={{ fontSize: 12, color: INK_MUTED, marginBottom: 8, letterSpacing: 2 }}>
                 {t("shareCard.sourcesTitle")}
               </div>
               {topSources.map((s, i) => (
@@ -346,7 +352,7 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
               <div style={{ fontSize: 14, color: "#2b2318", fontWeight: 600 }}>
                 fojin.app
               </div>
-              <div style={{ fontSize: 11, color: "#9a8e7a", marginTop: 3, lineHeight: 1.6 }}>
+              <div style={{ fontSize: 11, color: INK_MUTED, marginTop: 3, lineHeight: 1.6 }}>
                 {t("shareCard.platformLine1")}
                 <br />
                 {t("shareCard.platformLine2")}
@@ -359,7 +365,7 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
                   alt="fojin.app"
                   style={{ width: 70, height: 70, display: "block" }}
                 />
-                <div style={{ fontSize: 10, color: "#9a8e7a", marginTop: 4 }}>
+                <div style={{ fontSize: 10, color: INK_MUTED, marginTop: 4 }}>
                   {t("shareCard.scanToOpen")}
                 </div>
               </div>
@@ -408,7 +414,7 @@ export default function ShareCard({ open, onClose, question, answer, sources }: 
         </Button>
       </div>
       {generating && (
-        <div style={{ textAlign: "center", marginTop: 10, color: "#9a8e7a", fontSize: 12 }}>
+        <div style={{ textAlign: "center", marginTop: 10, color: INK_MUTED, fontSize: 12 }}>
           <Spin size="small" /> {t("shareCard.generatingImage")}
         </div>
       )}

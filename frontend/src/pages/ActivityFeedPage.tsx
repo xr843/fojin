@@ -75,7 +75,7 @@ function AcademicRow({ item }: { item: AcademicFeedItem }) {
         </div>
         {item.summary && <div className="feed-item-summary">{item.summary}</div>}
         <div className="feed-item-meta">
-          <Tag color="blue">{item.feed_source}</Tag>
+          <Tag>{item.feed_source}</Tag>
           {item.category && <Tag>{item.category}</Tag>}
           {item.author && <span>{item.author}</span>}
           {dateStr && <span>{dateStr}</span>}

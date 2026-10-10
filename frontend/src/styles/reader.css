@@ -125,10 +125,20 @@
 
 /* ── CBETA-style typography ── */
 
+/* ── 经题区配色（2026-10-10 收敛到站点色板）──
+   原来三色三对齐：经题 --fj-accent、译者行写死 #408080（青，色板外；在 --fj-bg 上浅色 4.18:1、
+   暗色 3.19:1，都不过 4.5）、正文墨色。现在：
+   - 经题 / 卷题用 --fj-cinnabar：站点给「大号标题文字」的那支朱砂（global.css 有来由：
+     --fj-accent 压成标题偏「暗酱」）。浅色 8.17 → 5.49:1、暗色 4.86 → 6.98:1，两侧都过 4.5。
+   - 译者行用 --fj-ink-muted：与引文抽屉 .chat-citation-body .text-byline 同一支，两处署名
+     终于同色。仍居右：CBETA Online 横排就是居右，从那里来的读者看惯了；刻本竖排里署名
+     「低幾格」起，横排对应的正是向行尾让位，与经题居中、正文左起三档分得开。
+   - 字号层级：经题 1.2em > 卷题 1.1em > 品题 1.05em > 正文 1em > 署名 0.95em。 */
+
 /* 经名标题 (e.g. 長阿含經序) */
 .reader-body .text-head {
   font-size: 1.2em;
-  color: var(--fj-accent, #8b6914);
+  color: var(--fj-cinnabar);
   text-align: center;
   margin: 0.5em 0 1em;
   padding: 0.5em 0;
@@ -137,7 +147,7 @@
 /* 卷标题 (e.g. 佛說長阿含經卷第一) */
 .reader-body .text-juan {
   font-size: 1.1em;
-  color: var(--fj-accent, #8b6914);
+  color: var(--fj-cinnabar);
   text-align: center;
   margin: 1.5em 0 1em;
   padding: 0.3em 0;
@@ -145,7 +155,7 @@
 
 /* 署名/译者 (e.g. 後秦弘始年佛陀耶舍共竺佛念譯) */
 .reader-body .text-byline {
-  color: #408080;
+  color: var(--fj-ink-muted);
   text-align: right;
   margin: 0 0 1.2em;
   font-size: 0.95em;

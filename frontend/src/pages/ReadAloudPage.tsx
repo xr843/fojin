@@ -70,7 +70,7 @@ export default function ReadAloudPage() {
             </div>
             <div className="readaloud-item-side">
               <Tag>{t("readaloud.juan_count", { n: it.juan_count })}</Tag>
-              <Tag color="blue">{formatDuration(it.total_duration_ms)}</Tag>
+              <Tag>{formatDuration(it.total_duration_ms)}</Tag>
             </div>
             {it.juan_count > 1 && (
               <div className="readaloud-juans">

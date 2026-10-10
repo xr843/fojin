@@ -172,7 +172,7 @@ function CollectionCard({
           <span className="coll-card-title-row">
             <BookOutlined className="coll-card-icon" aria-hidden="true" />
             <span className="coll-card-name">{coll.name}</span>
-            <Tag color="geekblue" style={{ fontSize: 11, marginLeft: 8 }}>{coll.tradition}</Tag>
+            <Tag style={{ fontSize: 11, marginLeft: 8 }}>{coll.tradition}</Tag>
             <span className="coll-card-count">
               {t("collections.card_stats", { texts: coll.mainTexts.length + coll.commentaries.length, resources: totalResources })}
             </span>

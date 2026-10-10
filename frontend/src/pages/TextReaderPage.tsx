@@ -1043,7 +1043,6 @@ export default function TextReaderPage() {
               placement="right"
             >
               <Tag
-                color="geekblue"
                 style={{
                   marginLeft: 12,
                   verticalAlign: "middle",
