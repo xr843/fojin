@@ -555,6 +555,8 @@
   "textDetail.exportCitation": "导出引用",
   "textDetail.sameTitle.title": "同名经典 · {{n}} 部",
   "textDetail.sameTitle.hint": "题名相同的其他文本：多为同经异译，也可能是同名的另一部著作。",
+  "textDetail.commentaries.title": "历代注疏 · {{n}} 家",
+  "textDetail.commentaries.caveat": "只列出已做经注对齐的注疏（对齐由程序产出、未经人工校订），不等于全部注家。",
   "textDetail.showAll": "展开全部 {{n}} 项",
   "textDetail.showLess": "收起",
   "work.lang.zh": "中文",

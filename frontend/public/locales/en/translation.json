@@ -555,6 +555,8 @@
   "textDetail.exportCitation": "Export citation",
   "textDetail.sameTitle.title": "Texts with the same title · {{n}}",
   "textDetail.sameTitle.hint": "Other texts sharing this title — usually alternative translations of the same sutra, but sometimes a different work with the same name.",
+  "textDetail.commentaries.title": "Commentaries · {{n}}",
+  "textDetail.commentaries.caveat": "Only commentaries that have been aligned to this text are listed (machine-aligned, not hand-checked); this is not every commentator.",
   "textDetail.showAll": "Show all {{n}}",
   "textDetail.showLess": "Show less",
   "work.lang.zh": "Chinese",

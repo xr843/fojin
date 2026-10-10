@@ -44,6 +44,10 @@ vi.mock("../components/SameTitleTexts", () => ({
   default: () => <div data-testid="same-title" />,
 }));
 
+vi.mock("../components/CommentaryWorks", () => ({
+  default: () => <div data-testid="commentary-works" />,
+}));
+
 vi.mock("../components/CitationGenerator", () => ({
   default: () => <div data-testid="citation-generator" />,
 }));
