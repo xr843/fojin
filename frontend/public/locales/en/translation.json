@@ -784,6 +784,7 @@
   "search.view_all_dict": "View all dictionary entries →",
   "search.view_all_dict_count": "View all {{n}} dictionary entries →",
   "search.semantic_match": "AI semantic matches",
+  "search.similarity_label": "Similarity",
   "search.crosslang_match": "Cross-language matches",
   "search.back_to_top": "Back to top",
   "search.rank": "Rank",

@@ -23,10 +23,10 @@ function makeHit(overrides: Partial<ContentSearchHit> = {}): ContentSearchHit {
   };
 }
 
-function renderCard(hit: ContentSearchHit, rank = 1) {
+function renderCard(hit: ContentSearchHit) {
   return render(
     <MemoryRouter>
-      <ContentCard hit={hit} rank={rank} />
+      <ContentCard hit={hit} />
     </MemoryRouter>,
   );
 }
@@ -66,5 +66,29 @@ describe("ContentCard 组件", () => {
     const cbetaLink = screen.getByText(/CBETA/).closest("a");
     expect(cbetaLink).toHaveAttribute("href", "https://cbetaonline.dila.edu.tw/zh/T0251");
     expect(cbetaLink).toHaveAttribute("target", "_blank");
+  });
+
+  // 经名即去详情页的主链接；「阅读」「CBETA 阅读」退为次级文字入口——此前「阅读」是
+  // 实心朱砂按钮，和每张经文标题卡上的「查看详情」一起把一页摊成十几个视觉重点。
+  it("经名是指向 /texts/{text_id} 的链接，卡内没有实心主按钮", () => {
+    const { container } = renderCard(makeHit({ text_id: 99 as TextId }));
+
+    expect(screen.getByRole("link", { name: "維摩經無我疏" })).toHaveAttribute("href", "/texts/99");
+    expect(container.querySelector(".ant-btn-primary")).toBeNull();
+  });
+
+  // <a><button> 是无效嵌套：一个入口两个 Tab 停靠点，读屏念成「链接 按钮 阅读」。
+  it("「阅读」是单一链接，不再是链接里套按钮", () => {
+    renderCard(makeHit());
+
+    const readLink = screen.getByText("阅读").closest("a")!;
+    expect(readLink.querySelector("button")).toBeNull();
+  });
+
+  it("不渲染排名序号", () => {
+    const { container } = renderCard(makeHit());
+
+    expect(container.querySelector(".s-card-rank")).toBeNull();
+    expect(screen.queryByText(/^#\d+$/)).not.toBeInTheDocument();
   });
 });

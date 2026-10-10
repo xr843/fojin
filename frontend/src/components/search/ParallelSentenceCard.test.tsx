@@ -21,10 +21,10 @@ function makeHit(overrides: Partial<ParallelSentenceHit> = {}): ParallelSentence
   };
 }
 
-function renderCard(hit: ParallelSentenceHit, rank = 1) {
+function renderCard(hit: ParallelSentenceHit) {
   return render(
     <MemoryRouter>
-      <ParallelSentenceCard hit={hit} rank={rank} />
+      <ParallelSentenceCard hit={hit} />
     </MemoryRouter>,
   );
 }
@@ -86,8 +86,10 @@ describe("ParallelSentenceCard 组件", () => {
     expect(screen.queryByText("阅读")).not.toBeInTheDocument();
   });
 
-  it("渲染排名序号", () => {
-    renderCard(makeHit(), 4);
-    expect(screen.getByText("#4")).toBeInTheDocument();
+  // 「#N」窄栏占宽度又不传达信息——顺序本身就是排序。
+  it("不渲染排名序号", () => {
+    const { container } = renderCard(makeHit());
+    expect(container.querySelector(".s-card-rank")).toBeNull();
+    expect(screen.queryByText(/^#\d+$/)).not.toBeInTheDocument();
   });
 });

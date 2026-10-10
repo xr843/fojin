@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Empty } from "antd";
+import { BookOutlined, FileSearchOutlined, FileTextOutlined } from "@ant-design/icons";
 import type { UnifiedSearchResponse } from "../../api/client";
 import ResultCard from "./ResultCard";
 import ContentCard from "./ContentCard";
@@ -72,7 +73,7 @@ export default function UnifiedResults({ data }: Props) {
           dedicated dictionary page so it doesn't push the text results down. */}
       {dictionary.length > 0 && (
         <section className="s-unified-section">
-          <h3 style={sectionTitleStyle}>{"🔤"} {t("search.section_dictionary")}</h3>
+          <h3 style={sectionTitleStyle}><FileTextOutlined className="s-head-icon" aria-hidden="true" />{t("search.section_dictionary")}</h3>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {dictionary.slice(0, 2).map((entry) => (
               <Link
@@ -123,9 +124,9 @@ export default function UnifiedResults({ data }: Props) {
       {/* 经文标题 */}
       {catalogResults.length > 0 && (
         <section className="s-unified-section">
-          <h3 style={sectionTitleStyle}>{"📖"} {t("search.section_titles")}</h3>
-          {catalogResults.slice(0, 5).map((hit, i) => (
-            <ResultCard key={hit.id} hit={hit} rank={i + 1} />
+          <h3 style={sectionTitleStyle}><BookOutlined className="s-head-icon" aria-hidden="true" />{t("search.section_titles")}</h3>
+          {catalogResults.slice(0, 5).map((hit) => (
+            <ResultCard key={hit.id} hit={hit} />
           ))}
         </section>
       )}
@@ -133,12 +134,12 @@ export default function UnifiedResults({ data }: Props) {
       {/* 经文内文片段 */}
       {mergedSnippets.length > 0 && (
         <section className="s-unified-section">
-          <h3 style={sectionTitleStyle}>{"🔍"} {t("search.section_content")}</h3>
-          {mergedSnippets.map((item, i) =>
+          <h3 style={sectionTitleStyle}><FileSearchOutlined className="s-head-icon" aria-hidden="true" />{t("search.section_content")}</h3>
+          {mergedSnippets.map((item) =>
             item.kind === "content" ? (
-              <ContentCard key={item.key} hit={item.hit} rank={i + 1} />
+              <ContentCard key={item.key} hit={item.hit} />
             ) : (
-              <SemanticCard key={item.key} hit={item.hit} rank={i + 1} />
+              <SemanticCard key={item.key} hit={item.hit} />
             )
           )}
         </section>

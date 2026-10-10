@@ -5,7 +5,7 @@ import type { DictEntry } from "../../api/client";
 
 const LANG_KEYS: Record<string, string> = { zh: "lang.zh", pi: "lang.pi", sa: "lang.sa", en: "lang.en" };
 
-export default function DictCard({ hit, rank }: { hit: DictEntry; rank: number }) {
+export default function DictCard({ hit }: { hit: DictEntry }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const needsTruncate = hit.definition.length > 300;
@@ -13,7 +13,6 @@ export default function DictCard({ hit, rank }: { hit: DictEntry; rank: number }
 
   return (
     <div className="s-card">
-      <div className="s-card-rank">{t("search.rank")}<br />#{rank}</div>
       <div className="s-card-body">
         <div className="s-card-title">
           {hit.headword}

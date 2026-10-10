@@ -784,6 +784,7 @@
   "search.view_all_dict": "查看全部辭典釋義 →",
   "search.view_all_dict_count": "查看全部 {{n}} 條辭典釋義 →",
   "search.semantic_match": "AI 語義匹配",
+  "search.similarity_label": "相似度",
   "search.crosslang_match": "跨語言匹配",
   "search.back_to_top": "回到頂部",
   "search.rank": "排序",

@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Checkbox } from "antd";
-import { DownOutlined, FilterOutlined } from "@ant-design/icons";
+import { BankOutlined, DownOutlined, FilterOutlined, GlobalOutlined } from "@ant-design/icons";
 import { useNarrowViewport } from "../../hooks/useNarrowViewport";
 import { localizedSourceName } from "../../utils/sourceName";
 
@@ -83,7 +83,7 @@ export default function SearchFilterSidebar({
   const groups = (
     <>
       <div className="s-filter-group">
-        <div className="s-filter-title">🌐 {t("search.filter_region")}</div>
+        <div className="s-filter-title"><GlobalOutlined className="s-head-icon" aria-hidden="true" />{t("search.filter_region")}</div>
         <FilterScroll>
           {regions.map((r) => (
             <label key={r} className="s-filter-item">
@@ -96,7 +96,7 @@ export default function SearchFilterSidebar({
       </div>
 
       <div className="s-filter-group">
-        <div className="s-filter-title">🏛 {t("search.filter_institution")}</div>
+        <div className="s-filter-title"><BankOutlined className="s-head-icon" aria-hidden="true" />{t("search.filter_institution")}</div>
         <FilterScroll>
           {institutions.map(({ name, nameEn, count }) => (
             <label key={name} className="s-filter-item">

@@ -1,9 +1,9 @@
 import { useMemo } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Tag, Button } from "antd";
-import { EyeOutlined, TranslationOutlined } from "@ant-design/icons";
+import { Tag } from "antd";
+import { TranslationOutlined } from "@ant-design/icons";
 import BookmarkButton from "../BookmarkButton";
 import { sanitizeHighlight } from "../../utils/sanitize";
 import { getSourceLabel } from "../../utils/sourceUrls";
@@ -28,7 +28,7 @@ const LANG_COLORS: Record<string, string> = {
   sa: "green",
 };
 
-export default function ResultCard({ hit, rank }: { hit: SearchHit; rank: number }) {
+export default function ResultCard({ hit }: { hit: SearchHit }) {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const titleHtml = hit.highlight?.title_zh?.[0] ?? hit.title_zh;
@@ -53,9 +53,13 @@ export default function ResultCard({ hit, rank }: { hit: SearchHit; rank: number
 
   return (
     <div className="s-card">
-      <div className="s-card-rank">{t("search.rank")}<br />#{rank}</div>
       <div className="s-card-body">
-        <div className="s-card-title" dangerouslySetInnerHTML={{ __html: sanitizeHighlight(titleHtml) }} />
+        {/* 经名即去详情页的主链接（整张卡唯一的视觉重点）；原先的实心「查看详情」已去掉 */}
+        <div className="s-card-title">
+          <Link to={`/texts/${hit.id}`} className="s-card-title-link">
+            <span dangerouslySetInnerHTML={{ __html: sanitizeHighlight(titleHtml) }} />
+          </Link>
+        </div>
         <div className="s-card-tags">
           {sourceName && (
             <Tag color="volcano" style={{ fontSize: 11 }}>{sourceName}</Tag>
@@ -101,11 +105,8 @@ export default function ResultCard({ hit, rank }: { hit: SearchHit; rank: number
             ))}
           </div>
         )}
+        {/* 游客看不到收藏（BookmarkButton 返回 null），此时整行由 .s-card-actions:empty 收起 */}
         <div className="s-card-actions">
-          <Button type="primary" size="small" icon={<EyeOutlined />}
-            onClick={() => navigate(`/texts/${hit.id}`)}>
-            {t("search.view_details")}
-          </Button>
           <BookmarkButton textId={hit.id} size="small" />
         </div>
       </div>
