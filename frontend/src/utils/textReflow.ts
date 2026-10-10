@@ -138,6 +138,106 @@ export function reflowText(raw: string): TextSegment[] {
     return false;
   };
 
+  // ── 经题折行 / 品题识别（2026-10-10，#1300 生产抽样遗留的三类）────────────────────
+  // 宁可漏判不可误判：每条规则都要「标题形状」+「结构锚点」两头成立才触发。回放 459 卷生产原文
+  // （含 203 卷未参与调规则的留出样本）与 10.4 万个模拟引文抽屉窗口，误伤为 0；回放脚本与逐条命中
+  // 见 PR 描述。合并一律逐字携带 offsets，与 splitBylineEnd 同一手法。
+  const ORD = "一二三四五六七八九十百千〇廿卅"; // i18n-exempt: CBETA 结构字面匹配
+  const reOrdEnd = new RegExp(`[${ORD}第]$`); // i18n-exempt: CBETA 结构字面匹配
+  // 标题行：无句读、无括注、无空白（全角空格分隔的多半是署名或目录）
+  const isTitleLike = (t: string): boolean =>
+    t.length >= 2 && t.length <= 25 && !/[，。；：！？、「」『』【】〔〕（）()]/.test(t) && !/\s/.test(t);
+  // 署名里才有的字眼 —— 出现即不当标题/品题
+  const hasBylineWord = (t: string): boolean => /譯|沙門|三藏|比丘|法師|居士|弟子|撰|述|著|造|編|錄/.test(t); // i18n-exempt: CBETA 署名字面匹配
+  // 目录页：「俱舍論頌疏記目次 / 卷第一 / 釋序文 …」里的「卷第一」是目录条目，不是经题后半截
+  const isTocTitle = (t: string): boolean => /目次|目錄|條箇/.test(t); // i18n-exempt: CBETA 目录页字面匹配
+  const nextIsBlank = (j: number): boolean => j >= lines.length || lines[j].trim() === "";
+  // 结构锚点：经题之后（至多隔一个空行）紧跟署名起首行。没有这个锚点，引文抽屉里从卷中段切出的
+  // chunk 也会把目录、碑铭里的无标点行当经题并起来（模拟窗口实测过）。「開府儀同三司…」「西天北印度…」
+  // 是不空、施护一系多行署名的起首，本身不带「譯」。
+  const bylineFollows = (j: number): boolean => {
+    let k = j;
+    if (k < lines.length && lines[k].trim() === "") k++;
+    if (k >= lines.length) return false;
+    const t = lines[k].trim();
+    // 署名行不会带「N卷」——经录（貞元錄、開元錄）里「…三藏續古今翻譯經圖紀二卷」那种书目行不算锚点
+    if (!t || t.includes("卷")) return false; // i18n-exempt: CBETA 结构字面匹配
+    return isByline(t) || hasBylineWord(t) || /^(開府|西天)/.test(t); // i18n-exempt: CBETA 署名字面匹配
+  };
+
+  // 经题后半截：「…釋論 / 第一」「…經卷 / 第一」「…經卷第 / 五」「…經 / 卷上」「…修行法 / 一卷」
+  // 「…見一切佛 / 世界義第五十一之餘」。只认卷首第一行 + 紧邻下一行，且其后是署名。
+  const reTailOrd = new RegExp(`^第[${ORD}]+(?:之[${ORD}]+|之餘)?$`); // i18n-exempt: CBETA 结构字面匹配
+  const reTailJuan = new RegExp(`^(?:卷第?[${ORD}]+|卷[上中下]|[${ORD}]+卷)$`); // i18n-exempt: CBETA 结构字面匹配
+  const reTailBare = new RegExp(`^[${ORD}]{1,4}$`);
+  const reTailPrefixed = new RegExp(`^[^${ORD}第卷]{1,4}第[${ORD}]+(?:之[${ORD}]+|之餘)?$`); // i18n-exempt: CBETA 结构字面匹配
+  const titleTailEnd = (i: number): boolean => {
+    if (i + 1 >= lines.length || !bylineFollows(i + 2)) return false;
+    const a = lines[i].trim();
+    const b = lines[i + 1].trim();
+    if (!isTitleLike(a) || !(reTailBare.test(b) || isTitleLike(b))) return false;
+    if (isJuan(a) || isByline(a) || isSection(a) || hasBylineWord(a) || isTocTitle(a)) return false;
+    if (isByline(b) || isSection(b)) return false;
+    if (reTailBare.test(b)) return /第$/.test(a); // i18n-exempt: 卷第 / 五
+    if (/第$/.test(a)) return false; // i18n-exempt: CBETA 结构字面匹配
+    if (reTailOrd.test(b)) return !reOrdEnd.test(a);
+    // 「…經 / 卷上」「…論頌 / 一卷」：首行须是被折断的长行（≥10 字）
+    if (reTailJuan.test(b)) return a.length >= 10 && !a.includes("卷"); // i18n-exempt: CBETA 结构字面匹配
+    // 带前缀的后半截：首行须是被折断的长行（≥10 字），以免把「XX經 / 序第一」之类误并
+    if (reTailPrefixed.test(b)) return a.length >= 10 && !reOrdEnd.test(a);
+    return false;
+  };
+  // 经题前半截：「佛說一切如來真實攝大乘現證 / 三昧大教王經卷第一」「根本說一切有部毘奈耶藥事 / 卷第一」
+  // （下一行是卷题），「聖八千頌般若波羅蜜多一百八 / 名真實圓義陀羅尼經」（下一行是经题而首行自己不是）。
+  // 首行须 ≥10 字（被折断的长行），短首行多是目录页「旅泊菴稿目錄 / 卷第一」，不并；其后须是署名。
+  const titleHeadType = (i: number): "juan" | "head" | null => {
+    if (i + 1 >= lines.length || !bylineFollows(i + 2)) return null;
+    const a = lines[i].trim();
+    const b = lines[i + 1].trim();
+    if (!isTitleLike(a) || !b || !isTitleLike(b) || a.length < 10 || a.includes("卷")) return null; // i18n-exempt: CBETA 结构字面匹配
+    if (isJuan(a) || isByline(a) || isSection(a) || hasBylineWord(a) || hasBylineWord(b) || isTocTitle(a)) return null;
+    if (isJuan(b)) return "juan";
+    if (a.length >= 12 && !isHead(a, 0) && isHead(b, 1) && !isByline(b)) return "head";
+    return null;
+  };
+  // 品题折行：「…教理分第二 / 十六之三」「…供養洗浴品 / 第五」「…鬼神成就品第 / 六」——
+  // 两行拼起来以「品/分第N」收尾、下一行纯是序数，且其后是空行（品题自成一段）。卷中也认。
+  const reSectionTail = new RegExp(`^[${ORD}]{1,4}(?:之[${ORD}]+|之餘)?$`); // i18n-exempt: CBETA 结构字面匹配
+  const reSectionEnd = new RegExp(`[品分]第[${ORD}]+(?:之[${ORD}]+|之餘)?$`); // i18n-exempt: CBETA 结构字面匹配
+  const sectionFoldEnd = (i: number): boolean => {
+    if (i + 1 >= lines.length || !nextIsBlank(i + 2)) return false;
+    const a = lines[i].trim();
+    const b = lines[i + 1].trim();
+    if (!isTitleLike(a) || hasBylineWord(a) || a.length < 4) return false;
+    const tailOk = (reSectionTail.test(b) && reOrdEnd.test(a)) || (reTailOrd.test(b) && /[品分]$/.test(a)); // i18n-exempt: CBETA 结构字面匹配
+    return tailOk && (a + b).length <= 30 && reSectionEnd.test(a + b);
+  };
+
+  const joinLines = (i: number, end: number): { text: string; offsets: number[] } => {
+    const first = trimmedOf(i);
+    let text = first.text;
+    const offsets = first.offsets.slice();
+    for (let j = i + 1; j <= end; j++) {
+      const part = trimmedOf(j);
+      text += part.text;
+      offsets.push(...part.offsets);
+    }
+    return { text, offsets };
+  };
+
+  // 正文尚未开始、卷首已出过经题或卷题，且上一段是署名或卷题。要求先有题：引文抽屉的 chunk
+  // 若恰好从署名末行切起（「…塞部撰 / 萬治二歲九月吉日」），没有题就不算卷首。
+  const atHeaderTail = (): boolean => {
+    let last: TextSegment["type"] | null = null;
+    let sawTitle = false;
+    for (const s of segments) {
+      if (s.type === "prose" || s.type === "verse") return false;
+      if (s.type === "head" || s.type === "juan") sawTitle = true;
+      if (s.type !== "break") last = s.type;
+    }
+    return sawTitle && (last === "byline" || last === "juan");
+  };
+
   let inVerseBlock = false;
   // Before the first 論曰, verse-like lines are opening verses
   let beforeFirstProse = true;
@@ -163,6 +263,30 @@ export function reflowText(raw: string): TextSegment[] {
     if (firstNonEmptyIdx < 0) firstNonEmptyIdx = i;
     const relIdx = i - firstNonEmptyIdx;
 
+    // 品题被折成两行：并成一个 section 段
+    if (sectionFoldEnd(i)) {
+      flushProse();
+      const merged = joinLines(i, i + 1);
+      segments.push({ type: "section", text: merged.text, offsets: merged.offsets });
+      lastNonEmptyLine = lines[i + 1].trim();
+      i += 1;
+      continue;
+    }
+
+    // 卷首经题被折成两行：并成一个 juan/head 段（只在卷首第一行触发）
+    if (relIdx === 0) {
+      const headType = titleHeadType(i);
+      const tail = !headType && titleTailEnd(i);
+      if (headType || tail) {
+        const merged = joinLines(i, i + 1);
+        const type = headType ?? (isJuan(merged.text) ? "juan" : "head");
+        segments.push({ type, text: merged.text, offsets: merged.offsets });
+        lastNonEmptyLine = lines[i + 1].trim();
+        i += 1;
+        continue;
+      }
+    }
+
     // Structural elements: head, juan, byline, section
     if (isJuan(trimmed)) {
       flushProse();
@@ -179,13 +303,7 @@ export function reflowText(raw: string): TextSegment[] {
     if (!proseBuf) {
       const end = splitBylineEnd(i);
       if (end > 0) {
-        let text = trimmed;
-        const offsets = tOffsets.slice();
-        for (let j = i + 1; j <= end; j++) {
-          const part = trimmedOf(j);
-          text += part.text;
-          offsets.push(...part.offsets);
-        }
+        const { text, offsets } = joinLines(i, end);
         segments.push({ type: "byline", text, offsets });
         lastNonEmptyLine = lines[end].trim();
         i = end;
@@ -202,6 +320,23 @@ export function reflowText(raw: string): TextSegment[] {
     if (isHead(trimmed, relIdx)) {
       flushProse();
       segments.push({ type: "head", text: trimmed, offsets: tOffsets });
+      continue;
+    }
+
+    // 卷首品题：署名/卷题之后、正文开始之前，一行无句读的短题自成一段（其后是空行）——
+    // 四分律「百眾學法之三」「八波羅夷法」「衣揵度之二」、八揵度論「智揵度之四修智跋渠之餘」。
+    // 没有「品第」字样，isSection 认不出，原先被并进正文首段。前一段必须是署名或卷题、
+    // 正文尚未开始，且该行不含署名字眼（「菩薩沙彌古吳智旭際明＋全角空格＋釋」之类第二署名人不算）。
+    if (
+      !proseBuf &&
+      atHeaderTail() &&
+      trimmed.length <= 20 &&
+      isTitleLike(trimmed) &&
+      !hasBylineWord(trimmed) &&
+      !/[釋解]$/.test(trimmed) &&
+      nextIsBlank(i + 1)
+    ) {
+      segments.push({ type: "section", text: trimmed, offsets: tOffsets });
       continue;
     }
 
