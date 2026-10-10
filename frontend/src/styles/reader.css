@@ -71,6 +71,10 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
+.reader-breadcrumb {
+  margin-bottom: 16px;
+}
+
 .reader-header {
   margin-bottom: 24px;
 }
@@ -154,10 +158,19 @@
   font-size: 1.05em;
 }
 
-/* 正文段落 */
+/* 正文段落
+   段距：reflowText 把 CBETA 原文里「句末标点 + 空行」（<p> 边界）渲染成一个 break 段 → <br>。
+   那个 <br> 独占一行（26px），叠在 1em 的段下边距上，相邻段之间空出 49px ≈ 1.6 行（2026-10-10
+   生产实测，桌面同样）。段落之间的 <br> 用 CSS 收掉、段距只留 0.7em —— 不删节点：划词、
+   行锚、「全藏出处」都按正文 DOM 文本定位，DOM 结构保持原样最稳。偈颂之间的 <br> 不动，
+   偈颂本身 margin 0，那一行空白就是颂与颂的分隔。 */
 .reader-body .text-prose {
   text-indent: 2em;
-  margin: 0 0 1em;
+  margin: 0 0 0.7em;
+}
+
+.reader-body .text-prose + br {
+  display: none;
 }
 
 /* 偈颂 */
@@ -339,6 +352,22 @@
   background: #a07a1a !important;
   border-color: #a07a1a !important;
   box-shadow: 0 6px 16px rgba(139, 105, 20, 0.4);
+}
+
+/* 手机：往下读时收起浮钮（AI 解读 / 回到顶部），见 TextReaderPage 的 fabTucked。
+   visibility 延后到动画结束再隐藏：收起后不可点、不进 Tab 序，也不会挡住下面的经文。 */
+.reader-ai-fab,
+.reader-backtop-fab {
+  transition: transform 0.2s ease, opacity 0.2s ease, visibility 0s linear 0s;
+}
+
+.reader-ai-fab.reader-fab-tucked,
+.reader-backtop-fab.reader-fab-tucked {
+  transform: translateY(calc(100% + 32px));
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: transform 0.2s ease, opacity 0.2s ease, visibility 0s linear 0.2s;
 }
 
 /* ── Back-to-top FAB ── */
@@ -633,8 +662,9 @@
     padding: 0 14px;
   }
 
+  /* 底部留出浮钮（48px + 距底 24px）+ 16px 间距：经末最后几行能滚到浮钮上方 */
   .reader-body {
-    padding: 16px 0;
+    padding: 16px 0 88px;
   }
 
   .bilingual-column {
@@ -655,7 +685,7 @@
   }
 
   .reader-header {
-    margin-bottom: 16px;
+    margin-bottom: 8px;
   }
 
   .reader-header h3 {
@@ -667,41 +697,77 @@
     gap: 6px;
   }
 
+  /* 工具栏一行：卷选择 | 上一卷 下一卷 | 更多（其余按钮收进「更多」，见 TextReaderPage 的
+     phone 分支）。2026-10-10 生产实测这里原是四行（卷选择 / 字号 / 两排 9 颗按钮），
+     首段正文被推到 y=480。按钮高 40px：手指点击区域的下限。 */
   .reader-nav .juan-select {
-    width: 100%;
-    order: -1;
+    flex: 1 1 0;
+    min-width: 96px;
+    width: auto;
+  }
+
+  .reader-nav .juan-select .ant-select-selector,
+  .reader-nav .juan-select.ant-select {
+    height: 40px;
   }
 
   .reader-nav .nav-btn-group {
     display: flex;
     gap: 6px;
-    flex: 1;
+    flex: 0 0 auto;
   }
 
-  .reader-nav .nav-btn-group .ant-btn {
-    flex: 1;
-    font-size: 13px;
-    padding: 4px 8px;
+  .reader-nav .nav-btn-group .ant-btn,
+  .reader-nav .reader-more-btn {
+    height: 40px;
+    font-size: 14px;
+    padding: 4px 10px;
   }
 
-  /* 收藏/标注/引用按钮缩小，允许换行 */
-  .reader-nav > .ant-btn {
-    font-size: 12px;
-    padding: 2px 8px;
-    height: 28px;
+  /* 卷选择本身已标明卷次，箭头图标省出宽度留给卷名 */
+  .reader-nav .nav-btn-group .anticon {
+    display: none;
   }
 
-  .reader-font-controls {
-    margin-left: 0;
-    order: -1;
-    width: 100%;
-    justify-content: flex-end;
-    margin-bottom: 4px;
+  /* 来源署名单行：CBETA / 84000 的署名是许可条件，所以不用省略号截掉，而是横向可滑 ——
+     每个来源都还在、都能点到。 */
+  .reader-header .source-attribution {
+    white-space: nowrap;
+    overflow-x: auto;
+    /* .reader-container 在列 flex 里是 margin:auto（按内容定宽），不写这一行，一整行不换行的
+       署名会把它的最小内容宽撑到 431px，手机布局视口被撑宽到 457px */
+    contain: inline-size;
+    scrollbar-width: none;
+    margin-bottom: 8px;
   }
 
+  .reader-header .source-attribution::-webkit-scrollbar {
+    display: none;
+  }
+
+  .reader-breadcrumb {
+    margin-bottom: 8px;
+  }
+
+  /* 底部留出浮钮（48px + 距底 24px）+ 16px 间距：经末最后几行能滚到浮钮上方 */
   .reader-body {
-    padding: 12px 0;
+    padding: 4px 0 88px;
     line-height: 1.75;
+  }
+
+  /* 经题 / 译者在手机上收紧上下留白（配色与对齐不动） */
+  .reader-body .text-head {
+    margin: 0 0 0.4em;
+    padding: 0.2em 0;
+  }
+
+  .reader-body .text-juan {
+    margin: 0.4em 0 0.4em;
+    padding: 0.1em 0;
+  }
+
+  .reader-body .text-byline {
+    margin: 0 0 0.6em;
   }
 
   .reader-bottom-nav {
@@ -729,25 +795,13 @@
     gap: 4px;
   }
 
-  .reader-nav .nav-btn-group {
-    width: 100%;
-    order: 0;
-  }
-
-  .reader-nav .nav-btn-group .ant-btn {
-    font-size: 12px;
-    padding: 2px 6px;
-    height: 28px;
-  }
-
-  .reader-nav > .ant-btn {
-    font-size: 12px;
-    padding: 2px 6px;
-    height: 26px;
+  .reader-nav .nav-btn-group .ant-btn,
+  .reader-nav .reader-more-btn {
+    padding: 4px 8px;
   }
 
   .reader-body {
-    padding: 10px 0;
+    padding: 4px 0 88px;
     line-height: 1.7;
     font-size: var(--reader-font-size, 16px);
   }
@@ -907,3 +961,43 @@
 
 /* 划词浮层底栏按钮多了（问小津/白话/全藏出处/报错），允许换行 */
 .reader-dict-popover-footer { flex-wrap: wrap; }
+
+/* ── 手机「更多」菜单 ── */
+.reader-more-popup {
+  min-width: 200px;
+}
+
+.reader-more-popup > .ant-dropdown-menu {
+  box-shadow: none;
+}
+
+/* 菜单项点击区域 ≥40px */
+.reader-more-dropdown .ant-dropdown-menu-item,
+.reader-more-dropdown .ant-dropdown-menu-submenu-title {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+}
+
+.reader-more-font {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px 10px;
+  border-top: 1px solid var(--fj-border, #e8e0d4);
+}
+
+.reader-more-font-label {
+  font-size: 13px;
+  color: var(--fj-ink-muted, #999);
+}
+
+.reader-more-font .reader-font-controls {
+  margin: 0;
+  width: auto;
+}
+
+.reader-more-font .reader-font-controls .ant-btn {
+  height: 40px;
+}

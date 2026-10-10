@@ -1351,6 +1351,8 @@
   "reader.juan.first": "Fascicle 1",
   "reader.nav.prev": "Previous",
   "reader.nav.next": "Next",
+  "reader.nav.more": "More",
+  "reader.font.size": "Font size",
   "reader.annotation.button": "Annotate",
   "reader.annotation.title": "Annotations",
   "reader.annotation.add": "New annotation",

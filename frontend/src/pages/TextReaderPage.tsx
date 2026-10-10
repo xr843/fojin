@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Helmet } from "react-helmet-async";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Typography, Spin, Button, Select, Breadcrumb, Row, Col, message, Tooltip, Tag, Popover, Dropdown, Drawer } from "antd";
+import { Typography, Spin, Button, Select, Breadcrumb, Row, Col, message, Tooltip, Tag, Popover, Dropdown, Drawer, theme, type MenuProps } from "antd";
 import { getLastPosition, recordReading } from "../utils/readingHistory";
 import {
   HomeOutlined,
@@ -21,11 +21,13 @@ import {
   DownloadOutlined,
   SoundOutlined,
   ExportOutlined,
+  EllipsisOutlined,
+  CheckOutlined,
 } from "@ant-design/icons";
 import { trackAudio } from "../audio/telemetry";
 import { useAudioPlayer } from "../audio/useAudioPlayback";
 import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBookmark, addBookmark, removeBookmark, searchDictionaryGrouped, getJuanApparatus, getJuanLineAnchors, getJuanAudio, type ApparatusEntryItem } from "../api/client";
-import { isNarrowViewport, useNarrowViewport } from "../hooks/useNarrowViewport";
+import { isNarrowViewport, useNarrowViewport, PHONE_VIEWPORT_QUERY } from "../hooks/useNarrowViewport";
 
 const AI_PANEL_PREF_KEY = "fojin.reader.aiPanel";
 function readAiPanelPref(): "open" | "closed" | null {
@@ -62,6 +64,11 @@ const FONT_SIZE_MIN = 14;
 const FONT_SIZE_MAX = 28;
 const FONT_SIZE_STEP = 2;
 const FONT_SIZE_KEY = "fojin-reader-font-size";
+
+/** 手机浮钮收起/出现的阈值（px）：离顶多少以内永远显示；离经末多少以内永远显示；小于多少的滚动当抖动忽略。 */
+const FAB_TUCK_MIN_OFFSET = 120;
+const FAB_REVEAL_NEAR_END = 120;
+const FAB_SCROLL_JITTER = 8;
 
 import { reflowText, type TextSegment } from "../utils/textReflow";
 
@@ -588,6 +595,38 @@ export default function TextReaderPage() {
     return () => window.removeEventListener("resize", compute);
   }, [content, aiPanelOpen, parallelPanelOpen, aiPanelWidth, parallelPanelWidth]);
 
+  // 手机：浮钮（AI 解读 / 回到顶部）往下读时收起、往回滑或到经末时出现。
+  // 2026-10-10 生产 390×844 实测：48px 的 AI 浮钮 fixed 在 x 318–366 / y 772–820，
+  // 正文列右缘到 372 —— 浮钮压在经文上（首屏遮住「應云何住？云何降伏其心」那一行
+  // 末字，往下读时每一屏的右下角都被它盖住）。读经是一路往下滑的，往回滑是在「找
+  // 东西」，这时再给入口；经末无处可滑，也给。
+  // 按 narrow（≤1024）而不是手机断点：769–1024 的平板上 42em 阅读列也几乎贴满，浮钮同样压字。
+  // narrow 布局从不锁高（见 reader-ai-active 的条件），滚动的永远是 document，直接读 window.scrollY；
+  // 抽屉/双语栏里的内部滚动经捕获阶段也会到这里，但 scrollY 不变，delta=0 被忽略。
+  const phone = useNarrowViewport(PHONE_VIEWPORT_QUERY);
+  const { token: antdToken } = theme.useToken();
+  const [fabTucked, setFabTucked] = useState(false);
+  useEffect(() => {
+    if (!narrow) return;
+    let last = window.scrollY;
+    const onScroll = () => {
+      const y = window.scrollY;
+      const nearEnd = document.documentElement.scrollHeight - (y + window.innerHeight) < FAB_REVEAL_NEAR_END;
+      if (nearEnd || y < FAB_TUCK_MIN_OFFSET) {
+        setFabTucked(false);
+        last = y;
+        return;
+      }
+      const delta = y - last;
+      if (Math.abs(delta) < FAB_SCROLL_JITTER) return;
+      setFabTucked(delta > 0);
+      last = y;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true, capture: true });
+    return () => window.removeEventListener("scroll", onScroll, { capture: true });
+  }, [narrow]);
+  const fabHidden = narrow && fabTucked;
+
   const scrollToTop = useCallback(() => {
     const el = readerContentRef.current;
     const scroller = el ? findScrollContainer(el) : null;
@@ -830,11 +869,125 @@ export default function TextReaderPage() {
     });
   };
 
+  // 桌面平铺按钮与手机「更多」菜单共用同一份动作，免得两处分叉。
+  const openKabc = () => {
+    if (!textDetail?.kabc_url) return;
+    window.open(
+      // Jump to the current juan in KABC: work URL + _T_{juan:03d}
+      // (Goryeo juan numbering matches Taishō for the vast majority).
+      `${textDetail.kabc_url}_T_${String(juanNum).padStart(3, "0")}`,
+      "_blank",
+      "noopener",
+    );
+  };
+  const audioActive = audioPlayer.track?.textId === Number(textId) && audioPlayer.track?.juanNum === juanNum;
+  const playAudio = () => {
+    if (!audioData) return;
+    // 意图信号：点了按钮 ≠ 听完，两个数的比值才是转化率
+    trackAudio("audio_open", Number(textId), juanNum);
+    audioPlayer.play({
+      textId: Number(textId),
+      juanNum,
+      title: t("reader.seo.title", {
+        title: content?.title_zh ?? "",
+        n: juanNum,
+      }),
+      audio: audioData,
+    });
+  };
+  const exportItems = (["txt", "html", "docx", "epub"] as const).flatMap((fmt) => [
+    {
+      key: `${fmt}-juan`,
+      label: `${t(`reader.export.${fmt}`)} · ${t("reader.export.this_juan")}`,
+      onClick: () => downloadExport(fmt, juanNum),
+    },
+    {
+      key: `${fmt}-all`,
+      label: `${t(`reader.export.${fmt}`)} · ${t("reader.export.whole_text")}`,
+      onClick: () => downloadExport(fmt, null),
+    },
+  ]);
+
+  // 只有 1 卷（金剛經等）时不渲染翻卷按钮：生产上顶部与经末各一组永远禁用的「上一卷/下一卷」。
+  // total_juans 未到时看 prev/next，有任一即多卷。
+  const multiJuan =
+    (content?.total_juans ?? juanList?.total_juans ?? 0) > 1 || !!content?.prev_juan || !!content?.next_juan;
+
+  const fontControls = (
+    <div className="reader-font-controls">
+      <Button
+        size="small"
+        icon={<FontSizeOutlined />}
+        disabled={fontSize <= FONT_SIZE_MIN}
+        onClick={() => changeFontSize(-FONT_SIZE_STEP)}
+      >
+        A-
+      </Button>
+      <span className="font-size-label">{fontSize}</span>
+      <Button
+        size="small"
+        icon={<FontSizeOutlined />}
+        disabled={fontSize >= FONT_SIZE_MAX}
+        onClick={() => changeFontSize(FONT_SIZE_STEP)}
+      >
+        A+
+      </Button>
+    </div>
+  );
+
+  // 手机「更多」：2026-10-10 生产 390px 实测，两排 9 颗工具按钮 + 字号行把首段正文推到
+  // y=480，首屏只剩约 12 行经文。收进一个菜单，工具栏只剩一行。
+  const checkMark = (on: boolean) => (on ? <CheckOutlined /> : null);
+  const moreMenuItems: MenuProps["items"] = [
+    {
+      key: "bookmark",
+      icon: bookmarked ? <HeartFilled style={{ color: "var(--fj-accent)" }} /> : <HeartOutlined />,
+      label: bookmarked ? t("reader.bookmark.added") : t("reader.bookmark.add"),
+      disabled: bookmarkLoading,
+      onClick: toggleBookmark,
+    },
+    { key: "annotation", icon: <EditOutlined />, label: t("reader.annotation.button"), onClick: () => setAnnotationOpen(true) },
+    { key: "citation", icon: <BookOutlined />, label: t("reader.citation.button"), onClick: () => setCitationOpen(true) },
+    { key: "export", icon: <DownloadOutlined />, label: t("reader.export.button"), children: exportItems, popupClassName: "reader-more-dropdown" },
+    {
+      key: "apparatus",
+      icon: <DiffOutlined />,
+      label: t("reader.apparatus.toggle"),
+      extra: checkMark(apparatusOn),
+      onClick: () => setApparatusOn((v) => !v),
+    },
+    ...(audioData
+      ? [{ key: "audio", icon: <SoundOutlined />, label: t("reader.audio.button"), extra: checkMark(audioActive), onClick: playAudio }]
+      : []),
+    {
+      key: "parallel",
+      icon: <GlobalOutlined />,
+      label: t("reader.parallel.button"),
+      extra: checkMark(parallelPanelOpen),
+      onClick: () => setParallelPanelOpen((v) => !v),
+    },
+    ...(textDetail?.kabc_url
+      ? [{
+          key: "kabc",
+          icon: <GlobalOutlined />,
+          // 外链标识与桌面按钮一致：它去的是东国大学 KABC，不是站内面板
+          label: (
+            <>
+              {t("reader.kabc.button")}
+              <ExportOutlined style={{ fontSize: 11, marginLeft: 4, opacity: 0.7 }} />
+            </>
+          ),
+          title: t("reader.kabc.tooltip", { k: textDetail.goryeo_k }),
+          onClick: openKabc,
+        }]
+      : []),
+  ];
+
   // 关闭态的入口：两种形态（内联 / 抽屉）共用同一颗浮动按钮。
   const aiFab = (
     <Tooltip title={t("reader.ai.title")} placement="left">
       <Button
-        className="reader-ai-fab"
+        className={`reader-ai-fab${fabHidden ? " reader-fab-tucked" : ""}`}
         type="primary"
         shape="circle"
         size="large"
@@ -857,7 +1010,7 @@ export default function TextReaderPage() {
       </Helmet>
 
       <Breadcrumb
-        style={{ marginBottom: 16 }}
+        className="reader-breadcrumb"
         items={[
           {
             title: (
@@ -924,157 +1077,135 @@ export default function TextReaderPage() {
               })) || [{ value: 1, label: t("reader.juan.first") }]
             }
           />
-          <div className="nav-btn-group">
-            <Button
-              icon={<LeftOutlined />}
-              disabled={!content?.prev_juan}
-              onClick={() =>
-                content?.prev_juan && setJuanNum(content.prev_juan)
-              }
-            >
-              {t("reader.nav.prev")}
-            </Button>
-            <Button
-              disabled={!content?.next_juan}
-              onClick={() =>
-                content?.next_juan && setJuanNum(content.next_juan)
-              }
-            >
-              {t("reader.nav.next")} <RightOutlined />
-            </Button>
-          </div>
-          <Button
-            size="small"
-            icon={bookmarked ? <HeartFilled style={{ color: "var(--fj-accent)" }} /> : <HeartOutlined />}
-            loading={bookmarkLoading}
-            onClick={toggleBookmark}
-          >
-            {bookmarked ? t("reader.bookmark.added") : t("reader.bookmark.add")}
-          </Button>
-          <Button
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => setAnnotationOpen(true)}
-          >
-            {t("reader.annotation.button")}
-          </Button>
-          <Button
-            size="small"
-            icon={<BookOutlined />}
-            onClick={() => setCitationOpen(true)}
-          >
-            {t("reader.citation.button")}
-          </Button>
-          <Dropdown
-            trigger={["click"]}
-            menu={{
-              items: (["txt", "html", "docx", "epub"] as const).flatMap((fmt) => [
-                {
-                  key: `${fmt}-juan`,
-                  label: `${t(`reader.export.${fmt}`)} · ${t("reader.export.this_juan")}`,
-                  onClick: () => downloadExport(fmt, juanNum),
-                },
-                {
-                  key: `${fmt}-all`,
-                  label: `${t(`reader.export.${fmt}`)} · ${t("reader.export.whole_text")}`,
-                  onClick: () => downloadExport(fmt, null),
-                },
-              ]),
-            }}
-          >
-            <Button size="small" icon={<DownloadOutlined />}>
-              {t("reader.export.button")}
-            </Button>
-          </Dropdown>
-          <Tooltip title={t("reader.apparatus.tooltip")}>
-            <Button
-              size="small"
-              type={apparatusOn ? "primary" : "default"}
-              icon={<DiffOutlined />}
-              onClick={() => setApparatusOn((v) => !v)}
-            >
-              {t("reader.apparatus.toggle")}
-            </Button>
-          </Tooltip>
-          {audioData && (
-            <Tooltip title={t("reader.audio.tooltip")}>
+          {multiJuan && (
+            <div className="nav-btn-group">
               <Button
-                size="small"
-                type={
-                  audioPlayer.track?.textId === Number(textId) &&
-                  audioPlayer.track?.juanNum === juanNum
-                    ? "primary"
-                    : "default"
-                }
-                icon={<SoundOutlined />}
-                onClick={() => {
-                  // 意图信号：点了按钮 ≠ 听完，两个数的比值才是转化率
-                  trackAudio("audio_open", Number(textId), juanNum);
-                  audioPlayer.play({
-                    textId: Number(textId),
-                    juanNum,
-                    title: t("reader.seo.title", {
-                      title: content?.title_zh ?? "",
-                      n: juanNum,
-                    }),
-                    audio: audioData,
-                  });
-                }}
-              >
-                {t("reader.audio.button")}
-              </Button>
-            </Tooltip>
-          )}
-          <Tooltip title={t("reader.parallel.tooltip")}>
-            <Button
-              size="small"
-              type={parallelPanelOpen ? "primary" : "default"}
-              icon={<GlobalOutlined />}
-              onClick={() => setParallelPanelOpen((v) => !v)}
-            >
-              {t("reader.parallel.button")}
-            </Button>
-          </Tooltip>
-          {textDetail?.kabc_url && (
-            <Tooltip title={t("reader.kabc.tooltip", { k: textDetail.goryeo_k })}>
-              <Button
-                size="small"
-                icon={<GlobalOutlined />}
+                icon={<LeftOutlined />}
+                disabled={!content?.prev_juan}
                 onClick={() =>
-                  window.open(
-                    // Jump to the current juan in KABC: work URL + _T_{juan:03d}
-                    // (Goryeo juan numbering matches Taishō for the vast majority).
-                    `${textDetail.kabc_url}_T_${String(juanNum).padStart(3, "0")}`,
-                    "_blank",
-                    "noopener",
-                  )
+                  content?.prev_juan && setJuanNum(content.prev_juan)
                 }
               >
-                {t("reader.kabc.button")}
-                {/* 外链标识：它去的是东国大学 KABC，不是站内面板 —— 别让它长得像「跨藏对照」 */}
-                <ExportOutlined style={{ fontSize: 11, marginLeft: 2, opacity: 0.7 }} />
+                {t("reader.nav.prev")}
               </Button>
-            </Tooltip>
+              <Button
+                disabled={!content?.next_juan}
+                onClick={() =>
+                  content?.next_juan && setJuanNum(content.next_juan)
+                }
+              >
+                {t("reader.nav.next")} <RightOutlined />
+              </Button>
+            </div>
           )}
-          <div className="reader-font-controls">
-            <Button
-              size="small"
-              icon={<FontSizeOutlined />}
-              disabled={fontSize <= FONT_SIZE_MIN}
-              onClick={() => changeFontSize(-FONT_SIZE_STEP)}
+          {phone ? (
+            <Dropdown
+              trigger={["click"]}
+              placement="bottomRight"
+              rootClassName="reader-more-dropdown"
+              menu={{ items: moreMenuItems }}
+              popupRender={(menu) => (
+                // 菜单与字号行包成一张卡：底色/阴影取 antd 浮层 token，暗色主题跟着变
+                <div
+                  className="reader-more-popup"
+                  style={{
+                    background: antdToken.colorBgElevated,
+                    borderRadius: antdToken.borderRadiusLG,
+                    boxShadow: antdToken.boxShadowSecondary,
+                  }}
+                >
+                  {menu}
+                  <div className="reader-more-font">
+                    <span className="reader-more-font-label">{t("reader.font.size")}</span>
+                    {fontControls}
+                  </div>
+                </div>
+              )}
             >
-              A-
-            </Button>
-            <span className="font-size-label">{fontSize}</span>
-            <Button
-              size="small"
-              icon={<FontSizeOutlined />}
-              disabled={fontSize >= FONT_SIZE_MAX}
-              onClick={() => changeFontSize(FONT_SIZE_STEP)}
-            >
-              A+
-            </Button>
-          </div>
+              <Button className="reader-more-btn" icon={<EllipsisOutlined />}>
+                {t("reader.nav.more")}
+              </Button>
+            </Dropdown>
+          ) : (
+            <>
+              <Button
+                size="small"
+                icon={bookmarked ? <HeartFilled style={{ color: "var(--fj-accent)" }} /> : <HeartOutlined />}
+                loading={bookmarkLoading}
+                onClick={toggleBookmark}
+              >
+                {bookmarked ? t("reader.bookmark.added") : t("reader.bookmark.add")}
+              </Button>
+              <Button
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => setAnnotationOpen(true)}
+              >
+                {t("reader.annotation.button")}
+              </Button>
+              <Button
+                size="small"
+                icon={<BookOutlined />}
+                onClick={() => setCitationOpen(true)}
+              >
+                {t("reader.citation.button")}
+              </Button>
+              <Dropdown
+                trigger={["click"]}
+                menu={{ items: exportItems }}
+              >
+                <Button size="small" icon={<DownloadOutlined />}>
+                  {t("reader.export.button")}
+                </Button>
+              </Dropdown>
+              <Tooltip title={t("reader.apparatus.tooltip")}>
+                <Button
+                  size="small"
+                  type={apparatusOn ? "primary" : "default"}
+                  icon={<DiffOutlined />}
+                  onClick={() => setApparatusOn((v) => !v)}
+                >
+                  {t("reader.apparatus.toggle")}
+                </Button>
+              </Tooltip>
+              {audioData && (
+                <Tooltip title={t("reader.audio.tooltip")}>
+                  <Button
+                    size="small"
+                    type={audioActive ? "primary" : "default"}
+                    icon={<SoundOutlined />}
+                    onClick={playAudio}
+                  >
+                    {t("reader.audio.button")}
+                  </Button>
+                </Tooltip>
+              )}
+              <Tooltip title={t("reader.parallel.tooltip")}>
+                <Button
+                  size="small"
+                  type={parallelPanelOpen ? "primary" : "default"}
+                  icon={<GlobalOutlined />}
+                  onClick={() => setParallelPanelOpen((v) => !v)}
+                >
+                  {t("reader.parallel.button")}
+                </Button>
+              </Tooltip>
+              {textDetail?.kabc_url && (
+                <Tooltip title={t("reader.kabc.tooltip", { k: textDetail.goryeo_k })}>
+                  <Button
+                    size="small"
+                    icon={<GlobalOutlined />}
+                    onClick={openKabc}
+                  >
+                    {t("reader.kabc.button")}
+                    {/* 外链标识：它去的是东国大学 KABC，不是站内面板 —— 别让它长得像「跨藏对照」 */}
+                    <ExportOutlined style={{ fontSize: 11, marginLeft: 2, opacity: 0.7 }} />
+                  </Button>
+                </Tooltip>
+              )}
+              {fontControls}
+            </>
+          )}
           {langData && langData.languages.length > 1 && (
             <Select
               value={compareLang}
@@ -1211,7 +1342,7 @@ export default function TextReaderPage() {
       </div>
 
       {/* Bottom navigation */}
-      {content && (
+      {content && multiJuan && (
         <div className="reader-bottom-nav">
           <Button
             disabled={!content.prev_juan}
@@ -1312,7 +1443,7 @@ export default function TextReaderPage() {
     {showBackTop && (
       <Tooltip title={t("reader.backtop")} placement="left">
         <Button
-          className="reader-backtop-fab"
+          className={`reader-backtop-fab${fabHidden ? " reader-fab-tucked" : ""}`}
           style={backTopStyle}
           shape="circle"
           size="large"
