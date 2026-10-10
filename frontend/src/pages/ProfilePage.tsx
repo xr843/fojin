@@ -316,7 +316,7 @@ export default function ProfilePage() {
                         style={{ cursor: "pointer" }}
                         onClick={() => navigate(`/texts/${item.text_id}`)}
                         actions={[
-                          <Tag color="blue">{item.cbeta_id}</Tag>,
+                          <Tag>{item.cbeta_id}</Tag>,
                         ]}
                       >
                         <List.Item.Meta

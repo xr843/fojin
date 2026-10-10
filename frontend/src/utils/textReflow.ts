@@ -112,6 +112,24 @@ export function reflowText(raw: string): TextSegment[] {
     return /[譯译述撰注疏記造]$/.test(line) && line.length <= 25 && !/[，。；]/.test(line);
   };
 
+  // CBETA 把长署名硬折成两三行：「姚秦罽賓三藏佛陀耶舍 / 共竺佛念等譯」「後秦北印度三藏 /
+  // 弗若多羅共羅什譯」「西天譯經三藏朝奉大夫試光祿卿 / 傳法大師賜紫沙門臣施護等 / 奉詔譯」。
+  // isByline 只认得以「譯」等结尾的末行，前半截会落进正文段（缩进、墨色、左对齐），与右侧的
+  // 后半截拆成两处（2026-10-10 生产，四分律卷二十一；抽样前 80 部里五分律、僧祇律、十誦律、
+  // 遺教經、大日經、大智度論、八十楞伽同病）。规则刻意收窄：起首行含「三藏」、整段无标点、
+  // 至多三行且相邻（中间无空行）、末行本身是署名，且只在段落边界上触发 —— 正文行几乎都带标点。
+  // 返回并入的末行下标，不成立返回 -1。
+  const splitBylineEnd = (i: number): number => {
+    const first = lines[i].trim();
+    if (!first.includes("三藏") || first.length > 25 || /[，。；：！？、]/.test(first)) return -1; // i18n-exempt: CBETA 署名里的字面匹配，不是界面文案
+    for (let j = i + 1; j <= i + 2 && j < lines.length; j++) {
+      const t = lines[j].trim();
+      if (!t || t.length > 25 || /[，。；：！？、]/.test(t)) return -1;
+      if (isByline(t)) return j;
+    }
+    return -1;
+  };
+
   const isSection = (line: string): boolean => {
     // 品名/章节: e.g. "（一）第一分初大本經第一", "大緣方便經第二"
     // Starts with （number） or contains 品第/分第/經第
@@ -156,6 +174,23 @@ export function reflowText(raw: string): TextSegment[] {
       flushProse();
       segments.push({ type: "byline", text: trimmed, offsets: tOffsets });
       continue;
+    }
+
+    if (!proseBuf) {
+      const end = splitBylineEnd(i);
+      if (end > 0) {
+        let text = trimmed;
+        const offsets = tOffsets.slice();
+        for (let j = i + 1; j <= end; j++) {
+          const part = trimmedOf(j);
+          text += part.text;
+          offsets.push(...part.offsets);
+        }
+        segments.push({ type: "byline", text, offsets });
+        lastNonEmptyLine = lines[end].trim();
+        i = end;
+        continue;
+      }
     }
 
     if (isSection(trimmed)) {

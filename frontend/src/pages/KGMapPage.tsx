@@ -109,7 +109,7 @@ export default function KGMapPage() {
       label: (
         <div style={{ display: "flex", alignItems: "baseline", gap: 6, padding: "2px 0" }}>
           <SearchOutlined style={{ color: "#bbb", fontSize: 12, flexShrink: 0, position: "relative", top: 2 }} />
-          <span style={{ fontWeight: 600, color: "#1677ff", flexShrink: 0 }}>{e.name_zh}</span>
+          <span style={{ fontWeight: 600, color: "var(--fj-ink)", flexShrink: 0 }}>{e.name_zh}</span>
           <span style={{ color: "var(--fj-text-secondary)", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {addr(e) || e.name_en || ""}
           </span>

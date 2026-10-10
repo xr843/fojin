@@ -174,12 +174,12 @@ export default function SutraLandingPage() {
             </Text>
           )}
           <Space wrap style={{ marginBottom: 12 }}>
-            <Tag color="blue">{sutra.cbeta_id}</Tag>
+            <Tag>{sutra.cbeta_id}</Tag>
             {sutra.dynasty && (
               <Tag color="gold">{sutra.dynasty}</Tag>
             )}
             {sutra.translator && (
-              <Tag color="geekblue">{t("sutra_landing.translator_tag", { translator: sutra.translator })}</Tag>
+              <Tag>{t("sutra_landing.translator_tag", { translator: sutra.translator })}</Tag>
             )}
             {sutra.fascicle_count > 0 && (
               <Tag>{t("sutra_landing.fascicle_count", { count: sutra.fascicle_count })}</Tag>
