@@ -153,8 +153,8 @@ describe("TextDetailPage", () => {
     expect(alternates.get("zh-Hant")).toBe("https://fojin.app/texts/1?lang=zh-Hant");
   });
 
-  // 生产 /texts/7 的真实形态：CBETA 译者字段自带朝代前缀「十六國 鳩摩羅什」，
-  // 此时再单列「朝代=十六國」就是重复。
+  // 部分条目的译者字段自带朝代前缀（如 /texts/36「姚秦 佛陀耶舍共竺佛念等」、
+  // /texts/10036「魏 菩提流支」）。前缀与 dynasty 相同时再单列朝代行就是重复。
   it("omits the dynasty row when the translator already starts with it", async () => {
     vi.mocked(getTextDetail).mockResolvedValue(
       textDetail({ title_zh: "金剛般若波羅蜜經", translator: "十六國 鳩摩羅什", dynasty: "十六國" }),
