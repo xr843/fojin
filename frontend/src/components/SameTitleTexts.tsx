@@ -73,7 +73,9 @@ export default function SameTitleTexts({ textId }: { textId: number }) {
               {v.title_zh || v.title_en}
             </Link>
             <span className="td-item-meta">
-              {[v.dynasty, v.translator, v.lang && v.lang !== "lzh" ? t(`lang.${v.lang}`, v.lang) : null]
+              {/* 有译者只写译者：CBETA 译者字段自带朝代前缀，再拼 dynasty 既重复，又会把
+                  两字段互相矛盾的数据拼成「元 · 魏 菩提流支」这种错话（菩提流支本即如此）。 */}
+              {[v.translator || v.dynasty, v.lang && v.lang !== "lzh" ? t(`lang.${v.lang}`, v.lang) : null]
                 .filter(Boolean)
                 .join(" · ") || t("reader.common.anonymous")}
             </span>

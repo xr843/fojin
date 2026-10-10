@@ -76,10 +76,13 @@ export default function TextDetailPage() {
   // 藏别标签：优先分类（与搜索结果卡同源），没有分类时用藏经名（GRETIL 等非汉文条目只有后者）。
   const canonTag = text.category || text.canon_label || null;
   // 定义列表只放标签没说过的事：典藏与标签相同就不写，经号已是标签，外文题名与标题相同也不写；
-  // 译者行不再拼朝代（朝代自有一行）。
+  // 译者行不再拼朝代（朝代自有一行）；CBETA 的译者字段本身常以朝代开头（「十六國 鳩摩羅什」），
+  // 那时朝代行就是重复，不再单列。
   const metaRows: [string, string][] = [];
   if (text.translator) metaRows.push([t("textDetail.translator"), text.translator]);
-  if (text.dynasty) metaRows.push([t("textDetail.dynasty"), text.dynasty]);
+  if (text.dynasty && !(text.translator && text.translator.startsWith(text.dynasty))) {
+    metaRows.push([t("textDetail.dynasty"), text.dynasty]);
+  }
   if (text.fascicle_count) {
     metaRows.push([t("textDetail.fascicles"), t("textDetail.fascicleCount", { count: text.fascicle_count })]);
   }

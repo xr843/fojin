@@ -153,6 +153,19 @@ describe("TextDetailPage", () => {
     expect(alternates.get("zh-Hant")).toBe("https://fojin.app/texts/1?lang=zh-Hant");
   });
 
+  // 生产 /texts/7 的真实形态：CBETA 译者字段自带朝代前缀「十六國 鳩摩羅什」，
+  // 此时再单列「朝代=十六國」就是重复。
+  it("omits the dynasty row when the translator already starts with it", async () => {
+    vi.mocked(getTextDetail).mockResolvedValue(
+      textDetail({ title_zh: "金剛般若波羅蜜經", translator: "十六國 鳩摩羅什", dynasty: "十六國" }),
+    );
+    const { container } = renderPage();
+    await waitFor(() => expect(screen.getByText("金剛般若波羅蜜經")).toBeInTheDocument());
+    const terms = Array.from(container.querySelectorAll(".td-meta dt")).map((el) => el.textContent);
+    expect(terms).not.toContain("Dynasty");
+    expect(Array.from(container.querySelectorAll(".td-meta dd")).map((el) => el.textContent)).toContain("十六國 鳩摩羅什");
+  });
+
   // 生产 /texts/7：「典藏=大正藏」「CBETA 编号=T0235」与上方两枚标签逐字重复，
   // 「译者=十六國 鳩摩羅什」又把朝代行重复了一遍。
   it("does not repeat in the metadata list what the tags already say", async () => {

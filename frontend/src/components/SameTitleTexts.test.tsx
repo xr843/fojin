@@ -86,6 +86,17 @@ describe("SameTitleTexts 同名经典", () => {
     expect(links).toEqual(expect.arrayContaining(["/texts/10036", "/texts/6491"]));
   });
 
+  // 菩提流支本的数据里 translator=「魏 菩提流支」、dynasty=「元」互相矛盾；
+  // 有译者时只写译者，不把两者拼成「元 · 魏 菩提流支」。
+  it("有译者时只显示译者，不再拼朝代", async () => {
+    vi.mocked(getTextVersions).mockResolvedValue(
+      versions([tr({ text_id: 10036, translator: "魏 菩提流支", dynasty: "元" })]),
+    );
+    renderPanel();
+    const meta = await screen.findByText(/菩提流支/);
+    expect(meta.textContent).toBe("魏 菩提流支");
+  });
+
   // relation_type 非空的行来自 text_relations，「关联文本」卡已经列过；
   // 已在「其他版本」（works 见证本）或「关联文本」里出现的 id 也不重复列。
   it("不重复列出已由关联文本 / 其他版本展示的条目", async () => {
