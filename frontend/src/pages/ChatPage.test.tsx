@@ -1187,6 +1187,79 @@ describe("额度提醒", () => {
     expect(vi.mocked(getChatSessionMessages)).not.toHaveBeenCalled();
   });
 
+// 游客拿到第一条回答后，「今日剩余 N 次」与「保存对话（登录）」两条横幅曾同时
+// 出现（2026-10-10 生产实测：手机 390px 上两条共约 130px，压缩消息区）。两条说的
+// 是同一个劝说——「登录」——只是理由不同，合成一条：剩余次数 + 不会保存 + 登录保存。
+describe("游客横幅合并", () => {
+  const GUEST_QUOTA = { limit: 10, used: 1, remaining: 9, has_byok: false, authenticated: false };
+
+  beforeEach(() => {
+    useAuthStore.setState({ token: null, user: null });
+    vi.mocked(getChatQuota).mockResolvedValue(GUEST_QUOTA);
+  });
+  afterEach(() => {
+    localStorage.removeItem("fojin.chat.saveHintDismissedAt");
+  });
+
+  async function guestWithAnswer() {
+    let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+    vi.mocked(sendChatMessageStream).mockImplementation(
+      async (_m, _s, _mid, callbacks) => { cb = callbacks; },
+    );
+    const r = renderPage();
+    // 前置：空态只有配额那一条（否则下面的「只剩一条」可能是因为配额根本没出来）
+    expect(await screen.findByText(/每日免费 10 次问答/)).toBeInTheDocument();
+    await screen.findByText("「三毒」指的是哪三种毒？");
+    fireEvent.click(r.container.querySelector(".chat-hero-card")!);
+    await waitFor(() => expect(cb).toBeDefined());
+    cb!.onToken("贪、嗔、痴。");
+    cb!.onDone();
+    await screen.findByText(/登录保存/);
+    return r;
+  }
+
+  it("游客有回答后只出现一条横幅，且同时说明剩余次数与登录可保存", async () => {
+    const { container } = await guestWithAnswer();
+    const alerts = container.querySelectorAll(".chat-main-column .ant-alert");
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].textContent).toMatch(/9 次/);
+    expect(alerts[0].textContent).toMatch(/登录保存/);
+  });
+
+  // 合并后关掉这一条，配额横幅不能当场「复活」——用户刚点了关闭。
+  it("关掉合并横幅后一条都不剩，且保存提示照旧记下 14 天静默", async () => {
+    const { container } = await guestWithAnswer();
+    const close = container.querySelector(".chat-main-column .ant-alert .ant-alert-close-icon") as HTMLElement;
+    fireEvent.click(close);
+    await waitFor(() => {
+      expect(container.querySelectorAll(".chat-main-column .ant-alert")).toHaveLength(0);
+    });
+    expect(localStorage.getItem("fojin.chat.saveHintDismissedAt")).not.toBeNull();
+  });
+
+  // 反方向：空态先关掉配额横幅，拿到回答后保存提示仍要出现（它是转化钩子），且
+  // 不能把用户关掉的配额说明带回来。这一条是给合并实现的护栏，不是先红后绿的
+  // 那种：若把两条做成同一个 antd 实例靠它内部的 closed 状态隐藏，空态关掉后首答的
+  // 保存提示会被一起吞掉。
+  it("空态关掉配额横幅后，首答的保存提示仍会出现", async () => {
+    let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+    vi.mocked(sendChatMessageStream).mockImplementation(
+      async (_m, _s, _mid, callbacks) => { cb = callbacks; },
+    );
+    const { container } = renderPage();
+    await screen.findByText(/每日免费 10 次问答/);
+    fireEvent.click(container.querySelector(".chat-main-column .ant-alert .ant-alert-close-icon") as HTMLElement);
+    await screen.findByText("「三毒」指的是哪三种毒？");
+    fireEvent.click(container.querySelector(".chat-hero-card")!);
+    await waitFor(() => expect(cb).toBeDefined());
+    cb!.onToken("贪、嗔、痴。");
+    cb!.onDone();
+    expect(await screen.findByText(/登录保存/)).toBeInTheDocument();
+    // 用户关掉过的配额说明不能借合并横幅又回来
+    expect(screen.queryByText(/每日免费|今日还可免费/)).toBeNull();
+  });
+});
+
 describe("导出 Markdown", () => {
   /** 抓住 handleExport 生成的那个 Blob —— jsdom 没有 createObjectURL。 */
   function captureExport() {

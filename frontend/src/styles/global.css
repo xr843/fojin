@@ -658,6 +658,45 @@ em {
   color: var(--fj-accent);
   background: rgba(217, 208, 193, 0.3);
 }
+/* 会话标题：最多两行，第二行末尾省略号。单行时 220px 侧栏只露约 8 个字，
+   同前缀的会话（「《心经》「色不异空」与…」×3）彼此无法区分（2026-10-10 实测）。
+   全文在 title 属性里，悬停可见。overflow-wrap:anywhere 兜住无空格的长拉丁串。 */
+.chat-session-title {
+  flex: 1;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+/* 侧栏顶部的「新对话」与「搜索会话」：同高（36px）、同圆角（8px），读作一组控件。
+   原先按钮 32px、搜索框是 size="small" 的 21px 高 12px 字，圆角都是主题的 2px。 */
+.chat-sidebar-new.ant-btn {
+  height: 36px;
+  border-radius: 8px;
+}
+.chat-sidebar-search.ant-input-affix-wrapper {
+  height: 36px;
+  border-radius: 8px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+.chat-sidebar-search .ant-input {
+  font-size: 13px;
+}
+.chat-sidebar-search .ant-input-prefix {
+  margin-inline-end: 6px;
+  color: var(--fj-ink-muted);
+}
+.chat-sidebar-search .ant-input-prefix svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
 
 /* 模型选择下拉：收紧行高与左右内边距。antd 默认的 5px/12px 是给正文尺寸的列表
    准备的，而这里是 size="small" 的工具栏控件，跟着输入框走更协调。 */
@@ -867,6 +906,19 @@ em {
   }
   .chat-main-column .ant-alert .ant-alert-close-icon::after {
     width: 40px;
+  }
+  /* 输入框下方的「＋」（附件）与宗风按钮：size="small" 只有 24px 高（2026-10-10
+     生产 390px 实测）。同一手法：视觉不变，伪元素把命中区撑到 ≥ 40px 高、
+     至少 40px 宽。antd 按钮本身是 position:relative，伪元素以它为定位基准；
+     发送钮在手机上已经是 36px 圆钮，不在此列。 */
+  .chat-input-toolbar > .ant-btn:not(.chat-send-btn)::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 40px);
+    height: 40px;
+    transform: translate(-50%, -50%);
   }
 }
 
@@ -1176,6 +1228,48 @@ em {
   :root {
     --fj-content-pad-y: 12px;
     --fj-content-pad-x: 10px;
+  }
+}
+
+/* ========== /chat 矮视口（横屏手机等，高度 ≤ 500px） ========== */
+/* 844×390 横屏下宽度 > 768，走的是桌面布局：外壳按「视口 − 顶栏 − 页脚 − 上下留白」
+   锁高只剩 240px，空态的标题被消息区裁掉、建议卡溢出外壳落到页脚后面（2026-10-10
+   生产实测：最后一张卡中心点命中的是 .ant-layout-footer）。按高度判，不按宽度：
+   问题出在矮，不在窄。顶栏不在本节处理范围内。 */
+@media (max-height: 500px) {
+  /* 上下留白 24 → 8：矮屏上每一像素都该给对话。只作用于承载 /chat 的那一层，
+     外壳的高度计算读的是同一个变量，两边自动一致。 */
+  .layout-content-inner:has(.chat-shell) {
+    --fj-content-pad-y: 8px;
+  }
+  /* 空态：与手机（≤768px）同一套做法——放开锁高、整页滚动，标题/横幅/输入框/建议卡
+     全部按内容铺开，滚得到。细节见 ≤768px 块里的同名规则。 */
+  .chat-shell.chat-shell--empty {
+    height: auto;
+    min-height: calc(100dvh - var(--fj-header-h) - var(--fj-footer-h) - 2 * var(--fj-content-pad-y));
+  }
+  .chat-shell--empty .chat-msgs-scroll {
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 0 !important;
+  }
+  .chat-shell--empty .chat-msgs-empty {
+    flex: 1 0 auto;
+  }
+  /* 外壳放开高度后，侧栏（登录态、宽度 > 768 时可见）会按整张会话列表撑高、把页面
+     拉长；限住它，列表在侧栏里自己滚。 */
+  .chat-shell--empty .chat-sidebar {
+    max-height: calc(100dvh - var(--fj-header-h) - var(--fj-footer-h) - 2 * var(--fj-content-pad-y));
+  }
+  /* 有对话时外壳仍锁高（消息区内部滚动、输入框钉底），只收紧竖向留白；
+     输入框最多长到 96px 后在框内滚动，不再把消息区挤没、把自己推到页脚后面。 */
+  .chat-shell:not(.chat-shell--empty) .chat-msgs-scroll {
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+  }
+  .chat-input-shell textarea.ant-input {
+    max-height: 96px !important;
+    overflow-y: auto !important;
   }
 }
 
