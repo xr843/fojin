@@ -277,9 +277,9 @@ describe("手机 AI 浮钮：下滑收起、上滑出现", () => {
   });
 });
 
-describe("卷选择框：手机只显示卷次，字数留在下拉选项里", () => {
-  // 2026-10-10 生产实测：手机上选择框只有约 120px 可用，「第 22 卷 (9,820字)」要 131px、
-  // 英文「Fascicle 22 (9,820 chars)」要 175px，被截成「第 22 卷 (9,8…」。
+describe("卷选择框：只显示卷次，字数留在下拉选项里", () => {
+  // 2026-10-10 生产实测：手机上选择框只有约 120px 可用、桌面 116px，「第 22 卷 (9,820字)」
+  // 要 131px、英文「Fascicle 22 (9,820 chars)」要 175px，被截成「第 22 卷 (9,8…」。
   const selected = (container: HTMLElement) =>
     container.querySelector(".juan-select .ant-select-selection-item")?.textContent;
 
@@ -297,9 +297,11 @@ describe("卷选择框：手机只显示卷次，字数留在下拉选项里", (
     expect(await screen.findByText("第 2 卷 (7,000字)")).toBeTruthy();
   });
 
-  it("桌面：选中项照旧带字数", async () => {
+  it("桌面：同样只显示卷次，展开后选项带字数", async () => {
     installMatchMedia("desktop");
     const { container } = await renderReader();
-    await waitFor(() => expect(selected(container)).toBe("第 1 卷 (7,574字)"));
+    await waitFor(() => expect(selected(container)).toBe("第 1 卷"));
+    fireEvent.mouseDown(container.querySelector(".juan-select .ant-select-selector") as HTMLElement);
+    expect(await screen.findByText("第 2 卷 (7,000字)")).toBeTruthy();
   });
 });

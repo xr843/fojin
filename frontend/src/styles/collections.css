@@ -161,6 +161,14 @@
   border-radius: 2px;
 }
 
+/* 经目行里的 CBETA 编号 / 「已收录」小标签（原为内联 style，挪到这里以便手机放大）。 */
+.coll-text-tag.ant-tag {
+  font-size: 10px;
+  margin: 0;
+  line-height: 16px;
+  padding: 0 4px;
+}
+
 .coll-text-meta {
   display: flex;
   gap: 8px;
@@ -361,6 +369,22 @@
 @media (max-width: 768px) {
   .cc-cbeta,
   .coll-card-tradition.ant-tag {
+    font-size: 12px;
+  }
+  /* 展开后的经目标签、资源分类计数、外链说明同样守 12px 下限。层级靠颜色与底色
+     而不是字号：经名 14px 墨色/朱色、标签是绿 / 橙底色块、计数是浅底圆角药丸、
+     外链说明是浅墨色（链接名 13px 朱色）。 */
+  .coll-text-tag.ant-tag {
+    font-size: 12px;
+    line-height: 18px;
+  }
+  .coll-res-tab-count {
+    font-size: 12px;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 9px;
+  }
+  .coll-link-desc {
     font-size: 12px;
   }
 }

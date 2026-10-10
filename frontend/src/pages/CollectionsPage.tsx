@@ -67,14 +67,15 @@ function TextItem({ text, cbetaMap }: { text: CollectionText; cbetaMap: Record<s
           <Link to={target!} aria-label={text.cbeta_id}>
             <Tag
               color={textId ? "green" : "volcano"}
-              style={{ fontSize: 10, margin: 0, lineHeight: "16px", padding: "0 4px", cursor: "pointer" }}
+              className="coll-text-tag"
+              style={{ cursor: "pointer" }}
             >
               {text.cbeta_id}
             </Tag>
           </Link>
         )}
         {textId && (
-          <Tag color="green" style={{ fontSize: 10, margin: 0, lineHeight: "16px", padding: "0 4px" }}>
+          <Tag color="green" className="coll-text-tag">
             {t("collections.indexed")}
           </Tag>
         )}
