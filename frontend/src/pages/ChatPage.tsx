@@ -225,6 +225,7 @@ function groupSessions(sessions: ChatSessionItem[]): { label: string; items: Cha
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const yesterday = new Date(today.getTime() - 86400000);
+  // 滚动 7 天而非自然周，所以文案是「7 天内」不是「本周」（周一时「本周」会装进上周的会话）。
   const weekAgo = new Date(today.getTime() - 7 * 86400000);
 
   const groups: Record<string, ChatSessionItem[]> = { pinned: [], today: [], yesterday: [], week: [], older: [] };
@@ -1807,12 +1808,19 @@ export default function ChatPage() {
     URL.revokeObjectURL(url);
   }, [messages, sessions, sessionId, t, i18n.language]);
 
+  // 「登录状态已过期」横幅的出现条件（判据的来由见渲染处注释）。提到这里是因为
+  // 游客横幅要据它让位：输入区上方同一时刻最多一条，过期说明优先。
+  const sessionExpiredBanner = !!quota && !quota.authenticated && (expired || !!user);
+
   // 游客输入区横幅的两个来源（渲染处合成一条，见那里的注释）。
   // 配额：过期者此刻确实是游客，但对他说「登录后额度更多」是答非所问 ——
   // 他刚才就是登录状态，这一条让位给下面那句过期说明（!expired）。
   const guestBannerQuota = !user && !expired && !keyStatus?.has_api_key && !!quota && quota.remaining >= 0
     && !guestQuotaClosed;
-  const guestBannerSaveHint = !user && !sending && !saveHintDismissed
+  // 保存提示同理让位给过期说明：401 已清掉 user，过期者首答后 !user 成立，两条会叠在
+  // 一起说同一件事（去登录、否则对话不进账号）。过期那条的「重新登录」走的是同一个
+  // goLoginKeepingTranscript，保存这条路并没有丢。
+  const guestBannerSaveHint = !user && !sending && !saveHintDismissed && !sessionExpiredBanner
     && messages.some((m) => m.role === "assistant" && m.content !== REQUEST_FAILED_SENTINEL);
 
   return (
@@ -2122,7 +2130,9 @@ export default function ChatPage() {
                 只是理由不同；首答之后两条叠在一起，手机上约 130px 压缩消息区
                 （2026-10-10 生产 390px 实测）。两者都该出现时，一行里同时给出
                 剩余次数与「登录保存」；只有一方成立时显示那一方的原文案。
-                出现条件逐字沿用合并前的两条，没有改动。 */}
+                出现条件沿用合并前的两条，唯一的增补是保存提示让位给下面的
+                「登录状态已过期」（见 guestBannerSaveHint 的注释）——三条横幅
+                （此条 / 过期 / 登录用户额度）由此两两互斥，输入区上方最多一条。 */}
             {guestBannerSaveHint || guestBannerQuota ? (
               <Alert
                 type={guestBannerQuota && quota && quota.remaining <= 2 ? "warning" : "info"}
@@ -2186,7 +2196,7 @@ export default function ChatPage() {
                 浏览器「恢复上次标签页」，而全项目只有 setAuth/logout 会清它。让它
                 单独驱动横幅，一条残留标记就能在一个完全有效的会话上长期说谎
                 （2026-08-18 user 638 反复看到的正是这个）。 */}
-            {quota && !quota.authenticated && (expired || !!user) && (
+            {sessionExpiredBanner && (
               <Alert
                 message={
                   <span>

@@ -1258,6 +1258,32 @@ describe("游客横幅合并", () => {
     // 用户关掉过的配额说明不能借合并横幅又回来
     expect(screen.queryByText(/每日免费|今日还可免费/)).toBeNull();
   });
+
+  // 登录过期被降为游客的人：401 已清掉 user（!user 成立），于是首答后「保存对话」
+  // 也满足条件，和「登录状态已过期」叠成两条。两条说的是同一件事（去登录、否则
+  // 对话不进账号），过期那条更准确——他刚才就是登录状态——所以只留它。
+  it("登录过期的游客首答后只出现一条横幅，且是过期说明", async () => {
+    markSessionExpired();
+    let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+    vi.mocked(sendChatMessageStream).mockImplementation(
+      async (_m, _s, _mid, callbacks) => { cb = callbacks; },
+    );
+    const { container } = renderPage();
+    expect(await screen.findByText(/登录状态已过期/)).toBeInTheDocument();
+    await screen.findByText("「三毒」指的是哪三种毒？");
+    fireEvent.click(container.querySelector(".chat-hero-card")!);
+    await waitFor(() => expect(cb).toBeDefined());
+    cb!.onToken("贪、嗔、痴。");
+    cb!.onDone();
+    await screen.findByText("贪、嗔、痴。");
+    // 前置：首答确已落地且不在发送中（保存提示的两个触发条件都已满足）
+    await waitFor(() => expect(container.querySelector(".chat-send-btn")).not.toBeNull());
+    const alerts = container.querySelectorAll(".chat-main-column .ant-alert");
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].textContent).toMatch(/登录状态已过期/);
+    expect(alerts[0].textContent).toMatch(/重新登录/);
+    expect(screen.queryByText(/登录保存/)).toBeNull();
+  });
 });
 
 describe("导出 Markdown", () => {

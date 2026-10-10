@@ -983,7 +983,7 @@
   "chat.send": "Send",
   "chat.session_group_today": "Today",
   "chat.session_group_yesterday": "Yesterday",
-  "chat.session_group_week": "This week",
+  "chat.session_group_week": "Past 7 days",
   "chat.session_group_older": "Earlier",
   "chat.load_session_failed": "Failed to load conversation",
   "chat.load_older_failed": "Failed to load earlier messages",
