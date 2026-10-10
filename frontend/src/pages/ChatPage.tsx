@@ -86,6 +86,7 @@ import {
 } from "../stores/authStore";
 import { expectedFirstTokenSeconds, recordFirstTokenMs } from "../utils/firstTokenStats";
 import type { TextId } from "../types/branded";
+import { useNarrowViewport } from "../hooks/useNarrowViewport";
 
 // 登录用户的额度提示只在快用完时出现。常驻一个「今日剩余 198 次」是纯噪音 ——
 // 而毫无预警地撞上上限、直接吃一个错误，才是真正会让人懵的那种体验。
@@ -1695,6 +1696,14 @@ export default function ChatPage() {
 
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
+  // placeholder 末尾的「⇥ Tab  ⇧⏎ 换行」是键盘提示：主输入是手指时这两个键都不存在，
+  // 390px 下它还会单独折出第二行。useNarrowViewport 只是 matchMedia 的响应式包装，
+  // 这里借它判指针精度。选 pointer: coarse 而不是 hover: none：要回答的是「主输入是
+  // 不是手指」，而部分带手写笔的 Android 机会把 hover 报成 hover，pointer 更稳；
+  // 接了触控板/鼠标的 iPad 两者都报精细指针，那时多半也接了键盘，保留提示是对的。
+  // 只改 placeholder 这一个 prop，不碰输入框节点 —— Tab 轮播的 effect 依赖节点同一性。
+  const coarsePointer = useNarrowViewport("(pointer: coarse)");
+
   // Attach native keydown listener to capture Tab before Ant Design / browser handles it
   useEffect(() => {
     const el = inputRef.current;
@@ -1980,8 +1989,12 @@ export default function ChatPage() {
             </div>
           </div>
           {/* Messages */}
+          {/* chat-msgs-scroll 只给手机空态的 CSS 用（global.css ≤768px 块）：那里外壳
+              高度是 auto，下面 .chat-msgs-empty 的 min-height:100% 解析不出来，
+              得让这个滚动容器自己当 flex 列把剩余高度交给 lead 撑高块。 */}
           <div
             ref={messagesScrollRef}
+            className="chat-msgs-scroll"
             onScroll={handleMessagesScroll}
             style={{ flex: messages.length === 0 ? "1 1 auto" : 1, overflow: "auto", padding: "16px 0" }}
           >
@@ -2186,7 +2199,11 @@ export default function ChatPage() {
                   e.preventDefault();
                   handleSend();
                 }}
-                placeholder={tabSuggestions.length > 0 ? `${tabSuggestions[(tabIndex + 1) % tabSuggestions.length]}    ⇥ Tab    ⇧⏎ ${t("chat.newline_hint")}` : t("chat.input_placeholder")}
+                placeholder={tabSuggestions.length > 0
+                  ? coarsePointer
+                    ? tabSuggestions[(tabIndex + 1) % tabSuggestions.length]
+                    : `${tabSuggestions[(tabIndex + 1) % tabSuggestions.length]}    ⇥ Tab    ⇧⏎ ${t("chat.newline_hint")}`
+                  : t("chat.input_placeholder")}
                 disabled={sending}
                 autoSize={{ minRows: 2, maxRows: 8 }}
                 variant="borderless"
@@ -2244,14 +2261,20 @@ export default function ChatPage() {
                 {sending ? (
                   <Button
                     danger
+                    className="chat-send-btn"
+                    aria-label={t("chat.stop")}
                     icon={<StopOutlined />}
                     onClick={handleCancel}
                   >
                     {t("chat.stop")}
                   </Button>
                 ) : (
+                  // 窄屏（≤480px）CSS 把它收成仅图标的圆钮、回到工具行右端，
+                  // 文字被隐藏，所以名字必须由 aria-label 给出。
                   <Button
                     type="primary"
+                    className="chat-send-btn"
+                    aria-label={t("chat.send", "发送")}
                     icon={<SendOutlined />}
                     onClick={handleSend}
                     style={{ background: "var(--fj-accent)", borderColor: "var(--fj-accent)" }}
