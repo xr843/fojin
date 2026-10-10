@@ -512,7 +512,7 @@ export default function SourcesPage() {
           allowClear
           value={searchInput}
           onChange={(e) => handleSearchInputChange(e.target.value)}
-          style={{ width: 260 }}
+          style={{ width: 260, maxWidth: "100%" }}
         />
         <Select
           value={regionFilter}

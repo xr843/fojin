@@ -300,7 +300,7 @@ export default function Layout() {
             )}
           </div>
           <Button
-            className="nav-mobile-trigger"
+            className="nav-mobile-trigger header-hit"
             type="text"
             icon={<MenuOutlined />}
             onClick={() => setDrawerOpen(true)}
@@ -323,6 +323,7 @@ export default function Layout() {
             }}
           >
             <Button
+              className="header-hit"
               type="text"
               icon={<GlobalOutlined />}
               style={{ color: inkMuted, fontSize: 13 }}
@@ -358,6 +359,7 @@ export default function Layout() {
               }}
             >
               <Button
+                className="header-hit"
                 type="text"
                 icon={<UserOutlined />}
                 style={{ color: inkMuted, fontSize: 13 }}
@@ -368,6 +370,7 @@ export default function Layout() {
             </Dropdown>
           ) : (
             <Button
+              className="header-hit"
               type="text"
               icon={<LoginOutlined />}
               style={{

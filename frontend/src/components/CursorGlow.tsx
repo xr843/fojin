@@ -1,20 +1,30 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+
+/**
+ * 触屏（无悬停能力或粗指针）没有鼠标可跟。光点会永远停在初始的 top/left -6px，
+ * 在手机每一页左上角露出半颗绿点（2026-10 生产 390×844 实测）。所以这类设备上
+ * 整个组件不渲染，而不只是不挂 mousemove。
+ */
+function isTouchOnly(): boolean {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+  return window.matchMedia("(hover: none)").matches || window.matchMedia("(pointer: coarse)").matches;
+}
 
 /**
  * A green glowing circle that follows the mouse cursor.
  * Uses requestAnimationFrame for smooth animation.
- * Hidden on touch devices.
+ * Not rendered at all on touch devices.
  */
 export default function CursorGlow() {
+  const [touchOnly] = useState(isTouchOnly);
   const dotRef = useRef<HTMLDivElement>(null);
   const pos = useRef({ x: -100, y: -100 });
   const rendered = useRef({ x: -100, y: -100 });
   const raf = useRef<number>(0);
 
   useEffect(() => {
-    // Skip on touch-only devices
-    if (window.matchMedia("(pointer: coarse)").matches) return;
+    if (touchOnly) return;
 
     const onMove = (e: MouseEvent) => {
       pos.current = { x: e.clientX, y: e.clientY };
@@ -39,7 +49,9 @@ export default function CursorGlow() {
       window.removeEventListener("mousemove", onMove);
       cancelAnimationFrame(raf.current);
     };
-  }, []);
+  }, [touchOnly]);
+
+  if (touchOnly) return null;
 
   return createPortal(
     <div

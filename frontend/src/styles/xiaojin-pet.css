@@ -543,11 +543,13 @@
 
 /* ---------- 响应式 ---------- */
 @media (max-width: 768px) {
-  /* 窄屏下首页改成 height:auto 会滚动，页脚跟着内容走、不再钉在视口底，
-     这时就按普通浮动按钮贴边即可。 */
+  /* 窄屏下首页改成 height:auto，但 390×844 等常见手机上内容不足一屏，页脚照样
+     落在视口底。bottom:14px 会让小津有 36px 骑在页脚上、盖住页脚右侧（2026-10
+     生产实测），所以和桌面一样先让开页脚再垫 10px。只改默认锚点，拖动后的
+     内联 left/top 不受影响。 */
   .xiaojin-pet {
     right: 14px;
-    bottom: 14px;
+    bottom: calc(var(--fj-footer-h) + 10px);
   }
   .xiaojin-body svg {
     width: 62px;
@@ -558,6 +560,17 @@
   /* 触屏没有 hover，赶走它的按钮就常驻。 */
   .xiaojin-dismiss {
     opacity: 1;
+    font-size: 12px;
+  }
+  /* 视觉保持 20×20 小圆，命中区用透明伪元素扩到 32×32。 */
+  .xiaojin-dismiss::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 32px;
+    height: 32px;
+    transform: translate(-50%, -50%);
   }
 }
 

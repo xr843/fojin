@@ -751,7 +751,9 @@
   height: 35px;
 }
 
-/* ---------- 响应式：平板 ---------- */
+/* ---------- 响应式：平板 ----------
+   手机端文字一律不低于 12px（2026-10 生产 390×844 实测首页有 17 个 9–11px 文字）；
+   层级靠字重/颜色/字距区分，不靠把次要文字缩到 9–11px。 */
 @media (max-width: 768px) {
   .home-page { height: auto; min-height: calc(100vh - 52px - 50px); overflow: auto; }
   .home-hero { padding: 40px 16px 32px; height: auto; min-height: calc(100vh - 52px - 50px); }
@@ -764,32 +766,36 @@
   .search-combo { max-width: 100%; }
   .search-combo-bar { height: 48px; }
   .search-combo-src { padding: 0 10px; font-size: 12px; }
-  .search-combo-badge { font-size: 10px; padding: 1px 6px; }
+  .search-combo-badge { font-size: 12px; padding: 1px 6px; }
   .search-combo-input { padding: 0 12px; font-size: 15px; }
   .search-combo-input::placeholder { font-size: 13px; }
   .search-combo-btn { padding: 0 16px; font-size: 14px; }
 
   .home-hot-tags { margin-bottom: 24px; gap: 6px; }
-  .home-hot-tag { padding: 2px 10px; font-size: 11px; }
+  .home-hot-tag { padding: 2px 10px; font-size: 12px; }
 
   .home-stats { flex-direction: row; max-width: 100%; gap: 0; margin-bottom: 0; }
   .home-stat-item { padding: 8px 12px; }
   .home-stat-num { font-size: 24px; margin-bottom: 4px; }
-  .home-stat-lbl { font-size: 10px; letter-spacing: 1px; }
+  .home-stat-lbl { font-size: 12px; letter-spacing: 1px; }
 
   .home-features { grid-template-columns: repeat(2, 1fr); max-width: 360px; gap: 12px; margin-top: 20px; }
   .home-feature-card { padding: 14px 12px; }
   .home-feature-icon { font-size: 22px; }
   .home-feature-desc { display: none; }
 
-  .home-trust { margin-top: 16px; font-size: 10px; }
+  /* 左右各让出小津的落脚处（54 宽 + 右距 14 + 间隙 8）：手机上小津默认停在页脚
+     正上方右侧，信任说明是首页最后一行内容，放大到 12px 后折成多行，不让开就会
+     钻到小津身下。对称留白保持居中。 */
+  .home-trust { margin-top: 16px; font-size: 12px; padding: 0 76px; text-wrap: balance; }
+  .home-trust-link { white-space: nowrap; }
 }
 
 /* ---------- 响应式：小屏手机 ---------- */
 @media (max-width: 480px) {
   .home-hero { padding: 24px 14px 24px; }
   .home-title { font-size: 40px; letter-spacing: 8px; margin-bottom: 4px; }
-  .home-subtitle { font-size: 11px; letter-spacing: 3px; margin-bottom: 16px; }
+  .home-subtitle { font-size: 12px; letter-spacing: 3px; margin-bottom: 16px; }
 
   .search-combo-bar { height: 44px; border-radius: 6px; }
   .search-combo-src .search-combo-src-text { display: none; }
@@ -799,11 +805,11 @@
   .search-combo-input { padding: 0 10px; font-size: 14px; }
 
   .home-hot-tags { margin-bottom: 16px; }
-  .home-hot-label { font-size: 11px; }
+  .home-hot-label { font-size: 12px; }
 
   .home-stat-item { padding: 6px 8px; }
   .home-stat-num { font-size: 20px; }
-  .home-stat-lbl { font-size: 9px; }
+  .home-stat-lbl { font-size: 12px; letter-spacing: 0; }
 
   .home-features { max-width: 100%; gap: 10px; margin-top: 16px; }
   .home-feature-card { padding: 12px 8px; }
