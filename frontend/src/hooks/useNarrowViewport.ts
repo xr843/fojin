@@ -7,6 +7,12 @@ import { useEffect, useState } from "react";
 export const NARROW_VIEWPORT_QUERY = "(max-width: 1024px)";
 
 /**
+ * 手机断点：阅读器工具栏收成一行 + 「更多」、浮钮下滑收起。与 reader.css 的
+ * Mobile 块（max-width: 768px）同一个数，改一处必须改另一处。
+ */
+export const PHONE_VIEWPORT_QUERY = "(max-width: 768px)";
+
+/**
  * 一次性判断，供 useState 惰性初值用。matchMedia 缺失（jsdom / SSR）时按宽屏处理 ——
  * 宽屏是原有行为，缺环境时保持原样比猜成窄屏安全。
  */

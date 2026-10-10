@@ -1353,6 +1353,8 @@
   "reader.juan.first": "第 1 卷",
   "reader.nav.prev": "上一卷",
   "reader.nav.next": "下一卷",
+  "reader.nav.more": "更多",
+  "reader.font.size": "字號",
   "reader.annotation.button": "標註",
   "reader.annotation.title": "標註面板",
   "reader.annotation.add": "新增標註",
