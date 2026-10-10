@@ -181,6 +181,9 @@ export interface TextDetail {
   // Goryeo (Tripitaka Koreana) cross-reference, null when no Goryeo parallel.
   goryeo_k?: string | null;
   kabc_url?: string | null;
+  // 藏经名（大正藏 / 卍续藏 / 梵文 GRETIL …），后端 /texts/{id} 一直在返回。
+  canon?: string | null;
+  canon_label?: string | null;
 }
 
 export interface JuanInfo {
