@@ -1,0 +1,159 @@
+/* ========== 404 ==========
+   铺满内容区：用负边距吃掉 .layout-content-inner 的内边距，让山水贴满顶栏与页脚
+   之间的整块区域，而不是缩在一个带白边的盒子里。高度同 /chat 外壳的算法，
+   铬高度只从 global.css 那三枚 token 取。 */
+.nf-page {
+  position: relative;
+  overflow: hidden;
+  margin: calc(-1 * var(--fj-content-pad-y)) calc(-1 * var(--fj-content-pad-x));
+  min-height: calc(100vh - var(--fj-header-h) - var(--fj-footer-h));
+  min-height: calc(100dvh - var(--fj-header-h) - var(--fj-footer-h));
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: clamp(40px, 11vh, 120px) 20px 200px;
+}
+
+/* 山水只占下半截，上缘用遮罩化进底色 —— 文字区落在留白的「天空」里。 */
+.nf-bg {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 58%;
+  z-index: 0;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 55%);
+  mask-image: linear-gradient(180deg, transparent 0%, #000 55%);
+}
+
+.nf-bg img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 75%;
+  opacity: 0.55;
+}
+
+/* 暗色：这张图本身是浅色的，原样叠在暖黑底上会是一块发灰的亮斑。压暗、去饱和，
+   让它退成夜色里的远山剪影。 */
+:root[data-theme="dark"] .nf-bg img {
+  opacity: 0.32;
+  filter: brightness(0.6) sepia(0.35) saturate(0.8);
+}
+
+.nf-inner {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  /* 640 而不是更窄：英文四个入口（Back to home / AI Q&A / Buddhist Dictionary /
+     Sources）合计约 560px，再窄第四个就掉到第二行孤零零一颗。 */
+  max-width: 640px;
+  text-align: center;
+}
+
+/* 朱砂印：描边而不是实底 —— 实底朱砂在暗色下会是一块刺眼的亮橙。 */
+.nf-seal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  height: 64px;
+  padding: 0 10px;
+  margin-bottom: 20px;
+  border: 2.5px solid var(--fj-cinnabar);
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 3px var(--fj-bg), inset 0 0 0 4px var(--fj-cinnabar);
+  color: var(--fj-cinnabar);
+  font-family: "Noto Serif SC", serif;
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: 0.04em;
+  transform: rotate(-5deg);
+}
+
+.nf-heading {
+  margin: 0 0 12px;
+  color: var(--fj-ink);
+  font-family: "Noto Serif SC", serif;
+  font-weight: 600;
+  font-size: 40px;
+  line-height: 1.25;
+  letter-spacing: 0.18em;
+  /* letter-spacing 会在最后一个字后面也留一截，居中时整行右偏；补回去。 */
+  margin-right: -0.18em;
+}
+
+:root[lang="en"] .nf-heading {
+  letter-spacing: 0.01em;
+  margin-right: 0;
+}
+
+.nf-desc {
+  margin: 0 0 28px;
+  color: var(--fj-ink-light);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.nf-search {
+  margin: 0 auto 28px;
+  max-width: 480px;
+}
+
+.nf-links-label {
+  margin-bottom: 12px;
+  color: var(--fj-ink-muted);
+  font-size: 13px;
+}
+
+.nf-links ul {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nf-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border: 1px solid var(--fj-border);
+  border-radius: 999px;
+  background: var(--fj-surface);
+  color: var(--fj-ink);
+  font-size: 14px;
+  line-height: 1.4;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.nf-link:hover,
+.nf-link:focus-visible {
+  border-color: var(--fj-cinnabar);
+  color: var(--fj-cinnabar);
+}
+
+@media (max-width: 768px) {
+  .nf-page {
+    padding: 36px 16px 140px;
+  }
+  .nf-heading {
+    font-size: 32px;
+  }
+  .nf-desc {
+    font-size: 14px;
+  }
+  /* 手机上四个入口排成 2×2，比一行挤三个再掉一个整齐。 */
+  .nf-links ul {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .nf-link {
+    justify-content: center;
+    width: 100%;
+  }
+}
