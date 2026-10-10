@@ -20,7 +20,6 @@ import OtherVersions from "../components/OtherVersions";
 import CrossCanonEntry from "../components/CrossCanonEntry";
 import SourceAttribution from "../components/SourceAttribution";
 import SameTitleTexts from "../components/SameTitleTexts";
-import CommentaryWorks from "../components/CommentaryWorks";
 import CitationGenerator from "../components/CitationGenerator";
 import { addViewHistory } from "../utils/history";
 
@@ -257,7 +256,6 @@ export default function TextDetailPage() {
         <OtherVersions textId={text.id} />
         <SameTitleTexts textId={text.id} />
         <RelatedTexts textId={text.id} />
-        <CommentaryWorks textId={text.id} />
       </div>
     </div>
   );
