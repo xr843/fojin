@@ -113,3 +113,41 @@ describe("搜索页筛选侧栏 · 手机端结果优先", { timeout: 20000 }, (
     expect(screen.queryByRole("button", { name: /筛选/ })).not.toBeInTheDocument();
   });
 });
+
+// 桌面上分面侧栏在 DOM 里排在结果前面：国家/地区 + 馆藏两组复选框，键盘用户要按约
+// 125 次 Tab 才到第一条结果（2026-10-10 生产实测）。侧栏前放一条「跳到结果」链接，
+// 平时视觉隐藏、聚焦时出现；目标是结果区容器，tabIndex=-1 让它能接住焦点。
+describe("搜索页 · 跳到结果链接", { timeout: 20000 }, () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("侧栏之前有「跳到结果」链接，href 指向结果区 id，结果区可被程序聚焦", async () => {
+    installMatchMedia(false);
+    renderPage();
+    const sidebarItem = await screen.findByText("SAT 大正藏数据库", { selector: ".s-filter-name" }, ASYNC);
+    const skip = screen.getByRole("link", { name: "跳到搜索结果" });
+    const href = skip.getAttribute("href")!;
+    expect(href).toMatch(/^#.+/);
+    const target = document.getElementById(href.slice(1))!;
+    expect(target).toBeTruthy();
+    expect(target).toHaveClass("s-main");
+    expect(target).toHaveAttribute("tabindex", "-1");
+    // 必须排在侧栏之前，否则它本身也要 Tab 过整个侧栏才到得了
+    expect(skip.compareDocumentPosition(sidebarItem) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(skip.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    target.focus();
+    expect(target).toHaveFocus();
+  });
+
+  it("键盘：从链接回车后焦点落到结果区", async () => {
+    installMatchMedia(false);
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("SAT 大正藏数据库", { selector: ".s-filter-name" }, ASYNC);
+    const skip = screen.getByRole("link", { name: "跳到搜索结果" });
+    skip.focus();
+    await user.keyboard("{Enter}");
+    expect(document.getElementById(skip.getAttribute("href")!.slice(1))).toHaveFocus();
+  });
+});

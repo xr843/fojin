@@ -23,24 +23,29 @@ export default function ExternalCard({ source, query }: { source: DataSource; qu
       <span className="s-ext-row-spacer" />
       {/* 两个按钮包成一组：窄屏时整组另起一行左对齐，不再随站名长短时而同行时而拆行 */}
       <span className="s-ext-row-actions">
+        {/* 与结果卡的「阅读 / CBETA」同一套次级文字链接（.s-card-action）：外部源是「去别处继续找」
+            的出口，不是本页的主操作——原先每行一颗实心朱砂主按钮，12 行就是全页最抢眼的 12 处。
+            触屏上 .s-card-action 撑到 40px 高作触控目标。 */}
         <a
-          className="s-card-btn-primary"
+          className="s-card-action"
           href={url}
           target="_blank"
           rel="noopener noreferrer"
           aria-label={t("search.search_at_source_aria", { name: localizedSourceName(source), query })}
         >
-          <LinkOutlined /> {t("search.search_at_source")}
+          <LinkOutlined aria-hidden="true" />
+          {t("search.search_at_source")}
         </a>
         {source.base_url && (
           <a
-            className="s-card-btn"
+            className="s-card-action"
             href={source.base_url}
             target="_blank"
             rel="noopener noreferrer"
             aria-label={t("search.visit_homepage_aria", { name: localizedSourceName(source) })}
           >
-            <EyeOutlined /> {t("search.visit_homepage")}
+            <EyeOutlined aria-hidden="true" />
+            {t("search.visit_homepage")}
           </a>
         )}
       </span>

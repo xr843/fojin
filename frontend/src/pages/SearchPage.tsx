@@ -16,7 +16,7 @@ import type { DictGroupedSearchResponse } from "../api/client";
 import { hasDirectSearchUrl } from "../utils/sourceUrls";
 import { addSearchHistory, getSearchHistory, type SearchHistoryItem } from "../utils/history";
 import { askAiKind, buildAskAiUrl } from "../utils/searchAskAi";
-import { ResultCard, ExternalSourcesSection, DictCard, ContentCard, CrossLangCard, SemanticCard, UnifiedResults } from "../components/search";
+import { ResultCard, ExternalSourcesSection, ContentCard, CrossLangCard, SemanticCard, UnifiedResults } from "../components/search";
 import ParallelSentenceCard from "../components/search/ParallelSentenceCard";
 import SearchFilterSidebar from "../components/search/SearchFilterSidebar";
 import "../styles/search.css";
@@ -30,6 +30,8 @@ const REGION_TAIWAN = "台湾"; // i18n-exempt
 const REGION_MAINLAND_CHINA = "中国大陆"; // i18n-exempt
 const REGION_TAIWAN_CHINA = "中国台湾"; // i18n-exempt
 const REGION_OTHER = "其他"; // i18n-exempt
+/** 结果区容器的 id——「跳到结果」链接的目标。 */
+const RESULTS_ID = "search-results";
 
 export default function SearchPage() {
   const { t } = useTranslation();
@@ -45,6 +47,7 @@ export default function SearchPage() {
   const selectedSources = searchParams.get("sources") ?? "";
 
   const [page, setPage] = useState(1);
+  const resultsRef = useRef<HTMLElement>(null);
 
   // Search history
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>(getSearchHistory);
@@ -422,6 +425,24 @@ export default function SearchPage() {
         </div>
       ) : (
         <div className="s-layout">
+          {/* 跳到结果：分面侧栏在 DOM 里排在结果前，桌面上键盘用户要 Tab 约 125 次才到第一条
+              结果。平时视觉隐藏、获得焦点时出现。用 JS 聚焦而不是放任锚点跳转：不往地址栏
+              追加 #、不多一条历史记录，焦点也确定落在结果区（tabIndex=-1）。 */}
+          {tab !== "dictionary" && tab !== "parallel" && (
+            <a
+              className="s-skip-link"
+              href={`#${RESULTS_ID}`}
+              onClick={(e) => {
+                const el = resultsRef.current;
+                if (!el) return;
+                e.preventDefault();
+                el.focus({ preventScroll: true });
+                el.scrollIntoView?.({ block: "start" });
+              }}
+            >
+              {t("search.skip_to_results")}
+            </a>
+          )}
           {/* 左侧筛选（辞典 / 跨语对照 Tab 不显示） */}
           {tab !== "dictionary" && tab !== "parallel" && (
             <SearchFilterSidebar
@@ -436,7 +457,7 @@ export default function SearchPage() {
           )}
 
           {/* 主内容 */}
-          <main className="s-main">
+          <main className="s-main" id={RESULTS_ID} tabIndex={-1} ref={resultsRef}>
             {tab === "all" ? (
               <>
                 {unifiedLoading && (
@@ -697,11 +718,6 @@ export default function SearchPage() {
             {!loading && tab === "catalog" && crossLangData && crossLangData.results.length > 0 && (<><div style={{margin: "16px 0 8px", fontSize: 13, color: "var(--fj-ink-muted)", borderTop: "1px solid var(--fj-border)", paddingTop: 12}}><TranslationOutlined className="s-head-icon" aria-hidden="true" />{t("search.crosslang_match")}</div>{crossLangData.results.map((hit) => (
               <CrossLangCard key={hit.id} hit={hit} />
             ))}</>)}
-
-            {/* 辞典结果 */}
-            {!loading && tab === "dictionary" && dictData && dictData.results.map((hit) => (
-              <DictCard key={hit.id} hit={hit} />
-            ))}
 
             {/* 辞典分页 */}
             {!loading && tab === "dictionary" && (dictData?.total || 0) > 20 && (

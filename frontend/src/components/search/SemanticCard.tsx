@@ -25,7 +25,7 @@ export default function SemanticCard({ hit }: { hit: SemanticSearchHit }) {
             </Tag>
           )}
           {hit.source_code && (
-            <Tag color="geekblue" style={{ fontSize: 11 }}>{hit.source_code}</Tag>
+            <Tag style={{ fontSize: 11 }}>{hit.source_code}</Tag>
           )}
           <Tag color="purple" style={{ fontSize: 11 }}>
             {t("search.juan_n", { num: hit.juan_num })}

@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router";
+import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Tag } from "antd";
 import { TranslationOutlined } from "@ant-design/icons";
@@ -17,11 +17,11 @@ const LANG_KEYS: Record<string, string> = {
   sa: "lang.sa",
 };
 
+// en 不配色：antd 的 blue 不在站点色板内（#1300 已在其它页清掉），落到中性默认 Tag
 const LANG_COLORS: Record<string, string> = {
   lzh: "red",
   zh: "red",
   pi: "orange",
-  en: "blue",
   bo: "purple",
   sa: "green",
 };
@@ -33,7 +33,6 @@ interface TitleEntry {
 }
 
 export default function CrossLangCard({ hit }: { hit: CrossLanguageSearchHit }) {
-  const navigate = useNavigate();
   const { t } = useTranslation();
   const titleHtml = hit.highlight?.title_zh?.[0] ?? hit.title_zh;
   const sourceName = hit.source_code ? getSourceLabel(hit.source_code, t) : null;
@@ -94,16 +93,13 @@ export default function CrossLangCard({ hit }: { hit: CrossLanguageSearchHit }) 
           <div className="s-card-translations">
             <TranslationOutlined style={{ fontSize: 12, color: "var(--fj-ink-muted)", marginRight: 4 }} />
             <span style={{ fontSize: 12, color: "var(--fj-ink-muted)", marginRight: 6 }}>{t("search.related_translations")}</span>
+            {/* 真链接而不是 Tag+onClick：Tab 可达、回车可跳、可新标签打开；外观仍是小标签，
+                但允许折行——英文「Classical Chinese - …」在 320px 不再撑出整列。 */}
             {relatedTranslations.map((rt) => (
-              <Tag
-                key={rt.id}
-                color={LANG_COLORS[rt.lang] || "default"}
-                style={{ fontSize: 11, cursor: "pointer", marginBottom: 2 }}
-                onClick={() => navigate(`/texts/${rt.id}`)}
-              >
+              <Link key={rt.id} to={`/texts/${rt.id}`} className="s-card-translation-link">
                 {langLabel(rt.lang)}
                 {rt.title ? ` - ${rt.title.length > 20 ? rt.title.slice(0, 20) + "..." : rt.title}` : ""}
-              </Tag>
+              </Link>
             ))}
           </div>
         )}
