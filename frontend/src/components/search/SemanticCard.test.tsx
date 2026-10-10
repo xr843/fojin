@@ -25,10 +25,10 @@ function makeHit(overrides: Partial<SemanticSearchHit> = {}): SemanticSearchHit 
 }
 
 /** 用 MemoryRouter 包裹渲染 */
-function renderCard(hit: SemanticSearchHit, rank = 1) {
+function renderCard(hit: SemanticSearchHit) {
   return render(
     <MemoryRouter>
-      <SemanticCard hit={hit} rank={rank} />
+      <SemanticCard hit={hit} />
     </MemoryRouter>,
   );
 }
@@ -48,45 +48,22 @@ describe("SemanticCard 组件", () => {
     expect(screen.getByText("85%")).toBeInTheDocument();
   });
 
-  // 分档断言锁的是语义 token，不是具体色值：调色是我们希望能自由做的事，写死
-  // #52c41a 只会让每次调色都误报。反过来，这三条此前只查了百分比文字却顶着
-  // "为绿色/蓝色/橙色" 的名字，结果三档颜色被整体换掉时它们照样全绿。
-  /** 取 antd Progress 环形路径上的 stroke（antd 以内联 style 写入 strokeColor）。 */
-  function strokeOf(container: HTMLElement): string {
-    const path = container.querySelector<SVGElement>(".ant-progress-circle-path");
-    expect(path).toBeTruthy();
-    return path!.style.stroke;
-  }
+  // 相似度从 40px 彩色圆环降为一行小字：一页 6~20 个红绿蓝圆环把视觉重心从经名上抢走，
+  // 而余弦相似度的 70%/50% 分档本身是任意切点，配上「绿=好」的颜色是在暗示并不存在的判断。
+  it("相似度不再画成彩色圆环，降为带标签的小字", () => {
+    const { container } = renderCard(makeHit({ similarity_score: 0.64 }));
 
-  it("相似度 > 0.7 归入 success 档", () => {
-    const { container } = renderCard(makeHit({ similarity_score: 0.75 }));
-
-    expect(strokeOf(container)).toBe("var(--fj-success)");
-    expect(screen.getByText("75%")).toBeInTheDocument();
+    expect(container.querySelector(".ant-progress")).toBeNull();
+    const score = container.querySelector(".s-card-score");
+    expect(score).not.toBeNull();
+    expect(score!.textContent).toMatch(/相似度\s*64%/);
   });
 
-  it("相似度 > 0.5 且 <= 0.7 归入 info 档", () => {
-    const { container } = renderCard(makeHit({ similarity_score: 0.6 }));
+  // 经名即去详情页的主链接，和「经文标题」区的卡片同一个出口。
+  it("经名是指向 /texts/{text_id} 的链接", () => {
+    renderCard(makeHit({ text_id: 99 as TextId, title_zh: "金剛經解義" }));
 
-    expect(strokeOf(container)).toBe("var(--fj-info)");
-    expect(screen.getByText("60%")).toBeInTheDocument();
-  });
-
-  it("相似度 <= 0.5 归入 warning 档", () => {
-    const { container } = renderCard(makeHit({ similarity_score: 0.3 }));
-
-    expect(strokeOf(container)).toBe("var(--fj-warning)");
-    expect(screen.getByText("30%")).toBeInTheDocument();
-  });
-
-  // 边界取的是闭区间（代码用 >= 70 / >= 50），把它钉住：这类边界一旦被误改成
-  // 严格大于，只有 70% / 50% 这两个点会变，日常几乎看不出来。
-  it("分档边界：正好 70% 归 success，正好 50% 归 info", () => {
-    const { container: at70 } = renderCard(makeHit({ similarity_score: 0.7 }));
-    expect(strokeOf(at70)).toBe("var(--fj-success)");
-
-    const { container: at50 } = renderCard(makeHit({ similarity_score: 0.5 }));
-    expect(strokeOf(at50)).toBe("var(--fj-info)");
+    expect(screen.getByRole("link", { name: "金剛經解義" })).toHaveAttribute("href", "/texts/99");
   });
 
   it("渲染匹配文本片段 snippet", () => {
@@ -110,10 +87,12 @@ describe("SemanticCard 组件", () => {
     expect(screen.queryByText("阅读")).not.toBeInTheDocument();
   });
 
-  it("渲染排名序号", () => {
-    renderCard(makeHit(), 5);
+  // 「#N」窄栏占宽度又不传达信息——顺序本身就是排序。
+  it("不渲染排名序号", () => {
+    const { container } = renderCard(makeHit());
 
-    expect(screen.getByText("#5")).toBeInTheDocument();
+    expect(container.querySelector(".s-card-rank")).toBeNull();
+    expect(screen.queryByText(/^#\d+$/)).not.toBeInTheDocument();
   });
 
   it("cbeta_id 渲染为 Tag", () => {

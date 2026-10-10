@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Tag, Button } from "antd";
+import { Tag } from "antd";
 import { ReadOutlined } from "@ant-design/icons";
 import { Link } from "react-router";
 import { buildReaderUrl } from "../../utils/sourceUrls";
@@ -29,13 +29,7 @@ const LANG_COLORS: Record<string, string> = {
  * 跨语对照结果卡片：并排展示对齐的汉文句与梵/藏语句，标注语种、出处与来源。
  * MITRA 平行语料的外语侧为内联原文，无独立引文页，故仅汉文侧提供阅读跳转。
  */
-export default function ParallelSentenceCard({
-  hit,
-  rank,
-}: {
-  hit: ParallelSentenceHit;
-  rank: number;
-}) {
+export default function ParallelSentenceCard({ hit }: { hit: ParallelSentenceHit }) {
   const { t } = useTranslation();
   const langLabel = (lang: string) => (LANG_KEYS[lang] ? t(LANG_KEYS[lang]) : lang);
   const foreignColor = LANG_COLORS[hit.foreign_lang] || "default";
@@ -56,7 +50,6 @@ export default function ParallelSentenceCard({
 
   return (
     <div className="s-card">
-      <div className="s-card-rank">#{rank}</div>
       <div className="s-card-body">
         {/* 并排对照：汉文 ↔ 外语 */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
@@ -96,12 +89,11 @@ export default function ParallelSentenceCard({
           )}
         </div>
 
-        <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}>
+        <div className="s-card-links" style={{ alignItems: "center" }}>
           {canRead && (
-            <Link to={buildReaderUrl(hit.text_id, hit.juan_num)}>
-              <Button size="small" icon={<ReadOutlined />}>
-                {t("search.read")}
-              </Button>
+            <Link className="s-card-action" to={buildReaderUrl(hit.text_id, hit.juan_num)}>
+              <ReadOutlined aria-hidden="true" />
+              {t("search.read")}
             </Link>
           )}
           {/* 来源与授权：低调标注，保持 CC BY-SA 4.0 可追溯 */}

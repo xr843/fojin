@@ -9,6 +9,7 @@ import {
 } from "antd";
 import {
   SearchOutlined, VerticalAlignTopOutlined, CloseOutlined, MessageOutlined,
+  FileTextOutlined, RobotOutlined, TranslationOutlined,
 } from "@ant-design/icons";
 import { searchTexts, searchContent, searchDictionary, searchCrossLanguage, searchSemantic, searchUnified, searchParallelSentences, getSources, getSearchSuggestions, searchDictionaryGrouped, getCbetaRedirect } from "../api/client";
 import type { DictGroupedSearchResponse } from "../api/client";
@@ -507,7 +508,7 @@ export default function SearchPage() {
                 )}
 
                 {!parallelLoading && !parallelError && parallelData && parallelData.results.map((hit, i) => (
-                  <ParallelSentenceCard key={`${hit.text_id}_${hit.taisho_id}_${i}`} hit={hit} rank={i + 1} />
+                  <ParallelSentenceCard key={`${hit.text_id}_${hit.taisho_id}_${i}`} hit={hit} />
                 ))}
 
                 {!parallelLoading && !parallelError && parallelData && parallelData.results.length === 0 && (
@@ -582,7 +583,7 @@ export default function SearchPage() {
             {!dictCardDismissed && dictKnowledge && dictKnowledge.groups.length > 0 && tab !== "dictionary" && (
               <div className="s-dict-knowledge">
                 <div className="s-dict-knowledge-header">
-                  <span className="s-dict-knowledge-title">{"\uD83D\uDCD6"} {t("search.dict_gloss_title", { query })}</span>
+                  <span className="s-dict-knowledge-title"><FileTextOutlined className="s-head-icon" aria-hidden="true" />{t("search.dict_gloss_title", { query })}</span>
                   <button
                     className="s-dict-knowledge-close"
                     onClick={() => setDictCardDismissed(true)}
@@ -632,9 +633,6 @@ export default function SearchPage() {
 
             {loading && !showEmptyState && Array.from({ length: 5 }).map((_, i) => (
               <div className="s-card" key={`skel-${i}`}>
-                <div className="s-card-rank">
-                  <Skeleton.Button active size="small" style={{ width: 28, height: 14 }} />
-                </div>
                 <div className="s-card-body">
                   <Skeleton.Input active size="small" style={{ width: 220, height: 22, marginBottom: 8 }} />
                   <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
@@ -671,12 +669,12 @@ export default function SearchPage() {
             )}
 
             {/* 本地结果 */}
-            {!loading && tab === "catalog" && data && data.results.map((hit, i) => (
-              <ResultCard key={hit.id} hit={hit} rank={i + 1 + (page - 1) * 20} />
+            {!loading && tab === "catalog" && data && data.results.map((hit) => (
+              <ResultCard key={hit.id} hit={hit} />
             ))}
 
             {!loading && tab === "content" && contentData && contentData.results.map((hit, i) => (
-              <ContentCard key={`${hit.text_id}_${i}`} hit={hit} rank={i + 1 + (page - 1) * 20} />
+              <ContentCard key={`${hit.text_id}_${i}`} hit={hit} />
             ))}
 
             {/* 语义搜索错误提示 */}
@@ -691,18 +689,18 @@ export default function SearchPage() {
             )}
 
             {/* 语义搜索结果 */}
-            {!loading && tab === "content" && semanticData && semanticData.results.length > 0 && (<><div style={{margin: "16px 0 8px", fontSize: 13, color: "var(--fj-ink-muted)"}}>⚡ {t("search.semantic_match")}</div>{semanticData.results.map((hit, i) => (
-              <SemanticCard key={`${hit.text_id}_${hit.juan_num}`} hit={hit} rank={i + 1} />
+            {!loading && tab === "content" && semanticData && semanticData.results.length > 0 && (<><div style={{margin: "16px 0 8px", fontSize: 13, color: "var(--fj-ink-muted)"}}><RobotOutlined className="s-head-icon" aria-hidden="true" />{t("search.semantic_match")}</div>{semanticData.results.map((hit) => (
+              <SemanticCard key={`${hit.text_id}_${hit.juan_num}`} hit={hit} />
             ))}</>)}
 
             {/* 跨语言结果 */}
-            {!loading && tab === "catalog" && crossLangData && crossLangData.results.length > 0 && (<><div style={{margin: "16px 0 8px", fontSize: 13, color: "var(--fj-ink-muted)", borderTop: "1px solid var(--fj-border)", paddingTop: 12}}>🌐 {t("search.crosslang_match")}</div>{crossLangData.results.map((hit, i) => (
-              <CrossLangCard key={hit.id} hit={hit} rank={i + 1 + (page - 1) * 20} />
+            {!loading && tab === "catalog" && crossLangData && crossLangData.results.length > 0 && (<><div style={{margin: "16px 0 8px", fontSize: 13, color: "var(--fj-ink-muted)", borderTop: "1px solid var(--fj-border)", paddingTop: 12}}><TranslationOutlined className="s-head-icon" aria-hidden="true" />{t("search.crosslang_match")}</div>{crossLangData.results.map((hit) => (
+              <CrossLangCard key={hit.id} hit={hit} />
             ))}</>)}
 
             {/* 辞典结果 */}
-            {!loading && tab === "dictionary" && dictData && dictData.results.map((hit, i) => (
-              <DictCard key={hit.id} hit={hit} rank={i + 1 + (dictPage - 1) * 20} />
+            {!loading && tab === "dictionary" && dictData && dictData.results.map((hit) => (
+              <DictCard key={hit.id} hit={hit} />
             ))}
 
             {/* 辞典分页 */}

@@ -14,7 +14,7 @@ const LANG_KEYS: Record<string, string> = {
   sa: "lang.sa",
 };
 
-export default function ContentCard({ hit, rank }: { hit: ContentSearchHit; rank: number }) {
+export default function ContentCard({ hit }: { hit: ContentSearchHit }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const hasMore = hit.matched_juan_count > 1;
@@ -22,9 +22,10 @@ export default function ContentCard({ hit, rank }: { hit: ContentSearchHit; rank
 
   return (
     <div className="s-card">
-      <div className="s-card-rank">#{rank}</div>
       <div className="s-card-body">
-        <div className="s-card-title">{hit.title_zh}</div>
+        <div className="s-card-title">
+          <Link to={`/texts/${hit.text_id}`} className="s-card-title-link">{hit.title_zh}</Link>
+        </div>
         <div className="s-card-tags">
           <Tag style={{ fontSize: 11 }}>{hit.cbeta_id}</Tag>
           {hit.translator && <Tag style={{ fontSize: 11 }}>{hit.dynasty ? `[${hit.dynasty}] ` : ""}{hit.translator}</Tag>}
@@ -42,19 +43,18 @@ export default function ContentCard({ hit, rank }: { hit: ContentSearchHit; rank
             <div key={j} className="s-card-meta" style={{ lineHeight: 1.7 }}
               dangerouslySetInnerHTML={{ __html: `...${sanitizeHighlight(h)}...` }} />
           ))}
-          {/* 站内阅读器排在前面：它带标注、校勘、跨藏对照，CBETA 外链只作次要出口 */}
-          <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-            <Link to={buildReaderUrl(hit.text_id, hit.juan_num)}>
-              <Button type="primary" size="small" icon={<ReadOutlined />}
-                style={{ background: "var(--fj-accent)", borderColor: "var(--fj-accent)" }}>
-                {t("search.read")}
-              </Button>
+          {/* 站内阅读器排在前面：它带标注、校勘、跨藏对照，CBETA 外链只作次要出口。
+              两者都是次级文字入口——卡片唯一的视觉重点是经名。 */}
+          <div className="s-card-links">
+            <Link className="s-card-action" to={buildReaderUrl(hit.text_id, hit.juan_num)}>
+              <ReadOutlined aria-hidden="true" />
+              {t("search.read")}
             </Link>
             {cbetaUrl && (
-              <Button size="small" icon={<LinkOutlined />}
-                href={cbetaUrl} target="_blank" rel="noopener noreferrer">
+              <a className="s-card-action" href={cbetaUrl} target="_blank" rel="noopener noreferrer">
+                <LinkOutlined aria-hidden="true" />
                 {t("search.cbeta_read")}
-              </Button>
+              </a>
             )}
           </div>
         </div>
@@ -68,11 +68,12 @@ export default function ContentCard({ hit, rank }: { hit: ContentSearchHit; rank
                 <div key={k} className="s-card-meta" style={{ lineHeight: 1.7 }}
                   dangerouslySetInnerHTML={{ __html: `...${sanitizeHighlight(h)}...` }} />
               ))}
-              <Link to={buildReaderUrl(hit.text_id, j.juan_num)}>
-                <Button size="small" icon={<ReadOutlined />} style={{ marginTop: 6 }}>
+              <div className="s-card-links">
+                <Link className="s-card-action" to={buildReaderUrl(hit.text_id, j.juan_num)}>
+                  <ReadOutlined aria-hidden="true" />
                   {t("search.read")}
-                </Button>
-              </Link>
+                </Link>
+              </div>
             </div>
           ))}
         {hasMore && (
