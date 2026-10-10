@@ -983,7 +983,7 @@
   "chat.send": "發送",
   "chat.session_group_today": "今天",
   "chat.session_group_yesterday": "昨天",
-  "chat.session_group_week": "本週",
+  "chat.session_group_week": "7 天內",
   "chat.session_group_older": "更早",
   "chat.load_session_failed": "載入會話失敗",
   "chat.load_older_failed": "載入歷史訊息失敗",

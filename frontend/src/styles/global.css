@@ -478,6 +478,10 @@ em {
 }
 .chat-hero-card-tag {
   flex-shrink: 0;
+  /* 标签永远一行：英文标签（Scripture exegesis）在 320 宽卡片里若能折行，会折成
+     两行胶囊，与右侧问题首行错开。不折行时它靠 flex-shrink:0 占住宽度，挤压的
+     只是问题文字（问题本来就允许折行，续行与首行左对齐）。 */
+  white-space: nowrap;
   font-size: 11px;
   padding: 2px 8px;
   border-radius: 10px;
@@ -788,6 +792,13 @@ em {
    600–480 这段每列只剩约 230px，卡片会挤成三四行。 */
 @media (max-width: 600px) {
   .chat-hero-cards { grid-template-columns: 1fr; }
+}
+/* 分类标签在手机上不再用 11px：低于 12px 在手机距离上已难辨认（2026-10-10 生产
+   390/320 实测均为 11px）。与问题文字（13px）的层级改由已有的底色胶囊 + 强调色
+   承担，字号只差 1px 也分得开。判据是「窄屏 或 手指设备」：横屏手机（844 宽）
+   和平板同样是手机/平板的观看距离，只按宽度判会漏掉它们；桌面鼠标保持 11px。 */
+@media (max-width: 600px), (pointer: coarse) {
+  .chat-hero-card-tag { font-size: 12px; }
 }
 
 /* ========== Chat Input Shell (Claude.ai-style) ========== */
