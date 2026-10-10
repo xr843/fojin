@@ -760,6 +760,8 @@
   "search.recent_searches": "Recent searches:",
   "search.filter_region": "Country/Region",
   "search.filter_institution": "Institution",
+  "search.filter_toggle": "Filters",
+  "search.filter_toggle_count": "Filters ({{n}} selected)",
   "search.failed_title": "Search failed",
   "search.failed_subtitle": "Search is temporarily unavailable. Please try again later.",
   "search.retry": "Retry",

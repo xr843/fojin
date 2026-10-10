@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { SUPPORTED_UI_LANGS } from "../i18n";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Pagination, Empty, Checkbox, Input, Tag, Button, Tabs, Result, Select, Typography, Skeleton, AutoComplete, Alert,
+  Pagination, Empty, Input, Tag, Button, Tabs, Result, Select, Typography, Skeleton, AutoComplete, Alert,
 } from "antd";
 import {
   SearchOutlined, VerticalAlignTopOutlined, CloseOutlined, MessageOutlined,
@@ -14,10 +14,10 @@ import { searchTexts, searchContent, searchDictionary, searchCrossLanguage, sear
 import type { DictGroupedSearchResponse } from "../api/client";
 import { hasDirectSearchUrl } from "../utils/sourceUrls";
 import { addSearchHistory, getSearchHistory, type SearchHistoryItem } from "../utils/history";
-import { localizedSourceName } from "../utils/sourceName";
 import { askAiKind, buildAskAiUrl } from "../utils/searchAskAi";
 import { ResultCard, ExternalSourcesSection, DictCard, ContentCard, CrossLangCard, SemanticCard, UnifiedResults } from "../components/search";
 import ParallelSentenceCard from "../components/search/ParallelSentenceCard";
+import SearchFilterSidebar from "../components/search/SearchFilterSidebar";
 import "../styles/search.css";
 import "../styles/sources.css";
 
@@ -422,39 +422,17 @@ export default function SearchPage() {
       ) : (
         <div className="s-layout">
           {/* 左侧筛选（辞典 / 跨语对照 Tab 不显示） */}
-          {tab !== "dictionary" && tab !== "parallel" && <aside className="s-sidebar">
-            <div className="s-filter-group">
-              <div className="s-filter-title">🌐 {t("search.filter_region")}</div>
-              <div className="s-filter-scroll">
-                {sortedRegions.map((r) => (
-                  <label key={r} className="s-filter-item">
-                    <Checkbox
-                      checked={regionFilter.has(r)}
-                      onChange={() => toggleRegion(r)}
-                    />
-                    <span className="s-filter-name">{t(`region.${r}`, r)}</span>
-                    <span className="s-filter-count">{regionCounts[r]}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="s-filter-group">
-              <div className="s-filter-title">🏛 {t("search.filter_institution")}</div>
-              <div className="s-filter-scroll">
-                {institutionList.map(({ name, nameEn, count }) => (
-                  <label key={name} className="s-filter-item">
-                    <Checkbox
-                      checked={institutionFilter.has(name)}
-                      onChange={() => toggleInstitution(name)}
-                    />
-                    <span className="s-filter-name">{localizedSourceName({ name_zh: name, name_en: nameEn })}</span>
-                    <span className="s-filter-count">{count}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </aside>}
+          {tab !== "dictionary" && tab !== "parallel" && (
+            <SearchFilterSidebar
+              regions={sortedRegions}
+              regionCounts={regionCounts}
+              regionFilter={regionFilter}
+              onToggleRegion={toggleRegion}
+              institutions={institutionList}
+              institutionFilter={institutionFilter}
+              onToggleInstitution={toggleInstitution}
+            />
+          )}
 
           {/* 主内容 */}
           <main className="s-main">
