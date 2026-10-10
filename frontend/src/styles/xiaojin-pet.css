@@ -544,7 +544,11 @@
 /* ---------- 响应式 ---------- */
 @media (max-width: 768px) {
   /* 窄屏下首页改成 height:auto 会滚动，页脚跟着内容走、不再钉在视口底，
-     这时就按普通浮动按钮贴边即可。 */
+     这时就按普通浮动按钮贴边即可。
+     不要为了「不骑页脚」把它抬到页脚上方：页脚右侧本来就是空白，小津骑在上面
+     不遮任何内容；抬上去反而落在首页最后一行信任说明上，得给正文让出两侧留白、
+     把一行挤成三行（2026-10-10 试过后撤回）。fixed 元素随滚动总会盖住某处，
+     停在空白的页脚里是最不打扰的位置。 */
   .xiaojin-pet {
     right: 14px;
     bottom: 14px;
@@ -558,6 +562,17 @@
   /* 触屏没有 hover，赶走它的按钮就常驻。 */
   .xiaojin-dismiss {
     opacity: 1;
+    font-size: 12px;
+  }
+  /* 视觉保持 20×20 小圆，命中区用透明伪元素扩到 32×32。 */
+  .xiaojin-dismiss::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 32px;
+    height: 32px;
+    transform: translate(-50%, -50%);
   }
 }
 

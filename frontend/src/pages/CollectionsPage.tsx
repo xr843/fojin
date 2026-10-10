@@ -493,13 +493,14 @@ export default function CollectionsPage() {
       </div>
 
       <div className="sources-toolbar">
+        {/* maxWidth：390px 手机上卡片内宽只有 296px，固定 320 会把输入框右缘顶出卡片 3px。 */}
         <Input
           prefix={<SearchOutlined style={{ color: "var(--fj-ink-muted)" }} />}
           placeholder={t("collections.search_placeholder")}
           allowClear
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          style={{ width: 320 }}
+          style={{ width: 320, maxWidth: "100%" }}
         />
       </div>
 

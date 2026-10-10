@@ -237,6 +237,21 @@ em {
   .header-login-text {
     display: none;
   }
+
+  /* 顶栏图标按钮（导航菜单 / 切换语言 / 登录或用户菜单）视觉只有 32×32、45×32、
+     46×30，低于 44×44 的触控下限。视觉尺寸不动，用透明伪元素把命中区以按钮中心
+     向外扩到至少 44×44：顶栏 52px 高装得下，且只在不足的方向上扩（语言/登录按钮
+     本身已宽于 44，只扩高度），不会伸进左侧明/暗/跟随开关。antd 按钮自带
+     position: relative，伪元素以它为定位基准。 */
+  .header-hit::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
 }
 
 /* ========== Chat Thinking Animation ========== */

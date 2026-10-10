@@ -629,6 +629,34 @@
     margin-left: 0;
   }
 
+  /* 手机字号下限 12px（桌面保持 10/11px 的紧凑徽标）。主次靠字重与颜色分：
+     中文名 14px/600 墨色，外文名、计数、语言标签 12px 浅墨。 */
+  .sources-group-count,
+  .source-card-name-en,
+  .source-card-dists-title,
+  .source-dist-meta,
+  .source-lang-tag {
+    font-size: 12px;
+  }
+  .source-card-badge.ant-tag {
+    font-size: 12px;
+    line-height: 18px;
+  }
+  /* 徽标放大后会更宽，原本就最窄只剩 76px 的标题列会被挤得更窄。允许顶行折行：
+     标题列至少保留 150px，放不下时整组徽标落到下一行、靠右排。 */
+  .source-card-top {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+  .source-card-titles {
+    flex: 1 1 150px;
+  }
+  .source-card-badges {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    margin-left: auto;
+  }
+
   .sources-grid {
     /* 不能写 1fr：它等于 minmax(auto, 1fr)，最小值取卡片 min-content（504px），
        单列轨道反而比 390px 视口宽，布局视口被撑到 608px、描述文字在右缘被裁
