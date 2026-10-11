@@ -261,6 +261,22 @@
   gap: 4px;
 }
 
+/* 结果卡上的藏经/语种/来源等 antd Tag。字号原先是行内 style（11/10px），行内样式
+   媒体查询改不动，所以收进类里：桌面保持原来的紧凑字号，手机在下方 ≤768 提到 12px。
+   .ant-tag 叠类是为了压过 antd cssinjs 运行时注入（顺序在本文件之后）的 .ant-tag 字号。 */
+.ant-tag.s-tag {
+  font-size: 11px;
+}
+
+.ant-tag.s-tag--xs {
+  font-size: 10px;
+}
+
+.s-card-provenance {
+  font-size: 11px;
+  color: var(--fj-ink-muted);
+}
+
 .s-card-meta {
   font-size: 13px;
   color: var(--fj-ink-light);
@@ -608,6 +624,21 @@
 
 /* ---------- 响应式 ---------- */
 @media (max-width: 768px) {
+  /* 手机正文最小字号 12px（生产 390×844 实测 /search?q=般若 有 50 处 11px 标签）。
+     Tag 保持 antd 默认的 nowrap 单行；极长的一个标签（英文分类名等）以省略号收尾，
+     不折两行、也不撑出卡片。 */
+  .ant-tag.s-tag,
+  .ant-tag.s-tag--xs,
+  .s-card-provenance,
+  .s-card-translation-link,
+  .s-dict-knowledge-source {
+    font-size: 12px;
+  }
+  .ant-tag.s-tag {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   /* 纵向排列时必须 stretch：桌面那条 align-items:flex-start 在列方向上让结果区按
      内容「最小宽度」定宽，任何一处不折行的内容（英文译本标签、语种+排序两个下拉）
      都会把整列撑出屏幕（生产 320px 英文实测结果区比容器宽 61px、整页横滚 35px）。 */

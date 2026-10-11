@@ -13,6 +13,8 @@ import {
 import type { DictEntry, DictGroupedResult } from "../api/client";
 import ConceptCard from "../components/ConceptCard";
 import { localizedSourceName } from "../utils/sourceName";
+import { useNarrowViewport } from "../hooks/useNarrowViewport";
+import { useTuckOnScrollDown } from "../hooks/useTuckOnScrollDown";
 import "../styles/dictionary.css";
 
 const LANG_COLORS: Record<string, string> = {
@@ -277,6 +279,11 @@ export default function DictionaryPage() {
     : 0;
 
   const isSearching = query.length > 0;
+  // ≤1024：「问小津」浮钮往下读时收起、往回滑 / 回到顶部 / 到页尾出现（同阅读器 #1295）。
+  // 2026-10-11 生产 390×844「般若」首屏它压住正文 2 个字（320 宽 4 个），往下读每屏都压。
+  // 没选给内容右侧让位：让出 56px 后 390 首屏可见字数 425 → 346，代价比 2 个字大得多。
+  const narrowViewport = useNarrowViewport();
+  const askFabTucked = useTuckOnScrollDown(narrowViewport);
 
   const browsedSource =
     sourceFilter && sources ? sources.find((s) => s.code === sourceFilter) ?? null : null;
@@ -461,7 +468,7 @@ export default function DictionaryPage() {
           )}
 
           {/* Ask AI floating button. 手机上缩成圆形图标按钮（见 dictionary.css），文字靠 aria-label/title 保留。 */}
-          <div className="dict-ask-ai">
+          <div className={askFabTucked ? "dict-ask-ai dict-ask-ai--tucked" : "dict-ask-ai"}>
             <Button
               type="primary"
               icon={<RobotOutlined />}

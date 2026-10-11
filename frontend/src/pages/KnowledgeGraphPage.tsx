@@ -492,7 +492,7 @@ export default function KnowledgeGraphPage() {
               <FieldTimeOutlined style={{ marginRight: 6 }} />
               {t("kg.timeline_title")}
             </span>
-            <span style={{ fontSize: 11, color: "var(--fj-ink-muted)" }}>
+            <span className="kg-timeline-hint">
               {t("kg.timeline_hint")}
             </span>
           </div>
@@ -554,7 +554,7 @@ export default function KnowledgeGraphPage() {
               max={4}
               value={graphDepth}
               onChange={setGraphDepth}
-              style={{ width: 80 }}
+              className="kg-depth-slider"
               tooltip={{ formatter: (v) => t("kg.depth_layers", { n: v }) }}
             />
           </div>
@@ -668,7 +668,7 @@ export default function KnowledgeGraphPage() {
               <div className="kg-sidebar-title">
                 {t("kg.search_results")}
                 {searchResults && (
-                  <span style={{ fontWeight: 400, color: "var(--fj-ink-muted)", marginLeft: 6, fontSize: 11 }}>
+                  <span className="kg-sidebar-count">
                     {t("kg.result_count", { n: searchResults.total })}
                   </span>
                 )}

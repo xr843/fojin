@@ -19,7 +19,7 @@ export default function ExternalCard({ source, query }: { source: DataSource; qu
   return (
     <div className="s-ext-row">
       <span className="s-ext-row-name">{localizedSourceName(source)}</span>
-      {source.region && <Tag style={{ fontSize: 11, margin: 0 }}>{t(`region.${source.region}`, source.region)}</Tag>}
+      {source.region && <Tag className="s-tag" style={{ margin: 0 }}>{t(`region.${source.region}`, source.region)}</Tag>}
       <span className="s-ext-row-spacer" />
       {/* 两个按钮包成一组：窄屏时整组另起一行左对齐，不再随站名长短时而同行时而拆行 */}
       <span className="s-ext-row-actions">

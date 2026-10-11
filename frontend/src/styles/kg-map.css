@@ -438,8 +438,19 @@
     align-items: center;
   }
 
-  .kg-map-toolbar-row .ant-checkbox-wrapper {
-    font-size: 11px;
+  /* 手机正文最小 12px（生产 390×844 实测筛选复选框与图例 8 处 11px）。
+     复选框列是 minmax(0,1fr)、组内 flex-wrap，放大 1px 只会多折行不会横溢。 */
+  .kg-map-toolbar-row .ant-checkbox-wrapper,
+  .kg-map-legend-item,
+  .kg-map-popup-year,
+  .kg-map-tooltip .tooltip-en,
+  .kg-map-tooltip .tooltip-type,
+  .kg-map-tooltip .tooltip-year,
+  .kg-map-tooltip .tooltip-desc,
+  .kg-map-tooltip .tooltip-header .tooltip-type,
+  .kg-map-tooltip .tooltip-meta,
+  .kg-map-tooltip .tooltip-local-notice {
+    font-size: 12px;
   }
 
   .kg-map-switch-label {
@@ -476,7 +487,7 @@
   }
 
   .kg-time-current {
-    font-size: 11px;
+    font-size: 12px;
     min-width: 60px;
   }
 }

@@ -287,6 +287,20 @@
   z-index: 50;
 }
 
+/* ≤1024 往下读时收起（DictionaryPage 用 useTuckOnScrollDown 切这个类），写法同阅读器
+   .reader-fab-tucked：先滑出再隐藏，visibility 延迟到动画结束，收起时不可点、不进焦点序。 */
+.dict-ask-ai {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.dict-ask-ai.dict-ask-ai--tucked {
+  transform: translateY(calc(100% + 32px));
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: transform 0.2s ease, opacity 0.2s ease, visibility 0s linear 0.2s;
+}
+
 .dict-ask-ai .ant-btn {
   height: 44px;
   border-radius: 22px;

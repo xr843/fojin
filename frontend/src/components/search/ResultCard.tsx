@@ -52,15 +52,15 @@ export default function ResultCard({ hit }: { hit: SearchHit }) {
         </div>
         <div className="s-card-tags">
           {sourceName && (
-            <Tag color="volcano" style={{ fontSize: 11 }}>{sourceName}</Tag>
+            <Tag color="volcano" className="s-tag">{sourceName}</Tag>
           )}
-          <Tag style={{ fontSize: 11 }}>{hit.has_content ? t("search.local_fulltext") : t("search.catalog_data")}</Tag>
+          <Tag className="s-tag">{hit.has_content ? t("search.local_fulltext") : t("search.catalog_data")}</Tag>
           {hasCrossCanon && (
-            <Tag color="cyan" style={{ fontSize: 11 }}>{t("crosscanon.entry_title")}</Tag>
+            <Tag color="cyan" className="s-tag">{t("crosscanon.entry_title")}</Tag>
           )}
-          {hit.category && <Tag style={{ fontSize: 11 }}>{hit.category}</Tag>}
+          {hit.category && <Tag className="s-tag">{hit.category}</Tag>}
           {hit.lang && hit.lang !== "lzh" && (
-            <Tag style={{ fontSize: 11 }}>
+            <Tag className="s-tag">
               {langLabel(hit.lang)}
             </Tag>
           )}

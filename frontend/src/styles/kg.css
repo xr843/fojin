@@ -136,7 +136,8 @@
 }
 
 .kg-toolbar .ant-slider {
-  width: 100px;
+  /* 原为行内 style={{ width: 80 }}（并压过这里的 100px）；收进 CSS 才能在手机上放宽 */
+  width: 80px;
 }
 
 .kg-toolbar .ant-slider .ant-slider-track {
@@ -382,6 +383,18 @@
 .kg-type-tag--concept  { background: #e6fffb; color: #006d75; border: 1px solid #87e8de; }
 .kg-type-tag--dynasty  { background: #fff0f6; color: #9e1068; border: 1px solid #ffadd2; }
 
+.kg-sidebar-count {
+  font-weight: 400;
+  color: var(--fj-ink-muted);
+  margin-left: 6px;
+  font-size: 11px;
+}
+
+.kg-timeline-hint {
+  font-size: 11px;
+  color: var(--fj-ink-muted);
+}
+
 .kg-no-relation-badge {
   font-size: 10px;
   color: #bfb8a8;
@@ -404,6 +417,27 @@
 
 .kg-graph-container svg {
   display: block;
+}
+
+/* 「适应窗口」按钮（ForceGraph），原为行内 style，收进类以便手机上放大命中区 */
+.kg-fit-view-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-family: "Noto Serif SC", serif;
+  color: var(--fj-ink-light);
+  background: var(--fj-surface);
+  border: 1px solid var(--fj-border);
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  z-index: 10;
 }
 
 .kg-graph-empty {
@@ -766,8 +800,34 @@
     min-width: 0;
   }
 
+  /* 深度滑块：桌面 80px 在手机上几乎拖不动（生产 390×844 实测 80×12px、拇指 10px）。
+     手机上占满所在行剩余宽度、至少 160px；放不下（320 宽）就整组换到下一行独占。
+     根元素高 40px（点轨道任意处即跳值），拇指的 ::before 命中区扩到 40×40——
+     rc-slider 只在拇指上监听 touchstart，拖动必须从拇指开始。 */
   .kg-depth-control {
     margin-left: 0;
+    flex: 1 1 200px;
+    min-width: 0;
+  }
+
+  .kg-toolbar .kg-depth-slider.ant-slider-horizontal {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 160px;
+    height: 40px;
+    padding-block: 18px;
+    margin-block: 0;
+  }
+
+  .kg-toolbar .kg-depth-slider .ant-slider-handle {
+    inset-block-start: 15px;
+  }
+
+  .kg-toolbar .kg-depth-slider .ant-slider-handle::before {
+    width: 40px !important;
+    height: 40px !important;
+    inset-inline-start: -15px !important;
+    inset-block-start: -15px !important;
   }
 
   .kg-predicate-bar {
@@ -775,8 +835,29 @@
     gap: 4px;
   }
 
-  .kg-predicate-bar .ant-checkbox-wrapper {
-    font-size: 11px;
+  /* 手机正文最小 12px（生产实测 /kg 有 16 处 10–11px：类型标签、关系度数、关系过滤） */
+  .kg-predicate-bar .ant-checkbox-wrapper,
+  .kg-type-tag,
+  .kg-result-degree,
+  .kg-no-relation-badge,
+  .kg-sidebar-count,
+  .kg-timeline-hint,
+  .kg-legend-title,
+  .kg-legend-item,
+  .kg-timeline-legend-item,
+  .kg-timeline-legend-hint,
+  .kg-mentions-panel .kg-mentions-hint,
+  /* 截断提示条下方另有 11px 规则（本块之后、同一 @media 里），用 .kg-page 前缀压过它 */
+  .kg-page .kg-truncated-bar .ant-alert,
+  .kg-page .kg-truncated-bar .ant-alert .ant-alert-message {
+    font-size: 12px;
+  }
+
+  /* 适应窗口按钮：手机命中区 ≥ 40×40（ForceGraph 里的 .kg-fit-view-btn） */
+  .kg-fit-view-btn {
+    min-height: 40px;
+    min-width: 40px;
+    padding: 4px 12px;
   }
 
   /* 移动端布局：Tab 模式下各面板全宽，不再 flex-column 堆叠 */
@@ -785,7 +866,10 @@
     gap: 10px;
   }
 
-  .kg-graph-container svg {
+  /* 只给图谱画布本身。原先写 `.kg-graph-container svg` 连「适应窗口」按钮里的
+     CompressOutlined 图标 svg 也吃到 50vh，按钮被撑成 86×432 的竖条，压住画布右侧
+     24% 宽（2026-10-11 生产 390×844 实测；320 宽 30%）。 */
+  .kg-graph-container svg.kg-graph-svg {
     min-height: 50vh;
   }
 

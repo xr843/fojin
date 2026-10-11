@@ -33,7 +33,6 @@ import { useAuthStore } from "../stores/authStore";
 import { useXiaojinStore } from "../stores/xiaojinStore";
 import { getAdminPendingSummary, type AdminPendingSummary } from "../api/client";
 import NotificationBell from "./NotificationBell";
-import CursorGlow from "./CursorGlow";
 import { useNavFit } from "../hooks/useNavFit";
 import { searchWithLang } from "../seo/syncLangParam";
 
@@ -538,7 +537,6 @@ export default function Layout() {
           )}
         </Space>
       </Drawer>
-      <CursorGlow />
     </AntLayout>
   );
 }

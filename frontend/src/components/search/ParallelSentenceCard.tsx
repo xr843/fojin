@@ -54,13 +54,13 @@ export default function ParallelSentenceCard({ hit }: { hit: ParallelSentenceHit
         {/* 并排对照：汉文 ↔ 外语 */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
           <div style={sentenceBox("#c0392b")}>
-            <Tag color={LANG_COLORS.lzh} style={{ fontSize: 10, marginBottom: 4 }}>
+            <Tag color={LANG_COLORS.lzh} className="s-tag s-tag--xs" style={{ marginBottom: 4 }}>
               {langLabel("lzh")}
             </Tag>
             <div>{hit.zh_text}</div>
           </div>
           <div style={sentenceBox("#7cb342")}>
-            <Tag color={foreignColor} style={{ fontSize: 10, marginBottom: 4 }}>
+            <Tag color={foreignColor} className="s-tag s-tag--xs" style={{ marginBottom: 4 }}>
               {langLabel(hit.foreign_lang)}
             </Tag>
             <div style={{ fontStyle: "italic" }}>{hit.foreign_text}</div>
@@ -70,20 +70,20 @@ export default function ParallelSentenceCard({ hit }: { hit: ParallelSentenceHit
         {/* 出处 + 质量分 */}
         <div className="s-card-tags" style={{ marginTop: 8 }}>
           {hit.taisho_id && (
-            <Tag style={{ fontSize: 11 }}>{hit.taisho_id}</Tag>
+            <Tag className="s-tag">{hit.taisho_id}</Tag>
           )}
           {hit.title && (
-            <Tag color="volcano" style={{ fontSize: 11 }}>
+            <Tag color="volcano" className="s-tag">
               {hit.title}
             </Tag>
           )}
           {hit.juan_num != null && (
-            <Tag color="purple" style={{ fontSize: 11 }}>
+            <Tag color="purple" className="s-tag">
               {t("search.juan_n", { num: hit.juan_num })}
             </Tag>
           )}
           {hit.mitra_e_score != null && (
-            <Tag style={{ fontSize: 11 }}>
+            <Tag className="s-tag">
               {t("search.parallel_score", { score: hit.mitra_e_score.toFixed(2) })}
             </Tag>
           )}
@@ -97,7 +97,7 @@ export default function ParallelSentenceCard({ hit }: { hit: ParallelSentenceHit
             </Link>
           )}
           {/* 来源与授权：低调标注，保持 CC BY-SA 4.0 可追溯 */}
-          <span style={{ fontSize: 11, color: "var(--fj-ink-muted)" }}>
+          <span className="s-card-provenance">
             {t("search.parallel_provenance")}
           </span>
         </div>

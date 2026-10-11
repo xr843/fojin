@@ -323,7 +323,7 @@ export default function SearchPage() {
         <div style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 8 }}>
           <span style={{ fontSize: 12, color: "var(--fj-ink-muted)", lineHeight: "24px" }}>{t("search.filter_sources_label")}</span>
           {selectedSources.split(",").filter(Boolean).map((code) => (
-            <Tag key={code} closable onClose={() => clearSource(code)} color="volcano" style={{ fontSize: 11 }}>
+            <Tag key={code} closable onClose={() => clearSource(code)} color="volcano" className="s-tag">
               {code}
             </Tag>
           ))}

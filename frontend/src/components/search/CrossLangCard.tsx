@@ -59,7 +59,7 @@ export default function CrossLangCard({ hit }: { hit: CrossLanguageSearchHit }) 
           <div className="s-card-alt-titles" style={{ marginBottom: 6 }}>
             {titles.map((entry) => (
               <div key={entry.lang} style={{ fontSize: 12, color: "var(--fj-ink-light)", lineHeight: 1.6 }}>
-                <Tag color={LANG_COLORS[entry.lang] || "default"} style={{ fontSize: 10, padding: "0 4px", lineHeight: "18px" }}>
+                <Tag color={LANG_COLORS[entry.lang] || "default"} className="s-tag s-tag--xs" style={{ padding: "0 4px", lineHeight: "18px" }}>
                   {langLabel(entry.lang)}
                 </Tag>
                 {entry.highlighted ? (
@@ -73,11 +73,11 @@ export default function CrossLangCard({ hit }: { hit: CrossLanguageSearchHit }) 
         )}
         <div className="s-card-tags">
           {sourceName && (
-            <Tag color="volcano" style={{ fontSize: 11 }}>{sourceName}</Tag>
+            <Tag color="volcano" className="s-tag">{sourceName}</Tag>
           )}
-          <Tag style={{ fontSize: 11 }}>{hit.has_content ? t("search.local_fulltext") : t("search.catalog_data")}</Tag>
-          {hit.category && <Tag style={{ fontSize: 11 }}>{hit.category}</Tag>}
-          <Tag color={LANG_COLORS[hit.lang] || "default"} style={{ fontSize: 11 }}>
+          <Tag className="s-tag">{hit.has_content ? t("search.local_fulltext") : t("search.catalog_data")}</Tag>
+          {hit.category && <Tag className="s-tag">{hit.category}</Tag>}
+          <Tag color={LANG_COLORS[hit.lang] || "default"} className="s-tag">
             {langLabel(hit.lang)}
           </Tag>
         </div>

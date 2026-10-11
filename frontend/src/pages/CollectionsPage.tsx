@@ -322,7 +322,10 @@ function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useN
       <div className="coll-section" style={{ padding: "16px 20px" }}>
         {/* Peer of the collection cards in the outline, so h2 like they are. */}
         <h2 className="coll-section-title">
-          <TranslationOutlined aria-hidden="true" /> {t("collections.alignment_title", { texts: groups.length, pairs: data.total_pairs.toLocaleString() })}
+          <TranslationOutlined aria-hidden="true" /> {t("collections.alignment_title")}
+          <span className="coll-section-subtitle">
+            {t("collections.alignment_stats", { texts: groups.length, pairs: data.total_pairs.toLocaleString() })}
+          </span>
         </h2>
         <p style={{ fontSize: 13, color: "var(--fj-ink-muted)", margin: "4px 0 12px" }}>
           {t("collections.alignment_desc")}

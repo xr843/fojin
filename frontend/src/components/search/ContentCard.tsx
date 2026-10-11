@@ -27,14 +27,14 @@ export default function ContentCard({ hit }: { hit: ContentSearchHit }) {
           <Link to={`/texts/${hit.text_id}`} className="s-card-title-link">{hit.title_zh}</Link>
         </div>
         <div className="s-card-tags">
-          <Tag style={{ fontSize: 11 }}>{hit.cbeta_id}</Tag>
-          {hit.translator && <Tag style={{ fontSize: 11 }}>{hit.dynasty ? `[${hit.dynasty}] ` : ""}{hit.translator}</Tag>}
+          <Tag className="s-tag">{hit.cbeta_id}</Tag>
+          {hit.translator && <Tag className="s-tag">{hit.dynasty ? `[${hit.dynasty}] ` : ""}{hit.translator}</Tag>}
           {hit.lang && hit.lang !== "lzh" && (
-            <Tag style={{ fontSize: 11 }}>
+            <Tag className="s-tag">
               {LANG_KEYS[hit.lang] ? t(LANG_KEYS[hit.lang]) : hit.lang}
             </Tag>
           )}
-          <Tag color="orange" style={{ fontSize: 11 }}>{t("search.juan_match_count", { n: hit.matched_juan_count })}</Tag>
+          <Tag color="orange" className="s-tag">{t("search.juan_match_count", { n: hit.matched_juan_count })}</Tag>
         </div>
         {/* 最佳匹配卷 */}
         <div className="s-content-juan">

@@ -182,6 +182,21 @@ describe("CollectionsPage", () => {
       expect(view.queryByText("瑜伽師地論")).not.toBeInTheDocument();
     });
 
+    // 生产 390×844：「跨藏对照（1016 部经 · 912,344 组对齐段落）」整串在 h2 里折成两行（47px）。
+    // 括号里的统计降为标题里的副标题元素（手机上独占一行的 12px 小字），主标题只剩「跨藏对照」。
+    it("keeps the alignment heading short and moves the counts into a subtitle", async () => {
+      await i18n.changeLanguage("zh");
+      const { container } = renderPage();
+      const view = within(container);
+
+      const heading = await view.findByRole("heading", { level: 2, name: /跨藏对照/ });
+      const stats = heading.querySelector(".coll-section-subtitle");
+      expect(stats).not.toBeNull();
+      expect(stats).toHaveTextContent("1 部经 · 39,046 组对齐段落");
+      expect(heading.textContent?.replace(stats?.textContent ?? "", "").trim()).toBe("跨藏对照");
+      expect(heading.textContent).not.toMatch(/[（）]/);
+    });
+
     it("keeps catalog titles traditional for 繁體 readers", async () => {
       await i18n.changeLanguage("zh-Hant");
       const { container } = renderPage();

@@ -18,16 +18,16 @@ export default function SemanticCard({ hit }: { hit: SemanticSearchHit }) {
           <Link to={`/texts/${hit.text_id}`} className="s-card-title-link">{hit.title_zh}</Link>
         </div>
         <div className="s-card-tags">
-          {hit.cbeta_id && <Tag style={{ fontSize: 11 }}>{hit.cbeta_id}</Tag>}
+          {hit.cbeta_id && <Tag className="s-tag">{hit.cbeta_id}</Tag>}
           {hit.translator && (
-            <Tag style={{ fontSize: 11 }}>
+            <Tag className="s-tag">
               {hit.dynasty ? `[${hit.dynasty}] ` : ""}{hit.translator}
             </Tag>
           )}
           {hit.source_code && (
-            <Tag style={{ fontSize: 11 }}>{hit.source_code}</Tag>
+            <Tag className="s-tag">{hit.source_code}</Tag>
           )}
-          <Tag color="purple" style={{ fontSize: 11 }}>
+          <Tag color="purple" className="s-tag">
             {t("search.juan_n", { num: hit.juan_num })}
           </Tag>
           {/* 相似度只作一行小字：原先是 40px 红绿蓝圆环，一页 6~20 个，把视觉重心从经名上抢走；

@@ -110,6 +110,24 @@
   font-family: "Noto Serif SC", serif;
 }
 
+/* 标题里的统计副标题（如跨藏对照的「1016 部经 · 912,344 组对齐段落」）：桌面跟在标题后同一行，
+   手机降为标题下独占一行的小字——整串放在 15px 标题里，390 宽折成两行（47px）。 */
+.coll-section-subtitle {
+  margin-left: 8px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--fj-ink-muted);
+}
+
+@media (max-width: 768px) {
+  .coll-section-subtitle {
+    display: block;
+    margin-left: 0;
+    margin-top: 2px;
+    font-size: 12px;
+  }
+}
+
 .coll-section-title .anticon {
   margin-right: 6px;
   color: var(--fj-accent, var(--fj-accent));

@@ -471,6 +471,7 @@ export default function ForceGraph({
       <span className="sr-only">{t("kg.graph_sr_desc")}</span>
       <svg
         ref={svgRef}
+        className="kg-graph-svg"
         width={width}
         height={height}
         style={{ background: "var(--fj-surface)" }}
@@ -481,24 +482,7 @@ export default function ForceGraph({
           type="button"
           onClick={() => fitToViewRef.current?.()}
           title={t("kg.fit_view_tip")}
-          style={{
-            position: "absolute",
-            top: 10,
-            right: 10,
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-            padding: "4px 10px",
-            fontSize: 12,
-            fontFamily: '"Noto Serif SC", serif',
-            color: "var(--fj-ink-light)",
-            background: "var(--fj-surface)",
-            border: "1px solid var(--fj-border)",
-            borderRadius: 6,
-            cursor: "pointer",
-            boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-            zIndex: 10,
-          }}
+          className="kg-fit-view-btn"
         >
           <CompressOutlined />
           {t("kg.fit_view")}

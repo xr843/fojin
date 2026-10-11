@@ -9,8 +9,8 @@ import "@ant-design/v5-patch-for-react-19";
 import i18n from "../i18n";
 i18n.changeLanguage("zh");
 
-// jsdom ships no matchMedia. Any component tree containing CursorGlow (i.e.
-// anything rendering Layout) throws on mount without this.
+// jsdom ships no matchMedia. antd's responsive Grid/useBreakpoint and
+// useTheme's prefers-color-scheme probe call it on mount and throw without this.
 if (!window.matchMedia) {
   window.matchMedia = (query: string) =>
     ({
