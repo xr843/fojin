@@ -25,7 +25,7 @@ describe("collections locale data", () => {
   const expectedCounts = {
     huayan: [8, 17, [5, 5, 5, 5, 3]],
     prajna: [10, 13, [5, 5, 5, 5, 3]],
-    lotus: [3, 11, [4, 5, 4, 3, 3]],
+    lotus: [4, 11, [4, 5, 4, 3, 3]],
     shurangama: [1, 7, [4, 3, 2, 2, 2]],
     pureland: [4, 10, [3, 4, 3, 3, 4]],
     yogacara: [10, 5, [4, 4, 4, 4, 2]],
@@ -58,9 +58,9 @@ describe("collections locale data", () => {
     );
 
     expect(collections).toHaveLength(13);
-    expect(collections.reduce((sum, collection) => sum + collection.mainTexts.length, 0)).toBe(85);
+    expect(collections.reduce((sum, collection) => sum + collection.mainTexts.length, 0)).toBe(86);
     expect(collections.reduce((sum, collection) => sum + collection.commentaries.length, 0)).toBe(97);
-    expect(totalTexts).toBe(182);
+    expect(totalTexts).toBe(183);
     expect(totalResources).toBe(223);
 
     for (const collection of collections) {

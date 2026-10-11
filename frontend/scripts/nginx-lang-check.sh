@@ -95,6 +95,15 @@ redirect() { # path expected-Location
 redirect "/CROSS-canon?lang=en"          "/cross-canon?lang=en"
 redirect "/CHAT"                         "/chat"
 redirect "/Verify?q=x"                   "/verify?q=x"
+# /topics 已并入 /collections：所有旧形态一跳到位、查询串跟过去、目标不再跳。
+redirect "/topics"                       "/collections"
+redirect "/Topics"                       "/collections"
+redirect "/TOPICS/"                      "/collections"
+redirect "/topics/"                      "/collections"
+redirect "/topics?lang=en"               "/collections?lang=en"
+redirect "/topics/index.en.html"         "/collections"
+code  "/topics"                          301
+code  "/collections?lang=en"             200
 code  "/collections/no-such-series"      200
 code  "/assets/does-not-exist.js"        404  # unchanged from master: a missing bundle must not get an HTML shell
 robots_hdr() { # path expected-X-Robots-Tag ("" = header must be absent)

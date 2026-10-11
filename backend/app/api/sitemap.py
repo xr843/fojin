@@ -27,7 +27,6 @@ STATIC_PAGES = [
     ("/sources", "weekly", "0.8"),
     ("/dictionary", "weekly", "0.8"),
     ("/collections", "weekly", "0.7"),
-    ("/topics", "weekly", "0.8"),
     ("/kg", "weekly", "0.7"),
     ("/chat", "weekly", "0.6"),
     # 「这句经，佛真的说过吗？」核对页（入口页可收录；?q= 结果页 noindex）。

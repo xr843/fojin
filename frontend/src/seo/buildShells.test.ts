@@ -62,7 +62,6 @@ describe("shellPlan", () => {
       "sources/index",
       "kg/index",
       "collections/index",
-      "topics/index",
       "dictionary/index",
       "cross-canon/index",
       "sutras/heart-sutra/index",
@@ -75,6 +74,12 @@ describe("shellPlan", () => {
         expect(byFile.has(`${route}${sfx}.html`), `${route}${sfx}`).toBe(true);
       }
     }
+  });
+
+  it("emits no /topics shell (merged into /collections; nginx 301s it)", () => {
+    // A dist/topics/ directory would resurrect a second 「经典专题」 page for
+    // anything that bypasses the nginx 301 (and re-arm the try_files $uri/ trap).
+    expect(plan.some((p) => p.outFile.startsWith("topics/"))).toBe(false);
   });
 
   it("builds language-only SPA fallbacks without hreflang", () => {

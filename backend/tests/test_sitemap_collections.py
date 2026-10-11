@@ -40,3 +40,10 @@ def test_sitemap_has_no_stale_collection_links():
 def test_cross_canon_browse_page_is_listed():
     # ~1000 aligned texts, a bigger index than /collections, previously absent.
     assert "/cross-canon" in {p for p, _, _ in STATIC_PAGES}
+
+
+def test_retired_topics_page_is_not_in_the_sitemap():
+    # /topics was merged into /collections and nginx 301s it there. Submitting a
+    # redirecting URL makes every crawl burn a hop and keeps the duplicate
+    # 「经典专题」 alive in the index.
+    assert "/topics" not in {p for p, _, _ in STATIC_PAGES}

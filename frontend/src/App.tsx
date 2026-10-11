@@ -14,6 +14,7 @@ import Layout from "./components/Layout";
 import ErrorBoundary from "./components/ErrorBoundary";
 import RouteErrorBoundary from "./components/RouteErrorBoundary";
 import ProtectedRoute from "./components/ProtectedRoute";
+import RedirectKeepingSearch from "./components/RedirectKeepingSearch";
 
 const antdLocales: Record<string, typeof zhCN> = { zh: zhCN, en: enUS, ja: jaJP, ko: koKR, th: thTH, vi: viVN };
 import HomePage from "./pages/HomePage";
@@ -36,7 +37,6 @@ const WorkDetailPage = lazy(() => import("./pages/WorkDetailPage"));
 const CollectionsPage = lazy(() => import("./pages/CollectionsPage"));
 const ReadAloudPage = lazy(() => import("./pages/ReadAloudPage"));
 const CrossCanonPage = lazy(() => import("./pages/CrossCanonPage"));
-const TopicsPage = lazy(() => import("./pages/TopicsPage"));
 const AdminDashboardPage = lazy(() => import("./pages/AdminDashboardPage"));
 const AdminAnswerQualityPage = lazy(() => import("./pages/AdminAnswerQualityPage"));
 const AdminUsersPage = lazy(() => import("./pages/AdminUsersPage"));
@@ -77,7 +77,8 @@ function App() {
             <Route path="/collections" element={<CollectionsPage />} />
             <Route path="/collections/:collectionId" element={<CollectionsPage />} />
             <Route path="/cross-canon" element={<CrossCanonPage />} />
-            <Route path="/topics" element={<TopicsPage />} />
+            {/* /topics 已并入 /collections（nginx 对爬虫做 301）；这条兜站内旧链接与 PWA 旧壳。 */}
+            <Route path="/topics" element={<RedirectKeepingSearch to="/collections" />} />
             <Route path="/sutras/:slug" element={<SutraLandingPage />} />
             <Route path="/works/:slug" element={<RouteErrorBoundary><WorkDetailPage /></RouteErrorBoundary>} />
             <Route path="/login" element={<LoginPage />} />
