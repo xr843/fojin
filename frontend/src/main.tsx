@@ -16,6 +16,7 @@ import App from "./App";
 import "./i18n";
 import "./styles/global.css";
 import "./umami";
+import { dropServerCanonical } from "./seo/dropServerCanonical";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,6 +26,8 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+dropServerCanonical();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

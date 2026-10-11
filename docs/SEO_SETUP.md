@@ -81,3 +81,26 @@ curl -s -A "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.h
 | 富结果（Book / Person / Breadcrumb） | 0 | ≥ 1,000 impressions |
 
 回访时检查 GSC → Performance + Pages → Indexed。
+
+## 8. 多语言版本（繁体 / 英文）与 hreflang（2026-10-11 起）
+
+同一路径用 `?lang=` 区分三种界面语言，每个版本自引用 canonical，并互相声明 hreflang：
+
+| 语言 | URL | `<html lang>` | hreflang |
+|---|---|---|---|
+| 简体（默认） | `https://fojin.app/chat` | `zh-Hans` | `zh-Hans`，同时作 `x-default` |
+| 繁体 | `https://fojin.app/chat?lang=zh-Hant` | `zh-Hant` | `zh-Hant` |
+| 英文 | `https://fojin.app/chat?lang=en` | `en` | `en` |
+
+- 有语言版本的：首页、`/chat` 等静态页、`/sutras/*`、`/collections`、`/collections/*`、`/cross-canon`、`/texts/:id`。
+- **没有**语言版本的：`/search`（结果页不收录）、`/dict/*`、`/persons/*`（正文是中文辞典 / 人物资料，换语言只换外壳，三语化只会多出约 70 万个近似重复 URL）、`/share/qa/*`、`/texts/:id/read`（noindex）。
+- 规则只有一份，三处实现必须逐字节一致：`backend/app/services/seo_lang.py`、`frontend/src/seo/langUrl.ts`、`frontend/src/seo/buildShells.ts`（构建期 shell，nginx 用 `map $arg_lang` 选文件）。sitemap 的 `xhtml:link` 也调用后端那份。
+- 设计与取舍：`docs/superpowers/specs/2026-10-11-i18n-seo-design.md`。
+
+**上线后验收**：`bash deploy/seo_lang_prod_check.sh`（Googlebot UA 抓生产，全部 ok 才算上线成功）。改 `frontend/nginx.conf` 或 shell 生成逻辑前后，本地跑 `cd frontend && npm run build && bash scripts/nginx-lang-check.sh`。
+
+**Search Console（需站长本人操作）**：
+1. Sitemaps → 重新提交 `https://fojin.app/sitemap.xml`（让 Google 读到新的 `xhtml:link`）。
+2. 网址检查 → 输入 `https://fojin.app/texts/235?lang=zh-Hant` → 查看「用户声明的规范网址」应是它自己，而不是不带参数的简体页。
+3. 8 周后看「网页 → 已编入索引」里是否出现 `?lang=zh-Hant` / `?lang=en` 的网址，以及效果报告里香港、台湾、新加坡、马来西亚的点击。
+
