@@ -16,6 +16,7 @@ import {
   MenuOutlined,
   DashboardOutlined,
   RobotOutlined,
+  SafetyCertificateOutlined,
   GithubOutlined,
   GlobalOutlined,
   // TranslationOutlined,  // cross-canon nav hidden (板块待打磨；路由仍可直达 /cross-canon)
@@ -103,6 +104,8 @@ export default function Layout() {
   }> = [
     { icon: <DatabaseOutlined />, label: t("nav.sources"), path: "/sources" },
     { icon: <RobotOutlined />, label: t("nav.chat"), path: "/chat" },
+    // 「这句经，佛真的说过吗？」核对页——全球增长子项目 ② 的入口，紧跟问答。
+    { icon: <SafetyCertificateOutlined />, label: t("nav.verify"), path: "/verify" },
     // 跨藏对照(/cross-canon)专属浏览页暂从导航撤下：独立板块当前呈现效果不佳，
     // 打磨后再对外公开。路由仍可直达 /cross-canon（供直达/测试），阅读器内的
     // 跨藏对照面板、文本详情段级入口、搜索藏/梵徽章等集成功能不受影响。

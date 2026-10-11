@@ -1,0 +1,175 @@
+/* ========================================
+   VerifyPage —「这句经，佛真的说过吗？」
+   ======================================== */
+
+.verify-page {
+  max-width: 760px;
+}
+
+.verify-form {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.verify-form .ant-input-textarea {
+  flex: 1;
+  min-width: 0;
+}
+
+.verify-form textarea {
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+.verify-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 14px 0 24px;
+  font-size: 13px;
+  color: var(--fj-ink-muted);
+}
+
+.verify-example {
+  border: 1px solid var(--fj-border, #e3dccf);
+  background: transparent;
+  color: var(--fj-ink);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  min-height: 32px;
+}
+
+.verify-example:hover {
+  border-color: var(--fj-cinnabar, #8b2500);
+}
+
+.verify-loading {
+  display: flex;
+  justify-content: center;
+  padding: 32px 0;
+}
+
+.verify-alert {
+  margin-bottom: 16px;
+}
+
+.verify-result {
+  border-top: 6px solid var(--verify-accent);
+  background: var(--fj-paper, #fcfaf6);
+  border-radius: 10px;
+  padding: 20px 20px 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.verdict-sutra { --verify-accent: #2e7d52; }
+.verdict-not_sutra { --verify-accent: #b07a21; }
+.verdict-partial { --verify-accent: #c4622d; }
+.verdict-absent { --verify-accent: #78736c; }
+
+.verify-badge {
+  display: inline-block;
+  background: var(--verify-accent);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+  padding: 6px 16px;
+  border-radius: 10px;
+}
+
+.verify-explain {
+  margin: 12px 0 16px;
+  color: var(--fj-ink);
+  line-height: 1.7;
+}
+
+.verify-segs {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+}
+
+.verify-seg {
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--fj-border, #e3dccf);
+}
+
+.verify-seg:last-child {
+  border-bottom: none;
+}
+
+.verify-seg-text {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 18px;
+  font-family: "Noto Serif SC", serif;
+  color: var(--fj-ink);
+}
+
+.verify-seg.is-found .anticon { color: #2e7d52; }
+.verify-seg.is-missing .anticon { color: #a9a198; }
+.verify-seg.is-missing .verify-seg-text span { color: #8e877e; }
+
+.verify-seg-sources {
+  margin: 4px 0 0 26px;
+  font-size: 13px;
+  color: var(--fj-ink-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.verify-source {
+  color: var(--fj-cinnabar, #8b2500);
+}
+
+.verify-card {
+  margin: 0 0 16px;
+}
+
+.verify-card img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid var(--fj-border, #e3dccf);
+}
+
+.verify-card figcaption {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--fj-ink-muted);
+  text-align: center;
+}
+
+.verify-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.verify-method {
+  margin-top: 28px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--fj-ink-muted);
+}
+
+@media (max-width: 600px) {
+  .verify-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .verify-form .ant-btn {
+    min-height: 44px;
+  }
+
+  .verify-result {
+    padding: 16px 14px 12px;
+  }
+}

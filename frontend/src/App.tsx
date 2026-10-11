@@ -30,6 +30,7 @@ const PersonPage = lazy(() => import("./pages/PersonPage"));
 const ChatPage = lazy(() => import("./pages/ChatPage"));
 const ResearchPage = lazy(() => import("./pages/ResearchPage"));
 const DictionaryPage = lazy(() => import("./pages/DictionaryPage"));
+const VerifyPage = lazy(() => import("./pages/VerifyPage"));
 const SutraLandingPage = lazy(() => import("./pages/SutraLandingPage"));
 const WorkDetailPage = lazy(() => import("./pages/WorkDetailPage"));
 const CollectionsPage = lazy(() => import("./pages/CollectionsPage"));
@@ -81,6 +82,7 @@ function App() {
             <Route path="/works/:slug" element={<RouteErrorBoundary><WorkDetailPage /></RouteErrorBoundary>} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/dictionary" element={<DictionaryPage />} />
+            <Route path="/verify" element={<RouteErrorBoundary><VerifyPage /></RouteErrorBoundary>} />
             <Route path="/chat" element={<RouteErrorBoundary><ChatPage /></RouteErrorBoundary>} />
             <Route path="/research" element={<RouteErrorBoundary><ResearchPage /></RouteErrorBoundary>} />
             <Route path="/share/qa/:id" element={<RouteErrorBoundary><SharedQAPage /></RouteErrorBoundary>} />

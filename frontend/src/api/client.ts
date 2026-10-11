@@ -1983,6 +1983,45 @@ export async function createSharedQA(payload: {
   return data;
 }
 
+// ── 「这句经，佛真的说过吗？」 (/verify) ─────────────────────────────────
+
+export type CanonClass =
+  | "sutra" | "vinaya" | "treatise" | "commentary" | "school" | "history" | "apocrypha" | "later" | "unknown";
+
+export interface ClaimSource {
+  text_id: number;
+  cbeta_id: string | null;
+  title_zh: string | null;
+  juan_num: number;
+  reader_url: string | null;
+  canon_class: CanonClass | null;
+}
+
+export interface ClaimSegment {
+  text: string;
+  found: boolean;
+  sources: ClaimSource[];
+  similarity: number;
+}
+
+export interface ClaimVerdict {
+  query: string;
+  verdict: "sutra" | "not_sutra" | "partial" | "absent";
+  source_class: CanonClass | null;
+  segments: ClaimSegment[];
+}
+
+export async function verifyClaim(q: string): Promise<ClaimVerdict> {
+  const { data } = await api.get<ClaimVerdict>("/verify/claim", { params: { q } });
+  return data;
+}
+
+/** Server-rendered result card (verdict recomputed server-side; only q + label language are sent). */
+export function verifyCardUrl(q: string, lang: string): string {
+  const params = new URLSearchParams({ q, lang: lang === "zh-Hant" || lang === "en" ? lang : "zh" });
+  return `/api/og/verify?${params.toString()}`;
+}
+
 export async function getSharedQA(id: string): Promise<SharedQA> {
   const { data } = await api.get<SharedQA>(`/share/qa/${id}`);
   return data;
