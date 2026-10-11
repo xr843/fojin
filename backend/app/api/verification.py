@@ -15,7 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.elasticsearch import get_es
 from app.database import get_db
-from app.schemas.verification import QuoteVerdict
+from app.schemas.verification import ClaimVerdict, QuoteVerdict
+from app.services.claim_check import check_claim
 from app.services.quote_lookup import QuoteTooShortError, verify_quote
 
 router = APIRouter(prefix="/verify", tags=["verification"])
@@ -42,3 +43,21 @@ async def verify_quote_endpoint(
         return await verify_quote(db, es, q, cite=cite, juan=juan)
     except QuoteTooShortError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/claim", response_model=ClaimVerdict)
+async def verify_claim_endpoint(
+    q: str = Query(..., min_length=1, max_length=200, description="待核对的一句「佛说」"),
+    db: AsyncSession = Depends(get_db),
+) -> ClaimVerdict:
+    """「这句经，佛真的说过吗？」——给人看的核对（/verify 页与结果图）。
+
+    Whole text first, then clause by clause; the verdict says whether it is in
+    a sūtra, only in later works, partly, or not at all. Up to 1 + 8 lookups per
+    call, hence its own, stricter limit (rate_limit_verify_claim)."""
+    es: AsyncElasticsearch = get_es()
+    try:
+        return await check_claim(db, es, q)
+    except QuoteTooShortError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+

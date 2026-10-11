@@ -33,6 +33,11 @@ STRICT_PATHS: dict[str, int] = {
     # Open-world quote verification — ES phrase search + fascicle reads per
     # call; the hosted MCP endpoint fronts it with its own per-client window.
     "/api/verify/quote": settings.rate_limit_verify_quote,
+    # Human-facing claim check and its result image: whole text + up to 8
+    # clauses per call. The image recomputes the verdict server-side (never
+    # trusts a verdict in the URL), so it costs the same.
+    "/api/verify/claim": settings.rate_limit_verify_claim,
+    "/api/og/verify": settings.rate_limit_verify_claim,
     # 经注对读：包常驻内存，单次查询只是子串定位——比核验便宜，
     # 但仍是全文检索，别落进 200/min 的默认桶。
     "/api/commentary/passage": settings.rate_limit_commentary,

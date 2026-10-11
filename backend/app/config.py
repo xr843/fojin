@@ -237,6 +237,9 @@ class Settings(BaseSettings):
     # ES phrase search plus full-fascicle source reads — same cost class as
     # /api/search/content (30/min).
     rate_limit_verify_quote: int = 30
+    # 核对页「这句经，佛真的说过吗？」：一次最多 1 + 8 次 verify_quote 查找，
+    # 结果图（/api/og/verify）同价——两者共用这一档。
+    rate_limit_verify_claim: int = 10
     rate_limit_commentary: int = 60
     # Chat (AI Q&A) — the most expensive endpoint: RAG retrieval always uses the
     # platform embedding key (even for BYOK users) plus a long streaming LLM

@@ -94,3 +94,34 @@ class QuoteVerdict(BaseModel):
     cite_matched: bool | None = None
     lang: str = "lzh"
     caveats: list[str] = []
+
+
+# ── 「这句经，佛真的说过吗？」 (GET /api/verify/claim) ─────────────────────
+
+
+class ClaimSegment(BaseModel):
+    """One clause of the pasted text and where (if anywhere) it is found."""
+
+    text: str
+    found: bool
+    # Up to three distinct titles, earliest-in-canon first.
+    sources: list[QuoteMatch] = []
+    similarity: float = 0.0
+
+
+class ClaimVerdict(BaseModel):
+    """Human-facing answer for the /verify page and its result image.
+
+    verdict:
+      sutra      — every clause is found, and found in a sūtra (经藏/密教/南传汉译)
+      not_sutra  — every clause is found, but not in a sūtra; see source_class
+      partial    — some clauses are found, some are not
+      absent     — nothing is found in the canon
+    Wording rule for consumers: "sutra" means 出自佛经, never 佛亲口所说 —
+    sūtras also record what bodhisattvas and disciples said.
+    """
+
+    query: str
+    verdict: Literal["sutra", "not_sutra", "partial", "absent"]
+    source_class: str | None = None
+    segments: list[ClaimSegment] = []
