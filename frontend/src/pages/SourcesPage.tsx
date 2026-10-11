@@ -411,6 +411,38 @@ export default function SourcesPage() {
   const isGroupOpen = (name: string) => openOverrides[name] ?? groupsOpenByDefault;
   // 关键词搜索时命中通常很少，组内不再截断到 12 条：命中的每一条都直接可见。
   const capPerGroup = search === "";
+  // 来源/可信度声明是本站立身之本：桌面与平板保持在目录上方；只在手机布局（与分组
+  // 默认收起同一条件）移到目录之后，把首屏让给「怎么找」。同一份内容只渲染一处。
+  const trustBlock = (
+    <div className={phone ? "sources-trust sources-trust--after" : "sources-trust"}>
+      <div className="sources-trust-items">
+        <div className="sources-trust-item">
+          <div className="sources-trust-title">{t("sources.trust_provenance")}</div>
+          <div className="sources-trust-desc">
+            {t("sources.trust_provenance_tip")}
+          </div>
+        </div>
+        <div className="sources-trust-item">
+          <div className="sources-trust-title">{t("sources.trust_sync")}</div>
+          <div className="sources-trust-desc">
+            {t("sources.trust_sync_tip")}
+          </div>
+        </div>
+        <div className="sources-trust-item">
+          <div className="sources-trust-title">{t("sources.trust_dedup")}</div>
+          <div className="sources-trust-desc">
+            {t("sources.trust_dedup_tip")}
+          </div>
+        </div>
+        <div className="sources-trust-item">
+          <div className="sources-trust-title">{t("sources.trust_coverage")}</div>
+          <div className="sources-trust-desc">
+            {t("sources.trust_coverage_tip", { regions: regions.length, langs: languages.length })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
   const jumpToGroup = (name: string, index: number) => {
     setGroupOpen(name, true);
     requestAnimationFrame(() => {
@@ -517,6 +549,8 @@ export default function SourcesPage() {
           </div>
         )}
       </div>
+
+      {!phone && trustBlock}
 
       <div className="sources-toolbar">
         <Input
@@ -653,34 +687,7 @@ export default function SourcesPage() {
         </>
       )}
 
-      <div className="sources-trust">
-        <div className="sources-trust-items">
-          <div className="sources-trust-item">
-            <div className="sources-trust-title">{t("sources.trust_provenance")}</div>
-            <div className="sources-trust-desc">
-              {t("sources.trust_provenance_tip")}
-            </div>
-          </div>
-          <div className="sources-trust-item">
-            <div className="sources-trust-title">{t("sources.trust_sync")}</div>
-            <div className="sources-trust-desc">
-              {t("sources.trust_sync_tip")}
-            </div>
-          </div>
-          <div className="sources-trust-item">
-            <div className="sources-trust-title">{t("sources.trust_dedup")}</div>
-            <div className="sources-trust-desc">
-              {t("sources.trust_dedup_tip")}
-            </div>
-          </div>
-          <div className="sources-trust-item">
-            <div className="sources-trust-title">{t("sources.trust_coverage")}</div>
-            <div className="sources-trust-desc">
-              {t("sources.trust_coverage_tip", { regions: regions.length, langs: languages.length })}
-            </div>
-          </div>
-        </div>
-      </div>
+      {phone && trustBlock}
 
       <SuggestSourceForm />
 

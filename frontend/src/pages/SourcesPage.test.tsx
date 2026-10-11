@@ -211,4 +211,19 @@ describe("SourcesPage 手机目录折叠", () => {
     fireEvent.click(screen.getByRole("button", { name: /展开全部/ }));
     expect(screen.getByText("台湾源14").closest(".source-card")?.classList.contains("is-overflow")).toBe(false);
   });
+
+  it("来源/可信度声明：桌面在目录上方，手机布局才移到目录之后（只渲染一份）", async () => {
+    for (const phone of [false, true]) {
+      mockPhone(phone);
+      mockGetSources.mockResolvedValue(catalog());
+      const { container, unmount } = renderPage();
+      await screen.findByText("SuttaCentral 巴利经藏");
+      const trusts = container.querySelectorAll(".sources-trust");
+      expect(trusts.length).toBe(1);
+      const groups = container.querySelector(".sources-groups")!;
+      const trustBeforeGroups = !!(trusts[0].compareDocumentPosition(groups) & Node.DOCUMENT_POSITION_FOLLOWING);
+      expect(trustBeforeGroups).toBe(!phone);
+      unmount();
+    }
+  });
 });

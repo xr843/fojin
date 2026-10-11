@@ -336,8 +336,9 @@
   transform: rotate(-135deg);
 }
 
-/* 可信度说明移到目录之后（手机上它原先 396px、把找来源的筛选挤出首屏）。 */
-.sources-catalog .sources-trust {
+/* 手机布局下可信度说明移到目录之后（它原先 396px、把找来源的筛选挤出首屏）；
+   桌面/平板仍在目录上方，不加这个类。 */
+.sources-catalog .sources-trust--after {
   margin-top: 32px;
 }
 
