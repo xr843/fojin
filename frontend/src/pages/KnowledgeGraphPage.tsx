@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Input, Select, Spin, Empty, Slider, Checkbox, Alert, Tooltip, Segmented } from "antd";
+import { Input, Select, Spin, Empty, Slider, Checkbox, Alert, Tooltip, Segmented, Button } from "antd";
 import {
   ApartmentOutlined,
   SearchOutlined,
@@ -24,6 +24,7 @@ import {
 import EntityCard from "../components/EntityCard";
 import KGTimeline from "../components/kg/KGTimeline";
 import KGMentionsPanel from "../components/kg/KGMentionsPanel";
+import { pickCoreSubgraph } from "../components/kg/coreSubgraph";
 import { searchKGEntities, getKGEntity, getKGEntityGraph, getKGStats, getKGTimeline } from "../api/client";
 import type { KGEntity, KGGraphNode, KGGraphLink } from "../api/client";
 import "../styles/kg.css";
@@ -127,6 +128,11 @@ const CURATED_GROUPS: { titleKey: string; items: { label: string; type: string }
   },
 ];
 
+// 默认深度：桌面和手机都是 1 层。玄奘的一层邻域就有 110 个节点，两层会顶到
+// max_nodes=150 的上限并截断——生产上 219 个访客里 217 个只看了这张默认图就走了。
+// 一层之上再由 pickCoreSubgraph 挑出核心（「显示全部」可一键拿回完整一层）。
+const DEFAULT_DEPTH = 1;
+
 // 移动端 Tab 三选项
 type MobileTab = "search" | "graph" | "detail";
 
@@ -189,8 +195,11 @@ export default function KnowledgeGraphPage() {
   });
   const [graphDepth, setGraphDepth] = useState(() => {
     const d = Number(searchParams.get("depth"));
-    return d >= 1 && d <= 4 ? d : isMobile ? 1 : 2;
+    return d >= 1 && d <= 4 ? d : DEFAULT_DEPTH;
   });
+  // 核心视图（默认）vs 完整视图。只在默认深度下生效：用户自己调深度就是想看更多，不再替他裁。
+  const [showAllNodes, setShowAllNodes] = useState(() => searchParams.get("all") === "1");
+  const coreView = graphDepth === DEFAULT_DEPTH && !showAllNodes;
   const [selectedPredicates, setSelectedPredicates] = useState<string[]>(() => {
     const rels = searchParams.get("rels");
     if (rels) {
@@ -211,6 +220,10 @@ export default function KnowledgeGraphPage() {
     nodes: KGGraphNode[];
     links: KGGraphLink[];
     truncated: boolean;
+    /** 核心视图隐藏掉的节点数；0 表示展示的就是取回的全部。 */
+    hiddenCount: number;
+    /** 核心视图下后端那一层本身就被 max_nodes 截过——总数写成「150+」，不装作精确。 */
+    hiddenIsLowerBound?: boolean;
   } | null>(null);
 
   // Track which node ids have already been depth-1 fetched so we can draw
@@ -246,12 +259,13 @@ export default function KnowledgeGraphPage() {
     if (query) next.set("q", query);
     if (entityType) next.set("type", entityType);
     if (selectedEntityId != null) next.set("id", String(selectedEntityId));
-    if (graphDepth !== (isMobile ? 1 : 2)) next.set("depth", String(graphDepth));
+    if (graphDepth !== DEFAULT_DEPTH) next.set("depth", String(graphDepth));
+    if (showAllNodes) next.set("all", "1");
     if (selectedPredicates.length !== ALL_PREDICATE_VALUES.length) {
       next.set("rels", selectedPredicates.join(","));
     }
     setSearchParams(next, { replace: true });
-  }, [query, entityType, selectedEntityId, graphDepth, selectedPredicates, isMobile, setSearchParams]);
+  }, [query, entityType, selectedEntityId, graphDepth, selectedPredicates, showAllNodes, setSearchParams]);
 
   const { data: searchResults, isLoading: searching } = useQuery({
     queryKey: ["kg-search", query, entityType],
@@ -285,10 +299,32 @@ export default function KnowledgeGraphPage() {
   // accumulatedGraph when graphData actually belongs to the active query —
   // this eliminates the two-effect race where the clear ran, then the old
   // graphData seeded stale data for one render before the refetch finished.
+  // What the initial fetch turns into on screen: in core view, only the
+  // pickCoreSubgraph subset (the backend's truncated flag is meaningless there —
+  // the user is deliberately seeing a part, so no over-limit warning); otherwise
+  // the full response.
+  const seedGraph = useMemo(() => {
+    if (!graphData) return null;
+    if (coreView && selectedEntityId != null) {
+      const core = pickCoreSubgraph(graphData, selectedEntityId as KGGraphNode["id"]);
+      return {
+        nodes: core.nodes,
+        links: core.links,
+        truncated: false,
+        hiddenCount: core.hiddenCount,
+        hiddenIsLowerBound: graphData.truncated,
+      };
+    }
+    return { nodes: graphData.nodes, links: graphData.links, truncated: graphData.truncated, hiddenCount: 0 };
+  }, [graphData, coreView, selectedEntityId]);
+
   const prevRootRef = useRef<string>("");
   // The root key that graphData currently corresponds to (react-query's
   // queryKey is [entity, depth, predicates], so we build the same key here).
   useEffect(() => {
+    // The core/full toggle is deliberately NOT part of this key: it doesn't
+    // change the react-query key, so graphData stays valid and the view is
+    // re-seeded from it right away (waiting for a refetch would never end).
     const key = `${selectedEntityId}_${graphDepth}_${selectedPredicates.join(",")}`;
     const rootChanged = key !== prevRootRef.current;
 
@@ -304,18 +340,14 @@ export default function KnowledgeGraphPage() {
     // Seed from graphData only when it matches the *current* root key.
     // If the root just changed above, graphData is still from the old query
     // (react-query hasn't refetched yet) — we must not seed from it.
-    if (!rootChanged && graphData) {
-      setAccumulatedGraph({
-        nodes: graphData.nodes,
-        links: graphData.links,
-        truncated: graphData.truncated,
-      });
+    if (!rootChanged && seedGraph) {
+      setAccumulatedGraph(seedGraph);
       // Mark the root entity as expanded (initial fetch covers its neighbourhood)
       const seeded = selectedEntityId != null ? new Set([selectedEntityId]) : new Set<number>();
       setExpandedNodeIds(seeded);
       expandedNodeIdsRef.current = seeded;
     }
-  }, [selectedEntityId, graphDepth, selectedPredicates, graphData]);
+  }, [selectedEntityId, graphDepth, selectedPredicates, seedGraph]);
 
   // ── Expand handler ─────────────────────────────────────────────────────────
   // Fetches the depth-1 neighbourhood of a node and merges it into the
@@ -348,7 +380,7 @@ export default function KnowledgeGraphPage() {
         setAccumulatedGraph((prev) => {
           if (!prev) return prev;
           const merged = mergeGraphData(prev, incoming);
-          return { ...merged, truncated: prev.truncated || incoming.truncated };
+          return { ...prev, ...merged, truncated: prev.truncated || incoming.truncated };
         });
 
         setExpandedNodeIds((prev) => {
@@ -402,7 +434,9 @@ export default function KnowledgeGraphPage() {
 
   // Use accumulated graph for display; fall back to raw query result while the
   // first effect hasn't run yet (avoids a blank frame on initial load).
-  const displayGraph = accumulatedGraph ?? graphData ?? null;
+  // seedGraph is already view-aware, so the first frame never flashes the
+  // full 110-node hairball before the core subset is seeded.
+  const displayGraph = accumulatedGraph ?? seedGraph;
 
   const entityHasRelations = displayGraph && displayGraph.links.length > 0;
 
@@ -710,18 +744,44 @@ export default function KnowledgeGraphPage() {
               </div>
             ) : displayGraph?.nodes.length ? (
               <div className="kg-graph-container">
+                {displayGraph.hiddenCount > 0 ? (
+                  <div className="kg-core-hint">
+                    <span>
+                      {t("kg.core_view_hint", {
+                        n: displayGraph.nodes.length,
+                        total: `${displayGraph.nodes.length + displayGraph.hiddenCount}${
+                          displayGraph.hiddenIsLowerBound ? "+" : ""
+                        }`,
+                      })}
+                    </span>
+                    <Button type="link" size="small" onClick={() => setShowAllNodes(true)}>
+                      {t("kg.show_all_nodes")}
+                    </Button>
+                  </div>
+                ) : showAllNodes && graphDepth === DEFAULT_DEPTH && !displayGraph.truncated ? (
+                  <div className="kg-core-hint">
+                    <span>{t("kg.full_view_hint", { n: displayGraph.nodes.length })}</span>
+                    <Button type="link" size="small" onClick={() => setShowAllNodes(false)}>
+                      {t("kg.show_core_nodes")}
+                    </Button>
+                  </div>
+                ) : null}
                 {displayGraph.truncated && (
                   <div className="kg-truncated-bar">
                     <Alert
-                      type="warning"
+                      type="info"
                       showIcon
                       message={
                         isMobile
                           ? t("kg.too_many_nodes", { n: displayGraph.nodes.length })
-                          : t("kg.graph_truncated", {
-                              nodes: displayGraph.nodes.length,
-                              edges: displayGraph.links.length,
-                            })
+                          : t("kg.graph_truncated", { n: displayGraph.nodes.length })
+                      }
+                      action={
+                        showAllNodes && graphDepth === DEFAULT_DEPTH ? (
+                          <Button type="link" size="small" onClick={() => setShowAllNodes(false)}>
+                            {t("kg.show_core_nodes")}
+                          </Button>
+                        ) : undefined
                       }
                       closable
                     />
