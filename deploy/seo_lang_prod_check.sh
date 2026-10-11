@@ -11,7 +11,7 @@ check() { # path expected-substring
   body=$(curl -s -A "$UA" "$B$1")
   if grep -qF -- "$2" <<<"$body"; then echo "ok   $1  ⊃ $2"; else echo "FAIL $1  ⊅ $2"; fail=1; fi
 }
-for p in "/" "/chat" "/sutras/heart-sutra" "/collections/huayan" "/cross-canon" "/texts/9"; do
+for p in "/" "/chat" "/verify" "/sutras/heart-sutra" "/collections/huayan" "/cross-canon" "/texts/9"; do
   check "$p"              '<html lang="zh-Hans">'
   check "$p?lang=zh-Hant" '<html lang="zh-Hant">'
   check "$p?lang=en"      '<html lang="en">'
@@ -21,6 +21,11 @@ done
 check "/texts/9"          '般若波罗蜜多心经（般若波羅蜜多心經）'
 check "/texts/9?lang=en"  'trans. '
 check "/dict/%E8%88%AC%E8%8B%A5" '<html lang="zh">'
-if curl -s "$B/sitemap-texts-0.xml" | grep -q 'hreflang="en"'; then echo "ok   sitemap-texts xhtml:link"; else echo "FAIL sitemap-texts xhtml:link"; fail=1; fi
-if curl -s "$B/sitemap-static.xml" | grep -q 'href="https://fojin.app/chat?lang=zh-Hant"'; then echo "ok   sitemap-static xhtml:link"; else echo "FAIL sitemap-static xhtml:link"; fail=1; fi
+# Fetch to a variable first: with pipefail, `curl … | grep -q` reports failure on
+# large files — grep exits at the first match and curl dies of SIGPIPE.
+texts_xml=$(curl -s "$B/sitemap-texts-0.xml")
+if grep -q 'hreflang="en"' <<<"$texts_xml"; then echo "ok   sitemap-texts xhtml:link"; else echo "FAIL sitemap-texts xhtml:link"; fail=1; fi
+static_xml=$(curl -s "$B/sitemap-static.xml")
+if grep -q 'href="https://fojin.app/chat?lang=zh-Hant"' <<<"$static_xml"; then echo "ok   sitemap-static xhtml:link"; else echo "FAIL sitemap-static xhtml:link"; fail=1; fi
+if grep -q 'href="https://fojin.app/verify?lang=en"' <<<"$static_xml"; then echo "ok   sitemap-static /verify"; else echo "FAIL sitemap-static /verify"; fail=1; fi
 exit $fail
