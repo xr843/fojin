@@ -97,4 +97,13 @@ redirect "/CHAT"                         "/chat"
 redirect "/Verify?q=x"                   "/verify?q=x"
 code  "/collections/no-such-series"      200
 code  "/assets/does-not-exist.js"        404  # unchanged from master: a missing bundle must not get an HTML shell
+robots_hdr() { # path expected-X-Robots-Tag ("" = header must be absent)
+  local got
+  got=$(curl -sI "http://127.0.0.1:$PORT$1" | tr -d '\r' | awk -F': ' 'tolower($1)=="x-robots-tag"{print $2}')
+  if [ "$got" = "$2" ]; then echo "ok   $1  X-Robots-Tag='$2'"; else echo "FAIL $1  X-Robots-Tag='$got' (want '$2')"; fail=1; fi
+}
+robots_hdr "/verify"                     ""
+robots_hdr "/verify?lang=en"             ""
+robots_hdr "/verify?q=x"                 "noindex, follow"
+nocache "/verify?q=x"
 exit $fail
