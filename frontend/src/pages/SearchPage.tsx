@@ -19,17 +19,16 @@ import { askAiKind, buildAskAiUrl } from "../utils/searchAskAi";
 import { ResultCard, ExternalSourcesSection, ContentCard, CrossLangCard, SemanticCard, UnifiedResults } from "../components/search";
 import ParallelSentenceCard from "../components/search/ParallelSentenceCard";
 import SearchFilterSidebar from "../components/search/SearchFilterSidebar";
+import type { SearchFacets } from "../api/client";
+import {
+  FACET_GROUPS, FACET_URL_PARAM, facetQueryParams, readFacetSelection, toggleValue, type FacetGroup,
+} from "../utils/searchFacets";
 import "../styles/search.css";
 import "../styles/sources.css";
 
 // CBETA-style identifier: prefix letter (T/X/J/B/P/C) + 1-4 digits + optional lowercase suffix.
 // 例：T0278、X0235a、J1510b。命中即直跳 /texts/{id}，跳过结果列表。
 const CBETA_ID_RE = /^[TXJBPC]\d{1,4}[a-z]?$/i;
-const REGION_CHINA = "中国"; // i18n-exempt
-const REGION_TAIWAN = "台湾"; // i18n-exempt
-const REGION_MAINLAND_CHINA = "中国大陆"; // i18n-exempt
-const REGION_TAIWAN_CHINA = "中国台湾"; // i18n-exempt
-const REGION_OTHER = "其他"; // i18n-exempt
 /** 结果区容器的 id——「跳到结果」链接的目标。 */
 const RESULTS_ID = "search-results";
 
@@ -112,16 +111,20 @@ export default function SearchPage() {
   const legacyLangParam = searchParams.get("lang") || "";
   const legacyLangIsFilter =
     legacyLangParam !== "" && !(SUPPORTED_UI_LANGS as readonly string[]).includes(legacyLangParam);
-  const langFilter = searchParams.get("tl") || (legacyLangIsFilter ? legacyLangParam : "");
+  // 分面（藏经 / 语言 / 朝代 / 部类）全部从 URL 派生：可分享、可后退，刷新不丢。
+  // 语言是其中一组，参数名仍是 tl；旧链接的 ?lang=pi 继续当语言筛选用。
+  const facetSel = readFacetSelection(searchParams, legacyLangIsFilter ? legacyLangParam : "");
+  const facetParams = facetQueryParams(facetSel);
+  const langFilter = facetParams.lang ?? "";
+  const canonFilter = facetParams.canon ?? "";
+  const dynastyFilter = facetParams.dynasty ?? "";
+  const sectionFilter = facetParams.section ?? "";
   const dictLang = searchParams.get("dict_lang") || "";
   const [dictPage, setDictPage] = useState(1);
   // Cross-lingual (MITRA) foreign-language filter: all | sa | bo. Local state
   // (like the parallel query's non-paginated shape) — not URL-driven.
   const [parallelLang, setParallelLang] = useState<string>("all");
   const [showTop, setShowTop] = useState(false);
-  const [regionFilter, setRegionFilter] = useState<Set<string>>(new Set());
-  const [institutionFilter, setInstitutionFilter] = useState<Set<string>>(new Set());
-
 
   const sortBy = searchParams.get("sort") || "relevance";
 
@@ -141,14 +144,14 @@ export default function SearchPage() {
   };
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["search", query, page, selectedSources, sortBy, langFilter],
-    queryFn: () => searchTexts({ q: query, page, size: 20, sources: selectedSources || undefined, sort: sortBy !== "relevance" ? sortBy : undefined, lang: langFilter || undefined }),
+    queryKey: ["search", query, page, selectedSources, sortBy, langFilter, canonFilter, dynastyFilter, sectionFilter],
+    queryFn: () => searchTexts({ q: query, page, size: 20, sources: selectedSources || undefined, sort: sortBy !== "relevance" ? sortBy : undefined, ...facetParams, facets: true }),
     enabled: query.length > 0 && tab === "catalog",
   });
 
   const { data: contentData, isLoading: contentLoading, isError: contentError } = useQuery({
-    queryKey: ["searchContent", query, page, selectedSources, langFilter],
-    queryFn: () => searchContent({ q: query, page, size: 20, sources: selectedSources || undefined, lang: langFilter || undefined }),
+    queryKey: ["searchContent", query, page, selectedSources, langFilter, canonFilter, dynastyFilter, sectionFilter],
+    queryFn: () => searchContent({ q: query, page, size: 20, sources: selectedSources || undefined, ...facetParams, facets: true }),
     enabled: query.length > 0 && tab === "content",
   });
 
@@ -159,14 +162,15 @@ export default function SearchPage() {
   });
 
   const { data: crossLangData, isLoading: crossLangLoading } = useQuery({
-    queryKey: ["searchCrossLang", query, page, selectedSources],
-    queryFn: () => searchCrossLanguage({ q: query, page, size: 20, sources: selectedSources || undefined }),
+    // 跨语言匹配刻意不按「语言」筛（跨语言本身就是目的），藏经/朝代/部类照筛。
+    queryKey: ["searchCrossLang", query, page, selectedSources, canonFilter, dynastyFilter, sectionFilter],
+    queryFn: () => searchCrossLanguage({ q: query, page, size: 20, sources: selectedSources || undefined, canon: facetParams.canon, dynasty: facetParams.dynasty, section: facetParams.section }),
     enabled: query.length > 0 && tab === "catalog",
   });
 
   const { data: semanticData, isLoading: semanticLoading } = useQuery({
-    queryKey: ["searchSemantic", query, selectedSources, langFilter],
-    queryFn: () => searchSemantic({ q: query, size: 20, lang: langFilter || undefined, sources: selectedSources || undefined }),
+    queryKey: ["searchSemantic", query, selectedSources, langFilter, canonFilter, dynastyFilter, sectionFilter],
+    queryFn: () => searchSemantic({ q: query, size: 20, sources: selectedSources || undefined, ...facetParams }),
     enabled: query.length > 0 && tab === "content",
   });
 
@@ -174,8 +178,8 @@ export default function SearchPage() {
   // to /search/unified returns sectioned results (dictionary, catalog,
   // content, semantic) so the user no longer has to pick a tab.
   const { data: unifiedData, isLoading: unifiedLoading, isError: unifiedError, refetch: refetchUnified } = useQuery({
-    queryKey: ["searchUnified", query, selectedSources, langFilter],
-    queryFn: () => searchUnified({ q: query, sources: selectedSources || undefined, lang: langFilter || undefined }),
+    queryKey: ["searchUnified", query, selectedSources, langFilter, canonFilter, dynastyFilter, sectionFilter],
+    queryFn: () => searchUnified({ q: query, sources: selectedSources || undefined, ...facetParams, facets: true }),
     enabled: query.length > 0 && tab === "all",
   });
 
@@ -220,15 +224,7 @@ export default function SearchPage() {
     updateUrl({ sources: codes.join(",") });
   };
 
-  /* 地区 & 馆藏统计 */
-  /* 地区：中国→中国大陆，台湾→中国台湾，其余保持原国家名 */
-  const normalizeRegion = (r: string): string => {
-    if (r === REGION_CHINA) return REGION_MAINLAND_CHINA;
-    if (r === REGION_TAIWAN) return REGION_TAIWAN_CHINA;
-    return r || REGION_OTHER;
-  };
-
-  /* 只保留有真实搜索入口的外部数据源（左侧筛选只针对外部源） */
+  /* 外部数据源：只保留有真实搜索入口的（站外检索入口列表）。分面只筛站内结果，不碰这里。 */
   const extSearchable = useMemo(() =>
     (sources || []).filter((s) =>
       s.access_type === "external" && hasDirectSearchUrl(s.code)
@@ -236,55 +232,35 @@ export default function SearchPage() {
     [sources]
   );
 
-  /* 按 selectedSources / 地区 / 馆藏筛选后的外部源 */
-  const filteredExtSources = useMemo(() => {
-    let result = extSearchable;
-    if (selectedSources) {
-      const codes = new Set(selectedSources.split(",").filter(Boolean));
-      result = result.filter((s) => codes.has(s.code));
-    }
-    if (regionFilter.size > 0) {
-      result = result.filter((s) => regionFilter.has(normalizeRegion(s.region || REGION_OTHER)));
-    }
-    if (institutionFilter.size > 0) {
-      result = result.filter((s) => institutionFilter.has(s.name_zh));
-    }
-    return result;
-  }, [extSearchable, selectedSources, regionFilter, institutionFilter]);
+  const selectedSourceCodes = new Set(selectedSources.split(",").filter(Boolean));
+  const filteredExtSources = selectedSourceCodes.size
+    ? extSearchable.filter((s) => selectedSourceCodes.has(s.code))
+    : extSearchable;
 
-  /* 地区统计：只统计外部可搜索源 */
-  const regionCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    extSearchable.forEach((s) => {
-      const r = normalizeRegion(s.region || REGION_OTHER);
-      counts[r] = (counts[r] || 0) + 1;
+  /* 分面计数跟着当前 Tab 的主结果走：全部=典籍分区、典籍、全文（按部计）。
+     新结果到之前沿用上一次的计数，侧栏不会在每次勾选时清空再长回来。 */
+  const liveFacets: SearchFacets | null | undefined =
+    tab === "all" ? unifiedData?.facets : tab === "catalog" ? data?.facets : tab === "content" ? contentData?.facets : undefined;
+  const [shownFacets, setShownFacets] = useState<SearchFacets | null | undefined>(liveFacets);
+  if (liveFacets && liveFacets !== shownFacets) setShownFacets(liveFacets);
+
+  const toggleFacet = (group: FacetGroup, key: string) => {
+    const next = toggleValue(facetSel[group], key);
+    setPage(1);
+    updateUrl({
+      [FACET_URL_PARAM[group]]: next.join(","),
+      // 旧链接的 ?lang=pi 一旦被语言分面接管就清掉，免得取消勾选后它又「复活」。
+      ...(group === "lang" && legacyLangIsFilter ? { lang: "" } : {}),
     });
-    return counts;
-  }, [extSearchable]);
-
-  /* 馆藏列表：只列出外部可搜索源，带数量。filter key 固定用 name_zh，
-     显示名按 locale 走 name_en (#707)。 */
-  const institutionList = useMemo(() => {
-    const counts = new Map<string, { count: number; nameEn: string | null }>();
-    extSearchable.forEach((s) => {
-      const entry = counts.get(s.name_zh) ?? { count: 0, nameEn: s.name_en ?? null };
-      entry.count += 1;
-      counts.set(s.name_zh, entry);
-    });
-    return Array.from(counts, ([name, { count, nameEn }]) => ({ name, nameEn, count }))
-      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "zh"));
-  }, [extSearchable]);
-
-  const toggleRegion = (r: string) => {
-    const next = new Set(regionFilter);
-    if (next.has(r)) next.delete(r); else next.add(r);
-    setRegionFilter(next);
+    if (typeof umami !== "undefined") umami.track("search_facet", { group, key, on: next.includes(key) ? "1" : "0" });
   };
 
-  const toggleInstitution = (name: string) => {
-    const next = new Set(institutionFilter);
-    if (next.has(name)) next.delete(name); else next.add(name);
-    setInstitutionFilter(next);
+  const clearFacets = () => {
+    setPage(1);
+    updateUrl({
+      ...Object.fromEntries(FACET_GROUPS.map((g) => [FACET_URL_PARAM[g], ""])),
+      ...(legacyLangIsFilter ? { lang: "" } : {}),
+    });
   };
 
   const loading = tab === "catalog" ? (isLoading || crossLangLoading) : tab === "content" ? (contentLoading || semanticLoading) : dictLoading;
@@ -302,19 +278,6 @@ export default function SearchPage() {
   // both the error block AND the "no on-site matches" copy.
   const primaryError = tab === "catalog" ? isError : tab === "content" ? contentError : dictError;
   const showEmptyState = !primaryLoading && !primaryError && localTotal === 0 && !hasSecondaryResults;
-
-  const sortedRegions = useMemo(() => {
-    return Object.keys(regionCounts).sort((a, b) => {
-      // 中国大陆第一，中国台湾第二，其他最后，其余按数量降序
-      if (a === REGION_MAINLAND_CHINA) return -1;
-      if (b === REGION_MAINLAND_CHINA) return 1;
-      if (a === REGION_TAIWAN_CHINA) return -1;
-      if (b === REGION_TAIWAN_CHINA) return 1;
-      if (a === REGION_OTHER) return 1;
-      if (b === REGION_OTHER) return -1;
-      return (regionCounts[b] || 0) - (regionCounts[a] || 0);
-    });
-  }, [regionCounts]);
 
   const pageTitle = query ? t("search.page_title", { query }) : t("search.page_title_default");
   const pageDesc = query ? t("search.page_desc", { query }) : t("search.page_desc_default");
@@ -442,13 +405,10 @@ export default function SearchPage() {
           {/* 左侧筛选（辞典 / 跨语对照 Tab 不显示） */}
           {tab !== "dictionary" && tab !== "parallel" && (
             <SearchFilterSidebar
-              regions={sortedRegions}
-              regionCounts={regionCounts}
-              regionFilter={regionFilter}
-              onToggleRegion={toggleRegion}
-              institutions={institutionList}
-              institutionFilter={institutionFilter}
-              onToggleInstitution={toggleInstitution}
+              facets={shownFacets}
+              selection={facetSel}
+              onToggle={toggleFacet}
+              onClear={clearFacets}
             />
           )}
 
@@ -550,22 +510,7 @@ export default function SearchPage() {
                 }
               </span>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                {(tab === "catalog" || tab === "content") && (
-                  <Select
-                    size="small"
-                    value={langFilter || "all"}
-                    onChange={(v) => { setPage(1); updateUrl({ tl: v === "all" ? "" : v, ...(legacyLangIsFilter ? { lang: "" } : {}) }); }}
-                    style={{ width: 110 }}
-                    options={[
-                      { value: "all", label: t("search.lang_all") },
-                      { value: "lzh", label: t("lang.lzh") },
-                      { value: "pi", label: t("lang.pi") },
-                      { value: "en", label: t("lang.en") },
-                      { value: "bo", label: t("lang.bo") },
-                      { value: "sa", label: t("lang.sa") },
-                    ]}
-                  />
-                )}
+                {/* 语言筛选已并入左侧分面（可多选、带计数），这里不再另放一个单选下拉。 */}
                 {tab === "catalog" && (
                   <Select
                     size="small"

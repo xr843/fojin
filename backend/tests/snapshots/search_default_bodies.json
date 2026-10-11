@@ -1,0 +1,1752 @@
+{
+ "_semantic": {
+  "四圣谛": {
+   "params": [
+    "[0.1,0.2]",
+    0.25,
+    100
+   ],
+   "sql": "SELECT te.text_id, te.juan_num, te.chunk_text, 1 - (te.embedding <=> $1::vector) AS score, COALESCE(bt.title_zh, '') AS title_zh, bt.translator, bt.dynasty, bt.category, ds.code AS source_code, bt.cbeta_id, bt.cbeta_url, CASE WHEN bt.content_char_count > 0 THEN true ELSE false END AS has_content FROM text_embeddings te JOIN buddhist_texts bt ON bt.id = te.text_id LEFT JOIN data_sources ds ON ds.id = bt.source_id WHERE te.embedding IS NOT NULL AND 1 - (te.embedding <=> $1::vector) >= $2  ORDER BY te.embedding <=> $1::vector LIMIT $3"
+  },
+  "心经": {
+   "params": [
+    "[0.1,0.2]",
+    0.25,
+    100
+   ],
+   "sql": "SELECT te.text_id, te.juan_num, te.chunk_text, 1 - (te.embedding <=> $1::vector) AS score, COALESCE(bt.title_zh, '') AS title_zh, bt.translator, bt.dynasty, bt.category, ds.code AS source_code, bt.cbeta_id, bt.cbeta_url, CASE WHEN bt.content_char_count > 0 THEN true ELSE false END AS has_content FROM text_embeddings te JOIN buddhist_texts bt ON bt.id = te.text_id LEFT JOIN data_sources ds ON ds.id = bt.source_id WHERE te.embedding IS NOT NULL AND 1 - (te.embedding <=> $1::vector) >= $2  ORDER BY te.embedding <=> $1::vector LIMIT $3"
+  },
+  "般若": {
+   "params": [
+    "[0.1,0.2]",
+    0.25,
+    100
+   ],
+   "sql": "SELECT te.text_id, te.juan_num, te.chunk_text, 1 - (te.embedding <=> $1::vector) AS score, COALESCE(bt.title_zh, '') AS title_zh, bt.translator, bt.dynasty, bt.category, ds.code AS source_code, bt.cbeta_id, bt.cbeta_url, CASE WHEN bt.content_char_count > 0 THEN true ELSE false END AS has_content FROM text_embeddings te JOIN buddhist_texts bt ON bt.id = te.text_id LEFT JOIN data_sources ds ON ds.id = bt.source_id WHERE te.embedding IS NOT NULL AND 1 - (te.embedding <=> $1::vector) >= $2  ORDER BY te.embedding <=> $1::vector LIMIT $3"
+  },
+  "阿弥陀": {
+   "params": [
+    "[0.1,0.2]",
+    0.25,
+    100
+   ],
+   "sql": "SELECT te.text_id, te.juan_num, te.chunk_text, 1 - (te.embedding <=> $1::vector) AS score, COALESCE(bt.title_zh, '') AS title_zh, bt.translator, bt.dynasty, bt.category, ds.code AS source_code, bt.cbeta_id, bt.cbeta_url, CASE WHEN bt.content_char_count > 0 THEN true ELSE false END AS has_content FROM text_embeddings te JOIN buddhist_texts bt ON bt.id = te.text_id LEFT JOIN data_sources ds ON ds.id = bt.source_id WHERE te.embedding IS NOT NULL AND 1 - (te.embedding <=> $1::vector) >= $2  ORDER BY te.embedding <=> $1::vector LIMIT $3"
+  }
+ },
+ "四圣谛": [
+  {
+   "from": 0,
+   "highlight": {
+    "fields": {
+     "title_en": {},
+     "title_zh": {},
+     "translator": {}
+    },
+    "post_tags": [
+     "</em>"
+    ],
+    "pre_tags": [
+     "<em>"
+    ]
+   },
+   "query": {
+    "bool": {
+     "filter": [],
+     "must": [
+      {
+       "multi_match": {
+        "fields": [
+         "title_zh^3",
+         "title_en^2",
+         "title_sa^2",
+         "title_bo",
+         "title_pi",
+         "translator^2",
+         "cbeta_id^4",
+         "taisho_id^4"
+        ],
+        "fuzziness": "AUTO",
+        "query": "四圣谛",
+        "type": "best_fields"
+       }
+      },
+      {
+       "bool": {
+        "minimum_should_match": 0,
+        "should": [
+         {
+          "match_phrase": {
+           "title_zh": {
+            "boost": 15,
+            "query": "四圣谛"
+           }
+          }
+         },
+         {
+          "match_phrase": {
+           "title_en": {
+            "boost": 8,
+            "query": "四圣谛"
+           }
+          }
+         }
+        ]
+       }
+      }
+     ]
+    }
+   },
+   "size": 20
+  },
+  {
+   "size": 0,
+   "suggest": {
+    "title_en_suggestion": {
+     "phrase": {
+      "direct_generator": [
+       {
+        "field": "title_en",
+        "suggest_mode": "popular"
+       }
+      ],
+      "field": "title_en",
+      "gram_size": 3,
+      "highlight": {
+       "post_tag": "",
+       "pre_tag": ""
+      },
+      "size": 1
+     },
+     "text": "四圣谛"
+    },
+    "title_zh_suggestion": {
+     "phrase": {
+      "direct_generator": [
+       {
+        "field": "title_zh",
+        "suggest_mode": "popular"
+       }
+      ],
+      "field": "title_zh",
+      "gram_size": 2,
+      "highlight": {
+       "post_tag": "",
+       "pre_tag": ""
+      },
+      "size": 1
+     },
+     "text": "四圣谛"
+    }
+   }
+  },
+  {
+   "from": 0,
+   "highlight": {
+    "fields": {
+     "title_en": {},
+     "title_zh": {},
+     "translator": {}
+    },
+    "post_tags": [
+     "</em>"
+    ],
+    "pre_tags": [
+     "<em>"
+    ]
+   },
+   "query": {
+    "bool": {
+     "filter": [],
+     "must": [
+      {
+       "multi_match": {
+        "fields": [
+         "title_zh^3",
+         "title_en^2",
+         "title_sa^2",
+         "title_bo",
+         "title_pi",
+         "translator^2",
+         "cbeta_id^4",
+         "taisho_id^4"
+        ],
+        "fuzziness": "AUTO",
+        "query": "四圣谛",
+        "type": "best_fields"
+       }
+      },
+      {
+       "bool": {
+        "minimum_should_match": 0,
+        "should": [
+         {
+          "match_phrase": {
+           "title_zh": {
+            "boost": 15,
+            "query": "四圣谛"
+           }
+          }
+         },
+         {
+          "match_phrase": {
+           "title_en": {
+            "boost": 8,
+            "query": "四圣谛"
+           }
+          }
+         }
+        ]
+       }
+      }
+     ]
+    }
+   },
+   "size": 10
+  },
+  {
+   "size": 0,
+   "suggest": {
+    "title_en_suggestion": {
+     "phrase": {
+      "direct_generator": [
+       {
+        "field": "title_en",
+        "suggest_mode": "popular"
+       }
+      ],
+      "field": "title_en",
+      "gram_size": 3,
+      "highlight": {
+       "post_tag": "",
+       "pre_tag": ""
+      },
+      "size": 1
+     },
+     "text": "四圣谛"
+    },
+    "title_zh_suggestion": {
+     "phrase": {
+      "direct_generator": [
+       {
+        "field": "title_zh",
+        "suggest_mode": "popular"
+       }
+      ],
+      "field": "title_zh",
+      "gram_size": 2,
+      "highlight": {
+       "post_tag": "",
+       "pre_tag": ""
+      },
+      "size": 1
+     },
+     "text": "四圣谛"
+    }
+   }
+  },
+  {
+   "aggs": {
+    "total_juans": {
+     "value_count": {
+      "field": "text_id"
+     }
+    },
+    "total_works": {
+     "cardinality": {
+      "field": "text_id"
+     }
+    }
+   },
+   "collapse": {
+    "field": "text_id",
+    "inner_hits": {
+     "highlight": {
+      "fields": {
+       "content": {
+        "fragment_size": 120,
+        "number_of_fragments": 3,
+        "post_tags": [
+         "</em>"
+        ],
+        "pre_tags": [
+         "<em>"
+        ]
+       }
+      }
+     },
+     "name": "matched_juans",
+     "size": 5,
+     "sort": [
+      {
+       "_score": "desc"
+      }
+     ]
+    }
+   },
+   "from": 0,
+   "highlight": {
+    "fields": {
+     "content": {
+      "fragment_size": 120,
+      "number_of_fragments": 3,
+      "post_tags": [
+       "</em>"
+      ],
+      "pre_tags": [
+       "<em>"
+      ]
+     }
+    }
+   },
+   "query": {
+    "match": {
+     "content": {
+      "analyzer": "cjk_content",
+      "query": "四圣谛"
+     }
+    }
+   },
+   "size": 20
+  },
+  {
+   "aggs": {
+    "total_juans": {
+     "value_count": {
+      "field": "text_id"
+     }
+    },
+    "total_works": {
+     "cardinality": {
+      "field": "text_id"
+     }
+    }
+   },
+   "collapse": {
+    "field": "text_id",
+    "inner_hits": {
+     "highlight": {
+      "fields": {
+       "content": {
+        "fragment_size": 120,
+        "number_of_fragments": 3,
+        "post_tags": [
+         "</em>"
+        ],
+        "pre_tags": [
+         "<em>"
+        ]
+       }
+      }
+     },
+     "name": "matched_juans",
+     "size": 5,
+     "sort": [
+      {
+       "_score": "desc"
+      }
+     ]
+    }
+   },
+   "from": 0,
+   "highlight": {
+    "fields": {
+     "content": {
+      "fragment_size": 120,
+      "number_of_fragments": 3,
+      "post_tags": [
+       "</em>"
+      ],
+      "pre_tags": [
+       "<em>"
+      ]
+     }
+    }
+   },
+   "query": {
+    "match": {
+     "content": {
+      "analyzer": "cjk_content",
+      "query": "四圣谛"
+     }
+    }
+   },
+   "size": 5
+  },
+  {
+   "from": 0,
+   "highlight": {
+    "fields": {
+     "title_bo": {},
+     "title_en": {},
+     "title_pi": {},
+     "title_sa": {},
+     "title_zh": {},
+     "translator": {}
+    },
+    "post_tags": [
+     "</em>"
+    ],
+    "pre_tags": [
+     "<em>"
+    ]
+   },
+   "query": {
+    "bool": {
+     "filter": [],
+     "must": [
+      {
+       "multi_match": {
+        "fields": [
+         "title_zh^3",
+         "title_en^2",
+         "title_sa^2",
+         "title_bo^2",
+         "title_pi^2",
+         "translator^1",
+         "cbeta_id^4",
+         "taisho_id^4"
+        ],
+        "fuzziness": "AUTO",
+        "query": "四圣谛",
+        "type": "best_fields"
+       }
+      }
+     ]
+    }
+   },
+   "size": 20
+  },
+  {
+   "size": 0,
+   "suggest": {
+    "title_en_suggestion": {
+     "phrase": {
+      "direct_generator": [
+       {
+        "field": "title_en",
+        "suggest_mode": "popular"
+       }
+      ],
+      "field": "title_en",
+      "gram_size": 3,
+      "highlight": {
+       "post_tag": "",
+       "pre_tag": ""
+      },
+      "size": 1
+     },
+     "text": "四圣谛"
+    },
+    "title_zh_suggestion": {
+     "phrase": {
+      "direct_generator": [
+       {
+        "field": "title_zh",
+        "suggest_mode": "popular"
+       }
+      ],
+      "field": "title_zh",
+      "gram_size": 2,
+      "highlight": {
+       "post_tag": "",
+       "pre_tag": ""
+      },
+      "size": 1
+     },
+     "text": "四圣谛"
+    }
+   }
+  }
+ ],
+ "心经": [
+  {
+   "from": 0,
+   "highlight": {
+    "fields": {
+     "title_en": {},
+     "title_zh": {},
+     "translator": {}
+    },
+    "post_tags": [
+     "</em>"
+    ],
+    "pre_tags": [
+     "<em>"
+    ]
+   },
+   "query": {
+    "bool": {
+     "filter": [],
+     "must": [
+      {
+       "multi_match": {
+        "fields": [
+         "title_zh^3",
+         "title_en^2",
+         "title_sa^2",
+         "title_bo",
+         "title_pi",
+         "translator^2",
+         "cbeta_id^4",
+         "taisho_id^4"
+        ],
+        "fuzziness": "AUTO",
+        "query": "心经",
+        "type": "best_fields"
+       }
+      },
+      {
+       "bool": {
+        "minimum_should_match": 0,
+        "should": [
+         {
+          "match_phrase": {
+           "title_zh": {
+            "boost": 15,
+            "query": "心经"
+           }
+          }
+         },
+         {
+          "match_phrase": {
+           "title_en": {
+            "boost": 8,
+            "query": "心经"
+           }
+          }
+         },
+         {
+          "match_phrase": {
+           "title_zh": {
+            "boost": 30,
+            "query": "般若波羅蜜多心經"
+           }
+          }
+         }
+        ]
+       }
+      }
+     ]
+    }
+   },
+   "size": 20
+  },
+  {
+   "size": 0,
+   "suggest": {
+    "title_en_suggestion": {
+     "phrase": {
+      "direct_generator": [
+       {
+        "field": "title_en",
+        "suggest_mode": "popular"
+       }
+      ],
+      "field": "title_en",
+      "gram_size": 3,
+      "highlight": {
+       "post_tag": "",
+       "pre_tag": ""
+      },
+      "size": 1
+     },
+     "text": "心经"
+    },
+    "title_zh_suggestion": {
+     "phrase": {
+      "direct_generator": [
+       {
+        "field": "title_zh",
+        "suggest_mode": "popular"
+       }
+      ],
+      "field": "title_zh",
+      "gram_size": 2,
+      "highlight": {
+       "post_tag": "",
+       "pre_tag": ""
+      },
+      "size": 1
+     },
+     "text": "心经"
+    }
+   }
+  },
+  {
+   "from": 0,
+   "highlight": {
+    "fields": {
+     "title_en": {},
+     "title_zh": {},
+     "translator": {}
+    },
+    "post_tags": [
+     "</em>"
+    ],
+    "pre_tags": [
+     "<em>"
+    ]
+   },
+   "query": {
+    "bool": {
+     "filter": [],
+     "must": [
+      {
+       "multi_match": {
+        "fields": [
+         "title_zh^3",
+         "title_en^2",
+         "title_sa^2",
+         "title_bo",
+         "title_pi",
+         "translator^2",
+         "cbeta_id^4",
+         "taisho_id^4"
+        ],
+        "fuzziness": "AUTO",
+        "query": "心经",
+        "type": "best_fields"
+       }
+      },
+      {
+       "bool": {
+        "minimum_should_match": 0,
+        "should": [
+         {
+          "match_phrase": {
+           "title_zh": {
+            "boost": 15,
+            "query": "心经"
+           }
+          }
+         },
+         {
+          "match_phrase": {
+           "title_en": {
+            "boost": 8,
+            "query": "心经"
+           }
+          }
+         },
+         {
+          "match_phrase": {
+           "title_zh": {
+            "boost": 30,
+            "query": "般若波羅蜜多心經"
+           }
+          }
+         }
+        ]
+       }
+      }
+     ]
+    }
+   },
+   "size": 10
+  },
+  {
+   "size": 0,
+   "suggest": {
+    "title_en_suggestion": {
+     "phrase": {
+      "direct_generator": [
+       {
+        "field": "title_en",
+        "suggest_mode": "popular"
+       }
+      ],
+      "field": "title_en",
+      "gram_size": 3,
+      "highlight": {
+       "post_tag": "",
+       "pre_tag": ""
+      },
+      "size": 1
+     },
+     "text": "心经"
+    },
+    "title_zh_suggestion": {
+     "phrase": {
+      "direct_generator": [
+       {
+        "field": "title_zh",
+        "suggest_mode": "popular"
+       }
+      ],
+      "field": "title_zh",
+      "gram_size": 2,
+      "highlight": {
+       "post_tag": "",
+       "pre_tag": ""
+      },
+      "size": 1
+     },
+     "text": "心经"
+    }
+   }
+  },
+  {
+   "aggs": {
+    "total_juans": {
+     "value_count": {
+      "field": "text_id"
+     }
+    },
+    "total_works": {
+     "cardinality": {
+      "field": "text_id"
+     }
+    }
+   },
+   "collapse": {
+    "field": "text_id",
+    "inner_hits": {
+     "highlight": {
+      "fields": {
+       "content": {
+        "fragment_size": 120,
+        "number_of_fragments": 3,
+        "post_tags": [
+         "</em>"
+        ],
+        "pre_tags": [
+         "<em>"
+        ]
+       }
+      }
+     },
+     "name": "matched_juans",
+     "size": 5,
+     "sort": [
+      {
+       "_score": "desc"
+      }
+     ]
+    }
+   },
+   "from": 0,
+   "highlight": {
+    "fields": {
+     "content": {
+      "fragment_size": 120,
+      "number_of_fragments": 3,
+      "post_tags": [
+       "</em>"
+      ],
+      "pre_tags": [
+       "<em>"
+      ]
+     }
+    }
+   },
+   "query": {
+    "match": {
+     "content": {
+      "analyzer": "cjk_content",
+      "query": "心经"
+     }
+    }
+   },
+   "size": 20
+  },
+  {
+   "aggs": {
+    "total_juans": {
+     "value_count": {
+      "field": "text_id"
+     }
+    },
+    "total_works": {
+     "cardinality": {
+      "field": "text_id"
+     }
+    }
+   },
+   "collapse": {
+    "field": "text_id",
+    "inner_hits": {
+     "highlight": {
+      "fields": {
+       "content": {
+        "fragment_size": 120,
+        "number_of_fragments": 3,
+        "post_tags": [
+         "</em>"
+        ],
+        "pre_tags": [
+         "<em>"
+        ]
+       }
+      }
+     },
+     "name": "matched_juans",
+     "size": 5,
+     "sort": [
+      {
+       "_score": "desc"
+      }
+     ]
+    }
+   },
+   "from": 0,
+   "highlight": {
+    "fields": {
+     "content": {
+      "fragment_size": 120,
+      "number_of_fragments": 3,
+      "post_tags": [
+       "</em>"
+      ],
+      "pre_tags": [
+       "<em>"
+      ]
+     }
+    }
+   },
+   "query": {
+    "match": {
+     "content": {
+      "analyzer": "cjk_content",
+      "query": "心经"
+     }
+    }
+   },
+   "size": 5
+  },
+  {
+   "from": 0,
+   "highlight": {
+    "fields": {
+     "title_bo": {},
+     "title_en": {},
+     "title_pi": {},
+     "title_sa": {},
+     "title_zh": {},
+     "translator": {}
+    },
+    "post_tags": [
+     "</em>"
+    ],
+    "pre_tags": [
+     "<em>"
+    ]
+   },
+   "query": {
+    "bool": {
+     "filter": [],
+     "must": [
+      {
+       "multi_match": {
+        "fields": [
+         "title_zh^3",
+         "title_en^2",
+         "title_sa^2",
+         "title_bo^2",
+         "title_pi^2",
+         "translator^1",
+         "cbeta_id^4",
+         "taisho_id^4"
+        ],
+        "fuzziness": "AUTO",
+        "query": "心经",
+        "type": "best_fields"
+       }
+      }
+     ]
+    }
+   },
+   "size": 20
+  },
+  {
+   "size": 0,
+   "suggest": {
+    "title_en_suggestion": {
+     "phrase": {
+      "direct_generator": [
+       {
+        "field": "title_en",
+        "suggest_mode": "popular"
+       }
+      ],
+      "field": "title_en",
+      "gram_size": 3,
+      "highlight": {
+       "post_tag": "",
+       "pre_tag": ""
+      },
+      "size": 1
+     },
+     "text": "心经"
+    },
+    "title_zh_suggestion": {
+     "phrase": {
+      "direct_generator": [
+       {
+        "field": "title_zh",
+        "suggest_mode": "popular"
+       }
+      ],
+      "field": "title_zh",
+      "gram_size": 2,
+      "highlight": {
+       "post_tag": "",
+       "pre_tag": ""
+      },
+      "size": 1
+     },
+     "text": "心经"
+    }
+   }
+  }
+ ],
+ "般若": [
+  {
+   "from": 0,
+   "highlight": {
+    "fields": {
+     "title_en": {},
+     "title_zh": {},
+     "translator": {}
+    },
+    "post_tags": [
+     "</em>"
+    ],
+    "pre_tags": [
+     "<em>"
+    ]
+   },
+   "query": {
+    "bool": {
+     "filter": [],
+     "must": [
+      {
+       "multi_match": {
+        "fields": [
+         "title_zh^3",
+         "title_en^2",
+         "title_sa^2",
+         "title_bo",
+         "title_pi",
+         "translator^2",
+         "cbeta_id^4",
+         "taisho_id^4"
+        ],
+        "fuzziness": "AUTO",
+        "query": "般若",
+        "type": "best_fields"
+       }
+      },
+      {
+       "bool": {
+        "minimum_should_match": 0,
+        "should": [
+         {
+          "match_phrase": {
+           "title_zh": {
+            "boost": 15,
+            "query": "般若"
+           }
+          }
+         },
+         {
+          "match_phrase": {
+           "title_en": {
+            "boost": 8,
+            "query": "般若"
+           }
+          }
+         }
+        ]
+       }
+      }
+     ]
+    }
+   },
+   "size": 20
+  },
+  {
+   "size": 0,
+   "suggest": {
+    "title_en_suggestion": {
+     "phrase": {
+      "direct_generator": [
+       {
+        "field": "title_en",
+        "suggest_mode": "popular"
+       }
+      ],
+      "field": "title_en",
+      "gram_size": 3,
+      "highlight": {
+       "post_tag": "",
+       "pre_tag": ""
+      },
+      "size": 1
+     },
+     "text": "般若"
+    },
+    "title_zh_suggestion": {
+     "phrase": {
+      "direct_generator": [
+       {
+        "field": "title_zh",
+        "suggest_mode": "popular"
+       }
+      ],
+      "field": "title_zh",
+      "gram_size": 2,
+      "highlight": {
+       "post_tag": "",
+       "pre_tag": ""
+      },
+      "size": 1
+     },
+     "text": "般若"
+    }
+   }
+  },
+  {
+   "from": 0,
+   "highlight": {
+    "fields": {
+     "title_en": {},
+     "title_zh": {},
+     "translator": {}
+    },
+    "post_tags": [
+     "</em>"
+    ],
+    "pre_tags": [
+     "<em>"
+    ]
+   },
+   "query": {
+    "bool": {
+     "filter": [],
+     "must": [
+      {
+       "multi_match": {
+        "fields": [
+         "title_zh^3",
+         "title_en^2",
+         "title_sa^2",
+         "title_bo",
+         "title_pi",
+         "translator^2",
+         "cbeta_id^4",
+         "taisho_id^4"
+        ],
+        "fuzziness": "AUTO",
+        "query": "般若",
+        "type": "best_fields"
+       }
+      },
+      {
+       "bool": {
+        "minimum_should_match": 0,
+        "should": [
+         {
+          "match_phrase": {
+           "title_zh": {
+            "boost": 15,
+            "query": "般若"
+           }
+          }
+         },
+         {
+          "match_phrase": {
+           "title_en": {
+            "boost": 8,
+            "query": "般若"
+           }
+          }
+         }
+        ]
+       }
+      }
+     ]
+    }
+   },
+   "size": 10
+  },
+  {
+   "size": 0,
+   "suggest": {
+    "title_en_suggestion": {
+     "phrase": {
+      "direct_generator": [
+       {
+        "field": "title_en",
+        "suggest_mode": "popular"
+       }
+      ],
+      "field": "title_en",
+      "gram_size": 3,
+      "highlight": {
+       "post_tag": "",
+       "pre_tag": ""
+      },
+      "size": 1
+     },
+     "text": "般若"
+    },
+    "title_zh_suggestion": {
+     "phrase": {
+      "direct_generator": [
+       {
+        "field": "title_zh",
+        "suggest_mode": "popular"
+       }
+      ],
+      "field": "title_zh",
+      "gram_size": 2,
+      "highlight": {
+       "post_tag": "",
+       "pre_tag": ""
+      },
+      "size": 1
+     },
+     "text": "般若"
+    }
+   }
+  },
+  {
+   "aggs": {
+    "total_juans": {
+     "value_count": {
+      "field": "text_id"
+     }
+    },
+    "total_works": {
+     "cardinality": {
+      "field": "text_id"
+     }
+    }
+   },
+   "collapse": {
+    "field": "text_id",
+    "inner_hits": {
+     "highlight": {
+      "fields": {
+       "content": {
+        "fragment_size": 120,
+        "number_of_fragments": 3,
+        "post_tags": [
+         "</em>"
+        ],
+        "pre_tags": [
+         "<em>"
+        ]
+       }
+      }
+     },
+     "name": "matched_juans",
+     "size": 5,
+     "sort": [
+      {
+       "_score": "desc"
+      }
+     ]
+    }
+   },
+   "from": 0,
+   "highlight": {
+    "fields": {
+     "content": {
+      "fragment_size": 120,
+      "number_of_fragments": 3,
+      "post_tags": [
+       "</em>"
+      ],
+      "pre_tags": [
+       "<em>"
+      ]
+     }
+    }
+   },
+   "query": {
+    "match": {
+     "content": {
+      "analyzer": "cjk_content",
+      "query": "般若"
+     }
+    }
+   },
+   "size": 20
+  },
+  {
+   "aggs": {
+    "total_juans": {
+     "value_count": {
+      "field": "text_id"
+     }
+    },
+    "total_works": {
+     "cardinality": {
+      "field": "text_id"
+     }
+    }
+   },
+   "collapse": {
+    "field": "text_id",
+    "inner_hits": {
+     "highlight": {
+      "fields": {
+       "content": {
+        "fragment_size": 120,
+        "number_of_fragments": 3,
+        "post_tags": [
+         "</em>"
+        ],
+        "pre_tags": [
+         "<em>"
+        ]
+       }
+      }
+     },
+     "name": "matched_juans",
+     "size": 5,
+     "sort": [
+      {
+       "_score": "desc"
+      }
+     ]
+    }
+   },
+   "from": 0,
+   "highlight": {
+    "fields": {
+     "content": {
+      "fragment_size": 120,
+      "number_of_fragments": 3,
+      "post_tags": [
+       "</em>"
+      ],
+      "pre_tags": [
+       "<em>"
+      ]
+     }
+    }
+   },
+   "query": {
+    "match": {
+     "content": {
+      "analyzer": "cjk_content",
+      "query": "般若"
+     }
+    }
+   },
+   "size": 5
+  },
+  {
+   "from": 0,
+   "highlight": {
+    "fields": {
+     "title_bo": {},
+     "title_en": {},
+     "title_pi": {},
+     "title_sa": {},
+     "title_zh": {},
+     "translator": {}
+    },
+    "post_tags": [
+     "</em>"
+    ],
+    "pre_tags": [
+     "<em>"
+    ]
+   },
+   "query": {
+    "bool": {
+     "filter": [],
+     "must": [
+      {
+       "multi_match": {
+        "fields": [
+         "title_zh^3",
+         "title_en^2",
+         "title_sa^2",
+         "title_bo^2",
+         "title_pi^2",
+         "translator^1",
+         "cbeta_id^4",
+         "taisho_id^4"
+        ],
+        "fuzziness": "AUTO",
+        "query": "般若",
+        "type": "best_fields"
+       }
+      }
+     ]
+    }
+   },
+   "size": 20
+  },
+  {
+   "size": 0,
+   "suggest": {
+    "title_en_suggestion": {
+     "phrase": {
+      "direct_generator": [
+       {
+        "field": "title_en",
+        "suggest_mode": "popular"
+       }
+      ],
+      "field": "title_en",
+      "gram_size": 3,
+      "highlight": {
+       "post_tag": "",
+       "pre_tag": ""
+      },
+      "size": 1
+     },
+     "text": "般若"
+    },
+    "title_zh_suggestion": {
+     "phrase": {
+      "direct_generator": [
+       {
+        "field": "title_zh",
+        "suggest_mode": "popular"
+       }
+      ],
+      "field": "title_zh",
+      "gram_size": 2,
+      "highlight": {
+       "post_tag": "",
+       "pre_tag": ""
+      },
+      "size": 1
+     },
+     "text": "般若"
+    }
+   }
+  }
+ ],
+ "阿弥陀": [
+  {
+   "from": 0,
+   "highlight": {
+    "fields": {
+     "title_en": {},
+     "title_zh": {},
+     "translator": {}
+    },
+    "post_tags": [
+     "</em>"
+    ],
+    "pre_tags": [
+     "<em>"
+    ]
+   },
+   "query": {
+    "bool": {
+     "filter": [],
+     "must": [
+      {
+       "multi_match": {
+        "fields": [
+         "title_zh^3",
+         "title_en^2",
+         "title_sa^2",
+         "title_bo",
+         "title_pi",
+         "translator^2",
+         "cbeta_id^4",
+         "taisho_id^4"
+        ],
+        "fuzziness": "AUTO",
+        "query": "阿弥陀",
+        "type": "best_fields"
+       }
+      },
+      {
+       "bool": {
+        "minimum_should_match": 0,
+        "should": [
+         {
+          "match_phrase": {
+           "title_zh": {
+            "boost": 15,
+            "query": "阿弥陀"
+           }
+          }
+         },
+         {
+          "match_phrase": {
+           "title_en": {
+            "boost": 8,
+            "query": "阿弥陀"
+           }
+          }
+         }
+        ]
+       }
+      }
+     ]
+    }
+   },
+   "size": 20
+  },
+  {
+   "size": 0,
+   "suggest": {
+    "title_en_suggestion": {
+     "phrase": {
+      "direct_generator": [
+       {
+        "field": "title_en",
+        "suggest_mode": "popular"
+       }
+      ],
+      "field": "title_en",
+      "gram_size": 3,
+      "highlight": {
+       "post_tag": "",
+       "pre_tag": ""
+      },
+      "size": 1
+     },
+     "text": "阿弥陀"
+    },
+    "title_zh_suggestion": {
+     "phrase": {
+      "direct_generator": [
+       {
+        "field": "title_zh",
+        "suggest_mode": "popular"
+       }
+      ],
+      "field": "title_zh",
+      "gram_size": 2,
+      "highlight": {
+       "post_tag": "",
+       "pre_tag": ""
+      },
+      "size": 1
+     },
+     "text": "阿弥陀"
+    }
+   }
+  },
+  {
+   "from": 0,
+   "highlight": {
+    "fields": {
+     "title_en": {},
+     "title_zh": {},
+     "translator": {}
+    },
+    "post_tags": [
+     "</em>"
+    ],
+    "pre_tags": [
+     "<em>"
+    ]
+   },
+   "query": {
+    "bool": {
+     "filter": [],
+     "must": [
+      {
+       "multi_match": {
+        "fields": [
+         "title_zh^3",
+         "title_en^2",
+         "title_sa^2",
+         "title_bo",
+         "title_pi",
+         "translator^2",
+         "cbeta_id^4",
+         "taisho_id^4"
+        ],
+        "fuzziness": "AUTO",
+        "query": "阿弥陀",
+        "type": "best_fields"
+       }
+      },
+      {
+       "bool": {
+        "minimum_should_match": 0,
+        "should": [
+         {
+          "match_phrase": {
+           "title_zh": {
+            "boost": 15,
+            "query": "阿弥陀"
+           }
+          }
+         },
+         {
+          "match_phrase": {
+           "title_en": {
+            "boost": 8,
+            "query": "阿弥陀"
+           }
+          }
+         }
+        ]
+       }
+      }
+     ]
+    }
+   },
+   "size": 10
+  },
+  {
+   "size": 0,
+   "suggest": {
+    "title_en_suggestion": {
+     "phrase": {
+      "direct_generator": [
+       {
+        "field": "title_en",
+        "suggest_mode": "popular"
+       }
+      ],
+      "field": "title_en",
+      "gram_size": 3,
+      "highlight": {
+       "post_tag": "",
+       "pre_tag": ""
+      },
+      "size": 1
+     },
+     "text": "阿弥陀"
+    },
+    "title_zh_suggestion": {
+     "phrase": {
+      "direct_generator": [
+       {
+        "field": "title_zh",
+        "suggest_mode": "popular"
+       }
+      ],
+      "field": "title_zh",
+      "gram_size": 2,
+      "highlight": {
+       "post_tag": "",
+       "pre_tag": ""
+      },
+      "size": 1
+     },
+     "text": "阿弥陀"
+    }
+   }
+  },
+  {
+   "aggs": {
+    "total_juans": {
+     "value_count": {
+      "field": "text_id"
+     }
+    },
+    "total_works": {
+     "cardinality": {
+      "field": "text_id"
+     }
+    }
+   },
+   "collapse": {
+    "field": "text_id",
+    "inner_hits": {
+     "highlight": {
+      "fields": {
+       "content": {
+        "fragment_size": 120,
+        "number_of_fragments": 3,
+        "post_tags": [
+         "</em>"
+        ],
+        "pre_tags": [
+         "<em>"
+        ]
+       }
+      }
+     },
+     "name": "matched_juans",
+     "size": 5,
+     "sort": [
+      {
+       "_score": "desc"
+      }
+     ]
+    }
+   },
+   "from": 0,
+   "highlight": {
+    "fields": {
+     "content": {
+      "fragment_size": 120,
+      "number_of_fragments": 3,
+      "post_tags": [
+       "</em>"
+      ],
+      "pre_tags": [
+       "<em>"
+      ]
+     }
+    }
+   },
+   "query": {
+    "match": {
+     "content": {
+      "analyzer": "cjk_content",
+      "query": "阿弥陀"
+     }
+    }
+   },
+   "size": 20
+  },
+  {
+   "aggs": {
+    "total_juans": {
+     "value_count": {
+      "field": "text_id"
+     }
+    },
+    "total_works": {
+     "cardinality": {
+      "field": "text_id"
+     }
+    }
+   },
+   "collapse": {
+    "field": "text_id",
+    "inner_hits": {
+     "highlight": {
+      "fields": {
+       "content": {
+        "fragment_size": 120,
+        "number_of_fragments": 3,
+        "post_tags": [
+         "</em>"
+        ],
+        "pre_tags": [
+         "<em>"
+        ]
+       }
+      }
+     },
+     "name": "matched_juans",
+     "size": 5,
+     "sort": [
+      {
+       "_score": "desc"
+      }
+     ]
+    }
+   },
+   "from": 0,
+   "highlight": {
+    "fields": {
+     "content": {
+      "fragment_size": 120,
+      "number_of_fragments": 3,
+      "post_tags": [
+       "</em>"
+      ],
+      "pre_tags": [
+       "<em>"
+      ]
+     }
+    }
+   },
+   "query": {
+    "match": {
+     "content": {
+      "analyzer": "cjk_content",
+      "query": "阿弥陀"
+     }
+    }
+   },
+   "size": 5
+  },
+  {
+   "from": 0,
+   "highlight": {
+    "fields": {
+     "title_bo": {},
+     "title_en": {},
+     "title_pi": {},
+     "title_sa": {},
+     "title_zh": {},
+     "translator": {}
+    },
+    "post_tags": [
+     "</em>"
+    ],
+    "pre_tags": [
+     "<em>"
+    ]
+   },
+   "query": {
+    "bool": {
+     "filter": [],
+     "must": [
+      {
+       "multi_match": {
+        "fields": [
+         "title_zh^3",
+         "title_en^2",
+         "title_sa^2",
+         "title_bo^2",
+         "title_pi^2",
+         "translator^1",
+         "cbeta_id^4",
+         "taisho_id^4"
+        ],
+        "fuzziness": "AUTO",
+        "query": "阿弥陀",
+        "type": "best_fields"
+       }
+      }
+     ]
+    }
+   },
+   "size": 20
+  },
+  {
+   "size": 0,
+   "suggest": {
+    "title_en_suggestion": {
+     "phrase": {
+      "direct_generator": [
+       {
+        "field": "title_en",
+        "suggest_mode": "popular"
+       }
+      ],
+      "field": "title_en",
+      "gram_size": 3,
+      "highlight": {
+       "post_tag": "",
+       "pre_tag": ""
+      },
+      "size": 1
+     },
+     "text": "阿弥陀"
+    },
+    "title_zh_suggestion": {
+     "phrase": {
+      "direct_generator": [
+       {
+        "field": "title_zh",
+        "suggest_mode": "popular"
+       }
+      ],
+      "field": "title_zh",
+      "gram_size": 2,
+      "highlight": {
+       "post_tag": "",
+       "pre_tag": ""
+      },
+      "size": 1
+     },
+     "text": "阿弥陀"
+    }
+   }
+  }
+ ]
+}

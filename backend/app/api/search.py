@@ -37,18 +37,24 @@ async def search(
     q: str = Query("", max_length=200, description="搜索关键词"),
     page: int = Query(1, ge=1, description="页码"),
     size: int = Query(20, ge=1, le=100, description="每页数量"),
-    dynasty: str | None = Query(None, description="朝代筛选"),
+    dynasty: str | None = Query(None, description="朝代筛选，逗号分隔多选"),
     category: str | None = Query(None, description="分类筛选"),
-    lang: str | None = Query(None, description="语言筛选 (lzh/pi/sa/bo/en)"),
+    lang: str | None = Query(None, description="语言筛选，逗号分隔多选 (lzh/pi/sa/bo/en)"),
     sources: str | None = Query(None, description="数据源筛选，逗号分隔 (cbeta,suttacentral,gretil)"),
     sort: str | None = Query(None, description="排序方式 (relevance/title/dynasty)"),
+    canon: str | None = Query(None, description="藏经筛选，逗号分隔 (taisho/xuzang/pali/kangyur/gretil…)"),
+    section: str | None = Query(None, description="大正藏部类筛选，逗号分隔 (agama/prajna/avatamsaka/vinaya…)"),
+    facets: bool = Query(False, description="同时返回 藏经/语言/朝代/部类 四组分面计数"),
     db: AsyncSession = Depends(get_db),
 ):
     """Search Buddhist texts by title, ID, translator, etc. with faceted filtering.
 
-    搜索佛教典籍。支持经名、编号、译者等多字段搜索，可按朝代、分类、语言和数据源筛选。"""
+    搜索佛教典籍。支持经名、编号、译者等多字段搜索，可按藏经、语言、朝代、部类和数据源筛选。"""
     es = get_es()
-    return await search_texts(es, q, page, size, dynasty, category, lang, sources, sort, db=db)
+    return await search_texts(
+        es, q, page, size, dynasty, category, lang, sources, sort, db=db,
+        canon=canon, section=section, facets=facets,
+    )
 
 
 def _alias_titles(q: str) -> list[str]:
@@ -160,13 +166,17 @@ async def cross_language_search(
     dynasty: str | None = Query(None, description="朝代筛选"),
     category: str | None = Query(None, description="分类筛选"),
     sources: str | None = Query(None, description="数据源筛选，逗号分隔"),
+    canon: str | None = Query(None, description="藏经筛选，逗号分隔 (taisho/xuzang/pali/kangyur/gretil…)"),
+    section: str | None = Query(None, description="大正藏部类筛选，逗号分隔 (agama/prajna/avatamsaka/vinaya…)"),
     db: AsyncSession = Depends(get_db),
 ):
     """Cross-language search across all title fields (zh, en, sa, pi, bo).
 
     跨语言搜索：同时搜索所有语种标题字段，自动获取相关翻译版本，按"作品族"分组展示。"""
     es = get_es()
-    return await search_cross_language(es, q, page, size, dynasty, category, sources, db=db)
+    return await search_cross_language(
+        es, q, page, size, dynasty, category, sources, db=db, canon=canon, section=section
+    )
 
 
 @router.get("/search/content")
@@ -176,8 +186,12 @@ async def content_search(
     page: int = Query(1, ge=1, description="页码"),
     size: int = Query(20, ge=1, le=100, description="每页数量"),
     sources: str | None = Query(None, description="数据源筛选，逗号分隔"),
-    lang: str | None = Query(None, description="语言筛选 (lzh/pi/en)"),
+    lang: str | None = Query(None, description="语言筛选，逗号分隔多选 (lzh/pi/en)"),
     phrase: bool = Query(False, description="出处模式：按标点切句，每句短语匹配且全部命中"),
+    dynasty: str | None = Query(None, description="朝代筛选，逗号分隔多选"),
+    canon: str | None = Query(None, description="藏经筛选，逗号分隔 (taisho/xuzang/pali/kangyur/gretil…)"),
+    section: str | None = Query(None, description="大正藏部类筛选，逗号分隔 (agama/prajna/avatamsaka/vinaya…)"),
+    facets: bool = Query(False, description="同时返回 藏经/语言/朝代/部类 四组分面计数"),
 ):
     """Full-text content search across scripture bodies with keyword highlighting.
 
@@ -185,7 +199,8 @@ async def content_search(
     es = get_es()
     gaiji_normalizer = getattr(request.app.state, "gaiji_normalizer", None)
     return await search_content(
-        es, q, page, size, sources, lang, gaiji_normalizer=gaiji_normalizer, phrase=phrase
+        es, q, page, size, sources, lang, gaiji_normalizer=gaiji_normalizer, phrase=phrase,
+        dynasty=dynasty, canon=canon, section=section, facets=facets,
     )
 
 
@@ -197,6 +212,8 @@ async def semantic_search(
     category: str | None = Query(None, description="分类筛选"),
     lang: str | None = Query(None, description="语言筛选 (lzh/pi/sa/bo/en)"),
     sources: str | None = Query(None, description="数据源筛选，逗号分隔 (cbeta,suttacentral,gretil)"),
+    canon: str | None = Query(None, description="藏经筛选，逗号分隔 (taisho/xuzang/pali/kangyur/gretil…)"),
+    section: str | None = Query(None, description="大正藏部类筛选，逗号分隔 (agama/prajna/avatamsaka/vinaya…)"),
     db: AsyncSession = Depends(get_db),
 ):
     """Semantic search using pgvector embedding similarity.
@@ -204,7 +221,7 @@ async def semantic_search(
     语义搜索。基于向量相似度在 34.7 万段经文中检索语义最相关的内容。支持按朝代、分类、语言和数据源筛选。"""
     # Strip first so blank/whitespace-only queries short-circuit before the
     # paid embedding call and can't each bust the embedding cache.
-    return await search_semantic(db, q.strip(), size, dynasty, category, lang, sources)
+    return await search_semantic(db, q.strip(), size, dynasty, category, lang, sources, canon=canon, section=section)
 
 
 # --- Cross-lingual parallel sentences (MITRA) ------------------------------

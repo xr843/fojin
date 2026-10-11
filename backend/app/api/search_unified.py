@@ -90,7 +90,11 @@ async def search_unified(
     request: Request,
     q: str = Query(..., min_length=1, max_length=200, description="Unified search query"),
     sources: str | None = Query(None, description="Comma-separated source codes filter"),
-    lang: str | None = Query(None),
+    lang: str | None = Query(None, description="Comma-separated language codes (lzh/pi/sa/bo)"),
+    dynasty: str | None = Query(None, description="Comma-separated dynasties"),
+    canon: str | None = Query(None, description="Comma-separated canon codes (taisho/xuzang/pali/…)"),
+    section: str | None = Query(None, description="Comma-separated Taishō section codes (agama/prajna/…)"),
+    facets: bool = Query(False, description="Return 藏经/语言/朝代/部类 counts on the catalog section"),
 ):
     """Run all search backends in parallel and return sectioned results.
 
@@ -103,6 +107,8 @@ async def search_unified(
                 "content": {...}       # ContentSearchResponse — top-5 body hits
                 "semantic": {...}      # SemanticSearchResponse — top-5 vector hits
             },
+            "facets": {...}            # only with facets=true: catalog-section counts
+                                       # per group (services/search_facets.py)
             "errors": { section_name: error_string, ... }
         }
     """
@@ -122,15 +128,19 @@ async def search_unified(
     async def catalog_coro():
         async with async_session() as session:
             return await search_texts(
-                es, q, page=1, size=10, sources=sources, lang=lang, db=session
+                es, q, page=1, size=10, sources=sources, lang=lang, db=session,
+                dynasty=dynasty, canon=canon, section=section, facets=facets,
             )
 
     async def semantic_coro():
         async with async_session() as session:
-            return await search_semantic(session, q, size=5, lang=lang, sources=sources)
+            return await search_semantic(
+                session, q, size=5, lang=lang, sources=sources, dynasty=dynasty, canon=canon, section=section
+            )
 
     content_coro = search_content(
-        es, q, page=1, size=5, sources=sources, lang=lang, gaiji_normalizer=gaiji_normalizer
+        es, q, page=1, size=5, sources=sources, lang=lang, gaiji_normalizer=gaiji_normalizer,
+        dynasty=dynasty, canon=canon, section=section,
     )
     dict_coro = _dict_top_hits(q)
 
@@ -161,6 +171,9 @@ async def search_unified(
             "results": [hit.model_dump() for hit in r.results],
         },
     )
+    out_facets = None
+    if facets and not isinstance(catalog_r, Exception) and catalog_r.facets is not None:
+        out_facets = {g: [b.model_dump() for b in rows] for g, rows in catalog_r.facets.items()}
     _attach("content", content_r)
     _attach(
         "semantic",
@@ -172,4 +185,7 @@ async def search_unified(
     )
     _attach("dictionary", dict_r)
 
-    return {"query": q, "sections": sections, "errors": errors}
+    out: dict[str, Any] = {"query": q, "sections": sections, "errors": errors}
+    if facets:
+        out["facets"] = out_facets
+    return out

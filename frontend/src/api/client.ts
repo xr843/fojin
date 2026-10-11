@@ -123,12 +123,29 @@ export interface SearchHit {
   related_translations: RelatedTranslation[];
 }
 
+/** 一个分面取值及其命中数（facets=true 时后端返回）。 */
+export interface SearchFacetBucket {
+  key: string;
+  count: number;
+}
+
+/** 藏经 / 语言 / 朝代 / 部类四组分面；旧后端副本不返回（undefined / null）。 */
+export type SearchFacets = Partial<Record<"canon" | "lang" | "dynasty" | "section", SearchFacetBucket[]>>;
+
+/** 分面筛选参数：逗号分隔多选，空则不传。 */
+export interface SearchFacetParams {
+  canon?: string;
+  dynasty?: string;
+  section?: string;
+}
+
 export interface SearchResponse {
   total: number;
   page: number;
   size: number;
   results: SearchHit[];
   suggestion?: string | null;
+  facets?: SearchFacets | null;
 }
 
 export interface CrossLanguageSearchHit {
@@ -246,6 +263,7 @@ export interface ContentSearchResponse {
   page: number;
   size: number;
   results: ContentSearchHit[];
+  facets?: SearchFacets | null;
 }
 
 export interface BookmarkItem {
@@ -450,7 +468,7 @@ export interface IIIFManifestInfo {
   rights: string | null;
 }
 
-export async function searchTexts(params: {
+export async function searchTexts(params: SearchFacetParams & {
   q: string;
   page?: number;
   size?: number;
@@ -459,12 +477,13 @@ export async function searchTexts(params: {
   sources?: string;
   sort?: string;
   lang?: string;
+  facets?: boolean;
 }): Promise<SearchResponse> {
   const { data } = await api.get<SearchResponse>("/search", { params });
   return data;
 }
 
-export async function searchCrossLanguage(params: {
+export async function searchCrossLanguage(params: SearchFacetParams & {
   q: string;
   page?: number;
   size?: number;
@@ -498,7 +517,7 @@ export interface SemanticSearchResponse {
   error?: string;  // 服务异常时的错误提示
 }
 
-export async function searchSemantic(params: {
+export async function searchSemantic(params: SearchFacetParams & {
   q: string;
   size?: number;
   dynasty?: string;
@@ -603,12 +622,15 @@ export interface UnifiedSearchResponse {
   query: string;
   sections: UnifiedSearchSection;
   errors: Record<string, string>;
+  /** facets=true 时：典籍（catalog）分区的分面计数 */
+  facets?: SearchFacets | null;
 }
 
-export async function searchUnified(params: {
+export async function searchUnified(params: SearchFacetParams & {
   q: string;
   sources?: string;
   lang?: string;
+  facets?: boolean;
 }): Promise<UnifiedSearchResponse> {
   const { data } = await api.get<UnifiedSearchResponse>("/search/unified", { params, timeout: 30000 });
   return data;
@@ -772,12 +794,13 @@ export async function getJuanAudio(textId: number, juanNum: number): Promise<Tex
 }
 
 // Content search
-export async function searchContent(params: {
+export async function searchContent(params: SearchFacetParams & {
   q: string;
   page?: number;
   size?: number;
   sources?: string;
   lang?: string;
+  facets?: boolean;
   /** 出处模式：q 按空格/标点切句，每句短语匹配且全部命中（阅读器「全藏出处」） */
   phrase?: boolean;
 }): Promise<ContentSearchResponse> {

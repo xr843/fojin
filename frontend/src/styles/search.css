@@ -742,3 +742,23 @@
     text-align: center;
   }
 }
+
+/* 分面「清除筛选」：文字按钮，跟在最后一组分面下面 */
+.s-filter-clear {
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--fj-highlight);
+  font-size: 13px;
+  cursor: pointer;
+}
+.s-filter-clear:hover,
+.s-filter-clear:focus-visible {
+  text-decoration: underline;
+}
+@media (max-width: 768px) {
+  .s-filter-clear {
+    min-height: 40px;
+    font-size: 14px;
+  }
+}

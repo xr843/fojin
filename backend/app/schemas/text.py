@@ -113,12 +113,20 @@ class SearchHit(BaseModel):
     related_translations: list[RelatedTranslation] = []
 
 
+class FacetBucket(BaseModel):
+    key: str
+    count: int
+
+
 class SearchResponse(BaseModel):
     total: int
     page: int
     size: int
     results: list[SearchHit]
     suggestion: str | None = None
+    # Only with ?facets=true: {"canon"|"lang"|"dynasty"|"section": [{key, count}]}
+    # — see services/search_facets.py. Absent (null) otherwise.
+    facets: dict[str, list[FacetBucket]] | None = None
 
 
 class CrossLanguageSearchHit(BaseModel):

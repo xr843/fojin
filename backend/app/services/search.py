@@ -23,6 +23,14 @@ from app.services.embedding import generate_embedding
 from app.services.gaiji import GaijiNormalizer, expand_for_query
 from app.services.passage_locator import fast_normalise
 from app.services.rag_retrieval import MIN_RELEVANCE_SCORE
+from app.services.search_facets import (
+    build_facet_aggs,
+    combine_filters,
+    facet_clauses,
+    facet_sql,
+    parse_facet_aggs,
+    split_multi,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -223,8 +231,19 @@ async def search_texts(
     sources: str | None = None,
     sort: str | None = None,
     db: AsyncSession | None = None,
+    *,
+    canon: str | None = None,
+    section: str | None = None,
+    facets: bool = False,
 ) -> SearchResponse:
-    """Search Buddhist texts in Elasticsearch."""
+    """Search Buddhist texts in Elasticsearch.
+
+    ``dynasty`` / ``lang`` / ``canon`` / ``section`` take a comma-separated list
+    (OR within a group). ``facets=True`` also returns per-group counts — see
+    services/search_facets.py; with ``facets=False`` and no new filter the ES
+    body is byte-identical to the pre-facet one (pinned by
+    tests/test_search_facets.py against a recorded snapshot).
+    """
     must = []
     filter_clauses = []
 
@@ -263,18 +282,26 @@ async def search_texts(
     else:
         must.append({"match_all": {}})
 
-    if dynasty:
-        filter_clauses.append({"term": {"dynasty": dynasty}})
+    active = facet_clauses(canon=canon, lang=lang, dynasty=dynasty, section=section)
+    # Without facets every filter stays in bool.filter, in the original order
+    # (dynasty, category, lang, sources). With facets the four facet groups move
+    # to post_filter so each group can be counted without its own filter.
+    inline = {} if facets else active
+    if "dynasty" in inline:
+        filter_clauses.append(inline["dynasty"])
     if category:
         filter_clauses.append({"term": {"category": category}})
-    if lang:
-        filter_clauses.append({"term": {"lang": lang}})
+    if "lang" in inline:
+        filter_clauses.append(inline["lang"])
     if sources:
         codes = [c.strip() for c in sources.split(",") if c.strip()]
         if len(codes) == 1:
             filter_clauses.append({"term": {"source_code": codes[0]}})
         elif codes:
             filter_clauses.append({"terms": {"source_code": codes}})
+    for group in ("canon", "section"):
+        if group in inline:
+            filter_clauses.append(inline[group])
 
     sort_clause = []
     if sort == "title":
@@ -311,11 +338,16 @@ async def search_texts(
 
     if sort_clause:
         body["sort"] = sort_clause
+    if facets:
+        if active:
+            body["post_filter"] = combine_filters(list(active.values()))
+        body["aggs"] = build_facet_aggs(active)
 
     result = await es.search(index=INDEX_NAME, body=body, timeout="10s")
 
     hits = result["hits"]
     total = hits["total"]["value"]
+    facet_counts = parse_facet_aggs(result.get("aggregations")) if facets else None
 
     results = []
     for hit in hits["hits"]:
@@ -373,7 +405,9 @@ async def search_texts(
             deduped.append(r)
     results = deduped
 
-    return SearchResponse(total=total, page=page, size=size, results=results, suggestion=suggestion)
+    return SearchResponse(
+        total=total, page=page, size=size, results=results, suggestion=suggestion, facets=facet_counts
+    )
 
 
 # 出处检索的小句切分：标点/空白处断开。cjk_content 是二元组分词，标点两侧
@@ -490,8 +524,18 @@ async def search_content(
     lang: str | None = None,
     gaiji_normalizer: GaijiNormalizer | None = None,
     phrase: bool = False,
+    *,
+    dynasty: str | None = None,
+    canon: str | None = None,
+    section: str | None = None,
+    facets: bool = False,
 ) -> dict:
     """Search full-text content in Elasticsearch.
+
+    ``lang`` / ``dynasty`` / ``canon`` / ``section`` filter (comma-separated =
+    OR); ``facets=True`` adds per-group *work* counts (services/search_facets.py).
+    Phrase mode ignores the facet arguments — it is the reader's 「全藏出处」,
+    which has no facet UI.
 
     When ``gaiji_normalizer`` is provided, the query is expanded with
     OR-clauses matching the CBETA gaiji alternate spellings of each
@@ -535,7 +579,9 @@ async def search_content(
     else:
         content_query = primary_clause
 
-    return await _run_content_search(es, content_query, page, size, sources, lang)
+    return await _run_content_search(
+        es, content_query, page, size, sources, lang, dynasty=dynasty, canon=canon, section=section, facets=facets
+    )
 
 
 async def _run_content_search(
@@ -545,15 +591,23 @@ async def _run_content_search(
     size: int,
     sources: str | None,
     lang: str | None,
+    *,
+    dynasty: str | None = None,
+    canon: str | None = None,
+    section: str | None = None,
+    facets: bool = False,
 ) -> dict:
+    active = facet_clauses(canon=canon, lang=lang, dynasty=dynasty, section=section)
+    inline = {} if facets else active
     # Wrap in bool query if sources or lang filter is present
     filter_clauses = []
     if sources:
         codes = [c.strip() for c in sources.split(",") if c.strip()]
         if codes:
             filter_clauses.append({"term": {"source_code": codes[0]}} if len(codes) == 1 else {"terms": {"source_code": codes}})
-    if lang:
-        filter_clauses.append({"term": {"lang": lang}})
+    for group in ("lang", "dynasty", "canon", "section"):
+        if group in inline:
+            filter_clauses.append(inline[group])
 
     if filter_clauses:
         content_query = {
@@ -592,15 +646,27 @@ async def _run_content_search(
     }
 
     # Use a separate cardinality aggregation to get total unique works
-    body["aggs"] = {
+    totals = {
         "total_works": {"cardinality": {"field": "text_id"}},
         "total_juans": {"value_count": {"field": "text_id"}},
     }
+    if facets and active:
+        # Aggregations ignore post_filter, so the totals must re-apply it.
+        post = combine_filters(list(active.values()))
+        body["post_filter"] = post
+        body["aggs"] = {"totals": {"filter": post, "aggs": totals}}
+    else:
+        body["aggs"] = dict(totals)
+    if facets:
+        body["aggs"].update(build_facet_aggs(active, works_field="text_id"))
 
     result = await es.search(index=CONTENT_INDEX_NAME, body=body, timeout="10s")
     hits = result["hits"]
-    total_works = result.get("aggregations", {}).get("total_works", {}).get("value", 0)
-    total_juans = result.get("aggregations", {}).get("total_juans", {}).get("value", 0)
+    agg_root = result.get("aggregations", {})
+    if facets and active:
+        agg_root = agg_root.get("totals", {})
+    total_works = agg_root.get("total_works", {}).get("value", 0)
+    total_juans = agg_root.get("total_juans", {}).get("value", 0)
 
     results = []
     for hit in hits["hits"]:
@@ -634,13 +700,16 @@ async def _run_content_search(
             "matched_juans": matched_juans,
         })
 
-    return {
+    out = {
         "total": total_works,
         "total_juans": total_juans,
         "page": page,
         "size": size,
         "results": results,
     }
+    if facets:
+        out["facets"] = parse_facet_aggs(result.get("aggregations"), works_field="text_id")
+    return out
 
 
 async def _get_phrase_suggestion(es: AsyncElasticsearch, query: str) -> str | None:
@@ -728,10 +797,15 @@ async def search_cross_language(
     category: str | None = None,
     sources: str | None = None,
     db: AsyncSession | None = None,
+    *,
+    canon: str | None = None,
+    section: str | None = None,
 ) -> CrossLanguageSearchResponse:
     """Cross-language search: search across ALL title fields simultaneously.
 
     For each result, fetches related translations and groups them together.
+    Takes the 藏经/朝代/部类 facets but deliberately not 语言 — crossing
+    languages is the point of this search.
     """
     must = []
     filter_clauses: list[dict] = []
@@ -759,8 +833,9 @@ async def search_cross_language(
     else:
         must.append({"match_all": {}})
 
-    if dynasty:
-        filter_clauses.append({"term": {"dynasty": dynasty}})
+    active = facet_clauses(canon=canon, dynasty=dynasty, section=section)
+    if "dynasty" in active:
+        filter_clauses.append(active["dynasty"])
     if category:
         filter_clauses.append({"term": {"category": category}})
     if sources:
@@ -769,6 +844,9 @@ async def search_cross_language(
             filter_clauses.append({"term": {"source_code": codes[0]}})
         elif codes:
             filter_clauses.append({"terms": {"source_code": codes}})
+    for group in ("canon", "section"):
+        if group in active:
+            filter_clauses.append(active[group])
 
     body = {
         "query": {
@@ -868,6 +946,9 @@ async def search_semantic(
     category: str | None = None,
     lang: str | None = None,
     sources: str | None = None,
+    *,
+    canon: str | None = None,
+    section: str | None = None,
 ) -> SemanticSearchResponse:
     """语义搜索：基于 pgvector 向量检索，复用 RAG embedding 能力。
 
@@ -898,18 +979,25 @@ async def search_semantic(
     params: list = [embedding_str, MIN_RELEVANCE_SCORE, pgvector_limit]
     param_idx = 4  # $1=embedding, $2=min_score, $3=limit, $4+ 为筛选参数
 
-    if dynasty:
-        filter_conditions.append(f"AND bt.dynasty = ${param_idx}")
-        params.append(dynasty)
-        param_idx += 1
+    def _in(column: str, values: list[str]) -> None:
+        # One value keeps the original `= $n` SQL; several become IN (…).
+        nonlocal param_idx
+        if not values:
+            return
+        if len(values) == 1:
+            filter_conditions.append(f"AND {column} = ${param_idx}")
+        else:
+            placeholders = ", ".join(f"${param_idx + i}" for i in range(len(values)))
+            filter_conditions.append(f"AND {column} IN ({placeholders})")
+        params.extend(values)
+        param_idx += len(values)
+
+    _in("bt.dynasty", split_multi(dynasty))
     if category:
         filter_conditions.append(f"AND bt.category = ${param_idx}")
         params.append(category)
         param_idx += 1
-    if lang:
-        filter_conditions.append(f"AND bt.lang = ${param_idx}")
-        params.append(lang)
-        param_idx += 1
+    _in("bt.lang", split_multi(lang))
     if sources:
         codes = [c.strip() for c in sources.split(",") if c.strip()]
         if codes:
@@ -917,6 +1005,10 @@ async def search_semantic(
             filter_conditions.append(f"AND ds.code IN ({placeholders})")
             params.extend(codes)
             param_idx += len(codes)
+    canon_sql, canon_params = facet_sql(canon=canon, section=section, start_idx=param_idx)
+    filter_conditions.extend(canon_sql)
+    params.extend(canon_params)
+    param_idx += len(canon_params)
 
     filter_sql = " ".join(filter_conditions)
 
