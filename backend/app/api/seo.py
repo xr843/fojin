@@ -31,6 +31,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.chat import SharedQA
 from app.models.text import TextContent
+from app.services.seo_lang import (
+    LANG_SHELL_SUFFIX,
+    SeoLang,
+    hreflang_tags,
+    html_lang,
+    lang_url,
+    localize_title,
+    og_locale,
+    resolve_lang,
+)
 from app.services.text import get_text_by_id
 
 logger = logging.getLogger(__name__)
@@ -42,7 +52,8 @@ router = APIRouter(tags=["seo"])
 # built dist/, so it has to fetch the entry HTML over HTTP.
 _FRONTEND_INDEX_URL = "http://frontend/index.html"
 _INDEX_HTML_CACHE_TTL = 60.0  # seconds
-_index_html_cache: dict[str, object] = {}
+# Keyed by shell suffix ("" / ".zh-Hant" / ".en") → (fetched_at, html).
+_index_html_cache: dict[str, tuple[float, str]] = {}
 
 _TITLE_RE = re.compile(r"<title>[^<]*</title>", re.IGNORECASE)
 _DESCRIPTION_RE = re.compile(
@@ -58,6 +69,8 @@ _ROBOTS_RE = re.compile(
     re.IGNORECASE,
 )
 _HEAD_CLOSE_RE = re.compile(r"</head>", re.IGNORECASE)
+_HTML_LANG_RE = re.compile(r'<html\s+lang="[^"]*"', re.IGNORECASE)
+_OG_LOCALE_RE = re.compile(r'<meta\s+property="og:locale"\s+content="[^"]*"\s*/?>', re.IGNORECASE)
 _ROOT_DIV_RE = re.compile(r'<div\s+id="root"\s*></div>', re.IGNORECASE)
 
 # Open Graph / Twitter equivalents of the three tags above. Without these the
@@ -138,21 +151,27 @@ def _sub_literal(pattern: re.Pattern[str], replacement: str, html: str, *, count
     return pattern.sub(lambda _match: replacement, html, count=count)
 
 
-async def _fetch_index_html() -> str:
-    """Fetch the built index.html from the frontend container with TTL caching."""
+async def _fetch_index_html(suffix: str = "") -> str:
+    """Fetch the built index{suffix}.html from the frontend container with TTL caching.
+
+    ``suffix`` selects the per-language shell the frontend build emits
+    (``.zh-Hant`` / ``.en``). If that file is missing — a build that predates
+    the multilingual shells — fall back to the plain ``index.html`` rather than
+    failing the page.
+    """
     now = time.monotonic()
-    cached_at = _index_html_cache.get("ts")
-    cached_html = _index_html_cache.get("html")
-    if isinstance(cached_at, float) and isinstance(cached_html, str) and now - cached_at < _INDEX_HTML_CACHE_TTL:
-        return cached_html
+    hit = _index_html_cache.get(suffix)
+    if hit is not None and now - hit[0] < _INDEX_HTML_CACHE_TTL:
+        return hit[1]
 
     async with httpx.AsyncClient(timeout=5.0) as client:
-        resp = await client.get(_FRONTEND_INDEX_URL)
+        resp = await client.get(f"http://frontend/index{suffix}.html")
+        if suffix and resp.status_code == 404:
+            resp = await client.get(_FRONTEND_INDEX_URL)
         resp.raise_for_status()
         html = resp.text
 
-    _index_html_cache["html"] = html
-    _index_html_cache["ts"] = now
+    _index_html_cache[suffix] = (now, html)
     return html
 
 
@@ -162,8 +181,14 @@ def _inject_meta(
     description: str,
     canonical_url: str,
     robots: str = "index, follow",
+    *,
+    lang: SeoLang = "zh",
+    hreflang: str | None = None,
 ) -> str:
     """Replace title / description / canonical / robots **and the og:* + twitter:* mirrors**.
+
+    Also stamps ``<html lang>`` / ``og:locale`` for ``lang`` and, when given,
+    inserts the ``hreflang`` alternates before ``</head>``.
 
     The Open Graph tags matter as much as ``<title>`` here: they are what a
     WeChat or Twitter share card renders. Leaving the template's values in
@@ -206,10 +231,68 @@ def _inject_meta(
         new_html = _sub_literal(_CANONICAL_RE, canonical_tag, new_html)
     else:
         new_html = _sub_literal(_HEAD_CLOSE_RE, f"  {canonical_tag}\n  </head>", new_html)
+    new_html = _sub_literal(_HTML_LANG_RE, f'<html lang="{html_lang(lang)}"', new_html)
+    new_html = _sub_literal(_OG_LOCALE_RE, f'<meta property="og:locale" content="{og_locale(lang)}" />', new_html)
+    if hreflang:
+        new_html = _sub_literal(_HEAD_CLOSE_RE, f"  {hreflang}\n  </head>", new_html)
     return new_html
 
 
-def _build_text_meta(text, request: Request, *, route: str) -> tuple[str, str, str]:
+# Crawler-facing copy for the text detail page, per UI language. The ``read``
+# route is noindex and stays zh-only, so only ``detail`` consults this table.
+_TEXT_COPY: dict[str, dict[str, str]] = {
+    "zh": {
+        "by": "{t}译",
+        "tail": " — 佛津 FoJin",
+        "sep": "，",
+        "desc_tail": (
+            "。佛津 FoJin 数字佛典平台提供全文阅读、平行对照、AI 智能问答与原典引用。"
+            "汉传、藏传、南传、梵文、巴利文多语种佛教文献聚合检索。"
+        ),
+        "crumb_home": "佛津 FoJin",
+        "crumb": "佛典阅读",
+        "toc": "卷目录",
+        "juan": "第 {n} 卷",
+        "total": "…共 {n} 卷",
+        "read": "阅读全文 »",
+        "browse": "浏览全部佛典",
+    },
+    "zh-Hant": {
+        "by": "{t}譯",
+        "tail": " — 佛津 FoJin",
+        "sep": "，",
+        "desc_tail": (
+            "。佛津 FoJin 數位佛典平台提供全文閱讀、平行對照、AI 智慧問答與原典引用。"
+            "漢傳、藏傳、南傳、梵文、巴利文多語種佛教文獻聚合檢索。"
+        ),
+        "crumb_home": "佛津 FoJin",
+        "crumb": "佛典閱讀",
+        "toc": "卷目錄",
+        "juan": "第 {n} 卷",
+        "total": "…共 {n} 卷",
+        "read": "閱讀全文 »",
+        "browse": "瀏覽全部佛典",
+    },
+    "en": {
+        "by": "trans. {t}",
+        "tail": " — FoJin",
+        "sep": ", ",
+        "desc_tail": (
+            ". Read the full text on FoJin, with parallel passages, AI Q&A that cites the original canon, "
+            "and cross-canon search across Chinese, Tibetan, Pali and Sanskrit sources."
+        ),
+        "crumb_home": "FoJin",
+        "crumb": "Texts",
+        "toc": "Fascicles",
+        "juan": "Fascicle {n}",
+        "total": "…{n} fascicles in total",
+        "read": "Read the full text »",
+        "browse": "Browse all texts",
+    },
+}
+
+
+def _build_text_meta(text, request: Request, *, route: str, lang: SeoLang = "zh") -> tuple[str, str, str]:
     """Compose the per-text title, description, and canonical URL.
 
     ``route`` is either ``"detail"`` (``/texts/{id}``) or ``"read"``
@@ -217,19 +300,22 @@ def _build_text_meta(text, request: Request, *, route: str) -> tuple[str, str, s
     requested URL to avoid the bot/browser canonical mismatch that previously
     existed (the prerender Worker pointed ``/texts/{id}`` at itself, while
     this module pointed it at ``/read``).
+
+    ``lang`` only matters for ``detail``; callers pass ``"zh"`` for ``read``.
     """
-    title_zh = text.title_zh or "佛典"
+    copy = _TEXT_COPY[lang]
+    title_zh = localize_title(text.title_zh or "佛典", lang)
     translator = (text.translator or "").strip()
     dynasty = (text.dynasty or "").strip()
     cbeta_id = (text.cbeta_id or "").strip()
 
     title_parts = [f"《{title_zh}》"]
     if translator:
-        title_parts.append(f" {translator}译")
+        title_parts.append(" " + copy["by"].format(t=translator))
     if route == "read":
         title_parts.append(" — 在线全文阅读 | 佛津 FoJin")
     else:
-        title_parts.append(" — 佛津 FoJin")
+        title_parts.append(copy["tail"])
     title = "".join(title_parts)
 
     desc_parts = [f"《{title_zh}》"]
@@ -237,14 +323,12 @@ def _build_text_meta(text, request: Request, *, route: str) -> tuple[str, str, s
     if dynasty:
         meta_bits.append(dynasty)
     if translator:
-        meta_bits.append(f"{translator}译")
+        meta_bits.append(copy["by"].format(t=translator))
     if cbeta_id:
         meta_bits.append(f"CBETA {cbeta_id}")
     if meta_bits:
-        desc_parts.append("，" + "，".join(meta_bits))
-    desc_parts.append(
-        "。佛津 FoJin 数字佛典平台提供全文阅读、平行对照、AI 智能问答与原典引用。汉传、藏传、南传、梵文、巴利文多语种佛教文献聚合检索。"
-    )
+        desc_parts.append(copy["sep"] + copy["sep"].join(meta_bits))
+    desc_parts.append(copy["desc_tail"])
     description = "".join(desc_parts)
 
     base = public_base_url(request)
@@ -253,7 +337,7 @@ def _build_text_meta(text, request: Request, *, route: str) -> tuple[str, str, s
     if route == "read":
         canonical = f"{base}/texts/{text.id}/read"
     else:
-        canonical = f"{base}/texts/{text.id}"
+        canonical = lang_url(base, f"/texts/{text.id}", lang)
     return title, description, canonical
 
 
@@ -268,16 +352,18 @@ async def _serve_text_seo_html(
     text = await get_text_by_id(db, text_id)
     if text is None:
         raise HTTPException(status_code=404, detail="text not found")
+    # Only the indexable detail page has language variants; /read is noindex.
+    lang: SeoLang = resolve_lang(request) if route == "detail" else "zh"
     try:
-        html = await _fetch_index_html()
+        html = await _fetch_index_html(LANG_SHELL_SUFFIX[lang])
     except httpx.HTTPError as e:
         logger.warning("Failed to fetch frontend index.html: %s", e)
         # Fall back to a minimal HTML so the bot still gets correct meta;
         # the user's browser would fail anyway since the bundle refs are
         # missing — but bots don't care about JS.
-        title, description, canonical = _build_text_meta(text, request, route=route)
+        title, description, canonical = _build_text_meta(text, request, route=route, lang=lang)
         fallback = (
-            "<!doctype html><html><head>"
+            f'<!doctype html><html lang="{html_lang(lang)}"><head>'
             f"<title>{_escape_meta_value(title)}</title>"
             f'<meta name="description" content="{_escape_meta_value(description)}" />'
             f'<meta name="robots" content="{_escape_meta_value(robots)}" />'
@@ -286,23 +372,24 @@ async def _serve_text_seo_html(
         )
         return HTMLResponse(content=fallback, status_code=200)
 
-    title, description, canonical = _build_text_meta(text, request, route=route)
-    patched = _inject_meta(html, title, description, canonical, robots=robots)
+    title, description, canonical = _build_text_meta(text, request, route=route, lang=lang)
+    base_url = public_base_url(request)
+    hreflang = hreflang_tags(base_url, f"/texts/{text.id}") if route == "detail" else None
+    patched = _inject_meta(html, title, description, canonical, robots=robots, lang=lang, hreflang=hreflang)
     patched = _inject_text_jsonld(patched, _build_text_jsonld(text, canonical_url=canonical))
 
     # Detail route is the indexable surface — give Googlebot a real body.
     # Reader route stays a SPA shell (it's noindex anyway).
     if route == "detail":
-        base_url = public_base_url(request)
         patched = _inject_text_jsonld(
-            patched, _build_breadcrumb_jsonld(text, canonical_url=canonical, base_url=base_url)
+            patched, _build_breadcrumb_jsonld(text, canonical_url=canonical, base_url=base_url, lang=lang)
         )
         try:
             body = await _fetch_text_seo_body(db, text.id)
         except Exception as e:  # body is best-effort — never block detail render
             logger.warning("SEO body fetch failed for text %s: %s", text.id, e)
             body = {"excerpt": "", "juans": [], "total_juans": 0}
-        seo_block = _render_text_seo_body(text, body, base_url=base_url)
+        seo_block = _render_text_seo_body(text, body, base_url=base_url, lang=lang)
         if _ROOT_DIV_RE.search(patched):
             patched = _sub_literal(_ROOT_DIV_RE, f'<div id="root"></div>\n{seo_block}', patched)
         else:
@@ -378,19 +465,30 @@ def _build_text_jsonld(text, *, canonical_url: str) -> dict:
     return payload
 
 
-def _build_breadcrumb_jsonld(text, *, canonical_url: str, base_url: str) -> dict:
+def _build_breadcrumb_jsonld(text, *, canonical_url: str, base_url: str, lang: SeoLang = "zh") -> dict:
     """BreadcrumbList JSON-LD so Google renders the path in rich results.
 
     Home › 全文检索 › {经名} maps the user's mental model better than the
     raw URL and is documented to lift CTR ~25% on Google search results.
     """
-    title_zh = (text.title_zh or "").strip() or "佛典"
+    copy = _TEXT_COPY[lang]
+    title_zh = localize_title((text.title_zh or "").strip() or "佛典", lang)
     return {
         "@context": "https://schema.org",
         "@type": "BreadcrumbList",
         "itemListElement": [
-            {"@type": "ListItem", "position": 1, "name": "佛津 FoJin", "item": base_url},
-            {"@type": "ListItem", "position": 2, "name": "佛典阅读", "item": f"{base_url}/sources"},
+            {
+                "@type": "ListItem",
+                "position": 1,
+                "name": copy["crumb_home"],
+                "item": base_url if lang == "zh" else lang_url(base_url, "/", lang),
+            },
+            {
+                "@type": "ListItem",
+                "position": 2,
+                "name": copy["crumb"],
+                "item": lang_url(base_url, "/sources", lang),
+            },
             {"@type": "ListItem", "position": 3, "name": f"《{title_zh}》", "item": canonical_url},
         ],
     }
@@ -420,7 +518,7 @@ async def _fetch_text_seo_body(db: AsyncSession, text_id: int) -> dict:
     return {"excerpt": cleaned, "juans": juans[:_SEO_JUAN_LIST_LIMIT], "total_juans": len(juans)}
 
 
-def _render_text_seo_body(text, body: dict, *, base_url: str) -> str:
+def _render_text_seo_body(text, body: dict, *, base_url: str, lang: SeoLang = "zh") -> str:
     """Render the <noscript> SEO block inserted just after <body>.
 
     The block contains: title, basic metadata, an excerpt of the canonical
@@ -428,8 +526,13 @@ def _render_text_seo_body(text, body: dict, *, base_url: str) -> str:
     container because Googlebot indexes its content (per JS-disabled
     fallback semantics) while real browsers with JS enabled ignore it
     entirely — no flicker, no double-rendering, no cloaking.
+
+    Links carry ``lang`` for non-zh variants so a reader arriving from the
+    English / traditional page stays in that UI language.
     """
-    title_zh = (text.title_zh or "佛典").strip()
+    copy = _TEXT_COPY[lang]
+    lang_qs = "" if lang == "zh" else f"lang={lang}"
+    title_zh = localize_title((text.title_zh or "佛典").strip(), lang)
     translator = (text.translator or "").strip()
     dynasty = (text.dynasty or "").strip()
     cbeta_id = (text.cbeta_id or "").strip()
@@ -440,7 +543,7 @@ def _render_text_seo_body(text, body: dict, *, base_url: str) -> str:
     if dynasty:
         meta_bits.append(_escape_meta_value(dynasty))
     if translator:
-        meta_bits.append(f"{_escape_meta_value(translator)}译")
+        meta_bits.append(_escape_meta_value(copy["by"].format(t=translator)))
     if cbeta_id:
         meta_bits.append(f"CBETA {_escape_meta_value(cbeta_id)}")
     if meta_bits:
@@ -449,18 +552,21 @@ def _render_text_seo_body(text, body: dict, *, base_url: str) -> str:
     if body.get("excerpt"):
         parts.append(f"<p>{_escape_meta_value(body['excerpt'])}</p>")
 
+    read_url = f"{base_url}/texts/{text.id}/read"
     juans = body.get("juans") or []
     if len(juans) > 1:
-        parts.append("<h2>卷目录</h2><ul>")
+        parts.append(f"<h2>{copy['toc']}</h2><ul>")
         for j in juans:
-            parts.append(f'<li><a href="{base_url}/texts/{text.id}/read?juan={int(j)}">第 {int(j)} 卷</a></li>')
+            qs = f"juan={int(j)}" + (f"&amp;{lang_qs}" if lang_qs else "")
+            parts.append(f'<li><a href="{read_url}?{qs}">{copy["juan"].format(n=int(j))}</a></li>')
         if body.get("total_juans", 0) > _SEO_JUAN_LIST_LIMIT:
-            parts.append(f"<li>…共 {body['total_juans']} 卷</li>")
+            parts.append(f"<li>{copy['total'].format(n=body['total_juans'])}</li>")
         parts.append("</ul>")
 
+    read_href = f"{read_url}?{lang_qs}" if lang_qs else read_url
     parts.append(
-        f'<p><a href="{base_url}/texts/{text.id}/read">阅读全文 »</a> · '
-        f'<a href="{base_url}/sources">浏览全部佛典</a></p>'
+        f'<p><a href="{read_href}">{copy["read"]}</a> · '
+        f'<a href="{lang_url(base_url, "/sources", lang)}">{copy["browse"]}</a></p>'
     )
     parts.append("</div></noscript>")
     return "".join(parts)

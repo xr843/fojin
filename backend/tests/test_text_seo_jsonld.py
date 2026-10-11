@@ -134,7 +134,7 @@ async def test_text_seo_html_contains_book_jsonld(seo_client):
         "</head><body></body></html>"
     )
 
-    async def _fake_fetch():
+    async def _fake_fetch(suffix: str = ""):
         return fake_index
 
     async def _fake_get_text(_db, text_id):
@@ -166,7 +166,7 @@ async def test_jsonld_does_not_break_when_payload_contains_html_like_text(seo_cl
     """JSON-LD blob must escape `</` so crawlers don't see a fake script close."""
     fake_index = "<!doctype html><html><head><title>x</title></head><body></body></html>"
 
-    async def _fake_fetch():
+    async def _fake_fetch(suffix: str = ""):
         return fake_index
 
     async def _fake_get_text(_db, text_id):
