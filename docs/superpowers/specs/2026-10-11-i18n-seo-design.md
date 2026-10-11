@@ -66,7 +66,7 @@
   - `localize_title(title_zh, lang)`：zh → 简繁并列「简体（繁體）」（两者相同时只写一次；不直接替换，避免已收录的 1 万多页标题突变引起排名波动）；zh-Hant → 原样（库内本是繁体）；en → 原样
 - 前端 `frontend/src/seo/langUrl.ts`（新）：`langUrl(path, lng)`、`hreflangLinks(path)`，供所有 Helmet 使用。
 
-### 4.2 五个服务端出口
+### 4.2 服务端出口
 
 | 出口 | 改动 |
 |---|---|
@@ -105,7 +105,7 @@
 
 ## 7. 测试与验收
 
-- 后端：`seo_lang` 单测；`seo.py` / sitemap 按三语各断言；`seo_dict` / `seo_persons` 只断言 `html lang`；上述 `html lang`、title、canonical、hreflang；**所有新断言先在未改代码上跑红**。
+- 后端：`seo_lang` 单测；`seo.py` / sitemap 按三语各断言 `html lang`、title、canonical、hreflang；`seo_dict` / `seo_persons` 只断言 `html lang`；**所有新断言先在未改代码上跑红**。
 - 前端：`langUrl` 单测；更新已有 7 个页面的 hreflang 断言（`?lang=` 值不变，新增 canonical 带语言的断言）；`seoPages()` 产出三语 shell 的测试。
 - 现有 SEO 测试全部保持绿（清单见实施计划）。
 - nginx：`nginx -t` + 本地 compose 起服务后 curl 三语 × 五类页面。
