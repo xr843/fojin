@@ -70,9 +70,9 @@
 
 | 出口 | 改动 |
 |---|---|
-| 根 shell `index.html` + 静态 shell（`seoPages()` 插件） | 构建期为每个路由多产出 `index.zh-Hant.html`、`index.en.html`；文案取自 `staticPages.json` 新增的 `zh-Hant`/`en` 分支；替换 `<html lang>`、`og:locale`、根 JSON-LD `inLanguage`、canonical、hreflang |
+| 根 shell `index.html` + 静态 shell（`seoPages()` 插件） | 构建期为每个路由多产出 `index.zh-Hant.html`、`index.en.html`；首页另出专用 shell（`_home/`，含 hreflang），通用 SPA 兜底只换语言不加 hreflang（它服务所有未预构建路由）；专题详情 13 个与 `/cross-canon` 新增 shell 以修正其 canonical；文案取自 `staticPages.json` 新增的 `zh-Hant`/`en` 分支；替换 `<html lang>`、`og:locale`、根 JSON-LD `inLanguage`、canonical、hreflang |
 | `frontend/nginx.conf` | 顶层加 `map $arg_lang $lang_sfx { "zh-Hant" ".zh-Hant"; "en" ".en"; default ""; }`；静态 shell 与 SPA 兜底改为 `try_files …/index$lang_sfx.html …/index.html` |
-| `backend/app/api/seo.py`（经文页、分享页） | 取对应语言的 shell（`index$lang_sfx.html`）；模板文案三语化；`localize_title`；canonical / hreflang / `html lang` / og:locale 按语言 |
+| `backend/app/api/seo.py`（经文详情页；分享页 `/share/qa` 与 noindex 的 `/read` 页不分语言） | 取对应语言的 shell（`index$lang_sfx.html`）；模板文案三语化；`localize_title`；canonical / hreflang / `html lang` / og:locale 按语言 |
 | `seo_dict.py`、`seo_persons.py`（全 SSR） | **仅**把 `<html lang>` 从 `zh-Hans` 修为与内容一致的值；不加语言版本、不加 hreflang（§2.1） |
 | `backend/app/api/sitemap.py` | 加 `xmlns:xhtml`，static 与 texts 两类 sitemap 的每个 `<url>` 带三语 `xhtml:link`（texts 约 1 万条，远低于单文件上限）；dict / persons sitemap 不变 |
 
