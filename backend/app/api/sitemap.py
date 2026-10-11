@@ -11,6 +11,7 @@ from sqlalchemy import select
 from app.api.seo_dict import count_distinct_headwords, get_distinct_headwords
 from app.database import async_session
 from app.models.knowledge_graph import KGEntity
+from app.services.seo_lang import lang_url
 from app.services.text import get_all_text_ids_with_dates
 
 router = APIRouter(tags=["sitemap"])
@@ -64,6 +65,26 @@ STATIC_PAGES = [
 ]
 
 
+# Pages that have no per-language variants: /search results are not indexed
+# (robots.txt disallows /search?), /agents is a single-language standalone page.
+_NO_ALTERNATES = {"/search", "/agents"}
+_URLSET_WITH_XHTML = (
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">'
+)
+
+
+def _alternate_lines(path: str) -> list[str]:
+    """The four hreflang alternates for ``path`` — same URLs the pages themselves declare.
+
+    See app/services/seo_lang.py and docs/superpowers/specs/2026-10-11-i18n-seo-design.md.
+    """
+    pairs = [("zh-Hans", "zh"), ("zh-Hant", "zh-Hant"), ("en", "en"), ("x-default", "zh")]
+    return [
+        f'    <xhtml:link rel="alternate" hreflang="{code}" href="{lang_url(BASE_URL, path, lang)}"/>'
+        for code, lang in pairs
+    ]
+
+
 def _xml_response(content: str) -> Response:
     return Response(
         content=content,
@@ -111,10 +132,12 @@ async def sitemap_static() -> Response:
     """Static pages sitemap with today's date as lastmod hint."""
     today = date.today().isoformat()
     lines = ['<?xml version="1.0" encoding="UTF-8"?>']
-    lines.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
+    lines.append(_URLSET_WITH_XHTML)
     for path, changefreq, priority in STATIC_PAGES:
         lines.append("  <url>")
         lines.append(f"    <loc>{BASE_URL}{path}</loc>")
+        if path not in _NO_ALTERNATES:
+            lines.extend(_alternate_lines(path))
         lines.append(f"    <lastmod>{today}</lastmod>")
         lines.append(f"    <changefreq>{changefreq}</changefreq>")
         lines.append(f"    <priority>{priority}</priority>")
@@ -221,10 +244,11 @@ async def sitemap_texts(batch: int) -> FastAPIResponse:
     batch_texts = texts[start:end]
 
     lines = ['<?xml version="1.0" encoding="UTF-8"?>']
-    lines.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
+    lines.append(_URLSET_WITH_XHTML)
     for text_id, date_str in batch_texts:
         lines.append("  <url>")
         lines.append(f"    <loc>{BASE_URL}/texts/{text_id}</loc>")
+        lines.extend(_alternate_lines(f"/texts/{text_id}"))
         lines.append(f"    <lastmod>{date_str}</lastmod>")
         lines.append("    <changefreq>monthly</changefreq>")
         lines.append("    <priority>0.6</priority>")
