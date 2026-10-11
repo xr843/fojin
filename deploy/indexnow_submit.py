@@ -18,7 +18,8 @@
     python3 deploy/indexnow_submit.py --state .deploy-state/indexnow-submitted.txt
 """
 
-from __future__ import annotations
+# 宿主机是 Python 3.6（deploy.sh 在宿主机上跑）：不要用 `from __future__ import annotations`、
+# list[str] 之类的内置泛型注解，也不要用 3.7+ 的 API。
 
 import argparse
 import json
@@ -42,16 +43,16 @@ UA = "Mozilla/5.0 (compatible; fojin-indexnow/1.0; +https://fojin.app)"
 NS = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9", "xhtml": "http://www.w3.org/1999/xhtml"}
 
 
-def fetch(url: str) -> bytes:
+def fetch(url):
     req = urllib.request.Request(url, headers={"User-Agent": UA})
     with urllib.request.urlopen(req, timeout=60) as resp:
         return resp.read()
 
 
-def urls_in_urlset(xml: bytes) -> list[str]:
+def urls_in_urlset(xml):
     """<loc> 加上每条的 hreflang 替代网址（繁体/英文版本是独立 URL），按出现顺序去重。"""
     root = ET.fromstring(xml)
-    seen: dict[str, None] = {}
+    seen = {}
     for url in root.findall("sm:url", NS):
         loc = url.findtext("sm:loc", default="", namespaces=NS).strip()
         if loc:
@@ -63,9 +64,9 @@ def urls_in_urlset(xml: bytes) -> list[str]:
     return list(seen)
 
 
-def collect(base: str) -> list[str]:
+def collect(base):
     index = ET.fromstring(fetch(f"{base}/sitemap.xml"))
-    out: dict[str, None] = {}
+    out = {}
     for loc in index.findall("sm:sitemap/sm:loc", NS):
         url = (loc.text or "").strip()
         name = url.rsplit("/", 1)[-1]
@@ -77,7 +78,7 @@ def collect(base: str) -> list[str]:
     return [u for u in out if u.startswith(f"{BASE}/") or u == BASE]
 
 
-def submit(urls: list[str]) -> int:
+def submit(urls):
     body = json.dumps({"host": HOST, "key": KEY, "keyLocation": KEY_LOCATION, "urlList": urls}).encode()
     req = urllib.request.Request(
         ENDPOINT,
@@ -92,7 +93,7 @@ def submit(urls: list[str]) -> int:
         return e.code
 
 
-def main() -> int:
+def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--state", type=Path, help="已推网址记录文件；不给则每次都推全部")
     ap.add_argument("--base", default=BASE, help="读取 sitemap 的站点根（默认生产）")
@@ -110,7 +111,7 @@ def main() -> int:
         return 1
 
     urls = collect(args.base)
-    done: set[str] = set()
+    done = set()
     if args.state and args.state.exists():
         done = set(args.state.read_text().split())
     new = [u for u in urls if u not in done]
