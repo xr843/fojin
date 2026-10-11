@@ -430,4 +430,9 @@ docker image prune -f   >/dev/null
 
 dispatch_deploy_success "$NEW_REV"
 
+# --- 7. IndexNow：把 sitemap 里新出现的网址推给 Bing 等（失败只告警，下次部署重试）---
+log "IndexNow: pushing new sitemap URLs ..."
+timeout 300 python3 deploy/indexnow_submit.py --state "$STATE_DIR/indexnow-submitted.txt" \
+  || warn "IndexNow 推送未完成（不影响部署，下次部署自动重试）"
+
 log "Done. Deployed $(git rev-parse --short HEAD) on $BRANCH."
