@@ -155,9 +155,10 @@ async def _fetch_index_html(suffix: str = "") -> str:
     """Fetch the built index{suffix}.html from the frontend container with TTL caching.
 
     ``suffix`` selects the per-language shell the frontend build emits
-    (``.zh-Hant`` / ``.en``). If that file is missing — a build that predates
-    the multilingual shells — fall back to the plain ``index.html`` rather than
-    failing the page.
+    (``.zh-Hant`` / ``.en``). Behind the real frontend nginx a missing variant
+    never 404s — its ``@spa`` fallback answers 200 with the simplified shell —
+    so the page degrades to zh copy rather than failing. The 404 branch below
+    only matters for a plain static file server.
     """
     now = time.monotonic()
     hit = _index_html_cache.get(suffix)

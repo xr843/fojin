@@ -15,7 +15,8 @@ __pycache__/
 venv/
 
 # Node
-node_modules/
+# 不带斜杠：也要挡住指向别处的 node_modules 软链接（worktree 常这样复用依赖）
+node_modules
 dist/
 .vite/
 

@@ -26,13 +26,16 @@ _t2s = OpenCC("t2s")
 
 
 def resolve_lang(request: Request) -> SeoLang:
-    """Only the two exact values open a new URL space; anything else is zh.
+    """Only ``zh-Hant`` and ``en`` open a language variant; anything else is zh.
 
-    Being strict here is what stops ``?lang=xyz`` or ``?lang=EN`` from being
-    indexed as distinct pages: they render zh and canonicalise to the bare URL.
+    Matched case-insensitively to agree with frontend/nginx.conf's
+    ``map $arg_lang`` (nginx map string matching ignores case): ``?lang=EN``
+    gets the English page, whose canonical is the lowercase ``?lang=en`` — so
+    case variants consolidate instead of becoming separate pages. Junk values
+    (``?lang=xyz``) render zh and canonicalise to the bare URL.
     """
-    value = request.query_params.get("lang", "")
-    if value == "zh-Hant":
+    value = request.query_params.get("lang", "").lower()
+    if value == "zh-hant":
         return "zh-Hant"
     if value == "en":
         return "en"

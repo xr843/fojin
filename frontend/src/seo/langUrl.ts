@@ -15,8 +15,9 @@ export type SeoLang = "zh" | "zh-Hant" | "en";
 const ORIGIN = "https://fojin.app";
 
 export function toSeoLang(lng: string): SeoLang {
-  if (lng.startsWith("zh-Hant")) return "zh-Hant";
-  if (lng === "en" || lng.startsWith("en-")) return "en";
+  const l = lng.toLowerCase();
+  if (l.startsWith("zh-hant")) return "zh-Hant";
+  if (l === "en" || l.startsWith("en-")) return "en";
   return "zh";
 }
 

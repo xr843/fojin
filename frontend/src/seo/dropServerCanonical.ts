@@ -1,16 +1,19 @@
+import { langUrl, type SeoLang } from "./langUrl";
+
 /**
- * Remove the server-rendered `<link rel="canonical">` before React mounts.
+ * Remove a server-rendered `<link rel="canonical">` that names a different page.
  *
- * Every shell ships one (index.html says `https://fojin.app/`; per-route and
- * backend shells say their own URL). react-helmet-async does not replace it —
- * it appends its own `data-rh` tag — so after hydration the rendered DOM carried
- * two canonicals, and on SPA-fallback routes they disagreed (`/` vs the page).
- * Search engines that render JS treat conflicting canonicals as no signal at all.
+ * react-helmet-async appends its own `data-rh` canonical instead of replacing
+ * the shell's, so after hydration the DOM can carry two. On SPA-fallback routes
+ * (e.g. /map) the shell's says `https://fojin.app/` — a different page — and
+ * search engines that render JS treat conflicting canonicals as no signal.
  *
- * Crawlers that don't run JS still read the server tag from the raw HTML; for
- * the rendered DOM the page's own <Helmet> is the single source. Pages that set
- * no canonical end up with none, which beats a wrong one.
+ * A shell canonical that already equals this page's URL in this language is
+ * kept: pages like /chat set no canonical in <Helmet>, and the shell's is right.
  */
-export function dropServerCanonical(doc: Document = document): void {
-  doc.head.querySelectorAll('link[rel="canonical"]:not([data-rh])').forEach((el) => el.remove());
+export function dropServerCanonical(pathname: string, lang: SeoLang, doc: Document = document): void {
+  const expected = langUrl(pathname, lang);
+  doc.head.querySelectorAll('link[rel="canonical"]:not([data-rh])').forEach((el) => {
+    if (el.getAttribute("href") !== expected) el.remove();
+  });
 }

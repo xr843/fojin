@@ -38,6 +38,12 @@ describe("localizeShell", () => {
     expect(html).not.toContain("hreflang=");
   });
 
+  it("drops Chinese leftovers from English share-card tags", () => {
+    const html = localizeShell(template, { lang: "en", path: "/", meta: { ...meta, title: "FoJin — Ask the canon" }, hreflang: false });
+    expect(html).toContain('<meta property="og:site_name" content="FoJin"');
+    expect(html).toContain('<meta property="og:image:alt" content="FoJin — Ask the canon"');
+  });
+
   it("escapes attribute values", () => {
     const html = localizeShell(template, { lang: "en", path: "/x", meta: { ...meta, desc: 'a "b" <c>' }, hreflang: false });
     expect(html).toContain('<meta name="description" content="a &quot;b&quot; &lt;c&gt;"');

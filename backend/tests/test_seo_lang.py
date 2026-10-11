@@ -18,8 +18,17 @@ def _req(qs: str = "") -> Request:
 def test_resolve_lang_only_accepts_two_values():
     assert resolve_lang(_req("lang=zh-Hant")) == "zh-Hant"
     assert resolve_lang(_req("lang=en")) == "en"
-    for qs in ("", "lang=zh", "lang=xyz", "lang=EN", "lang=zh-hant"):
+    for qs in ("", "lang=zh", "lang=xyz", "lang=english", "lang=zh-TW"):
         assert resolve_lang(_req(qs)) == "zh"
+
+
+def test_resolve_lang_is_case_insensitive_like_nginx_map():
+    # frontend/nginx.conf's `map $arg_lang` matches strings case-insensitively,
+    # so /?lang=EN already gets the English shell; the backend must agree or the
+    # raw HTML and the shell disagree for /texts/:id?lang=EN.
+    assert resolve_lang(_req("lang=EN")) == "en"
+    assert resolve_lang(_req("lang=zh-hant")) == "zh-Hant"
+    assert resolve_lang(_req("lang=ZH-HANT")) == "zh-Hant"
 
 
 def test_lang_url():

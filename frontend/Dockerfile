@@ -25,6 +25,7 @@ FROM nginx:stable-bookworm
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY security-headers.conf /etc/nginx/security-headers.conf
+COPY html-no-cache.conf /etc/nginx/html-no-cache.conf
 
 # Run as non-root nginx user
 RUN chown -R nginx:nginx /usr/share/nginx/html && \

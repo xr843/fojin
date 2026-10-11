@@ -88,6 +88,9 @@ export function localizeShell(template: string, { lang, path, meta, hreflang }: 
   html = sub(html, /<meta name="twitter:title" content="[^"]*"/, `<meta name="twitter:title" content="${titleAttr}"`);
   html = sub(html, /<meta name="twitter:description" content="[^"]*"/, `<meta name="twitter:description" content="${desc}"`);
   html = sub(html, /"inLanguage": "[^"]*"/, `"inLanguage": "${HTML_LANG[lang]}"`);
+  html = sub(html, /<meta property="og:image:alt" content="[^"]*"/, `<meta property="og:image:alt" content="${titleAttr}"`);
+  // zh / zh-Hant keep the template's bilingual site name as-is.
+  if (lang === "en") html = sub(html, /<meta property="og:site_name" content="[^"]*"/, '<meta property="og:site_name" content="FoJin"');
   html = sub(
     html,
     /<noscript>[\s\S]*?<\/noscript>/,

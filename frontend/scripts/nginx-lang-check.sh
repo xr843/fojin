@@ -18,8 +18,10 @@ trap 'nginx -p "$WORK" -c "$WORK/nginx.conf" -s stop 2>/dev/null || true; rm -rf
 # 并把端口、security-headers 的绝对路径换成本地的。
 sed -e "s#listen 80;#listen $PORT;#" \
     -e "s#/etc/nginx/security-headers.conf#$FRONTEND/security-headers.conf#g" \
+    -e "s#/etc/nginx/html-no-cache.conf#$WORK/html-no-cache.conf#g" \
     -e "s#root /usr/share/nginx/html;#root $FRONTEND/dist;#" \
     nginx.conf > "$WORK/site.conf"
+sed -e "s#/etc/nginx/security-headers.conf#$FRONTEND/security-headers.conf#g" html-no-cache.conf > "$WORK/html-no-cache.conf"
 mkdir -p "$WORK/logs"
 cat > "$WORK/nginx.conf" <<EOF
 pid $WORK/nginx.pid;
@@ -77,6 +79,18 @@ nocache "/"
 nocache "/?lang=en"
 nocache "/map"
 nocache "/map?lang=zh-Hant"
+nocache "/chat?lang=en"
+nocache "/sutras/heart-sutra"
+nocache "/collections/huayan"
+nocache "/collections/no-such-series"
+nocache "/cross-canon?lang=zh-Hant"
+redirect() { # path expected-Location
+  local got
+  got=$(curl -sI "http://127.0.0.1:$PORT$1" | tr -d '\r' | awk 'tolower($1)=="location:"{print $2}')
+  if [ "$got" = "$2" ]; then echo "ok   $1  ↦ $2"; else echo "FAIL $1  ↦ $got (want $2)"; fail=1; fi
+}
+redirect "/CROSS-canon?lang=en"          "/cross-canon?lang=en"
+redirect "/CHAT"                         "/chat"
 code  "/collections/no-such-series"      200
 code  "/assets/does-not-exist.js"        404  # unchanged from master: a missing bundle must not get an HTML shell
 exit $fail

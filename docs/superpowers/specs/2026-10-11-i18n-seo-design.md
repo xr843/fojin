@@ -50,7 +50,7 @@
 
 每个版本：`<html lang>` 与 `og:locale` 对应该语言；title / description 用该语言模板；**canonical 指向自己**（含 `?lang`）；服务端输出全部三条 hreflang + x-default。
 
-`lang` 只认 `zh-Hant`、`en` 两个值；其他值（含 `zh`）一律按简体处理，canonical 指回无参数 URL，**不产生新的 URL 空间**。
+`lang` 只认 `zh-Hant`、`en` 两个值（不区分大小写，与 nginx `map` 的字符串匹配一致；canonical 一律写规范形式，大小写变体因此归并）；其他值（含 `zh`）一律按简体处理，canonical 指回无参数 URL，**不产生新的 URL 空间**。
 
 选 A 不选路径前缀的理由：改动集中在服务端出口，URL 结构与已有 hreflang 测试不变；Google 官方支持参数区分语言。8 周后若收录信号不足再升级为路径前缀，A 的服务端工作可复用。
 

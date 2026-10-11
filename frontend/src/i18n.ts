@@ -61,8 +61,10 @@ i18n
     },
   });
 
+// Same values the server-rendered shells use (src/seo/buildShells.ts,
+// backend/app/services/seo_lang.py): the UI code "zh" is simplified Chinese.
 i18n.on("languageChanged", (lng) => {
-  document.documentElement.lang = lng;
+  document.documentElement.lang = lng === "zh" ? "zh-Hans" : lng;
 });
 
 export default i18n;

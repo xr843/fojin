@@ -34,7 +34,7 @@ import { getAdminPendingSummary, type AdminPendingSummary } from "../api/client"
 import NotificationBell from "./NotificationBell";
 import CursorGlow from "./CursorGlow";
 import { useNavFit } from "../hooks/useNavFit";
-import { syncLangParam } from "../seo/syncLangParam";
+import { searchWithLang } from "../seo/syncLangParam";
 
 const { Header, Content, Footer } = AntLayout;
 
@@ -346,7 +346,10 @@ export default function Layout() {
               ],
               onClick: ({ key }) => {
                 void i18n.changeLanguage(key);
-                syncLangParam(key);
+                navigate(
+                  { pathname: location.pathname, search: searchWithLang(location.search, key), hash: location.hash },
+                  { replace: true, state: location.state },
+                );
               },
               selectedKeys: [currentUILang(i18n)],
             }}

@@ -16,6 +16,8 @@ describe("langUrl", () => {
     expect(toSeoLang("zh")).toBe("zh");
     expect(toSeoLang("ja")).toBe("zh");
     expect(toSeoLang("")).toBe("zh");
+    expect(toSeoLang("EN")).toBe("en");
+    expect(toSeoLang("zh-hant")).toBe("zh-Hant");
   });
 
   it("maps og:locale", () => {
