@@ -67,6 +67,7 @@
 
 .verdict-sutra { --verify-accent: #2e7d52; }
 .verdict-not_sutra { --verify-accent: #b07a21; }
+.verdict-variant { --verify-accent: #2f6f8f; }
 .verdict-partial { --verify-accent: #c4622d; }
 .verdict-absent { --verify-accent: #78736c; }
 
@@ -112,6 +113,12 @@
 
 .verify-seg.is-found .anticon { color: #2e7d52; }
 .verify-seg.is-missing .anticon { color: #a9a198; }
+.verify-seg.is-close .anticon { color: #2f6f8f; }
+
+.verify-close-text {
+  color: #2f6f8f;
+  font-family: "Noto Serif SC", serif;
+}
 .verify-seg.is-missing .verify-seg-text span { color: #8e877e; }
 
 .verify-seg-sources {

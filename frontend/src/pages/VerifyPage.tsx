@@ -2,7 +2,13 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { Helmet } from "react-helmet-async";
 import { Alert, Button, Input, Spin, message } from "antd";
-import { CheckCircleFilled, CloseCircleFilled, LinkOutlined, RobotOutlined } from "@ant-design/icons";
+import {
+  CheckCircleFilled,
+  CloseCircleFilled,
+  ExclamationCircleFilled,
+  LinkOutlined,
+  RobotOutlined,
+} from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { isAxiosError } from "axios";
@@ -44,12 +50,35 @@ function explanation(v: ClaimVerdict, t: (k: string, o?: Record<string, unknown>
 function Segment({ seg, language }: { seg: ClaimSegment; language: string }) {
   const { t } = useTranslation();
   return (
-    <li className={`verify-seg ${seg.found ? "is-found" : "is-missing"}`}>
+    <li className={`verify-seg ${seg.found ? "is-found" : seg.close ? "is-close" : "is-missing"}`}>
       <div className="verify-seg-text">
-        {seg.found ? <CheckCircleFilled aria-hidden /> : <CloseCircleFilled aria-hidden />}
+        {seg.found ? (
+          <CheckCircleFilled aria-hidden />
+        ) : seg.close ? (
+          <ExclamationCircleFilled aria-hidden />
+        ) : (
+          <CloseCircleFilled aria-hidden />
+        )}
         <span>{seg.text}</span>
       </div>
-      {seg.found ? (
+      {!seg.found && seg.close ? (
+        <div className="verify-seg-sources verify-seg-close">
+          {t("verify.segment_close")}
+          <span className="verify-close-text">「{seg.close.window_normalised}」</span>
+          {(() => {
+            const c = seg.close;
+            const title = `《${localizeHan(c.title_zh ?? c.cbeta_id ?? "", language)}》${t("verify.juan", { n: c.juan_num })}`;
+            const path = inAppPath(c.reader_url);
+            return path ? (
+              <Link to={path} className="verify-source">
+                {title}
+              </Link>
+            ) : (
+              <span className="verify-source">{title}</span>
+            );
+          })()}
+        </div>
+      ) : seg.found ? (
         <div className="verify-seg-sources">
           {t("verify.segment_found")}
           {seg.sources.map((s) => {

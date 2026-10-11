@@ -1997,16 +1997,30 @@ export interface ClaimSource {
   canon_class: CanonClass | null;
 }
 
+export interface ClaimClose {
+  text_id: number;
+  juan_num: number;
+  reader_url: string | null;
+  similarity: number;
+  /** The canon's wording, in the matcher's normalised space (simplified, no punctuation). */
+  window_normalised: string;
+  cbeta_id: string | null;
+  title_zh: string | null;
+  canon_class: CanonClass | null;
+}
+
 export interface ClaimSegment {
   text: string;
   found: boolean;
   sources: ClaimSource[];
   similarity: number;
+  /** Not verbatim, but the canon has it worded slightly differently. */
+  close: ClaimClose | null;
 }
 
 export interface ClaimVerdict {
   query: string;
-  verdict: "sutra" | "not_sutra" | "partial" | "absent";
+  verdict: "sutra" | "not_sutra" | "variant" | "partial" | "absent";
   source_class: CanonClass | null;
   segments: ClaimSegment[];
 }

@@ -66,6 +66,8 @@ check "/collections/huayan"              '<link rel="canonical" href="https://fo
 check "/collections/huayan?lang=en"      'Avatamsaka'
 check "/cross-canon?lang=en"             '<html lang="en">'
 check "/map?lang=en"                     '<html lang="en">'
+check "/verify?lang=zh-Hant"             '<link rel="canonical" href="https://fojin.app/verify?lang=zh-Hant"'
+check "/verify?q=x"                      '<html lang="zh-Hans">'
 check "/map"                             '<html lang="zh-Hans">'
 code  "/chat"                            200
 code  "/cross-canon"                     200
@@ -84,6 +86,7 @@ nocache "/sutras/heart-sutra"
 nocache "/collections/huayan"
 nocache "/collections/no-such-series"
 nocache "/cross-canon?lang=zh-Hant"
+nocache "/verify?lang=en"
 redirect() { # path expected-Location
   local got
   got=$(curl -sI "http://127.0.0.1:$PORT$1" | tr -d '\r' | awk 'tolower($1)=="location:"{print $2}')
@@ -91,6 +94,7 @@ redirect() { # path expected-Location
 }
 redirect "/CROSS-canon?lang=en"          "/cross-canon?lang=en"
 redirect "/CHAT"                         "/chat"
+redirect "/Verify?q=x"                   "/verify?q=x"
 code  "/collections/no-such-series"      200
 code  "/assets/does-not-exist.js"        404  # unchanged from master: a missing bundle must not get an HTML shell
 exit $fail

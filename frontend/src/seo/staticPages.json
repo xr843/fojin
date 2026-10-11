@@ -128,5 +128,15 @@
       "desc": "Passage-by-passage alignments of the same sutra across its Chinese, Pali, Sanskrit and Tibetan versions, read side by side on one page.",
       "noscript": "<h1>FoJin — Cross-canon Parallels</h1><p>Passage-by-passage alignments of the same sutra across its Chinese, Pali, Sanskrit and Tibetan versions.</p><a href=\"/?lang=en\">Back to home</a>"
     }
+  },
+  "verify": {
+    "title": "这句经，佛真的说过吗？— 引文核对 | 佛津 FoJin",
+    "desc": "粘贴一句「佛说」，逐字比对汉文大藏经原文：出自哪部经、是不是佛经里的话，一查便知。网上流传的假佛语、AI 编造的经文，都能核对。",
+    "noscript": "<h1>这句经，佛真的说过吗？</h1><p>粘贴一句「佛说」，佛津逐字比对 CBETA 汉文大藏经原文，告诉你它出自哪部经、是不是佛经里的话；真经文后面接了编造的半句，也会逐句标出来。</p><ul><li>出自佛经：见于经藏（「出自佛经」不等于佛亲口所说）</li><li>出自论典、注疏或祖师著作：大藏经里有，但不是佛经</li><li>大藏经中未见：很可能是后人托名</li></ul><a href=\"/\">返回首页</a>",
+    "en": {
+      "title": "Did the Buddha really say this? — Quote checker | FoJin",
+      "desc": "Paste a saying attributed to the Buddha and check it word for word against the Chinese Buddhist canon: which text it comes from, and whether it is in a sūtra at all.",
+      "noscript": "<h1>Did the Buddha really say this?</h1><p>Paste a saying and FoJin checks it word for word against the CBETA Chinese Buddhist canon: which text it comes from, whether it is in a sūtra, and which part of a half-real saying was added later.</p><a href=\"/?lang=en\">Back to home</a>"
+    }
   }
 }

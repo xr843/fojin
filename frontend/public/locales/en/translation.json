@@ -1675,5 +1675,8 @@
   "verify.error_short": "Too short — enter at least four characters.",
   "verify.error_rate": "Too many checks in a row — please wait a minute.",
   "verify.error_generic": "The check failed. Please try again later.",
-  "verify.method": "How it works: the text is compared word for word with the CBETA Chinese canon; traditional/simplified script and modern punctuation do not affect the result. Only the Chinese canon is covered for now — Pali, Tibetan and Sanskrit originals are not yet included."
+  "verify.method": "How it works: the text is compared word for word with the CBETA Chinese canon; traditional/simplified script and modern punctuation do not affect the result. Only the Chinese canon is covered for now — Pali, Tibetan and Sanskrit originals are not yet included.",
+  "verify.verdict.variant": "In the canon, worded slightly differently",
+  "verify.explain.variant": "The canon has this line, but the version going around changes a character or two. The canon's own wording is shown below.",
+  "verify.segment_close": "The canon reads"
 }

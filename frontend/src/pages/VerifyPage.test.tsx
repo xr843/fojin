@@ -57,7 +57,7 @@ describe("VerifyPage", () => {
       verdict({
         verdict: "sutra",
         source_class: "sutra",
-        segments: [{ text: "一切有为法，如梦幻泡影", found: true, sources: [DIAMOND], similarity: 1 }],
+        segments: [{ text: "一切有为法，如梦幻泡影", found: true, sources: [DIAMOND], similarity: 1 , close: null }],
       }),
     );
     renderAt("/verify?q=一切有为法，如梦幻泡影");
@@ -76,7 +76,7 @@ describe("VerifyPage", () => {
       verdict({
         verdict: "not_sutra",
         source_class: "school",
-        segments: [{ text: "菩提本无树", found: true, sources: [{ ...DIAMOND, canon_class: "school" }], similarity: 1 }],
+        segments: [{ text: "菩提本无树", found: true, sources: [{ ...DIAMOND, canon_class: "school" }], similarity: 1 , close: null }],
       }),
     );
     renderAt("/verify?q=菩提本无树");
@@ -89,8 +89,8 @@ describe("VerifyPage", () => {
       verdict({
         verdict: "partial",
         segments: [
-          { text: "一切有为法", found: true, sources: [DIAMOND], similarity: 1 },
-          { text: "看开便是福", found: false, sources: [], similarity: 0.2 },
+          { text: "一切有为法", found: true, sources: [DIAMOND], similarity: 1 , close: null },
+          { text: "看开便是福", found: false, sources: [], similarity: 0.2, close: null },
         ],
       }),
     );
@@ -102,12 +102,46 @@ describe("VerifyPage", () => {
 
   it("says plainly when nothing is in the canon", async () => {
     vi.mocked(verifyClaim).mockResolvedValue(
-      verdict({ verdict: "absent", segments: [{ text: "一切都是最好的安排", found: false, sources: [], similarity: 0.3 }] }),
+      verdict({ verdict: "absent", segments: [{ text: "一切都是最好的安排", found: false, sources: [], similarity: 0.3, close: null }] }),
     );
     const { container } = renderAt("/verify?q=一切都是最好的安排");
     await waitFor(() =>
       expect(container.querySelector(".verify-badge")?.textContent).toBe(locale["verify.verdict.absent"]),
     );
+  });
+
+  it("shows the canon's own wording when the popular version is a character off", async () => {
+    vi.mocked(verifyClaim).mockResolvedValue(
+      verdict({
+        verdict: "variant",
+        source_class: "sutra",
+        segments: [
+          {
+            text: "犹如莲花不著水，亦如日月不住空",
+            found: false,
+            sources: [],
+            similarity: 0.93,
+            close: {
+              text_id: 297,
+              juan_num: 1,
+              reader_url: "https://fojin.app/texts/297/read?juan=1",
+              similarity: 0.93,
+              window_normalised: "犹如莲花不着水亦如日月不着空",
+              cbeta_id: "T0297",
+              title_zh: "普賢菩薩行願讚",
+              canon_class: "sutra",
+            },
+          },
+        ],
+      }),
+    );
+    const { container } = renderAt("/verify?q=犹如莲花不著水，亦如日月不住空");
+    await waitFor(() =>
+      expect(container.querySelector(".verify-badge")?.textContent).toBe(locale["verify.verdict.variant"]),
+    );
+    expect(screen.getByText("「犹如莲花不着水亦如日月不着空」")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /普贤菩萨行愿赞/ }).getAttribute("href")).toBe("/texts/297/read?juan=1");
+    expect(container.querySelectorAll(".verify-seg.is-close")).toHaveLength(1);
   });
 
   it("keeps result pages out of the index but not the entry page", async () => {
