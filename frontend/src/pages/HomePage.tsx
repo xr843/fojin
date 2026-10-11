@@ -10,7 +10,7 @@ import {
   DownOutlined,
   ApartmentOutlined,
   RobotOutlined,
-  BookOutlined,
+  SafetyCertificateOutlined,
   FileTextOutlined,
   GlobalOutlined,
 } from "@ant-design/icons";
@@ -20,7 +20,6 @@ import SourceSelector from "../components/SourceSelector";
 import XiaojinPet from "../components/XiaojinPet";
 import { getStats, getSources, getFilters, getSearchSuggestItems, getHomeShowcase } from "../api/client";
 import { askQueryFrom, buildHomeSuggestOptions, itemsFromSuggestResponse, type SuggestGroup } from "./homeSuggest";
-import { getLocalizedCollections } from "../data/collections";
 import { getLangName } from "../utils/sourceUrls";
 import { getReadingHistory } from "../utils/readingHistory";
 import { useAuthStore } from "../stores/authStore";
@@ -35,7 +34,7 @@ function truncateTitle(title: string, max = 12): string {
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { user } = useAuthStore();
   const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
   const [sourceOpen, setSourceOpen] = useState(false);
@@ -59,7 +58,7 @@ export default function HomePage() {
   // any extra backend round-trip.
   const [rand] = useState(() => ({
     sources: Math.random(), chat: Math.random(), dict: Math.random(),
-    kg: Math.random(), geo: Math.random(), col: Math.random(),
+    kg: Math.random(), geo: Math.random(),
   }));
 
   // Pick one item from each cached pool using the per-mount random values.
@@ -95,15 +94,6 @@ export default function HomePage() {
         : null,
     };
   }, [showcase, rand]);
-
-  // 经典专题 card is driven by the frontend's own collection content (the server
-  // doesn't hold it). Pick a random featured slice per load, same as the pools.
-  const collectionsDesc = useMemo(() => {
-    const cols = getLocalizedCollections(i18n.language).map((c) => c.name).filter(Boolean);
-    if (cols.length === 0) return null;
-    const start = Math.floor(rand.col * cols.length) % cols.length;
-    return [0, 1, 2].map((i) => cols[(start + i) % cols.length]).join(" · ");
-  }, [i18n.language, rand.col]);
 
   // 搜索联想：复用 SearchPage 已有的 /search/suggest 接口与防抖模式。
   // 后端按 type 排好序，这里分组显示（经名 / 词条 / 热门问题），末尾固定一行「问小津」
@@ -295,6 +285,13 @@ export default function HomePage() {
               {sc.chat || t("home.feature_chat_desc")}
             </div>
           </div>
+          {/* 核对页（#1308）：面向大众的入口——网上流传的「佛说」是真是假。
+              顶替原「经典专题」卡：首页落地访客点它最少（30 天 26 次），导航里仍有。 */}
+          <div className="home-feature-card" onClick={() => navigate("/verify")}>
+            <SafetyCertificateOutlined className="home-feature-icon" />
+            <div className="home-feature-title">{t("home.feature_verify_title")}</div>
+            <div className="home-feature-desc">{t("home.feature_verify_desc")}</div>
+          </div>
           <div
             className="home-feature-card"
             onClick={() =>
@@ -328,13 +325,6 @@ export default function HomePage() {
                     places: sc.geo.places.join("、"),
                   })
                 : t("home.feature_geo_desc")}
-            </div>
-          </div>
-          <div className="home-feature-card" onClick={() => navigate("/collections")}>
-            <BookOutlined className="home-feature-icon" />
-            <div className="home-feature-title">{t("home.feature_collections_title")}</div>
-            <div className="home-feature-desc">
-              {collectionsDesc || t("home.feature_collections_desc")}
             </div>
           </div>
         </div>
