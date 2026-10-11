@@ -358,7 +358,8 @@ describe("remaining page i18n", () => {
       ]),
     );
     expect(alternates.get("x-default")).toBe("https://fojin.app/sutras/heart-sutra");
-    expect(alternates.get("zh")).toBe("https://fojin.app/sutras/heart-sutra");
+    expect(alternates.get("zh-Hans")).toBe("https://fojin.app/sutras/heart-sutra");
+    expect(document.head.querySelector('link[rel="canonical"]')?.getAttribute("href")).toBe("https://fojin.app/sutras/heart-sutra?lang=en");
     expect(alternates.get("en")).toBe("https://fojin.app/sutras/heart-sutra?lang=en");
     expect(alternates.get("zh-Hant")).toBe("https://fojin.app/sutras/heart-sutra?lang=zh-Hant");
   });
@@ -435,7 +436,8 @@ describe("remaining page i18n", () => {
       ]),
     );
     expect(alternates.get("x-default")).toBe("https://fojin.app/");
-    expect(alternates.get("zh")).toBe("https://fojin.app/");
+    expect(alternates.get("zh-Hans")).toBe("https://fojin.app/");
+    expect(document.head.querySelector('link[rel="canonical"]')?.getAttribute("href")).toBe("https://fojin.app/?lang=en");
     expect(alternates.get("en")).toBe("https://fojin.app/?lang=en");
     expect(alternates.get("zh-Hant")).toBe("https://fojin.app/?lang=zh-Hant");
   });

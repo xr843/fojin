@@ -55,23 +55,17 @@ function renderPage(id = "1") {
 }
 
 describe("PersonPage", () => {
-  it("emits hreflang alternates for every supported UI language", async () => {
+  // 人物页本期不做语言版本（docs/superpowers/specs/2026-10-11-i18n-seo-design.md §2.1）：
+  // 4.4 万个人物页换语言只换外壳，三语化只会新增近似重复 URL。
+  it("does not advertise language alternates", async () => {
     mockGetKGEntity.mockResolvedValue(entity());
 
     renderPage("1");
 
     await waitFor(() => expect(screen.getAllByText("鸠摩罗什").length).toBeGreaterThan(0));
-    await waitFor(() => expect(document.head.querySelectorAll('link[rel="alternate"]').length).toBeGreaterThan(0));
-
-    const alternates = new Map(
-      Array.from(document.head.querySelectorAll('link[rel="alternate"]')).map((el) => [
-        el.getAttribute("hreflang"),
-        el.getAttribute("href"),
-      ]),
+    await waitFor(() =>
+      expect(document.head.querySelector('link[rel="canonical"]')?.getAttribute("href")).toBe("https://fojin.app/person/1"),
     );
-    expect(alternates.get("x-default")).toBe("https://fojin.app/person/1");
-    expect(alternates.get("zh")).toBe("https://fojin.app/person/1");
-    expect(alternates.get("en")).toBe("https://fojin.app/person/1?lang=en");
-    expect(alternates.get("zh-Hant")).toBe("https://fojin.app/person/1?lang=zh-Hant");
+    expect(document.head.querySelectorAll('link[rel="alternate"][hreflang]')).toHaveLength(0);
   });
 });

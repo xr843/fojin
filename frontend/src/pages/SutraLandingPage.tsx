@@ -23,6 +23,9 @@ import {
   getLocalizedPopularSutras,
 } from "../data/popularSutras";
 import { useTranslation } from "react-i18next";
+import { LangAlternates } from "../seo/LangAlternates";
+import { langUrl, toSeoLang } from "../seo/langUrl";
+import { currentUILang } from "../i18n";
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -107,15 +110,10 @@ export default function SutraLandingPage() {
         <title>{sutra.metaTitle}</title>
         <meta name="description" content={sutra.metaDescription} />
         <meta name="keywords" content={sutra.keywords.join(",")} />
-        <link rel="canonical" href={canonicalUrl} />
-        <link rel="alternate" hrefLang="x-default" href={canonicalUrl} />
-        <link rel="alternate" hrefLang="zh" href={canonicalUrl} />
-        <link rel="alternate" hrefLang="en" href={`${canonicalUrl}?lang=en`} />
-        <link rel="alternate" hrefLang="zh-Hant" href={`${canonicalUrl}?lang=zh-Hant`} />
         <meta property="og:type" content="book" />
         <meta property="og:title" content={sutra.metaTitle} />
         <meta property="og:description" content={sutra.metaDescription} />
-        <meta property="og:url" content={canonicalUrl} />
+        <meta property="og:url" content={langUrl(`/sutras/${sutra.slug}`, toSeoLang(currentUILang(i18n)))} />
         <meta property="og:site_name" content={t("sutra_landing.site_name")} />
         <meta property="og:locale" content={ogLocale(i18n.language)} />
         <meta name="twitter:card" content="summary" />
@@ -131,6 +129,7 @@ export default function SutraLandingPage() {
           {JSON.stringify(schemaBreadcrumb)}
         </script>
       </Helmet>
+      <LangAlternates path={`/sutras/${sutra.slug}`} />
 
       <Space direction="vertical" size="large" style={{ width: "100%" }}>
         {/* Breadcrumb */}

@@ -20,6 +20,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { getWork, getWorkWitnesses } from "../api/client";
 import { workLangLabel, workCanonLabel, witnessHref } from "../utils/works";
+import { LangAlternates } from "../seo/LangAlternates";
+import { langUrl, toSeoLang } from "../seo/langUrl";
+import { currentUILang } from "../i18n";
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -31,7 +34,7 @@ const { Title, Text, Paragraph } = Typography;
 export default function WorkDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const {
     data: work,
@@ -91,18 +94,14 @@ export default function WorkDetailPage() {
       <Helmet>
         <title>{t("workDetail.pageTitle", { title: work.title_primary })}</title>
         <meta name="description" content={metaDesc} />
-        <link rel="canonical" href={canonicalUrl} />
-        <link rel="alternate" hrefLang="x-default" href={canonicalUrl} />
-        <link rel="alternate" hrefLang="zh" href={canonicalUrl} />
-        <link rel="alternate" hrefLang="en" href={`${canonicalUrl}?lang=en`} />
-        <link rel="alternate" hrefLang="zh-Hant" href={`${canonicalUrl}?lang=zh-Hant`} />
         <meta property="og:type" content="book" />
         <meta property="og:title" content={t("workDetail.ogTitle", { title: work.title_primary })} />
         <meta property="og:description" content={metaDesc} />
-        <meta property="og:url" content={canonicalUrl} />
+        <meta property="og:url" content={langUrl(`/works/${work.slug}`, toSeoLang(currentUILang(i18n)))} />
         <meta property="og:site_name" content={t("app.name")} />
         <script type="application/ld+json">{JSON.stringify(schemaBook)}</script>
       </Helmet>
+      <LangAlternates path={`/works/${work.slug}`} />
 
       <Space direction="vertical" size="large" style={{ width: "100%" }}>
         <Breadcrumb

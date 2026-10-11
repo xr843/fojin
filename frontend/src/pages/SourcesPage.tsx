@@ -17,6 +17,7 @@ import {
   REGION_ORDER,
 } from "./sources/constants";
 import "../styles/sources.css";
+import { LangAlternates } from "../seo/LangAlternates";
 
 type GroupBy = "region" | "field" | "lang";
 type Capability = "direct" | "local" | "remote" | "iiif" | "api";
@@ -387,12 +388,8 @@ export default function SourcesPage() {
               : t("sources.page_desc_default")
           }
         />
-        <link rel="canonical" href="https://fojin.app/sources" />
-        <link rel="alternate" hrefLang="x-default" href="https://fojin.app/sources" />
-        <link rel="alternate" hrefLang="zh" href="https://fojin.app/sources" />
-        <link rel="alternate" hrefLang="en" href="https://fojin.app/sources?lang=en" />
-        <link rel="alternate" hrefLang="zh-Hant" href="https://fojin.app/sources?lang=zh-Hant" />
       </Helmet>
+      <LangAlternates path="/sources" />
       <div className="sources-header">
         <h1 className="sources-title">{t("sources.heading")}</h1>
         <p className="sources-desc">{t("sources.subtitle", { n: total })}</p>

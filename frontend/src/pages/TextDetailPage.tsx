@@ -22,13 +22,16 @@ import SourceAttribution from "../components/SourceAttribution";
 import SameTitleTexts from "../components/SameTitleTexts";
 import CitationGenerator from "../components/CitationGenerator";
 import { addViewHistory } from "../utils/history";
+import { LangAlternates } from "../seo/LangAlternates";
+import { langUrl, ogLocaleFor, seoTitle, toSeoLang } from "../seo/langUrl";
+import { currentUILang } from "../i18n";
 
 const { Title } = Typography;
 
 export default function TextDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [citationOpen, setCitationOpen] = useState(false);
   // 续读：有本地阅读记录时，主按钮变为"继续阅读·第N卷"。
   // useMemo 按 id 重算：相关经典跳转复用同一路由实例，useState 初始化会 stale。
@@ -102,6 +105,7 @@ export default function TextDetailPage() {
     text.dynasty,
     text.category,
   ].filter(Boolean).join(" · ");
+  const seoLang = toSeoLang(currentUILang(i18n));
   const seoDescription = t("textDetail.seoDescription", { details: seoParts });
   const shortDescription = [
     text.title_zh,
@@ -112,21 +116,16 @@ export default function TextDetailPage() {
   return (
     <div className="text-detail-page">
       <Helmet>
-        <title>{t("textDetail.pageTitle", { title: text.title_zh })}</title>
+        <title>{t("textDetail.pageTitle", { title: seoTitle(text.title_zh, seoLang) })}</title>
         <meta name="description" content={seoDescription} />
-        <link rel="canonical" href={`https://fojin.app/texts/${id}`} />
-        <link rel="alternate" hrefLang="x-default" href={`https://fojin.app/texts/${id}`} />
-        <link rel="alternate" hrefLang="zh" href={`https://fojin.app/texts/${id}`} />
-        <link rel="alternate" hrefLang="en" href={`https://fojin.app/texts/${id}?lang=en`} />
-        <link rel="alternate" hrefLang="zh-Hant" href={`https://fojin.app/texts/${id}?lang=zh-Hant`} />
         <meta property="og:type" content="book" />
-        <meta property="og:title" content={t("textDetail.pageTitle", { title: text.title_zh })} />
+        <meta property="og:title" content={t("textDetail.pageTitle", { title: seoTitle(text.title_zh, seoLang) })} />
         <meta property="og:description" content={shortDescription} />
-        <meta property="og:url" content={`https://fojin.app/texts/${id}`} />
+        <meta property="og:url" content={langUrl(`/texts/${id}`, seoLang)} />
         <meta property="og:site_name" content={t("app.name")} />
-        <meta property="og:locale" content="zh_CN" />
+        <meta property="og:locale" content={ogLocaleFor(seoLang)} />
         <meta name="twitter:card" content="summary" />
-        <meta name="twitter:title" content={t("textDetail.pageTitle", { title: text.title_zh })} />
+        <meta name="twitter:title" content={t("textDetail.pageTitle", { title: seoTitle(text.title_zh, seoLang) })} />
         <meta name="twitter:description" content={shortDescription} />
         <script type="application/ld+json">
           {JSON.stringify({
@@ -154,6 +153,7 @@ export default function TextDetailPage() {
           })}
         </script>
       </Helmet>
+      <LangAlternates path={`/texts/${id}`} />
       <Breadcrumb
         className="td-breadcrumb"
         items={[

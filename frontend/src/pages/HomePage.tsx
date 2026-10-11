@@ -25,6 +25,7 @@ import { getLangName } from "../utils/sourceUrls";
 import { getReadingHistory } from "../utils/readingHistory";
 import { useAuthStore } from "../stores/authStore";
 import "../styles/home.css"; // mobile-responsive v2.1
+import { LangAlternates } from "../seo/LangAlternates";
 
 /** 代码点级截断：CBETA 题名偶含扩展 B 区汉字，String.slice 会撕裂代理对。 */
 function truncateTitle(title: string, max = 12): string {
@@ -157,11 +158,8 @@ export default function HomePage() {
     <div className="home-page">
       <Helmet>
         <title>{t("app.title")}</title>
-        <link rel="alternate" hrefLang="x-default" href="https://fojin.app/" />
-        <link rel="alternate" hrefLang="zh" href="https://fojin.app/" />
-        <link rel="alternate" hrefLang="en" href="https://fojin.app/?lang=en" />
-        <link rel="alternate" hrefLang="zh-Hant" href="https://fojin.app/?lang=zh-Hant" />
       </Helmet>
+      <LangAlternates path="/" />
       <section className="home-hero">
         <div className="home-hero-bg">
           <img src="/landscape-bg.webp" alt="" decoding="async" />

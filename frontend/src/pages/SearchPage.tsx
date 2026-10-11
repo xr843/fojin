@@ -329,10 +329,6 @@ export default function SearchPage() {
         <title>{pageTitle}</title>
         <meta name="description" content={pageDesc} />
         <link rel="canonical" href={`https://fojin.app/search${(() => { const p = new URLSearchParams(); if (query) p.set("q", query); if (page > 1) p.set("page", String(page)); return p.toString() ? `?${p.toString()}` : ""; })()}`} />
-        <link rel="alternate" hrefLang="x-default" href={`https://fojin.app/search${query ? `?q=${encodeURIComponent(query)}` : ""}`} />
-        <link rel="alternate" hrefLang="zh" href={`https://fojin.app/search${query ? `?q=${encodeURIComponent(query)}` : ""}`} />
-        <link rel="alternate" hrefLang="en" href={`https://fojin.app/search?${new URLSearchParams({ ...(query ? { q: query } : {}), lang: "en" }).toString()}`} />
-        <link rel="alternate" hrefLang="zh-Hant" href={`https://fojin.app/search?${new URLSearchParams({ ...(query ? { q: query } : {}), lang: "zh-Hant" }).toString()}`} />
         {query && page > 1 && (
           <link rel="prev" href={`https://fojin.app/search?${new URLSearchParams({ q: query, ...(page > 2 ? { page: String(page - 1) } : {}) }).toString()}`} />
         )}

@@ -148,9 +148,11 @@ describe("TextDetailPage", () => {
       ]),
     );
     expect(alternates.get("x-default")).toBe("https://fojin.app/texts/1");
-    expect(alternates.get("zh")).toBe("https://fojin.app/texts/1");
+    expect(alternates.get("zh-Hans")).toBe("https://fojin.app/texts/1");
     expect(alternates.get("en")).toBe("https://fojin.app/texts/1?lang=en");
     expect(alternates.get("zh-Hant")).toBe("https://fojin.app/texts/1?lang=zh-Hant");
+    // en 是本组用例的界面语言：canonical 必须指向英文版自身，否则 Google 会把它并进简体页。
+    expect(document.head.querySelector('link[rel="canonical"]')?.getAttribute("href")).toBe("https://fojin.app/texts/1?lang=en");
   });
 
   // 部分条目的译者字段自带朝代前缀（如 /texts/36「姚秦 佛陀耶舍共竺佛念等」、

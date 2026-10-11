@@ -91,7 +91,8 @@ describe("SourcesPage", () => {
       ]),
     );
     expect(alternates.get("x-default")).toBe("https://fojin.app/sources");
-    expect(alternates.get("zh")).toBe("https://fojin.app/sources");
+    expect(alternates.get("zh-Hans")).toBe("https://fojin.app/sources");
+    expect(document.head.querySelector('link[rel="canonical"]')?.getAttribute("href")).toBe("https://fojin.app/sources");
     expect(alternates.get("en")).toBe("https://fojin.app/sources?lang=en");
     expect(alternates.get("zh-Hant")).toBe("https://fojin.app/sources?lang=zh-Hant");
   });

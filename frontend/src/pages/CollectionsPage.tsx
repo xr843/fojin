@@ -31,6 +31,7 @@ import { getAlignmentCatalog } from "../api/client";
 import { localizeHan } from "../utils/hanScript";
 import "../styles/sources.css";
 import "../styles/collections.css";
+import { LangAlternates } from "../seo/LangAlternates";
 
 const RESOURCE_ICONS: Record<ResourceCategory, React.ReactNode> = {
   reading: <ReadOutlined />,
@@ -476,15 +477,8 @@ export default function CollectionsPage() {
           name="description"
           content={openCollection ? openCollection.description : t("collections.page_desc")}
         />
-        <link
-          rel="canonical"
-          href={
-            openCollection
-              ? `https://fojin.app/collections/${openCollection.id}`
-              : "https://fojin.app/collections"
-          }
-        />
       </Helmet>
+      <LangAlternates path={openCollection ? `/collections/${openCollection.id}` : "/collections"} />
 
       <div className="sources-header">
         <h1 className="sources-title">{t("collections.title")}</h1>
