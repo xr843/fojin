@@ -2,9 +2,9 @@
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
-import { resolve } from "path";
+import { dirname, resolve } from "path";
 import { mkdirSync, writeFileSync, readFileSync } from "fs";
-import { STATIC_SEO_PAGES } from "./src/seo/staticPages";
+import { localizeShell, shellPlan } from "./src/seo/buildShells";
 
 /**
  * 为关键路由生成独立 HTML 文件，让搜索引擎无需 JS 即可获取正确的
@@ -12,8 +12,6 @@ import { STATIC_SEO_PAGES } from "./src/seo/staticPages";
  * dist/sources/index.html，爬虫直接拿到正确 meta。
  */
 function seoPages(): Plugin {
-  const pages = STATIC_SEO_PAGES;
-
   return {
     name: "seo-pages",
     closeBundle() {
@@ -25,65 +23,12 @@ function seoPages(): Plugin {
         return; // dist not ready
       }
 
-      for (const [route, meta] of Object.entries(pages)) {
-        let html = template;
-
-        // Replace title
-        html = html.replace(
-          /<title>[^<]*<\/title>/,
-          `<title>${meta.title}</title>`,
-        );
-
-        // Replace meta description
-        html = html.replace(
-          /<meta name="description" content="[^"]*"/,
-          `<meta name="description" content="${meta.desc}"`,
-        );
-
-        // Replace canonical
-        html = html.replace(
-          /<link rel="canonical" href="[^"]*"/,
-          `<link rel="canonical" href="https://fojin.app/${route}"`,
-        );
-
-        // Replace og:url
-        html = html.replace(
-          /<meta property="og:url" content="[^"]*"/,
-          `<meta property="og:url" content="https://fojin.app/${route}"`,
-        );
-
-        // Replace og:title
-        html = html.replace(
-          /<meta property="og:title" content="[^"]*"/,
-          `<meta property="og:title" content="${meta.title}"`,
-        );
-
-        // Replace og:description
-        html = html.replace(
-          /<meta property="og:description" content="[^"]*"/,
-          `<meta property="og:description" content="${meta.desc}"`,
-        );
-
-        // Replace Twitter metadata as well; otherwise route pages inherit the
-        // generic SPA shell description.
-        html = html.replace(
-          /<meta name="twitter:title" content="[^"]*"/,
-          `<meta name="twitter:title" content="${meta.title}"`,
-        );
-        html = html.replace(
-          /<meta name="twitter:description" content="[^"]*"/,
-          `<meta name="twitter:description" content="${meta.desc}"`,
-        );
-
-        // Replace noscript content
-        html = html.replace(
-          /<noscript>[\s\S]*?<\/noscript>/,
-          `<noscript><div style="max-width:800px;margin:40px auto;padding:0 24px;font-family:serif;color:#2b2318">${meta.noscript}</div></noscript>`,
-        );
-
-        const dir = resolve(distDir, route);
-        mkdirSync(dir, { recursive: true });
-        writeFileSync(resolve(dir, "index.html"), html);
+      // One shell per (route × UI language); nginx picks the file by ?lang=.
+      // See src/seo/buildShells.ts and frontend/nginx.conf (`map $arg_lang`).
+      for (const entry of shellPlan(template)) {
+        const out = resolve(distDir, entry.outFile);
+        mkdirSync(dirname(out), { recursive: true });
+        writeFileSync(out, localizeShell(template, entry));
       }
     },
   };
@@ -129,7 +74,11 @@ export default defineConfig({
         // og-image.png (236KB) is excluded for exactly the same reason: it is the
         // share card served to WeChat/Twitter crawlers, never rendered in the app.
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webp}"],
-        globIgnores: ["**/landscape-bg.png", "**/og-image.png"],
+        // The per-route / per-language crawler shells (src/seo/buildShells.ts) are
+        // never used by the SW: every navigation is answered from the precached
+        // root index.html (navigateFallback). Precaching ~100 of them would add
+        // ~1.2 MB to every visitor's first load for nothing.
+        globIgnores: ["**/landscape-bg.png", "**/og-image.png", "**/index.*.html", "*/**/index.html"],
         // /agents and /llms.txt are real files served outside the SPA, and a
         // navigation to either would otherwise be answered from the precached
         // index.html: /agents has no React Router route (→ 404 page for anyone

@@ -2,37 +2,72 @@
   "chat": {
     "title": "佛经 AI 问答 — 每句引用可点开核对原文 | 佛津 FoJin",
     "desc": "向大藏经提问，佛学助手「小津」检索典籍原文后作答。答案里每条引用都标注经名与卷号，点开即可比对原典；也可选择以历代祖师的视角作答。",
-    "noscript": "<h1>佛津 — 佛经 AI 问答</h1><p>用大白话向大藏经提问，佛学助手「小津」检索典籍原文后作答。答案中每条引用都标注经名与卷号，点开即可比对原典——你不必相信它，你可以去查它。</p><h2>能做什么</h2><ul><li>依据典籍原文回答佛学问题，并给出可核对的出处</li><li>以历代祖师的视角作答，各自只依其宗派典籍</li><li>汉传·南传·藏传三系跨语对读，一览异译</li><li>引用可一键导出 BibTeX、RIS、APA 学术格式</li></ul><h2>可以这样问</h2><ul><li>「应无所住而生其心」出自哪部经？</li><li>《心经》里的「色即是空」该怎么理解？</li><li>汉传《阿含经》与南传《尼柯耶》有何异同？</li></ul><a href=\"/\">返回首页</a>"
+    "noscript": "<h1>佛津 — 佛经 AI 问答</h1><p>用大白话向大藏经提问，佛学助手「小津」检索典籍原文后作答。答案中每条引用都标注经名与卷号，点开即可比对原典——你不必相信它，你可以去查它。</p><h2>能做什么</h2><ul><li>依据典籍原文回答佛学问题，并给出可核对的出处</li><li>以历代祖师的视角作答，各自只依其宗派典籍</li><li>汉传·南传·藏传三系跨语对读，一览异译</li><li>引用可一键导出 BibTeX、RIS、APA 学术格式</li></ul><h2>可以这样问</h2><ul><li>「应无所住而生其心」出自哪部经？</li><li>《心经》里的「色即是空」该怎么理解？</li><li>汉传《阿含经》与南传《尼柯耶》有何异同？</li></ul><a href=\"/\">返回首页</a>",
+    "en": {
+      "title": "AI Q&A on the Buddhist Canon — every citation links to the source | FoJin",
+      "desc": "Ask the Buddhist canon in plain language. XiaoJin answers from the original texts, and every citation names the sutra and fascicle so you can open it and check the source. You can also ask from the perspective of a historical master.",
+      "noscript": "<h1>FoJin — AI Q&amp;A on the Buddhist Canon</h1><p>Ask in plain language. XiaoJin searches the canon and answers from the original texts. Every citation names the sutra and fascicle and opens the source — you don't have to trust it, you can check it.</p><h2>What it does</h2><ul><li>Answers questions from the original texts, with sources you can verify</li><li>Answers from the perspective of historical masters, each drawing only on their own lineage's texts</li><li>Compares Chinese, Pali and Tibetan parallels side by side</li><li>Exports citations as BibTeX, RIS or APA</li></ul><a href=\"/?lang=en\">Back to home</a>"
+    }
   },
   "search": {
     "title": "搜索 | 佛津 FoJin",
     "desc": "搜索全球佛教古籍数字资源 — 支持按经名、编号、译者检索",
-    "noscript": "<h1>佛津 — 典籍搜索</h1><p>跨多个数据源检索佛教古籍，支持按经名、编号、译者查询。</p><a href=\"/\">返回首页</a>"
+    "noscript": "<h1>佛津 — 典籍搜索</h1><p>跨多个数据源检索佛教古籍，支持按经名、编号、译者查询。</p><a href=\"/\">返回首页</a>",
+    "en": {
+      "title": "Search | FoJin",
+      "desc": "Search Buddhist classics across many digital collections — by title, catalogue number or translator.",
+      "noscript": "<h1>FoJin — Text Search</h1><p>Search Buddhist classics across many data sources, by title, catalogue number or translator.</p><a href=\"/?lang=en\">Back to home</a>"
+    }
   },
   "sources": {
     "title": "数据源导航 | 佛津 FoJin",
     "desc": "聚合全球佛教数字资源，覆盖图书馆、大学、研究机构、数字项目等。",
-    "noscript": "<h1>佛津 — 数据源导航</h1><p>聚合 CBETA、BDRC、SAT、SuttaCentral 等全球佛教数字资源。</p><a href=\"/\">返回首页</a>"
+    "noscript": "<h1>佛津 — 数据源导航</h1><p>聚合 CBETA、BDRC、SAT、SuttaCentral 等全球佛教数字资源。</p><a href=\"/\">返回首页</a>",
+    "en": {
+      "title": "Data Source Navigator | FoJin",
+      "desc": "Aggregating Buddhist digital resources worldwide, covering libraries, universities, research institutes and digital projects.",
+      "noscript": "<h1>FoJin — Data Source Navigator</h1><p>Aggregates Buddhist digital resources worldwide, including CBETA, BDRC, SAT and SuttaCentral.</p><a href=\"/?lang=en\">Back to home</a>"
+    }
   },
   "kg": {
     "title": "知识图谱 | 佛津 FoJin",
     "desc": "佛教知识图谱 — 人物、寺院、宗派关系可视化",
-    "noscript": "<h1>佛津 — 知识图谱</h1><p>可视化展示佛教人物、寺院、宗派之间的关系网络。</p><a href=\"/\">返回首页</a>"
+    "noscript": "<h1>佛津 — 知识图谱</h1><p>可视化展示佛教人物、寺院、宗派之间的关系网络。</p><a href=\"/\">返回首页</a>",
+    "en": {
+      "title": "Knowledge Graph | FoJin",
+      "desc": "Buddhist knowledge graph — relationships between people, monasteries and schools, visualised.",
+      "noscript": "<h1>FoJin — Knowledge Graph</h1><p>Visualises the network of relationships between Buddhist figures, monasteries and schools.</p><a href=\"/?lang=en\">Back to home</a>"
+    }
   },
   "collections": {
     "title": "经典专题 | 佛津 FoJin",
     "desc": "按经论系列分类浏览佛教经典，包含主要经典、注疏论释及相关资源。",
-    "noscript": "<h1>佛津 — 经典专题</h1><p>按经论系列分类浏览佛教经典，每个系列收录主要经典、注疏论释与相关外部资源。</p><h2>经论系列</h2><ul><li>华严经系列</li><li>般若经系列</li><li>法华经系列</li><li>楞严经系列</li><li>净土经系列</li><li>唯识系列</li><li>禅宗经典系列</li><li>律典系列</li><li>阿含经/尼柯耶系列</li><li>密教系列</li><li>涅槃经系列</li><li>阿毗达磨系列</li><li>南传巴利三藏</li></ul><a href=\"/\">返回首页</a>"
+    "noscript": "<h1>佛津 — 经典专题</h1><p>按经论系列分类浏览佛教经典，每个系列收录主要经典、注疏论释与相关外部资源。</p><h2>经论系列</h2><ul><li>华严经系列</li><li>般若经系列</li><li>法华经系列</li><li>楞严经系列</li><li>净土经系列</li><li>唯识系列</li><li>禅宗经典系列</li><li>律典系列</li><li>阿含经/尼柯耶系列</li><li>密教系列</li><li>涅槃经系列</li><li>阿毗达磨系列</li><li>南传巴利三藏</li></ul><a href=\"/\">返回首页</a>",
+    "en": {
+      "title": "Text Collections | FoJin",
+      "desc": "Browse Buddhist classics by series, including main texts, commentaries and related resources.",
+      "noscript": "<h1>FoJin — Text Collections</h1><p>Browse Buddhist classics by series. Each series gathers the main texts, commentaries and related external resources.</p><a href=\"/?lang=en\">Back to home</a>"
+    }
   },
   "topics": {
     "title": "经典专题 — 佛津 FoJin",
     "desc": "按主题浏览佛教经典：般若系、净土五经、法华系、禅宗典籍、律藏、阿含经、唯识经论、华严系。",
-    "noscript": "<h1>佛津 — 经典专题</h1><p>按主题浏览佛教经典，帮助您找到入门路径。</p><a href=\"/\">返回首页</a>"
+    "noscript": "<h1>佛津 — 经典专题</h1><p>按主题浏览佛教经典，帮助您找到入门路径。</p><a href=\"/\">返回首页</a>",
+    "en": {
+      "title": "Topics — FoJin",
+      "desc": "Browse Buddhist classics by theme: Prajnaparamita, the Pure Land sutras, the Lotus, Chan texts, Vinaya, Agamas, Yogacara and Avatamsaka.",
+      "noscript": "<h1>FoJin — Topics</h1><p>Browse Buddhist classics by theme to find a way in.</p><a href=\"/?lang=en\">Back to home</a>"
+    }
   },
   "dictionary": {
     "title": "佛学辞典 — 佛津 FoJin",
     "desc": "38 部权威佛学辞典，712,000+ 词条，覆盖中梵巴藏英五语。在线查询佛光大辞典、丁福保佛学大辞典、Digital Pali Dictionary 等权威辞典。",
-    "noscript": "<h1>佛津 — 佛学辞典</h1><p>聚合 38 部权威佛学辞典，超过 712,000 条词条，覆盖中文、梵文、巴利文、藏文、英文五种语言。</p><h2>收录辞典</h2><ul><li>佛光大辞典</li><li>丁福保佛学大辞典</li><li>Digital Pali Dictionary (DPD)</li><li>Sanskrit Heritage Dictionary</li><li>Monier-Williams Sanskrit-English Dictionary</li><li>Buddhist Hybrid Sanskrit Dictionary</li><li>翻译名义集</li><li>一切经音义</li></ul><a href=\"/\">返回首页</a>"
+    "noscript": "<h1>佛津 — 佛学辞典</h1><p>聚合 38 部权威佛学辞典，超过 712,000 条词条，覆盖中文、梵文、巴利文、藏文、英文五种语言。</p><h2>收录辞典</h2><ul><li>佛光大辞典</li><li>丁福保佛学大辞典</li><li>Digital Pali Dictionary (DPD)</li><li>Sanskrit Heritage Dictionary</li><li>Monier-Williams Sanskrit-English Dictionary</li><li>Buddhist Hybrid Sanskrit Dictionary</li><li>翻译名义集</li><li>一切经音义</li></ul><a href=\"/\">返回首页</a>",
+    "en": {
+      "title": "Buddhist Dictionaries — FoJin",
+      "desc": "Look up terms across authoritative Buddhist dictionaries covering Chinese, Sanskrit, Pali, Tibetan and English, including the Foguang Dictionary, the Digital Pali Dictionary and Monier-Williams.",
+      "noscript": "<h1>FoJin — Buddhist Dictionaries</h1><p>Authoritative Buddhist dictionaries in one place, covering Chinese, Sanskrit, Pali, Tibetan and English.</p><h2>Included</h2><ul><li>Foguang Buddhist Dictionary</li><li>Ding Fubao Buddhist Dictionary</li><li>Digital Pali Dictionary (DPD)</li><li>Sanskrit Heritage Dictionary</li><li>Monier-Williams Sanskrit-English Dictionary</li><li>Buddhist Hybrid Sanskrit Dictionary</li></ul><a href=\"/?lang=en\">Back to home</a>"
+    }
   },
   "sutras/heart-sutra": {
     "title": "心经全文 — 般若波罗蜜多心经原文在线阅读 | 佛津 FoJin",
@@ -83,5 +118,15 @@
     "title": "维摩诘经全文 — 维摩诘所说经原文在线阅读 | 佛津 FoJin",
     "desc": "维摩诘经全文在线阅读。《维摩诘所说经》三卷十四品，姚秦鸠摩罗什译，展现大乘不二法门与在家修行的殊胜。",
     "noscript": "<h1>维摩诘经全文 — 维摩诘所说经</h1><p>姚秦鸠摩罗什译，不二法门经典。</p><a href=\"/\">返回首页</a>"
+  },
+  "cross-canon": {
+    "title": "跨藏对照 — 汉传·南传·藏传逐段跨语对读 | 佛津 FoJin",
+    "desc": "同一部经的汉译、巴利、梵文、藏译逐段对齐，一页之内对读异译。",
+    "noscript": "<h1>佛津 — 跨藏对照</h1><p>同一部经的汉译、巴利、梵文、藏译逐段对齐，一页之内对读异译。</p><a href=\"/\">返回首页</a>",
+    "en": {
+      "title": "Cross-canon Parallels — Chinese, Pali, Sanskrit and Tibetan side by side | FoJin",
+      "desc": "Passage-by-passage alignments of the same sutra across its Chinese, Pali, Sanskrit and Tibetan versions, read side by side on one page.",
+      "noscript": "<h1>FoJin — Cross-canon Parallels</h1><p>Passage-by-passage alignments of the same sutra across its Chinese, Pali, Sanskrit and Tibetan versions.</p><a href=\"/?lang=en\">Back to home</a>"
+    }
   }
 }

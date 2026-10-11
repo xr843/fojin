@@ -21,4 +21,12 @@ export interface SeoPage {
   noscript: string;
 }
 
-export const STATIC_SEO_PAGES: Record<string, SeoPage> = pages;
+/**
+ * zh copy at the top level; `en` is the English shell. zh-Hant is not stored —
+ * buildShells.ts derives it from zh with OpenCC, so the two cannot drift.
+ */
+export interface StaticSeoPage extends SeoPage {
+  en?: SeoPage;
+}
+
+export const STATIC_SEO_PAGES: Record<string, StaticSeoPage> = pages;
