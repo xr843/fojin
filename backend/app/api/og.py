@@ -26,13 +26,18 @@ import io
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from opencc import OpenCC
 from PIL import Image, ImageDraw, ImageFont
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.elasticsearch import get_es
 from app.database import get_db
 from app.models.chat import SharedQA
+from app.schemas.verification import ClaimVerdict
+from app.services.claim_check import check_claim
+from app.services.quote_lookup import QuoteTooShortError
 
 logger = logging.getLogger(__name__)
 
@@ -205,3 +210,166 @@ async def shared_qa_og_image(
         media_type="image/png",
         headers={"Cache-Control": "public, max-age=86400"},
     )
+
+
+# ── 「这句经，佛真的说过吗？」 result card (GET /api/og/verify?q=…) ───────────
+#
+# Shown as an <img> on /verify (long-press to save in WeChat) and used as the
+# page's og:image. Only ``q`` (and the label language) is accepted: the verdict
+# is always recomputed by check_claim, so no URL can make this card say
+# something fojin did not find.
+
+_VERDICT_COLOURS = {
+    "sutra": (46, 125, 82),
+    "not_sutra": (176, 122, 33),
+    "partial": (196, 98, 45),
+    "absent": (120, 115, 108),
+}
+_FOUND_INK = (34, 32, 30)
+_MISSING_INK = (176, 168, 158)
+
+_CLASS_LABELS = {
+    "zh": {
+        "vinaya": "律典", "treatise": "论典（菩萨、论师所造）", "commentary": "注疏",
+        "school": "宗派与祖师著作", "history": "史传", "apocrypha": "疑伪经",
+        "later": "后世注疏、语录", "unknown": "其他典籍",
+    },
+    "zh-Hant": {
+        "vinaya": "律典", "treatise": "論典（菩薩、論師所造）", "commentary": "注疏",
+        "school": "宗派與祖師著作", "history": "史傳", "apocrypha": "疑偽經",
+        "later": "後世注疏、語錄", "unknown": "其他典籍",
+    },
+    "en": {
+        "vinaya": "a Vinaya text", "treatise": "a treatise (śāstra)", "commentary": "a commentary",
+        "school": "a school or master's work", "history": "a historical work", "apocrypha": "an apocryphal sūtra",
+        "later": "a later commentary or record", "unknown": "another work",
+    },
+}
+_COPY = {
+    "zh": {
+        "header": "佛津 FoJin · 这句经，佛真的说过吗？",
+        "sutra": "出自佛经",
+        "not_sutra": "出自{cls}，不是佛经",
+        "partial": "只有部分能在大藏经中找到",
+        "absent": "大藏经中未见",
+        "source": "出处 · {titles}",
+        "missing": "灰色部分：大藏经中未见",
+        "footer": "逐字比对 CBETA 原文 · fojin.app/verify",
+    },
+    "zh-Hant": {
+        "header": "佛津 FoJin · 這句經，佛真的說過嗎？",
+        "sutra": "出自佛經",
+        "not_sutra": "出自{cls}，不是佛經",
+        "partial": "只有部分能在大藏經中找到",
+        "absent": "大藏經中未見",
+        "source": "出處 · {titles}",
+        "missing": "灰色部分：大藏經中未見",
+        "footer": "逐字比對 CBETA 原文 · fojin.app/verify",
+    },
+    "en": {
+        "header": "FoJin · Did the Buddha really say this?",
+        "sutra": "Found in a sūtra",
+        "not_sutra": "Found in {cls}, not a sūtra",
+        "partial": "Only partly found in the canon",
+        "absent": "Not found in the Buddhist canon",
+        "source": "Source · {titles}",
+        "missing": "Grey: not found in the canon",
+        "footer": "Checked word for word against CBETA · fojin.app/verify",
+    },
+}
+_T2S = OpenCC("t2s")
+_BADGE_FONT = _font(40)
+_QUOTE_FONT = _font(48)
+_QUOTE_MAX_LINES = 4
+
+
+def _layout_segments(verdict: ClaimVerdict, max_width: int) -> list[list[tuple[str, tuple[int, int, int]]]]:
+    """Wrap the pasted text char by char into ≤4 lines, colouring each clause."""
+    runs = [(seg.text, _FOUND_INK if seg.found else _MISSING_INK) for seg in verdict.segments]
+    if len(runs) > 1:  # clause texts dropped their punctuation when split
+        runs = [(t + ("，" if i < len(runs) - 1 else ""), c) for i, (t, c) in enumerate(runs)]
+    lines: list[list[tuple[str, tuple[int, int, int]]]] = [[]]
+    width = 0.0
+    for text, colour in runs:
+        for ch in text:
+            w = _QUOTE_FONT.getlength(ch) if hasattr(_QUOTE_FONT, "getlength") else 24
+            if width + w > max_width:
+                if len(lines) == _QUOTE_MAX_LINES:
+                    last = lines[-1]
+                    last[-1] = (last[-1][0][:-1] + "…", last[-1][1]) if last and last[-1][0] else last[-1]
+                    return lines
+                lines.append([])
+                width = 0.0
+            if lines[-1] and lines[-1][-1][1] == colour:
+                lines[-1][-1] = (lines[-1][-1][0] + ch, colour)
+            else:
+                lines[-1].append((ch, colour))
+            width += w
+    return lines
+
+
+def _render_verify_card(verdict: ClaimVerdict, lang: str) -> bytes:
+    copy = _COPY[lang]
+    accent = _VERDICT_COLOURS[verdict.verdict]
+    img = Image.new("RGB", (CARD_WIDTH, CARD_HEIGHT), color=(252, 250, 246))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle(((0, 0), (CARD_WIDTH, 10)), fill=accent)
+    draw.text((PADDING, PADDING - 8), copy["header"], fill=(143, 100, 65), font=_HEADER_FONT)
+
+    if verdict.verdict == "not_sutra":
+        cls = _CLASS_LABELS[lang].get(verdict.source_class or "unknown", _CLASS_LABELS[lang]["unknown"])
+        badge = copy["not_sutra"].format(cls=cls)
+    else:
+        badge = copy[verdict.verdict]
+    bx, by = PADDING, PADDING + 48
+    bbox = draw.textbbox((bx + 24, by + 12), badge, font=_BADGE_FONT)
+    draw.rounded_rectangle(((bx, by), (bbox[2] + 24, bbox[3] + 14)), radius=14, fill=accent)
+    draw.text((bx + 24, by + 12), badge, fill=(255, 255, 255), font=_BADGE_FONT)
+
+    y = by + 112
+    for line in _layout_segments(verdict, CARD_WIDTH - 2 * PADDING):
+        x = PADDING
+        for text, colour in line:
+            draw.text((x, y), text, fill=colour, font=_QUOTE_FONT)
+            x += draw.textlength(text, font=_QUOTE_FONT)
+        y += 66
+
+    titles: list[str] = []
+    for seg in verdict.segments:
+        for src in seg.sources:
+            title = src.title_zh or src.cbeta_id or ""
+            if lang == "zh":  # titles are stored in traditional script (CBETA)
+                title = _T2S.convert(title)
+            if title and f"《{title}》" not in titles:
+                titles.append(f"《{title}》")
+    footer_y = CARD_HEIGHT - PADDING - 30
+    if titles:
+        label = copy["source"].format(titles="".join(titles[:2]) + ("…" if len(titles) > 2 else ""))
+        draw.text((PADDING, footer_y - 44), label[:60], fill=(110, 92, 78), font=_FOOTER_FONT)
+    if verdict.verdict == "partial":
+        draw.text((PADDING, footer_y), copy["missing"], fill=_MISSING_INK, font=_WATERMARK_FONT)
+    fb = draw.textbbox((0, 0), copy["footer"], font=_WATERMARK_FONT)
+    draw.text((CARD_WIDTH - PADDING - (fb[2] - fb[0]), footer_y + 4), copy["footer"], fill=(140, 130, 120), font=_WATERMARK_FONT)
+
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG", optimize=True)
+    return buffer.getvalue()
+
+
+@router.get("/verify")
+async def verify_card_image(
+    q: str = Query(..., min_length=1, max_length=200),
+    lang: str = Query("zh", pattern="^(zh|zh-Hant|en)$"),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """1200×630 PNG of the /verify result for ``q``, verdict recomputed server-side."""
+    try:
+        verdict = await check_claim(db, get_es(), q)
+    except QuoteTooShortError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return Response(
+        content=_render_verify_card(verdict, lang),
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
