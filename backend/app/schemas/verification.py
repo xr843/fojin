@@ -69,6 +69,12 @@ class ClosestMiss(BaseModel):
     # verdict was computed in" is answerable; "here, in your original string"
     # is not.
     diff: list[DiffOp] = []
+    # Which text the closest window is in — added for the human-facing /verify
+    # page, which names it ("the canon has this line, worded slightly
+    # differently, in 《…》"). Optional so older consumers are unaffected.
+    cbeta_id: str | None = None
+    title_zh: str | None = None
+    canon_class: str | None = None
 
 
 class QuoteVerdict(BaseModel):
@@ -107,6 +113,9 @@ class ClaimSegment(BaseModel):
     # Up to three distinct titles, earliest-in-canon first.
     sources: list[QuoteMatch] = []
     similarity: float = 0.0
+    # Not verbatim but a near miss (similarity ≥ NEAR_MISS_THRESHOLD): where
+    # the canon has it, and in what words. Only set when found is False.
+    close: ClosestMiss | None = None
 
 
 class ClaimVerdict(BaseModel):
@@ -115,6 +124,8 @@ class ClaimVerdict(BaseModel):
     verdict:
       sutra      — every clause is found, and found in a sūtra (经藏/密教/南传汉译)
       not_sutra  — every clause is found, but not in a sūtra; see source_class
+      variant    — the canon has it, worded slightly differently (near miss);
+                   source_class says where — the popular 莲花 vs the canon's 蓮華
       partial    — some clauses are found, some are not
       absent     — nothing is found in the canon
     Wording rule for consumers: "sutra" means 出自佛经, never 佛亲口所说 —
@@ -122,6 +133,6 @@ class ClaimVerdict(BaseModel):
     """
 
     query: str
-    verdict: Literal["sutra", "not_sutra", "partial", "absent"]
+    verdict: Literal["sutra", "not_sutra", "variant", "partial", "absent"]
     source_class: str | None = None
     segments: list[ClaimSegment] = []

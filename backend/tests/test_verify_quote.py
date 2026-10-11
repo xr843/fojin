@@ -222,6 +222,8 @@ async def test_near_miss_reports_closest_window():
     assert out.closest is not None
     assert out.closest.urn == "fojin:cbeta/T0374.13"
     assert "生灭灭已" in out.closest.window_normalised  # normalised (simplified) space
+    # The /verify page names the text the near miss is in.
+    assert (out.closest.cbeta_id, out.closest.title_zh, out.closest.canon_class) == ("T0374", "大般涅槃經", "sutra")
     # "差异在哪": the verdict must name the changed characters, not merely
     # score the miss.
     changed = [(o.op, o.quote, o.source) for o in out.closest.diff if o.op != "equal"]

@@ -55,15 +55,23 @@ def _segment(text: str, verdict: QuoteVerdict) -> ClaimSegment:
         sources.append(m)
         if len(sources) == MAX_SOURCES_PER_SEGMENT:
             break
-    return ClaimSegment(text=text, found=verdict.verbatim, sources=sources, similarity=verdict.similarity)
+    close = verdict.closest if (not verdict.verbatim and verdict.bucket == "near_miss") else None
+    return ClaimSegment(
+        text=text, found=verdict.verbatim, sources=sources, similarity=verdict.similarity, close=close
+    )
 
 
 def _overall(query: str, segments: list[ClaimSegment]) -> ClaimVerdict:
     found = [s for s in segments if s.found]
-    if not found:
+    close = [s for s in segments if not s.found and s.close is not None]
+    if not found and not close:
         return ClaimVerdict(query=query, verdict="absent", segments=segments)
-    if len(found) < len(segments):
+    if len(found) + len(close) < len(segments):
         return ClaimVerdict(query=query, verdict="partial", segments=segments)
+    if close:
+        first = segments[0]
+        cls = first.sources[0].canon_class if first.found and first.sources else (first.close and first.close.canon_class)
+        return ClaimVerdict(query=query, verdict="variant", source_class=cls, segments=segments)
     classes = [s.sources[0].canon_class if s.sources else None for s in segments]
     if all(c == "sutra" for c in classes):
         return ClaimVerdict(query=query, verdict="sutra", source_class="sutra", segments=segments)
@@ -80,7 +88,10 @@ async def check_claim(db: AsyncSession, es: AsyncElasticsearch, text: str) -> Cl
 
     whole = await verify_quote(db, es, text)  # raises QuoteTooShortError if too short
     clauses = split_clauses(text)
-    if whole.verbatim or len(clauses) <= 1:
+    # A whole-text near miss (a character or two off the canon) is answered as
+    # one variant segment: splitting it would turn「莲花/蓮華」into a clause
+    # that is merely "missing", which is exactly the wrong message.
+    if whole.verbatim or whole.bucket == "near_miss" or len(clauses) <= 1:
         segments = [_segment(text, whole)]
     else:
         segments = [_segment(c, await verify_quote(db, es, c)) for c in clauses]

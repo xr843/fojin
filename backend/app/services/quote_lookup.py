@@ -468,7 +468,7 @@ async def verify_quote(
             ratio, text_id, juan_num, window = best_miss
             meta = (
                 await db.execute(
-                    sql_text("SELECT cbeta_id FROM buddhist_texts WHERE id = :t"),
+                    sql_text("SELECT cbeta_id, title_zh FROM buddhist_texts WHERE id = :t"),
                     {"t": text_id},
                 )
             ).fetchone()
@@ -480,6 +480,9 @@ async def verify_quote(
                 similarity=round(ratio, 4),
                 window_normalised=window,
                 diff=diff_ops(needle, window),
+                cbeta_id=meta[0] if meta else None,
+                title_zh=meta[1] if meta else None,
+                canon_class=canon_class(meta[0] if meta else None),
             )
 
     cite_matched: bool | None = None

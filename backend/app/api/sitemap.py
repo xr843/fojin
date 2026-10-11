@@ -30,6 +30,8 @@ STATIC_PAGES = [
     ("/topics", "weekly", "0.8"),
     ("/kg", "weekly", "0.7"),
     ("/chat", "weekly", "0.6"),
+    # 「这句经，佛真的说过吗？」核对页（入口页可收录；?q= 结果页 noindex）。
+    ("/verify", "monthly", "0.8"),
     # Agent portal — the AI-facing front door (hosted MCP, verify_quote, URNs).
     ("/agents", "monthly", "0.6"),
     # Sutra landing pages

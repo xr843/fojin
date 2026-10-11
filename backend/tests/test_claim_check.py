@@ -6,7 +6,7 @@ verify_quote 本身另有测试；这里把它替换成按句查表的假实现�
 
 import pytest
 
-from app.schemas.verification import QuoteMatch, QuoteVerdict
+from app.schemas.verification import ClosestMiss, DiffOp, QuoteMatch, QuoteVerdict
 from app.services import claim_check
 from app.services.claim_check import check_claim, split_clauses
 
@@ -32,6 +32,14 @@ COMMENTARY = _match("X0508", "金剛經闡說", "later", 900)
 PLATFORM = _match("T2008", "六祖大師法寶壇經", "school", 70)
 YUANWU = _match("T1997", "圓悟佛果禪師語錄", "school", 60)
 
+LOTUS_CLOSE = ClosestMiss(
+    text_id=297, juan_num=1, urn="fojin:cbeta/T0297.1", reader_url="https://fojin.app/texts/297/read?juan=1",
+    similarity=0.9286, window_normalised="犹如莲花不着水亦如日月不着空",
+    diff=[DiffOp(op="replace", quote="住", source="着")],
+    cbeta_id="T0297", title_zh="普賢菩薩行願讚", canon_class="sutra",
+)
+NEAR = {"犹如莲花不著水，亦如日月不住空": LOTUS_CLOSE}
+
 TABLE = {
     "一切有为法，如梦幻泡影": [DIAMOND, DIAMOND_B, COMMENTARY],
     "一切有为法": [DIAMOND, COMMENTARY],
@@ -46,6 +54,12 @@ def fake_lookup(monkeypatch):
 
     async def fake_verify(db, es, quote, **kw):
         calls.append(quote)
+        if quote in NEAR:
+            close = NEAR[quote]
+            return QuoteVerdict(
+                quote=quote, normalised_quote=quote, verbatim=False, bucket="near_miss",
+                similarity=close.similarity, closest=close,
+            )
         return _verdict(quote, TABLE.get(quote, []))
 
     monkeypatch.setattr(claim_check, "verify_quote", fake_verify)
@@ -106,6 +120,20 @@ async def test_results_are_cached(fake_lookup):
     n = len(fake_lookup)
     await check_claim(None, None, "一切有為法，如夢幻泡影")  # same after normalisation
     assert len(fake_lookup) == n
+
+
+async def test_whole_quote_near_miss_is_a_variant_not_absent(fake_lookup):
+    """Popular versions often differ from the canon by a character (莲花/蓮華,
+    其土/其國). Saying "not in the canon" would be wrong; the line is there,
+    worded slightly differently — and the reader should see the canon's words."""
+    out = await check_claim(None, None, "犹如莲花不著水，亦如日月不住空")
+    assert out.verdict == "variant"
+    assert out.source_class == "sutra"
+    assert len(out.segments) == 1  # whole near-miss is not split into clauses
+    seg = out.segments[0]
+    assert seg.found is False
+    assert seg.close is not None and seg.close.title_zh == "普賢菩薩行願讚"
+    assert fake_lookup == ["犹如莲花不著水，亦如日月不住空"]
 
 
 # ── endpoint + rate limit ───────────────────────────────────────────────
