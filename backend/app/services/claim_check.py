@@ -19,6 +19,11 @@ from app.services.quote_lookup import MIN_LOOKUP_QUOTE_CHARS, verify_quote
 from app.services.quote_verifier import normalise_for_match
 
 MAX_CLAUSES = 8
+# A clause shorter than this, found verbatim but with no neighbouring clause
+# found, is not evidence of a source (measured 2026-10-11: 4 of 10 fake
+# 「佛说」 came back "partly found" because 相由心生 / 方得自在 / 心若不动 /
+# 随缘而安 each occur somewhere in the canon).
+MIN_STANDALONE_CHARS = 6
 MAX_SOURCES_PER_SEGMENT = 3
 _CACHE_TTL = 3600.0
 _CACHE_MAX = 512
@@ -89,6 +94,17 @@ def _segment(text: str, verdict: QuoteVerdict) -> ClaimSegment:
     )
 
 
+def _discount_isolated_short_hits(segments: list[ClaimSegment]) -> list[ClaimSegment]:
+    found = [s.found for s in segments]
+    out = []
+    for i, seg in enumerate(segments):
+        neighbour_found = (i > 0 and found[i - 1]) or (i + 1 < len(found) and found[i + 1])
+        if seg.found and not neighbour_found and len(normalise_for_match(seg.text)) < MIN_STANDALONE_CHARS:
+            seg = seg.model_copy(update={"found": False, "weak": True})
+        out.append(seg)
+    return out
+
+
 def _overall(query: str, segments: list[ClaimSegment]) -> ClaimVerdict:
     found = [s for s in segments if s.found]
     close = [s for s in segments if not s.found and s.close is not None]
@@ -131,6 +147,7 @@ async def check_claim(db: AsyncSession, es: AsyncElasticsearch, text: str) -> Cl
         segments = [_segment(text, whole)]
     else:
         segments = [_segment(c, await verify_quote(db, es, c, strict=True)) for c in clauses]
+        segments = _discount_isolated_short_hits(segments)
     result = _overall(text, segments)
 
     if len(_CACHE) >= _CACHE_MAX:

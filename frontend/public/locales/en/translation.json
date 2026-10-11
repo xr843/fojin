@@ -1678,5 +1678,6 @@
   "verify.method": "How it works: the text is compared word for word with the CBETA Chinese canon; traditional/simplified script and modern punctuation do not affect the result. Only the Chinese canon is covered for now — Pali, Tibetan and Sanskrit originals are not yet included.",
   "verify.verdict.variant": "In the canon, worded slightly differently",
   "verify.explain.variant": "The canon has this line, but the version going around changes a character or two. The canon's own wording is shown below.",
-  "verify.segment_close": "The canon reads"
+  "verify.segment_close": "The canon reads",
+  "verify.segment_weak": "These few characters do occur in the canon, but too briefly to show where the saying comes from"
 }

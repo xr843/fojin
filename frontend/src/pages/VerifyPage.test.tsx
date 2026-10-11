@@ -100,6 +100,21 @@ describe("VerifyPage", () => {
     expect(missing?.className).toContain("is-missing");
   });
 
+  it("explains a short standalone hit instead of calling it missing or found", async () => {
+    vi.mocked(verifyClaim).mockResolvedValue(
+      verdict({
+        verdict: "absent",
+        segments: [
+          { text: "命由己造", found: false, sources: [], similarity: 0.3, close: null },
+          { text: "相由心生", found: false, weak: true, sources: [], similarity: 1, close: null },
+          { text: "境由心转", found: false, sources: [], similarity: 0.3, close: null },
+        ],
+      }),
+    );
+    renderAt("/verify?q=命由己造，相由心生，境由心转");
+    expect(await screen.findByText(locale["verify.segment_weak"])).toBeInTheDocument();
+  });
+
   it("says plainly when nothing is in the canon", async () => {
     vi.mocked(verifyClaim).mockResolvedValue(
       verdict({ verdict: "absent", segments: [{ text: "一切都是最好的安排", found: false, sources: [], similarity: 0.3, close: null }] }),

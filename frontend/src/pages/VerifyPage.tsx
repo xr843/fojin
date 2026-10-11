@@ -78,6 +78,8 @@ function Segment({ seg, language }: { seg: ClaimSegment; language: string }) {
             );
           })()}
         </div>
+      ) : seg.weak ? (
+        <div className="verify-seg-sources">{t("verify.segment_weak")}</div>
       ) : seg.found ? (
         <div className="verify-seg-sources">
           {t("verify.segment_found")}

@@ -116,6 +116,11 @@ class ClaimSegment(BaseModel):
     # Not verbatim but a near miss (similarity ≥ NEAR_MISS_THRESHOLD): where
     # the canon has it, and in what words. Only set when found is False.
     close: ClosestMiss | None = None
+    # The clause does occur verbatim, but it is short and stands alone (no
+    # neighbouring clause found): a four-character phrase turns up somewhere in
+    # 80,000 fascicles by chance, so it is shown but not counted as evidence —
+    # found is False and the verdict treats it as missing.
+    weak: bool = False
 
 
 class ClaimVerdict(BaseModel):

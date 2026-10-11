@@ -60,6 +60,11 @@ NEAR = {
 }
 
 TABLE = {
+    # Short phrases that happen to occur somewhere in 80,000 fascicles.
+    "相由心生": [_match("X1300", "某禪師語錄", "later", 1300)],
+    "方得自在": [_match("X1301", "某疏", "later", 1301)],
+    "色即是空": [_match("T1509", "大智度論", "treatise", 1509), _match("T0251", "般若波羅蜜多心經", "sutra", 9)],
+    "空即是色": [_match("T0251", "般若波羅蜜多心經", "sutra", 9)],
     "犹如莲花不著水": [_match("T0297", "普賢菩薩行願讚", "sutra", 297)],
     "如露亦如电": [DIAMOND],
     "应作如是观": [DIAMOND],
@@ -209,6 +214,33 @@ async def test_search_outage_is_an_error_not_a_verdict(monkeypatch):
     with pytest.raises(SearchUnavailableError):
         await check_claim(None, None, "应无所住而生其心")
     assert claim_check._CACHE == {}
+
+
+async def test_an_isolated_short_hit_is_not_evidence():
+    """「命由己造，相由心生，境由心转」: 相由心生 occurs somewhere in the canon,
+    but four characters on their own say nothing about where a saying comes
+    from — the verdict must not become "partly found"."""
+    out = await check_claim(None, None, "命由己造，相由心生，境由心转")
+    assert out.verdict == "absent"
+    weak = [s for s in out.segments if s.weak]
+    assert [s.text for s in weak] == ["相由心生"]
+    assert weak[0].found is False
+
+
+async def test_adjacent_short_hits_still_count():
+    """色即是空 + 空即是色: two short clauses found side by side are real evidence."""
+    out = await check_claim(None, None, "色即是空，空即是色，人生何必太执着")
+    assert out.verdict == "partial"
+    assert [(s.text, s.found, s.weak) for s in out.segments] == [
+        ("色即是空", True, False),
+        ("空即是色", True, False),
+        ("人生何必太执着", False, False),
+    ]
+
+
+async def test_one_short_hit_beside_a_miss_is_absent():
+    out = await check_claim(None, None, "放下执念，方得自在")
+    assert out.verdict == "absent"
 
 
 # ── endpoint + rate limit ───────────────────────────────────────────────

@@ -2016,6 +2016,8 @@ export interface ClaimSegment {
   similarity: number;
   /** Not verbatim, but the canon has it worded slightly differently. */
   close: ClaimClose | null;
+  /** Occurs verbatim, but too short and standalone to say where a saying comes from. */
+  weak?: boolean;
 }
 
 export interface ClaimVerdict {

@@ -1678,5 +1678,6 @@
   "verify.method": "怎么核对的：逐字比对 CBETA 汉文大藏经原文，繁简、新式标点的差异不影响结果；目前只覆盖汉文藏经，巴利文、藏文、梵文原典暂未纳入。",
   "verify.verdict.variant": "经中有此句，用字略有不同",
   "verify.explain.variant": "大藏经里有这句话，只是流传的版本改了个别字。下面列出经中原文。",
-  "verify.segment_close": "经中原文作"
+  "verify.segment_close": "经中原文作",
+  "verify.segment_weak": "这几个字在大藏经里出现过，但太短，说明不了出处"
 }
