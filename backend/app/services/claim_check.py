@@ -14,7 +14,7 @@ import time
 from elasticsearch import AsyncElasticsearch
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.schemas.verification import ClaimSegment, ClaimVerdict, QuoteVerdict
+from app.schemas.verification import ClaimSegment, ClaimVerdict, ClosestMiss, QuoteVerdict
 from app.services.quote_lookup import MIN_LOOKUP_QUOTE_CHARS, verify_quote
 from app.services.quote_verifier import normalise_for_match
 
@@ -30,7 +30,12 @@ _CLAUSE_SPLIT_RE = re.compile(r"[，。；：！？、,.;:!?\s「」『』“”
 
 
 def split_clauses(text: str) -> list[str]:
-    """Punctuation-delimited clauses, each long enough to look up, at most MAX_CLAUSES."""
+    """Punctuation-delimited clauses, each long enough to look up.
+
+    At most MAX_CLAUSES: anything past the cap is merged into the last clause
+    rather than dropped — a fabricated line after eight real ones must still be
+    checked, or the page would call the whole thing a sūtra line.
+    """
     parts = [p for p in _CLAUSE_SPLIT_RE.split(text) if p]
     clauses: list[str] = []
     for part in parts:
@@ -41,23 +46,46 @@ def split_clauses(text: str) -> list[str]:
     if len(clauses) > 1 and len(normalise_for_match(clauses[-1])) < MIN_LOOKUP_QUOTE_CHARS:
         tail = clauses.pop()
         clauses[-1] += tail
-    return clauses[:MAX_CLAUSES]
+    if len(clauses) > MAX_CLAUSES:
+        clauses = clauses[: MAX_CLAUSES - 1] + ["".join(clauses[MAX_CLAUSES - 1 :])]
+    return clauses
+
+
+# A near miss counts as "the canon has it, worded slightly differently" only
+# when the differences are character substitutions, at most this many: 莲花/蓮華,
+# 其土/其國, 我禮/我供. An insertion or deletion is an addition or an omission —
+# 「不應作如是觀」 reverses the meaning, 「…應作如是觀，放下吧」 appends a tail —
+# and must not be presented as a wording variant.
+MAX_VARIANT_SUBSTITUTIONS = 2
+
+
+def _is_wording_variant(close: ClosestMiss | None) -> bool:
+    if close is None or not close.diff:
+        return False
+    changed = [op for op in close.diff if op.op != "equal"]
+    if not changed or any(op.op != "replace" for op in changed):
+        return False
+    return sum(len(op.quote) for op in changed) <= MAX_VARIANT_SUBSTITUTIONS
 
 
 def _segment(text: str, verdict: QuoteVerdict) -> ClaimSegment:
     seen: set[str] = set()
-    sources = []
-    for m in verdict.matches:  # already earliest-in-canon first
+    distinct = []
+    for m in verdict.matches:  # earliest-in-canon first
         key = m.title_zh or m.cbeta_id or str(m.text_id)
-        if key in seen:
-            continue
-        seen.add(key)
-        sources.append(m)
-        if len(sources) == MAX_SOURCES_PER_SEGMENT:
-            break
+        if key not in seen:
+            seen.add(key)
+            distinct.append(m)
+    # A sūtra occurrence is the answer to「佛说的吗」— list it first even when a
+    # treatise or commentary with a lower catalogue number also has the line.
+    distinct.sort(key=lambda m: m.canon_class != "sutra")
     close = verdict.closest if (not verdict.verbatim and verdict.bucket == "near_miss") else None
     return ClaimSegment(
-        text=text, found=verdict.verbatim, sources=sources, similarity=verdict.similarity, close=close
+        text=text,
+        found=verdict.verbatim,
+        sources=distinct[:MAX_SOURCES_PER_SEGMENT],
+        similarity=verdict.similarity,
+        close=close if _is_wording_variant(close) else None,
     )
 
 
@@ -68,11 +96,18 @@ def _overall(query: str, segments: list[ClaimSegment]) -> ClaimVerdict:
         return ClaimVerdict(query=query, verdict="absent", segments=segments)
     if len(found) + len(close) < len(segments):
         return ClaimVerdict(query=query, verdict="partial", segments=segments)
+
+    def seg_class(s: ClaimSegment) -> str | None:
+        if s.found:
+            return "sutra" if any(m.canon_class == "sutra" for m in s.sources) else (
+                s.sources[0].canon_class if s.sources else None
+            )
+        return s.close.canon_class if s.close else None
+
+    classes = [seg_class(s) for s in segments]
     if close:
-        first = segments[0]
-        cls = first.sources[0].canon_class if first.found and first.sources else (first.close and first.close.canon_class)
+        cls = "sutra" if all(c == "sutra" for c in classes) else next(c for c in classes if c != "sutra")
         return ClaimVerdict(query=query, verdict="variant", source_class=cls, segments=segments)
-    classes = [s.sources[0].canon_class if s.sources else None for s in segments]
     if all(c == "sutra" for c in classes):
         return ClaimVerdict(query=query, verdict="sutra", source_class="sutra", segments=segments)
     first_other = next(c for c in classes if c != "sutra")
@@ -80,21 +115,22 @@ def _overall(query: str, segments: list[ClaimSegment]) -> ClaimVerdict:
 
 
 async def check_claim(db: AsyncSession, es: AsyncElasticsearch, text: str) -> ClaimVerdict:
-    key = normalise_for_match(text)
+    # Keyed by the input as typed: punctuation decides how it is split, so two
+    # texts that normalise alike can still deserve different answers.
+    key = text.strip()
     hit = _CACHE.get(key)
     now = time.monotonic()
     if hit is not None and now - hit[0] < _CACHE_TTL:
         return hit[1]
 
-    whole = await verify_quote(db, es, text)  # raises QuoteTooShortError if too short
+    # strict: a search outage raises (→ 503) instead of reading as "not found",
+    # and nothing is cached.
+    whole = await verify_quote(db, es, text, strict=True)  # QuoteTooShortError if too short
     clauses = split_clauses(text)
-    # A whole-text near miss (a character or two off the canon) is answered as
-    # one variant segment: splitting it would turn「莲花/蓮華」into a clause
-    # that is merely "missing", which is exactly the wrong message.
-    if whole.verbatim or whole.bucket == "near_miss" or len(clauses) <= 1:
+    if whole.verbatim or len(clauses) <= 1:
         segments = [_segment(text, whole)]
     else:
-        segments = [_segment(c, await verify_quote(db, es, c)) for c in clauses]
+        segments = [_segment(c, await verify_quote(db, es, c, strict=True)) for c in clauses]
     result = _overall(text, segments)
 
     if len(_CACHE) >= _CACHE_MAX:

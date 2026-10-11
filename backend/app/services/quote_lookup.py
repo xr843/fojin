@@ -92,6 +92,12 @@ _SHORT_QUOTE_CAVEAT = (
 _CBETA_HINT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9\-]{0,30}$")
 
 
+class SearchUnavailableError(RuntimeError):
+    """Elasticsearch could not be queried. Raised only in ``strict`` mode: the
+    human-facing /verify page must answer "try again", never「大藏经中未见」,
+    when the search itself failed."""
+
+
 class QuoteTooShortError(ValueError):
     """Raised when the quote normalises to fewer than MIN_QUOTE_CHARS chars."""
 
@@ -280,6 +286,7 @@ async def _es_candidates(
     phrase: bool,
     size: int,
     canonical_order: bool = False,
+    strict: bool = False,
 ) -> list[dict]:
     """Candidate fascicles from ES. ``phrase=True`` is the precise pass
     (cjk_content analyzer makes match_phrase ≈ normalised-substring recall);
@@ -321,14 +328,20 @@ async def _es_candidates(
         body["sort"] = [
             {"_script": {"type": "number", "script": {"source": CANON_ORDER_SCRIPT}, "order": "asc"}}
         ]
+        # One fascicle per text: otherwise a long sūtra that repeats the line
+        # (大般若經's many fascicles) fills every slot and the other texts that
+        # also have it — the 心經 for 色即是空 — never surface.
+        body["collapse"] = {"field": "text_id"}
     try:
         resp = await es.search(index="text_contents", body=body)
         # elasticsearch-py 8.x returns ObjectApiResponse (Mapping-like, NOT a
         # dict) — subscript it; an isinstance(resp, dict) guard silently
         # discards every real result while passing dict-based test doubles.
         hits = resp["hits"]["hits"]
-    except Exception:  # pragma: no cover - ES outage degrades, not crashes
+    except Exception as exc:  # ES outage degrades (agents) or errors (strict)
         logger.warning("verify_quote ES candidate search failed", exc_info=True)
+        if strict:
+            raise SearchUnavailableError(str(exc)) from exc
         return []
     out = []
     for h in hits:
@@ -361,8 +374,12 @@ async def verify_quote(
     *,
     cite: str | None = None,
     juan: int | None = None,
+    strict: bool = False,
 ) -> QuoteVerdict:
-    """Open-world verbatim check of ``quote`` against the corpus."""
+    """Open-world verbatim check of ``quote`` against the corpus.
+
+    ``strict``: raise SearchUnavailableError when ES fails instead of
+    degrading to "nothing found" (the agent-facing API keeps degrading)."""
     needle = normalise_for_match(quote)
     if len(needle) < MIN_LOOKUP_QUOTE_CHARS:
         raise QuoteTooShortError(
@@ -410,7 +427,7 @@ async def verify_quote(
             # ES narrows within the hinted text (finds hits in other juans —
             # reported honestly as juan_matched=False when a juan was hinted).
             cands = await _es_candidates(
-                es, quote, text_id=target.text_id, phrase=True, size=_MAX_CANDIDATES
+                es, quote, text_id=target.text_id, phrase=True, size=_MAX_CANDIDATES, strict=strict
             )
             for src in cands:
                 if src["juan_num"] != target.juan:
@@ -443,7 +460,7 @@ async def verify_quote(
         # Open-world pass (also runs when a cite hint resolved but missed —
         # "not where you said, but it IS here" is the useful answer).
         for src in await _es_candidates(
-            es, quote, text_id=None, phrase=True, size=_CANON_ORDER_CANDIDATES, canonical_order=True
+            es, quote, text_id=None, phrase=True, size=_CANON_ORDER_CANDIDATES, canonical_order=True, strict=strict
         ):
             if len(matches) >= _MAX_CANDIDATES:
                 break
@@ -453,7 +470,7 @@ async def verify_quote(
         # Nothing phrase-exact anywhere: fuzzy fallback purely to locate the
         # closest text for the near_miss/absent verdict.
         for src in await _es_candidates(
-            es, quote, text_id=None, phrase=False, size=_MAX_FUZZY_CANDIDATES
+            es, quote, text_id=None, phrase=False, size=_MAX_FUZZY_CANDIDATES, strict=strict
         ):
             await _confirm(src)
 

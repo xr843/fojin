@@ -17,7 +17,7 @@ from app.core.elasticsearch import get_es
 from app.database import get_db
 from app.schemas.verification import ClaimVerdict, QuoteVerdict
 from app.services.claim_check import check_claim
-from app.services.quote_lookup import QuoteTooShortError, verify_quote
+from app.services.quote_lookup import QuoteTooShortError, SearchUnavailableError, verify_quote
 
 router = APIRouter(prefix="/verify", tags=["verification"])
 
@@ -60,4 +60,6 @@ async def verify_claim_endpoint(
         return await check_claim(db, es, q)
     except QuoteTooShortError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except SearchUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="search temporarily unavailable") from exc
 

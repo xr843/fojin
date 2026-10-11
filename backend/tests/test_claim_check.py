@@ -38,9 +38,32 @@ LOTUS_CLOSE = ClosestMiss(
     diff=[DiffOp(op="replace", quote="住", source="着")],
     cbeta_id="T0297", title_zh="普賢菩薩行願讚", canon_class="sutra",
 )
-NEAR = {"犹如莲花不著水，亦如日月不住空": LOTUS_CLOSE}
+def _close(window, ops, sim=0.9):
+    return ClosestMiss(
+        text_id=7, juan_num=1, similarity=sim, window_normalised=window,
+        diff=[DiffOp(op=o, quote=q, source=src) for o, q, src in ops],
+        cbeta_id="T0235", title_zh="金剛般若波羅蜜經", canon_class="sutra",
+    )
+
+
+NEAR = {
+    "犹如莲花不著水，亦如日月不住空": LOTUS_CLOSE,
+    "亦如日月不住空": _close("亦如日月不着空", [("equal", "亦如日月不", "亦如日月不"), ("replace", "住", "着"), ("equal", "空", "空")]),
+    # 「不」inserted: the meaning is reversed — never a mere wording variant.
+    "不应作如是观": _close("应作如是观", [("insert", "不", ""), ("equal", "应作如是观", "应作如是观")], 0.91),
+    "应作如是观放下吧": _close("应作如是观", [("equal", "应作如是观", "应作如是观"), ("insert", "放下吧", "")], 0.77),
+    "一切有为法，如梦幻泡影，如露亦如电，应作如是观，放下吧": _close(
+        "一切有为法如梦幻泡影如露亦如电应作如是观",
+        [("equal", "一切有为法如梦幻泡影如露亦如电应作如是观", "一切有为法如梦幻泡影如露亦如电应作如是观"), ("insert", "放下吧", "")],
+        0.87,
+    ),
+}
 
 TABLE = {
+    "犹如莲花不著水": [_match("T0297", "普賢菩薩行願讚", "sutra", 297)],
+    "如露亦如电": [DIAMOND],
+    "应作如是观": [DIAMOND],
+    "色即是空": [_match("T1509", "大智度論", "treatise", 1509), _match("T0251", "般若波羅蜜多心經", "sutra", 9)],
     "一切有为法，如梦幻泡影": [DIAMOND, DIAMOND_B, COMMENTARY],
     "一切有为法": [DIAMOND, COMMENTARY],
     "如梦幻泡影": [DIAMOND],
@@ -118,7 +141,7 @@ async def test_nothing_found_is_absent():
 async def test_results_are_cached(fake_lookup):
     await check_claim(None, None, "一切有为法，如梦幻泡影")
     n = len(fake_lookup)
-    await check_claim(None, None, "一切有為法，如夢幻泡影")  # same after normalisation
+    await check_claim(None, None, "  一切有为法，如梦幻泡影 ")  # same input, surrounding space ignored
     assert len(fake_lookup) == n
 
 
@@ -129,11 +152,63 @@ async def test_whole_quote_near_miss_is_a_variant_not_absent(fake_lookup):
     out = await check_claim(None, None, "犹如莲花不著水，亦如日月不住空")
     assert out.verdict == "variant"
     assert out.source_class == "sutra"
-    assert len(out.segments) == 1  # whole near-miss is not split into clauses
-    seg = out.segments[0]
-    assert seg.found is False
-    assert seg.close is not None and seg.close.title_zh == "普賢菩薩行願讚"
-    assert fake_lookup == ["犹如莲花不著水，亦如日月不住空"]
+    # Checked clause by clause like anything not verbatim: the first clause is
+    # verbatim, the second is the near miss that carries the canon's wording.
+    assert [(s.text, s.found, s.close is not None) for s in out.segments] == [
+        ("犹如莲花不著水", True, False),
+        ("亦如日月不住空", False, True),
+    ]
+
+
+async def test_real_line_plus_short_invented_tail_is_partial_not_a_variant():
+    """B1: a short tail keeps the whole-text similarity above 0.85, but it is
+    an addition, not a wording variant — the tail must show up as missing."""
+    out = await check_claim(None, None, "一切有为法，如梦幻泡影，如露亦如电，应作如是观，放下吧")
+    assert out.verdict == "partial"
+    assert out.segments[-1].found is False and out.segments[-1].close is None
+
+
+async def test_inserted_negation_is_not_a_wording_variant():
+    out = await check_claim(None, None, "不应作如是观")
+    assert out.verdict == "absent"
+    assert out.segments[0].close is None
+
+
+async def test_clauses_past_the_cap_are_still_checked():
+    """B2: a fabricated line after eight real clauses must not vanish."""
+    text = "，".join(["一切有为法"] * 8 + ["看开便是福气"])
+    out = await check_claim(None, None, text)
+    assert out.verdict == "partial"
+    assert len(out.segments) == claim_check.MAX_CLAUSES
+    assert "看开便是福气" in out.segments[-1].text
+
+
+async def test_cache_does_not_merge_inputs_that_split_differently(fake_lookup):
+    """S1: the key must be the input itself — punctuation decides the clauses."""
+    a = await check_claim(None, None, "一切有为法如梦幻泡影看开便是福")
+    b = await check_claim(None, None, "一切有为法，如梦幻泡影，看开便是福")
+    assert a.query != b.query
+    assert b.verdict == "partial"
+
+
+async def test_any_sutra_source_makes_it_a_sutra_line_listed_first():
+    """S4: a line in a treatise *and* a sūtra is a sūtra line; list the sūtra first."""
+    out = await check_claim(None, None, "色即是空")
+    assert out.verdict == "sutra"
+    assert out.segments[0].sources[0].canon_class == "sutra"
+
+
+async def test_search_outage_is_an_error_not_a_verdict(monkeypatch):
+    """S2: an ES failure must not be cached and shown as「大藏经中未见」."""
+    from app.services.quote_lookup import SearchUnavailableError
+
+    async def down(db, es, quote, **kw):
+        raise SearchUnavailableError("es down")
+
+    monkeypatch.setattr(claim_check, "verify_quote", down)
+    with pytest.raises(SearchUnavailableError):
+        await check_claim(None, None, "应无所住而生其心")
+    assert claim_check._CACHE == {}
 
 
 # ── endpoint + rate limit ───────────────────────────────────────────────
@@ -196,3 +271,16 @@ def test_claim_and_image_endpoints_are_strict_rate_limited():
     assert STRICT_PATHS["/api/og/verify"] == settings.rate_limit_verify_claim
     # up to 1 + MAX_CLAUSES lookups per call — must sit well below the quote endpoint
     assert settings.rate_limit_verify_claim < settings.rate_limit_verify_quote
+
+
+async def test_claim_endpoint_maps_search_outage_to_503(monkeypatch):
+    from app.api import verification
+    from app.services.quote_lookup import SearchUnavailableError
+
+    async def down(db, es, text):
+        raise SearchUnavailableError("es down")
+
+    monkeypatch.setattr(verification, "get_es", lambda: None)
+    monkeypatch.setattr(verification, "check_claim", down)
+    assert (await _get("/api/verify/claim?q=应无所住而生其心")).status_code == 503
+

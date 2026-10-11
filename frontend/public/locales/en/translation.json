@@ -1652,7 +1652,7 @@
   "verify.verdict.partial": "Only partly found in the canon",
   "verify.verdict.absent": "Not found in the Buddhist canon",
   "verify.explain.sutra": "This line appears in the sūtra collection. \"Found in a sūtra\" does not mean the Buddha said it himself — sūtras also record the words of bodhisattvas and disciples.",
-  "verify.explain.not_sutra": "The canon contains this line, but its earliest occurrence is in {{cls}}; it is not in any sūtra.",
+  "verify.explain.not_sutra": "The canon contains this line, in {{cls}}, but not in any sūtra.",
   "verify.explain.partial": "The greyed-out part is nowhere in the canon — most likely a later addition.",
   "verify.explain.absent": "This line is not in the Chinese Buddhist canon — most likely attributed to the Buddha by someone later.",
   "verify.class.vinaya": "a Vinaya text",

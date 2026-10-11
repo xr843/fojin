@@ -1652,7 +1652,7 @@
   "verify.verdict.partial": "只有部分能在大藏经中找到",
   "verify.verdict.absent": "大藏经中未见",
   "verify.explain.sutra": "这句话见于经藏。「出自佛经」不等于佛亲口所说——经中也记录菩萨、弟子的话。",
-  "verify.explain.not_sutra": "大藏经里有这句话，但最早见于{{cls}}，经藏中没有。",
+  "verify.explain.not_sutra": "大藏经里有这句话，见于{{cls}}，经藏中没有。",
   "verify.explain.partial": "标灰的部分在大藏经中找不到，很可能是后人加上的。",
   "verify.explain.absent": "汉文大藏经中找不到这句话，很可能是后人托名。",
   "verify.class.vinaya": "律典",

@@ -58,7 +58,7 @@
 
 ### 3.4 结果图（`GET /api/og/verify?q=`）
 
-复用 `og.py` 的字体与画布：结论徽章（颜色区分）+ 原句（逐句着色：命中/未见）+ 首位出处（经名·卷）+「佛津 FoJin · fojin.app/verify」。`Cache-Control: public, max-age=86400`。页面上以 `<img>` 呈现 → 微信里长按即可保存/转发；同时作 og:image。
+复用 `og.py` 的字体与画布：结论徽章（颜色区分）+ 原句（逐句着色：命中/未见）+ 首位出处（经名·卷）+「佛津 FoJin · fojin.app/verify」。`Cache-Control: public, max-age=86400`。页面上以 `<img>` 呈现 → 微信里长按即可保存/转发。（Helmet 也写了 og:image，但 `/verify?q=` 由 nginx 返回静态 shell，不执行 JS 的抓取器拿不到它——链接预览图仍是通用图；要做需后端为 `?q=` 注入，本期不做。）
 
 ### 3.5 页面（`/verify`，`VerifyPage.tsx`）
 

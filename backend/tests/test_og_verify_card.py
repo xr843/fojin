@@ -123,3 +123,13 @@ def test_near_miss_text_is_not_greyed_like_a_missing_clause():
     lines = og._layout_segments(variant, 1000)
     assert {colour for line in lines for _, colour in line} == {og._FOUND_INK}
 
+
+async def test_search_outage_draws_no_card(monkeypatch):
+    from app.services.quote_lookup import SearchUnavailableError
+
+    async def down(db, es, text):
+        raise SearchUnavailableError("es down")
+
+    monkeypatch.setattr(og, "check_claim", down)
+    assert (await _get("/api/og/verify?q=应无所住而生其心")).status_code == 503
+

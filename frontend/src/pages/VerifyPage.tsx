@@ -107,7 +107,9 @@ export default function VerifyPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const q = (searchParams.get("q") ?? "").trim().slice(0, MAX_CHARS);
+  // Array.from: slice by code point, so a hand-made long link cannot cut an
+  // Extension-B character in half (a lone surrogate makes encodeURIComponent throw).
+  const q = Array.from((searchParams.get("q") ?? "").trim()).slice(0, MAX_CHARS).join("");
   const [draft, setDraft] = useState(q);
   const [prevQ, setPrevQ] = useState(q);
   if (prevQ !== q) {
@@ -125,7 +127,7 @@ export default function VerifyPage() {
   });
 
   const submit = (text: string) => {
-    const value = text.trim().slice(0, MAX_CHARS);
+    const value = Array.from(text.trim()).slice(0, MAX_CHARS).join("");
     if (!value) return;
     const params = new URLSearchParams(searchParams);
     params.set("q", value);
@@ -226,7 +228,16 @@ export default function VerifyPage() {
           </ul>
 
           <figure className="verify-card">
-            <img src={verifyCardUrl(q, lang)} alt={`${t("verify.card_alt")} — ${headline(verdict, t)}`} width={1200} height={630} />
+            <img
+              src={verifyCardUrl(q, lang)}
+              alt={`${t("verify.card_alt")} — ${headline(verdict, t)}`}
+              width={1200}
+              height={630}
+              onError={(e) => {
+                // Rate-limited or failed: hide the card rather than show a broken image.
+                (e.currentTarget.closest("figure") as HTMLElement | null)?.style.setProperty("display", "none");
+              }}
+            />
             <figcaption>{t("verify.save_hint")}</figcaption>
           </figure>
 

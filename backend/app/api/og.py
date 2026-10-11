@@ -37,7 +37,7 @@ from app.database import get_db
 from app.models.chat import SharedQA
 from app.schemas.verification import ClaimVerdict
 from app.services.claim_check import check_claim
-from app.services.quote_lookup import QuoteTooShortError
+from app.services.quote_lookup import QuoteTooShortError, SearchUnavailableError
 
 logger = logging.getLogger(__name__)
 
@@ -384,6 +384,9 @@ async def verify_card_image(
         verdict = await check_claim(db, get_es(), q)
     except QuoteTooShortError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except SearchUnavailableError as exc:
+        # Never draw a branded「大藏经中未见」card for a search that failed.
+        raise HTTPException(status_code=503, detail="search temporarily unavailable") from exc
     return Response(
         content=_render_verify_card(verdict, lang),
         media_type="image/png",

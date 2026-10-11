@@ -379,3 +379,26 @@ async def test_matches_keep_es_canon_order_and_carry_their_class():
     assert [m.cbeta_id for m in out.matches] == ["T0007", "T0374", "X0508"]
     assert [m.canon_class for m in out.matches] == ["sutra", "sutra", "later"]
 
+
+@pytest.mark.asyncio
+async def test_open_world_pass_collapses_to_one_fascicle_per_text():
+    """S5: a long sūtra repeating the line must not fill every slot."""
+    es = FakeES({"match_phrase": [_hit(15, 13)]})
+    await verify_quote(DB, es, SNOW_VERSE)
+    assert _open_world_phrase_body(es)["collapse"] == {"field": "text_id"}
+
+
+class _BrokenES:
+    async def search(self, index, body):
+        raise ConnectionError("es down")
+
+
+@pytest.mark.asyncio
+async def test_strict_mode_raises_on_search_outage_default_degrades():
+    from app.services.quote_lookup import SearchUnavailableError
+
+    out = await verify_quote(DB, _BrokenES(), SNOW_VERSE)  # agents: degrade
+    assert out.verbatim is False
+    with pytest.raises(SearchUnavailableError):
+        await verify_quote(DB, _BrokenES(), SNOW_VERSE, strict=True)
+
