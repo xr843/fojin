@@ -222,6 +222,7 @@ async def shared_qa_og_image(
 _VERDICT_COLOURS = {
     "sutra": (46, 125, 82),
     "not_sutra": (176, 122, 33),
+    "variant": (47, 111, 143),
     "partial": (196, 98, 45),
     "absent": (120, 115, 108),
 }
@@ -250,8 +251,10 @@ _COPY = {
         "header": "佛津 FoJin · 这句经，佛真的说过吗？",
         "sutra": "出自佛经",
         "not_sutra": "出自{cls}，不是佛经",
+        "variant": "经中有此句，用字略有不同",
         "partial": "只有部分能在大藏经中找到",
         "absent": "大藏经中未见",
+        "canon_reads": "经中原文：{text}",
         "source": "出处 · {titles}",
         "missing": "灰色部分：大藏经中未见",
         "footer": "逐字比对 CBETA 原文 · fojin.app/verify",
@@ -260,8 +263,10 @@ _COPY = {
         "header": "佛津 FoJin · 這句經，佛真的說過嗎？",
         "sutra": "出自佛經",
         "not_sutra": "出自{cls}，不是佛經",
+        "variant": "經中有此句，用字略有不同",
         "partial": "只有部分能在大藏經中找到",
         "absent": "大藏經中未見",
+        "canon_reads": "經中原文：{text}",
         "source": "出處 · {titles}",
         "missing": "灰色部分：大藏經中未見",
         "footer": "逐字比對 CBETA 原文 · fojin.app/verify",
@@ -270,8 +275,10 @@ _COPY = {
         "header": "FoJin · Did the Buddha really say this?",
         "sutra": "Found in a sūtra",
         "not_sutra": "Found in {cls}, not a sūtra",
+        "variant": "In the canon, worded slightly differently",
         "partial": "Only partly found in the canon",
         "absent": "Not found in the Buddhist canon",
+        "canon_reads": "The canon reads: {text}",
         "source": "Source · {titles}",
         "missing": "Grey: not found in the canon",
         "footer": "Checked word for word against CBETA · fojin.app/verify",
@@ -285,7 +292,8 @@ _QUOTE_MAX_LINES = 4
 
 def _layout_segments(verdict: ClaimVerdict, max_width: int) -> list[list[tuple[str, tuple[int, int, int]]]]:
     """Wrap the pasted text char by char into ≤4 lines, colouring each clause."""
-    runs = [(seg.text, _FOUND_INK if seg.found else _MISSING_INK) for seg in verdict.segments]
+    # Near misses are in the canon (worded slightly differently) — not greyed.
+    runs = [(seg.text, _FOUND_INK if (seg.found or seg.close) else _MISSING_INK) for seg in verdict.segments]
     if len(runs) > 1:  # clause texts dropped their punctuation when split
         runs = [(t + ("，" if i < len(runs) - 1 else ""), c) for i, (t, c) in enumerate(runs)]
     lines: list[list[tuple[str, tuple[int, int, int]]]] = [[]]
@@ -334,9 +342,18 @@ def _render_verify_card(verdict: ClaimVerdict, lang: str) -> bytes:
             x += draw.textlength(text, font=_QUOTE_FONT)
         y += 66
 
+    if verdict.verdict == "variant":
+        close = next((seg.close for seg in verdict.segments if seg.close is not None), None)
+        if close is not None:
+            # window_normalised is in the matcher's normalised space (simplified,
+            # punctuation stripped) — shown as-is; the page links the source.
+            line = copy["canon_reads"].format(text=close.window_normalised)
+            draw.text((PADDING, y + 6), line[:34] + ("…" if len(line) > 34 else ""), fill=(47, 111, 143), font=_FOOTER_FONT)
+
     titles: list[str] = []
     for seg in verdict.segments:
-        for src in seg.sources:
+        refs = list(seg.sources) + ([seg.close] if seg.close is not None else [])
+        for src in refs:
             title = src.title_zh or src.cbeta_id or ""
             if lang == "zh":  # titles are stored in traditional script (CBETA)
                 title = _T2S.convert(title)

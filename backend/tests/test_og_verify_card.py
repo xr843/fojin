@@ -11,7 +11,7 @@ import pytest
 from PIL import Image
 
 from app.api import og
-from app.schemas.verification import ClaimSegment, ClaimVerdict, QuoteMatch
+from app.schemas.verification import ClaimSegment, ClaimVerdict, ClosestMiss, QuoteMatch
 
 DIAMOND = QuoteMatch(text_id=7, cbeta_id="T0235", title_zh="金剛般若波羅蜜經", juan_num=1, canon_class="sutra")
 PLATFORM = QuoteMatch(text_id=70, cbeta_id="T2008", title_zh="六祖大師法寶壇經", juan_num=1, canon_class="school")
@@ -31,6 +31,16 @@ VERDICTS = {
             ClaimSegment(text="一切有为法", found=True, sources=[DIAMOND]),
             ClaimSegment(text="看开便是福", found=False),
         ],
+    ),
+    "犹如莲花不著水，亦如日月不住空": ClaimVerdict(
+        query="", verdict="variant", source_class="sutra",
+        segments=[ClaimSegment(
+            text="犹如莲花不著水，亦如日月不住空", found=False,
+            close=ClosestMiss(
+                text_id=297, juan_num=1, similarity=0.93, window_normalised="犹如莲花不着水亦如日月不着空",
+                cbeta_id="T0297", title_zh="普賢菩薩行願讚", canon_class="sutra",
+            ),
+        )],
     ),
     "一切都是最好的安排": ClaimVerdict(
         query="", verdict="absent", segments=[ClaimSegment(text="一切都是最好的安排", found=False)],
@@ -106,4 +116,10 @@ def test_simplified_card_shows_titles_in_simplified_script():
     from app.api.og import _T2S
 
     assert _T2S.convert("金剛般若波羅蜜經") == "金刚般若波罗蜜经"
+
+
+def test_near_miss_text_is_not_greyed_like_a_missing_clause():
+    variant = VERDICTS["犹如莲花不著水，亦如日月不住空"]
+    lines = og._layout_segments(variant, 1000)
+    assert {colour for line in lines for _, colour in line} == {og._FOUND_INK}
 
