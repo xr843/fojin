@@ -17,6 +17,8 @@ import { LANG_ORDER, getChannelLabel, trackSourceClick } from "./constants";
 interface SourceCardProps {
   source: DataSource;
   searchQuery: string;
+  /** 超出分组折叠上限：仍渲染（SEO / 页内查找能看到名称与链接），只用 CSS 隐藏。 */
+  overflow?: boolean;
 }
 
 // Cron-updated reachability verdicts worth surfacing to readers. "ok" shows
@@ -47,7 +49,7 @@ const HEALTH_BADGE: Record<
   },
 };
 
-export default function SourceCard({ source: s, searchQuery }: SourceCardProps) {
+export default function SourceCard({ source: s, searchQuery, overflow = false }: SourceCardProps) {
   const { t } = useTranslation();
   const langs = [
     ...new Map(
@@ -103,7 +105,7 @@ export default function SourceCard({ source: s, searchQuery }: SourceCardProps) 
     : null;
 
   return (
-    <div className="source-card">
+    <div className={overflow ? "source-card is-overflow" : "source-card"}>
       <div className="source-card-top">
         <span className="source-card-icon">
           <GlobalOutlined />

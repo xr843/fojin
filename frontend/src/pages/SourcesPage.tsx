@@ -18,8 +18,15 @@ import {
 } from "./sources/constants";
 import "../styles/sources.css";
 import { LangAlternates } from "../seo/LangAlternates";
+import { useNarrowViewport } from "../hooks/useNarrowViewport";
 
 type GroupBy = "region" | "field" | "lang";
+
+// 分组默认收起的视口：竖屏手机（≤768 宽，与 sources.css 手机块同一个数）和横屏手机
+// （宽 844 但只有 390 高 —— 按宽度算是「桌面」，实测全展开是 74 屏；限 coarse 指针，
+// 免得把拉矮的桌面浏览器窗口也当手机）。平板与桌面
+// 一屏能放下多张卡片，保持原来的默认展开。
+const COLLAPSE_GROUPS_QUERY = "(max-width: 768px), (max-height: 520px) and (pointer: coarse)";
 type Capability = "direct" | "local" | "remote" | "iiif" | "api";
 
 const VALID_GROUP_BY: readonly GroupBy[] = ["region", "field", "lang"] as const;
@@ -139,6 +146,31 @@ export default function SourcesPage() {
   const GROUP_COLLAPSE_LIMIT = 12;
   const toggleGroup = useCallback((name: string) => {
     setExpandedGroups((prev) => ({ ...prev, [name]: !prev[name] }));
+  }, []);
+
+  // 分组收起/展开（<details>）。手机上 35 个地区组全展开是 51,389px ≈ 61 屏
+  // （2026-10-11 生产 390×844 实测），所以手机默认收起、只露组名+数量；桌面
+  // 默认展开，保持原样。任何筛选/搜索生效时一律默认展开 —— 不能出现「搜到了
+  // 但被折叠看不见」。用户手动开/合的记录在筛选条件或分组方式变化时清空，
+  // 否则先合上某组、再搜到该组里的源，命中会被藏在合上的组里。
+  const phone = useNarrowViewport(COLLAPSE_GROUPS_QUERY);
+  const filtersActive =
+    search !== "" ||
+    searchQuery !== "" ||
+    regionFilter !== "all" ||
+    langFilter !== "all" ||
+    fieldFilter !== "all" ||
+    fulltextOnly ||
+    capability !== null;
+  const [openOverrides, setOpenOverrides] = useState<Record<string, boolean>>({});
+  const filterKey = [search, searchQuery, regionFilter, langFilter, fieldFilter, fulltextOnly, capability, groupBy].join("\u0001");
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (prevFilterKey !== filterKey) {
+    setPrevFilterKey(filterKey);
+    setOpenOverrides({});
+  }
+  const setGroupOpen = useCallback((name: string, open: boolean) => {
+    setOpenOverrides((prev) => (prev[name] === open ? prev : { ...prev, [name]: open }));
   }, []);
 
   // Resync mirrors when the URL changes externally — adjusted during render.
@@ -375,9 +407,22 @@ export default function SourcesPage() {
   }
 
   const total = sources?.length || 0;
+  const groupsOpenByDefault = !phone || filtersActive || grouped.length <= 1;
+  const isGroupOpen = (name: string) => openOverrides[name] ?? groupsOpenByDefault;
+  // 关键词搜索时命中通常很少，组内不再截断到 12 条：命中的每一条都直接可见。
+  const capPerGroup = search === "";
+  const jumpToGroup = (name: string, index: number) => {
+    setGroupOpen(name, true);
+    requestAnimationFrame(() => {
+      const prefersReduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+      document
+        .getElementById(`sources-group-${index}`)
+        ?.scrollIntoView({ behavior: prefersReduced ? "auto" : "smooth", block: "start" });
+    });
+  };
 
   return (
-    <div className="sources-page">
+    <div className="sources-page sources-catalog">
       <Helmet>
         <title>{t("sources.page_title")}</title>
         <meta
@@ -460,7 +505,7 @@ export default function SourcesPage() {
               requestAnimationFrame(() => {
                 const prefersReduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
                 document
-                  .querySelector(".sources-toolbar")
+                  .querySelector(".sources-stats-bar")
                   ?.scrollIntoView({ behavior: prefersReduced ? "auto" : "smooth", block: "start" });
               });
             }
@@ -472,6 +517,141 @@ export default function SourcesPage() {
           </div>
         )}
       </div>
+
+      <div className="sources-toolbar">
+        <Input
+          prefix={<SearchOutlined style={{ color: "var(--fj-ink-muted)" }} />}
+          placeholder={t("sources.search_placeholder")}
+          allowClear
+          value={searchInput}
+          onChange={(e) => handleSearchInputChange(e.target.value)}
+          className="sources-filter-search"
+        />
+        <Select
+          value={regionFilter}
+          onChange={setRegionFilter}
+          className="sources-filter-select sources-filter-w140"
+          options={[
+            { value: "all", label: t("sources.all_regions", { n: regions.length }) },
+            ...regions.map((r) => ({ value: r, label: t(`region.${r}`, r) })),
+          ]}
+        />
+        <Select
+          value={langFilter}
+          onChange={setLangFilter}
+          className="sources-filter-select sources-filter-w140"
+          options={[
+            { value: "all", label: t("sources.all_langs", { n: languages.length }) },
+            ...languages.map((l) => ({ value: l, label: localizedLangName(normalizeLangCode(l), t) })),
+          ]}
+        />
+        <Select
+          value={fieldFilter}
+          onChange={setFieldFilter}
+          className="sources-filter-select sources-filter-w150"
+          options={[
+            { value: "all", label: t("sources.all_fields", { n: researchFields.length }) },
+            ...researchFields.map((f) => ({ value: f, label: t(`field.${f}`, FIELD_NAMES[f] || f) })),
+          ]}
+        />
+        <button
+          type="button"
+          className={`sources-toggle-chip${fulltextOnly ? " is-active" : ""}`}
+          onClick={() => setFulltextOnly(!fulltextOnly)}
+          title={t("sources.fulltext_only_tip")}
+        >
+          {fulltextOnly ? "✓ " : ""}{t("sources.fulltext_only", { n: counters.local + counters.remote })}
+        </button>
+        <Select
+          value={groupBy}
+          onChange={setGroupBy}
+          className="sources-filter-select sources-filter-w130"
+          options={[
+            { value: "region", label: t("sources.group_by_region") },
+            { value: "field", label: t("sources.group_by_field") },
+            { value: "lang", label: t("sources.group_by_lang") },
+          ]}
+        />
+      </div>
+
+      <div className="sources-stats-bar">
+        {t("sources.stats_showing")} <strong>{filtered.length}</strong> / {total} {t("sources.stats_unit")}
+        {groupBy !== "region" && ` · ${t("sources.stats_groups", { n: grouped.length })}`}
+        {groupBy !== "region" && (
+          <span className="sources-stats-hint">{groupBy === "field" ? t("sources.stats_hint_field") : t("sources.stats_hint_lang")}</span>
+        )}
+      </div>
+
+      {filtered.length === 0 ? (
+        <Empty description={t("sources.no_match")} style={{ marginTop: 60 }} />
+      ) : (
+        <>
+          {grouped.length > 1 && (
+            <nav className="sources-overview" aria-label={t("sources.overview_aria")}>
+              {grouped.map(([groupName, items], i) => (
+                <button
+                  key={groupName}
+                  type="button"
+                  className="sources-overview-chip"
+                  onClick={() => jumpToGroup(groupName, i)}
+                >
+                  {groupLabel(groupName)}
+                  <span className="sources-overview-count">{items.length}</span>
+                </button>
+              ))}
+            </nav>
+          )}
+          <div className="sources-groups">
+            {grouped.map(([groupName, items], i) => {
+              const isExpanded = expandedGroups[groupName] ?? false;
+              const shouldCollapse = capPerGroup && items.length > GROUP_COLLAPSE_LIMIT;
+              const open = isGroupOpen(groupName);
+              return (
+                // 收起用 <details> 而不是不渲染：来源名称与链接始终在 DOM 里，
+                // 搜索引擎能读到，浏览器页内查找（Ctrl+F）也会自动展开命中的组。
+                <details
+                  key={groupName}
+                  id={`sources-group-${i}`}
+                  className="sources-group"
+                  open={open}
+                  onToggle={(e) => {
+                    const next = e.currentTarget.open;
+                    if (next !== open) setGroupOpen(groupName, next);
+                  }}
+                >
+                  <summary className="sources-group-header">
+                    <span className="sources-group-name">{groupLabel(groupName)}</span>
+                    <span className="sources-group-count">{items.length}</span>
+                    <span className="sources-group-chevron" aria-hidden="true" />
+                  </summary>
+                  <div className="sources-grid">
+                    {items.map((s, idx) => (
+                      <SourceCard
+                        key={s.code}
+                        source={s}
+                        searchQuery={searchQuery}
+                        overflow={shouldCollapse && !isExpanded && idx >= GROUP_COLLAPSE_LIMIT}
+                      />
+                    ))}
+                  </div>
+                  {shouldCollapse && (
+                    <button
+                      type="button"
+                      className="sources-group-toggle"
+                      onClick={() => toggleGroup(groupName)}
+                      aria-expanded={isExpanded}
+                    >
+                      {isExpanded
+                        ? t("sources.collapse_group", { group: groupLabel(groupName) })
+                        : t("sources.expand_group", { n: items.length, remaining: items.length - GROUP_COLLAPSE_LIMIT })}
+                    </button>
+                  )}
+                </details>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       <div className="sources-trust">
         <div className="sources-trust-items">
@@ -501,108 +681,6 @@ export default function SourcesPage() {
           </div>
         </div>
       </div>
-
-      <div className="sources-toolbar">
-        <Input
-          prefix={<SearchOutlined style={{ color: "var(--fj-ink-muted)" }} />}
-          placeholder={t("sources.search_placeholder")}
-          allowClear
-          value={searchInput}
-          onChange={(e) => handleSearchInputChange(e.target.value)}
-          style={{ width: 260, maxWidth: "100%" }}
-        />
-        <Select
-          value={regionFilter}
-          onChange={setRegionFilter}
-          style={{ width: 140 }}
-          options={[
-            { value: "all", label: t("sources.all_regions", { n: regions.length }) },
-            ...regions.map((r) => ({ value: r, label: t(`region.${r}`, r) })),
-          ]}
-        />
-        <Select
-          value={langFilter}
-          onChange={setLangFilter}
-          style={{ width: 140 }}
-          options={[
-            { value: "all", label: t("sources.all_langs", { n: languages.length }) },
-            ...languages.map((l) => ({ value: l, label: localizedLangName(normalizeLangCode(l), t) })),
-          ]}
-        />
-        <Select
-          value={fieldFilter}
-          onChange={setFieldFilter}
-          style={{ width: 150 }}
-          options={[
-            { value: "all", label: t("sources.all_fields", { n: researchFields.length }) },
-            ...researchFields.map((f) => ({ value: f, label: t(`field.${f}`, FIELD_NAMES[f] || f) })),
-          ]}
-        />
-        <button
-          type="button"
-          className={`sources-toggle-chip${fulltextOnly ? " is-active" : ""}`}
-          onClick={() => setFulltextOnly(!fulltextOnly)}
-          title={t("sources.fulltext_only_tip")}
-        >
-          {fulltextOnly ? "✓ " : ""}{t("sources.fulltext_only", { n: counters.local + counters.remote })}
-        </button>
-        <Select
-          value={groupBy}
-          onChange={setGroupBy}
-          style={{ width: 130 }}
-          options={[
-            { value: "region", label: t("sources.group_by_region") },
-            { value: "field", label: t("sources.group_by_field") },
-            { value: "lang", label: t("sources.group_by_lang") },
-          ]}
-        />
-      </div>
-
-      <div className="sources-stats-bar">
-        {t("sources.stats_showing")} <strong>{filtered.length}</strong> / {total} {t("sources.stats_unit")}
-        {groupBy !== "region" && ` · ${t("sources.stats_groups", { n: grouped.length })}`}
-        {groupBy !== "region" && (
-          <span className="sources-stats-hint">{groupBy === "field" ? t("sources.stats_hint_field") : t("sources.stats_hint_lang")}</span>
-        )}
-      </div>
-
-      {filtered.length === 0 ? (
-        <Empty description={t("sources.no_match")} style={{ marginTop: 60 }} />
-      ) : (
-        <div className="sources-groups">
-          {grouped.map(([groupName, items]) => {
-            const isExpanded = expandedGroups[groupName] ?? false;
-            const shouldCollapse = items.length > GROUP_COLLAPSE_LIMIT;
-            const visible =
-              shouldCollapse && !isExpanded ? items.slice(0, GROUP_COLLAPSE_LIMIT) : items;
-            return (
-              <div key={groupName} className="sources-group">
-                <div className="sources-group-header">
-                  <span className="sources-group-name">{groupLabel(groupName)}</span>
-                  <span className="sources-group-count">{items.length}</span>
-                </div>
-                <div className="sources-grid">
-                  {visible.map((s) => (
-                    <SourceCard key={s.code} source={s} searchQuery={searchQuery} />
-                  ))}
-                </div>
-                {shouldCollapse && (
-                  <button
-                    type="button"
-                    className="sources-group-toggle"
-                    onClick={() => toggleGroup(groupName)}
-                    aria-expanded={isExpanded}
-                  >
-                    {isExpanded
-                      ? t("sources.collapse_group", { group: groupLabel(groupName) })
-                      : t("sources.expand_group", { n: items.length, remaining: items.length - GROUP_COLLAPSE_LIMIT })}
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
 
       <SuggestSourceForm />
 

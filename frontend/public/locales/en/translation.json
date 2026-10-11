@@ -917,6 +917,7 @@
   "sources.stats_hint_field": "(a source can belong to multiple research fields)",
   "sources.stats_hint_lang": "(a source can belong to multiple languages)",
   "sources.no_match": "No matching sources",
+  "sources.overview_aria": "Jump to group",
   "sources.collapse_group": "Collapse {{group}}",
   "sources.expand_group": "Show all {{n}} ({{remaining}} more)",
   "sources.back_to_top_aria": "Back to top",

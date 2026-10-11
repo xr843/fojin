@@ -253,6 +253,99 @@
   color: var(--fj-highlight);
 }
 
+/* ---------- 目录页（/sources）专属：筛选控件宽度、分组概览、可收起分组 ----------
+   .sources-page / .sources-toolbar 也被 /collections 复用，所以本页新增的规则一律挂在
+   .sources-catalog 下，不影响别的页面。 */
+.sources-filter-search { width: 260px; max-width: 100%; }
+.sources-filter-w140 { width: 140px; }
+.sources-filter-w150 { width: 150px; }
+.sources-filter-w130 { width: 130px; }
+
+/* 分组概览：每组一个入口（组名 + 数量），点开即展开并跳到该组。 */
+.sources-overview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 20px;
+}
+
+.sources-overview-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid var(--fj-border);
+  border-radius: 999px;
+  background: var(--fj-surface);
+  color: var(--fj-ink-light);
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.sources-overview-chip:hover {
+  border-color: var(--fj-gold);
+  color: var(--fj-ink);
+}
+
+.sources-overview-chip:focus-visible,
+.sources-catalog .sources-group-header:focus-visible {
+  outline: 2px solid var(--fj-gold);
+  outline-offset: 2px;
+}
+
+.sources-overview-count {
+  font-size: 12px;
+  color: var(--fj-ink-muted);
+}
+
+/* 分组用 <details>：summary 即组标题，去掉原生三角，换成右侧的折角。 */
+.sources-catalog .sources-group {
+  /* 顶栏 64px 是 sticky 的，跳转时组标题不能藏在它下面。 */
+  scroll-margin-top: 72px;
+}
+
+.sources-catalog .sources-group-header {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+.sources-catalog .sources-group-header::-webkit-details-marker {
+  display: none;
+}
+
+.sources-catalog .sources-group:not([open]) > .sources-group-header {
+  margin-bottom: 0;
+}
+
+.sources-group-chevron {
+  margin-left: auto;
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid var(--fj-ink-muted);
+  border-bottom: 1.5px solid var(--fj-ink-muted);
+  transform: rotate(45deg);
+  transition: transform 0.15s;
+  flex-shrink: 0;
+  margin-right: 6px;
+}
+
+.sources-group[open] > .sources-group-header .sources-group-chevron {
+  transform: rotate(-135deg);
+}
+
+/* 可信度说明移到目录之后（手机上它原先 396px、把找来源的筛选挤出首屏）。 */
+.sources-catalog .sources-trust {
+  margin-top: 32px;
+}
+
+/* 超出每组上限（12）的卡片：照常渲染、只是不显示，点「展开全部」后出现。 */
+.source-card.is-overflow {
+  display: none;
+}
+
 /* ---------- 分组 ---------- */
 .sources-groups {
   display: flex;
@@ -685,6 +778,82 @@
   .sources-suggest-row {
     flex-direction: column;
     gap: 0;
+  }
+}
+
+/* ---------- 目录页手机端：首屏放下「是什么 + 怎么找」，分组默认收起 ---------- */
+@media (max-width: 768px) {
+  .sources-catalog .sources-header {
+    padding: 16px 0 14px;
+  }
+
+  .sources-catalog .sources-desc {
+    margin-bottom: 8px;
+  }
+
+  .sources-catalog .sources-cap-chips {
+    gap: 6px;
+    justify-content: center;
+  }
+
+  .sources-catalog .sources-cap-chip {
+    padding: 4px 10px;
+  }
+
+  .sources-catalog .sources-hero-search {
+    margin-bottom: 12px;
+  }
+
+  /* 工具栏：搜索框占满一行，四个下拉 + 「仅看全文」两两并排，原先六行竖排 286px。 */
+  .sources-catalog .sources-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+    padding: 10px;
+    margin-bottom: 10px;
+  }
+
+  .sources-catalog .sources-filter-search {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .sources-catalog .sources-filter-select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .sources-catalog .sources-toggle-chip {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sources-catalog .sources-stats-bar {
+    margin-bottom: 10px;
+  }
+
+  .sources-catalog .sources-overview {
+    margin-bottom: 14px;
+  }
+
+  /* 收起的组只是一行组名：行高到 44px 触控下限，组间不再留 28px 空。 */
+  .sources-catalog .sources-groups {
+    gap: 0;
+  }
+
+  .sources-catalog .sources-group-header {
+    min-height: 44px;
+    padding: 8px 2px;
+    margin-bottom: 0;
+  }
+
+  .sources-catalog .sources-group[open] {
+    padding-bottom: 20px;
+  }
+
+  .sources-catalog .sources-group[open] > .sources-group-header {
+    margin-bottom: 12px;
   }
 }
 
