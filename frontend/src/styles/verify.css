@@ -176,6 +176,12 @@
     min-height: 44px;
   }
 
+  /* antd's showCount sits just below the textarea; in the stacked layout it
+     would otherwise overlap the full-width button. */
+  .verify-form .ant-input-textarea-show-count {
+    margin-bottom: 20px;
+  }
+
   .verify-result {
     padding: 16px 14px 12px;
   }
