@@ -30,6 +30,10 @@ class QuoteMatch(BaseModel):
     reader_url: str | None = None
     # True/False only when the caller hinted a juan; None otherwise.
     juan_matched: bool | None = None
+    # Which part of the canon this source belongs to (sutra / vinaya /
+    # treatise / commentary / school / history / apocrypha / later / unknown)
+    # — see app/services/canon_class.py. Matches arrive earliest-in-canon first.
+    canon_class: str | None = None
 
 
 class DiffOp(BaseModel):

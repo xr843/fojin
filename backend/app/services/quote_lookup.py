@@ -32,6 +32,7 @@ from sqlalchemy import text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.verification import ClosestMiss, DiffOp, QuoteMatch, QuoteVerdict
+from app.services.canon_class import CANON_ORDER_SCRIPT, canon_class
 from app.services.quote_verifier import (
     MIN_QUOTE_CHARS,
     NEAR_MISS_THRESHOLD,
@@ -51,6 +52,10 @@ logger = logging.getLogger(__name__)
 _MAX_CANDIDATES = 5
 # Fuzzy fallback candidates when the phrase query finds nothing.
 _MAX_FUZZY_CANDIDATES = 3
+# Open-world phrase pass, canon-ordered: look past the first five so the
+# confirm loop still reaches five verbatim sources when a few candidates are
+# phrase-hits but not normalised-substring hits (punctuation-free subfield).
+_CANON_ORDER_CANDIDATES = 10
 # Full-text-scan ceiling: scanning every juan of a hinted text is allowed
 # only under this fascicle count (T0220 has 600 juans of ~100k chars — a
 # blind full scan there is a several-hundred-MB read).
@@ -274,23 +279,48 @@ async def _es_candidates(
     text_id: int | None,
     phrase: bool,
     size: int,
+    canonical_order: bool = False,
 ) -> list[dict]:
     """Candidate fascicles from ES. ``phrase=True`` is the precise pass
     (cjk_content analyzer makes match_phrase ≈ normalised-substring recall);
     ``phrase=False`` is the fuzzy fallback used only to find *closest* text
     for a near-miss verdict."""
-    query_type = "match_phrase" if phrase else "match"
-    content_query: dict = {
-        query_type: {"content": {"query": quote, "analyzer": "cjk_content"}}
-    }
+    if phrase:
+        # Two phrase routes, either suffices:
+        # - content.nopunct drops punctuation/line breaks between Han
+        #   characters at index time, so CBETA's 「如夢、幻、泡、影」 and a user's
+        #   own commas stop deciding whether the candidate is even returned
+        #   (see backend/scripts/es_text_contents_join_wraps.py). No explicit
+        #   analyzer: an index that predates the subfield has no cjk_nopunct
+        #   and would 400 the whole search; an unmapped field just matches
+        #   nothing and the plain route still answers.
+        # - content is the original field (hard wraps joined once the index
+        #   is rebuilt).
+        content_query: dict = {
+            "bool": {
+                "should": [
+                    {"match_phrase": {"content.nopunct": {"query": quote}}},
+                    {"match_phrase": {"content": {"query": quote, "analyzer": "cjk_content"}}},
+                ],
+                "minimum_should_match": 1,
+            }
+        }
+    else:
+        content_query = {"match": {"content": {"query": quote, "analyzer": "cjk_content"}}}
     filters: list[dict] = [{"term": {"lang": "lzh"}}]
     if text_id is not None:
         filters.append({"term": {"text_id": text_id}})
-    body = {
+    body: dict = {
         "query": {"bool": {"must": [content_query], "filter": filters}},
         "size": size,
         "_source": ["text_id", "cbeta_id", "title_zh", "juan_num"],
     }
+    if canonical_order:
+        # Earliest-in-canon first instead of BM25: commentaries quote a famous
+        # line many times and outscore the sutra itself. See canon_class.py.
+        body["sort"] = [
+            {"_script": {"type": "number", "script": {"source": CANON_ORDER_SCRIPT}, "order": "asc"}}
+        ]
     try:
         resp = await es.search(index="text_contents", body=body)
         # elasticsearch-py 8.x returns ObjectApiResponse (Mapping-like, NOT a
@@ -320,6 +350,7 @@ def _match_from(
         urn=build_urn(src.get("cbeta_id"), juan_num),
         reader_url=absolute_reader_url(reader_path(src["text_id"], juan_num)),
         juan_matched=(juan_num == hinted_juan) if hinted_juan is not None else None,
+        canon_class=canon_class(src.get("cbeta_id")),
     )
 
 
@@ -412,7 +443,7 @@ async def verify_quote(
         # Open-world pass (also runs when a cite hint resolved but missed —
         # "not where you said, but it IS here" is the useful answer).
         for src in await _es_candidates(
-            es, quote, text_id=None, phrase=True, size=_MAX_CANDIDATES
+            es, quote, text_id=None, phrase=True, size=_CANON_ORDER_CANDIDATES, canonical_order=True
         ):
             if len(matches) >= _MAX_CANDIDATES:
                 break

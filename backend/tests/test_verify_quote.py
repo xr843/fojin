@@ -109,7 +109,10 @@ class FakeES:
 
     async def search(self, index, body):
         self.calls.append(body)
-        (qtype,) = body["query"]["bool"]["must"][0].keys()
+        clause = body["query"]["bool"]["must"][0]
+        if "bool" in clause:  # the phrase pass: should[content.nopunct, content]
+            clause = clause["bool"]["should"][0]
+        (qtype,) = clause.keys()
         hits = self.hits_by_type.get(qtype, [])
         # Honour the text_id term filter like real ES would.
         for f in body["query"]["bool"]["filter"]:
@@ -318,3 +321,59 @@ async def test_matches_carry_a_clickable_absolute_url():
 def test_verify_quote_is_strict_rate_limited():
     assert STRICT_PATHS["/api/verify/quote"] == settings.rate_limit_verify_quote
     assert settings.rate_limit_verify_quote <= settings.rate_limit_default
+
+
+# ── canonical source ordering (核对页「出自哪部经」) ───────────────────────
+
+
+def _open_world_phrase_body(es: "FakeES") -> dict:
+    return next(
+        b for b in es.calls
+        if "bool" in b["query"]["bool"]["must"][0]
+        and not any("text_id" in f.get("term", {}) for f in b["query"]["bool"]["filter"])
+    )
+
+
+@pytest.mark.asyncio
+async def test_open_world_phrase_pass_is_sorted_in_canon_order():
+    """BM25 put commentaries ahead of the sutra they quote (1/25 famous quotes
+    had their own sutra first, 2026-10-11). The phrase pass must ask ES for
+    canon order instead, and look at enough candidates to reach the sutra."""
+    from app.services.canon_class import CANON_ORDER_SCRIPT
+
+    es = FakeES({"match_phrase": [_hit(15, 13)]})
+    await verify_quote(DB, es, SNOW_VERSE)
+    body = _open_world_phrase_body(es)
+    assert body["sort"][0]["_script"]["script"]["source"] == CANON_ORDER_SCRIPT
+    assert body["sort"][0]["_script"]["order"] == "asc"
+    assert body["size"] == 10
+
+
+@pytest.mark.asyncio
+async def test_phrase_pass_also_queries_the_punctuation_free_subfield():
+    """CBETA writes 如夢、幻、泡、影; people write 如梦幻泡影. The nopunct
+    subfield closes that gap; the plain field keeps working on an index that
+    predates the subfield (an unmapped field just yields no hits)."""
+    es = FakeES({"match_phrase": [_hit(15, 13)]})
+    await verify_quote(DB, es, SNOW_VERSE)
+    should = _open_world_phrase_body(es)["query"]["bool"]["must"][0]["bool"]["should"]
+    fields = [next(iter(c["match_phrase"])) for c in should]
+    assert fields == ["content.nopunct", "content"]
+    # No explicit analyzer on the subfield: naming cjk_nopunct would 400 on
+    # an index that does not define it, taking the whole search down.
+    assert "analyzer" not in should[0]["match_phrase"]["content.nopunct"]
+
+
+@pytest.mark.asyncio
+async def test_matches_keep_es_canon_order_and_carry_their_class():
+    db = FakeDB(
+        texts={15: ("T0374", "大般涅槃經"), 900: ("X0508", "金剛經闡說"), 7: ("T0007", "大般涅槃經")},
+        contents={(15, 13): JUAN_13, (900, 1): JUAN_13, (7, 1): JUAN_13},
+    )
+    es = FakeES({"match_phrase": [
+        _hit(7, 1, cbeta="T0007"), _hit(15, 13), _hit(900, 1, cbeta="X0508", title="金剛經闡說"),
+    ]})
+    out = await verify_quote(db, es, SNOW_VERSE)
+    assert [m.cbeta_id for m in out.matches] == ["T0007", "T0374", "X0508"]
+    assert [m.canon_class for m in out.matches] == ["sutra", "sutra", "later"]
+
