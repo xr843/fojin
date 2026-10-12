@@ -793,3 +793,18 @@
     font-size: 14px;
   }
 }
+
+/* 超长关键词（用户贴整段经文）被截短搜索时的说明条 */
+.s-long-query {
+  max-width: 640px;
+  margin: 0 auto 12px;
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--fj-ink-light);
+  background: var(--fj-surface-alt);
+  border-radius: 6px;
+  text-align: center;
+}
+.s-long-query a { color: var(--fj-accent, #8b6914); font-weight: 500; white-space: nowrap; }
+.s-long-query a:hover { text-decoration: underline; }

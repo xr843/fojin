@@ -807,6 +807,8 @@
   "search.failed_title": "搜索失败",
   "search.failed_subtitle": "搜索服务暂时不可用，请稍后重试。",
   "search.retry": "重试",
+  "search.long_query.notice": "你粘贴的文字有 {{n}} 字，超过搜索上限，已按句截取前 {{m}} 字检索。",
+  "search.long_query.verify": "定位这段原文的出处 →",
   "search.found_dict": "辞典找到 {{n}} 条词条",
   "search.found_catalog": "在 {{n}} 部经典中找到匹配（共 {{juans}} 卷）",
   "search.found_semantic": "语义搜索找到 {{n}} 条相关结果",

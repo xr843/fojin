@@ -807,6 +807,8 @@
   "search.failed_title": "搜尋失敗",
   "search.failed_subtitle": "搜尋服務暫時不可用，請稍後重試。",
   "search.retry": "重試",
+  "search.long_query.notice": "你貼上的文字有 {{n}} 字，超過搜尋上限，已按句截取前 {{m}} 字檢索。",
+  "search.long_query.verify": "定位這段原文的出處 →",
   "search.found_dict": "辭典找到 {{n}} 條詞條",
   "search.found_catalog": "在 {{n}} 部經典中找到匹配（共 {{juans}} 卷）",
   "search.found_semantic": "語義搜尋找到 {{n}} 條相關結果",

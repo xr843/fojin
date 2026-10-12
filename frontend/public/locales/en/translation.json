@@ -807,6 +807,8 @@
   "search.failed_title": "Search failed",
   "search.failed_subtitle": "Search is temporarily unavailable. Please try again later.",
   "search.retry": "Retry",
+  "search.long_query.notice": "Your text is {{n}} characters, over the search limit — the first {{m}} (cut at a sentence end) were searched.",
+  "search.long_query.verify": "Find where this passage comes from →",
   "search.found_dict": "Found {{n}} dictionary entries",
   "search.found_catalog": "Matches in {{n}} texts ({{juans}} fascicles in total)",
   "search.found_semantic": "Semantic search found {{n}} results",

@@ -16,6 +16,7 @@ import type { DictGroupedSearchResponse } from "../api/client";
 import { hasDirectSearchUrl } from "../utils/sourceUrls";
 import { addSearchHistory, getSearchHistory, type SearchHistoryItem } from "../utils/history";
 import { askAiKind, buildAskAiUrl } from "../utils/searchAskAi";
+import { clampSearchQuery } from "../utils/searchQuery";
 import { ResultCard, ExternalSourcesSection, ContentCard, CrossLangCard, SemanticCard, UnifiedResults } from "../components/search";
 import ParallelSentenceCard from "../components/search/ParallelSentenceCard";
 import SearchFilterSidebar from "../components/search/SearchFilterSidebar";
@@ -41,6 +42,12 @@ export default function SearchPage() {
   // Default tab is "all" (unified overview); legacy aliases still resolve to
   // their canonical tab so old links keep working.
   const query = searchParams.get("q") ?? "";
+  // 发给后端的关键词：超过后端 200 字上限的长段落（用户贴经文）按句截短后再搜，
+  // 否则后端 422、页面显示「服务暂时不可用」。地址栏、标题、问小津仍用完整原文。
+  const { text: apiQuery, truncated: queryTruncated, total: queryLen } = useMemo(
+    () => clampSearchQuery(query),
+    [query],
+  );
   const rawTab = searchParams.get("tab") ?? "all";
   const tab = rawTab === "crosslang" ? "catalog" : rawTab === "semantic" ? "content" : rawTab === "dictionary" ? "catalog" : rawTab;
   const selectedSources = searchParams.get("sources") ?? "";
@@ -144,51 +151,51 @@ export default function SearchPage() {
   };
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["search", query, page, selectedSources, sortBy, langFilter, canonFilter, dynastyFilter, sectionFilter],
-    queryFn: () => searchTexts({ q: query, page, size: 20, sources: selectedSources || undefined, sort: sortBy !== "relevance" ? sortBy : undefined, ...facetParams, facets: true }),
-    enabled: query.length > 0 && tab === "catalog",
+    queryKey: ["search", apiQuery, page, selectedSources, sortBy, langFilter, canonFilter, dynastyFilter, sectionFilter],
+    queryFn: () => searchTexts({ q: apiQuery, page, size: 20, sources: selectedSources || undefined, sort: sortBy !== "relevance" ? sortBy : undefined, ...facetParams, facets: true }),
+    enabled: apiQuery.length > 0 && tab === "catalog",
   });
 
   const { data: contentData, isLoading: contentLoading, isError: contentError } = useQuery({
-    queryKey: ["searchContent", query, page, selectedSources, langFilter, canonFilter, dynastyFilter, sectionFilter],
-    queryFn: () => searchContent({ q: query, page, size: 20, sources: selectedSources || undefined, ...facetParams, facets: true }),
-    enabled: query.length > 0 && tab === "content",
+    queryKey: ["searchContent", apiQuery, page, selectedSources, langFilter, canonFilter, dynastyFilter, sectionFilter],
+    queryFn: () => searchContent({ q: apiQuery, page, size: 20, sources: selectedSources || undefined, ...facetParams, facets: true }),
+    enabled: apiQuery.length > 0 && tab === "content",
   });
 
   const { data: dictData, isLoading: dictLoading, isError: dictError } = useQuery({
-    queryKey: ["searchDict", query, dictPage, dictLang],
-    queryFn: () => searchDictionary({ q: query, page: dictPage, size: 20, lang: dictLang || undefined }),
-    enabled: query.length > 0 && tab === "dictionary",
+    queryKey: ["searchDict", apiQuery, dictPage, dictLang],
+    queryFn: () => searchDictionary({ q: apiQuery, page: dictPage, size: 20, lang: dictLang || undefined }),
+    enabled: apiQuery.length > 0 && tab === "dictionary",
   });
 
   const { data: crossLangData, isLoading: crossLangLoading } = useQuery({
     // 跨语言匹配刻意不按「语言」筛（跨语言本身就是目的），藏经/朝代/部类照筛。
-    queryKey: ["searchCrossLang", query, page, selectedSources, canonFilter, dynastyFilter, sectionFilter],
-    queryFn: () => searchCrossLanguage({ q: query, page, size: 20, sources: selectedSources || undefined, canon: facetParams.canon, dynasty: facetParams.dynasty, section: facetParams.section }),
-    enabled: query.length > 0 && tab === "catalog",
+    queryKey: ["searchCrossLang", apiQuery, page, selectedSources, canonFilter, dynastyFilter, sectionFilter],
+    queryFn: () => searchCrossLanguage({ q: apiQuery, page, size: 20, sources: selectedSources || undefined, canon: facetParams.canon, dynasty: facetParams.dynasty, section: facetParams.section }),
+    enabled: apiQuery.length > 0 && tab === "catalog",
   });
 
   const { data: semanticData, isLoading: semanticLoading } = useQuery({
-    queryKey: ["searchSemantic", query, selectedSources, langFilter, canonFilter, dynastyFilter, sectionFilter],
-    queryFn: () => searchSemantic({ q: query, size: 20, sources: selectedSources || undefined, ...facetParams }),
-    enabled: query.length > 0 && tab === "content",
+    queryKey: ["searchSemantic", apiQuery, selectedSources, langFilter, canonFilter, dynastyFilter, sectionFilter],
+    queryFn: () => searchSemantic({ q: apiQuery, size: 20, sources: selectedSources || undefined, ...facetParams }),
+    enabled: apiQuery.length > 0 && tab === "content",
   });
 
   // Unified search powers the default "全部 / All" tab — single round trip
   // to /search/unified returns sectioned results (dictionary, catalog,
   // content, semantic) so the user no longer has to pick a tab.
   const { data: unifiedData, isLoading: unifiedLoading, isError: unifiedError, refetch: refetchUnified } = useQuery({
-    queryKey: ["searchUnified", query, selectedSources, langFilter, canonFilter, dynastyFilter, sectionFilter],
-    queryFn: () => searchUnified({ q: query, sources: selectedSources || undefined, ...facetParams, facets: true }),
-    enabled: query.length > 0 && tab === "all",
+    queryKey: ["searchUnified", apiQuery, selectedSources, langFilter, canonFilter, dynastyFilter, sectionFilter],
+    queryFn: () => searchUnified({ q: apiQuery, sources: selectedSources || undefined, ...facetParams, facets: true }),
+    enabled: apiQuery.length > 0 && tab === "all",
   });
 
   // Cross-lingual parallel sentences (MITRA). Non-paginated; empty result is
   // the natural dark state (coverage is sparse and grows with imports).
   const { data: parallelData, isLoading: parallelLoading, isError: parallelError, refetch: refetchParallel } = useQuery({
-    queryKey: ["searchParallel", query, parallelLang],
-    queryFn: () => searchParallelSentences(query, { lang: parallelLang === "all" ? undefined : parallelLang, limit: 30 }),
-    enabled: query.length > 0 && tab === "parallel",
+    queryKey: ["searchParallel", apiQuery, parallelLang],
+    queryFn: () => searchParallelSentences(apiQuery, { lang: parallelLang === "all" ? undefined : parallelLang, limit: 30 }),
+    enabled: apiQuery.length > 0 && tab === "parallel",
   });
 
   // Dictionary knowledge card (parallel, non-blocking)
@@ -200,9 +207,10 @@ export default function SearchPage() {
     setDictCardDismissed(false);
   }
   const { data: dictKnowledge } = useQuery<DictGroupedSearchResponse>({
-    queryKey: ["dictKnowledge", query],
-    queryFn: () => searchDictionaryGrouped({ q: query }),
-    enabled: query.length > 0 && tab !== "dictionary",
+    queryKey: ["dictKnowledge", apiQuery],
+    queryFn: () => searchDictionaryGrouped({ q: apiQuery }),
+    // 截断过的长段落不是词条，查辞典只会白跑一次
+    enabled: apiQuery.length > 0 && !queryTruncated && tab !== "dictionary",
     staleTime: 5 * 60 * 1000,
   });
 
@@ -365,6 +373,13 @@ export default function SearchPage() {
             <MessageOutlined /> {askKind === "passage" ? t("search.ask_ai.passage_label") : t("search.ask_ai.term_label", { term: query.trim() })}
           </Link>
           <span className="s-ask-ai-hint">{t("search.ask_ai.hint")}</span>
+        </div>
+      )}
+
+      {queryTruncated && (
+        <div className="s-long-query" role="status">
+          {t("search.long_query.notice", { n: queryLen, m: Array.from(apiQuery).length })}{" "}
+          <Link to={`/verify?q=${encodeURIComponent(apiQuery)}`}>{t("search.long_query.verify")}</Link>
         </div>
       )}
 
