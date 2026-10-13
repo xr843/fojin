@@ -808,7 +808,7 @@ export async function searchContent(params: SearchFacetParams & {
   return data;
 }
 
-// fojin研读交流群：站内定向邀请（名单与二维码只在服务器上，见 backend/app/services/community_invite.py）
+// fojin平台交流群：站内定向邀请（名单与二维码只在服务器上，见 backend/app/services/community_invite.py）
 export async function getCommunityInvite(): Promise<{ invited: boolean }> {
   const { data } = await api.get<{ invited: boolean }>("/community/invite");
   return data;

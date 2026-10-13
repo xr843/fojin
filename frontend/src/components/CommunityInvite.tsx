@@ -7,7 +7,7 @@ import { dismissCommunityInvite, getCommunityInvite, getCommunityInviteQr } from
 import "../styles/community-invite.css";
 
 /**
- * fojin研读交流群的站内邀请（只对服务器名单里的已登录用户出现）。
+ * fojin平台交流群的站内邀请（只对服务器名单里的已登录用户出现）。
  *
  * 是否邀请、二维码图片都由后端判定并下发（backend/app/services/community_invite.py），
  * 前端包里没有名单也没有二维码。二维码带登录凭证取回后转成 data URL 显示，

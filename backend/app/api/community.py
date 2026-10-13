@@ -1,4 +1,4 @@
-"""fojin研读交流群的站内邀请接口。逻辑与安全约束见 services/community_invite.py。"""
+"""fojin平台交流群的站内邀请接口。逻辑与安全约束见 services/community_invite.py。"""
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, Response

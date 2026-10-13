@@ -47,7 +47,7 @@ describe("CommunityInvite", () => {
     vi.mocked(getCommunityInviteQr).mockResolvedValue(new Blob(["qr"], { type: "image/png" }));
     const user = userEvent.setup();
     renderCard();
-    expect(await screen.findByText(/fojin研读交流群/, {}, ASYNC)).toBeInTheDocument();
+    expect(await screen.findByText(/fojin平台交流群/, {}, ASYNC)).toBeInTheDocument();
     expect(getCommunityInviteQr).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: /加开发者微信/ }));
     const img = await screen.findByRole("img", { name: /开发者微信二维码/ }, ASYNC);
@@ -60,7 +60,7 @@ describe("CommunityInvite", () => {
     vi.mocked(getCommunityInvite).mockResolvedValue({ invited: true });
     const user = userEvent.setup();
     const { container } = renderCard();
-    await screen.findByText(/fojin研读交流群/, {}, ASYNC);
+    await screen.findByText(/fojin平台交流群/, {}, ASYNC);
     await user.click(screen.getByRole("button", { name: "不了，谢谢" }));
     await waitFor(() => expect(container).toBeEmptyDOMElement());
     expect(dismissCommunityInvite).toHaveBeenCalledTimes(1);
@@ -70,7 +70,7 @@ describe("CommunityInvite", () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     vi.mocked(getCommunityInvite).mockResolvedValueOnce({ invited: true });
     const first = renderCard(650, qc);
-    await screen.findByText(/fojin研读交流群/, {}, ASYNC);
+    await screen.findByText(/fojin平台交流群/, {}, ASYNC);
     first.unmount();
     vi.mocked(getCommunityInvite).mockResolvedValueOnce({ invited: false });
     const second = renderCard(999, qc);

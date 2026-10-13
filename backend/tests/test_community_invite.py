@@ -1,4 +1,4 @@
-"""fojin研读交流群邀请：名单与二维码只给名单里的已登录用户，任何异常都按「不邀请」处理。"""
+"""fojin平台交流群邀请：名单与二维码只给名单里的已登录用户，任何异常都按「不邀请」处理。"""
 
 import json
 from types import SimpleNamespace

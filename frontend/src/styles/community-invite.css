@@ -1,4 +1,4 @@
-/* fojin研读交流群 邀请卡（CommunityInvite.tsx）。只给名单里的用户显示，
+/* fojin平台交流群 邀请卡（CommunityInvite.tsx）。只给名单里的用户显示，
    放在 /chat 顶栏下方，平时一行收起，点「加开发者微信」才展开二维码。 */
 .community-invite {
   /* 与 .chat-column-inner 同宽同居中（global.css）。不套那个类：ChatPage.test 的 D1

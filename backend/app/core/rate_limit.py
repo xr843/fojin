@@ -52,7 +52,7 @@ STRICT_PATHS: dict[str, int] = {
     # garbage-collected. At the loose default this was ~2 GB/min/IP of
     # permanent writes, plus the CPU of parsing each one.
     "/api/chat/attachments": settings.rate_limit_attachment_upload,
-    # 开发者微信二维码（fojin研读交流群邀请）：只有名单内用户取得到，但每次都读文件；
+    # 开发者微信二维码（fojin平台交流群邀请）：只有名单内用户取得到，但每次都读文件；
     # 正常人一次展开取一次，10 次/分钟足够，防止名单内账号被拿来高频刷。
     "/api/community/invite/qr": 10,
 }
