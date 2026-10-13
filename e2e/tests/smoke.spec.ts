@@ -41,8 +41,16 @@ test("language switcher opens and switches the UI to English", async ({ page }) 
     .getByRole("button", { name: /Switch language|切换语言|切換語言/ })
     .click();
   await page.getByRole("menuitem", { name: "English" }).click();
+  // Assert on things that stay on screen at any width. The nav entries are not
+  // such a thing: since #1302 the header folds them into a hamburger whenever
+  // they don't fit, and the English labels need ~1254px — more than this 1280
+  // viewport leaves — so "Buddhist Dictionary" vanished and this went red for a
+  // reason that had nothing to do with the language switch.
+  await expect(page.locator(".header-lang-text")).toHaveText("English", {
+    timeout: 10_000,
+  });
   await expect(
-    page.getByRole("button", { name: /Buddhist Dictionary/ })
+    page.locator(".home-feature-title", { hasText: "Data Sources" })
   ).toBeVisible({ timeout: 10_000 });
 });
 
@@ -76,14 +84,21 @@ test("english locale file is current and the search page renders in English", as
   await expect(page.locator(".header-lang-text")).toHaveText("English", {
     timeout: 10_000,
   });
-  // Source names are DB data (name_en, #707) — the institution facet and the
-  // external-source launcher rows must render English names, not name_zh.
-  const firstInstitution = page.locator(".s-filter-group").nth(1).locator(".s-filter-name").first();
-  await expect(firstInstitution).toBeVisible({ timeout: 20_000 });
-  await expect(firstInstitution).not.toContainText(/[\u4e00-\u9fff]/);
+  // Source names are DB data (name_en, #707) — the external-source launcher
+  // rows must render English names, not name_zh.
   const firstLauncher = page.locator(".s-ext-row-name").first();
   await expect(firstLauncher).toBeVisible({ timeout: 20_000 });
   await expect(firstLauncher).not.toContainText(/[\u4e00-\u9fff]/);
+
+  // Facet values must render in English, not fall back to the Chinese key
+  // labels. Since #1318 the facets are 藏经/语言/朝代/部类 (the old 国家/馆藏
+  // institution group is gone), and they only render when the catalog has
+  // hits — an English query like the one above has none, so use a Chinese
+  // term that does. The first group is the canon list ("Taishō Canon" …).
+  await page.goto("/search?q=%E8%88%AC%E8%8B%A5"); // 般若
+  const firstCanon = page.locator(".s-filter-group").first().locator(".s-filter-name").first();
+  await expect(firstCanon).toBeVisible({ timeout: 20_000 });
+  await expect(firstCanon).not.toContainText(/[\u4e00-\u9fff]/);
 });
 
 test("reader opens the Heart Sutra via CBETA id redirect", async ({ page, request }) => {
