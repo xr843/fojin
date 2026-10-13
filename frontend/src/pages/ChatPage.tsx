@@ -2025,7 +2025,7 @@ export default function ChatPage() {
             </div>
           </div>
           {/* fojin研读交流群邀请：只对服务器名单里的已登录用户出现（后端判定），其余人渲染为空 */}
-          <CommunityInvite enabled={!!user} />
+          <CommunityInvite userId={user?.id ?? null} />
           {/* Messages */}
           {/* chat-msgs-scroll 只给手机空态的 CSS 用（global.css ≤768px 块）：那里外壳
               高度是 auto，下面 .chat-msgs-empty 的 min-height:100% 解析不出来，

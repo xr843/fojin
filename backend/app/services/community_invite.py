@@ -19,6 +19,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import stat
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -44,7 +46,7 @@ def load_config(base: Path | None = None) -> InviteConfig | None:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
         return None
-    except (OSError, ValueError):
+    except (OSError, ValueError, RecursionError):
         logger.warning("community invite: %s unreadable or not valid JSON; invite disabled", path)
         return None
     if not isinstance(raw, dict) or raw.get("enabled") is not True:
@@ -54,6 +56,9 @@ def load_config(base: Path | None = None) -> InviteConfig | None:
         return None
     # bool 是 int 的子类，true/false 不能被当成用户 1/0。
     valid = frozenset(i for i in ids if isinstance(i, int) and not isinstance(i, bool) and i > 0)
+    if len(valid) != len(ids):
+        # 只记数量，不记具体值：名单内容不进日志。
+        logger.warning("community invite: ignored %d malformed user_ids entries", len(ids) - len(valid))
     return InviteConfig(user_ids=valid) if valid else None
 
 
@@ -62,17 +67,60 @@ def is_listed(user_id: int, base: Path | None = None) -> bool:
     return cfg is not None and user_id in cfg.user_ids
 
 
-def load_qr(base: Path | None = None) -> tuple[bytes, str] | None:
-    """返回（图片字节, MIME）；没有或过大时返回 None。"""
+_MAGIC = {"image/png": b"\x89PNG\r\n\x1a\n", "image/jpeg": b"\xff\xd8\xff"}
+
+
+def _read_regular_file(path: Path, limit: int) -> bytes | None:
+    """读一个普通文件，最多 limit 字节；软链接、非普通文件（/proc、设备、FIFO）、超限一律拒绝。
+
+    用 O_NOFOLLOW 打开、再对打开的文件描述符做 fstat：判断与读取作用在同一个
+    inode 上，中途被替换也读不到别的东西。读取量以实际读到的字节为准，不信任 st_size
+    （/proc 下的伪文件 st_size 是 0，内容却不受限）。
+    """
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    try:
+        fd = os.open(path, flags)
+    except OSError:
+        return None
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            return None
+        chunks, total = [], 0
+        while total <= limit:
+            chunk = os.read(fd, 64 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+        if total > limit:
+            return None
+        return b"".join(chunks)
+    except OSError:
+        return None
+    finally:
+        os.close(fd)
+
+
+def qr_present(base: Path | None = None) -> bool:
+    """二维码是否就位（只看是否存在合格的普通文件，不读内容）。"""
     root = base or COMMUNITY_DIR
-    for name, mime in QR_CANDIDATES:
-        path = root / name
+    for name, _ in QR_CANDIDATES:
         try:
-            if not path.is_file() or path.stat().st_size > QR_MAX_BYTES:
-                continue
-            return path.read_bytes(), mime
+            st = os.lstat(root / name)
         except OSError:
             continue
+        if stat.S_ISREG(st.st_mode) and 0 < st.st_size <= QR_MAX_BYTES:
+            return True
+    return False
+
+
+def load_qr(base: Path | None = None) -> tuple[bytes, str] | None:
+    """返回（图片字节, MIME）。软链接、非普通文件、过大、文件头不是 PNG/JPEG 一律 None。"""
+    root = base or COMMUNITY_DIR
+    for name, mime in QR_CANDIDATES:
+        body = _read_regular_file(root / name, QR_MAX_BYTES)
+        if body and body.startswith(_MAGIC[mime]):
+            return body, mime
     return None
 
 

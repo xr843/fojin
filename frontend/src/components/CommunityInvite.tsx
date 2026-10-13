@@ -33,16 +33,19 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
-const INVITE_KEY = ["communityInvite"];
+// 缓存键必须带用户 id：同一台设备上 A 退出、B 登录时，B 不能沿用 A 的「受邀」结果
+// （与 expired-token 那次「常量 queryKey 缓存了别人的配额」是同一类坑）。
+const inviteKey = (userId: number | null) => ["communityInvite", userId] as const;
 
-export default function CommunityInvite({ enabled }: { enabled: boolean }) {
+export default function CommunityInvite({ userId }: { userId: number | null }) {
+  const enabled = userId != null;
   const { t } = useTranslation();
   const qc = useQueryClient();
   const [expanded, setExpanded] = useState(false);
   const [device] = useState(detectDevice);
 
   const { data } = useQuery({
-    queryKey: INVITE_KEY,
+    queryKey: inviteKey(userId),
     queryFn: getCommunityInvite,
     enabled,
     staleTime: 10 * 60 * 1000,
@@ -51,7 +54,7 @@ export default function CommunityInvite({ enabled }: { enabled: boolean }) {
   const invited = enabled && data?.invited === true;
 
   const qr = useQuery({
-    queryKey: ["communityInviteQr"],
+    queryKey: ["communityInviteQr", userId],
     queryFn: async () => blobToDataUrl(await getCommunityInviteQr()),
     enabled: invited && expanded,
     staleTime: Infinity,
@@ -61,7 +64,7 @@ export default function CommunityInvite({ enabled }: { enabled: boolean }) {
 
   const dismiss = useMutation({
     mutationFn: dismissCommunityInvite,
-    onSettled: () => qc.setQueryData(INVITE_KEY, { invited: false }),
+    onSettled: () => qc.setQueryData(inviteKey(userId), { invited: false }),
   });
 
   useEffect(() => {

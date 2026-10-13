@@ -11,11 +11,10 @@ vi.mock("../api/client", () => ({
   dismissCommunityInvite: vi.fn(async () => undefined),
 }));
 
-function renderCard(enabled = true) {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function renderCard(userId: number | null = 650, qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
   return render(
     <QueryClientProvider client={qc}>
-      <CommunityInvite enabled={enabled} />
+      <CommunityInvite userId={userId} />
     </QueryClientProvider>,
   );
 }
@@ -30,7 +29,7 @@ describe("CommunityInvite", () => {
   });
 
   it("游客（未登录）不发任何请求、不渲染", () => {
-    const { container } = renderCard(false);
+    const { container } = renderCard(null);
     expect(getCommunityInvite).not.toHaveBeenCalled();
     expect(container).toBeEmptyDOMElement();
   });
@@ -65,5 +64,17 @@ describe("CommunityInvite", () => {
     await user.click(screen.getByRole("button", { name: "不了，谢谢" }));
     await waitFor(() => expect(container).toBeEmptyDOMElement());
     expect(dismissCommunityInvite).toHaveBeenCalledTimes(1);
+  });
+
+  it("同一设备换账号：名单外的新用户不能沿用上一位的「受邀」缓存", async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    vi.mocked(getCommunityInvite).mockResolvedValueOnce({ invited: true });
+    const first = renderCard(650, qc);
+    await screen.findByText(/fojin研读交流群/, {}, ASYNC);
+    first.unmount();
+    vi.mocked(getCommunityInvite).mockResolvedValueOnce({ invited: false });
+    const second = renderCard(999, qc);
+    await waitFor(() => expect(getCommunityInvite).toHaveBeenCalledTimes(2));
+    expect(second.container).toBeEmptyDOMElement();
   });
 });

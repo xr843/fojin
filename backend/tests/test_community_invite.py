@@ -154,3 +154,59 @@ async def test_redis_down_means_no_card(cdir, call):
     write_invite(cdir)
     app = make_app(LISTED, FakeRedis(broken=True))
     assert (await call(app, "GET", "/api/community/invite")).json() == {"invited": False}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("target", ["secret_file", "proc_environ"])
+async def test_qr_symlink_is_never_followed(cdir, call, tmp_path, target):
+    """二维码文件若被换成软链接（指向密钥文件或 /proc 伪文件），绝不能把目标内容发出去。"""
+    write_invite(cdir)
+    qr = cdir / "wechat-qr.png"
+    qr.unlink()
+    if target == "secret_file":
+        secret = tmp_path / "secret.env"
+        secret.write_bytes(b"\x89PNG\r\n\x1a\nJWT_SECRET_KEY=do-not-leak")
+        qr.symlink_to(secret)
+    else:
+        qr.symlink_to("/proc/self/environ")
+    app = make_app(LISTED)
+    r = await call(app, "GET", "/api/community/invite/qr")
+    assert r.status_code == 404
+    assert b"JWT_SECRET_KEY" not in r.content
+    assert (await call(app, "GET", "/api/community/invite")).json() == {"invited": False}
+
+
+@pytest.mark.asyncio
+async def test_qr_must_actually_be_an_image(cdir, call):
+    write_invite(cdir)
+    (cdir / "wechat-qr.png").write_bytes(b"JWT_SECRET_KEY=not-an-image")
+    assert (await call(make_app(LISTED), "GET", "/api/community/invite/qr")).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_deeply_nested_json_fails_closed(cdir, call):
+    write_invite(cdir)
+    (cdir / "invite.json").write_text("[" * 100_000 + "]" * 100_000, encoding="utf-8")
+    r = await call(make_app(LISTED), "GET", "/api/community/invite")
+    assert r.status_code == 200
+    assert r.json() == {"invited": False}
+
+
+@pytest.mark.asyncio
+async def test_invite_answer_is_never_cacheable(cdir, call):
+    write_invite(cdir)
+    r = await call(make_app(LISTED), "GET", "/api/community/invite")
+    assert "no-store" in r.headers["cache-control"]
+    assert "private" in r.headers["cache-control"]
+
+
+def test_qr_endpoint_has_its_own_rate_limit():
+    from app.core.rate_limit import STRICT_PATHS
+
+    assert STRICT_PATHS["/api/community/invite/qr"] <= 10
+
+
+def test_community_routes_not_in_public_openapi():
+    from app.main import app
+
+    assert not any(p.startswith("/api/community") for p in app.openapi()["paths"])
