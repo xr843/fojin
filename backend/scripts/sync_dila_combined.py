@@ -48,6 +48,25 @@ _INSERT_PERSON_SQL = """
 """
 
 
+# The highest DILA *person* id in the DB, where the incremental API scan resumes.
+# Must exclude places: they also carry external_ids.dila (``PL000000059900`` …),
+# and ``PL…`` sorts after ``A…``, so an unfiltered max() returned a place id and
+# the scan crashed on int("PL000000059900"). Person ids are ``A`` + 6 digits
+# (fixed width), so the string max is the numeric max.
+_MAX_PERSON_ID_SQL = """
+    SELECT max(external_ids->>'dila') FROM kg_entities
+    WHERE entity_type = 'person' AND external_ids->>'dila' ~ '^A[0-9]{6}$'
+"""
+
+_PERSON_ID_RE = re.compile(r"^A(\d{6})$")
+
+
+def _person_num(aid: str | None) -> int | None:
+    """``A049069`` → 49069; anything else (place ids, junk) → None."""
+    m = _PERSON_ID_RE.match(aid or "")
+    return int(m.group(1)) if m else None
+
+
 def is_contemporary(person: dict) -> bool:
     """True when the person looks like a living modern figure we don't want in the Buddhist KG.
 
@@ -186,8 +205,9 @@ def api_incremental_scan(max_db_id):
     print("\n" + "=" * 60)
     print("Phase 2: API Incremental Scan")
     print("=" * 60)
-    # Parse numeric part of max ID
-    num = int(max_db_id.replace("A", ""))
+    num = _person_num(max_db_id)
+    if num is None:
+        raise ValueError(f"not a DILA person id: {max_db_id!r}")
     empty_streak = 0
     new_persons = {}
 
@@ -269,9 +289,7 @@ async def sync_to_db(persons: dict):
             await session.commit()
 
         # Get max ID after insert
-        result = await session.execute(text(
-            "SELECT max(external_ids->>'dila') FROM kg_entities WHERE external_ids->>'dila' IS NOT NULL"
-        ))
+        result = await session.execute(text(_MAX_PERSON_ID_SQL))
         max_id = result.scalar() or "A000000"
 
         print(f"  Inserted {inserted} persons")
