@@ -808,6 +808,22 @@ export async function searchContent(params: SearchFacetParams & {
   return data;
 }
 
+// fojin研读交流群：站内定向邀请（名单与二维码只在服务器上，见 backend/app/services/community_invite.py）
+export async function getCommunityInvite(): Promise<{ invited: boolean }> {
+  const { data } = await api.get<{ invited: boolean }>("/community/invite");
+  return data;
+}
+
+/** 开发者微信二维码。带登录凭证取图，返回 blob，由调用方转成 object URL。 */
+export async function getCommunityInviteQr(): Promise<Blob> {
+  const { data } = await api.get<Blob>("/community/invite/qr", { responseType: "blob" });
+  return data;
+}
+
+export async function dismissCommunityInvite(): Promise<void> {
+  await api.post("/community/invite/dismiss");
+}
+
 // Bookmarks
 export async function getBookmarks(page: number = 1, size: number = 20): Promise<PaginatedResponse<BookmarkItem>> {
   const { data } = await api.get<PaginatedResponse<BookmarkItem>>("/bookmarks", { params: { page, size } });

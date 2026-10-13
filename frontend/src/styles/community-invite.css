@@ -1,0 +1,85 @@
+/* fojin研读交流群 邀请卡（CommunityInvite.tsx）。只给名单里的用户显示，
+   放在 /chat 顶栏下方，平时一行收起，点「加开发者微信」才展开二维码。 */
+.community-invite {
+  /* 与 .chat-column-inner 同宽同居中（global.css）。不套那个类：ChatPage.test 的 D1
+     锁定页面上恰好三处 .chat-column-inner，那是空态居中布局的承重结构。 */
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 840px;
+  margin: 0 auto 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--fj-border);
+  border-radius: 8px;
+  background: var(--fj-surface-alt);
+  color: var(--fj-ink);
+}
+.community-invite-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.community-invite-icon {
+  color: var(--fj-accent);
+  font-size: 18px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.community-invite-text { flex: 1; min-width: 0; }
+.community-invite-title { font-weight: 600; font-size: 14px; line-height: 1.5; }
+.community-invite-body { font-size: 13px; line-height: 1.6; color: var(--fj-ink-light); margin-top: 2px; }
+.community-invite-close {
+  flex-shrink: 0;
+  border: 0;
+  background: none;
+  color: var(--fj-ink-muted);
+  cursor: pointer;
+  /* 视觉 12px 图标，命中区 32×32 */
+  width: 32px;
+  height: 32px;
+  margin: -6px -6px 0 0;
+  border-radius: 6px;
+}
+.community-invite-close:hover { color: var(--fj-ink); }
+.community-invite-actions {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0 0 28px;
+}
+.community-invite-qr {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin: 10px 0 0 28px;
+}
+.community-invite-qr-img,
+.community-invite-qr-msg {
+  width: 160px;
+  height: 160px;
+  border-radius: 6px;
+  background: #fff; /* 二维码需要白底才好扫，暗色模式下也保持 */
+}
+.community-invite-qr-img { object-fit: contain; }
+.community-invite-qr-msg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  text-align: center;
+  font-size: 12px;
+  color: #666;
+}
+.community-invite-steps {
+  flex: 1;
+  min-width: 200px;
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--fj-ink-light);
+}
+.community-invite-qr-foot { flex-basis: 100%; margin-left: -7px; }
+@media (max-width: 768px) {
+  .community-invite-actions,
+  .community-invite-qr { margin-left: 0; }
+}

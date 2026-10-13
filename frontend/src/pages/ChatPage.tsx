@@ -40,6 +40,7 @@ import {
 } from "@ant-design/icons";
 const ShareCard = lazy(() => import("../components/ShareCard"));
 const CitationDrawer = lazy(() => import("../components/CitationDrawer"));
+import CommunityInvite from "../components/CommunityInvite";
 import ChatModelSelector from "../components/ChatModelSelector";
 import MasterGallery, { MasterSeal } from "../components/MasterGallery";
 import {
@@ -2023,6 +2024,8 @@ export default function ChatPage() {
               )}
             </div>
           </div>
+          {/* fojin研读交流群邀请：只对服务器名单里的已登录用户出现（后端判定），其余人渲染为空 */}
+          <CommunityInvite enabled={!!user} />
           {/* Messages */}
           {/* chat-msgs-scroll 只给手机空态的 CSS 用（global.css ≤768px 块）：那里外壳
               高度是 auto，下面 .chat-msgs-empty 的 min-height:100% 解析不出来，
