@@ -35,6 +35,19 @@ _BORN_POST_1920_IN_DESC = re.compile(
 )
 
 
+# CAST(:x AS json), never ``:x::json``: SQLAlchemy's text() bind regex reads
+# ``:props::json`` as a parameter named ``prop`` followed by ``s::json`` (and
+# ``:ext::json`` as ``ex``), producing invalid SQL. That is why this cron failed
+# every night from 2026-04 to 2026-10 with ``syntax error at or near ":"``.
+_INSERT_PERSON_SQL = """
+    INSERT INTO kg_entities (entity_type, name_zh, name_en, description, properties, external_ids)
+    VALUES ('person', :nz, :ne, :desc, CAST(:props AS json), CAST(:ext AS json))
+    ON CONFLICT ((external_ids->>'dila'))
+    WHERE external_ids->>'dila' IS NOT NULL
+    DO NOTHING
+"""
+
+
 def is_contemporary(person: dict) -> bool:
     """True when the person looks like a living modern figure we don't want in the Buddhist KG.
 
@@ -246,13 +259,7 @@ async def sync_to_db(persons: dict):
                 # manual run could otherwise re-insert a duplicate. The predicate
                 # must match the partial index. rowcount counts only real inserts
                 # (DO NOTHING skips return 0).
-                result = await session.execute(text("""
-                    INSERT INTO kg_entities (entity_type, name_zh, name_en, description, properties, external_ids)
-                    VALUES ('person', :nz, :ne, :desc, :props::json, :ext::json)
-                    ON CONFLICT ((external_ids->>'dila'))
-                    WHERE external_ids->>'dila' IS NOT NULL
-                    DO NOTHING
-                """), {
+                result = await session.execute(text(_INSERT_PERSON_SQL), {
                     "nz": p["name_zh"], "ne": p.get("name_en", ""),
                     "desc": p.get("desc", ""),
                     "props": json.dumps(props, ensure_ascii=False),
