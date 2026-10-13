@@ -86,6 +86,13 @@ class ChatAnswerDiagnostic(Base):
     min_source_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     citation_mutations: Mapped[list | None] = mapped_column(JSON, nullable=True)
     quote_mutations: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # Latency of the streamed answer, ms from request start (migration 0182).
+    # NULL = not recorded (older rows, non-stream path).
+    prep_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    first_token_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    total_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # The model that actually served the answer (fallback model if the primary failed).
+    model: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

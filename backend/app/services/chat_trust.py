@@ -2,7 +2,7 @@
 
 import re
 from collections.abc import Iterable
-from dataclasses import asdict, is_dataclass
+from dataclasses import asdict, dataclass, is_dataclass
 from typing import Any
 
 from sqlalchemy import select
@@ -96,6 +96,17 @@ def trust_status_from_diagnostic(
     )
 
 
+@dataclass(frozen=True)
+class AnswerTiming:
+    """Latency of one streamed answer, in ms from request start. Plain scalars only:
+    it crosses from the stream into the persistence session (SSE lifecycle rule)."""
+
+    prep_ms: int | None = None
+    first_token_ms: int | None = None
+    total_ms: int | None = None
+    model: str | None = None
+
+
 async def persist_answer_diagnostic(
     db: AsyncSession,
     *,
@@ -103,8 +114,13 @@ async def persist_answer_diagnostic(
     trust_status: ChatTrustStatus,
     citation_mutations: list[Any],
     quote_mutations: list[Any],
+    timing: AnswerTiming | None = None,
 ) -> ChatAnswerDiagnostic:
-    """Insert or update the diagnostic row for one assistant message."""
+    """Insert or update the diagnostic row for one assistant message.
+
+    ``timing`` (stream path only) records latency; when omitted the timing
+    columns are left untouched, so an upsert never erases a recorded timing.
+    """
     result = await db.execute(
         select(ChatAnswerDiagnostic).where(ChatAnswerDiagnostic.message_id == message_id)
     )
@@ -122,6 +138,13 @@ async def persist_answer_diagnostic(
         "citation_mutations": _serialize_mutations(citation_mutations),
         "quote_mutations": _serialize_mutations(quote_mutations),
     }
+    if timing is not None:
+        values.update(
+            prep_ms=timing.prep_ms,
+            first_token_ms=timing.first_token_ms,
+            total_ms=timing.total_ms,
+            model=(timing.model or None) and timing.model[:100],
+        )
 
     if row is None:
         row = ChatAnswerDiagnostic(message_id=message_id, **values)

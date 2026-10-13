@@ -44,7 +44,7 @@ from app.services.chat_sessions import (  # noqa: F401
     update_message_feedback,
     update_session,
 )
-from app.services.chat_trust import build_trust_status, persist_answer_diagnostic
+from app.services.chat_trust import AnswerTiming, build_trust_status, persist_answer_diagnostic
 from app.services.citation_guard import enforce_citation_whitelist, log_mutations
 from app.services.daily_metrics import ANONYMOUS_MESSAGES, increment_daily_metric
 
@@ -980,9 +980,10 @@ async def send_message_stream(
     # 非流式路径打）—— 2026-08-13 排查延迟时这一环量不到，只能拿 rag_retrieval
     # 的 TIMING 当代理。reader 标记同理：page_content 决定 max_tokens 2000/8000，
     # 但日志里此前无从分辨 reader 模式占比。
+    _prep_ms = int((_time.monotonic() - _prep_t0) * 1000)
     logger.info(
         "TIMING: stream prep took %.2fs (reader=%s)",
-        _time.monotonic() - _prep_t0, bool(page_content),
+        _prep_ms / 1000, bool(page_content),
     )
 
     (
@@ -1170,6 +1171,10 @@ async def send_message_stream(
 
     full_answer = ""
     received_first_token = False
+    # 落库的耗时（chat_answer_diagnostics，迁移 0182）。首字 = 第一个**正文**字到达，
+    # 不是推理片段；模型记实际服务的那个（主模型失败时是 fallback）。
+    _first_token_at: float | None = None
+    _served_model = model
     reasoning_chars = 0
     finish_reason: str | None = None
     last_reasoning_emit = 0.0
@@ -1228,6 +1233,8 @@ async def send_message_stream(
                         continue
                     if not received_first_token:
                         received_first_token = True
+                        _first_token_at = _time.monotonic()
+                        _served_model = att_model
                         if is_fb:
                             logger.info(
                                 "Serving via fallback LLM: %s/%s (primary %s/%s failed)",
@@ -1285,6 +1292,14 @@ async def send_message_stream(
         error_msg = "抱歉，AI 服务暂时不可用，请稍后重试。"
         yield _error_frame(error_msg, "internal")
         full_answer = full_answer or error_msg
+
+    # 上面的 try 吞掉所有异常，所以这里总会执行：不论成败都有耗时可写。
+    _answer_timing = AnswerTiming(
+        prep_ms=_prep_ms,
+        first_token_ms=(int((_first_token_at - _prep_t0) * 1000) if _first_token_at is not None else None),
+        total_ms=int((_time.monotonic() - _prep_t0) * 1000),
+        model=_served_model,
+    )
 
     # reasoning 与 model 是这条日志里最贵的两个字段，别删：
     # 隐藏推理和可见答案共用同一个 max_tokens，所以「0 chars」的成因几乎总是
@@ -1454,6 +1469,7 @@ async def send_message_stream(
                             trust_status=trust_status,
                             citation_mutations=_citation_mutations,
                             quote_mutations=_quote_mutations,
+                            timing=_answer_timing,
                         )
                     except Exception:
                         await db_save.rollback()

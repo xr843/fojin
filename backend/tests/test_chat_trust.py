@@ -246,3 +246,35 @@ async def test_persist_and_reconstruct_quote_checked_count(trust_session):
     reconstructed = trust_status_from_diagnostic(row)
     assert reconstructed is not None
     assert reconstructed.quote_checked_count == 2
+
+
+@pytest.mark.anyio
+async def test_persist_records_timing_and_upsert_without_timing_keeps_it(trust_session):
+    """Latency must be stored (migration 0182), and a later upsert that carries no
+    timing (e.g. a re-score) must not erase what was recorded."""
+    from app.services.chat_trust import AnswerTiming
+
+    session = ChatSession(user_id=None)
+    trust_session.add(session)
+    await trust_session.flush()
+    msg = ChatMessage(session_id=session.id, role="assistant", content="答。", created_at=datetime.now(UTC))
+    trust_session.add(msg)
+    await trust_session.commit()
+    await trust_session.refresh(msg)
+
+    status = build_trust_status(msg.content, [], citation_mutations=[], quote_mutations=[])
+    await persist_answer_diagnostic(
+        trust_session,
+        message_id=msg.id,
+        trust_status=status,
+        citation_mutations=[],
+        quote_mutations=[],
+        timing=AnswerTiming(prep_ms=812, first_token_ms=31_250, total_ms=58_004, model="deepseek-v4-pro"),
+    )
+    await persist_answer_diagnostic(
+        trust_session, message_id=msg.id, trust_status=status, citation_mutations=[], quote_mutations=[]
+    )
+    row = (
+        await trust_session.execute(select(ChatAnswerDiagnostic).where(ChatAnswerDiagnostic.message_id == msg.id))
+    ).scalar_one()
+    assert (row.prep_ms, row.first_token_ms, row.total_ms, row.model) == (812, 31_250, 58_004, "deepseek-v4-pro")
