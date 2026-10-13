@@ -1,92 +1,89 @@
-"""Reverse-index ("appears in N sutras") lookup must not hold a pool connection
-for tens of seconds. Prod outage 2026-06-23: short/uncommon CJK headwords that
-the trgm index can't serve seq-scan the 406MB content table for ~60s; under
-crawler load these pile up and exhaust the DB pool, making backend unhealthy.
-The block is a best-effort SEO nicety — cap its statement_timeout and drop it on
-timeout rather than starve the pool.
+"""「出现于哪些经典」反查（/dict/<词> 页面上的 best-effort 区块）。
+
+2026-10 起走 Elasticsearch 短语查询，不再在 Postgres 里 ILIKE 全表扫：爬虫逐个枚举
+约 55 万词头（KeenableBot 7 天 ~20.8 万个不同页面），每个请求都是新词，缓存无用；
+旧的 ILIKE 每次 0.2–3s，让 PG 与后端常年接近 100% CPU。生产实测 ES 27–67ms，
+且因索引时接上了 CBETA 硬换行，跨行的词也能找到（旧 ILIKE 漏掉的）。
 """
 
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.seo_dict import _fetch_reverse_index, dict_seo_html
 
 
+def _fake_es(hits=None, exc=None):
+    """A get_es() double: es.options(...).search(...) returns ``hits`` or raises ``exc``."""
+    search = AsyncMock()
+    if exc is not None:
+        search.side_effect = exc
+    else:
+        search.return_value = {"hits": {"hits": hits or []}}
+    es = MagicMock()
+    es.options.return_value = SimpleNamespace(search=search)
+    return es, search
+
+
 @pytest.mark.anyio
 async def test_skips_single_char_and_overlong_headwords():
-    # Single-char "appears in N sutras" is meaningless (matches ~everything) and
-    # is the worst case for the trgm index; overlong is junk. Neither should hit
-    # the DB at all.
+    # 单字「出现于 N 部经」毫无意义；超长是垃圾输入。都不该发查询。
+    es, search = _fake_es()
+    with patch("app.api.seo_dict.get_es", return_value=es):
+        assert await _fetch_reverse_index(AsyncMock(), "火") == []
+        assert await _fetch_reverse_index(AsyncMock(), "字" * 201) == []
+    search.assert_not_awaited()
+
+
+@pytest.mark.anyio
+async def test_two_char_headwords_are_now_looked_up():
+    """旧做法因 pg_trgm 无法服务两字模式而整类跳过（般若、菩提从不显示这一块）；
+    ES 二元组索引对两字词正好是一个 token，便宜且准确。"""
+    es, search = _fake_es(hits=[{"_source": {"text_id": 9, "title_zh": "般若波羅蜜多心經", "cbeta_id": "T0251"}}])
+    with patch("app.api.seo_dict.get_es", return_value=es):
+        out = await _fetch_reverse_index(AsyncMock(), "般若")
+    assert out == [{"id": 9, "title_zh": "般若波羅蜜多心經", "cbeta_id": "T0251"}]
+    search.assert_awaited_once()
+
+
+@pytest.mark.anyio
+async def test_never_touches_postgres():
+    """整个修复的要点：反查不得再在数据库里跑（那正是被爬虫打满的地方）。"""
     db = AsyncMock()
-    assert await _fetch_reverse_index(db, "火") == []
-    assert await _fetch_reverse_index(db, "字" * 201) == []
+    es, _ = _fake_es()
+    with patch("app.api.seo_dict.get_es", return_value=es):
+        await _fetch_reverse_index(db, "波羅蜜")
     db.execute.assert_not_awaited()
 
 
 @pytest.mark.anyio
-async def test_skips_two_char_headwords_the_trgm_index_cannot_serve():
-    """A 2-char headword can NEVER be served by the trgm index, so running it
-    is pure waste — it always burns the full timeout budget and returns nothing.
-
-    pg_trgm can only use the index for a ``LIKE '%x%'`` pattern when the pattern
-    contains at least one *complete* trigram, i.e. 3+ characters. An unanchored
-    2-char pattern yields zero extractable trigrams, so the planner falls back to
-    a Seq Scan over ``text_contents`` — 276MB of TOASTed content that must be
-    detoasted and ILIKE-rechecked row by row.
-
-    Measured on prod (2026-07-21), 8 random 2-char headwords: 11.8s / 13.5s /
-    14.0s / 14.8s and 4 more that did not finish within 20s — against a 3s
-    budget. Success rate is therefore 0%: every such lookup times out, rolls
-    back, and renders the page without the block. It also touches ~795MB of
-    shared buffers (shared_buffers is 640MB), flushing the cache that the
-    *fast* 3+-char lookups depend on — which is why they time out too.
-
-    So this is not a tradeoff: skipping 2-char lookups loses no functionality
-    that exists today, and stops the collateral damage.
-    """
-    db = AsyncMock()
-    assert await _fetch_reverse_index(db, "般若") == []
-    assert await _fetch_reverse_index(db, "菩提") == []
-    db.execute.assert_not_awaited()
+async def test_query_is_a_phrase_one_hit_per_text_lowest_id_first():
+    es, search = _fake_es()
+    with patch("app.api.seo_dict.get_es", return_value=es):
+        await _fetch_reverse_index(AsyncMock(), "波羅蜜")
+    body = search.await_args.kwargs["body"]
+    assert body["query"] == {"match_phrase": {"content": "波羅蜜"}}
+    assert body["collapse"] == {"field": "text_id"}
+    assert body["sort"] == [{"text_id": "asc"}]
+    assert body["size"] == 8
+    # 请求必须带超时：ES 慢的时候宁可不显示这一块，也不能拖住页面。
+    assert es.options.call_args.kwargs["request_timeout"] <= 2.0
 
 
 @pytest.mark.anyio
-async def test_caps_statement_timeout_before_the_ilike():
-    db = AsyncMock()
-    res = MagicMock()
-    res.all.return_value = []
-    db.execute.return_value = res
-
-    # 3+ chars: the trgm index can serve this, so it is allowed through to the DB.
-    await _fetch_reverse_index(db, "波羅蜜")
-
-    first_sql = str(db.execute.await_args_list[0].args[0]).lower()
-    assert "statement_timeout" in first_sql, (
-        "must cap per-query statement_timeout BEFORE the ILIKE, so a slow "
-        "reverse-index lookup fails fast instead of holding a pool connection "
-        "~60s under crawler load"
-    )
+async def test_es_failure_drops_the_block_instead_of_raising():
+    es, _ = _fake_es(exc=ConnectionError("es down"))
+    with patch("app.api.seo_dict.get_es", return_value=es):
+        assert await _fetch_reverse_index(AsyncMock(), "波羅蜜") == []
 
 
 @pytest.mark.anyio
-async def test_best_effort_empty_and_rollback_on_db_error():
-    db = AsyncMock()
-    calls = {"n": 0}
-
-    async def _exec(*a, **k):
-        calls["n"] += 1
-        if calls["n"] >= 2:  # the SELECT, after the SET LOCAL statement_timeout
-            raise SQLAlchemyError("canceling statement due to statement timeout")
-        return MagicMock()
-
-    db.execute.side_effect = _exec
-
-    out = await _fetch_reverse_index(db, "波羅蜜")
-    assert out == []
-    db.rollback.assert_awaited()  # aborted txn cleaned so the session is reusable
+async def test_malformed_hits_are_skipped():
+    es, _ = _fake_es(hits=[{"_source": {"text_id": "x"}}, {"_source": {}}, {"_source": {"text_id": 3, "title_zh": " 長阿含經 "}}])
+    with patch("app.api.seo_dict.get_es", return_value=es):
+        out = await _fetch_reverse_index(AsyncMock(), "波羅蜜")
+    assert out == [{"id": 3, "title_zh": "長阿含經", "cbeta_id": ""}]
 
 
 @pytest.mark.anyio

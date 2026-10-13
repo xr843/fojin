@@ -30,15 +30,14 @@ from urllib.parse import unquote
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from opencc import OpenCC
-from sqlalchemy import func, or_, select, text
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app.api.seo import _escape_meta_value, public_base_url
+from app.core.elasticsearch import CONTENT_INDEX_NAME, get_es
 from app.database import get_db
 from app.models.dictionary import DictionaryEntry
-from app.models.text import BuddhistText, TextContent
 
 # Dictionary entries are stored in traditional Chinese (CBETA / DDB / FGS
 # convention). Users typing simplified Chinese in the URL must be matched
@@ -52,17 +51,11 @@ router = APIRouter(tags=["seo"])
 _DEFINITION_PREVIEW_CHARS = 220
 _REVERSE_INDEX_LIMIT = 8
 _MAX_HEADWORD_LEN = 200
-# pg_trgm can only use ix_text_contents_content_trgm for an unanchored
-# ``ILIKE '%term%'`` when the pattern holds at least one *complete* trigram —
-# i.e. 3+ characters. At 2 characters the planner extracts nothing and falls
-# back to a Seq Scan over 276MB of TOASTed content, so the lookup can never
-# finish inside _REVERSE_INDEX_TIMEOUT_MS. This was 2 (single-char only), which
-# let every 2-char headword through to a guaranteed-timeout seq scan.
-_MIN_HEADWORD_LEN = 3
-# Cap how long the best-effort reverse-index lookup may hold a pool connection.
-# Terms the trgm index can't serve seq-scan the 406MB content table; bounding
-# this (vs the global ~60s) is what stops crawler load from exhausting the pool.
-_REVERSE_INDEX_TIMEOUT_MS = 3000
+# 单字的「出现于 N 部经」毫无意义（几乎每部经都有），不查。两字起都查：
+# 这一步改走 ES 之后（见 _fetch_reverse_index），两字词不再是数据库全表扫描。
+_MIN_HEADWORD_LEN = 2
+# ES 短语查询实测 27–67ms（生产，2026-10-13）；给 2s 上限，超时就不显示这一块。
+_REVERSE_INDEX_TIMEOUT_S = 2.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,44 +115,60 @@ def _build_dict_jsonld(headword: str, entries: list[_DictEntryView], canonical: 
 async def _fetch_reverse_index(
     db: AsyncSession, headword: str
 ) -> list[dict]:
-    """Return up to N sutras containing this headword in their content.
+    """Return up to N sutras whose text contains this headword (「出现于哪些经典」).
 
-    text_contents.content has a GIN trigram index (ix_text_contents_content_trgm,
-    migration 0157) that serves most ILIKE substring matches sub-second. But
-    terms the index can't serve seq-scan the content table for tens of seconds;
-    under crawler load those pile up and exhaust the connection pool (prod outage
-    2026-06-23). This block is a best-effort SEO nicety, so:
-      - skip headwords under _MIN_HEADWORD_LEN chars — pg_trgm cannot extract a
-        trigram from them, so they are guaranteed seq scans (see the constant),
-      - cap the per-query statement_timeout so a slow lookup fails fast and
-        releases its pool connection instead of holding it ~60s; on timeout we
-        drop the "appears in N sutras" block rather than starve the pool.
+    Served from the Elasticsearch ``text_contents`` index, not Postgres. Until
+    2026-10 this was ``text_contents.content ILIKE '%term%'``: a trigram-index
+    lookup that took 0.2–3s per page and seq-scanned the content table for
+    anything the index couldn't serve. Crawlers enumerate the ~550k headwords
+    one by one (KeenableBot: ~208k distinct /dict pages in 7 days, rising to
+    78k/day), so caching cannot help — every request is a new term — and those
+    scans kept Postgres and the backend pinned near 100% CPU, with ~56
+    "gave up" timeouts a minute.
+
+    The ES phrase query is 27–67ms for the same terms (measured on prod) and is
+    *more* correct: ``text_contents`` joins CBETA hard line-wraps between two
+    汉字 at index time (see es-text-contents-hard-wrap-fix), so a headword split
+    across a line is found — ILIKE missed those (頻婆娑羅 in text 35, 大圓鏡智
+    in texts 65 and 84). One hit per text (collapse on text_id), lowest text id
+    first, matching the previous ordering.
+
+    Best-effort SEO nicety: any ES failure or timeout drops the block. ``db`` is
+    unused but kept so the call site and its rollback-safety contract (the page
+    renders from snapshots taken before this call) stay unchanged.
     """
     if not (_MIN_HEADWORD_LEN <= len(headword) <= _MAX_HEADWORD_LEN):
         return []
-    stmt = (
-        select(BuddhistText.id, BuddhistText.title_zh, BuddhistText.cbeta_id)
-        .join(TextContent, TextContent.text_id == BuddhistText.id)
-        .where(TextContent.content.ilike(f"%{headword}%"))
-        .group_by(BuddhistText.id, BuddhistText.title_zh, BuddhistText.cbeta_id)
-        .order_by(BuddhistText.id.asc())
-        .limit(_REVERSE_INDEX_LIMIT)
-    )
+    body = {
+        "query": {"match_phrase": {"content": headword}},
+        "collapse": {"field": "text_id"},
+        "sort": [{"text_id": "asc"}],
+        "size": _REVERSE_INDEX_LIMIT,
+        "_source": ["text_id", "cbeta_id", "title_zh"],
+        "track_total_hits": False,
+    }
     try:
-        # SET LOCAL applies to the request's already-open transaction (the
-        # caller fetched entries first), bounding just this lookup.
-        await db.execute(text(f"SET LOCAL statement_timeout = '{_REVERSE_INDEX_TIMEOUT_MS}ms'"))
-        rows = await db.execute(stmt)
-        return [
-            {"id": r[0], "title_zh": (r[1] or "").strip(), "cbeta_id": (r[2] or "").strip()}
-            for r in rows.all()
-        ]
-    except SQLAlchemyError as exc:
-        # Timeout / cancellation: abort the txn so the session is reusable, drop
-        # the block. This is the last DB op of the request, so rollback is safe.
+        es = get_es()
+        resp = await es.options(request_timeout=_REVERSE_INDEX_TIMEOUT_S).search(
+            index=CONTENT_INDEX_NAME, body=body, timeout=f"{int(_REVERSE_INDEX_TIMEOUT_S * 1000)}ms"
+        )
+        # ObjectApiResponse is Mapping-like, not a dict — subscript it.
+        hits = resp["hits"]["hits"]
+    except Exception as exc:  # ES down / timeout: drop the block, never 500 the page
         logger.warning("reverse-index lookup gave up for %r (best-effort): %s", headword, exc)
-        await db.rollback()
         return []
+    out: list[dict] = []
+    for h in hits:
+        src = h.get("_source") or {}
+        if isinstance(src.get("text_id"), int):
+            out.append(
+                {
+                    "id": src["text_id"],
+                    "title_zh": (src.get("title_zh") or "").strip(),
+                    "cbeta_id": (src.get("cbeta_id") or "").strip(),
+                }
+            )
+    return out
 
 
 def _render_dict_html(
