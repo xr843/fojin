@@ -91,6 +91,7 @@ from app.services.prompt_builder import (  # noqa: F401
     _is_failed_answer,
     _is_meta_question,
     _strip_followup_suggestions,
+    card_llm_message,
 )
 from app.services.quote_fulljuan import load_full_juan_check
 from app.services.quote_verifier import juans_to_recheck, log_quote_mutations, verify_quoted_content
@@ -507,7 +508,8 @@ async def _prepare_chat(
             # Client may send a stale display_text — trust the DB copy so the
             # stored history always matches the currently active card.
             message = hq[0]
-            llm_message_override = hq[1]
+            # 模板末尾贴作答提示（见 CARD_THINKING_TAIL，2026-10-15 eval）。
+            llm_message_override = card_llm_message(hq[1])
 
     # Resolve session first so ownership checks (403) come before config checks (503)
     chat_session = None
