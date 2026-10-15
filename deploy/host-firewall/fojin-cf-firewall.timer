@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly refresh of Cloudflare ranges for port-80 allowlist (fojin)
+
+[Timer]
+OnBootSec=1min
+OnCalendar=weekly
+Persistent=true
+
+[Install]
+WantedBy=timers.target
