@@ -1,11 +1,11 @@
-fastapi==0.142.2
+fastapi==0.143.0
 uvicorn[standard]==0.54.0
 prometheus-client==0.26.0
-asyncpg==0.31.0
-sqlalchemy[asyncio]==2.0.51
+asyncpg==0.32.0
+sqlalchemy[asyncio]==2.1.4
 alembic==1.20.0
 pydantic-settings==2.15.0
-pydantic[email]==2.13.5
+pydantic[email]==2.14.1
 elasticsearch[async]==8.17.0
 redis[hiredis]==8.1.0
 httpx==0.28.1
@@ -19,6 +19,6 @@ tiktoken==0.14.0
 opencc-python-reimplemented==0.1.7
 Pillow==12.3.0
 python-multipart==0.0.32
-pypdf==6.19.0
+pypdf==6.20.0
 python-docx==1.2.0
 beautifulsoup4==4.15.0
