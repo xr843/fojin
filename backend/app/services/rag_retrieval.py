@@ -19,6 +19,7 @@ from app.database import async_session
 from app.models.dictionary import DictionaryEntry
 from app.schemas.chat import ChatSource
 from app.services.embedding import generate_embedding, similarity_search, source_similarity_search
+from app.services.named_works import MAX_NAMED_WORKS, resolve_named_work
 from app.services.passage_locator import inject_located, locate_pasted_passage
 from app.services.precise_retrieval import try_precise_text_retrieval
 from app.services.urn import build_urn
@@ -332,6 +333,34 @@ async def _inject_root_sutra_slot(
         return [root_hits[0], *others[: MAX_CONTEXT_CHUNKS - 1]]
     logger.debug("义理本典保底: last slot for doctrine root %s (text_id=%d)", cbeta_id, root_tid)
     return [*others[: MAX_CONTEXT_CHUNKS - 1], root_hits[0]]
+
+
+async def _inject_named_work_slots(
+    db: AsyncSession, named_works: list[str], query_embedding: list[float], search_results: list[dict]
+) -> list[dict]:
+    """卡片题点名的经论各保底一个上下文槽（见 named_works 模块说明）。
+
+    每部经论在自己的范围里按问题语义取最相关的一段，排在最前；已经在结果里的不重复
+    取。保底段之外至少留 2 个槽给原检索，总数不少于 MAX_CONTEXT_CHUNKS。"""
+    present = {r["text_id"] for r in search_results}
+    picked: list[dict] = []
+    for name in named_works:
+        if len(picked) >= MAX_NAMED_WORKS:
+            break
+        ids = await resolve_named_work(db, name)
+        if not ids or present.intersection(ids):
+            continue
+        hits = await similarity_search(db, query_embedding, limit=1, scope_text_ids=list(ids))
+        if hits:
+            picked.append(hits[0])
+            present.add(hits[0]["text_id"])
+    if not picked:
+        return search_results
+    logger.info("named_works: 保底 %d 部 %s", len(picked), [h.get("title_zh") for h in picked])
+    picked_ids = {h["text_id"] for h in picked}
+    others = [r for r in search_results if r["text_id"] not in picked_ids]
+    cap = max(MAX_CONTEXT_CHUNKS, len(picked) + 2)
+    return [*picked, *others][:cap]
 
 
 def _format_source_label(result: dict) -> str:
@@ -990,6 +1019,7 @@ async def retrieve_rag_context(
     prev_query: str | None = None,
     pgvector_limit: int = 15,
     scope_text_ids: list[int] | None = None,
+    named_works: list[str] | None = None,
 ) -> tuple[list[ChatSource], str]:
     """Run pgvector similarity search and return (sources, context_text).
 
@@ -1002,6 +1032,8 @@ async def retrieve_rag_context(
     When prev_query is provided (from conversation history), it is prepended
     to the current query for embedding generation, enabling context-aware
     retrieval in multi-turn conversations.
+
+    named_works: 卡片模板点名的经论（extract_named_works 的结果），各保底一个槽。
     """
     sources: list[ChatSource] = []
     context_text = ""
@@ -1159,6 +1191,13 @@ async def retrieve_rag_context(
                 )
             except Exception:
                 logger.warning("本经召回保底 injection failed; using un-injected results", exc_info=True)
+            if named_works:
+                try:
+                    search_results = await _inject_named_work_slots(
+                        db, named_works, query_embedding, search_results
+                    )
+                except Exception:
+                    logger.warning("named_works injection failed; using un-injected results", exc_info=True)
 
         # 贴原文定位放在最后：它是用户亲手给出的原文，排第 1 位，压过上面所有排序。
         if locate_task is not None:

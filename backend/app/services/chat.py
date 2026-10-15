@@ -81,6 +81,7 @@ from app.services.llm_client import (  # noqa: F401
 )
 from app.services.llm_cost import record_llm_cost
 from app.services.master_profiles import get_master
+from app.services.named_works import extract_named_works
 from app.services.prompt_builder import (  # noqa: F401
     _FAILED_ANSWER_PREFIXES,
     _build_llm_messages,
@@ -502,6 +503,7 @@ async def _prepare_chat(
     # prompt template but KEEP the caller's display message for RAG / history
     # / session-title generation. Only the final LLM turn uses the template.
     llm_message_override: str | None = None
+    card_named_works: list[str] | None = None
     if hot_question_id is not None:
         hq = await get_hot_question_prompt(db, hot_question_id)
         if hq is not None:
@@ -510,6 +512,8 @@ async def _prepare_chat(
             message = hq[0]
             # 模板末尾贴作答提示（见 CARD_THINKING_TAIL，2026-10-15 eval）。
             llm_message_override = card_llm_message(hq[1])
+            # 模板点名的经论各保底一个检索槽（见 named_works，2026-10-16 eval）。
+            card_named_works = extract_named_works(hq[1])
 
     # Resolve session first so ownership checks (403) come before config checks (503)
     chat_session = None
@@ -556,6 +560,7 @@ async def _prepare_chat(
         scope_text_ids = _master_scope_text_ids(master)
         sources, context_text = await retrieve_rag_context(
             db, message, prev_query=prev_user_msg, scope_text_ids=scope_text_ids,
+            named_works=card_named_works,
         )
 
     # Reading context: enhance prompt when user is reading a specific text
