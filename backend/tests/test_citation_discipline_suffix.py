@@ -12,6 +12,7 @@
 
 from app.services.prompt_builder import (
     CITATION_DISCIPLINE_SUFFIX,
+    THINKING_STYLE_SUFFIX,
     _build_llm_messages,
 )
 
@@ -24,9 +25,11 @@ def _system_of(msgs: list[dict]) -> str:
 def test_plain_rag_question_gets_the_suffix_at_the_end():
     msgs = _build_llm_messages([], "【系统自动检索】……", "「般若」和智慧有什么不同？")
     system = _system_of(msgs)
-    assert system.endswith(CITATION_DISCIPLINE_SUFFIX), (
+    # 2026-10-15 起末尾再跟一段思考方式后缀（见 test_thinking_style_suffix），
+    # 两段的先后顺序就是那次 eval 的注入顺序。
+    assert system.endswith(CITATION_DISCIPLINE_SUFFIX + THINKING_STYLE_SUFFIX), (
         "后缀必须在系统提示词末尾（与 eval 注入位置一致，且离生成最近的指令"
-        f"服从率最高）；实际结尾: …{system[-80:]!r}"
+        f"服从率最高）；实际结尾: …{system[-120:]!r}"
     )
 
 

@@ -86,6 +86,19 @@ CITATION_DISCIPLINE_SUFFIX = (
     "- 不确定时选择不引用——转述并说明依据即可。"
 )
 
+# 与 2026-10-15 同窗配对 eval（90 题 × 2 臂）的实验臂逐字相同 —— 改这段文字
+# 必须重跑（backend/eval/model_pair_eval.py）。
+# 动机：抓下 10 道题的完整推理文本，约四成是在思考里先写一遍回答草稿、再正式
+# 写一遍，另有大量逐条复述格式规则 —— 都是与「逐字核对引文」无关的重复劳动。
+# 结果：首字中位 38.0s→25.7s、p90 79.9s→60.7s、推理 3,533→2,126 字；逐字保真度
+# 90.5%→91.9%、卷号 94.2%→93.2%，配对 5:6 / 7:7（p=1.0），引文总数 268→292，
+# 零截断 —— 速度 −32%，准确率在噪声内不变。
+THINKING_STYLE_SUFFIX = (
+    "\n\n## 思考方式\n"
+    "思考只做三件事：确认出处与卷号、逐字核对要引用的原文是否出现在检索片段中、排定要点。"
+    "不要在思考中写出完整的回答草稿，也不要逐条复述或自查以上格式规则——引文核对完成后直接作答。"
+)
+
 META_INTRO_PROMPT = (
     "你是小津（XiaoJin）——佛津（FoJin）平台内置的佛教古籍研习 AI 助手。\n\n"
     "当用户询问你是谁、你能做什么、请你自我介绍时，严格按以下格式回复，"
@@ -312,6 +325,8 @@ def _build_llm_messages(
         # 最近的指令服从率最高（规则 4b/4c 讲过同样的事，但排在 2,000 字外）。
         if not _is_meta_question(message) and not reading_context:
             enhanced_prompt += CITATION_DISCIPLINE_SUFFIX
+            # 思考方式紧跟其后 —— 同一条路径、同一注入位置（2026-10-15 eval）。
+            enhanced_prompt += THINKING_STYLE_SUFFIX
 
     # Enhance with reading context when user is asking from the reader page.
     # Only the reading-mode *instructions* go into the system prompt; the
