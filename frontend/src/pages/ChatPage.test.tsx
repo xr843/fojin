@@ -565,6 +565,68 @@ describe("ChatPage 首屏结构", () => {
     }
   });
 
+  // 内联引文悬停预览，登录用户顺序（message_id 先于 done）：卡片读的必须是换过 id 之后
+  // 那条消息的 trust_status；正文拆成 span 后复制/选中得到的文本仍是完整标记。
+  it("内联引文预览: 登录用户顺序下显示已逐字核验，卡片内打开原文记 via:preview", async () => {
+    const realMatchMedia = window.matchMedia;
+    window.matchMedia = ((query: string) =>
+      ({
+        matches: query === "(hover: hover)",
+        media: query,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList);
+    const track = vi.fn();
+    (globalThis as unknown as { umami: unknown }).umami = { track };
+    try {
+      let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+      vi.mocked(sendChatMessageStream).mockImplementation(
+        async (_m, _s, _mid, callbacks) => { cb = callbacks; },
+      );
+      const { container } = await renderEmpty();
+      fireEvent.click(container.querySelector(".chat-hero-card")!);
+      await waitFor(() => expect(cb).toBeDefined());
+
+      cb!.onToken("「應無所住而生其心」出自【《金剛般若波羅蜜經》第1卷】。");
+      cb!.onSources([{
+        text_id: 235 as TextId, juan_num: 1, chunk_index: 3,
+        chunk_text: "應無所住而生其心", score: 0.9, title_zh: "金剛般若波羅蜜經",
+      }]);
+      cb!.onTrustStatus?.({
+        state: "verified", citation_count: 1, source_count: 1,
+        citation_mutation_count: 0, quote_mutation_count: 0, quote_checked_count: 1,
+        checked_quotes: [{ title: "金剛般若波羅蜜經", juan: 1, quote: "應無所住而生其心" }],
+      });
+      cb!.onMessageId?.(31340);
+      cb!.onDone();
+
+      const cite = await screen.findByRole("button", { name: "【《金刚般若波罗蜜经》第1卷】" });
+      // 复制完整性：拆 span 不增删任何字符
+      expect(cite.textContent).toBe("【《金刚般若波罗蜜经》第1卷】");
+      expect(cite.querySelector(".chat-cite-title")!.textContent).toBe("《金刚般若波罗蜜经》");
+      expect(container.querySelector(".chat-markdown")!.textContent!.trim())
+        .toBe("「應無所住而生其心」出自【《金刚般若波罗蜜经》第1卷】。");
+
+      fireEvent.pointerOver(cite, { pointerType: "mouse" });
+      const card = await screen.findByRole("dialog", { name: "引文预览" });
+      expect(card.textContent).toContain("已逐字核验");
+      expect(card.textContent).toContain("應無所住而生其心");
+      expect(track).toHaveBeenCalledWith("citation_preview_show", { text_id: 235, checked: 1 });
+
+      fireEvent.click(screen.getByRole("button", { name: "打开原文" }));
+      expect(track).toHaveBeenCalledWith("citation_preview_open", { text_id: 235 });
+      expect(track).toHaveBeenCalledWith("citation_click", { text_id: 235, via: "preview" });
+      expect(screen.queryByRole("dialog", { name: "引文预览" })).toBeNull();
+    } finally {
+      window.matchMedia = realMatchMedia;
+      delete (globalThis as unknown as { umami?: unknown }).umami;
+    }
+  });
+
   // 推理进度：把此前被丢弃的 reasoning 增量用作「仍在推进」的实证。
   // 与 retrieved 同一条承重约束 —— 只写独立字段，绝不碰 content（哨兵一旦被顶掉，
   // onDone 的空回复兜底就失效）。

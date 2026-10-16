@@ -104,7 +104,9 @@ Prometheus 量的是系统；下面这四个数量的是产品。定位（2026-0
 | `answer_truncated` | 收到 `truncated` 帧（finish_reason=length/max_tokens） | 上限 2000 tokens 不够用的证据 |
 | `answer_continue` | 截断提示上点「继续写完」 | 续写请求带中断处结尾 80 字 |
 | `chat_stream_error` | 流失败 | `stage`=no_token/mid_stream/empty_done，`reason`=后端 code；用户手动停止（cancelled）**不记** |
-| `citation_click` | 点答案里的内联引文，或宽屏引文边栏里的一条引文 | `text_id`；`via`=`inline`（答案正文）/`panel`（边栏）。缺 `via` 的是边栏上线前的旧事件，等同 inline |
+| `citation_click` | 点答案里的内联引文，或宽屏引文边栏里的一条引文，或内联引文悬停卡片里的「打开原文」 | `text_id`；`via`=`inline`（答案正文）/`panel`（边栏）/`preview`（悬停卡片）。缺 `via` 的是边栏上线前的旧事件，等同 inline |
+| `citation_preview_show` | 桌面（`hover: hover`）鼠标停在内联引文上约 300ms、或键盘 Tab 聚焦到内联引文时弹出预览卡片 | `text_id`；`checked`=1/0（该引句是否在 `trust_status.checked_quotes` 里）。每次悬停最多一次——鼠标在引文与卡片之间来回不重复记；触屏不弹也不记 |
+| `citation_preview_open` | 预览卡片里点「打开原文」 | `text_id`。同时另记一条 `citation_click`（`via=preview`），核对率口径不受影响 |
 | `source_click` | 点「参考经文」chip / 等待期 chip / 边栏里的参考经文 | `phase=retrieved` 是等答案时先读原文；`via=panel` 是边栏里点的 |
 | `citation_panel_toggle` | 宽屏（≥1280px）引文边栏收起 / 展开 | `state`=`collapsed`/`expanded`；收起状态记在 localStorage |
 | `chat_copy` | 复制回答 | 有用信号 |

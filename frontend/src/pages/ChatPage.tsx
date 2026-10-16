@@ -86,6 +86,8 @@ import { expectedFirstTokenSeconds, recordFirstTokenMs } from "../utils/firstTok
 import type { TextId } from "../types/branded";
 import { useNarrowViewport } from "../hooks/useNarrowViewport";
 import { MOD_KEY_LABEL, useChatShortcuts } from "../hooks/useChatShortcuts";
+import { InlineCitation } from "../components/CitationPreview";
+import { CitationPreviewContext } from "../components/citationPreviewContext";
 
 // 登录用户的额度提示只在快用完时出现。常驻一个「今日剩余 198 次」是纯噪音 ——
 // 而毫无预警地撞上上限、直接吃一个错误，才是真正会让人懵的那种体验。
@@ -386,6 +388,12 @@ function MessageBubbleInner({
   }, [isAssistantText, m.sources]);
   const trustLabelKey = trustStatusLabelKey(m.trust_status);
   const quoteDetail = quoteCheckDetail(m.trust_status);
+  // 内联引文悬停预览读的是**这条**回答的 sources / checked_quotes。走 context 而不是
+  // 按消息 id 回查：id 在流中途会被 message_id 换掉，而这里拿的就是 m 本身。
+  const citationPreviewData = useMemo(
+    () => ({ sources: m.sources, checkedQuotes: m.trust_status?.checked_quotes }),
+    [m.sources, m.trust_status],
+  );
 
   // 「已思考 N 秒」要自己走秒 —— 后端只在推理增量到达时发活性信号（约 1 次/秒
   // 且会随推理结束而停），秒数不能靠事件驱动。memo 不拦组件自身的 state 更新，
@@ -488,7 +496,9 @@ function MessageBubbleInner({
               <>
                 <AnswerSummaryBar m={m} isStreaming={isStreaming} />
                 <div className="chat-markdown">
-                  <Markdown remarkPlugins={MARKDOWN_REMARK_PLUGINS} rehypePlugins={[[rehypeSanitize, CHAT_SANITIZE_SCHEMA]]} urlTransform={chatUrlTransform} components={markdownComponents}>{rendered}</Markdown>
+                  <CitationPreviewContext.Provider value={citationPreviewData}>
+                    <Markdown remarkPlugins={MARKDOWN_REMARK_PLUGINS} rehypePlugins={[[rehypeSanitize, CHAT_SANITIZE_SCHEMA]]} urlTransform={chatUrlTransform} components={markdownComponents}>{rendered}</Markdown>
+                  </CitationPreviewContext.Provider>
                 </div>
                 {trustLabelKey && (
                   <div className="chat-answer-trust" style={{ color: trustStatusColor(m.trust_status) }}>
@@ -906,15 +916,16 @@ export default function ChatPage() {
         const parsed = parseCitationHref(href);
         if (parsed) {
           return (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
+            <InlineCitation
+              parsed={parsed}
+              onOpen={(via) => {
                 // Behavioural quality signal: clicking a citation = engaging
                 // with / trusting the cited source.
                 if (typeof umami !== "undefined") {
-                  // via 与侧栏面板的点击（via: "panel"）分开，核对率口径前后可比。
-                  umami.track("citation_click", { text_id: parsed.textId, via: "inline" });
+                  // via 与侧栏面板的点击（via: "panel"）分开，核对率口径前后可比；
+                  // 悬停卡片里的「打开原文」记 via: "preview"，另记一个专属事件。
+                  if (via === "preview") umami.track("citation_preview_open", { text_id: parsed.textId });
+                  umami.track("citation_click", { text_id: parsed.textId, via });
                 }
                 if (parsed.chunkIndex < 0) {
                   // Legacy history message without chunk_index — fall back
@@ -924,19 +935,9 @@ export default function ChatPage() {
                 }
                 setCitationTarget(parsed);
               }}
-              style={{
-                background: "none",
-                border: 0,
-                padding: 0,
-                font: "inherit",
-                color: "var(--fj-highlight)",
-                borderBottom: "1px dashed var(--fj-accent)",
-                fontWeight: 500,
-                cursor: "pointer",
-              }}
             >
               {children}
-            </button>
+            </InlineCitation>
           );
         }
       }
