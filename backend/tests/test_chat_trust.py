@@ -278,3 +278,53 @@ async def test_persist_records_timing_and_upsert_without_timing_keeps_it(trust_s
         await trust_session.execute(select(ChatAnswerDiagnostic).where(ChatAnswerDiagnostic.message_id == msg.id))
     ).scalar_one()
     assert (row.prep_ms, row.first_token_ms, row.total_ms, row.model) == (812, 31_250, 58_004, "deepseek-v4-pro")
+
+
+def test_status_lists_which_quotes_were_checked():
+    # The aggregate count alone cannot say WHICH citation carried a checked
+    # quote; the citation side panel needs the list, and it must be the exact
+    # set behind the count (same scan), in answer order.
+    answer = (
+        "云：「假引文片段一假引文片段一」【《心經》第1卷】\n"
+        "又：「假引文片段二假引文片段二」【《心經》第2卷】\n"
+        "《心經》阐述空性【《心經》第1卷】"
+    )
+    status = build_trust_status(answer, [_src()], citation_mutations=[], quote_mutations=[])
+
+    assert status.checked_quotes is not None
+    assert len(status.checked_quotes) == status.quote_checked_count == 2
+    assert [(q.title, q.juan, q.quote) for q in status.checked_quotes] == [
+        ("心經", 1, "假引文片段一假引文片段一"),
+        ("心經", 2, "假引文片段二假引文片段二"),
+    ]
+
+
+def _diag(quote_checked_count):
+    return ChatAnswerDiagnostic(
+        message_id=1,
+        trust_state="verified",
+        citation_count=1,
+        source_count=1,
+        citation_mutation_count=0,
+        quote_mutation_count=0,
+        quote_checked_count=quote_checked_count,
+    )
+
+
+def test_reconstructed_status_recomputes_checked_quotes_from_served_answer():
+    answer = "云：「假引文片段一假引文片段一」【《心經》第1卷】"
+    status = trust_status_from_diagnostic(_diag(1), answer)
+    assert status is not None
+    assert [q.quote for q in status.checked_quotes] == ["假引文片段一假引文片段一"]
+
+
+def test_reconstructed_status_drops_list_when_it_disagrees_with_stored_count():
+    # Stored count says 2 were checked but today's scan finds 1 → the scanner
+    # drifted since the answer was served; a list would claim checks that never
+    # ran on these passages. Fall back to the aggregate.
+    answer = "云：「假引文片段一假引文片段一」【《心經》第1卷】"
+    assert trust_status_from_diagnostic(_diag(2), answer).checked_quotes is None
+    # Legacy row: count never stored → no list either.
+    assert trust_status_from_diagnostic(_diag(None), answer).checked_quotes is None
+    # No answer passed → no list.
+    assert trust_status_from_diagnostic(_diag(1)).checked_quotes is None

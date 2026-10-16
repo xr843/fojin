@@ -7,7 +7,8 @@ import type { InputRef } from "antd";
 import Markdown, { defaultUrlTransform, type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
-import { CITATION_URL_SCHEME, injectCitationLinks } from "../utils/citationLinks";
+import { CITATION_URL_SCHEME, injectCitationLinks, parseCitationHref } from "../utils/citationLinks";
+import { trustStatusColor, trustStatusLabelKey } from "../utils/trustDisplay";
 import { localizeHan } from "../utils/hanScript";
 import { quoteCheckDetail } from "../utils/trustDetail";
 import { isNearBottom } from "../utils/scrollBottom";
@@ -30,7 +31,6 @@ import {
   PushpinFilled,
 } from "@ant-design/icons";
 const ShareCard = lazy(() => import("../components/ShareCard"));
-const CitationDrawer = lazy(() => import("../components/CitationDrawer"));
 import CommunityInvite from "../components/CommunityInvite";
 import ChatModelSelector from "../components/ChatModelSelector";
 import { fetchChatModels, type ChatModelOption } from "../api/chatModels";
@@ -46,6 +46,8 @@ import {
 } from "../components/RailIcons";
 import DraggableModal from "../components/DraggableModal";
 import ReasoningExcerpt from "../components/ReasoningExcerpt";
+import AnswerSummaryBar from "../components/AnswerSummaryBar";
+import CitationSidebar from "../components/CitationSidebar";
 import { getMasters } from "../api/client";
 import type { CitationTarget } from "../components/CitationDrawer";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -88,7 +90,7 @@ import { MOD_KEY_LABEL, useChatShortcuts } from "../hooks/useChatShortcuts";
 // 而毫无预警地撞上上限、直接吃一个错误，才是真正会让人懵的那种体验。
 const LOW_QUOTA_THRESHOLD = 20;
 /** 桌面侧栏展开宽度：≥1440px 加宽到 264（220 下会话标题只露约 8 个字），以下保持 220。
- *  小屏不加宽是因为引文抽屉（默认 560px，用户常开着读）与侧栏并排时，1280 屏对话列只剩
+ *  小屏不加宽是因为引文抽屉（默认 440px；宽屏常驻）与侧栏并排时，1280 屏对话列只剩
  *  约 400px，侧栏再宽 44px 就更挤；标题两行截断已能缓解小屏的辨认问题。 */
 const SIDEBAR_EXPANDED_W_WIDE = 264;
 const SIDEBAR_EXPANDED_W = 220;
@@ -165,54 +167,6 @@ const chatUrlTransform = (url: string): string => {
   if (url.startsWith(`${CITATION_URL_SCHEME}:`)) return url;
   return defaultUrlTransform(url);
 };
-
-function trustStatusLabelKey(status?: ChatTrustStatus | null): string | null {
-  if (!status) return null;
-  return `chat.trust.${status.state}`;
-}
-
-function trustStatusColor(status?: ChatTrustStatus | null): string {
-  switch (status?.state) {
-    case "verified":
-      return "#3f7d20";
-    case "quote_relaxed":
-      // A paraphrase-as-quote was relaxed to prose (fixed) — a correction, not
-      // a warning, so use the accent tone rather than the legacy amber.
-      return "var(--fj-accent)";
-    case "quote_unverified":
-      return "#a66300";
-    case "no_sources":
-      return "var(--fj-ink-muted)";
-    default:
-      return "var(--fj-accent)";
-  }
-}
-
-interface ParsedCitation {
-  textId: number;
-  juanNum: number;
-  chunkIndex: number;
-  titleZh: string;
-  quote?: string;
-}
-
-function parseCitationHref(href: string): ParsedCitation | null {
-  if (!href.startsWith(`${CITATION_URL_SCHEME}://`)) return null;
-  const rest = href.slice(`${CITATION_URL_SCHEME}://`.length);
-  const parts = rest.split("/");
-  if (parts.length < 3) return null;
-  const textId = parseInt(parts[0], 10);
-  const juanNum = parseInt(parts[1], 10);
-  const chunkIndex = parseInt(parts[2], 10);
-  const titleZh = parts[3] ? decodeURIComponent(parts[3]) : "";
-  // Segment 5 (optional) carries the quoted passage so the drawer can
-  // highlight it. Absent on legacy links built before quote-aware citations.
-  const quote = parts[4] ? decodeURIComponent(parts[4]) : undefined;
-  if (!Number.isFinite(textId) || !Number.isFinite(juanNum) || !Number.isFinite(chunkIndex)) {
-    return null;
-  }
-  return { textId, juanNum, chunkIndex, titleZh, quote };
-}
 
 // Pinned sessions leave the date groups entirely and form their own section at
 // the top — that is the whole point of pinning. Leaving them ALSO in 今天/更早
@@ -520,6 +474,7 @@ function MessageBubbleInner({
               t("chat.request_failed")
             ) : (
               <>
+                <AnswerSummaryBar m={m} isStreaming={isStreaming} />
                 <div className="chat-markdown">
                   <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[[rehypeSanitize, CHAT_SANITIZE_SCHEMA]]} urlTransform={chatUrlTransform} components={markdownComponents}>{rendered}</Markdown>
                 </div>
@@ -794,9 +749,9 @@ export default function ChatPage() {
     try {
       const saved = localStorage.getItem("fojin-citation-panel-width");
       const n = saved ? parseInt(saved, 10) : NaN;
-      return Number.isFinite(n) && n >= 360 && n <= 900 ? n : 560;
+      return Number.isFinite(n) && n >= 360 && n <= 900 ? n : 440;
     } catch {
-      return 560;
+      return 440;
     }
   });
   const citationDragRef = useRef(false);
@@ -946,7 +901,8 @@ export default function ChatPage() {
                 // Behavioural quality signal: clicking a citation = engaging
                 // with / trusting the cited source.
                 if (typeof umami !== "undefined") {
-                  umami.track("citation_click", { text_id: parsed.textId });
+                  // via 与侧栏面板的点击（via: "panel"）分开，核对率口径前后可比。
+                  umami.track("citation_click", { text_id: parsed.textId, via: "inline" });
                 }
                 if (parsed.chunkIndex < 0) {
                   // Legacy history message without chunk_index — fall back
@@ -1359,8 +1315,14 @@ export default function ChatPage() {
         patchLive((m) => {
           const current = m.content === THINKING_SENTINEL ? "" : m.content;
           // reasoningText 随首个 token 销毁：被模型自己推翻的中间结论
-          // 不能留在屏幕上（渲染层另有一道保险，两道各自独立）。
-          return { ...m, content: current + content, reasoningText: null };
+          // 不能留在屏幕上（渲染层另有一道保险，两道各自独立）。全文移进
+          // reasoningFinal，只在回答上方摘要条被用户主动展开时才显示。
+          return {
+            ...m,
+            content: current + content,
+            reasoningFinal: m.reasoningText ?? m.reasoningFinal ?? null,
+            reasoningText: null,
+          };
         });
         scrollToBottom();
       },
@@ -2317,29 +2279,16 @@ export default function ChatPage() {
           {messages.length === 0 && <div className="chat-hero-trail" />}
         </div>
 
-        {/* Citation drawer — inline side panel, drag to resize */}
-        {citationTarget !== null && (
-          <>
-            <div className="chat-citation-divider" onMouseDown={handleCitationDragStart} />
-            {/* complementary 而不是 dialog：这是个**非模态**侧栏，左边的对话仍可读可点
-                （见 global.css 里 .chat-citation-panel 的说明）。标成 dialog 会让读屏
-                以为进入了模态上下文。整页此前只有一个 <main>，补上这个 landmark 后，
-                读屏用户才能直接跳到原文对照区，而不必从对话里一路 Tab 过来。 */}
-            <div
-              className="chat-citation-panel"
-              role="complementary"
-              aria-label={t("reader.citation.title")}
-              style={{ width: citationPanelWidth }}
-            >
-              <Suspense fallback={<div style={{ padding: 40, textAlign: "center" }}>…</div>}>
-                <CitationDrawer
-                  target={citationTarget}
-                  onClose={() => setCitationTarget(null)}
-                />
-              </Suspense>
-            </div>
-          </>
-        )}
+        {/* 引文边栏：宽屏常驻列出当前回答的引文，点开即原文对照；窄屏只在点开引文时出现。
+            复用同一列与同一宽度（citationPanelWidth），逻辑全在 CitationSidebar 里。 */}
+        <CitationSidebar
+          messages={messages}
+          sending={sending}
+          target={citationTarget}
+          onTargetChange={setCitationTarget}
+          width={citationPanelWidth}
+          onResizeStart={handleCitationDragStart}
+        />
       </div>
       {shareTarget !== null && (
         <Suspense fallback={null}>

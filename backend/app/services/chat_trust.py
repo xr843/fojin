@@ -9,8 +9,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.chat import ChatAnswerDiagnostic
-from app.schemas.chat import ChatSource, ChatTrustStatus
-from app.services.quote_verifier import count_checked_quotes
+from app.schemas.chat import ChatCheckedQuote, ChatSource, ChatTrustStatus
+from app.services.quote_verifier import iter_quote_citations
 
 _CITATION_RE = re.compile(r"【《[^》]+》(?:第[^】]+?卷)?】")
 
@@ -26,6 +26,15 @@ def _score_bounds(sources: list[ChatSource]) -> tuple[float | None, float | None
     return round(max(scores), 3), round(min(scores), 3)
 
 
+def checked_quotes_for(answer: str) -> list[ChatCheckedQuote]:
+    """The quoted passages the verifier examined in ``answer`` — the same scan
+    ``count_checked_quotes`` counts, so list and count can never disagree."""
+    return [
+        ChatCheckedQuote(title=q.title, juan=q.juan, quote=q.quote)
+        for q in iter_quote_citations(answer or "")
+    ]
+
+
 def build_trust_status(
     answer: str,
     sources: list[ChatSource],
@@ -37,6 +46,7 @@ def build_trust_status(
     valid_sources = _valid_sources(sources)
     citation_count = len(_CITATION_RE.findall(answer or ""))
     max_score, min_score = _score_bounds(valid_sources)
+    checked = checked_quotes_for(answer)
 
     if not valid_sources:
         state = "no_sources"
@@ -59,7 +69,8 @@ def build_trust_status(
         source_count=len(valid_sources),
         citation_mutation_count=len(citation_mutations),
         quote_mutation_count=len(quote_mutations),
-        quote_checked_count=count_checked_quotes(answer or "", valid_sources),
+        quote_checked_count=len(checked),
+        checked_quotes=checked,
         max_source_score=max_score,
         min_source_score=min_score,
     )
@@ -81,9 +92,23 @@ def _serialize_mutations(mutations: list[Any]) -> list[dict[str, Any]]:
 
 def trust_status_from_diagnostic(
     diagnostic: ChatAnswerDiagnostic | None,
+    answer: str | None = None,
 ) -> ChatTrustStatus | None:
+    """Rebuild a stored answer's trust status.
+
+    ``answer`` (the persisted, already-guarded content) lets the per-passage
+    ``checked_quotes`` list be recomputed — it is not stored. It is attached only
+    when the recomputed list has exactly the stored ``quote_checked_count``
+    entries: if the scanner changed since the answer was served, a mismatching
+    list would claim checks that never ran, so the UI falls back to the count.
+    """
     if diagnostic is None:
         return None
+    checked_quotes = None
+    if answer is not None and diagnostic.quote_checked_count is not None:
+        recomputed = checked_quotes_for(answer)
+        if len(recomputed) == diagnostic.quote_checked_count:
+            checked_quotes = recomputed
     return ChatTrustStatus(
         state=diagnostic.trust_state,  # type: ignore[arg-type]
         citation_count=diagnostic.citation_count,
@@ -91,6 +116,7 @@ def trust_status_from_diagnostic(
         citation_mutation_count=diagnostic.citation_mutation_count,
         quote_mutation_count=diagnostic.quote_mutation_count,
         quote_checked_count=diagnostic.quote_checked_count,
+        checked_quotes=checked_quotes,
         max_source_score=diagnostic.max_source_score,
         min_source_score=diagnostic.min_source_score,
     )

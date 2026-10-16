@@ -465,6 +465,67 @@ describe("ChatPage 首屏结构", () => {
     expect(screen.getAllByRole("button", { name: /金刚般若波罗蜜经/ })).toHaveLength(2);
   });
 
+  // 引文边栏 + 摘要条，登录用户顺序（message_id 与收尾帧同一 tick）：宽屏常驻面板必须在
+  // 流结束时就列出引文与逐条核验标记，摘要条带上耗时，展开能看到思考过程；内联点击记 via:inline。
+  it("引文边栏/摘要条: 登录用户流结束时即可用，内联点击记 via:inline", async () => {
+    const realMatchMedia = window.matchMedia;
+    window.matchMedia = ((query: string) =>
+      ({
+        matches: query.includes("min-width: 1280px"),
+        media: query,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList);
+    const track = vi.fn();
+    (globalThis as unknown as { umami: unknown }).umami = { track };
+    try {
+      let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+      vi.mocked(sendChatMessageStream).mockImplementation(
+        async (_m, _s, _mid, callbacks) => { cb = callbacks; },
+      );
+      const { container } = await renderEmpty();
+      fireEvent.click(container.querySelector(".chat-hero-card")!);
+      await waitFor(() => expect(cb).toBeDefined());
+
+      cb!.onReasoning?.({ chars: 9, text: "先查金刚经出处。" });
+      cb!.onToken("「應無所住而生其心」出自【《金剛般若波羅蜜經》第1卷】。");
+      cb!.onTrustStatus?.({
+        state: "verified", citation_count: 1, source_count: 1,
+        citation_mutation_count: 0, quote_mutation_count: 0, quote_checked_count: 1,
+        checked_quotes: [{ title: "金剛般若波羅蜜經", juan: 1, quote: "應無所住而生其心" }],
+      });
+      cb!.onSources([{
+        text_id: 235 as TextId, juan_num: 1, chunk_index: 3,
+        chunk_text: "應無所住而生其心", score: 0.9, title_zh: "金剛般若波羅蜜經",
+      }]);
+      cb!.onMessageId?.(31339);   // ← 登录用户才有的这一步
+      cb!.onDone();
+
+      await waitFor(() => {
+        expect(container.querySelector(".chat-cpanel-item")).not.toBeNull();
+      });
+      const row = container.querySelector(".chat-cpanel-item")!;
+      expect(row.textContent).toContain("已逐字核验");
+      expect(row.textContent).toContain("應無所住而生其心");
+
+      const summary = container.querySelector(".chat-answer-summary")!;
+      expect(summary.textContent).toMatch(/检索 1 部经典 · 核验 1 条引文 · 用时 [\d.]+ 秒/);
+      expect(screen.queryByText("先查金刚经出处。")).toBeNull();
+      fireEvent.click(summary.querySelector("button")!);
+      expect(screen.getByText("先查金刚经出处。")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "【《金刚般若波罗蜜经》第1卷】" }));
+      expect(track).toHaveBeenCalledWith("citation_click", { text_id: 235, via: "inline" });
+    } finally {
+      window.matchMedia = realMatchMedia;
+      delete (globalThis as unknown as { umami?: unknown }).umami;
+    }
+  });
+
   // 推理进度：把此前被丢弃的 reasoning 增量用作「仍在推进」的实证。
   // 与 retrieved 同一条承重约束 —— 只写独立字段，绝不碰 content（哨兵一旦被顶掉，
   // onDone 的空回复兜底就失效）。

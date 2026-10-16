@@ -61,14 +61,14 @@ async def _trust_statuses_for_messages(
     db: AsyncSession,
     messages: list[ChatMessage],
 ) -> dict[int, ChatTrustStatus | None]:
-    ids = [m.id for m in messages if m.role == "assistant"]
-    if not ids:
+    content_by_id = {m.id: m.content for m in messages if m.role == "assistant"}
+    if not content_by_id:
         return {}
     result = await db.execute(
-        select(ChatAnswerDiagnostic).where(ChatAnswerDiagnostic.message_id.in_(ids))
+        select(ChatAnswerDiagnostic).where(ChatAnswerDiagnostic.message_id.in_(list(content_by_id)))
     )
     return {
-        row.message_id: trust_status_from_diagnostic(row)
+        row.message_id: trust_status_from_diagnostic(row, content_by_id.get(row.message_id))
         for row in result.scalars().all()
     }
 

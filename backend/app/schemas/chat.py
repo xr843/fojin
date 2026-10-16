@@ -123,6 +123,22 @@ ChatTrustState = Literal[
 ]
 
 
+class ChatCheckedQuote(BaseModel):
+    """One quoted passage counted in ``quote_checked_count``.
+
+    Produced by the very scan that counts (``iter_quote_citations``) over the
+    *served* answer — i.e. after ``verify_quoted_content`` has already stripped
+    the quote marks off every passage that failed. A passage listed here
+    therefore passed the verbatim check; failures never appear (they are no
+    longer quotes). Lets the UI mark *which* citation was checked instead of
+    only showing the aggregate count.
+    """
+
+    title: str
+    juan: int | None = None
+    quote: str
+
+
 class ChatTrustStatus(BaseModel):
     state: ChatTrustState
     citation_count: int = 0
@@ -135,6 +151,10 @@ class ChatTrustStatus(BaseModel):
     # None for historical answers reconstructed from a diagnostic row (the
     # count predates persistence and is not stored).
     quote_checked_count: int | None = None
+    # The passages behind quote_checked_count, in answer order. None when the
+    # list is not known for certain (historical rows whose recomputed list no
+    # longer matches the stored count) — the UI then shows the aggregate only.
+    checked_quotes: list[ChatCheckedQuote] | None = None
     max_source_score: float | None = None
     min_source_score: float | None = None
 

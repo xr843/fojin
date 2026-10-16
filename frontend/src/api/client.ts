@@ -1887,6 +1887,15 @@ export type ChatTrustState =
   | "sources_available"
   | "no_sources";
 
+/** One quoted passage behind `quote_checked_count` — produced by the same scan
+ *  that counts, over the served answer (failing quotes were already stripped to
+ *  prose by the verifier, so every entry here passed the verbatim check). */
+export interface ChatCheckedQuote {
+  title: string;
+  juan: number | null;
+  quote: string;
+}
+
 export interface ChatTrustStatus {
   state: ChatTrustState;
   citation_count: number;
@@ -1896,6 +1905,10 @@ export interface ChatTrustStatus {
   /** How many 「…」 quotes were verbatim-checked against a source. null for
    *  historical answers reconstructed from a diagnostic (not stored there). */
   quote_checked_count?: number | null;
+  /** The passages counted above, in answer order. Absent/null when the list is
+   *  not known for certain (old backend replica, or a historical row whose
+   *  recomputed list disagrees with the stored count) — show the count only. */
+  checked_quotes?: ChatCheckedQuote[] | null;
   max_source_score?: number | null;
   min_source_score?: number | null;
 }
@@ -1988,6 +2001,9 @@ export interface ChatMessageItem {
   /** 等待期「思考过程片段」活窗的内容（保尾截断）。只在 content 仍是哨兵时
    *  渲染，首个 token 一到即清空 —— 绝不持久化、绝不混进 content。 */
   reasoningText?: string | null;
+  /** 首个正文 token 到达时从 reasoningText 移过来的完整思考文本，只供回答上方的
+   *  摘要条在用户**主动展开**时显示（带「非最终回答」标签）。同样不持久化、绝不混进 content。 */
+  reasoningFinal?: string | null;
   /** 从按下发送到第一个正文字到达的毫秒数。等待的绝大部分花在这一段（生产实测
    *  24-180 秒），所以它和总耗时分开报。空回复（一个 token 都没来）时为 null。 */
   firstTokenMs?: number | null;
