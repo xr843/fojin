@@ -60,6 +60,46 @@ export function extractAnswerCitations(
       verbatimChecked: isCheckedQuote(checked, parsed.titleZh, parsed.quote),
     });
   }
+  return withUnshownCheckedQuotes(out, content, checked);
+}
+
+/**
+ * The inline link carries only the quote nearest its 【】 marker, but the
+ * verifier may have checked a different 「…」 in the same passage (prod session
+ * 3652: 「已逐字核验 3 条」 next to 1 badge). Give every checked quote that no row
+ * shows its own badged row, right after the citation of the same title and
+ * fascicle, so the badges add up to the count. Only quotes that really occur in
+ * the answer, under a fascicle the answer really cites — never invented.
+ */
+function withUnshownCheckedQuotes(
+  rows: AnswerCitation[],
+  content: string,
+  checked: ChatCheckedQuote[] | null | undefined,
+): AnswerCitation[] {
+  if (!checked || checked.length === 0 || rows.length === 0) return rows;
+  const nContent = normalizeForMatch(content);
+  const shown = new Set(
+    rows.filter((r) => r.target.quote).map((r) => `${normalizeForMatch(r.target.titleZh)}|${normalizeForMatch(r.target.quote!)}`),
+  );
+  const out = [...rows];
+  for (const c of checked) {
+    const nq = normalizeForMatch(c.quote);
+    const nt = normalizeForMatch(c.title);
+    if (!nq || shown.has(`${nt}|${nq}`) || !nContent.includes(nq)) continue;
+    const anchor = out.findIndex(
+      (r) => normalizeForMatch(r.target.titleZh) === nt && (c.juan == null || r.target.juanNum === c.juan),
+    );
+    if (anchor < 0) continue;
+    const base = out[anchor].target;
+    let at = anchor + 1;
+    while (at < out.length && out[at].target.textId === base.textId && out[at].target.juanNum === base.juanNum) at++;
+    out.splice(at, 0, {
+      key: `${base.textId}:${base.juanNum}:${base.chunkIndex}:${c.quote}`,
+      target: { ...base, quote: c.quote },
+      verbatimChecked: true,
+    });
+    shown.add(`${nt}|${nq}`);
+  }
   return out;
 }
 
