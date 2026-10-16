@@ -1757,7 +1757,6 @@
   "chat.cpanel.close": "关闭引文面板",
   "chat.cpanel.entry_citations": "{{n}} 处出处",
   "chat.cpanel.entry_checked": "已逐字核验 {{n}} 条",
-  "chat.cpanel.entry_sources": "参考经文 {{n}} 部",
   "chat.cpanel.entry_hint": "在右侧查看本条回答的引文",
   "chat.cpanel.back_to_list": "返回引文列表",
   "chat.cpanel.viewing_earlier": "正在看较早的一条回答",

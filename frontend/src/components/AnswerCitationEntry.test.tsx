@@ -61,10 +61,10 @@ describe("AnswerCitationEntry", () => {
     expect(chip()!.textContent).toBe("2 处出处");
   });
 
-  it("only retrieved sources, no explicit citation → 参考经文 N 部", () => {
+  it("only retrieved sources, no explicit citation → no chip (the 参考经文 chips row already covers it)", () => {
     const m = msg({ content: "这是转述，没有标出处。", trust_status: trust({ state: "sources_available", quote_checked_count: 0 }) });
     render(<AnswerCitationEntry m={m} isStreaming={false} onOpen={vi.fn()} />);
-    expect(chip()!.textContent).toBe("参考经文 2 部");
+    expect(chip()).toBeNull();
   });
 
   it("is not shown while streaming", () => {

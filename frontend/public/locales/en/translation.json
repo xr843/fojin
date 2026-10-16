@@ -1757,7 +1757,6 @@
   "chat.cpanel.close": "Close citation panel",
   "chat.cpanel.entry_citations": "Sources cited: {{n}}",
   "chat.cpanel.entry_checked": "{{n}} verified verbatim",
-  "chat.cpanel.entry_sources": "Reference texts: {{n}}",
   "chat.cpanel.entry_hint": "View this answer's citations",
   "chat.cpanel.back_to_list": "Back to citations",
   "chat.cpanel.viewing_earlier": "Viewing an earlier answer",

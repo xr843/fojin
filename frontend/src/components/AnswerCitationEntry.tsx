@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { BookOutlined, RightOutlined } from "@ant-design/icons";
 import type { ChatMessageItem } from "../api/client";
-import { citedFascicleCount, distinctSourceTextCount } from "../utils/answerCitations";
+import { citedFascicleCount } from "../utils/answerCitations";
 import { quoteCheckDetail } from "../utils/trustDetail";
 import { trustStatusColor, trustStatusLabelKey } from "../utils/trustDisplay";
 import "../styles/chat-citation-panel.css";
@@ -23,7 +23,7 @@ interface Props {
  *    拿它当「引文数」会把同一处出处数多次。
  *  - 「已逐字核验 M 条」= trust_status.quote_checked_count（逐句计，单位是引句不是出处，
  *    所以 1 处出处下核验 3 条是正常的，两个数字刻意用不同的量词）。
- *  - 没有显式引文、只有检索到的参考经文时：「参考经文 N 部」（不同 text_id 数，与摘要条同源）。
+ *  - 没有显式引文、只有检索到的参考经文时不出胶囊：面板内容与下方「参考经文」芯片行重复。
  * 流式中不显示：sources / trust_status 要等流结束才到。
  *
  * 信任行：胶囊出现后，原来那行「引用已校验 · 已逐字核验 N 条引文」里的核验数由胶囊承担，
@@ -42,7 +42,6 @@ export default function AnswerCitationEntry({ m, isStreaming, onOpen }: Props) {
   const trust = m.trust_status;
   const trustKey = trustStatusLabelKey(trust);
   const detail = quoteCheckDetail(trust);
-  const texts = distinctSourceTextCount(m.sources);
   const checked = trust?.quote_checked_count ?? 0;
 
   let label: string | null = null;
@@ -53,9 +52,9 @@ export default function AnswerCitationEntry({ m, isStreaming, onOpen }: Props) {
       label += ` · ${t("chat.cpanel.entry_checked", { n: checked })}`;
       checkedInChip = true;
     }
-  } else if (texts > 0) {
-    label = t("chat.cpanel.entry_sources", { n: texts });
   }
+  // 只有参考经文、没有显式引文时不出胶囊：面板此时只会列出参考经文，与回答下方已有的
+  // 「参考经文」芯片行一字不差，胶囊只是重复入口（芯片本身可点开原文）。
 
   const trustLine = trustKey ? (
     <span className="chat-answer-trust-label" style={{ color: trustStatusColor(trust) }}>
