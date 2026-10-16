@@ -45,8 +45,11 @@ export function normalizeForMatch(s: string): string {
 // A 「…」/『…』/“…”/‘…’/"…" pair sitting within ~80 chars before a citation
 // marker — the passage the LLM is attributing. Mirrors the backend verifier's
 // _QUOTE_CITATION_RE lookback window.
+// Minimum 4 (not 6): a short quote such as 「大善快問」 still tells the drawer what to
+// highlight. Binding a citation to a chunk stays at ≥6 (pickSourceForQuote), and
+// the drawer only highlights a <6-char quote when it is unique in what it shows.
 const PRECEDING_QUOTE_RE =
-  /[「『“‘"]([^「『“‘"」』”’]{6,400})[」』”’"][^【】「『“‘"」』”’]{0,80}$/;
+  /[「『“‘"]([^「『“‘"」』”’]{4,400})[」』”’"][^【】「『“‘"」』”’]{0,80}$/;
 
 /** Pull the quoted passage that sits just before a citation marker, if any. */
 export function extractPrecedingQuote(textBefore: string): string | null {
@@ -217,3 +220,19 @@ export function findQuoteSpans(
   }
   return spans;
 }
+
+/** How many non-overlapping times `quote` occurs in `haystack` (same tolerant
+ *  matching as findQuoteSpan). Used to refuse highlighting a short quote that
+ *  is not unique in a whole fascicle. */
+export function countQuoteOccurrences(haystack: string, quote: string): number {
+  let n = 0;
+  let cursor = 0;
+  while (cursor < haystack.length) {
+    const hit = findQuoteSpan(haystack.slice(cursor), quote);
+    if (!hit) break;
+    n++;
+    cursor += Math.max(hit[1], 1);
+  }
+  return n;
+}
+

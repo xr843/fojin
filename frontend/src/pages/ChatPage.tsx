@@ -923,12 +923,7 @@ export default function ChatPage() {
                   if (via === "preview") umami.track("citation_preview_open", { text_id: parsed.textId });
                   umami.track("citation_click", { text_id: parsed.textId, via });
                 }
-                if (parsed.chunkIndex < 0) {
-                  // Legacy history message without chunk_index — fall back
-                  // to navigating to the reader page as before.
-                  navigate(`/texts/${parsed.textId}/read?juan=${parsed.juanNum}`);
-                  return;
-                }
+                // chunkIndex < 0（无段级锚点）也在右栏打开：抽屉会取整卷原文，不再整页跳走。
                 setCitationTarget(parsed);
               }}
             >
@@ -954,7 +949,7 @@ export default function ChatPage() {
       }
       return <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>;
     },
-  }), [navigate]);
+  }), []);
 
   /** 自动跟随流式输出，但用户上滚阅读时不抢滚动条。
    *
@@ -1558,13 +1553,8 @@ export default function ChatPage() {
     if (typeof umami !== "undefined") {
       umami.track("source_click", phase ? { text_id: s.text_id, phase } : { text_id: s.text_id });
     }
+    // 无段级锚点时 chunkIndex = -1：抽屉按整卷打开，不整页跳走。
     const chunkIndex = s.chunk_index ?? -1;
-    if (chunkIndex < 0) {
-      // No chunk anchor (legacy / non-chunked source) — fall back to the reader,
-      // same as the inline-citation legacy path.
-      navigate(`/texts/${s.text_id}/read?juan=${s.juan_num}`);
-      return;
-    }
     setCitationTarget({
       textId: s.text_id,
       juanNum: s.juan_num,
@@ -1573,7 +1563,7 @@ export default function ChatPage() {
       // 定位卡片带上命中窗口，抽屉高亮那一句
       ...(quote ? { quote } : {}),
     });
-  }, [navigate]);
+  }, []);
 
   const handleFeedbackMessage = useCallback((m: ChatMessageItem, dir: "up" | "down") => {
     const newFeedback = m.feedback === dir ? null : dir;

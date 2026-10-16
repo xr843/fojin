@@ -10,6 +10,7 @@ import {
   getChunkAlignment,
   getCommentaryCorpus,
   getCommentarySource,
+  getJuanContent,
   type ChunkContextItem,
 } from "../api/client";
 
@@ -52,12 +53,14 @@ vi.mock("../api/client", () => ({
   getChunkAlignment: vi.fn(),
   getCommentaryCorpus: vi.fn(),
   getCommentarySource: vi.fn(),
+  getJuanContent: vi.fn(),
 }));
 
 const mockContext = vi.mocked(getChunkContext);
 const mockAlignment = vi.mocked(getChunkAlignment);
 const mockCorpus = vi.mocked(getCommentaryCorpus);
 const mockSource = vi.mocked(getCommentarySource);
+const mockJuan = vi.mocked(getJuanContent);
 
 const TARGET: CitationTarget = {
   textId: 1558,
@@ -598,4 +601,34 @@ describe("注疏反查", () => {
     await waitFor(() => expect(mockSource).toHaveBeenCalled());
     expect(screen.queryByTestId("commentary-source")).toBeNull();
   });
+
+  // 引文没有段级锚点（chunkIndex = -1：引句太短无法定段、或卷号与检索段不在同一卷）时，
+  // 以前整页跳去阅读器、对话现场丢失（生产会话 3662「大善快問」）。现在在右栏按整卷打开。
+  describe("整卷模式（chunkIndex < 0）", () => {
+    const JUAN_TARGET = { textId: 12350, juanNum: 2, chunkIndex: -1, titleZh: "盂蘭盆經疏孝衡鈔" };
+    const juan = (content: string) =>
+      mockJuan.mockResolvedValue({ text_id: 12350, juan_num: 2, title_zh: "盂蘭盆經疏孝衡鈔", content } as never);
+
+    it("取整卷原文渲染在右栏，不请求段落上下文", async () => {
+      juan("前文一句。佛印可此問：大善快問。後文一句。");
+      renderDrawer({ target: { ...JUAN_TARGET, quote: "大善快問" } });
+      await waitFor(() => expect(document.querySelector("mark.chat-citation-quote-mark")?.textContent).toBe("大善快問"));
+      expect(mockContext).not.toHaveBeenCalled();
+    });
+
+    it("短引句在全卷出现不止一次时不高亮，并说明未定位到具体段落", async () => {
+      juan("大善快問，初一處。中間若干文字。大善快問，又一處。");
+      renderDrawer({ target: { ...JUAN_TARGET, quote: "大善快問" } });
+      await waitFor(() => expect(screen.getByText("未能定位到具体段落，以下为该卷原文")).toBeInTheDocument());
+      expect(document.querySelector("mark.chat-citation-quote-mark")).toBeNull();
+    });
+
+    it("较长引句即使无段级锚点也照常高亮", async () => {
+      const q = "若僧若俗王臣庶人皆應為父母";
+      juan(`開頭。${q}，設此盆供。${q}再現。`);
+      renderDrawer({ target: { ...JUAN_TARGET, quote: q } });
+      await waitFor(() => expect(document.querySelectorAll("mark.chat-citation-quote-mark").length).toBe(1));
+    });
+  });
 });
+

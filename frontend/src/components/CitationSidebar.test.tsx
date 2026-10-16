@@ -224,6 +224,17 @@ describe("CitationSidebar", () => {
     expect(onTarget).toHaveBeenCalledWith(expect.objectContaining({ textId: 7, juanNum: 1, chunkIndex: 3, quote: QUOTE }));
   });
 
+  // 生产会话 3662：引文卷号与检索段不在同一卷（或引句太短无法定段）→ chunkIndex = -1。
+  // 以前点它整页跳去阅读器、对话现场丢失；现在交给抽屉按整卷打开。
+  it("a citation without a chunk anchor still opens in the column instead of leaving the page", () => {
+    const onTarget = vi.fn();
+    const m = answer({ content: "佛印可此問：「大善快問」【《般若波罗蜜多心经》第2卷】。" });
+    const { rerender } = render(<Harness messages={[m]} onTarget={onTarget} />);
+    rerender(<Harness messages={[m]} request={req(m)} onTarget={onTarget} />);
+    fireEvent.click(rows()[0]);
+    expect(onTarget).toHaveBeenCalledWith(expect.objectContaining({ textId: 7, juanNum: 2, chunkIndex: -1, quote: "大善快問" }));
+  });
+
   it("narrow screen: the chip opens the list in the drawer slot, but it is not remembered", () => {
     wide = false;
     const m = answer();

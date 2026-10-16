@@ -9,10 +9,11 @@ import {
   getChunkAlignment,
   getCommentaryCorpus,
   getCommentarySource,
+  getJuanContent,
   type ChunkContextItem,
   type ParallelPair,
 } from "../api/client";
-import { findQuoteSpans } from "../utils/citationMatch";
+import { countQuoteOccurrences, findQuoteSpans, normalizeForMatch } from "../utils/citationMatch";
 import DrawerPassageActions from "./DrawerPassageActions";
 import { localizeHan } from "../utils/hanScript";
 import { reflowText } from "../utils/textReflow";
@@ -336,13 +337,35 @@ export default function CitationDrawer({ target, onClose }: Props) {
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const { data, isLoading, error } = useQuery({
+  // 整卷模式：引文没有段级锚点（chunkIndex < 0——引句太短无法定段，或 LLM 写的卷号与
+  // 检索到的段不在同一卷）。以前整页跳去阅读器、对话现场丢失；现在在本栏取整卷原文。
+  const juanMode = target !== null && target.chunkIndex < 0;
+  const chunkQuery = useQuery({
     queryKey: ["citation-context", target?.textId, target?.juanNum, target?.chunkIndex],
     queryFn: () =>
       getChunkContext(target!.textId, target!.juanNum, target!.chunkIndex, 2),
-    enabled: target !== null,
+    enabled: target !== null && !juanMode,
     staleTime: 15 * 60 * 1000,
   });
+  const juanQuery = useQuery({
+    queryKey: ["citation-juan", target?.textId, target?.juanNum],
+    queryFn: () => getJuanContent(target!.textId, target!.juanNum),
+    enabled: juanMode,
+    staleTime: 15 * 60 * 1000,
+  });
+  const juanData = juanQuery.data;
+  const data = useMemo(() => {
+    if (!juanMode) return chunkQuery.data;
+    if (!juanData) return undefined;
+    return {
+      title_zh: juanData.title_zh,
+      chunks: [{ chunk_index: 0, chunk_text: juanData.content ?? "", is_center: false }],
+      has_more_before: false,
+      has_more_after: false,
+    };
+  }, [juanMode, chunkQuery.data, juanData]);
+  const isLoading = juanMode ? juanQuery.isLoading : chunkQuery.isLoading;
+  const error = juanMode ? juanQuery.error : chunkQuery.error;
 
   // Fetch cross-canon parallels (trilingual RAG). Independent from chunk context
   // so the main 汉文 passage renders immediately while parallels load in background.
@@ -350,7 +373,7 @@ export default function CitationDrawer({ target, onClose }: Props) {
     queryKey: ["citation-alignment", target?.textId, target?.juanNum, target?.chunkIndex],
     queryFn: () =>
       getChunkAlignment(target!.textId, target!.juanNum, target!.chunkIndex, 5),
-    enabled: target !== null,
+    enabled: target !== null && !juanMode,
     staleTime: 15 * 60 * 1000,
     // parallels are optional — don't block rendering if this 404s or empty
     retry: false,
@@ -373,7 +396,7 @@ export default function CitationDrawer({ target, onClose }: Props) {
   const { data: source } = useQuery({
     queryKey: ["commentary-source", target?.textId, target?.juanNum, target?.chunkIndex],
     queryFn: () => getCommentarySource(target!.textId, target!.juanNum, target!.chunkIndex),
-    enabled: target !== null && isAlignedCommentary,
+    enabled: target !== null && !juanMode && isAlignedCommentary,
     staleTime: 15 * 60 * 1000,
     // 附带信息，拿不到就不显示——不要因为它失败而影响正文对照。
     retry: false,
@@ -402,6 +425,16 @@ export default function CitationDrawer({ target, onClose }: Props) {
   );
   // 与 CitationBlocks 用同一份拼接正文，「白话 / 全藏出处」的被引句定位才一致
   const stitchedText = useMemo(() => stitchChunks(dedupedChunks).text, [dedupedChunks]);
+
+  // 不足 6 字的短引句只有在当前显示的原文（整卷，或被引段前后几段）里恰好出现一次时才高亮，
+  // 否则「法界藏」这类常见词会被标在第一次出现处，读者会以为那就是被引的地方。
+  const quote = target?.quote;
+  const ambiguousShortQuote =
+    !!quote &&
+    normalizeForMatch(quote).length < 6 &&
+    countQuoteOccurrences(stitchedText, quote) !== 1;
+  const effectiveQuote = ambiguousShortQuote ? undefined : quote;
+  const juanOnlyNotice = juanMode && (!quote || ambiguousShortQuote);
 
   // Group parallels by lang so each language becomes a tab.
   // Primary source (汉文) is always the first tab; additional langs appended.
@@ -453,9 +486,12 @@ export default function CitationDrawer({ target, onClose }: Props) {
             juanNum={target.juanNum}
             title={target.titleZh || data?.title_zh || ""}
             passage={stitchedText}
-            quoteSpans={findQuoteSpans(stitchedText, target.quote)}
+            quoteSpans={findQuoteSpans(stitchedText, effectiveQuote)}
           >
-            <CitationBlocks chunks={dedupedChunks} quote={target.quote} />
+            {juanOnlyNotice && (
+              <Alert type="info" showIcon message={t("reader.citation.juan_only")} style={{ marginBottom: 12 }} />
+            )}
+            <CitationBlocks chunks={dedupedChunks} quote={effectiveQuote} />
           </DrawerPassageActions>
         ) : (
           <CitationBlocks chunks={dedupedChunks} quote={undefined} />

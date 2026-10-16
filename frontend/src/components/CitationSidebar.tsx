@@ -1,6 +1,5 @@
 import { lazy, Suspense, useEffect, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router";
 import { ArrowLeftOutlined } from "@ant-design/icons";
 import type { ChatMessageItem, ChatSource } from "../api/client";
 import type { CitationTarget } from "./CitationDrawer";
@@ -89,7 +88,6 @@ export default function CitationSidebar({
 }: Props) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
-  const navigate = useNavigate();
   const wide = useNarrowViewport(CITATION_SIDEBAR_QUERY);
   const [wideOpen, setWideOpen] = useState(readOpen);
   const [narrowOpen, setNarrowOpen] = useState(false);
@@ -151,20 +149,12 @@ export default function CitationSidebar({
 
   const openCitation = (c: AnswerCitation) => {
     track("citation_click", { text_id: c.target.textId, via: "panel" });
-    if (c.target.chunkIndex < 0) {
-      navigate(`/texts/${c.target.textId}/read?juan=${c.target.juanNum}`);
-      return;
-    }
-    onTargetChange(c.target);
+    onTargetChange(c.target); // chunkIndex < 0 也在本栏打开：抽屉取整卷原文
   };
 
   const openSource = (s: ChatSource) => {
     track("source_click", { text_id: s.text_id, via: "panel" });
     const chunkIndex = s.chunk_index ?? -1;
-    if (chunkIndex < 0) {
-      navigate(`/texts/${s.text_id}/read?juan=${s.juan_num}`);
-      return;
-    }
     onTargetChange({ textId: s.text_id, juanNum: s.juan_num, chunkIndex, titleZh: s.title_zh ?? "" });
   };
 
