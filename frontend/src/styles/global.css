@@ -1096,6 +1096,52 @@ em {
   cursor: default;
 }
 
+/* 贴原文定位卡片（PassageLocateCard）：答案正文上方，与正文同列左对齐。
+   不拉满整列 —— 它是「关于用户原文」的元信息，不是回答的一部分。 */
+.chat-locate-card {
+  align-self: flex-start;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 14px;
+  padding: 8px 14px 10px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--fj-accent) 35%, transparent);
+  border-left: 3px solid var(--fj-accent);
+  background: color-mix(in srgb, var(--fj-accent) 6%, transparent);
+  color: var(--fj-ink);
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.chat-locate-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fj-accent);
+  font-size: 12px;
+}
+.chat-locate-snippet { color: var(--fj-ink-muted); font-size: 12px; }
+.chat-locate-foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-top: 6px;
+}
+.chat-locate-open {
+  padding: 2px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--fj-accent);
+  background: transparent;
+  color: var(--fj-accent);
+  font-size: 12px;
+  line-height: 1.7;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.chat-locate-open:hover { background: color-mix(in srgb, var(--fj-accent) 12%, transparent); }
+.chat-locate-note { color: var(--fj-ink-muted); font-size: 11px; }
+
 /* 手机：去掉助手头像，正文吃满整列；用户气泡放宽。 */
 @media (max-width: 768px) {
   .chat-msg-row { padding: 0 12px; gap: 0; margin-bottom: 24px; }

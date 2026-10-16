@@ -69,26 +69,10 @@ export default function PassageLocateCard({ sources, retrieval, onOpen }: Props)
     );
   };
 
+  // 样式在 global.css（.chat-locate-*）：颜色全用主题 token，深浅色自动跟随。
   return (
-    <div
-      className="chat-locate-card"
-      data-testid="passage-locate-card"
-      style={{
-        marginBottom: 8,
-        padding: "8px 12px",
-        borderRadius: 10,
-        border: "1px solid rgba(176,141,87,0.45)",
-        borderLeft: "3px solid var(--fj-accent)",
-        background: "rgba(176,141,87,0.06)",
-        color: "var(--fj-ink)",
-        fontSize: 13,
-        lineHeight: 1.7,
-        maxWidth: "100%",
-        boxSizing: "border-box",
-        wordBreak: "break-word",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--fj-accent)", fontSize: 12 }}>
+    <div className="chat-locate-card" data-testid="passage-locate-card">
+      <div className="chat-locate-label">
         <AimOutlined aria-hidden />
         <span>{t("chat.locate.label")}</span>
       </div>
@@ -102,29 +86,13 @@ export default function PassageLocateCard({ sources, retrieval, onOpen }: Props)
         )}
       </div>
       {info.window && (
-        <div style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}>
-          {t("chat.locate.snippet", { text: snippetOf(info.window) })}
-        </div>
+        <div className="chat-locate-snippet">{t("chat.locate.snippet", { text: snippetOf(info.window) })}</div>
       )}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 4 }}>
-        <button
-          type="button"
-          onClick={handleOpen}
-          data-testid="passage-locate-open"
-          style={{
-            padding: "2px 12px",
-            borderRadius: 12,
-            border: "1px solid var(--fj-accent)",
-            background: "transparent",
-            color: "var(--fj-accent)",
-            fontSize: 12,
-            lineHeight: 1.7,
-            cursor: "pointer",
-          }}
-        >
+      <div className="chat-locate-foot">
+        <button type="button" className="chat-locate-open" onClick={handleOpen} data-testid="passage-locate-open">
           {t("chat.locate.open")}
         </button>
-        <span style={{ color: "var(--fj-ink-muted)", fontSize: 11 }}>{t("chat.locate.note")}</span>
+        <span className="chat-locate-note">{t("chat.locate.note")}</span>
       </div>
     </div>
   );
