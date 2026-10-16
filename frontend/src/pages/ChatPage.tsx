@@ -8,9 +8,7 @@ import Markdown, { defaultUrlTransform, type Components } from "react-markdown";
 import { MARKDOWN_REMARK_PLUGINS } from "../utils/markdownPlugins";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import { CITATION_URL_SCHEME, injectCitationLinks, parseCitationHref } from "../utils/citationLinks";
-import { trustStatusColor, trustStatusLabelKey } from "../utils/trustDisplay";
 import { localizeHan } from "../utils/hanScript";
-import { quoteCheckDetail } from "../utils/trustDetail";
 import { isNearBottom } from "../utils/scrollBottom";
 import {
   SendOutlined,
@@ -48,7 +46,8 @@ import DraggableModal from "../components/DraggableModal";
 import ReasoningExcerpt from "../components/ReasoningExcerpt";
 import PassageLocateCard from "../components/PassageLocateCard";
 import AnswerSummaryBar from "../components/AnswerSummaryBar";
-import CitationSidebar from "../components/CitationSidebar";
+import CitationSidebar, { type CitationPanelRequest } from "../components/CitationSidebar";
+import AnswerCitationEntry from "../components/AnswerCitationEntry";
 import { getMasters } from "../api/client";
 import type { CitationTarget } from "../components/CitationDrawer";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -329,6 +328,8 @@ interface MessageBubbleProps {
   onRegenerate: (m: ChatMessageItem, modelId?: string) => void;
   onFeedback: (m: ChatMessageItem, dir: "up" | "down") => void;
   onSourceClick: (source: ChatSource, phase?: SourceClickPhase, quote?: string) => void;
+  /** 回答下方入口胶囊：展开右栏并列出这条回答的引文。 */
+  onOpenCitationPanel: (m: ChatMessageItem) => void;
 }
 
 /** One chat message row, memoised on (m, isStreaming, sending, user). A streaming
@@ -339,7 +340,7 @@ interface MessageBubbleProps {
     which was the dominant "越聊越卡" jank in long conversations. */
 function MessageBubbleInner({
   m, isStreaming, sending, user, markdownComponents, isLast = false, expectedFirstTokenS = null, regenerateModels,
-  onSuggestionClick, onShare, onRetry, onContinue, onRegenerate, onFeedback, onSourceClick,
+  onSuggestionClick, onShare, onRetry, onContinue, onRegenerate, onFeedback, onSourceClick, onOpenCitationPanel,
 }: MessageBubbleProps) {
   // Read t here (not as a prop): on a mid-conversation language switch, i18next's
   // subscription re-renders the bubble — which memo does NOT block, since memo
@@ -384,8 +385,6 @@ function MessageBubbleInner({
     }
     return out;
   }, [isAssistantText, m.sources]);
-  const trustLabelKey = trustStatusLabelKey(m.trust_status);
-  const quoteDetail = quoteCheckDetail(m.trust_status);
 
   // 「已思考 N 秒」要自己走秒 —— 后端只在推理增量到达时发活性信号（约 1 次/秒
   // 且会随推理结束而停），秒数不能靠事件驱动。memo 不拦组件自身的 state 更新，
@@ -490,19 +489,8 @@ function MessageBubbleInner({
                 <div className="chat-markdown">
                   <Markdown remarkPlugins={MARKDOWN_REMARK_PLUGINS} rehypePlugins={[[rehypeSanitize, CHAT_SANITIZE_SCHEMA]]} urlTransform={chatUrlTransform} components={markdownComponents}>{rendered}</Markdown>
                 </div>
-                {trustLabelKey && (
-                  <div className="chat-answer-trust" style={{ color: trustStatusColor(m.trust_status) }}>
-                    {t(trustLabelKey)}
-                    {quoteDetail && (
-                      <span style={{ color: "var(--fj-ink-muted)" }}>
-                        {" · "}
-                        {quoteDetail.key === "chat.trust.quotes_checked"
-                          ? t(quoteDetail.key, { n: quoteDetail.count })
-                          : t(quoteDetail.key)}
-                      </span>
-                    )}
-                  </div>
-                )}
+                {/* 引文面板入口胶囊 + 信任状态（右栏默认收起，靠它按需展开）。流式中不渲染。 */}
+                <AnswerCitationEntry m={m} isStreaming={isStreaming} onOpen={onOpenCitationPanel} />
                 {sourceChips.length > 0 && (
                   <div className="chat-answer-sources">
                     <span className="chat-answer-sources-label">{t("chat.reference_sources")}</span>
@@ -757,6 +745,14 @@ export default function ChatPage() {
     sources: ChatSource[] | null;
   } | null>(null);
   const [citationTarget, setCitationTarget] = useState<CitationTarget | null>(null);
+  // 回答下方入口胶囊的点击。按 created_at 认回答（流中途 message_id 会换掉 id）；
+  // 每次点击一个新对象，CitationSidebar 按身份比较。只用参数 m、不读闭包里会变的状态，
+  // 所以回调恒定 —— MessageBubble 的 memo 比较器不看回调，回调必须不会过期。
+  const [citationPanelRequest, setCitationPanelRequest] = useState<CitationPanelRequest | null>(null);
+  const handleOpenCitationPanel = useCallback((m: ChatMessageItem) => {
+    setCitationTarget(null);
+    setCitationPanelRequest({ key: m.created_at });
+  }, []);
   const [citationPanelWidth, setCitationPanelWidth] = useState<number>(() => {
     try {
       const saved = localStorage.getItem("fojin-citation-panel-width");
@@ -2007,6 +2003,7 @@ export default function ChatPage() {
                 onRegenerate={handleRegenerateMessage}
                 onFeedback={handleFeedbackMessage}
                 onSourceClick={handleSourceClick}
+                onOpenCitationPanel={handleOpenCitationPanel}
               />
             ))}
             {/* Streaming cursor is shown inline via ▌ in the message bubble */}
@@ -2293,13 +2290,14 @@ export default function ChatPage() {
           {messages.length === 0 && <div className="chat-hero-trail" />}
         </div>
 
-        {/* 引文边栏：宽屏常驻列出当前回答的引文，点开即原文对照；窄屏只在点开引文时出现。
+        {/* 引文边栏：默认收起，由回答下方的入口胶囊或点开引文展开；列表与原文对照
             复用同一列与同一宽度（citationPanelWidth），逻辑全在 CitationSidebar 里。 */}
         <CitationSidebar
           messages={messages}
           sending={sending}
           target={citationTarget}
           onTargetChange={setCitationTarget}
+          request={citationPanelRequest}
           width={citationPanelWidth}
           onResizeStart={handleCitationDragStart}
         />

@@ -1,33 +1,38 @@
-import { lazy, Suspense, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
-import { ArrowLeftOutlined, MenuUnfoldOutlined } from "@ant-design/icons";
+import { ArrowLeftOutlined } from "@ant-design/icons";
 import type { ChatMessageItem, ChatSource } from "../api/client";
 import type { CitationTarget } from "./CitationDrawer";
 import CitationPanel from "./CitationPanel";
 import { useNarrowViewport } from "../hooks/useNarrowViewport";
-import { extractAnswerCitations, findAnswerForTarget, type AnswerCitation } from "../utils/answerCitations";
+import { findAnswerForTarget, isExplicitCitationOf, type AnswerCitation } from "../utils/answerCitations";
 import "../styles/chat-citation-panel.css";
 
 const CitationDrawer = lazy(() => import("./CitationDrawer"));
 
-/** 常驻面板的断点。低于它维持原样（只在点开引文时出抽屉）：对话列在 1280 以下
- *  再让出一整列给常驻面板就太挤了。改这里同时看 chat-citation-panel.css。 */
+/** 并排面板的断点。≥1280 时右栏与对话列并排、展开状态记在 localStorage；
+ *  低于它右栏仍是原来的抽屉位（769–1279 并排、≤768 堆到对话下方，见 global.css），
+ *  展开只在本页有效、不记忆 —— 手机上一进来就被半屏面板盖住不可接受。 */
 export const CITATION_SIDEBAR_QUERY = "(min-width: 1280px)";
 
-const COLLAPSED_KEY = "fojin-citation-sidebar-collapsed";
+/** 宽屏「用户手动展开过」的记忆。默认 false = 收起（DeepSeek 式：靠回答下方的入口按需展开）。
+ *
+ *  换了新键而不是沿用 #1344 的 `fojin-citation-sidebar-collapsed`：那个键缺省 = 展开，
+ *  老用户大多没有它，沿用就会把他们留在旧默认里。旧键不再读取。 */
+export const OPEN_KEY = "fojin-citation-sidebar-open";
 
-function readCollapsed(): boolean {
+function readOpen(): boolean {
   try {
-    return localStorage.getItem(COLLAPSED_KEY) === "1";
+    return localStorage.getItem(OPEN_KEY) === "1";
   } catch {
     return false;
   }
 }
 
-function writeCollapsed(v: boolean) {
+function writeOpen(v: boolean) {
   try {
-    localStorage.setItem(COLLAPSED_KEY, v ? "1" : "0");
+    localStorage.setItem(OPEN_KEY, v ? "1" : "0");
   } catch {
     /* private mode / blocked storage — the panel just won't remember */
   }
@@ -37,12 +42,26 @@ function track(event: string, data: Record<string, string | number>) {
   if (typeof umami !== "undefined") umami.track(event, data);
 }
 
-/** 选中的回答用 created_at 认，不用 id：流中途 message_id 会把占位 id 换成真 id
- *  （只有登录用户会换），按 id 记的选中会在那一刻失配。created_at 在换 id 时原样保留。 */
+/** 「打开某条回答的引文面板」的请求。每次点击是一个新对象（按身份比较，不带计数）。
+ *  用 created_at 认回答，不用 id：流中途 message_id 会把占位 id 换成真 id（只有登录用户会换），
+ *  created_at 在换 id 时原样保留。 */
+export interface CitationPanelRequest {
+  key: string;
+}
+
+/** 选中的回答，同样按 created_at 认。 */
 interface Selection {
   key: string;
   /** 选中时的「最新回答」。出现更新的回答（用户又问了一句）选中即作废，回到最新。 */
   latestKey: string;
+}
+
+/** 渲染期决定的「面板被打开了」，交给 effect 去打点 / 记忆（渲染期不做副作用）。 */
+interface OpenEvent {
+  /** null = 面板本来就开着，不算一次「打开」，不打点。 */
+  via: "chip" | "inline" | "source" | null;
+  /** 宽屏是否记住「展开」：只有入口胶囊（用户明确要看列表）记，点内联引文顺带打开的不记。 */
+  remember: boolean;
 }
 
 interface Props {
@@ -50,22 +69,34 @@ interface Props {
   sending: boolean;
   target: CitationTarget | null;
   onTargetChange: (t: CitationTarget | null) => void;
+  /** 回答下方入口胶囊的点击（AnswerCitationEntry）。 */
+  request: CitationPanelRequest | null;
   width: number;
   onResizeStart: (e: ReactMouseEvent) => void;
 }
 
 /**
- * /chat 右侧那一列。宽屏（≥1280）常驻：默认列出当前回答的引文（CitationPanel），
- * 点任一条就在同一位置换成原文对照（CitationDrawer），顶部有返回列表。窄屏与旧行为
- * 完全一致：只有点开引文时才出现抽屉。
+ * /chat 右侧那一列，默认收起。三种打开方式：
+ *  - 回答下方的入口胶囊（request）→ 列出**那条**回答的引文（CitationPanel）；宽屏记住「展开」；
+ *  - 点正文内联引文 / 参考经文 / 定位卡片（target）→ 直接进原文对照（CitationDrawer），
+ *    顶部「返回引文列表」回到该回答的列表；这种打开不记忆；
+ *  - 宽屏上次手动展开过 → 进页即展开。
+ * 关闭只有一个语义：右上角 ×（列表视图在 CitationPanel 顶栏，原文视图在 CitationDrawer 顶栏），
+ * 关掉整列，宽屏记住「收起」。窄屏同一套逻辑，落在原来的抽屉位里。
  */
-export default function CitationSidebar({ messages, sending, target, onTargetChange, width, onResizeStart }: Props) {
+export default function CitationSidebar({
+  messages, sending, target, onTargetChange, request, width, onResizeStart,
+}: Props) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const navigate = useNavigate();
   const wide = useNarrowViewport(CITATION_SIDEBAR_QUERY);
-  const [collapsed, setCollapsed] = useState(readCollapsed);
+  const [wideOpen, setWideOpen] = useState(readOpen);
+  const [narrowOpen, setNarrowOpen] = useState(false);
+  const open = wide ? wideOpen : narrowOpen;
+  const setOpen = (next: boolean) => (wide ? setWideOpen(next) : setNarrowOpen(next));
   const [selection, setSelection] = useState<Selection | null>(null);
+  const [openEvent, setOpenEvent] = useState<OpenEvent | null>(null);
 
   const answers = messages.filter((m) => m.role === "assistant");
   const latest = answers.length > 0 ? answers[answers.length - 1] : null;
@@ -75,21 +106,47 @@ export default function CitationSidebar({ messages, sending, target, onTargetCha
       ? answers.find((m) => m.created_at === selection.key)
       : null) ?? latest;
 
-  // 点了某条回答里的内联引文 → 面板跟到那条回答。按 props 变化调整 state 的
-  // React 惯用法（渲染期比较上一次的值），不用 effect。
+  // 下面两段是「按 props 变化调整 state」的 React 惯用法（渲染期比较上一次的值），不用 effect。
+  // 点了某条回答里的内联引文 → 面板跟到那条回答；收起状态下顺带展开（不记忆）。
   const [seenTarget, setSeenTarget] = useState<CitationTarget | null>(target);
   if (seenTarget !== target) {
     setSeenTarget(target);
     if (target) {
       const owner = findAnswerForTarget(messages, target, lang, selected);
       if (owner && owner !== selected) setSelection({ key: owner.created_at, latestKey });
+      if (!open) {
+        setOpen(true);
+        setOpenEvent({
+          via: owner && isExplicitCitationOf(owner, target, lang) ? "inline" : "source",
+          remember: false,
+        });
+      }
     }
   }
 
-  const toggleCollapsed = (next: boolean) => {
-    setCollapsed(next);
-    writeCollapsed(next);
-    track("citation_panel_toggle", { state: next ? "collapsed" : "expanded" });
+  // 点了某条回答下方的入口胶囊 → 展开并列出那条回答。
+  const [seenRequest, setSeenRequest] = useState<CitationPanelRequest | null>(request);
+  if (seenRequest !== request) {
+    setSeenRequest(request);
+    if (request) {
+      setSelection({ key: request.key, latestKey });
+      if (!open) setOpen(true);
+      // 已经开着（例如被内联引文临时打开）也算一次手动展开：照样记住。埋点只记「从关到开」。
+      setOpenEvent({ via: open ? null : "chip", remember: wide });
+    }
+  }
+
+  useEffect(() => {
+    if (!openEvent) return;
+    if (openEvent.via) track("citation_panel_open", { via: openEvent.via });
+    if (openEvent.remember) writeOpen(true);
+  }, [openEvent]);
+
+  const close = () => {
+    setOpen(false);
+    if (wide) writeOpen(false);
+    track("citation_panel_close", { view: target ? "passage" : "list" });
+    if (target) onTargetChange(null);
   };
 
   const openCitation = (c: AnswerCitation) => {
@@ -111,11 +168,9 @@ export default function CitationSidebar({ messages, sending, target, onTargetCha
     onTargetChange({ textId: s.text_id, juanNum: s.juan_num, chunkIndex, titleZh: s.title_zh ?? "" });
   };
 
-  const drawer = target ? (
-    <Suspense fallback={<div style={{ padding: 40, textAlign: "center" }}>…</div>}>
-      <CitationDrawer target={target} onClose={() => onTargetChange(null)} />
-    </Suspense>
-  ) : null;
+  if (!open) return null;
+  // 还没有任何回答（空态首页）：不占列。
+  if (!latest && !target) return null;
 
   const column = (children: ReactNode) => (
     <>
@@ -134,40 +189,15 @@ export default function CitationSidebar({ messages, sending, target, onTargetCha
     </>
   );
 
-  // 窄屏 / 中屏：原样。
-  if (!wide) return target ? column(drawer) : null;
-
-  // 宽屏，但还没有任何回答（空态首页）：不占列。
-  if (!latest && !target) return null;
-
-  if (collapsed && !target) {
-    const count = selected
-      ? extractAnswerCitations(selected.content, selected.sources, lang).length
-      : 0;
-    return (
-      <button
-        type="button"
-        className="chat-cpanel-rail"
-        aria-label={t("chat.cpanel.expand")}
-        title={t("chat.cpanel.expand")}
-        onClick={() => toggleCollapsed(false)}
-      >
-        <MenuUnfoldOutlined />
-        <span className="chat-cpanel-rail-label">{t("chat.cpanel.rail_label")}</span>
-        {count > 0 && <span className="chat-cpanel-rail-count">{count}</span>}
-      </button>
-    );
-  }
-
   if (target) {
     return column(
       <>
-        {!collapsed && (
-          <button type="button" className="chat-cpanel-back" onClick={() => onTargetChange(null)}>
-            <ArrowLeftOutlined /> {t("chat.cpanel.back_to_list")}
-          </button>
-        )}
-        {drawer}
+        <button type="button" className="chat-cpanel-back" onClick={() => onTargetChange(null)}>
+          <ArrowLeftOutlined /> {t("chat.cpanel.back_to_list")}
+        </button>
+        <Suspense fallback={<div style={{ padding: 40, textAlign: "center" }}>…</div>}>
+          <CitationDrawer target={target} onClose={close} />
+        </Suspense>
       </>,
     );
   }
@@ -179,7 +209,7 @@ export default function CitationSidebar({ messages, sending, target, onTargetCha
       pending={sending && selected === latest}
       onOpenCitation={openCitation}
       onOpenSource={openSource}
-      onCollapse={() => toggleCollapsed(true)}
+      onClose={close}
       onShowLatest={() => setSelection(null)}
     />,
   );

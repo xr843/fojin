@@ -541,12 +541,28 @@ describe("ChatPage 首屏结构", () => {
         text_id: 235 as TextId, juan_num: 1, chunk_index: 3,
         chunk_text: "應無所住而生其心", score: 0.9, title_zh: "金剛般若波羅蜜經",
       }]);
-      cb!.onMessageId?.(31339);   // ← 登录用户才有的这一步
+      // 流式中：没有入口胶囊，右栏默认收起
+      expect(container.querySelector(".chat-cpanel-entry")).toBeNull();
+      cb!.onMessageId?.(31339);   // ← 登录用户才有的这一步（id 在收尾前被换掉）
       cb!.onDone();
 
+      // 流结束：胶囊出现，右栏仍收起，直到点胶囊
+      const entry = await waitFor(() => {
+        const el = container.querySelector<HTMLButtonElement>(".chat-cpanel-entry");
+        expect(el).not.toBeNull();
+        return el!;
+      });
+      expect(entry.textContent).toBe("1 处出处 · 已逐字核验 1 条");
+      expect(container.querySelector(".chat-citation-panel")).toBeNull();
+      // 信任行仍在，但核验数不再与胶囊重复
+      expect(screen.getByText("引用已校验")).toBeInTheDocument();
+      expect(container.querySelector(".chat-answer-trust")!.textContent).not.toContain("已逐字核验 1 条引文");
+
+      entry.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
       await waitFor(() => {
         expect(container.querySelector(".chat-cpanel-item")).not.toBeNull();
       });
+      expect(track).toHaveBeenCalledWith("citation_panel_open", { via: "chip" });
       const row = container.querySelector(".chat-cpanel-item")!;
       expect(row.textContent).toContain("已逐字核验");
       expect(row.textContent).toContain("應無所住而生其心");

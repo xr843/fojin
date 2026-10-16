@@ -125,6 +125,29 @@ export function distinctSourceTextCount(sources: ChatSource[] | null | undefined
   return new Set(sources.filter((s) => s.text_id > 0).map((s) => s.text_id)).size;
 }
 
+/**
+ * How many distinct 出处 (text + fascicle) an answer explicitly cites — the number
+ * on the entry chip under the answer. Deliberately NOT the panel's row count:
+ * a row is one (出处, 引句) pair, and withUnshownCheckedQuotes adds extra rows for
+ * checked quotes the inline links don't carry, so rows over-count 出处 and would
+ * double-count against quote_checked_count. Counting 出处 keeps the two numbers
+ * on the chip in different units (处 vs 条 quoted sentences).
+ */
+export function citedFascicleCount(
+  content: string,
+  sources: ChatSource[] | null,
+  language: string,
+): number {
+  const rows = extractAnswerCitations(content, sources, language);
+  return new Set(rows.map((r) => `${r.target.textId}:${r.target.juanNum}`)).size;
+}
+
+/** True when `target` is one of `m`'s explicit 【】 citations (an inline click),
+ *  as opposed to a retrieved-source chip or the locate card. */
+export function isExplicitCitationOf(m: ChatMessageItem, target: CitationTarget, language: string): boolean {
+  return extractAnswerCitations(m.content, m.sources, language).some((c) => sameTarget(c.target, target));
+}
+
 function sameTarget(a: CitationTarget, b: CitationTarget): boolean {
   return (
     a.textId === b.textId &&

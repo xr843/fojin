@@ -53,6 +53,7 @@ function renderBubble(overrides: Partial<ChatMessageItem>) {
       onRegenerate={noop}
       onFeedback={noop}
       onSourceClick={noop}
+      onOpenCitationPanel={noop}
     />,
   );
 }

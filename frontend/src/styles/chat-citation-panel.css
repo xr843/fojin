@@ -174,51 +174,59 @@
   background: var(--fj-bg-alt);
 }
 
-/* 收起后的竖条：留在右缘，点开即展开 */
-.chat-cpanel-rail {
-  flex-shrink: 0;
-  width: 36px;
-  align-self: stretch;
+
+/* ---------- 回答下方的面板入口胶囊（AnswerCitationEntry） ----------
+   右栏默认收起，靠它按需展开。与信任状态同一行：胶囊在前，状态文字在后，窄屏自动折行。 */
+.chat-cpanel-entry-row {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  padding: 14px 0;
-  border: 0;
-  border-left: 1px solid var(--fj-border);
-  background: var(--fj-bg-alt);
-  color: var(--fj-ink-muted);
-  font-family: inherit;
-  cursor: pointer;
+  gap: 6px 12px;
 }
 
-.chat-cpanel-rail:hover,
-.chat-cpanel-rail:focus-visible {
+.chat-cpanel-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 3px 10px 3px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--fj-border);
+  background: var(--fj-surface-alt);
+  color: var(--fj-ink);
+  font-family: inherit;
+  font-size: 12.5px;
+  line-height: 1.6;
+  cursor: pointer;
+  text-align: start;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.chat-cpanel-entry .anticon {
+  font-size: 12px;
+  color: var(--fj-accent);
+  flex-shrink: 0;
+}
+
+.chat-cpanel-entry .chat-cpanel-entry-arrow {
+  font-size: 10px;
+  color: var(--fj-ink-muted);
+}
+
+.chat-cpanel-entry:hover,
+.chat-cpanel-entry:focus-visible {
+  border-color: var(--fj-accent);
   color: var(--fj-accent);
 }
 
-.chat-cpanel-rail-label {
-  writing-mode: vertical-rl;
-  font-size: 13px;
-  letter-spacing: 2px;
+.chat-cpanel-entry-label {
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
 }
 
-.chat-cpanel-rail-count {
-  min-width: 20px;
-  padding: 0 5px;
-  border-radius: 10px;
-  font-size: 11px;
-  line-height: 18px;
-  text-align: center;
-  background: var(--fj-accent);
-  color: var(--fj-on-accent, #fff);
-}
-
-/* 常驻面板只在宽屏出现（CITATION_SIDEBAR_QUERY）；保险起见窄屏把竖条也藏掉。 */
-@media (max-width: 1279px) {
-  .chat-cpanel-rail {
-    display: none;
-  }
+/* 列表视图顶栏右上角的 ×（与原文对照视图 CitationDrawer 的 × 同位置、同语义：关掉整列） */
+.chat-cpanel-close {
+  color: var(--fj-ink-muted);
 }
 
 /* ---------- 回答摘要条 ---------- */

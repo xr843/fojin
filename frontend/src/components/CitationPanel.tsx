@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, Tooltip } from "antd";
-import { BookOutlined, CheckCircleFilled, MenuFoldOutlined } from "@ant-design/icons";
+import { BookOutlined, CheckCircleFilled, CloseOutlined } from "@ant-design/icons";
 import type { ChatMessageItem, ChatSource } from "../api/client";
 import { distinctSourceFascicles, extractAnswerCitations, type AnswerCitation } from "../utils/answerCitations";
 import { localizeHan } from "../utils/hanScript";
@@ -16,7 +16,8 @@ interface Props {
   pending: boolean;
   onOpenCitation: (c: AnswerCitation) => void;
   onOpenSource: (s: ChatSource) => void;
-  onCollapse: () => void;
+  /** 右上角 ×：关掉整列（与原文对照视图里 CitationDrawer 的 × 同语义）。 */
+  onClose: () => void;
   onShowLatest: () => void;
 }
 
@@ -30,7 +31,7 @@ interface Props {
  *  - 其余条目不打任何标记 —— 不打绿勾，也不打「未核验」，因为前端不知道。
  */
 export default function CitationPanel({
-  message, isLatest, pending, onOpenCitation, onOpenSource, onCollapse, onShowLatest,
+  message, isLatest, pending, onOpenCitation, onOpenSource, onClose, onShowLatest,
 }: Props) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
@@ -54,13 +55,14 @@ export default function CitationPanel({
         <span className="chat-citation-panel-title">
           <BookOutlined /> {t("chat.cpanel.title")}
         </span>
-        <Tooltip title={t("chat.cpanel.collapse")}>
+        <Tooltip title={t("chat.cpanel.close")}>
           <Button
             type="text"
             size="small"
-            icon={<MenuFoldOutlined />}
-            aria-label={t("chat.cpanel.collapse")}
-            onClick={onCollapse}
+            className="chat-cpanel-close"
+            icon={<CloseOutlined />}
+            aria-label={t("chat.cpanel.close")}
+            onClick={onClose}
           />
         </Tooltip>
       </div>
