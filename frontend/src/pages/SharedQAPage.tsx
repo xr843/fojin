@@ -4,7 +4,7 @@ import { Helmet } from "react-helmet-async";
 import { Spin, Button, Result } from "antd";
 import { RobotOutlined, MessageOutlined, ShareAltOutlined } from "@ant-design/icons";
 import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { MARKDOWN_REMARK_PLUGINS } from "../utils/markdownPlugins";
 import rehypeSanitize from "rehype-sanitize";
 import { useTranslation } from "react-i18next";
 import { getSharedQA, type SharedQA } from "../api/client";
@@ -161,7 +161,7 @@ export default function SharedQAPage() {
             fontFamily: '"Noto Serif SC", serif',
           }}
         >
-          <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>{data.answer}</Markdown>
+          <Markdown remarkPlugins={MARKDOWN_REMARK_PLUGINS} rehypePlugins={[rehypeSanitize]}>{data.answer}</Markdown>
         </div>
       </div>
 

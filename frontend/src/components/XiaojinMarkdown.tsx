@@ -1,5 +1,5 @@
 import Markdown, { type Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { MARKDOWN_REMARK_PLUGINS } from "../utils/markdownPlugins";
 
 /**
  * 小津气泡里的 markdown 渲染 —— 单独成文件是为了**懒加载边界**：
@@ -49,7 +49,7 @@ const COMPONENTS: Components = {
 export default function XiaojinMarkdown({ content }: { content: string }) {
   return (
     <div className="xiaojin-md">
-      <Markdown remarkPlugins={[remarkGfm]} components={COMPONENTS}>
+      <Markdown remarkPlugins={MARKDOWN_REMARK_PLUGINS} components={COMPONENTS}>
         {tightenLists(content)}
       </Markdown>
     </div>

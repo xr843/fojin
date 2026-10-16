@@ -4,7 +4,7 @@ import { Helmet } from "react-helmet-async";
 import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { MARKDOWN_REMARK_PLUGINS } from "../utils/markdownPlugins";
 import { ApartmentOutlined, FileTextOutlined, ReadOutlined, SendOutlined } from "@ant-design/icons";
 import { runResearch, type ResearchReport, type ResearchStep, type ChatSource } from "../api/client";
 import { useAuthStore } from "../stores/authStore";
@@ -120,7 +120,7 @@ export default function ResearchPage() {
               <section className="rp-section">
                 <h2>{t("research.answer_title")}</h2>
                 <div className="rp-answer">
-                  <Markdown remarkPlugins={[remarkGfm]}>{report.answer}</Markdown>
+                  <Markdown remarkPlugins={MARKDOWN_REMARK_PLUGINS}>{report.answer}</Markdown>
                 </div>
                 {report.trust_status && (
                   <div className="rp-trust">{t(`chat.trust.${report.trust_status.state}`)}</div>

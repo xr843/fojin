@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Input, Button, message, Alert, Tooltip, Modal, Tag, Spin, Dropdown } from "antd";
 import type { InputRef } from "antd";
 import Markdown, { defaultUrlTransform, type Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { MARKDOWN_REMARK_PLUGINS } from "../utils/markdownPlugins";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import { CITATION_URL_SCHEME, injectCitationLinks, parseCitationHref } from "../utils/citationLinks";
 import { trustStatusColor, trustStatusLabelKey } from "../utils/trustDisplay";
@@ -488,7 +488,7 @@ function MessageBubbleInner({
               <>
                 <AnswerSummaryBar m={m} isStreaming={isStreaming} />
                 <div className="chat-markdown">
-                  <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[[rehypeSanitize, CHAT_SANITIZE_SCHEMA]]} urlTransform={chatUrlTransform} components={markdownComponents}>{rendered}</Markdown>
+                  <Markdown remarkPlugins={MARKDOWN_REMARK_PLUGINS} rehypePlugins={[[rehypeSanitize, CHAT_SANITIZE_SCHEMA]]} urlTransform={chatUrlTransform} components={markdownComponents}>{rendered}</Markdown>
                 </div>
                 {trustLabelKey && (
                   <div className="chat-answer-trust" style={{ color: trustStatusColor(m.trust_status) }}>

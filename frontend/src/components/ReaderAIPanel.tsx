@@ -19,7 +19,7 @@ import {
   DislikeFilled,
 } from "@ant-design/icons";
 import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { MARKDOWN_REMARK_PLUGINS } from "../utils/markdownPlugins";
 import rehypeSanitize from "rehype-sanitize";
 import { sendChatMessageStream, updateChatMessageFeedback } from "../api/client";
 import type { ChatSource, ChatMessageItem, ReadingContext } from "../api/client";
@@ -418,7 +418,7 @@ export default function ReaderAIPanel({
                     <ReaderThinking m={m} t={t} />
                   ) : (
                     <>
-                      <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]} components={markdownComponents}>
+                      <Markdown remarkPlugins={MARKDOWN_REMARK_PLUGINS} rehypePlugins={[rehypeSanitize]} components={markdownComponents}>
                         {tightenLists(injectCitationLinks(cleanContent, m.sources)) + (isStreaming ? " ▌" : "")}
                       </Markdown>
                       {suggestions.length > 0 && !sending && (

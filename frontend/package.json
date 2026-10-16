@@ -46,6 +46,7 @@
     "react-markdown": "^10.1.0",
     "react-router": "^8.3.0",
     "rehype-sanitize": "^6.0.0",
+    "remark-cjk-friendly": "2.3.2",
     "remark-gfm": "^4.0.1",
     "zustand": "^5.0.2"
   },
