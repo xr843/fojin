@@ -1068,7 +1068,7 @@
   "chat.locate.label": "Passage located",
   "chat.locate.found_in": "The text you pasted appears verbatim in {{title}}, fascicle {{n}}",
   "chat.locate.sep": "; ",
-  "chat.locate.also_in": "also found in {{n}} other text(s)",
+  "chat.locate.also_in": "these phrases also appear in up to {{n}} other text(s)",
   "chat.locate.snippet": "“{{text}}”",
   "chat.locate.open": "Open text",
   "chat.locate.note": "Appearing verbatim here does not make this the original source — Buddhist texts often quote one another and non-Buddhist works.",

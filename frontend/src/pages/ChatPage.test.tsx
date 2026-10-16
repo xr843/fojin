@@ -483,7 +483,7 @@ describe("ChatPage 首屏结构", () => {
     });
     const card = await screen.findByTestId("passage-locate-card");
     expect(card.textContent).toContain("《金刚般若波罗蜜经》第 1 卷");
-    expect(card.textContent).toContain("另见于 2 部典籍");
+    expect(card.textContent).toContain("另有至多 2 部典籍含这些语句");
     // 卡片不在等待区里，content 仍是哨兵
     expect(container.querySelector(".chat-thinking")).not.toBeNull();
     expect(container.querySelector(".chat-thinking")!.contains(card)).toBe(false);

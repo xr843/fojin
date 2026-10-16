@@ -1068,7 +1068,7 @@
   "chat.locate.label": "原文定位",
   "chat.locate.found_in": "您贴的这段文字逐字见于《{{title}}》第 {{n}} 卷",
   "chat.locate.sep": "，",
-  "chat.locate.also_in": "另见于 {{n}} 部典籍",
+  "chat.locate.also_in": "另有至多 {{n}} 部典籍含这些语句",
   "chat.locate.snippet": "「{{text}}」",
   "chat.locate.open": "打开原文",
   "chat.locate.note": "逐字见于此处不等于出自此处——佛典常互相引用，也引外典。",

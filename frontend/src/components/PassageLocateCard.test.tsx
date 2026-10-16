@@ -51,7 +51,7 @@ describe("PassageLocateCard", () => {
 
   it("多部命中：写「另见于 N 部典籍」，N 不含本书", () => {
     render(<PassageLocateCard sources={[located(4)]} onOpen={vi.fn()} />);
-    expect(screen.getByTestId("passage-locate-also").textContent).toContain("另见于 3 部典籍");
+    expect(screen.getByTestId("passage-locate-also").textContent).toContain("另有至多 3 部典籍含这些语句");
   });
 
   it("典籍数未知（0/缺省）时不编「另见于」", () => {
@@ -88,7 +88,7 @@ describe("PassageLocateCard", () => {
     };
     render(<PassageLocateCard sources={null} retrieval={retrieval} onOpen={vi.fn()} />);
     expect(screen.getByTestId("passage-locate-card").textContent).toContain("第 2 卷");
-    expect(screen.getByTestId("passage-locate-also").textContent).toContain("另见于 2 部典籍");
+    expect(screen.getByTestId("passage-locate-also").textContent).toContain("另有至多 2 部典籍含这些语句");
     expect(track).toHaveBeenCalledWith("paste_locate_show", { text_id: 7, texts: 3, phase: "live" });
   });
 });
