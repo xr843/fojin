@@ -94,3 +94,33 @@ describe("findAnswerForTarget", () => {
     expect(findAnswerForTarget(msgs, target, "zh", older)).toBe(older);
   });
 });
+
+describe("extractAnswerCitations — checked quote that is not the one nearest the marker", () => {
+  // 生产实例（会话 3652）：后端核验了同一段里较早的那句，面板只展示了紧贴标记的那句，
+  // 于是「已逐字核验 3 条」配 1 个徽章。核验过的句子必须在面板上以自己的一行出现并带徽章。
+  const EARLY = "觀自在菩薩行深般若波羅蜜多時";
+  const ANS = `经文先说「${EARLY}」，接着说「${QUOTE}」【《般若波罗蜜多心经》第1卷】。`;
+  const SRC: ChatSource[] = [{ ...SOURCES[0], chunk_text: `${EARLY}，照見五蘊皆空……${QUOTE}。` }];
+
+  it("adds the checked quote as its own badged row under the same citation", () => {
+    const checked = [{ title: "般若波罗蜜多心经", juan: 1, quote: EARLY }];
+    const rows = extractAnswerCitations(ANS, SRC, "zh", checked);
+    const early = rows.find((r) => r.target.quote === EARLY);
+    expect(early).toBeDefined();
+    expect(early!.verbatimChecked).toBe(true);
+    expect([early!.target.textId, early!.target.juanNum, early!.target.chunkIndex]).toEqual([7, 1, 3]);
+    // 紧贴标记的那句没被核验，仍不带徽章
+    expect(rows.find((r) => r.target.quote === QUOTE)?.verbatimChecked).toBe(false);
+    expect(rows.filter((r) => r.verbatimChecked)).toHaveLength(1);
+  });
+
+  it("does not invent a row for a checked quote absent from the answer or under another fascicle", () => {
+    const checked = [
+      { title: "般若波罗蜜多心经", juan: 1, quote: "答案里根本没有这一句话" },
+      { title: "般若波罗蜜多心经", juan: 9, quote: EARLY },
+    ];
+    const rows = extractAnswerCitations(ANS, SRC, "zh", checked);
+    expect(rows.some((r) => r.verbatimChecked)).toBe(false);
+    expect(rows).toHaveLength(1);
+  });
+});
