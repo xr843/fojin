@@ -60,7 +60,6 @@ import {
   getApiKeyStatus,
   getChatQuota,
   getChunkContext,
-  getHotQuestions,
   getRandomHotQuestions,
   updateChatMessageFeedback,
   type ChatMessageItem,
@@ -806,12 +805,6 @@ export default function ChatPage() {
     queryKey: ["chatSessions"],
     queryFn: getChatSessions,
     enabled: !!user,
-  });
-
-  const { data: hotQuestionsData } = useQuery({
-    queryKey: ["hotQuestions"],
-    queryFn: getHotQuestions,
-    staleTime: 3600_000,
   });
 
   // Welcome-screen categorized cards: fetched fresh each mount, with
