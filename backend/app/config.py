@@ -77,6 +77,15 @@ class Settings(BaseSettings):
     vernacular_model: str = "deepseek-v4-flash"
     # /chat：用户贴了经文时，把那段原文所在的检索块放进上下文第 1 位（passage_locator）
     enable_paste_locate: bool = True
+    # /chat 多轮上下文窗口（prompt_builder._build_llm_messages）。
+    # chat_max_input_tokens 是「系统提示 + 检索片段 + 本轮提问 + 历史」的总预算；
+    # 本轮提问/附件钳制与检索片段截断仍按固定的 6000 基础预算算（行为不随窗口变），
+    # 多出来的部分只给历史用。chat_history_max_messages 是最多带入的历史条数。
+    # 回滚到扩窗之前的行为：CHAT_MAX_INPUT_TOKENS=6000 + CHAT_HISTORY_MAX_MESSAGES=10
+    # （docker-compose 已转发这两个变量，改 .env 后重建后端容器即生效，不用发版）。
+    # 16000/20 的依据见 backend/eval/reports/multiturn-context-2026-10.md。
+    chat_max_input_tokens: int = 16000
+    chat_history_max_messages: int = 20
 
     # Embedding (can use a separate provider)
     embedding_api_url: str = ""  # Falls back to llm_api_url if empty

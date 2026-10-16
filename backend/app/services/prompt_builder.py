@@ -8,6 +8,7 @@ DB, HTTP, or streaming concerns.
 
 import logging
 
+from app.config import settings
 from app.models.chat import ChatMessage
 from app.services.master_profiles import get_master
 
@@ -283,7 +284,10 @@ def _estimate_tokens(text: str) -> int:
     return max(1, len(text) * 2 // 3)
 
 
-# Reserve tokens for system prompt + output (max_tokens=2000)
+# Base input budget: system prompt + reader block + the final user turn + RAG
+# context. The user-turn clamp and RAG truncation below are sized off THIS,
+# never off the configured total, so widening the history window cannot let a
+# huge attachment or retrieval dump take a bigger slice.
 _MAX_INPUT_TOKENS = 6000
 
 # Share of the remaining budget the user turn may take, leaving room for RAG
@@ -382,9 +386,15 @@ def _build_llm_messages(
             ctx_tokens = _estimate_tokens(context_text)
         budget -= ctx_tokens
 
-    # Add as many recent history messages as budget allows
+    # History gets whatever the base budget left over, plus everything the
+    # configured total adds on top of the base (settings.chat_max_input_tokens).
+    # With the rollback values (6000 / 10 messages) this is exactly the old
+    # behaviour. Most recent first, contiguous: stop at the first message that
+    # does not fit rather than skipping it, so the model never sees a gap.
+    budget += settings.chat_max_input_tokens - _MAX_INPUT_TOKENS
+    max_messages = max(0, settings.chat_history_max_messages)
     trimmed_history = []
-    for msg in reversed(history[-10:]):
+    for msg in reversed(history[-max_messages:] if max_messages else []):
         msg_tokens = _estimate_tokens(msg.content)
         if budget - msg_tokens < 0:
             break
