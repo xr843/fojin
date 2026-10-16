@@ -4,6 +4,7 @@ import {
   extractPrecedingQuote,
   pickSourceForQuote,
   findQuoteSpan,
+  findQuoteSpans,
 } from "./citationMatch";
 import type { ChatSource } from "../api/client";
 
@@ -82,3 +83,30 @@ describe("findQuoteSpan", () => {
   });
 });
 
+
+describe("findQuoteSpans — characters whose 繁→简 fold changes UTF-16 length", () => {
+  // 生产实例（《楞伽經宗通》第7卷）：引句前出现 3 个兼容区「灰」U+2F835（2 个 UTF-16 单位），
+  // OpenCC 把它折成 U+7070（1 个单位），高亮整体前移 3 格——标成「夫人。勝鬘經……不思」。
+  const COMPAT_HUI = String.fromCodePoint(0x2f835);
+  const QUOTE = "勝鬘經中說二種如來藏：一空如來藏，脫離一切煩惱；二不空如來藏，具過恒沙不思議佛法。";
+  const HAY =
+    `不如還我死${COMPAT_HUI}來。淋過死${COMPAT_HUI}無力，未淋過死\n${COMPAT_HUI}有力。為踰闍王夫人。勝鬘經中說二種\n` +
+    "如來藏：一空如來藏，脫離一切煩惱；二不空如來\n\n藏，具過恒沙不思議佛法。佛為勝鬘夫人說此二";
+
+  it("maps the hit back onto the raw string exactly (hard-wrapped quote)", () => {
+    const [[s, e]] = findQuoteSpans(HAY, QUOTE);
+    expect(HAY.slice(s, e).replace(/\n/g, "")).toBe(QUOTE);
+  });
+
+  it("maps a direct (unwrapped) hit exactly too", () => {
+    const hay = `死${COMPAT_HUI}無力。${QUOTE}佛為`;
+    const [[s, e]] = findQuoteSpans(hay, QUOTE);
+    expect(hay.slice(s, e)).toBe(QUOTE);
+  });
+
+  it("matches a quote that itself contains such a character", () => {
+    const hay = `前文。淋過死${COMPAT_HUI}無力，喻聲聞妄修。後文`;
+    const [[s, e]] = findQuoteSpans(hay, "淋過死灰無力，喻聲聞妄修");
+    expect(hay.slice(s, e)).toBe(`淋過死${COMPAT_HUI}無力，喻聲聞妄修`);
+  });
+});

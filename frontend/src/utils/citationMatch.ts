@@ -9,9 +9,9 @@
  * These helpers locate the chunk whose text genuinely contains the quoted
  * passage, and (for the drawer) the quote's span inside that text so it can
  * be highlighted. CBETA stores traditional Chinese while LLM answers are
- * usually simplified, so every comparison folds 繁→简 first. That fold is
- * 1 char → 1 char, which preserves string indices — findQuoteSpan depends on
- * that to map a match on the folded text back onto the original.
+ * usually simplified, so every comparison folds 繁→简 first. That fold does NOT
+ * preserve UTF-16 indices (compatibility ideographs are surrogate pairs that
+ * fold to one unit), so findQuoteSpan folds per code point and keeps a raw map.
  */
 import * as OpenCC from "opencc-js";
 
@@ -82,24 +82,66 @@ export function pickSourceForQuote(
   return best;
 }
 
+// Per-code-point fold cache. Folding one code point at a time (rather than the
+// whole string) is what lets us keep an exact raw-index map: OpenCC is NOT
+// length-preserving in UTF-16 units — CBETA uses compatibility ideographs such
+// as 灰 U+2F835 (a surrogate pair) that it folds to U+7070 (one unit). Three of
+// those before a quote shifted the drawer highlight three characters early
+// (《楞伽經宗通》卷7, 2026-10-16).
+const _foldCache = new Map<string, string>();
+function foldChar(ch: string): string {
+  let f = _foldCache.get(ch);
+  if (f === undefined) {
+    f = toSimplified(ch);
+    _foldCache.set(ch, f);
+  }
+  return f;
+}
+
+/** Folded text plus, for every folded UTF-16 unit, the raw [start, end) of the
+ *  code point it came from. */
+function foldWithMap(raw: string): { folded: string; starts: number[]; ends: number[] } {
+  let folded = "";
+  const starts: number[] = [];
+  const ends: number[] = [];
+  let r = 0;
+  for (const ch of raw) {
+    const f = foldChar(ch);
+    folded += f;
+    for (let k = 0; k < f.length; k++) {
+      starts.push(r);
+      ends.push(r + ch.length);
+    }
+    r += ch.length;
+  }
+  return { folded, starts, ends };
+}
+
+function foldPlain(s: string): string {
+  let out = "";
+  for (const ch of s) out += foldChar(ch);
+  return out;
+}
+
 /**
  * Locate the quoted passage inside a rendered chunk so the drawer can <mark>
  * it. Returns [start, end) indices into the original `haystack`, or null.
  *
- * Folds both sides 繁→简 (index-preserving) for a direct substring hit; if
- * punctuation differs between the LLM quote and the CBETA text, retries on a
- * punctuation-stripped projection and maps the hit back to original indices.
+ * Folds both sides 繁→简 code point by code point, keeping a map back to raw
+ * indices, for a direct substring hit; if punctuation differs between the LLM
+ * quote and the CBETA text (or CBETA hard-wraps inside it), retries on a
+ * punctuation-stripped projection and maps the hit back the same way.
  */
 export function findQuoteSpan(
   haystack: string,
   quote: string,
 ): [number, number] | null {
-  const hs = toSimplified(haystack);
-  const qs = toSimplified(quote).trim();
+  const { folded: hs, starts, ends } = foldWithMap(haystack);
+  const qs = foldPlain(quote).trim();
   if (qs.length < 4) return null;
 
   const direct = hs.indexOf(qs);
-  if (direct >= 0) return [direct, direct + qs.length];
+  if (direct >= 0) return [starts[direct], ends[direct + qs.length - 1]];
 
   // Punctuation-tolerant pass: strip punct from both, match, map back.
   const qStripped = qs.replace(PUNCT_GLOBAL, "");
@@ -114,7 +156,19 @@ export function findQuoteSpan(
   }
   const sIdx = stripped.indexOf(qStripped);
   if (sIdx < 0) return null;
-  return [map[sIdx], map[sIdx + qStripped.length - 1] + 1];
+  // The stripped match ends on the last Han character; carry the quote's own
+  // closing punctuation (「…佛法。」) along when the source has the same marks
+  // there, hard-wraps aside, so the highlight covers exactly what was quoted.
+  let last = map[sIdx + qStripped.length - 1];
+  const tail = qs.slice(qs.replace(new RegExp(PUNCT_ONE.source + "+$"), "").length);
+  let k = last + 1;
+  for (const tc of tail) {
+    while (k < hs.length && /\s/.test(hs[k])) k++;
+    if (hs[k] !== tc) break;
+    last = k;
+    k++;
+  }
+  return [starts[map[sIdx]], ends[last]];
 }
 
 
