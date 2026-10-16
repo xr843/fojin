@@ -9,6 +9,7 @@ import { message } from "antd";
 import ChatPage from "./ChatPage";
 import { markSessionExpired, useAuthStore } from "../stores/authStore";
 import { uploadChatAttachment } from "../api/chatAttachments";
+import { fetchChatModels } from "../api/chatModels";
 import {
   getApiKeyStatus,
   getChatQuota,
@@ -1929,5 +1930,140 @@ describe("重新生成与等待预期", () => {
     await startSend();
     await waitFor(() => expect(document.querySelector(".chat-thinking")).toBeTruthy());
     expect(screen.queryByText(/上次首字约/)).toBeNull();
+  });
+});
+
+describe("操作栏、换模型重答与快捷键", () => {
+  const TWO_MODELS = [
+    {
+      id: "deepseek:v4-pro", provider: "deepseek", label: "DeepSeek V4 Pro",
+      description: "", vision: false, available: true, requires_byok: false,
+    },
+    {
+      id: "dashscope:qwen3.6-plus", provider: "dashscope", label: "通义千问 Qwen3.6 Plus",
+      description: "", vision: false, available: true, requires_byok: false,
+    },
+  ];
+
+  async function startSend() {
+    let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+    vi.mocked(sendChatMessageStream).mockImplementation(
+      async (_m, _s, _mid, cbs) => { cb = cbs; },
+    );
+    vi.mocked(getChatSessionMessages).mockResolvedValue({
+      total: 0, page: 1, size: 50, messages: [],
+    } as never);
+    const { container } = renderPage();
+    await waitFor(() => expect(screen.getByText("「三毒」指的是哪三种毒？")).toBeInTheDocument());
+    fireEvent.click(container.querySelector(".chat-hero-card")!);
+    await waitFor(() => expect(cb).toBeDefined());
+    const calls = vi.mocked(sendChatMessageStream).mock.calls;
+    return { cb: cb!, firstMsg: calls[calls.length - 1][0], container };
+  }
+
+  afterEach(() => {
+    vi.mocked(fetchChatModels).mockResolvedValue([TWO_MODELS[0]]);
+    localStorage.removeItem("fojin.chat.modelId");
+  });
+
+  it("换模型重答（登录态，流中途 id 被 message_id 换掉）：以所选模型 regenerate 重发、替换旧问答，且不改输入框的默认模型", async () => {
+    vi.mocked(fetchChatModels).mockResolvedValue(TWO_MODELS);
+    localStorage.setItem("fojin.chat.modelId", "deepseek:v4-pro");
+    const { cb, firstMsg } = await startSend();
+    act(() => cb.onToken!("答案甲：贪、嗔、痴。"));
+    // 登录用户：落库后真实 id 换掉 Date.now() 占位符 —— 换模型重答必须跟得上这次换 id。
+    act(() => cb.onMessageId!(4242));
+    act(() => cb.onDone!());
+    const swap = await waitFor(() => {
+      const el = document.querySelector(".anticon-swap");
+      expect(el).toBeTruthy();
+      return el!.closest("button")!;
+    });
+    fireEvent.click(swap);
+    const item = await screen.findByRole("menuitem", { name: /Qwen3\.6 Plus/ });
+    const sendsBefore = vi.mocked(sendChatMessageStream).mock.calls.length;
+    fireEvent.click(item);
+    await waitFor(() =>
+      expect(vi.mocked(sendChatMessageStream).mock.calls.length).toBe(sendsBefore + 1),
+    );
+    const call = vi.mocked(sendChatMessageStream).mock.calls[sendsBefore];
+    expect(call[0]).toBe(firstMsg);
+    expect(call[4]).toMatchObject({ regenerate: true, modelId: "dashscope:qwen3.6-plus" });
+    expect(screen.queryByText("答案甲：贪、嗔、痴。")).toBeNull();
+    expect(screen.getAllByText(firstMsg)).toHaveLength(1);
+    // 只影响这一次：默认模型原样
+    expect(localStorage.getItem("fojin.chat.modelId")).toBe("deepseek:v4-pro");
+
+    // 下一次普通提问回到默认模型（默认模型不带 model_id）
+    const cb2 = vi.mocked(sendChatMessageStream).mock.calls[sendsBefore][3];
+    act(() => cb2.onToken!("答案乙。"));
+    act(() => cb2.onDone!());
+    const ta = document.querySelector(".chat-input-shell textarea") as HTMLTextAreaElement;
+    await waitFor(() => expect(ta.disabled).toBe(false));
+    fireEvent.change(ta, { target: { value: "再问一个" } });
+    fireEvent.keyDown(ta, { key: "Enter", code: "Enter", keyCode: 13, charCode: 13 });
+    await waitFor(() =>
+      expect(vi.mocked(sendChatMessageStream).mock.calls.length).toBe(sendsBefore + 2),
+    );
+    expect(vi.mocked(sendChatMessageStream).mock.calls[sendsBefore + 1][4]).toMatchObject({ modelId: null });
+  });
+
+  it("只有一个可用模型时不显示换模型按钮", async () => {
+    const { cb } = await startSend();
+    act(() => cb.onToken!("答。"));
+    act(() => cb.onDone!());
+    await waitFor(() => expect(document.querySelector(".anticon-redo")).toBeTruthy());
+    expect(document.querySelector(".anticon-swap")).toBeNull();
+  });
+
+  it("最后一条助手回答的操作栏常显，更早的与用户消息只在悬停时显示", async () => {
+    vi.mocked(getChatSessions).mockResolvedValue([
+      { id: 3 as ChatSessionId, title: "会话 3", pinned: false, created_at: new Date().toISOString() },
+    ]);
+    vi.mocked(getChatSessionMessages).mockResolvedValue({
+      total: 4, page: 1, size: 50,
+      messages: [
+        { id: 1, role: "user", content: "问一", sources: null, created_at: "2026-08-27T00:00:00Z" },
+        { id: 2, role: "assistant", content: "答一", sources: null, created_at: "2026-08-27T00:00:01Z" },
+        { id: 3, role: "user", content: "问二", sources: null, created_at: "2026-08-27T00:00:02Z" },
+        { id: 4, role: "assistant", content: "答二", sources: null, created_at: "2026-08-27T00:00:03Z" },
+      ],
+    });
+    renderPage("/chat?s=3");
+    await screen.findByText("答二");
+    expect(document.querySelectorAll(".chat-msg-actions")).toHaveLength(4);
+    const pinned = document.querySelectorAll(".chat-msg-actions.is-pinned");
+    expect(pinned).toHaveLength(1);
+    expect(pinned[0].closest(".chat-msg-row")?.textContent).toContain("答二");
+    // 用户消息也有复制按钮
+    const userRow = screen.getByText("问一").closest(".chat-msg-row")!;
+    expect(userRow.querySelector(".anticon-copy")).toBeTruthy();
+  });
+
+  it("生成中按 Esc 停止（中断这次请求）；输入法组字时的 Esc 不停止", async () => {
+    await startSend();
+    const calls = vi.mocked(sendChatMessageStream).mock.calls;
+    const opts = calls[calls.length - 1][4]!;
+    const signal = opts.signal as AbortSignal;
+    act(() => { document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", isComposing: true, bubbles: true })); });
+    expect(signal.aborted).toBe(false);
+    act(() => { document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+    expect(signal.aborted).toBe(true);
+  });
+
+  it("Ctrl+K 开新对话；输入框为空时 ↑ 召回上一条提问", async () => {
+    const { cb, firstMsg } = await startSend();
+    act(() => cb.onToken!("答。"));
+    act(() => cb.onDone!());
+    const ta = document.querySelector(".chat-input-shell textarea") as HTMLTextAreaElement;
+    await waitFor(() => expect(ta.disabled).toBe(false));
+    ta.focus();
+    act(() => { ta.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true, cancelable: true })); });
+    await waitFor(() => expect(ta.value).toBe(firstMsg));
+    act(() => { document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true, cancelable: true })); });
+    await waitFor(() => expect(screen.queryByText("答。")).toBeNull());
+    // 回到空首屏
+    await waitFor(() => expect(document.querySelector(".chat-shell--empty")).toBeTruthy());
+    expect(screen.queryByText(firstMsg, { selector: ".chat-msg-body" })).toBeNull();
   });
 });
