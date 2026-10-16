@@ -1,0 +1,283 @@
+/* /chat 引文边栏（CitationSidebar / CitationPanel）与回答摘要条（AnswerSummaryBar）。
+   单独成文件以免与 global.css 里的回答排版改动互相冲突。颜色一律走 --fj-* token，
+   深浅色由 :root[data-theme] 切换。 */
+
+/* ---------- 引文列表视图 ---------- */
+.chat-cpanel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px 20px;
+}
+
+.chat-cpanel-scope {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--fj-ink-muted);
+  background: var(--fj-surface-alt);
+  border: 1px solid var(--fj-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-bottom: 12px;
+}
+
+.chat-cpanel-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--fj-accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.chat-cpanel-trust {
+  font-size: 12px;
+  line-height: 1.6;
+  padding-bottom: 10px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--fj-border);
+}
+
+.chat-cpanel-trust-detail {
+  color: var(--fj-ink-muted);
+}
+
+.chat-cpanel-heading {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fj-ink-muted);
+  letter-spacing: 0.4px;
+  margin: 12px 0 8px;
+}
+
+.chat-cpanel-empty {
+  font-size: 13px;
+  color: var(--fj-ink-muted);
+  margin: 4px 0 8px;
+  line-height: 1.7;
+}
+
+.chat-cpanel-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat-cpanel-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  text-align: start;
+  font-family: inherit;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--fj-border);
+  background: var(--fj-card-bg, var(--fj-surface));
+  color: var(--fj-ink);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.chat-cpanel-item:hover,
+.chat-cpanel-item:focus-visible {
+  border-color: var(--fj-accent);
+  background: var(--fj-surface-alt);
+}
+
+.chat-cpanel-item-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fj-highlight, var(--fj-accent));
+}
+
+.chat-cpanel-item-quote {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--fj-ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  line-clamp: 3;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.chat-cpanel-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--fj-success);
+}
+
+.chat-cpanel-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chat-cpanel-source {
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 3px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--fj-border);
+  background: transparent;
+  color: var(--fj-ink-muted);
+  cursor: pointer;
+  text-align: start;
+}
+
+.chat-cpanel-source:hover,
+.chat-cpanel-source:focus-visible {
+  color: var(--fj-accent);
+  border-color: var(--fj-accent);
+}
+
+.chat-cpanel-note {
+  margin: 16px 0 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--fj-ink-muted);
+}
+
+/* 原文对照视图顶上的「返回引文列表」 */
+.chat-cpanel-back {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  width: 100%;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 8px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--fj-border);
+  background: var(--fj-surface-alt);
+  color: var(--fj-accent);
+  cursor: pointer;
+  text-align: start;
+}
+
+.chat-cpanel-back:hover,
+.chat-cpanel-back:focus-visible {
+  background: var(--fj-bg-alt);
+}
+
+/* 收起后的竖条：留在右缘，点开即展开 */
+.chat-cpanel-rail {
+  flex-shrink: 0;
+  width: 36px;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 0;
+  border: 0;
+  border-left: 1px solid var(--fj-border);
+  background: var(--fj-bg-alt);
+  color: var(--fj-ink-muted);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.chat-cpanel-rail:hover,
+.chat-cpanel-rail:focus-visible {
+  color: var(--fj-accent);
+}
+
+.chat-cpanel-rail-label {
+  writing-mode: vertical-rl;
+  font-size: 13px;
+  letter-spacing: 2px;
+}
+
+.chat-cpanel-rail-count {
+  min-width: 20px;
+  padding: 0 5px;
+  border-radius: 10px;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+  background: var(--fj-accent);
+  color: var(--fj-on-accent, #fff);
+}
+
+/* 常驻面板只在宽屏出现（CITATION_SIDEBAR_QUERY）；保险起见窄屏把竖条也藏掉。 */
+@media (max-width: 1279px) {
+  .chat-cpanel-rail {
+    display: none;
+  }
+}
+
+/* ---------- 回答摘要条 ---------- */
+.chat-answer-summary {
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--fj-ink-muted);
+  line-height: 1.6;
+  /* 正文列是 pre-wrap；摘要条是拼出来的短句，不该继承 JSX 之间的空白。 */
+  white-space: normal;
+}
+
+/* 一行三段：箭头 | 摘要（窄屏时自己折行）| 「展开思考过程」（永不折行、永远贴在第一行）。
+   此前整个按钮 flex-wrap，1280 与 390 下提示被单独挤到第二行。 */
+.chat-answer-summary-toggle {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: nowrap;
+  gap: 6px;
+  max-width: 100%;
+  padding: 2px 10px 2px 8px;
+  border: 1px solid var(--fj-border);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: start;
+}
+
+.chat-answer-summary-toggle .anticon {
+  font-size: 10px;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+.chat-answer-summary-toggle:hover,
+.chat-answer-summary-toggle:focus-visible {
+  border-color: var(--fj-accent);
+  color: var(--fj-accent);
+}
+
+.chat-answer-summary-line {
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.chat-answer-summary-hint {
+  flex-shrink: 0;
+  white-space: nowrap;
+  opacity: 0.75;
+}
+
+/* 展开后的思考全文：不再是 3 行活窗，而是可滚动的静态块 */
+.chat-reasoning-excerpt--settled {
+  white-space: normal;
+}
+
+.chat-reasoning-excerpt--settled .chat-reasoning-excerpt-text {
+  max-height: 16em;
+  overflow-y: auto;
+}

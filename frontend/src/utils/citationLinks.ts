@@ -140,3 +140,30 @@ export function injectCitationLinks(
 
   return withExplicit;
 }
+
+export interface ParsedCitation {
+  textId: number;
+  juanNum: number;
+  chunkIndex: number;
+  titleZh: string;
+  quote?: string;
+}
+
+/** Inverse of the URLs built by injectCitationLinks. */
+export function parseCitationHref(href: string): ParsedCitation | null {
+  if (!href.startsWith(`${CITATION_URL_SCHEME}://`)) return null;
+  const rest = href.slice(`${CITATION_URL_SCHEME}://`.length);
+  const parts = rest.split("/");
+  if (parts.length < 3) return null;
+  const textId = parseInt(parts[0], 10);
+  const juanNum = parseInt(parts[1], 10);
+  const chunkIndex = parseInt(parts[2], 10);
+  const titleZh = parts[3] ? decodeURIComponent(parts[3]) : "";
+  // Segment 5 (optional) carries the quoted passage so the drawer can
+  // highlight it. Absent on legacy links built before quote-aware citations.
+  const quote = parts[4] ? decodeURIComponent(parts[4]) : undefined;
+  if (!Number.isFinite(textId) || !Number.isFinite(juanNum) || !Number.isFinite(chunkIndex)) {
+    return null;
+  }
+  return { textId, juanNum, chunkIndex, titleZh, quote };
+}

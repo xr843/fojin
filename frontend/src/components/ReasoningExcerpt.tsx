@@ -17,7 +17,11 @@ const TICK_MS = 33;
 // 约几十字（不到一秒的滞后），看起来是「实时在写」。
 const CATCHUP_DIVISOR = 40;
 
-export default function ReasoningExcerpt({ text }: { text: string }) {
+/**
+ * `settled`：回答完成后，摘要条展开时的静态全文视图 —— 不打字机、不带光标、
+ * 可滚动、对读屏可见（用户主动展开的内容不该藏起来）。标签「非最终回答」照留。
+ */
+export default function ReasoningExcerpt({ text, settled = false }: { text: string; settled?: boolean }) {
   const { t } = useTranslation();
   // 减动效偏好：整段直出，不做打字机（放 useState 初始化器：渲染期不读环境）。
   const [reduceMotion] = useState(
@@ -35,7 +39,7 @@ export default function ReasoningExcerpt({ text }: { text: string }) {
   }, [text]);
 
   useEffect(() => {
-    if (reduceMotion) return;
+    if (reduceMotion || settled) return;
     const id = setInterval(() => {
       setShown((s) => {
         const len = textRef.current.length;
@@ -44,7 +48,16 @@ export default function ReasoningExcerpt({ text }: { text: string }) {
       });
     }, TICK_MS);
     return () => clearInterval(id);
-  }, [reduceMotion]);
+  }, [reduceMotion, settled]);
+
+  if (settled) {
+    return (
+      <div className="chat-reasoning-excerpt chat-reasoning-excerpt--settled">
+        <span className="chat-reasoning-excerpt-label">{t("chat.reasoning_excerpt_label")}</span>
+        <div className="chat-reasoning-excerpt-text">{text}</div>
+      </div>
+    );
+  }
 
   const visible = reduceMotion ? text : text.slice(0, shown);
   return (
