@@ -1153,7 +1153,7 @@
   "chat.master_buddhaghosa": "🌿 Buddhaghosa (Theravāda commentator · Visuddhimagga)",
   "chat.master_mahasi": "🌿 Mahāsi Sayādaw (Burmese vipassanā · noting)",
   "chat.master_ajahn_chah": "🌿 Ajahn Chah (Thai Forest tradition)",
-  "chat.newline_hint": "newline",
+  "chat.tab_hint_tooltip": "Press Tab to fill in a suggested question; press again for the next one",
   "chat.attachment_tooltip": "Upload attachment (PDF/TXT/MD/DOCX/CSV/HTML, ≤10MB)",
   "chat.model_requires_key": " (requires API key)",
   "dict.collapse": "Collapse",

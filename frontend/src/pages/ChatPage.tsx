@@ -11,7 +11,7 @@ import { CITATION_URL_SCHEME, injectCitationLinks, parseCitationHref } from "../
 import { localizeHan } from "../utils/hanScript";
 import { isNearBottom } from "../utils/scrollBottom";
 import {
-  SendOutlined,
+  ArrowUpOutlined,
   RobotOutlined,
   UserOutlined,
   DeleteOutlined,
@@ -20,7 +20,6 @@ import {
   MenuOutlined,
   MenuFoldOutlined,
   DownloadOutlined,
-  StopOutlined,
   ReloadOutlined,
   DownOutlined,
   MoreOutlined,
@@ -2152,12 +2151,13 @@ export default function ChatPage() {
                   e.preventDefault();
                   handleSend();
                 }}
+                // 占位符只放示例问题本身。键盘提示另放：Tab 是工具行右端的淡色键帽
+                // （见下），⇧⏎ 换行是通用约定、? 快捷键卡片里也有，不再写进来。
                 placeholder={tabSuggestions.length > 0
-                  ? coarsePointer
-                    ? tabSuggestions[(tabIndex + 1) % tabSuggestions.length]
-                    : `${tabSuggestions[(tabIndex + 1) % tabSuggestions.length]}    ⇥ Tab    ⇧⏎ ${t("chat.newline_hint")}`
+                  ? tabSuggestions[(tabIndex + 1) % tabSuggestions.length]
                   : t("chat.input_placeholder")}
-                disabled={sending}
+                // 生成中照样可以打字（首字常要等 20–60 秒，用户可以先写下一问）；
+                // 只是发不出去 —— 回车在 handleSendMessage 里被 sending 挡下，草稿原样留着。
                 autoSize={{ minRows: 2, maxRows: 8 }}
                 variant="borderless"
                 style={{ fontFamily: '"Noto Serif SC", serif', fontSize: 16, resize: "none" }}
@@ -2211,32 +2211,37 @@ export default function ChatPage() {
                 </Tooltip>
                 <ChatModelSelector value={modelId} onChange={handleModelChange} onConfigureKey={goConfigureKey} />
                 <span className="chat-input-spacer" />
+                {/* Tab 采纳示例问题是 fojin 自己的功能，别处学不到：输入框空着（或正停在
+                    某个示例上）时给一个淡色键帽。触屏没有 Tab 键，不显示。 */}
+                {!coarsePointer && tabSuggestions.length > 0 && (!input || tabSuggestions.includes(input)) && (
+                  <Tooltip title={t("chat.tab_hint_tooltip")}>
+                    <kbd className="chat-tab-hint">Tab</kbd>
+                  </Tooltip>
+                )}
+                {/* 发送与停止是同一位置的圆形图标钮（对标 ChatGPT / Claude）：
+                    空输入时发送钮置灰；生成中原地变成 ■。不再用红色描边 —— 停止不是出错。
+                    钮上没有文字，名字由 aria-label 给出。 */}
                 {sending ? (
                   <Tooltip title={t("chat.stop_tooltip")}>
                     <Button
-                      danger
-                      className="chat-send-btn"
+                      shape="circle"
+                      className="chat-send-btn chat-send-btn--stop"
                       aria-label={t("chat.stop")}
                       aria-keyshortcuts="Escape"
-                      icon={<StopOutlined />}
+                      icon={<span className="chat-stop-square" aria-hidden />}
                       onClick={handleCancel}
-                    >
-                      {t("chat.stop")}
-                    </Button>
+                    />
                   </Tooltip>
                 ) : (
-                  // 窄屏（≤480px）CSS 把它收成仅图标的圆钮、回到工具行右端，
-                  // 文字被隐藏，所以名字必须由 aria-label 给出。
                   <Button
                     type="primary"
+                    shape="circle"
                     className="chat-send-btn"
                     aria-label={t("chat.send", "发送")}
-                    icon={<SendOutlined />}
+                    icon={<ArrowUpOutlined />}
                     onClick={handleSend}
-                    style={{ background: "var(--fj-accent)", borderColor: "var(--fj-accent)" }}
-                  >
-                    {t("chat.send", "发送")}
-                  </Button>
+                    disabled={!input.trim()}
+                  />
                 )}
               </div>
             </div>

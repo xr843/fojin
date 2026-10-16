@@ -268,10 +268,9 @@ describe("ChatPage 首屏结构", () => {
     expect(list!.compareDocumentPosition(foot!) & FOLLOWING).toBeTruthy();
   });
 
-  // 输入框 placeholder 末尾的「⇥ Tab  ⇧⏎ 换行」是键盘提示，手机上没有这两个键，
-  // 390px 下它还会单独折出第二行（2026-10-10 生产实测）。主输入是手指
-  // （pointer: coarse）时只留建议问题本身；桌面保持原样。
-  describe("placeholder 键盘提示", () => {
+  // 占位符只放示例问题本身（不再拼「⇥ Tab  ⇧⏎ 换行」）。Tab 提示是工具行右端的
+  // 淡色键帽：桌面有、触屏没有（主输入是手指时没有 Tab 键）。
+  describe("Tab 键帽提示", () => {
     const realMatchMedia = window.matchMedia;
     afterEach(() => {
       window.matchMedia = realMatchMedia;
@@ -285,22 +284,35 @@ describe("ChatPage 首屏结构", () => {
       })) as unknown as typeof window.matchMedia;
     }
 
-    it("触屏：只留建议问题，不带 Tab / ⇧⏎ 提示", async () => {
+    it("触屏：占位符只有示例问题，没有 Tab 键帽", async () => {
       emulatePointer(true);
       const { container } = await renderEmpty();
       const ta = container.querySelector("textarea")!;
       await waitFor(() => expect(ta.placeholder).toContain("什么是四圣谛？"));
       expect(ta.placeholder).toBe("什么是四圣谛？");
+      expect(container.querySelector(".chat-tab-hint")).toBeNull();
     });
 
-    it("桌面：仍带 Tab / ⇧⏎ 提示", async () => {
+    it("桌面：占位符同样干净，Tab 键帽在工具行；输入别的内容后键帽消失", async () => {
       emulatePointer(false);
       const { container } = await renderEmpty();
       const ta = container.querySelector("textarea")!;
       await waitFor(() => expect(ta.placeholder).toContain("什么是四圣谛？"));
-      expect(ta.placeholder).toContain("⇥ Tab");
-      expect(ta.placeholder).toContain("⇧⏎");
+      expect(ta.placeholder).toBe("什么是四圣谛？");
+      expect(container.querySelector(".chat-input-toolbar .chat-tab-hint")?.textContent).toBe("Tab");
+      fireEvent.change(ta, { target: { value: "自己的问题" } });
+      expect(container.querySelector(".chat-tab-hint")).toBeNull();
     });
+  });
+
+  it("输入为空时发送钮置灰，有字才可点", async () => {
+    const { container } = await renderEmpty();
+    const btn = container.querySelector(".chat-send-btn") as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+    fireEvent.change(container.querySelector("textarea")!, { target: { value: "  " } });
+    expect((container.querySelector(".chat-send-btn") as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(container.querySelector("textarea")!, { target: { value: "问" } });
+    expect((container.querySelector(".chat-send-btn") as HTMLButtonElement).disabled).toBe(false);
   });
 
   // P1 的承重约束。THINKING_SENTINEL 是按身份比较的哨兵：onDone 里「流结束但
@@ -2177,7 +2189,7 @@ describe("操作栏、换模型重答与快捷键", () => {
     act(() => cb2.onToken!("答案乙。"));
     act(() => cb2.onDone!());
     const ta = document.querySelector(".chat-input-shell textarea") as HTMLTextAreaElement;
-    await waitFor(() => expect(ta.disabled).toBe(false));
+    await waitFor(() => expect(document.querySelector(".chat-send-btn--stop")).toBeNull());
     fireEvent.change(ta, { target: { value: "再问一个" } });
     fireEvent.keyDown(ta, { key: "Enter", code: "Enter", keyCode: 13, charCode: 13 });
     await waitFor(() =>
@@ -2218,6 +2230,25 @@ describe("操作栏、换模型重答与快捷键", () => {
     expect(userRow.querySelector(".anticon-copy")).toBeTruthy();
   });
 
+  it("生成中输入框仍可打字：回车不发、草稿保留；流结束后回车发出草稿", async () => {
+    const { cb } = await startSend();
+    const ta = document.querySelector(".chat-input-shell textarea") as HTMLTextAreaElement;
+    expect(document.querySelector(".chat-send-btn--stop")).toBeTruthy();
+    expect(ta.disabled).toBe(false);
+    const sendsBefore = vi.mocked(sendChatMessageStream).mock.calls.length;
+    fireEvent.change(ta, { target: { value: "下一问的草稿" } });
+    fireEvent.keyDown(ta, { key: "Enter", code: "Enter", keyCode: 13, charCode: 13 });
+    expect(vi.mocked(sendChatMessageStream).mock.calls.length).toBe(sendsBefore);
+    expect(ta.value).toBe("下一问的草稿");
+    act(() => cb.onToken!("答。"));
+    act(() => cb.onDone!());
+    await waitFor(() => expect(document.querySelector(".chat-send-btn--stop")).toBeNull());
+    expect(ta.value).toBe("下一问的草稿");
+    fireEvent.keyDown(ta, { key: "Enter", code: "Enter", keyCode: 13, charCode: 13 });
+    await waitFor(() => expect(vi.mocked(sendChatMessageStream).mock.calls.length).toBe(sendsBefore + 1));
+    expect(vi.mocked(sendChatMessageStream).mock.calls[sendsBefore][0]).toBe("下一问的草稿");
+  });
+
   it("生成中按 Esc 停止（中断这次请求）；输入法组字时的 Esc 不停止", async () => {
     await startSend();
     const calls = vi.mocked(sendChatMessageStream).mock.calls;
@@ -2234,7 +2265,7 @@ describe("操作栏、换模型重答与快捷键", () => {
     act(() => cb.onToken!("答。"));
     act(() => cb.onDone!());
     const ta = document.querySelector(".chat-input-shell textarea") as HTMLTextAreaElement;
-    await waitFor(() => expect(ta.disabled).toBe(false));
+    await waitFor(() => expect(document.querySelector(".chat-send-btn--stop")).toBeNull());
     ta.focus();
     act(() => { ta.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true, cancelable: true })); });
     await waitFor(() => expect(ta.value).toBe(firstMsg));

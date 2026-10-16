@@ -869,6 +869,45 @@ em {
 .chat-model-select {
   min-width: 180px;
 }
+/* 发送 / 停止：同一位置的 32px 圆形图标钮（窄屏放大到 36px，见下）。
+   停止钮用墨色实心底 + 白色方块，不用红色 —— 红色读起来像出错。 */
+.chat-input-toolbar > .chat-send-btn.ant-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  padding: 0;
+}
+.chat-input-toolbar > .chat-send-btn.ant-btn-primary:not(:disabled) {
+  background: var(--fj-accent);
+  border-color: var(--fj-accent);
+}
+.chat-input-toolbar > .chat-send-btn--stop.ant-btn,
+.chat-input-toolbar > .chat-send-btn--stop.ant-btn:hover {
+  background: var(--fj-ink);
+  border-color: var(--fj-ink);
+}
+.chat-stop-square {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--fj-surface);
+}
+.chat-tab-hint {
+  flex-shrink: 0;
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1;
+  padding: 3px 6px;
+  border: 1px solid var(--fj-border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  color: var(--fj-ink-muted);
+  background: transparent;
+  cursor: default;
+  user-select: none;
+}
 /* 窄屏：发送钮留在工具行右端，输入卡片两行高（文本框 + 工具行）。
    原先这里让工具栏 wrap、spacer 撑满 100% 把发送钮单独挤到第三行
    （2026-10-10 生产 390px 实测：卡片 155px 高，工具栏 75px 里发送钮独占一行）。
@@ -902,14 +941,9 @@ em {
     min-width: 0;
   }
   .chat-input-toolbar > .chat-send-btn.ant-btn {
-    flex-shrink: 0;
     width: 36px;
     height: 36px;
-    padding: 0;
-    border-radius: 50%;
-  }
-  .chat-input-toolbar > .chat-send-btn.ant-btn > span:not(.ant-btn-icon) {
-    display: none;
+    min-width: 36px;
   }
 }
 
