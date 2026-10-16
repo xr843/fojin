@@ -250,6 +250,17 @@ async def test_root_text_missed_by_both_shortlists_is_found_by_asking_which_root
 
 
 @pytest.mark.anyio
+async def test_root_carrier_query_is_stripped_to_bare_characters():
+    # 生产实测：卍續藏常见的全角「．」在 content.nopunct 里仍会断开二元组链，短语查询静默落空
+    es = MagicMock()
+    es.search = AsyncMock(return_value={"hits": {"hits": []}, "aggregations": {"texts": {"value": 0}}})
+    await pl._root_carriers(es, "若無想．若非有想非無想，我皆令\n入無餘涅槃而滅")
+    body = es.search.call_args.kwargs["body"]
+    phrase = next(f["match_phrase"]["content.nopunct"]["query"] for f in body["query"]["bool"]["filter"] if "match_phrase" in f)
+    assert phrase == "若無想若非有想非無想我皆令入無餘涅槃而滅"
+
+
+@pytest.mark.anyio
 async def test_root_carrier_lookup_failure_keeps_the_shortlist_pick():
     es = _fake_es_full(shortlist=COMMENTARY_JUANS, root_shortlist=[], all_texts=16, root_texts=3)
     original = es.search.side_effect

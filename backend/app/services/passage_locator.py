@@ -321,14 +321,17 @@ async def _root_carriers(es: AsyncElasticsearch, source_span: str) -> tuple[int,
     shortlist doubled. What we actually want is "the lowest-numbered root text
     that has this passage", so ask exactly that. ``content.nopunct`` drops
     punctuation and CBETA hard wraps between Han characters, so one phrase query
-    over the whole window works whatever the source's line breaks."""
+    over the whole window works whatever the source's line breaks — but not every
+    mark: a full-width 「．」 (common in 卍續藏) still breaks the bigram chain and the
+    phrase silently matches nothing. So the query is stripped to bare characters."""
+    bare = _SPLIT_RE.sub("", source_span)
     body = {
         "query": {
             "bool": {
                 "filter": [
                     {"term": {"lang": "lzh"}},
                     ROOT_CANON_FILTER,
-                    {"match_phrase": {"content.nopunct": {"query": source_span}}},
+                    {"match_phrase": {"content.nopunct": {"query": bare}}},
                 ]
             }
         },
