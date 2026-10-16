@@ -399,6 +399,29 @@ describe("sendChatMessageStream", () => {
     expect(onRetrieved).toHaveBeenNthCalledWith(2, { count: 1, titles: ["法華經"], refs: undefined });
   });
 
+  it("retrieved 帧的 located 要透传给 onRetrieved —— 定位卡片在作答前出现的原料", async () => {
+    const { sendChatMessageStream } = await import("./client");
+    const onRetrieved = vi.fn();
+    const callbacks = {
+      onToken: vi.fn(), onSources: vi.fn(), onSessionId: vi.fn(),
+      onError: vi.fn(), onDone: vi.fn(), onRetrieved,
+    };
+
+    const promise = sendChatMessageStream("hello", undefined, null, callbacks);
+    const xhr = MockStreamXHR.instances[0];
+    xhr.responseText =
+      'data: {"type": "retrieved", "count": 2, "titles": ["金剛經"], "located": {"text_id": 7, "juan_num": 1, "chunk_index": 3, "title_zh": "金剛經", "window": "凡所有相，皆是虛妄", "texts": 3}}\n\n' +
+      'data: {"type": "retrieved", "count": 1, "titles": ["法華經"], "located": null}\n\n' +
+      'data: {"type": "done"}\n\n';
+    xhr.onprogress?.();
+    await promise;
+
+    expect(onRetrieved.mock.calls[0][0].located).toEqual({
+      text_id: 7, juan_num: 1, chunk_index: 3, title_zh: "金剛經", window: "凡所有相，皆是虛妄", texts: 3,
+    });
+    expect(onRetrieved.mock.calls[1][0].located).toBeUndefined();
+  });
+
   it("truncated 帧 → onTruncated(reason)；没带 reason 的旧帧落成 unknown", async () => {
     // 后端在答案被 max_tokens 截断时发 {"type":"truncated","reason":"length"}。
     // 消费方据此渲染「继续写完」——帧丢了就等于截断不可见，用户只看到一句没写完的话。

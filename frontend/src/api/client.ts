@@ -1653,6 +1653,13 @@ export interface ChatSource {
   // Portable cross-canon citation id (fojin:cbeta/T0001.1 …), null when the
   // source has no round-trippable cbeta_id.
   urn?: string | null;
+  /** 贴原文定位：用户贴的原文逐字见于这一块（后端 passage_locator）。
+   *  逐字出现 ≠ 原始出处，展示时措辞须如实。旧消息/旧后端没有这些字段。 */
+  located?: boolean;
+  /** 命中的那一段，取语料自己的字（繁体、原标点、已去硬换行）。 */
+  located_window?: string | null;
+  /** 全藏含这段文字的典籍数（含本书）；>1 时写「另见于」。0/缺省 = 未知。 */
+  located_texts?: number | null;
 }
 
 export interface ChunkContextItem {
@@ -1953,6 +1960,17 @@ export interface ChatRetrieval {
   titles: string[];
   /** 旧后端副本（滚动部署期间）不带；缺席时前端退回纯文本经名。 */
   refs?: ChatRetrievalRef[];
+  /** 贴原文定位命中时才有：让定位卡片在模型作答前就出现。 */
+  located?: ChatRetrievalLocated | null;
+}
+
+export interface ChatRetrievalLocated {
+  text_id: number;
+  juan_num: number;
+  chunk_index?: number | null;
+  title_zh?: string | null;
+  window?: string | null;
+  texts?: number | null;
 }
 
 /** 推理模型思考阶段的进度帧（后端按约 4 帧/秒节流聚合，见
@@ -2325,6 +2343,10 @@ export function sendChatMessageStream(
                 count: event.count,
                 titles: Array.isArray(event.titles) ? event.titles : [],
                 refs: Array.isArray(event.refs) ? event.refs : undefined,
+                located:
+                  event.located && typeof event.located === "object" && typeof event.located.text_id === "number"
+                    ? event.located
+                    : undefined,
               });
               break;
             case "truncated":

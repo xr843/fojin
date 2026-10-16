@@ -181,6 +181,9 @@ class Located:
     window_text: str
     window_han: int
     texts_with_window: int
+    # The window as it reads in the source chunk (source punctuation, hard wraps
+    # kept); None when it could not be mapped back. Shown to the reader.
+    source_span: str | None = None
 
 
 def pick_located(
@@ -352,7 +355,13 @@ async def locate_pasted_passage(es: AsyncElasticsearch, db: AsyncSession, messag
             n_texts, AMBIGUOUS_TEXTS, window.text(clauses)[:30],
         )
         return None
-    return Located(chunk=chunk, window_text=window.text(clauses), window_han=window.han, texts_with_window=n_texts)
+    return Located(
+        chunk=chunk,
+        window_text=window.text(clauses),
+        window_han=window.han,
+        texts_with_window=n_texts,
+        source_span=span,
+    )
 
 
 def inject_located(located_chunk: dict, results: list[dict], max_chunks: int) -> list[dict]:

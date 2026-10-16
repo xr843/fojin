@@ -1039,6 +1039,21 @@ async def send_message_stream(
             )
             if len(_refs) >= 8:
                 break
+        # located：贴原文定位命中时，前端在模型作答前就显示「定位卡片」。同样只带
+        # 定位字段和命中的那一小段（window），不带 chunk_text。完整字段随 sources 入库。
+        _loc = next((_s for _s in sources if _s.located), None)
+        _located_ev = (
+            {
+                "text_id": _loc.text_id,
+                "juan_num": _loc.juan_num,
+                "chunk_index": _loc.chunk_index,
+                "title_zh": _loc.title_zh,
+                "window": _loc.located_window,
+                "texts": _loc.located_texts,
+            }
+            if _loc is not None
+            else None
+        )
         yield (
             "data: "
             + json.dumps(
@@ -1049,6 +1064,7 @@ async def send_message_stream(
                     # count 仍是全量数字，所以「已检索 8 部经典：《A》《B》《C》」诚实。
                     "titles": _seen_titles[:3],
                     "refs": _refs,
+                    "located": _located_ev,
                 },
                 ensure_ascii=False,
             )

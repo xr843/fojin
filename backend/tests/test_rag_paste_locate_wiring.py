@@ -93,3 +93,71 @@ async def test_flag_off_disables_the_locator(monkeypatch, stub_io):  # noqa: F81
     monkeypatch.setattr(R, "ENABLE_PASTE_LOCATE", False)
     await R.retrieve_rag_context(object(), PASTE)
     assert called == []
+
+
+# ---- 定位结果带到前端（定位卡片）：located 字段随 sources 流式下发并入库 ----
+
+
+@pytest.mark.asyncio
+async def test_located_source_carries_card_fields(monkeypatch, stub_io):  # noqa: F811
+    _pool(monkeypatch)
+
+    async def _locate(es, db, message):
+        return PL.Located(
+            chunk=_located().chunk,
+            window_text="凡所有相，皆是虚妄",
+            window_han=18,
+            texts_with_window=2,
+            source_span="凡所有相，\n皆是虛妄",
+        )
+
+    monkeypatch.setattr(R, "locate_pasted_passage", _locate)
+    monkeypatch.setattr(R, "get_es", lambda: object())
+    sources, _ = await R.retrieve_rag_context(object(), PASTE)
+    top = sources[0]
+    assert top.located is True
+    # 展示的是语料自己的字（繁体、原标点），CBETA 硬换行去掉 —— 抽屉高亮按它找
+    assert top.located_window == "凡所有相，皆是虛妄"
+    assert top.located_texts == 2
+    dumped = top.model_dump()
+    assert dumped["located"] is True and dumped["located_texts"] == 2
+    # 其他来源不带定位字段
+    assert all(s.located is False and s.located_window is None and s.located_texts is None for s in sources[1:])
+    # 内部的 located_quote 只给模型上下文用，不进 schema
+    assert "located_quote" not in dumped
+
+
+@pytest.mark.asyncio
+async def test_located_window_falls_back_to_user_text_without_span(monkeypatch, stub_io):  # noqa: F811
+    _pool(monkeypatch)
+
+    async def _locate(es, db, message):
+        return _located()  # source_span 缺省
+
+    monkeypatch.setattr(R, "locate_pasted_passage", _locate)
+    monkeypatch.setattr(R, "get_es", lambda: object())
+    sources, _ = await R.retrieve_rag_context(object(), PASTE)
+    assert sources[0].located is True
+    assert sources[0].located_window == "凡所有相，皆是虚妄"
+
+
+@pytest.mark.asyncio
+async def test_no_located_fields_when_locator_misses(monkeypatch, stub_io):  # noqa: F811
+    _pool(monkeypatch)
+
+    async def _miss(es, db, message):
+        return None
+
+    monkeypatch.setattr(R, "locate_pasted_passage", _miss)
+    monkeypatch.setattr(R, "get_es", lambda: object())
+    sources, _ = await R.retrieve_rag_context(object(), PASTE)
+    assert sources and not any(s.located for s in sources)
+    assert all(s.located_window is None and s.located_texts is None for s in sources)
+
+
+def test_stored_sources_without_located_still_load():
+    """入库的旧 sources（无 located 字段）读回来仍合法，默认不定位。"""
+    from app.schemas.chat import ChatSource
+
+    s = ChatSource(text_id=1, juan_num=1, chunk_text="x", score=0.5)
+    assert s.located is False and s.located_window is None and s.located_texts is None

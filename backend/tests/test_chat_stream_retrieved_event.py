@@ -186,3 +186,31 @@ async def test_retrieved_refs_capped_at_eight():
     retrieved = next(e for e in events if e.get("type") == "retrieved")
     assert len(retrieved["refs"]) == 8
     assert retrieved["count"] == 12
+
+
+@pytest.mark.anyio
+async def test_retrieved_carries_located_when_passage_was_located():
+    """贴原文定位命中时，``retrieved`` 带 ``located``，卡片在模型作答前就出现。
+    仍不带 chunk_text（只带定位窗口那一小段）。"""
+    srcs = _sources()
+    srcs.insert(0, ChatSource(
+        text_id=9, juan_num=3, chunk_index=5, chunk_text="凡所有相皆是虛妄", score=1.0,
+        title_zh="金剛般若波羅蜜經", located=True, located_window="凡所有相，皆是虛妄", located_texts=4,
+    ))
+    events = await _run_stream(srcs)
+    retrieved = next(e for e in events if e.get("type") == "retrieved")
+    assert retrieved["located"] == {
+        "text_id": 9, "juan_num": 3, "chunk_index": 5, "title_zh": "金剛般若波羅蜜經",
+        "window": "凡所有相，皆是虛妄", "texts": 4,
+    }
+    assert "chunk_text" not in json.dumps(retrieved, ensure_ascii=False)
+    # 完整 sources 里 located 字段原样下发（入库同此 model_dump）
+    sources_ev = next(e for e in events if e.get("type") == "sources")
+    assert sources_ev["sources"][0]["located"] is True
+
+
+@pytest.mark.anyio
+async def test_retrieved_has_no_located_without_a_located_source():
+    events = await _run_stream(_sources())
+    retrieved = next(e for e in events if e.get("type") == "retrieved")
+    assert retrieved.get("located") is None

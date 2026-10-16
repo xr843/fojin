@@ -46,6 +46,7 @@ import {
 } from "../components/RailIcons";
 import DraggableModal from "../components/DraggableModal";
 import ReasoningExcerpt from "../components/ReasoningExcerpt";
+import PassageLocateCard from "../components/PassageLocateCard";
 import { getMasters } from "../api/client";
 import type { CitationTarget } from "../components/CitationDrawer";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -351,6 +352,9 @@ function SessionRow({ s, active, onSelect, onRename, onTogglePin, onDelete }: Se
   );
 }
 
+/** source_click 埋点的相位：retrieved = 等待期 chip；locate = 贴原文定位卡片。缺省 = 流末参考经文。 */
+type SourceClickPhase = "retrieved" | "locate";
+
 interface MessageBubbleProps {
   m: ChatMessageItem;
   isStreaming: boolean;
@@ -370,7 +374,7 @@ interface MessageBubbleProps {
   /** modelId 有值 = 只这一次换用该模型重答（不改输入框里的默认模型）。 */
   onRegenerate: (m: ChatMessageItem, modelId?: string) => void;
   onFeedback: (m: ChatMessageItem, dir: "up" | "down") => void;
-  onSourceClick: (source: ChatSource, phase?: "retrieved") => void;
+  onSourceClick: (source: ChatSource, phase?: SourceClickPhase, quote?: string) => void;
 }
 
 /** One chat message row, memoised on (m, isStreaming, sending, user). A streaming
@@ -455,6 +459,14 @@ function MessageBubbleInner({
         {m.role === "user" ? <UserOutlined /> : <RobotOutlined />}
       </div>
       <div className="chat-msg-col">
+        {/* 贴原文定位卡片：没有定位结果时渲染 null。流式中靠 retrieval.located 先出现。 */}
+        {m.role === "assistant" && (
+          <PassageLocateCard
+            sources={m.sources}
+            retrieval={m.retrieval}
+            onOpen={(s, quote) => onSourceClick(s, "locate", quote)}
+          />
+        )}
         <div className="chat-msg-body">
           {m.role === "assistant" ? (
             m.content === THINKING_SENTINEL ? (
@@ -1580,7 +1592,7 @@ export default function ChatPage() {
     handleSendMessage(t("chat.continue_prompt", { tail }), { origin: "continue" });
   }, [handleSendMessage, t]);
 
-  const handleSourceClick = useCallback((s: ChatSource, phase?: "retrieved") => {
+  const handleSourceClick = useCallback((s: ChatSource, phase?: SourceClickPhase, quote?: string) => {
     // Behavioural signal, mirroring inline citation clicks: opening a source
     // from the persistent list is engagement with / trust in the retrieved text.
     // phase=retrieved：答案还没来、用户先点开了原文 —— 单独可分，别混进流末的点击。
@@ -1599,6 +1611,8 @@ export default function ChatPage() {
       juanNum: s.juan_num,
       chunkIndex,
       titleZh: s.title_zh ?? "",
+      // 定位卡片带上命中窗口，抽屉高亮那一句
+      ...(quote ? { quote } : {}),
     });
   }, [navigate]);
 

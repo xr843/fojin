@@ -107,6 +107,14 @@ class ChatSource(BaseModel):
     # Portable cross-canon citation id (fojin:cbeta/T0001.1 …) built from the
     # source's cbeta_id; None when unavailable. Backward-compatible optional.
     urn: str | None = None
+    # 贴原文定位（passage_locator）：用户贴的原文逐字见于这一块。前端据此在答案上方
+    # 显示「定位卡片」。逐字出现 ≠ 原始出处（佛典大量引用外典），措辞须如实。
+    # located_window：命中的那一段，取语料自己的字（去掉硬换行）；
+    # located_texts：全藏含这段文字的典籍数（>1 时卡片写「另见于 N 部」）。
+    # 全部可选，入库的旧 sources 读回来默认不定位。
+    located: bool = False
+    located_window: str | None = None
+    located_texts: int | None = None
 
 
 ChatTrustState = Literal[

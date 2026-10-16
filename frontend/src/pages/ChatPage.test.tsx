@@ -465,6 +465,45 @@ describe("ChatPage 首屏结构", () => {
     expect(screen.getAllByRole("button", { name: /金刚般若波罗蜜经/ })).toHaveLength(2);
   });
 
+  // 贴原文定位卡片：retrieved.located 一到（模型作答前）就出现在气泡上方，点开即抽屉；
+  // 之后 sources 与 message_id 同一 tick 到达、id 被换掉，卡片仍在（改由 sources 撑起）。
+  it("定位卡片: 作答前由 retrieved.located 撑起，换 id 之后仍在，点开引文抽屉", async () => {
+    let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+    vi.mocked(sendChatMessageStream).mockImplementation(
+      async (_m, _s, _mid, callbacks) => { cb = callbacks; },
+    );
+    const { container } = await renderEmpty();
+    fireEvent.click(container.querySelector(".chat-hero-card")!);
+    await waitFor(() => expect(cb).toBeDefined());
+
+    cb!.onRetrieved?.({
+      count: 5,
+      titles: ["金剛般若波羅蜜經"],
+      located: { text_id: 235, juan_num: 1, chunk_index: 3, title_zh: "金剛般若波羅蜜經", window: "應無所住而生其心", texts: 3 },
+    });
+    const card = await screen.findByTestId("passage-locate-card");
+    expect(card.textContent).toContain("《金刚般若波罗蜜经》第 1 卷");
+    expect(card.textContent).toContain("另见于 2 部典籍");
+    // 卡片不在等待区里，content 仍是哨兵
+    expect(container.querySelector(".chat-thinking")).not.toBeNull();
+    expect(container.querySelector(".chat-thinking")!.contains(card)).toBe(false);
+
+    cb!.onToken("这段是说……");
+    cb!.onSources([{
+      text_id: 235 as TextId, juan_num: 1, chunk_index: 3, chunk_text: "應無所住而生其心", score: 1,
+      title_zh: "金剛般若波羅蜜經", located: true, located_window: "應無所住而生其心", located_texts: 3,
+    }]);
+    cb!.onMessageId?.(31339);
+    cb!.onDone();
+    await waitFor(() => expect(screen.getByText("参考经文")).toBeInTheDocument());
+    expect(screen.getAllByTestId("passage-locate-card")).toHaveLength(1);
+
+    fireEvent.click(screen.getByTestId("passage-locate-open"));
+    await waitFor(() => {
+      expect(container.querySelector(".chat-citation-panel")).not.toBeNull();
+    });
+  });
+
   // 推理进度：把此前被丢弃的 reasoning 增量用作「仍在推进」的实证。
   // 与 retrieved 同一条承重约束 —— 只写独立字段，绝不碰 content（哨兵一旦被顶掉，
   // onDone 的空回复兜底就失效）。

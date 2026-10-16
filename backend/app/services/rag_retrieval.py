@@ -1204,7 +1204,16 @@ async def retrieve_rag_context(
             located = await locate_task
             locate_task = None
             if located is not None:
-                chunk = {**located.chunk, "located_quote": located.window_text[:60]}
+                # located_*：随 sources 下发并入库，前端的「定位卡片」读它。窗口取
+                # 语料自己的字（抽屉按它高亮，繁简/异体都对得上），去掉 CBETA 硬换行。
+                card_window = re.sub(r"\s+", "", located.source_span or located.window_text)[:200]
+                chunk = {
+                    **located.chunk,
+                    "located_quote": located.window_text[:60],
+                    "located": True,
+                    "located_window": card_window,
+                    "located_texts": located.texts_with_window,
+                }
                 search_results = inject_located(chunk, search_results, MAX_CONTEXT_CHUNKS)
 
         # Attach alignment parallels to sources (only if parallel mode on).
