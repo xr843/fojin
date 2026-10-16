@@ -12,6 +12,7 @@ import { localizeHan } from "../utils/hanScript";
 import { isNearBottom } from "../utils/scrollBottom";
 import {
   ArrowUpOutlined,
+  ArrowRightOutlined,
   RobotOutlined,
   UserOutlined,
   DeleteOutlined,
@@ -512,32 +513,24 @@ function MessageBubbleInner({
                     ))}
                   </div>
                 )}
+                {/* 相关问题做成竖排列表（对标 Perplexity / ChatGPT 的 Related），与上面
+                    「参考经文」的胶囊在形状上就分开：胶囊 = 去读原文，整行 = 继续问。
+                    两者原先都是金色描边胶囊，只差底色，实际看不出哪个是哪个。 */}
                 {suggestions.length > 0 && !sending && (
-                  <div className="chat-answer-followups">
+                  <div className="chat-answer-followups" role="group" aria-label={t("chat.related_questions")}>
+                    <div className="chat-answer-followups-title">{t("chat.related_questions")}</div>
                     {suggestions.map((q, i) => (
                       // 必须是原生 <button>：浏览器只为真正的可交互元素把 Enter/空格
                       // 合成成 click。span[role=button] 看着一模一样，键盘用户和读屏
                       // 用户却永远触发不了这些追问 —— 而它们是继续对话的主要入口。
-                      // fontFamily 要显式 inherit：button 不继承字体族，去掉这行会在
-                      // 一堆 Noto Serif 里冒出一颗系统默认字体的胶囊。用长属性而不是
-                      // font 简写——简写会连带重置 fontSize，得靠对象键序才能救回来。
                       <button
                         key={i}
                         type="button"
+                        className="chat-followup-row"
                         onClick={() => onSuggestionClick(q)}
-                        style={{
-                          display: "inline-block", padding: "4px 12px", borderRadius: 14,
-                          border: "1px solid var(--fj-gold, #b08d57)", color: "var(--fj-gold, #b08d57)",
-                          fontFamily: "inherit",
-                          // button 的 UA 默认是 text-align:center。单行时看不出来，
-                          // 长追问换行后每一行都会居中——和改动前的 span 不一样。
-                          textAlign: "start",
-                          fontSize: 12, cursor: "pointer", background: "transparent", transition: "all 0.2s", lineHeight: 1.6,
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(176,141,87,0.1)"; e.currentTarget.style.color = "var(--fj-accent)"; e.currentTarget.style.borderColor = "var(--fj-accent)"; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--fj-gold, #b08d57)"; e.currentTarget.style.borderColor = "var(--fj-gold, #b08d57)"; }}
                       >
-                        {q}
+                        <span className="chat-followup-text">{q}</span>
+                        <ArrowRightOutlined className="chat-followup-arrow" aria-hidden />
                       </button>
                     ))}
                   </div>

@@ -2230,6 +2230,19 @@ describe("操作栏、换模型重答与快捷键", () => {
     expect(userRow.querySelector(".anticon-copy")).toBeTruthy();
   });
 
+  it("相关问题是带标题的整行列表（不是与参考经文同形的胶囊），点一行即发问", async () => {
+    const { cb } = await startSend();
+    act(() => cb.onToken!("答。\n[追问] 十二因缘中的无明为何是起点？\n[追问] 缘起与空是什么关系？"));
+    act(() => cb.onDone!());
+    await waitFor(() => expect(document.querySelectorAll(".chat-followup-row")).toHaveLength(2));
+    const group = document.querySelector(".chat-answer-followups")!;
+    expect(group.querySelector(".chat-answer-followups-title")?.textContent).toBe("相关问题");
+    const sendsBefore = vi.mocked(sendChatMessageStream).mock.calls.length;
+    fireEvent.click(document.querySelectorAll(".chat-followup-row")[1]);
+    await waitFor(() => expect(vi.mocked(sendChatMessageStream).mock.calls.length).toBe(sendsBefore + 1));
+    expect(vi.mocked(sendChatMessageStream).mock.calls[sendsBefore][0]).toBe("缘起与空是什么关系？");
+  });
+
   it("生成中输入框仍可打字：回车不发、草稿保留；流结束后回车发出草稿", async () => {
     const { cb } = await startSend();
     const ta = document.querySelector(".chat-input-shell textarea") as HTMLTextAreaElement;

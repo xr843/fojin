@@ -1153,6 +1153,7 @@
   "chat.master_buddhaghosa": "🌿 觉音尊者（上座部论师·清净道论）",
   "chat.master_mahasi": "🌿 马哈希尊者（缅甸内观·标记法）",
   "chat.master_ajahn_chah": "🌿 阿姜查（泰国森林禅林派）",
+  "chat.related_questions": "相关问题",
   "chat.tab_hint_tooltip": "按 Tab 填入示例问题，再按换下一个",
   "chat.attachment_tooltip": "附件上传 (PDF/TXT/MD/DOCX/CSV/HTML, ≤10MB)",
   "chat.model_requires_key": "（需配置 Key）",
