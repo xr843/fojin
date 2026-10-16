@@ -268,41 +268,17 @@ describe("ChatPage 首屏结构", () => {
     expect(list!.compareDocumentPosition(foot!) & FOLLOWING).toBeTruthy();
   });
 
-  // 占位符只放示例问题本身（不再拼「⇥ Tab  ⇧⏎ 换行」）。Tab 提示是工具行右端的
-  // 淡色键帽：桌面有、触屏没有（主输入是手指时没有 Tab 键）。
-  describe("Tab 键帽提示", () => {
-    const realMatchMedia = window.matchMedia;
-    afterEach(() => {
-      window.matchMedia = realMatchMedia;
-    });
-    function emulatePointer(coarse: boolean) {
-      window.matchMedia = ((query: string) => ({
-        matches: coarse && query === "(pointer: coarse)",
-        media: query, onchange: null,
-        addListener: () => {}, removeListener: () => {},
-        addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
-      })) as unknown as typeof window.matchMedia;
-    }
-
-    it("触屏：占位符只有示例问题，没有 Tab 键帽", async () => {
-      emulatePointer(true);
-      const { container } = await renderEmpty();
-      const ta = container.querySelector("textarea")!;
-      await waitFor(() => expect(ta.placeholder).toContain("什么是四圣谛？"));
-      expect(ta.placeholder).toBe("什么是四圣谛？");
-      expect(container.querySelector(".chat-tab-hint")).toBeNull();
-    });
-
-    it("桌面：占位符同样干净，Tab 键帽在工具行；输入别的内容后键帽消失", async () => {
-      emulatePointer(false);
-      const { container } = await renderEmpty();
-      const ta = container.querySelector("textarea")!;
-      await waitFor(() => expect(ta.placeholder).toContain("什么是四圣谛？"));
-      expect(ta.placeholder).toBe("什么是四圣谛？");
-      expect(container.querySelector(".chat-input-toolbar .chat-tab-hint")?.textContent).toBe("Tab");
-      fireEvent.change(ta, { target: { value: "自己的问题" } });
-      expect(container.querySelector(".chat-tab-hint")).toBeNull();
-    });
+  // 输入框只留一句固定的「问问小津」：不轮播示例问题、没有 Tab 键帽，Tab 也不再
+  // 被拦下填示例（键盘用户按 Tab 要能离开输入框）。
+  it("占位符固定为「问问小津」，无 Tab 键帽，Tab 不填示例问题", async () => {
+    const { container } = await renderEmpty();
+    const ta = container.querySelector("textarea")!;
+    expect(ta.placeholder).toBe("问问小津");
+    expect(container.querySelector(".chat-tab-hint")).toBeNull();
+    const ev = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+    act(() => { ta.dispatchEvent(ev); });
+    expect(ev.defaultPrevented).toBe(false);
+    expect(ta.value).toBe("");
   });
 
   it("输入为空时发送钮置灰，有字才可点", async () => {
@@ -1686,7 +1662,7 @@ describe("空状态副标题", () => {
 
     // 原来的第一行「可以问我关于佛经内容、佛教历史、经典翻译等问题」是第三次
     // 重复：下方四张卡片（白话翻译/经文解读/对比辨析/佛教史话）带真实例题且可点，
-    // 输入框 placeholder 还在轮播真实例题。抽象地再说一遍只是噪音。
+    // 抽象地再说一遍只是噪音。
     expect(hero.textContent).not.toContain("可以问我关于");
   });
 });

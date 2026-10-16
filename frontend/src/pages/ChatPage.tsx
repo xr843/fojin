@@ -737,7 +737,6 @@ export default function ChatPage() {
     wantSearchFocusRef.current = true;
     setCollapsed(false);
   }, [setCollapsed]);
-  const [tabIndex, setTabIndex] = useState(-1);
   const [hasOlderMessages, setHasOlderMessages] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -1565,50 +1564,11 @@ export default function ChatPage() {
     });
   }, []);
 
-  // Tab key: cycle through suggested questions when input is empty
-  const tabSuggestions = useMemo(() => {
-    // Prefer follow-up suggestions from the last assistant message
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === "assistant") {
-        const { suggestions } = parseFollowUps(messages[i].content);
-        if (suggestions.length > 0) return suggestions;
-        break;
-      }
-    }
-    // Fallback to hot questions (same defaults as the welcome card)
-    return hotQuestionsData?.questions ?? (t("chat.hot_questions", { returnObjects: true }) as string[]);
-  }, [messages, hotQuestionsData, t]);
-
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // placeholder 末尾的「⇥ Tab  ⇧⏎ 换行」是键盘提示：主输入是手指时这两个键都不存在，
-  // 390px 下它还会单独折出第二行。useNarrowViewport 只是 matchMedia 的响应式包装，
-  // 这里借它判指针精度。选 pointer: coarse 而不是 hover: none：要回答的是「主输入是
-  // 不是手指」，而部分带手写笔的 Android 机会把 hover 报成 hover，pointer 更稳；
-  // 接了触控板/鼠标的 iPad 两者都报精细指针，那时多半也接了键盘，保留提示是对的。
-  // 只改 placeholder 这一个 prop，不碰输入框节点 —— Tab 轮播的 effect 依赖节点同一性。
-  const coarsePointer = useNarrowViewport("(pointer: coarse)");
   // 同一个 matchMedia 包装，这里判的是「宽屏」而非窄屏。
   const wideDesktop = useNarrowViewport(SIDEBAR_WIDE_QUERY);
   const sidebarExpandedW = wideDesktop ? SIDEBAR_EXPANDED_W_WIDE : SIDEBAR_EXPANDED_W;
-
-  // Attach native keydown listener to capture Tab before Ant Design / browser handles it
-  useEffect(() => {
-    const el = inputRef.current;
-    if (!el) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key !== "Tab" || tabSuggestions.length === 0) return;
-      const val = (e.target as HTMLTextAreaElement).value || "";
-      if (val && !tabSuggestions.includes(val)) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const nextIndex = (tabIndex + 1) % tabSuggestions.length;
-      setTabIndex(nextIndex);
-      setInput(tabSuggestions[nextIndex]);
-    };
-    el.addEventListener("keydown", handler);
-    return () => el.removeEventListener("keydown", handler);
-  }, [tabSuggestions, tabIndex]);
 
   // 键盘快捷键（Esc 停止 / Ctrl·⌘+K 新对话 / ↑ 召回上一问 / 「/」聚焦 / ? 说明）。
   // 逻辑全在 useChatShortcuts，这里只接线。
@@ -1621,7 +1581,6 @@ export default function ChatPage() {
   }, [messages]);
   const handleRecallLastQuestion = useCallback((text: string) => {
     setInput(text);
-    setTabIndex(-1);
     // 光标放到末尾：受控值在下一帧才写进 DOM。
     requestAnimationFrame(() => {
       const el = inputRef.current;
@@ -2138,17 +2097,15 @@ export default function ChatPage() {
               <Input.TextArea
                 ref={(instance) => { inputRef.current = instance?.resizableTextArea?.textArea ?? null; }}
                 value={input}
-                onChange={(e) => { setInput(e.target.value); setTabIndex(-1); }}
+                onChange={(e) => setInput(e.target.value)}
                 onPressEnter={(e) => {
                   if (e.shiftKey) return;
                   e.preventDefault();
                   handleSend();
                 }}
-                // 占位符只放示例问题本身。键盘提示另放：Tab 是工具行右端的淡色键帽
-                // （见下），⇧⏎ 换行是通用约定、? 快捷键卡片里也有，不再写进来。
-                placeholder={tabSuggestions.length > 0
-                  ? tabSuggestions[(tabIndex + 1) % tabSuggestions.length]
-                  : t("chat.input_placeholder")}
+                // 占位符固定一句「问问小津」。示例问题已经在首屏卡片和回答下方的「相关问题」里，
+                // 再在输入框里轮播一遍只是噪音（Tab 轮换示例的功能随之撤掉）。
+                placeholder={t("chat.input_placeholder")}
                 // 生成中照样可以打字（首字常要等 20–60 秒，用户可以先写下一问）；
                 // 只是发不出去 —— 回车在 handleSendMessage 里被 sending 挡下，草稿原样留着。
                 autoSize={{ minRows: 2, maxRows: 8 }}
@@ -2204,13 +2161,6 @@ export default function ChatPage() {
                 </Tooltip>
                 <ChatModelSelector value={modelId} onChange={handleModelChange} onConfigureKey={goConfigureKey} />
                 <span className="chat-input-spacer" />
-                {/* Tab 采纳示例问题是 fojin 自己的功能，别处学不到：输入框空着（或正停在
-                    某个示例上）时给一个淡色键帽。触屏没有 Tab 键，不显示。 */}
-                {!coarsePointer && tabSuggestions.length > 0 && (!input || tabSuggestions.includes(input)) && (
-                  <Tooltip title={t("chat.tab_hint_tooltip")}>
-                    <kbd className="chat-tab-hint">Tab</kbd>
-                  </Tooltip>
-                )}
                 {/* 发送与停止是同一位置的圆形图标钮（对标 ChatGPT / Claude）：
                     空输入时发送钮置灰；生成中原地变成 ■。不再用红色描边 —— 停止不是出错。
                     钮上没有文字，名字由 aria-label 给出。 */}

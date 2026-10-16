@@ -8,7 +8,6 @@ const ROWS: { keys: string[]; labelKey: string }[] = [
   { keys: ["Esc"], labelKey: "chat.shortcuts.stop" },
   { keys: [MOD_KEY_LABEL, "K"], labelKey: "chat.shortcuts.new_chat" },
   { keys: ["↑"], labelKey: "chat.shortcuts.recall" },
-  { keys: ["Tab"], labelKey: "chat.shortcuts.cycle_suggestions" },
   { keys: ["/"], labelKey: "chat.shortcuts.focus_input" },
   { keys: ["?"], labelKey: "chat.shortcuts.show_help" },
 ];

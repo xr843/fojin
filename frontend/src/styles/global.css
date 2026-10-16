@@ -894,20 +894,6 @@ em {
   border-radius: 2px;
   background: var(--fj-surface);
 }
-.chat-tab-hint {
-  flex-shrink: 0;
-  font-family: inherit;
-  font-size: 11px;
-  line-height: 1;
-  padding: 3px 6px;
-  border: 1px solid var(--fj-border);
-  border-bottom-width: 2px;
-  border-radius: 4px;
-  color: var(--fj-ink-muted);
-  background: transparent;
-  cursor: default;
-  user-select: none;
-}
 /* 窄屏：发送钮留在工具行右端，输入卡片两行高（文本框 + 工具行）。
    原先这里让工具栏 wrap、spacer 撑满 100% 把发送钮单独挤到第三行
    （2026-10-10 生产 390px 实测：卡片 155px 高，工具栏 75px 里发送钮独占一行）。
