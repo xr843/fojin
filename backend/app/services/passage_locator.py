@@ -22,7 +22,10 @@ Design (same contract as ``quote_lookup``: **ES shortlists, Postgres decides**):
    and over fills the BM25 shortlist with them (《起信論》「心真如者……」: 8 of 8
    slots went to its 疏 and 《釋摩訶衍論》, the 論 itself never got fetched). So a
    second, smaller shortlist is drawn from 大正藏 經律論 proper (T0001–T1692)
-   and merged in. A window found in more
+   and merged in. Relevance ranking still favours short fascicles, so once the
+   best window is known we also ask ES directly which 經律論 carry it verbatim,
+   lowest number first, and let those compete for the window too
+   (``_root_carriers``). A window found in more
    than ``AMBIGUOUS_TEXTS`` texts is a stock formula (如是我聞……) and is not
    injected: it locates nothing in particular. When the pick is root canon the
    count that matters is how many *root* texts carry it: 疏 quoting a sutra line
@@ -67,6 +70,9 @@ ROOT_SHORTLIST_JUANS = 4
 # 大正藏 T0001–T1692 是經、律、論本身；T1693 起是經疏、律疏、論疏、諸宗、史傳、事彙、
 # 外教、目錄。cbeta_id 是零填充的 keyword，字典序区间即编号区间（含 T0220a 这类带后缀的）。
 ROOT_CANON_FILTER = {"range": {"cbeta_id": {"gte": "T0001", "lt": "T1693"}}}
+# After the window is found: this many 經律論 that carry it verbatim, lowest
+# number first, join the candidates (see ``_root_carriers``).
+ROOT_CARRIER_TEXTS = 4
 # A window carried by more texts than this is a stock formula, not a location.
 AMBIGUOUS_TEXTS = 20
 
@@ -283,7 +289,7 @@ def is_root_canon(cbeta_id: str | None) -> bool:
     return "T0001" <= cid < "T1693"
 
 
-async def _count_texts_with(es: AsyncElasticsearch, source_span: str, *, root_only: bool = False) -> int:
+async def _count_texts_with(es: AsyncElasticsearch, source_span: str) -> int:
     """How many distinct texts carry the passage. Split at the *source's*
     punctuation (see ``raw_span``) so every clause is a phrase that really exists."""
     # 按原文自己的换行再切一刀：跨换行的短语查不到（见 _shortlist），行内的片段都能精确命中。
@@ -296,7 +302,7 @@ async def _count_texts_with(es: AsyncElasticsearch, source_span: str, *, root_on
                 "must": [
                     {"match_phrase": {"content": {"query": c, "analyzer": "cjk_content"}}} for c in window_clauses
                 ],
-                "filter": [{"term": {"lang": "lzh"}}, *([ROOT_CANON_FILTER] if root_only else [])],
+                "filter": [{"term": {"lang": "lzh"}}],
             }
         },
         "size": 0,
@@ -304,6 +310,41 @@ async def _count_texts_with(es: AsyncElasticsearch, source_span: str, *, root_on
     }
     resp = await es.search(index="text_contents", body=body, timeout="5s")
     return int(resp["aggregations"]["texts"]["value"])
+
+
+async def _root_carriers(es: AsyncElasticsearch, source_span: str) -> tuple[int, list[tuple[int, int]]]:
+    """(how many 經律論 carry the window verbatim, the first ``ROOT_CARRIER_TEXTS``
+    of them by 經號 — one fascicle each).
+
+    The shortlists rank by relevance, which favours short fascicles: 《金剛經》 is
+    one long juan and lost every slot to 釋經論 quoting it, even with the 經律論-only
+    shortlist doubled. What we actually want is "the lowest-numbered root text
+    that has this passage", so ask exactly that. ``content.nopunct`` drops
+    punctuation and CBETA hard wraps between Han characters, so one phrase query
+    over the whole window works whatever the source's line breaks."""
+    body = {
+        "query": {
+            "bool": {
+                "filter": [
+                    {"term": {"lang": "lzh"}},
+                    ROOT_CANON_FILTER,
+                    {"match_phrase": {"content.nopunct": {"query": source_span}}},
+                ]
+            }
+        },
+        "sort": [{"cbeta_id": "asc"}, {"juan_num": "asc"}],
+        "collapse": {"field": "text_id"},
+        "size": ROOT_CARRIER_TEXTS,
+        "_source": ["text_id", "juan_num"],
+        "aggs": {"texts": {"cardinality": {"field": "text_id"}}},
+    }
+    resp = await es.search(index="text_contents", body=body, timeout="5s")
+    juans: list[tuple[int, int]] = []
+    for h in resp["hits"]["hits"]:
+        src = h.get("_source") or {}
+        if isinstance(src.get("text_id"), int) and isinstance(src.get("juan_num"), int):
+            juans.append((src["text_id"], src["juan_num"]))
+    return int(resp["aggregations"]["texts"]["value"]), juans
 
 
 # 归一化书名 → text_id 列表。全库约一万部，进程内缓存一次，书名的繁简写法就都能对上。
@@ -379,14 +420,32 @@ async def locate_pasted_passage(es: AsyncElasticsearch, db: AsyncSession, messag
     if picked is None:
         return None
     chunk, window = picked
-    window_norm = "".join(fast_normalise(c) for c in clauses[window.start : window.end])
-    span = raw_span(chunk.get("chunk_text") or "", window_norm)
-    n_texts = await _count_texts_with(es, span) if span else 0
+    span = _source_span(chunk, clauses, window)
+    if not span:
+        return Located(chunk=chunk, window_text=window.text(clauses), window_han=window.han, texts_with_window=0)
+    n_texts, (n_root, carriers) = await asyncio.gather(_count_texts_with(es, span), _root_carriers_safe(es, span))
+    extra = [j for j in carriers if j not in juans]
+    if extra:
+        # 含这段的经律论（经号最小的几部）补进候选，同长窗口按 canon_rank_key 本经胜出
+        chunks += await _fetch_chunks(db, extra)
+        repicked = pick_located(clauses, chunks, named_text_ids=frozenset(named_ids))
+        if repicked is not None and repicked[0] is not chunk:
+            chunk, new_window = repicked
+            if new_window != window:  # 窗口变了（更长），两个计数都按新窗口重数
+                window = new_window
+                span = _source_span(chunk, clauses, window)
+                if span:
+                    n_texts, (n_root, _) = await asyncio.gather(
+                        _count_texts_with(es, span), _root_carriers_safe(es, span)
+                    )
+                else:
+                    n_texts, n_root = 0, 0
+            else:
+                span = _source_span(chunk, clauses, window) or span
     if n_texts > AMBIGUOUS_TEXTS:
-        # 本经本论被注疏大量引用不算「套语」：只数经律论里有几部含这段
-        n_root = (
-            await _count_texts_with(es, span, root_only=True) if is_root_canon(chunk.get("cbeta_id")) else n_texts
-        )
+        # 本经本论被注疏大量引用不算「套语」：选中经律论时只数经律论里有几部含这段
+        if n_root is None or not is_root_canon(chunk.get("cbeta_id")):
+            n_root = n_texts
         if n_root > AMBIGUOUS_TEXTS:
             logger.info(
                 "paste_locate ambiguous: window in %d texts / %d root texts (>%d), not injecting (%r)",
@@ -400,6 +459,21 @@ async def locate_pasted_passage(es: AsyncElasticsearch, db: AsyncSession, messag
         texts_with_window=n_texts,
         source_span=span,
     )
+
+
+def _source_span(chunk: dict, clauses: list[str], window: Window) -> str | None:
+    window_norm = "".join(fast_normalise(c) for c in clauses[window.start : window.end])
+    return raw_span(chunk.get("chunk_text") or "", window_norm)
+
+
+async def _root_carriers_safe(es: AsyncElasticsearch, span: str) -> tuple[int | None, list[tuple[int, int]]]:
+    """``_root_carriers`` or (None, []) — it only ever improves the pick, so a
+    failure falls back to the shortlist result and the whole-canon formula count."""
+    try:
+        return await _root_carriers(es, span)
+    except Exception:
+        logger.warning("paste_locate root-carrier lookup failed; keeping shortlist pick", exc_info=True)
+        return None, []
 
 
 def inject_located(located_chunk: dict, results: list[dict], max_chunks: int) -> list[dict]:

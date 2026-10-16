@@ -8,7 +8,7 @@
         python -u /eval/root_text.py --old /eval/old.py --new /eval/new.py --out /eval/out
 
 子集：
-- R / R2  本经被注疏大量引用（R 开发集 种子 20261016，R2 留出集 20261017）：从下列本经本论里**按字符位置**随机截 24 字（不按标点切句，与被测的
+- R / R2 / R3  本经被注疏大量引用（R、R2 开发集 种子 20261016/20261017，R3 留出集 20261018）：从下列本经本论里**按字符位置**随机截 24 字（不按标点切句，与被测的
      「按标点切句、逐句比对」不同源），只留在 ≥2 部**其他**典籍里也逐字出现的片段（ES
      content.nopunct 短语查询判定，与定位器的二元组词袋粗筛不同源）。指标：定位到本经的比例。
 - B″ 真经文对照集（independent.sample_b，种子 20261007）。
@@ -35,8 +35,9 @@ from app.core.elasticsearch import init_es
 from app.database import async_session
 
 ROOTS = ["T0235", "T0251", "T0262", "T0279", "T0475", "T0945", "T1558", "T1564", "T1585", "T1666"]
-R_SEED = 20261016  # 开发集；留出集 R2 用 20261017（修订 6）
-R2_SEED = 20261017
+R_SEED = 20261016  # 开发集（修订 5）
+R2_SEED = 20261017  # 修订 6 的留出集，修订 7 起也是开发集
+R3_SEED = 20261018  # 修订 7 的留出集
 R_SPAN = 24  # 原文字符数（含标点）
 R_MIN_HAN = 16
 R_PER_TEXT = 4
@@ -153,8 +154,9 @@ async def sample_r(es, han_count, seed: int = R_SEED) -> tuple[list[dict], dict]
 
 async def run_r(old, new, es, seed: int = R_SEED) -> dict:
     items, stats = await sample_r(es, new.han_count, seed)
-    if seed != R_SEED:  # 留出集剔除与开发集重复的片段
-        dev = {(it["text_id"], it["span"]) for it in (await sample_r(es, new.han_count, R_SEED))[0]}
+    dev_seeds = [x for x in (R_SEED, R2_SEED) if x < seed]
+    if dev_seeds:  # 留出集剔除与之前各开发集重复的片段
+        dev = {(it["text_id"], it["span"]) for d in dev_seeds for it in (await sample_r(es, new.han_count, d))[0]}
         stats["dropped_overlap_with_dev"] = sum((it["text_id"], it["span"]) in dev for it in items)
         items = [it for it in items if (it["text_id"], it["span"]) not in dev]
     rows = []
@@ -283,8 +285,8 @@ async def main(a) -> None:
     await canary(old, new, es)
     os.makedirs(a.out, exist_ok=True)
     for name in a.only.split(","):
-        if name == "R2":
-            res = await run_r(old, new, es, R2_SEED)
+        if name in ("R2", "R3"):
+            res = await run_r(old, new, es, R2_SEED if name == "R2" else R3_SEED)
         else:
             fn = {"R": run_r, "B": run_b, "A": run_a}.get(name)
             res = await (fn(old, new, es) if fn else run_l(old, new, es, a.days, a.out))
@@ -299,6 +301,6 @@ if __name__ == "__main__":
     ap.add_argument("--old", required=True, help="旧版 passage_locator.py 路径")
     ap.add_argument("--new", required=True, help="新版 passage_locator.py 路径")
     ap.add_argument("--out", default="/tmp/pl-eval")
-    ap.add_argument("--only", default="R2,R,B,A,L")
+    ap.add_argument("--only", default="R3,R2,R,B,A,L")
     ap.add_argument("--days", type=int, default=90)
     asyncio.run(main(ap.parse_args()))

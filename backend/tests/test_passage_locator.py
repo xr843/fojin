@@ -91,13 +91,36 @@ def test_inject_puts_located_first_replaces_same_fascicle_and_caps():
 # ── 端到端（假 ES / 假库）────────────────────────────────────────────────
 
 
-def _fake_es(n_texts: int) -> MagicMock:
+def _hits(*juans: tuple[int, int]) -> list[dict]:
+    return [{"_source": {"text_id": t, "juan_num": j}} for t, j in juans]
+
+
+def _fake_es_full(
+    *,
+    shortlist: list[tuple[int, int]],
+    root_shortlist: list[tuple[int, int]] | None = None,
+    all_texts: int,
+    root_texts: int,
+    carriers: list[tuple[int, int]] = (),
+) -> MagicMock:
+    """Answers each of the locator's four ES queries:
+    通用粗筛 / 经律论粗筛（range 过滤）/ 全藏计数（size 0）/ 经律论逐字载体（collapse）。"""
+
+    def search(index, body, timeout):
+        if body.get("size") == 0:
+            return {"aggregations": {"texts": {"value": all_texts}}}
+        if "collapse" in body:
+            return {"hits": {"hits": _hits(*carriers)}, "aggregations": {"texts": {"value": root_texts}}}
+        restricted = any("range" in f for f in body["query"]["bool"]["filter"])
+        return {"hits": {"hits": _hits(*(root_shortlist if restricted and root_shortlist is not None else shortlist))}}
+
     es = MagicMock()
-    es.search = AsyncMock(side_effect=lambda index, body, timeout: (
-        {"aggregations": {"texts": {"value": n_texts}}} if body.get("size") == 0
-        else {"hits": {"hits": [{"_source": {"text_id": 7, "juan_num": 1}}, {"_source": {"text_id": 9, "juan_num": 1}}]}}
-    ))
+    es.search = AsyncMock(side_effect=search)
     return es
+
+
+def _fake_es(n_texts: int) -> MagicMock:
+    return _fake_es_full(shortlist=[(7, 1), (9, 1)], all_texts=n_texts, root_texts=n_texts)
 
 
 @pytest.mark.anyio
@@ -188,46 +211,58 @@ QIXIN_SHIMOHEYAN = "論曰：" + QIXIN + "。釋曰：此中明心真如門。"
 QIXIN_SHU = "疏：" + QIXIN + "。此舉真如門之體也。"
 
 
-def _fake_es_crowded_by_commentaries() -> MagicMock:
-    """注疏反复引用本论这段，BM25 把它们排满了通用短名单；本论只有在限定
-    「经律论本身」的查询里才排得上。"""
-    commentary_hits = [
-        {"_source": {"text_id": 12675, "juan_num": 1}},  # X 起信论疏
-        {"_source": {"text_id": 7842, "juan_num": 2}},  # T1668 釋摩訶衍論
-    ]
-    root_hits = [{"_source": {"text_id": 51, "juan_num": 1}}]  # T1666 大乘起信論
+QIXIN_BY_JUAN = {
+    (12675, 1): _chunk("X0759", QIXIN_SHU, text_id=12675),
+    (7842, 2): _chunk("T1668", QIXIN_SHIMOHEYAN, text_id=7842, juan=2, idx=10),
+    (51, 1): _chunk("T1666", QIXIN_ROOT, text_id=51, idx=4),
+}
+QIXIN_MSG = "这段怎么理解：心真如者，即是一法界大總相法門體。所謂心性不生不滅。一切諸法唯依妄念而有差別。"
+COMMENTARY_JUANS = [(12675, 1), (7842, 2)]  # 注疏反复引用这段，BM25 把它们排满了通用短名单
 
-    def search(index, body, timeout):
-        if body.get("size") == 0:
-            return {"aggregations": {"texts": {"value": 16}}}
-        filters = body["query"]["bool"]["filter"]
-        restricted = any("range" in f and "cbeta_id" in f["range"] for f in filters)
-        return {"hits": {"hits": root_hits if restricted else commentary_hits}}
 
-    es = MagicMock()
-    es.search = AsyncMock(side_effect=search)
-    return es
+async def _fetch_qixin(db, juans):
+    return [QIXIN_BY_JUAN[j] for j in juans if j in QIXIN_BY_JUAN]
 
 
 @pytest.mark.anyio
 async def test_root_treatise_is_located_even_when_commentaries_fill_the_shortlist():
-    by_juan = {
-        (12675, 1): _chunk("X0759", QIXIN_SHU, text_id=12675),
-        (7842, 2): _chunk("T1668", QIXIN_SHIMOHEYAN, text_id=7842, juan=2, idx=10),
-        (51, 1): _chunk("T1666", QIXIN_ROOT, text_id=51, idx=4),
-    }
-
-    async def fetch(db, juans):
-        return [by_juan[j] for j in juans if j in by_juan]
-
-    with patch.object(pl, "_fetch_chunks", AsyncMock(side_effect=fetch)):
-        got = await pl.locate_pasted_passage(
-            _fake_es_crowded_by_commentaries(),
-            MagicMock(),
-            "这段怎么理解：心真如者，即是一法界大總相法門體。所謂心性不生不滅。一切諸法唯依妄念而有差別。",
-        )
+    # 本论只在「经律论粗筛」里排得上
+    es = _fake_es_full(shortlist=COMMENTARY_JUANS, root_shortlist=[(51, 1)], all_texts=16, root_texts=3)
+    with patch.object(pl, "_fetch_chunks", AsyncMock(side_effect=_fetch_qixin)):
+        got = await pl.locate_pasted_passage(es, MagicMock(), QIXIN_MSG)
     assert got is not None
     assert got.chunk["cbeta_id"] == "T1666"
+
+
+@pytest.mark.anyio
+async def test_root_text_missed_by_both_shortlists_is_found_by_asking_which_root_texts_carry_it():
+    # 两个粗筛都没排上本论（长卷吃 BM25 长度归一化的亏）；选出窗口后按经号问「哪些经律论含这段」
+    es = _fake_es_full(
+        shortlist=COMMENTARY_JUANS, root_shortlist=[(7842, 2)], all_texts=16, root_texts=3, carriers=[(51, 1)]
+    )
+    with patch.object(pl, "_fetch_chunks", AsyncMock(side_effect=_fetch_qixin)):
+        got = await pl.locate_pasted_passage(es, MagicMock(), QIXIN_MSG)
+    assert got is not None
+    assert got.chunk["cbeta_id"] == "T1666"
+    assert got.texts_with_window == 16
+    carrier_body = next(c.kwargs["body"] for c in es.search.call_args_list if "collapse" in c.kwargs["body"])
+    assert carrier_body["sort"][0] == {"cbeta_id": "asc"}  # 经号最小的先来
+
+
+@pytest.mark.anyio
+async def test_root_carrier_lookup_failure_keeps_the_shortlist_pick():
+    es = _fake_es_full(shortlist=COMMENTARY_JUANS, root_shortlist=[], all_texts=16, root_texts=3)
+    original = es.search.side_effect
+
+    def boom(index, body, timeout):
+        if "collapse" in body:
+            raise RuntimeError("es down")
+        return original(index, body, timeout)
+
+    es.search.side_effect = boom
+    with patch.object(pl, "_fetch_chunks", AsyncMock(side_effect=_fetch_qixin)):
+        got = await pl.locate_pasted_passage(es, MagicMock(), QIXIN_MSG)
+    assert got is not None and got.chunk["cbeta_id"] == "T1668"
 
 
 # ── 套语判定：本经被注疏大量引用 ≠ 套语 ─────────────────────────────────
@@ -237,16 +272,7 @@ XINJING = "以無所得故，菩提薩埵依般若波羅蜜多故，心無罣礙
 
 
 def _fake_es_counts(all_texts: int, root_texts: int) -> MagicMock:
-    def search(index, body, timeout):
-        if body.get("size") == 0:
-            filters = body["query"]["bool"]["filter"]
-            restricted = any("range" in f for f in filters)
-            return {"aggregations": {"texts": {"value": root_texts if restricted else all_texts}}}
-        return {"hits": {"hits": [{"_source": {"text_id": 7, "juan_num": 1}}]}}
-
-    es = MagicMock()
-    es.search = AsyncMock(side_effect=search)
-    return es
+    return _fake_es_full(shortlist=[(7, 1)], all_texts=all_texts, root_texts=root_texts)
 
 
 @pytest.mark.anyio
