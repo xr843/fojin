@@ -17,9 +17,18 @@ Design (same contract as ``quote_lookup``: **ES shortlists, Postgres decides**):
    ≥ ``MIN_WINDOW_HAN`` 汉字 of the user's own text inside it.
 4. Several texts can carry the same passage (commentaries quote the sutra). Among
    the longest windows prefer root canon over 卍續藏, then the lowest number —
-   the sutra before the treatise before the commentary. A window found in more
+   the sutra before the treatise before the commentary. That ordering only helps
+   if the root text is *among the candidates*: a passage commentaries quote over
+   and over fills the BM25 shortlist with them (《起信論》「心真如者……」: 8 of 8
+   slots went to its 疏 and 《釋摩訶衍論》, the 論 itself never got fetched). So a
+   second, smaller shortlist is drawn from 大正藏 經律論 proper (T0001–T1692)
+   and merged in. A window found in more
    than ``AMBIGUOUS_TEXTS`` texts is a stock formula (如是我聞……) and is not
-   injected: it locates nothing in particular.
+   injected: it locates nothing in particular. When the pick is root canon the
+   count that matters is how many *root* texts carry it: 疏 quoting a sutra line
+   do not make the sutra ambiguous (《心經》「心無罣礙……」 is in ~50 texts but only
+   the 3–4 心經 translations among 經律論), while 如是我聞一時佛在舍衛國 is in 71
+   經律論 and stays suppressed.
 
 The located chunk is returned in the same shape as ``similarity_search`` rows so
 it travels through the existing pipeline (drawer coordinates, citation guard)
@@ -28,6 +37,7 @@ unchanged. Thresholds and their evidence: ``eval/paste_locate/GATE.md``.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 import unicodedata
@@ -51,6 +61,12 @@ MIN_PROBE_HAN = 4
 # Bounded work per message.
 MAX_CLAUSES = 24
 SHORTLIST_JUANS = 8
+# Extra juans drawn only from 大正藏 經律論 proper — the root texts that 疏/鈔/記
+# quote — so commentaries cannot crowd the root out of the candidate set.
+ROOT_SHORTLIST_JUANS = 4
+# 大正藏 T0001–T1692 是經、律、論本身；T1693 起是經疏、律疏、論疏、諸宗、史傳、事彙、
+# 外教、目錄。cbeta_id 是零填充的 keyword，字典序区间即编号区间（含 T0220a 这类带后缀的）。
+ROOT_CANON_FILTER = {"range": {"cbeta_id": {"gte": "T0001", "lt": "T1693"}}}
 # A window carried by more texts than this is a stock formula, not a location.
 AMBIGUOUS_TEXTS = 20
 
@@ -219,7 +235,12 @@ def pick_located(
 
 
 async def _shortlist(
-    es: AsyncElasticsearch, clauses: list[str], *, text_ids: list[int] | None = None
+    es: AsyncElasticsearch,
+    clauses: list[str],
+    *,
+    text_ids: list[int] | None = None,
+    root_only: bool = False,
+    size: int = SHORTLIST_JUANS,
 ) -> list[tuple[int, int]]:
     probes = [c for c in clauses if han_count(c) >= MIN_PROBE_HAN]
     if not probes:
@@ -227,6 +248,8 @@ async def _shortlist(
     filters: list[dict] = [{"term": {"lang": "lzh"}}]
     if text_ids:
         filters.append({"terms": {"text_id": text_ids}})
+    if root_only:
+        filters.append(ROOT_CANON_FILTER)
     # 不用 match_phrase：CBETA 原文每 17–20 字一个硬换行，cjk_bigram 不跨换行生成二元组，
     # 所以跨行的句子做短语查询必然落空（随机抽 80 句真经文，短语粗筛只找回 71%）。
     # 改为逐句的二元组词袋、命中 75% 即入围：一处换行只丢一个二元组。是否真在原文里，
@@ -242,7 +265,7 @@ async def _shortlist(
                 "filter": filters,
             }
         },
-        "size": SHORTLIST_JUANS,
+        "size": size,
         "_source": ["text_id", "juan_num"],
     }
     resp = await es.search(index="text_contents", body=body, timeout="5s")
@@ -254,7 +277,13 @@ async def _shortlist(
     return out
 
 
-async def _count_texts_with(es: AsyncElasticsearch, source_span: str) -> int:
+def is_root_canon(cbeta_id: str | None) -> bool:
+    """大正藏 經律論 proper — the same range as ``ROOT_CANON_FILTER``."""
+    cid = cbeta_id or ""
+    return "T0001" <= cid < "T1693"
+
+
+async def _count_texts_with(es: AsyncElasticsearch, source_span: str, *, root_only: bool = False) -> int:
     """How many distinct texts carry the passage. Split at the *source's*
     punctuation (see ``raw_span``) so every clause is a phrase that really exists."""
     # 按原文自己的换行再切一刀：跨换行的短语查不到（见 _shortlist），行内的片段都能精确命中。
@@ -267,7 +296,7 @@ async def _count_texts_with(es: AsyncElasticsearch, source_span: str) -> int:
                 "must": [
                     {"match_phrase": {"content": {"query": c, "analyzer": "cjk_content"}}} for c in window_clauses
                 ],
-                "filter": [{"term": {"lang": "lzh"}}],
+                "filter": [{"term": {"lang": "lzh"}}, *([ROOT_CANON_FILTER] if root_only else [])],
             }
         },
         "size": 0,
@@ -337,7 +366,11 @@ async def locate_pasted_passage(es: AsyncElasticsearch, db: AsyncSession, messag
     if han_count("".join(clauses)) < MIN_WINDOW_HAN:
         return None
     named_ids = await _resolve_named(db, named_titles(message))
-    juans = await _shortlist(es, clauses)
+    general, root = await asyncio.gather(
+        _shortlist(es, clauses),
+        _shortlist(es, clauses, root_only=True, size=ROOT_SHORTLIST_JUANS),
+    )
+    juans = general + [j for j in root if j not in general]
     if named_ids:
         # 用户点名的书即使不在通用候选的前几名里，也要拿来比一比
         juans += [j for j in await _shortlist(es, clauses, text_ids=named_ids) if j not in juans]
@@ -350,11 +383,16 @@ async def locate_pasted_passage(es: AsyncElasticsearch, db: AsyncSession, messag
     span = raw_span(chunk.get("chunk_text") or "", window_norm)
     n_texts = await _count_texts_with(es, span) if span else 0
     if n_texts > AMBIGUOUS_TEXTS:
-        logger.info(
-            "paste_locate ambiguous: window in %d texts (>%d), not injecting (%r)",
-            n_texts, AMBIGUOUS_TEXTS, window.text(clauses)[:30],
+        # 本经本论被注疏大量引用不算「套语」：只数经律论里有几部含这段
+        n_root = (
+            await _count_texts_with(es, span, root_only=True) if is_root_canon(chunk.get("cbeta_id")) else n_texts
         )
-        return None
+        if n_root > AMBIGUOUS_TEXTS:
+            logger.info(
+                "paste_locate ambiguous: window in %d texts / %d root texts (>%d), not injecting (%r)",
+                n_texts, n_root, AMBIGUOUS_TEXTS, window.text(clauses)[:30],
+            )
+            return None
     return Located(
         chunk=chunk,
         window_text=window.text(clauses),

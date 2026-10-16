@@ -177,3 +177,102 @@ def test_named_text_wins_a_tie():
 def test_text_inside_title_marks_is_not_a_passage():
     assert pl.split_clauses("《药师琉璃光如来本愿功德经》等经典如何阐述身病与心病？") == ["等经典如何阐述身病与心病"]
     assert pl.named_titles("如《思益》云：……《楞伽》云") == ["思益", "楞伽"]
+
+
+# ── 短名单不能被注疏挤满（生产 2026-10-16：《起信論》被定位到《釋摩訶衍論》）──────
+
+
+QIXIN = "心真如者，即是一法界大總相法門體。所謂心性不生不滅。一切諸法唯依妄念而有差別"
+QIXIN_ROOT = "所言義者，則有三種。云何為三？一者體大……" + QIXIN + "，若離心念則無一切境界之相。"
+QIXIN_SHIMOHEYAN = "論曰：" + QIXIN + "。釋曰：此中明心真如門。"
+QIXIN_SHU = "疏：" + QIXIN + "。此舉真如門之體也。"
+
+
+def _fake_es_crowded_by_commentaries() -> MagicMock:
+    """注疏反复引用本论这段，BM25 把它们排满了通用短名单；本论只有在限定
+    「经律论本身」的查询里才排得上。"""
+    commentary_hits = [
+        {"_source": {"text_id": 12675, "juan_num": 1}},  # X 起信论疏
+        {"_source": {"text_id": 7842, "juan_num": 2}},  # T1668 釋摩訶衍論
+    ]
+    root_hits = [{"_source": {"text_id": 51, "juan_num": 1}}]  # T1666 大乘起信論
+
+    def search(index, body, timeout):
+        if body.get("size") == 0:
+            return {"aggregations": {"texts": {"value": 16}}}
+        filters = body["query"]["bool"]["filter"]
+        restricted = any("range" in f and "cbeta_id" in f["range"] for f in filters)
+        return {"hits": {"hits": root_hits if restricted else commentary_hits}}
+
+    es = MagicMock()
+    es.search = AsyncMock(side_effect=search)
+    return es
+
+
+@pytest.mark.anyio
+async def test_root_treatise_is_located_even_when_commentaries_fill_the_shortlist():
+    by_juan = {
+        (12675, 1): _chunk("X0759", QIXIN_SHU, text_id=12675),
+        (7842, 2): _chunk("T1668", QIXIN_SHIMOHEYAN, text_id=7842, juan=2, idx=10),
+        (51, 1): _chunk("T1666", QIXIN_ROOT, text_id=51, idx=4),
+    }
+
+    async def fetch(db, juans):
+        return [by_juan[j] for j in juans if j in by_juan]
+
+    with patch.object(pl, "_fetch_chunks", AsyncMock(side_effect=fetch)):
+        got = await pl.locate_pasted_passage(
+            _fake_es_crowded_by_commentaries(),
+            MagicMock(),
+            "这段怎么理解：心真如者，即是一法界大總相法門體。所謂心性不生不滅。一切諸法唯依妄念而有差別。",
+        )
+    assert got is not None
+    assert got.chunk["cbeta_id"] == "T1666"
+
+
+# ── 套语判定：本经被注疏大量引用 ≠ 套语 ─────────────────────────────────
+
+
+XINJING = "以無所得故，菩提薩埵依般若波羅蜜多故，心無罣礙；無罣礙故，無有恐怖"
+
+
+def _fake_es_counts(all_texts: int, root_texts: int) -> MagicMock:
+    def search(index, body, timeout):
+        if body.get("size") == 0:
+            filters = body["query"]["bool"]["filter"]
+            restricted = any("range" in f for f in filters)
+            return {"aggregations": {"texts": {"value": root_texts if restricted else all_texts}}}
+        return {"hits": {"hits": [{"_source": {"text_id": 7, "juan_num": 1}}]}}
+
+    es = MagicMock()
+    es.search = AsyncMock(side_effect=search)
+    return es
+
+
+@pytest.mark.anyio
+async def test_root_sutra_quoted_by_many_commentaries_is_still_located():
+    # 生产实测：《心經》這段全藏 51 部含有，經律論裡只有 3 部（心經諸譯）
+    chunks = [_chunk("T0251", "觀自在菩薩……" + XINJING, text_id=7)]
+    with patch.object(pl, "_fetch_chunks", AsyncMock(return_value=chunks)):
+        got = await pl.locate_pasted_passage(_fake_es_counts(51, 3), MagicMock(), XINJING + "。请解释")
+    assert got is not None and got.chunk["cbeta_id"] == "T0251"
+    assert got.texts_with_window == 51  # 卡片「另见于 N 部」仍报全藏数
+
+
+@pytest.mark.anyio
+async def test_formula_common_across_root_texts_is_still_suppressed():
+    chunks = [_chunk("T0001", "如是我聞：一時，佛在舍衛國祇樹給孤獨園，與大比丘眾", text_id=7)]
+    with patch.object(pl, "_fetch_chunks", AsyncMock(return_value=chunks)):
+        got = await pl.locate_pasted_passage(
+            _fake_es_counts(111, 71), MagicMock(), "如是我聞：一時，佛在舍衛國祇樹給孤獨園。何义？"
+        )
+    assert got is None
+
+
+@pytest.mark.anyio
+async def test_commentary_pick_uses_the_whole_canon_count():
+    # 选中的是注疏（非经律论）：仍按全藏数判套语，不因经律论里没有就放行
+    chunks = [_chunk("X0759", "疏：" + XINJING, text_id=9)]
+    with patch.object(pl, "_fetch_chunks", AsyncMock(return_value=chunks)):
+        got = await pl.locate_pasted_passage(_fake_es_counts(51, 0), MagicMock(), XINJING + "。请解释")
+    assert got is None
