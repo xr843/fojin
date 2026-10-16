@@ -21,6 +21,8 @@ import {
 import Markdown from "react-markdown";
 import { MARKDOWN_REMARK_PLUGINS } from "../utils/markdownPlugins";
 import rehypeSanitize from "rehype-sanitize";
+import { injectCitationLinks, parseCitationHref } from "../utils/citationLinks";
+import { CITATION_SANITIZE_SCHEMA, citationUrlTransform } from "../utils/citationMarkdown";
 import { sendChatMessageStream, updateChatMessageFeedback } from "../api/client";
 import type { ChatSource, ChatMessageItem, ReadingContext } from "../api/client";
 import type { ReactNode } from "react";
@@ -53,24 +55,6 @@ function parseFollowUps(content: string): { cleanContent: string; suggestions: s
     }
   }
   return { cleanContent: cleaned.join("\n").trimEnd(), suggestions };
-}
-
-function injectCitationLinks(content: string, sources: ChatSource[] | null): string {
-  if (!sources || sources.length === 0) return content;
-  const titleMap = new Map<string, ChatSource>();
-  for (const s of sources) {
-    if (!s.title_zh || s.text_id <= 0) continue;
-    const existing = titleMap.get(s.title_zh);
-    if (!existing || s.score > existing.score) titleMap.set(s.title_zh, s);
-  }
-  if (titleMap.size === 0) return content;
-  return content.replace(/【《([^》]+)》(?:第(\d+)卷)?】/g, (_match, title: string, juanStr: string | undefined) => {
-    const source = titleMap.get(title);
-    if (!source) return _match;
-    const juan = juanStr ? parseInt(juanStr, 10) : source.juan_num;
-    const url = `/texts/${source.text_id}/read?juan=${juan}`;
-    return `[${_match}](${url})`;
-  });
 }
 
 function tightenLists(md: string): string {
@@ -160,7 +144,7 @@ export default function ReaderAIPanel({
   selectedText,
   onSelectedTextConsumed,
 }: ReaderAIPanelProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [messages, setMessages] = useState<ChatMessageItem[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -347,6 +331,18 @@ export default function ReaderAIPanel({
 
   const markdownComponents = useMemo(() => ({
     a: ({ href, children }: { href?: string; children?: ReactNode }) => {
+      // 内联引文：与 /chat 同一套注入（繁简归一、按引句选段落），点开跳到阅读器该卷并高亮所引段落。
+      const cite = href ? parseCitationHref(href) : null;
+      if (cite) {
+        return (
+          <Link
+            to={`/texts/${cite.textId}/read?juan=${cite.juanNum}&highlight_chunk=${cite.chunkIndex}`}
+            style={{ color: "var(--fj-highlight)", textDecoration: "none", borderBottom: "1px dashed var(--fj-accent)", fontWeight: 500 }}
+          >
+            {children}
+          </Link>
+        );
+      }
       if (href && href.startsWith("/texts/")) {
         return (
           <Link to={href} style={{ color: "var(--fj-highlight)", textDecoration: "none", borderBottom: "1px dashed var(--fj-accent)", fontWeight: 500 }}>
@@ -418,8 +414,8 @@ export default function ReaderAIPanel({
                     <ReaderThinking m={m} t={t} />
                   ) : (
                     <>
-                      <Markdown remarkPlugins={MARKDOWN_REMARK_PLUGINS} rehypePlugins={[rehypeSanitize]} components={markdownComponents}>
-                        {tightenLists(injectCitationLinks(cleanContent, m.sources)) + (isStreaming ? " ▌" : "")}
+                      <Markdown remarkPlugins={MARKDOWN_REMARK_PLUGINS} rehypePlugins={[[rehypeSanitize, CITATION_SANITIZE_SCHEMA]]} urlTransform={citationUrlTransform} components={markdownComponents}>
+                        {tightenLists(injectCitationLinks(cleanContent, m.sources, i18n.language)) + (isStreaming ? " ▌" : "")}
                       </Markdown>
                       {suggestions.length > 0 && !sending && (
                         <div className="reader-ai-suggestions">

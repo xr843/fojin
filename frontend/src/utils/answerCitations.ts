@@ -21,7 +21,9 @@ const EXPLICIT_LINK_RE = new RegExp(
   "g",
 );
 
-function isCheckedQuote(
+/** Was this exact (title, quote) verbatim-checked by the backend? The one rule —
+ *  the side-panel badge and the inline hover preview both call this. */
+export function isCheckedQuote(
   checked: ChatCheckedQuote[] | null | undefined,
   titleZh: string,
   quote: string | undefined,

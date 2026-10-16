@@ -248,4 +248,25 @@ describe("ReaderAIPanel 滚动跟随", () => {
       spy.mockRestore();
     }
   });
+
+  // 模型写简体经名、来源是 CBETA 繁体：旧的注入按繁体精确查表，简体引文一条也链不上，
+  // 读者在阅读器 AI 面板里点不开任何引文（2026-10-16 发现）。
+  it("引文: 简体经名也能链到所引经卷，并带上引句所在的段落", async () => {
+    const { container } = renderPanel();
+    await ask(container);
+    cb!.onSources([{
+      text_id: 235 as never, juan_num: 1, chunk_index: 3, score: 0.9,
+      chunk_text: "應無所住而生其心", title_zh: "金剛般若波羅蜜經",
+    }]);
+    cb!.onToken("经云「应无所住而生其心」【《金刚般若波罗蜜经》第1卷】。");
+    cb!.onDone();
+    const link = await waitFor(() => {
+      const a = container.querySelector('a[href^="/texts/235/read"]');
+      expect(a).not.toBeNull();
+      return a as HTMLAnchorElement;
+    });
+    expect(link.getAttribute("href")).toContain("juan=1");
+    expect(link.getAttribute("href")).toContain("highlight_chunk=3");
+    expect(link.textContent).toBe("【《金刚般若波罗蜜经》第1卷】");
+  });
 });
