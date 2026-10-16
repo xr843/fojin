@@ -8,7 +8,6 @@ import Markdown, { defaultUrlTransform, type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import { CITATION_URL_SCHEME, injectCitationLinks } from "../utils/citationLinks";
-import { formatResponseSeconds } from "../utils/responseTiming";
 import { localizeHan } from "../utils/hanScript";
 import { quoteCheckDetail } from "../utils/trustDetail";
 import { isNearBottom } from "../utils/scrollBottom";
@@ -23,15 +22,7 @@ import {
   MenuFoldOutlined,
   DownloadOutlined,
   StopOutlined,
-  ClockCircleOutlined,
-  CopyOutlined,
   ReloadOutlined,
-  RedoOutlined,
-  LikeOutlined,
-  LikeFilled,
-  DislikeOutlined,
-  DislikeFilled,
-  ShareAltOutlined,
   DownOutlined,
   MoreOutlined,
   EditOutlined,
@@ -42,6 +33,9 @@ const ShareCard = lazy(() => import("../components/ShareCard"));
 const CitationDrawer = lazy(() => import("../components/CitationDrawer"));
 import CommunityInvite from "../components/CommunityInvite";
 import ChatModelSelector from "../components/ChatModelSelector";
+import { fetchChatModels, type ChatModelOption } from "../api/chatModels";
+import MessageActions from "../components/MessageActions";
+import ChatShortcutsHelp from "../components/ChatShortcutsHelp";
 import MasterGallery, { MasterSeal } from "../components/MasterGallery";
 import {
   RailSidebarIcon,
@@ -88,6 +82,7 @@ import {
 import { expectedFirstTokenSeconds, recordFirstTokenMs } from "../utils/firstTokenStats";
 import type { TextId } from "../types/branded";
 import { useNarrowViewport } from "../hooks/useNarrowViewport";
+import { MOD_KEY_LABEL, useChatShortcuts } from "../hooks/useChatShortcuts";
 
 // 登录用户的额度提示只在快用完时出现。常驻一个「今日剩余 198 次」是纯噪音 ——
 // 而毫无预警地撞上上限、直接吃一个错误，才是真正会让人懵的那种体验。
@@ -364,13 +359,16 @@ interface MessageBubbleProps {
   isLast?: boolean;
   /** 本机最近几次首字耗时的中位数（秒）；null = 没有样本，等待期不显示预期。 */
   expectedFirstTokenS?: number | null;
+  /** 「换模型重答」可选的模型（已过滤为可用）。少于两个时不显示该按钮。 */
+  regenerateModels?: ChatModelOption[];
   user: UserProfile | null;
   markdownComponents: Components;
   onSuggestionClick: (q: string) => void;
   onShare: (m: ChatMessageItem) => void;
   onRetry: (m: ChatMessageItem) => void;
   onContinue: (m: ChatMessageItem) => void;
-  onRegenerate: (m: ChatMessageItem) => void;
+  /** modelId 有值 = 只这一次换用该模型重答（不改输入框里的默认模型）。 */
+  onRegenerate: (m: ChatMessageItem, modelId?: string) => void;
   onFeedback: (m: ChatMessageItem, dir: "up" | "down") => void;
   onSourceClick: (source: ChatSource, phase?: "retrieved") => void;
 }
@@ -382,7 +380,7 @@ interface MessageBubbleProps {
     react-markdown render) re-ran for every historical message on every token,
     which was the dominant "越聊越卡" jank in long conversations. */
 function MessageBubbleInner({
-  m, isStreaming, sending, user, markdownComponents, isLast = false, expectedFirstTokenS = null,
+  m, isStreaming, sending, user, markdownComponents, isLast = false, expectedFirstTokenS = null, regenerateModels,
   onSuggestionClick, onShare, onRetry, onContinue, onRegenerate, onFeedback, onSourceClick,
 }: MessageBubbleProps) {
   // Read t here (not as a prop): on a mid-conversation language switch, i18next's
@@ -450,25 +448,14 @@ function MessageBubbleInner({
   }, [reasoningSince]);
 
   return (
-    <div style={{
-      display: "flex", gap: 12, marginBottom: 16, padding: "0 16px",
-      flexDirection: m.role === "user" ? "row-reverse" : "row",
-    }}>
-      <div style={{
-        width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        background: m.role === "user" ? "var(--fj-accent)" : "rgba(217,208,193,0.5)",
-        color: m.role === "user" ? "#fff" : "var(--fj-ink)", fontSize: 14,
-      }}>
+    // 排版全在 global.css（.chat-msg-*）：助手回答不套卡片、直接落在页面背景上，
+    // 用户消息保留气泡。行内样式里断点和主题都够不着，所以挪成类名。
+    <div className={`chat-msg-row chat-msg-row--${m.role}`}>
+      <div className="chat-msg-avatar" aria-hidden>
         {m.role === "user" ? <UserOutlined /> : <RobotOutlined />}
       </div>
-      <div style={{ maxWidth: "75%", display: "flex", flexDirection: "column", alignItems: m.role === "user" ? "flex-end" : "flex-start" }}>
-        <div style={{
-          padding: "10px 16px", borderRadius: 12,
-          background: m.role === "user" ? "var(--fj-accent)" : "rgba(217,208,193,0.2)",
-          color: m.role === "user" ? "#fff" : "var(--fj-ink)",
-          fontSize: 14, lineHeight: 1.8, whiteSpace: "pre-wrap", wordBreak: "break-word",
-        }}>
+      <div className="chat-msg-col">
+        <div className="chat-msg-body">
           {m.role === "assistant" ? (
             m.content === THINKING_SENTINEL ? (
               <>
@@ -537,16 +524,7 @@ function MessageBubbleInner({
                   <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[[rehypeSanitize, CHAT_SANITIZE_SCHEMA]]} urlTransform={chatUrlTransform} components={markdownComponents}>{rendered}</Markdown>
                 </div>
                 {trustLabelKey && (
-                  <div
-                    style={{
-                      marginTop: 8,
-                      paddingTop: 6,
-                      borderTop: "1px solid rgba(217,208,193,0.45)",
-                      color: trustStatusColor(m.trust_status),
-                      fontSize: 12,
-                      lineHeight: 1.5,
-                    }}
-                  >
+                  <div className="chat-answer-trust" style={{ color: trustStatusColor(m.trust_status) }}>
                     {t(trustLabelKey)}
                     {quoteDetail && (
                       <span style={{ color: "var(--fj-ink-muted)" }}>
@@ -559,8 +537,8 @@ function MessageBubbleInner({
                   </div>
                 )}
                 {sourceChips.length > 0 && (
-                  <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-                    <span style={{ fontSize: 12, color: "var(--fj-ink-muted)" }}>{t("chat.reference_sources")}</span>
+                  <div className="chat-answer-sources">
+                    <span className="chat-answer-sources-label">{t("chat.reference_sources")}</span>
                     {sourceChips.map((s) => (
                       <SourceChipButton
                         key={`${s.text_id}:${s.juan_num}`}
@@ -571,7 +549,7 @@ function MessageBubbleInner({
                   </div>
                 )}
                 {suggestions.length > 0 && !sending && (
-                  <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  <div className="chat-answer-followups">
                     {suggestions.map((q, i) => (
                       // 必须是原生 <button>：浏览器只为真正的可交互元素把 Enter/空格
                       // 合成成 click。span[role=button] 看着一模一样，键盘用户和读屏
@@ -617,101 +595,21 @@ function MessageBubbleInner({
             </Button>
           </div>
         )}
-        {/* Action buttons outside bubble */}
+        {/* 操作栏（复制/分享/反馈/重试/重新生成/换模型重答）：显隐规则见 MessageActions。 */}
         {m.content !== THINKING_SENTINEL && !isStreaming && (
-          <div style={{ marginTop: 4, display: "flex", gap: 4, alignItems: "center" }}>
-            {/* 响应耗时。只对本次会话生成的回答显示：totalMs 的有无就是那个判据，
-                历史消息读回来时为空。失败的回答不显示 —— 给一句「请求失败」标上
-                用了多少秒，是拿噪音充信息。 */}
-            {m.role === "assistant" && m.totalMs != null
-              && m.content !== REQUEST_FAILED_SENTINEL && (
-              <Tooltip title={t("chat.timing.tooltip")}>
-                <span
-                  style={{
-                    color: "var(--fj-ink-muted)", fontSize: 12,
-                    marginRight: 4, whiteSpace: "nowrap",
-                    fontVariantNumeric: "tabular-nums", cursor: "default",
-                  }}
-                >
-                  <ClockCircleOutlined style={{ marginRight: 4 }} />
-                  {m.firstTokenMs != null && (
-                    <>{t("chat.timing.first_token", { n: formatResponseSeconds(m.firstTokenMs) })}
-                      {" · "}</>
-                  )}
-                  {t("chat.timing.total", { n: formatResponseSeconds(m.totalMs) })}
-                </span>
-              </Tooltip>
-            )}
-            <Tooltip title={t("chat.copy")}>
-              <Button
-                type="text" size="small" icon={<CopyOutlined />}
-                style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
-                onClick={() => {
-                  const textToCopy = m.role === "assistant" ? parseFollowUps(m.content).cleanContent : m.content;
-                  navigator.clipboard.writeText(textToCopy);
-                  message.success(t("chat.copied"));
-                  // Behavioural quality signal: copying an answer = found it useful.
-                  if (m.role === "assistant" && typeof umami !== "undefined") {
-                    umami.track("chat_copy");
-                  }
-                }}
-              />
-            </Tooltip>
-            {m.role === "assistant" && m.content !== REQUEST_FAILED_SENTINEL && (
-              <Tooltip title={t("chat.share_card_tooltip")}>
-                <Button
-                  type="text" size="small" icon={<ShareAltOutlined />}
-                  style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
-                  onClick={() => onShare(m)}
-                />
-              </Tooltip>
-            )}
-            {/* Hide feedback affordances until the real chat_messages.id has
-                replaced the in-flight Date.now() placeholder (≥ ~1.7e12); a click
-                during the streaming-but-not-yet-saved window would PUT to a
-                nonexistent id and 404 silently. */}
-            {m.role === "assistant" && user && m.id < 1e12 && (
-              <>
-                <Tooltip title={t("chat.feedback_helpful")}>
-                  <Button
-                    type="text" size="small"
-                    icon={m.feedback === "up" ? <LikeFilled /> : <LikeOutlined />}
-                    style={{ color: m.feedback === "up" ? "var(--fj-accent)" : "var(--fj-ink-muted)", fontSize: 12 }}
-                    onClick={() => onFeedback(m, "up")}
-                  />
-                </Tooltip>
-                <Tooltip title={t("chat.feedback_not_helpful")}>
-                  <Button
-                    type="text" size="small"
-                    icon={m.feedback === "down" ? <DislikeFilled /> : <DislikeOutlined />}
-                    style={{ color: m.feedback === "down" ? "#e74c3c" : "var(--fj-ink-muted)", fontSize: 12 }}
-                    onClick={() => onFeedback(m, "down")}
-                  />
-                </Tooltip>
-              </>
-            )}
-            {m.role === "assistant" && m.content === REQUEST_FAILED_SENTINEL && (
-              <Tooltip title={t("chat.retry")}>
-                <Button
-                  type="text" size="small" icon={<ReloadOutlined />}
-                  style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
-                  onClick={() => onRetry(m)}
-                />
-              </Tooltip>
-            )}
-            {/* 「重新生成」只给最后一条成功的回答。图标用 Redo 而不是 Reload：Reload
-                是失败重试的图标，测试按 .anticon-reload 找它，两者不能撞。 */}
-            {m.role === "assistant" && isLast && m.content !== REQUEST_FAILED_SENTINEL && (
-              <Tooltip title={t("chat.regenerate")}>
-                <Button
-                  type="text" size="small" icon={<RedoOutlined />}
-                  style={{ color: "var(--fj-ink-muted)", fontSize: 12 }}
-                  disabled={sending}
-                  onClick={() => onRegenerate(m)}
-                />
-              </Tooltip>
-            )}
-          </div>
+          <MessageActions
+            m={m}
+            copyText={isAssistantText ? cleanContent : m.content}
+            isLast={isLast}
+            failed={m.content === REQUEST_FAILED_SENTINEL}
+            sending={sending}
+            loggedIn={!!user}
+            models={regenerateModels}
+            onShare={onShare}
+            onRetry={onRetry}
+            onRegenerate={onRegenerate}
+            onFeedback={onFeedback}
+          />
         )}
       </div>
     </div>
@@ -746,7 +644,8 @@ export const MessageBubble = memo(
     prev.sending === next.sending &&
     prev.user === next.user &&
     prev.isLast === next.isLast &&
-    prev.expectedFirstTokenS === next.expectedFirstTokenS,
+    prev.expectedFirstTokenS === next.expectedFirstTokenS &&
+    prev.regenerateModels === next.regenerateModels,
 );
 
 export default function ChatPage() {
@@ -785,6 +684,17 @@ export default function ChatPage() {
   const selectedMaster = useMemo(
     () => mastersData?.find((m) => m.id === masterId) ?? null,
     [mastersData, masterId],
+  );
+  // 「换模型重答」下拉的模型列表。与 ChatModelSelector 各取各的：那边挂载时要校正
+  // 陈旧的 localStorage 选择，这里只读。只列真能用的。
+  const { data: chatModelsData } = useQuery({
+    queryKey: ["chat-models", "regenerate-menu"],
+    queryFn: fetchChatModels,
+    staleTime: 10 * 60 * 1000,
+  });
+  const regenerateModels = useMemo(
+    () => (chatModelsData ?? []).filter((x) => x.available),
+    [chatModelsData],
   );
   const [modelId, setModelId] = useState<string>(() => {
     if (typeof window === "undefined") return "deepseek:v4-pro";
@@ -1346,10 +1256,13 @@ export default function ChatPage() {
 
   const handleSendMessage = useCallback(async (
     text: string,
-    options?: { hotQuestionId?: number | null; origin?: SendOrigin },
+    // modelOverride：只作用于这一次请求（「换模型重答」），不写回 modelId state、
+    // 不落 localStorage —— 输入框里那个默认模型是用户的长期选择，一次试探不该改它。
+    options?: { hotQuestionId?: number | null; origin?: SendOrigin; modelOverride?: string },
   ) => {
     const msg = text.trim();
     if (!msg || sending) return;
+    const effectiveModelId = options?.modelOverride ?? modelId;
     const hotQuestionId = options?.hotQuestionId ?? null;
 
     // Umami: 只有用户主动发的新问题才记 "chat"（问题截前 30 字）。重试走的是同一条
@@ -1600,7 +1513,7 @@ export default function ChatPage() {
       // pick the platform default for whatever LLM_API_URL is configured —
       // important for non-deepseek deployments where forcing a deepseek
       // catalog id would otherwise raise.
-      modelId: modelId === "deepseek:v4-pro" ? null : modelId,
+      modelId: effectiveModelId === "deepseek:v4-pro" ? null : effectiveModelId,
       attachmentIds: attachmentIdsForSend.length ? attachmentIdsForSend : null,
     });
   }, [sending, sessionId, masterId, modelId, user, attachments, refetchSessions, refetchQuota, queryClient, scrollToBottom, setShowJumpToBottom, syncSessionParam]);
@@ -1642,16 +1555,19 @@ export default function ChatPage() {
     }
   }, [messages, handleSendMessage]);
 
-  const handleRegenerateMessage = useCallback((m: ChatMessageItem) => {
+  const handleRegenerateMessage = useCallback((m: ChatMessageItem, modelOverride?: string) => {
     const idx = messages.findIndex((x) => x.id === m.id);
     const userMsg = idx > 0 ? messages[idx - 1] : null;
     if (!userMsg || userMsg.role !== "user") return;
     // 对答案不满意才会点：30 天里约 88 次「隔一会儿原样再发同一问题」就是没有这个
     // 按钮的代价。替换而不是追加 —— 后端把旧的那对从上下文里去掉（否则模型多半
     // 照抄），新答案落库时删旧的；游客不落库，只在视图里替换。
-    if (typeof umami !== "undefined") umami.track("chat_regenerate");
+    // 换模型重答走同一条替换语义，只多带一个只作用于本次请求的 model 覆盖。
+    if (typeof umami !== "undefined") {
+      umami.track("chat_regenerate", modelOverride ? { model: modelOverride } : undefined);
+    }
     setMessages((prev) => prev.filter((x) => x.id !== m.id && x.id !== userMsg.id));
-    handleSendMessage(userMsg.content, { origin: "regenerate" });
+    handleSendMessage(userMsg.content, { origin: "regenerate", modelOverride });
   }, [messages, handleSendMessage]);
 
   const handleContinueMessage = useCallback((m: ChatMessageItem) => {
@@ -1738,6 +1654,35 @@ export default function ChatPage() {
     el.addEventListener("keydown", handler);
     return () => el.removeEventListener("keydown", handler);
   }, [tabSuggestions, tabIndex]);
+
+  // 键盘快捷键（Esc 停止 / Ctrl·⌘+K 新对话 / ↑ 召回上一问 / 「/」聚焦 / ? 说明）。
+  // 逻辑全在 useChatShortcuts，这里只接线。
+  const [shortcutsHelpOpen, setShortcutsHelpOpen] = useState(false);
+  const lastUserText = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "user") return messages[i].content;
+    }
+    return null;
+  }, [messages]);
+  const handleRecallLastQuestion = useCallback((text: string) => {
+    setInput(text);
+    setTabIndex(-1);
+    // 光标放到末尾：受控值在下一帧才写进 DOM。
+    requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (el) el.setSelectionRange(el.value.length, el.value.length);
+    });
+  }, []);
+  const toggleShortcutsHelp = useCallback(() => setShortcutsHelpOpen((v) => !v), []);
+  useChatShortcuts({
+    sending,
+    inputRef,
+    onStop: handleCancel,
+    onNewChat: handleNewChat,
+    lastUserText,
+    onRecall: handleRecallLastQuestion,
+    onToggleHelp: toggleShortcutsHelp,
+  });
 
   // Handle pre-filled message from URL params (e.g. from "Ask XiaoJin" button on reader page)
   useEffect(() => {
@@ -1891,7 +1836,7 @@ export default function ChatPage() {
           </Tooltip>
           {/* 收起态是一条图标轨：按钮去掉边框、统一 32×32 居中。带边框的方块在
               48px 宽的窄轨里会显得又挤又重，这也是它和 ChatGPT 观感差最多的地方。 */}
-          <Tooltip title={sidebarCollapsed ? t("chat.new_chat") : ""} placement="right">
+          <Tooltip title={t("chat.new_chat_shortcut", { n: `${MOD_KEY_LABEL} K` })} placement="right">
             <Button
               icon={sidebarCollapsed ? <RailNewChatIcon /> : <PlusOutlined />}
               type={sidebarCollapsed ? "text" : "default"}
@@ -2076,6 +2021,7 @@ export default function ChatPage() {
                 sending={sending}
                 isLast={i === messages.length - 1}
                 expectedFirstTokenS={expectedFirstTokenS}
+                regenerateModels={regenerateModels}
                 user={user}
                 markdownComponents={markdownComponents}
                 onSuggestionClick={handleSendMessage}
@@ -2302,15 +2248,18 @@ export default function ChatPage() {
                 <ChatModelSelector value={modelId} onChange={handleModelChange} onConfigureKey={goConfigureKey} />
                 <span className="chat-input-spacer" />
                 {sending ? (
-                  <Button
-                    danger
-                    className="chat-send-btn"
-                    aria-label={t("chat.stop")}
-                    icon={<StopOutlined />}
-                    onClick={handleCancel}
-                  >
-                    {t("chat.stop")}
-                  </Button>
+                  <Tooltip title={t("chat.stop_tooltip")}>
+                    <Button
+                      danger
+                      className="chat-send-btn"
+                      aria-label={t("chat.stop")}
+                      aria-keyshortcuts="Escape"
+                      icon={<StopOutlined />}
+                      onClick={handleCancel}
+                    >
+                      {t("chat.stop")}
+                    </Button>
+                  </Tooltip>
                 ) : (
                   // 窄屏（≤480px）CSS 把它收成仅图标的圆钮、回到工具行右端，
                   // 文字被隐藏，所以名字必须由 aria-label 给出。
@@ -2423,6 +2372,7 @@ export default function ChatPage() {
           autoFocus
         />
       </Modal>
+      <ChatShortcutsHelp open={shortcutsHelpOpen} onClose={() => setShortcutsHelpOpen(false)} />
     </>
   );
 }

@@ -954,66 +954,261 @@ em {
   }
 }
 
-/* ========== Chat Markdown ========== */
-/* Override bubble's pre-wrap so markdown controls its own whitespace */
-.chat-markdown { white-space: normal; line-height: 1.65; }
-.chat-markdown > * + * { margin-top: 0.35em; }
-.chat-markdown p { margin: 0; }
-.chat-markdown ul, .chat-markdown ol { margin: 0; padding-left: 1.5em; }
-.chat-markdown li { margin: 0; padding: 0; }
-.chat-markdown li + li { margin-top: 0.15em; }
-.chat-markdown li p { margin: 0; }
-.chat-markdown li > ul, .chat-markdown li > ol { margin: 0; }
-.chat-markdown hr { margin: 0.4em 0; border: none; border-top: 1px solid rgba(217,208,193,0.6); }
-.chat-markdown pre {
-  background: rgba(0,0,0,0.06);
+/* ========== Chat Messages ========== */
+/* 对标 Claude / ChatGPT 网页版：助手回答不套卡片、直接落在页面背景上，正文占满
+   对话列；用户消息保留一个低对比的气泡靠右。颜色只用主题 token，深浅色自动跟随。 */
+.chat-msg-row {
+  display: flex;
+  gap: 14px;
+  padding: 0 16px;
+  margin-bottom: 28px;
+}
+.chat-msg-row--user {
+  flex-direction: row-reverse;
+  margin-bottom: 24px;
+}
+.chat-msg-avatar {
+  width: 28px;
+  height: 28px;
+  margin-top: 2px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  background: var(--fj-bg-alt);
+  border: 1px solid var(--fj-border);
+  color: var(--fj-ink-light);
+}
+/* 用户一侧不放头像：气泡靠右本身就说明了是谁。 */
+.chat-msg-row--user .chat-msg-avatar { display: none; }
+.chat-msg-col {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.chat-msg-row--user .chat-msg-col {
+  max-width: min(78%, 620px);
+  align-items: flex-end;
+}
+.chat-msg-row--assistant .chat-msg-col {
+  flex: 1;
+  align-items: stretch;
+}
+.chat-msg-body {
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--fj-ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.chat-msg-row--user .chat-msg-body {
+  padding: 10px 16px;
+  border-radius: 18px;
+  background: var(--fj-bg-alt);
+  border: 1px solid color-mix(in srgb, var(--fj-border) 55%, transparent);
+  line-height: 1.7;
+}
+/* 助手回答里的思考/检索提示仍是 inline-flex：不被 stretch 拉满一行。 */
+.chat-msg-row--assistant .chat-msg-body > .chat-thinking { align-self: flex-start; }
+
+/* 回答下方的层次：信任行 / 参考经文与正文之间留一道细线和足够的空白，
+   追问胶囊再隔一段 —— 三者都是「关于这条回答」的元信息，不该挤进正文。 */
+.chat-answer-trust {
+  margin-top: 22px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--fj-border) 70%, transparent);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.chat-answer-sources {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+/* 旧回答没有信任行时，分隔线挪到参考经文上。 */
+.chat-markdown + .chat-answer-sources {
+  margin-top: 22px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--fj-border) 70%, transparent);
+}
+.chat-answer-sources-label {
+  font-size: 12px;
+  color: var(--fj-ink-muted);
+  margin-right: 2px;
+}
+.chat-answer-followups {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* 操作栏：桌面悬停整行才出现，最后一条助手回答常显（is-pinned），键盘聚焦进来时
+   显示，触屏设备（没有 hover）一律常显。用 opacity 而不是不渲染：不渲染会让悬停
+   时行高跳动，且键盘/读屏用户要一直够得到这些按钮。 */
+.chat-msg-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  margin-top: 10px;
+  min-height: 28px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.chat-msg-row--user .chat-msg-actions { margin-top: 4px; }
+.chat-msg-row:hover .chat-msg-actions,
+.chat-msg-actions:focus-within,
+.chat-msg-actions.is-pinned {
+  opacity: 1;
+}
+@media (hover: none) {
+  .chat-msg-actions { opacity: 1; }
+}
+.chat-msg-actions .ant-btn.ant-btn {
+  width: 28px;
+  height: 28px;
   border-radius: 6px;
-  padding: 8px 12px;
+  color: var(--fj-ink-muted);
+  font-size: 14px;
+}
+.chat-msg-actions .ant-btn.ant-btn:not(:disabled):hover {
+  color: var(--fj-ink);
+  background: var(--fj-bg-alt);
+}
+.chat-msg-actions .ant-btn.ant-btn:disabled { color: var(--fj-ink-muted); opacity: 0.45; }
+.chat-msg-actions .ant-btn.ant-btn.is-active-up { color: var(--fj-accent); }
+.chat-msg-actions .ant-btn.ant-btn.is-active-down { color: var(--fj-danger); }
+@media (pointer: coarse) {
+  .chat-msg-actions .ant-btn.ant-btn { width: 36px; height: 36px; }
+}
+.chat-msg-timing {
+  color: var(--fj-ink-muted);
+  font-size: 12px;
+  margin-right: 6px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+}
+
+/* 手机：去掉助手头像，正文吃满整列；用户气泡放宽。 */
+@media (max-width: 768px) {
+  .chat-msg-row { padding: 0 12px; gap: 0; margin-bottom: 24px; }
+  .chat-msg-row--assistant .chat-msg-avatar { display: none; }
+  .chat-msg-row--user .chat-msg-col { max-width: 86%; }
+}
+
+/* 快捷键说明卡片 */
+.chat-shortcuts-list { margin: 0; }
+.chat-shortcuts-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--fj-border) 60%, transparent);
+}
+.chat-shortcuts-row:last-child { border-bottom: 0; }
+.chat-shortcuts-row dt { color: var(--fj-ink); font-weight: 400; }
+.chat-shortcuts-row dd { margin: 0; display: flex; gap: 4px; flex-shrink: 0; }
+.chat-shortcuts-row kbd {
+  min-width: 24px;
+  padding: 1px 6px;
+  text-align: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--fj-ink);
+  background: var(--fj-surface);
+  border: 1px solid var(--fj-border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+}
+
+/* ========== Chat Markdown ========== */
+/* 阅读排版：段间一行空白、中文正文行高 1.8、标题上松下紧（标题属于它下面的
+   内容）、引文块与上下文各隔开一段。只动样式 —— markdown 解析、sanitize、
+   引文注入一概不碰。 */
+.chat-markdown { white-space: normal; line-height: 1.8; }
+.chat-markdown > :first-child { margin-top: 0; }
+.chat-markdown > :last-child { margin-bottom: 0; }
+.chat-markdown p { margin: 0 0 0.9em; }
+.chat-markdown strong { font-weight: 600; color: var(--fj-ink); }
+.chat-markdown h1, .chat-markdown h2, .chat-markdown h3,
+.chat-markdown h4, .chat-markdown h5, .chat-markdown h6 {
+  margin: 1.5em 0 0.55em;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--fj-ink);
+}
+.chat-markdown h1 { font-size: 1.28em; }
+.chat-markdown h2 { font-size: 1.18em; }
+.chat-markdown h3 { font-size: 1.08em; }
+.chat-markdown h4, .chat-markdown h5, .chat-markdown h6 { font-size: 1em; }
+.chat-markdown ul, .chat-markdown ol { margin: 0 0 0.9em; padding-left: 1.6em; }
+.chat-markdown li { margin: 0; padding-left: 0.2em; }
+.chat-markdown li + li { margin-top: 0.4em; }
+.chat-markdown li::marker { color: var(--fj-ink-muted); }
+.chat-markdown li > p { margin: 0; }
+.chat-markdown li > p + p { margin-top: 0.5em; }
+.chat-markdown li > ul, .chat-markdown li > ol { margin: 0.4em 0 0; }
+.chat-markdown blockquote {
+  margin: 1.1em 0;
+  padding: 0.2em 0 0.2em 1em;
+  border-left: 3px solid var(--fj-gold);
+  color: var(--fj-ink-light);
+}
+.chat-markdown blockquote p { margin: 0 0 0.5em; }
+.chat-markdown blockquote > :last-child { margin-bottom: 0; }
+.chat-markdown hr {
+  margin: 1.6em 0;
+  border: none;
+  border-top: 1px solid color-mix(in srgb, var(--fj-border) 70%, transparent);
+}
+.chat-markdown pre {
+  background: var(--fj-bg-alt);
+  border-radius: 8px;
+  padding: 10px 14px;
   overflow-x: auto;
   font-size: 13px;
-  margin: 0.3em 0;
+  line-height: 1.6;
+  margin: 0 0 1em;
 }
 .chat-markdown code {
-  background: rgba(0,0,0,0.06);
-  border-radius: 3px;
-  padding: 1px 4px;
-  font-size: 13px;
+  background: var(--fj-bg-alt);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.88em;
 }
 .chat-markdown pre code { background: none; padding: 0; }
-.chat-markdown blockquote {
-  border-left: 3px solid var(--fj-gold);
-  padding-left: 12px;
-  margin: 0.1em 0;
-  opacity: 0.85;
-}
-.chat-markdown h1, .chat-markdown h2, .chat-markdown h3 {
-  font-size: 1em;
-  font-weight: 600;
-  margin: 0.3em 0 0.1em;
-}
 .chat-markdown table {
   border-collapse: collapse;
-  margin: 0.5em 0;
+  margin: 0 0 1em;
   width: 100%;
   font-size: 0.95em;
   display: block;
   overflow-x: auto;
 }
 .chat-markdown thead {
-  background: rgba(217, 208, 193, 0.35);
+  background: var(--fj-bg-alt);
 }
 .chat-markdown th, .chat-markdown td {
-  border: 1px solid rgba(217, 208, 193, 0.7);
-  padding: 6px 10px;
+  border: 1px solid var(--fj-border);
+  padding: 7px 12px;
   text-align: left;
   vertical-align: top;
-  line-height: 1.55;
+  line-height: 1.6;
 }
 .chat-markdown th {
   font-weight: 600;
 }
 .chat-markdown tbody tr:nth-child(even) {
-  background: rgba(0, 0, 0, 0.02);
+  background: color-mix(in srgb, var(--fj-bg-alt) 45%, transparent);
 }
 
 /* ========== Chat Sidebar Mobile ========== */
