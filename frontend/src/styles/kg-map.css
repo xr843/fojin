@@ -349,6 +349,81 @@
   box-shadow: 0 0 0 2px var(--fj-gold);
 }
 
+/* ---------- 2D / 3D 视角切换 ---------- */
+/* 右下角、压在 MapTiler 版权条之上（版权条在 bottom 约 10px，高约 22px）。
+   右上角留给点击后弹出的条目卡片。 */
+.kg-map-view-controls {
+  position: absolute;
+  right: 12px;
+  bottom: 44px;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.kg-map-view-toggle {
+  display: flex;
+  background: var(--fj-surface);
+  border: 1px solid var(--fj-border);
+  border-radius: 6px;
+  padding: 2px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.kg-map-view-toggle button,
+.kg-map-compass {
+  font-family: "Noto Serif SC", serif;
+  border: 0;
+  background: transparent;
+  color: var(--fj-ink-light);
+  cursor: pointer;
+}
+
+.kg-map-view-toggle button {
+  min-width: 36px;
+  height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border-radius: 4px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.kg-map-view-toggle button:hover {
+  color: var(--fj-accent);
+}
+
+.kg-map-view-toggle button.is-active {
+  background: var(--fj-accent);
+  color: var(--fj-surface);
+}
+
+.kg-map-compass {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--fj-surface);
+  border: 1px solid var(--fj-border);
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  color: var(--fj-ink);
+}
+
+.kg-map-compass svg {
+  transition: transform 0.1s linear;
+}
+
+.kg-map-view-toggle button:focus-visible,
+.kg-map-compass:focus-visible {
+  outline: 2px solid var(--fj-accent);
+  outline-offset: 2px;
+}
+
 /* ---------- 地图图例 ---------- */
 .kg-map-legend {
   position: absolute;

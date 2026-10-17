@@ -4,6 +4,7 @@ import type { StyleSpecification } from "maplibre-gl";
 import DeckGL from "@deck.gl/react";
 import { ScatterplotLayer, ArcLayer } from "@deck.gl/layers";
 import type { PickingInfo } from "@deck.gl/core";
+import { Tooltip } from "antd";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -27,6 +28,12 @@ const INITIAL_VIEW_STATE = {
   pitch: 0,
   bearing: 0,
 };
+
+/** 立体视角的镜头：斜 55°、略向西偏 15°。deck 的 MapView 上限是 60°，55° 时
+ *  东亚全图的上缘还在地平线以内（不会露出地图边界外的空白天空）。 */
+const PITCH_3D = 55;
+const BEARING_3D = -15;
+const VIEW_TRANSITION_MS = 900;
 
 /** MapTiler Streets with Chinese labels — one basemap per theme.
  *  The map canvas covers ~65% of the viewport, so a light basemap under the dark
@@ -78,6 +85,22 @@ export default function DeckGLMap({
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [arcTooltip, setArcTooltip] = useState<ArcTooltipState | null>(null);
   const [viewState, setViewState] = useState<typeof INITIAL_VIEW_STATE & { transitionDuration?: number }>(INITIAL_VIEW_STATE);
+  // 2D / 3D 只换镜头，不换数据：每个点仍画在它自己的经纬度上，弧线本来就是 3D 拱。
+  // 平面模式下关掉拖拽旋转——否则右键一拖就意外斜过去，又没有回正的入口。
+  const [is3D, setIs3D] = useState(false);
+  const setViewMode = useCallback((next: boolean) => {
+    setIs3D(next);
+    setViewState((prev) => ({
+      ...prev,
+      pitch: next ? PITCH_3D : 0,
+      bearing: next ? BEARING_3D : 0,
+      transitionDuration: VIEW_TRANSITION_MS,
+    }));
+    if (typeof umami !== "undefined") umami.track("map_view_mode", { mode: next ? "3d" : "2d" });
+  }, []);
+  const resetNorth = useCallback(() => {
+    setViewState((prev) => ({ ...prev, bearing: 0, transitionDuration: VIEW_TRANSITION_MS / 2 }));
+  }, []);
   const mapRef = useRef<MapRef>(null);
   const isPhone = useNarrowViewport(PHONE_QUERY);
   // A boolean, not the raw zoom, so the layers below rebuild only when the
@@ -258,6 +281,9 @@ export default function DeckGLMap({
         getRadius: 2500,
         radiusMinPixels: denseOverview ? 2 : 3,
         radiusMaxPixels: 9,
+        // 斜视时贴地的圆会被压成扁椭圆、远处挤成一条线；立起来正对镜头。
+        // 只影响点的朝向，锚点仍是它的经纬度。
+        billboard: is3D,
         pickable: true,
         autoHighlight: true,
         highlightColor: [255, 215, 0, 220],
@@ -286,6 +312,7 @@ export default function DeckGLMap({
           radiusScale: pulseScale,
           radiusMinPixels: Math.round(12 * pulseScale),
           radiusMaxPixels: Math.round(22 * pulseScale),
+          billboard: is3D,
           pickable: false,
           updateTriggers: {
             getLineColor: [pulseScale],
@@ -322,14 +349,14 @@ export default function DeckGLMap({
     }
 
     return result;
-  }, [filteredEntities, filteredArcs, showArcs, handleHover, handleClick, focusEntity, pulseScale, TYPE_COLORS, denseOverview]);
+  }, [filteredEntities, filteredArcs, showArcs, handleHover, handleClick, focusEntity, pulseScale, TYPE_COLORS, denseOverview, is3D]);
 
   return (
     <>
       <DeckGL
         viewState={viewState}
         onViewStateChange={(e) => setViewState(e.viewState as typeof viewState)}
-        controller
+        controller={{ dragRotate: is3D, touchRotate: is3D }}
         layers={layers}
         // Smaller dots on phones must not mean harder taps: let a fingertip
         // within 8px pick the nearest dot. Desktop keeps exact mouse picking.
@@ -345,6 +372,34 @@ export default function DeckGLMap({
           />
         )}
       </DeckGL>
+
+      <div className="kg-map-view-controls">
+        {/* 指北针放在切换钮之上：容器贴底排列，它出现/消失时切换钮不挪位，
+            否则刚点完「3D」光标下就换成了指北针。 */}
+        {is3D && (
+          <Tooltip title={t("geo.reset_north")} placement="left">
+            <button type="button" className="kg-map-compass" aria-label={t("geo.reset_north")} onClick={resetNorth}>
+              {/* 指针跟着地图转：bearing 是地图相对正北的旋转，指针反向转回去仍指北。 */}
+              <svg viewBox="0 0 24 24" width="18" height="18" style={{ transform: `rotate(${-viewState.bearing}deg)` }} aria-hidden>
+                <path d="M12 3 L15.5 12 L12 10.6 L8.5 12 Z" fill="var(--fj-cinnabar, #b5452c)" />
+                <path d="M12 21 L8.5 12 L12 13.4 L15.5 12 Z" fill="currentColor" opacity="0.45" />
+              </svg>
+            </button>
+          </Tooltip>
+        )}
+        <div className="kg-map-view-toggle" role="group" aria-label={t("geo.view_mode")}>
+          <Tooltip title={t("geo.view_2d_tooltip")} placement="left">
+            <button type="button" aria-pressed={!is3D} className={!is3D ? "is-active" : undefined} onClick={() => is3D && setViewMode(false)}>
+              2D
+            </button>
+          </Tooltip>
+          <Tooltip title={t("geo.view_3d_tooltip")} placement="left">
+            <button type="button" aria-pressed={is3D} className={is3D ? "is-active" : undefined} onClick={() => !is3D && setViewMode(true)}>
+              3D
+            </button>
+          </Tooltip>
+        </div>
+      </div>
 
       {tooltip && (() => {
         const e = tooltip.entity;
