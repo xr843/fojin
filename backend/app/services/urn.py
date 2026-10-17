@@ -271,7 +271,7 @@ def _expand_work_id(parsed: ParsedURN) -> str:
     return f"{prefix}{parsed.work_id}"
 
 
-async def juan_for_line(db: AsyncSession, text_id: int, anchor: str) -> int | None:
+async def juan_for_line(db: AsyncSession, text_id: int, anchor: str, *, nearest: bool = False) -> int | None:
     """The juan that holds CBETA line ``anchor`` (``p0749a05`` / ``0749a05``) in ``text_id``.
 
     A bare CBETA line head (``T08n0235_p0749a05``, as scholars paste it from CBETA
@@ -286,7 +286,25 @@ async def juan_for_line(db: AsyncSession, text_id: int, anchor: str) -> int | No
             TextLineAnchor.text_id == text_id, TextLineAnchor.line_ref == ref
         )
     )
-    return result.scalar_one_or_none()
+    juan = result.scalar_one_or_none()
+    if juan is not None or not nearest:
+        return juan
+    # text_line_anchors is sparse (50–86% of CBETA lines: heading lines and lines
+    # starting at a paragraph boundary are not stored), so a pasted line head often
+    # has no row of its own. Fall back to the nearest stored line before it, then
+    # after it — the reader highlights the gap between the two, which contains it.
+    for cmp, order in ((TextLineAnchor.line_ref < ref, TextLineAnchor.line_ref.desc()),
+                       (TextLineAnchor.line_ref > ref, TextLineAnchor.line_ref.asc())):
+        row = await db.execute(
+            select(TextLineAnchor.juan_num)
+            .where(TextLineAnchor.text_id == text_id, cmp)
+            .order_by(order)
+            .limit(1)
+        )
+        juan = row.scalar_one_or_none()
+        if juan is not None:
+            return juan
+    return None
 
 
 async def resolve_urn_full(
@@ -300,7 +318,11 @@ async def resolve_urn_full(
     """
     text_id, reader_url = await resolve_urn(db, parsed)
     if text_id is not None and parsed.anchor and parsed.juan is None:
-        juan = await juan_for_line(db, text_id, parsed.anchor)
+        # Nearest-line fallback only for the Taishō: page/col/line is unique per
+        # volume there and every T work in fojin sits in one volume. The X canon's
+        # stored refs mix in the R edition's pages, so "nearest" could be another
+        # edition's line.
+        juan = await juan_for_line(db, text_id, parsed.anchor, nearest=parsed.work_id.startswith("T"))
         if juan is not None:
             parsed = replace(parsed, juan=juan)
             reader_url = build_reader_url(parsed, text_id=text_id)

@@ -242,8 +242,8 @@ async def test_resolve_full_fills_juan_from_anchor(monkeypatch: pytest.MonkeyPat
     async def fake_text_id(_db, cbeta_id):
         return 42 if cbeta_id == "T0235" else None
 
-    async def fake_juan(_db, text_id, anchor):
-        assert (text_id, anchor) == (42, "p0749a05")
+    async def fake_juan(_db, text_id, anchor, *, nearest=False):
+        assert (text_id, anchor, nearest) == (42, "p0749a05", True)
         return 1
 
     monkeypatch.setattr(urn_mod, "get_text_id_by_cbeta", fake_text_id)
@@ -259,7 +259,7 @@ async def test_resolve_full_unknown_line_falls_back_to_text_page(monkeypatch: py
     async def fake_text_id(_db, _cbeta_id):
         return 42
 
-    async def fake_juan(_db, _text_id, _anchor):
+    async def fake_juan(_db, _text_id, _anchor, *, nearest=False):
         return None
 
     monkeypatch.setattr(urn_mod, "get_text_id_by_cbeta", fake_text_id)
@@ -282,3 +282,23 @@ async def test_resolve_full_keeps_explicit_juan(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr(urn_mod, "juan_for_line", boom)
     _, _, url = await urn_mod.resolve_urn_full(None, parse_urn("fojin:cbeta/T0235.1#p0749a05"))
     assert url == "/texts/42/read?juan=1&anchor=p0749a05"
+
+
+@pytest.mark.asyncio
+async def test_resolve_full_nearest_fallback_only_for_taisho(monkeypatch: pytest.MonkeyPatch) -> None:
+    """X refs in text_line_anchors mix in the R edition's pages — no nearest-line guessing there."""
+    import app.services.urn as urn_mod
+
+    seen = {}
+
+    async def fake_text_id(_db, _cbeta_id):
+        return 7
+
+    async def fake_juan(_db, _text_id, _anchor, *, nearest=False):
+        seen["nearest"] = nearest
+        return None
+
+    monkeypatch.setattr(urn_mod, "get_text_id_by_cbeta", fake_text_id)
+    monkeypatch.setattr(urn_mod, "juan_for_line", fake_juan)
+    await urn_mod.resolve_urn_full(None, parse_urn("fojin:cbeta/X0456#p0455c03"))
+    assert seen["nearest"] is False

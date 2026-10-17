@@ -209,18 +209,29 @@ function renderSegment(seg: TextSegment, i: number, ctx?: ReaderCtx) {
   return <p key={i} className={`text-${seg.type}`}>{children}</p>;
 }
 
-/** 高亮深链的目标行——从这一行的锚点到下一行的锚点（CBETA 自己只滚到段落、不标行）。
- * 用 CSS Custom Highlight API：不改 DOM、不打断选区与校勘标记；不支持的浏览器退回整段闪烁。
- * 返回清理函数。 */
-function highlightCbetaLine(container: HTMLElement, el: HTMLElement): () => void {
-  const p = el.closest("p");
+/** 高亮深链的目标：从 startEl 之后到 endEl 之前（都是 .cbeta-line 锚点）。
+ * 目标行有锚点时 = 这一行（它的锚点 → 下一个锚点）；目标行没存锚点时（标题行、段首行，
+ * 约占 14–50%）= 前后两个锚点之间的那一段，必然含目标行——目次跳转时正好是品名那几行。
+ * CBETA 自己只滚到段落、不标行。用 CSS Custom Highlight API：不改 DOM、不打断选区与校勘
+ * 标记；不支持的浏览器退回整段闪烁。返回清理函数。 */
+function highlightCbetaSpan(startEl: HTMLElement | null, endEl: HTMLElement | null): () => void {
+  const anchorEl = startEl ?? endEl;
+  if (!anchorEl) return () => {};
+  const p = anchorEl.closest("p");
   if (typeof CSS !== "undefined" && "highlights" in CSS && typeof Highlight !== "undefined") {
-    const all = Array.from(container.querySelectorAll<HTMLElement>(".cbeta-line"));
-    const next = all[all.indexOf(el) + 1];
     const range = document.createRange();
-    range.setStartAfter(el);
-    if (next) range.setEndBefore(next);
-    else if (p) range.setEnd(p, p.childNodes.length);
+    if (startEl) range.setStartAfter(startEl);
+    else {
+      const ep = endEl!.closest("p");
+      if (ep) range.setStart(ep, 0);
+      else range.setStartBefore(endEl!);
+    }
+    if (endEl) range.setEndBefore(endEl);
+    else {
+      const sp = startEl!.closest("p");
+      if (sp) range.setEnd(sp, sp.childNodes.length);
+      else range.setEndAfter(startEl!);
+    }
     CSS.highlights.set("cbeta-target-line", new Highlight(range));
     const timer = setTimeout(() => CSS.highlights.delete("cbeta-target-line"), 4000);
     return () => {
@@ -909,26 +920,29 @@ export default function TextReaderPage() {
   const anchorTarget = jumpTarget?.ref ?? searchParams.get("anchor")?.replace(/^p/, "") ?? null;
   useEffect(() => {
     if (!anchorTarget || !lineAnchors.length) return;
-    // 目标行号不在本卷的锚点里时：大正藏落到它之后最近的一行（目次指向的品名行在导入正文
-    // 时被去掉了，品名之后紧接正文，落点正确）；卍续藏不猜——库里混着 R 版页码，「之后最近」
-    // 可能落到另一版的页上。
-    let ref = anchorTarget;
-    if (!lineAnchors.some((a) => a.ref === ref)) {
-      if (!lineLevel) return;
-      const after = lineAnchors.map((a) => a.ref).filter((r) => r > ref).sort()[0];
-      if (!after) return;
-      ref = after;
-    }
+    // 目标行号不在本卷的锚点里（锚点是稀疏的：标题行、段首行没存）：大正藏取前后最近的两个
+    // 锚点，高亮二者之间——必含目标行。卍续藏不猜：库里混着 R 版页码，「最近」可能是另一版的行。
+    const refs = lineAnchors.map((a) => a.ref);
+    const exact = refs.includes(anchorTarget);
+    if (!exact && !lineLevel) return;
+    const before = refs.filter((r) => r < anchorTarget).sort();
+    const prevRef = exact ? anchorTarget : (before[before.length - 1] ?? null);
+    const nextRef = refs.filter((r) => r > anchorTarget).sort()[0] ?? null;
+    if (!prevRef && !nextRef) return;
     let raf = 0;
     let clear: (() => void) | undefined;
     let cancelled = false;
     let tries = 0;
+    const find = (container: HTMLElement, ref: string | null) =>
+      ref ? container.querySelector<HTMLElement>(`.cbeta-line[data-ref="${CSS.escape(ref)}"]`) : null;
 
     const attempt = () => {
       if (cancelled) return;
       const container = readerContentRef.current;
-      const el = container?.querySelector<HTMLElement>(`.cbeta-line[data-ref="${CSS.escape(ref)}"]`);
-      if (!container || !el) {
+      const startEl = container ? find(container, prevRef) : null;
+      const endEl = container ? find(container, nextRef) : null;
+      const target = exact ? startEl : endEl ?? startEl;
+      if (!container || !target) {
         // ~1s at 60fps. Give up quietly after that: the anchor may belong to
         // another juan, and nudging the reader somewhere arbitrary is worse
         // than leaving it where the reader put it.
@@ -941,8 +955,8 @@ export default function TextReaderPage() {
       // tens of thousands of pixels tall and the smooth path never completes
       // over that distance in this container. Instant is also what a deep link
       // wants: arrive at the line, don't animate past everything before it.
-      el.scrollIntoView({ block: "center" });
-      clear = highlightCbetaLine(container, el);
+      target.scrollIntoView({ block: "center" });
+      clear = highlightCbetaSpan(startEl, endEl);
     };
 
     raf = requestAnimationFrame(attempt);
