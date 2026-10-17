@@ -116,7 +116,9 @@ export default function Layout() {
     // { icon: <ExperimentOutlined />, label: t("nav.research"), path: "/research" },
     { icon: <FileTextOutlined />, label: t("nav.dictionary"), path: "/dictionary" },
     { icon: <ApartmentOutlined />, label: t("nav.kg"), path: "/kg" },
-    { icon: <GlobalOutlined />, label: t("nav.geo"), path: "/map" },
+    // 佛教地理暂从导航撤下（2026-10-17 用户要求）。路由 /map 仍可直达（首页卡片、分享链接、
+    // SEO 收录不受影响），恢复时取消下一行注释。
+    // { icon: <GlobalOutlined />, label: t("nav.geo"), path: "/map" },
     { icon: <BookOutlined />, label: t("nav.collections"), path: "/collections" },
     // 在线读诵(/read-aloud)不占导航位：读诵是**读一部经时的一个动作**，不是与
     // 辞典/知识图谱并列的一个板块 —— 它的入口已经在阅读页工具栏上，和跨藏对照、

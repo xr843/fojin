@@ -43,9 +43,14 @@ describe("Layout 顶部导航", () => {
   it("既有导航项不受影响", () => {
     renderLayout();
 
-    for (const label of ["数据源", "AI 问答", "佛学辞典", "知识图谱", "佛教地理", "经典专题"]) {
+    for (const label of ["数据源", "AI 问答", "佛学辞典", "知识图谱", "经典专题"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
+  });
+
+  it("佛教地理暂不在导航里（路由 /map 仍可直达）", () => {
+    renderLayout();
+    expect(screen.queryByText("佛教地理")).toBeNull();
   });
 });
 
