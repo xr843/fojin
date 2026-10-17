@@ -10,7 +10,7 @@ import {
   DownOutlined,
   ApartmentOutlined,
   RobotOutlined,
-  SafetyCertificateOutlined,
+  BookOutlined,
   FileTextOutlined,
 } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
@@ -21,6 +21,7 @@ import { getStats, getSources, getFilters, getSearchSuggestItems, getHomeShowcas
 import { askQueryFrom, buildHomeSuggestOptions, itemsFromSuggestResponse, type SuggestGroup } from "./homeSuggest";
 import { getLangName } from "../utils/sourceUrls";
 import { getReadingHistory } from "../utils/readingHistory";
+import { getLocalizedCollections } from "../data/collections";
 import { useAuthStore } from "../stores/authStore";
 import "../styles/home.css"; // mobile-responsive v2.1
 import { LangAlternates } from "../seo/LangAlternates";
@@ -33,7 +34,7 @@ function truncateTitle(title: string, max = 12): string {
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuthStore();
   const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
   const [sourceOpen, setSourceOpen] = useState(false);
@@ -57,8 +58,16 @@ export default function HomePage() {
   // any extra backend round-trip.
   const [rand] = useState(() => ({
     sources: Math.random(), chat: Math.random(), dict: Math.random(),
-    kg: Math.random(), geo: Math.random(),
+    kg: Math.random(), geo: Math.random(), col: Math.random(),
   }));
+
+  // 经典专题卡：随机起点取三个专题名，每次进首页看到的不同。
+  const collectionsDesc = useMemo(() => {
+    const cols = getLocalizedCollections(i18n.language).map((c) => c.name).filter(Boolean);
+    if (cols.length === 0) return null;
+    const start = Math.floor(rand.col * cols.length) % cols.length;
+    return [0, 1, 2].map((i) => cols[(start + i) % cols.length]).join(" · ");
+  }, [i18n.language, rand.col]);
 
   // Pick one item from each cached pool using the per-mount random values.
   const sc = useMemo(() => {
@@ -284,13 +293,6 @@ export default function HomePage() {
               {sc.chat || t("home.feature_chat_desc")}
             </div>
           </div>
-          {/* 核对页（#1308）：面向大众的入口——网上流传的「佛说」是真是假。
-              顶替原「经典专题」卡：首页落地访客点它最少（30 天 26 次），导航里仍有。 */}
-          <div className="home-feature-card" onClick={() => navigate("/verify")}>
-            <SafetyCertificateOutlined className="home-feature-icon" />
-            <div className="home-feature-title">{t("home.feature_verify_title")}</div>
-            <div className="home-feature-desc">{t("home.feature_verify_desc")}</div>
-          </div>
           <div
             className="home-feature-card"
             onClick={() =>
@@ -314,8 +316,16 @@ export default function HomePage() {
                 : t("home.feature_kg_desc")}
             </div>
           </div>
-          {/* 佛教地理卡暂撤（2026-10-17 用户要求，与顶部导航一致）；/map 仍可直达。
-              恢复时从 git 历史取回这张卡（navigate("/map")），并把 .home-features 改回 6 列。 */}
+          {/* 首页功能卡与顶部导航一一对应、同顺序（2026-10-17 用户要求）：数据源 · AI 问答 ·
+              佛学辞典 · 知识图谱 · 经典专题。核对经文、佛教地理已从导航暂撤，卡片也不放；
+              /verify、/map 路由仍可直达。导航增减时这里同步改。 */}
+          <div className="home-feature-card" onClick={() => navigate("/collections")}>
+            <BookOutlined className="home-feature-icon" />
+            <div className="home-feature-title">{t("home.feature_collections_title")}</div>
+            <div className="home-feature-desc">
+              {collectionsDesc || t("home.feature_collections_desc")}
+            </div>
+          </div>
         </div>
 
         {!user && !tipDismissed && (

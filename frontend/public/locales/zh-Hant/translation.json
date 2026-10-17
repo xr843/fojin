@@ -430,6 +430,8 @@
   "home.sc_sources": "{{sources}} 個來源 · {{texts}} 部經典",
   "home.sc_sources_names": "{{sources}} 個來源 · {{names}}",
   "home.sc_geo": "{{count}} 座佛教寺院 · {{places}}",
+  "home.feature_collections_title": "經典專題",
+  "home.feature_collections_desc": "例如：禪宗典籍、淨土經典、律藏專題",
   "home.feature_kg_title": "知識圖譜",
   "home.feature_kg_desc": "例如：鳩摩羅什 → 譯經 → 《妙法蓮華經》",
   "home.feature_chat_title": "AI 問答",
