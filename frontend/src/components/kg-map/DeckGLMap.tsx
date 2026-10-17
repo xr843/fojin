@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import { Map, type MapRef } from "react-map-gl/maplibre";
-import type { StyleSpecification } from "maplibre-gl";
-import DeckGL from "@deck.gl/react";
+import { Map, Source, Layer, useControl, type MapRef, type ViewStateChangeEvent } from "react-map-gl/maplibre";
+import type { StyleSpecification, SkySpecification } from "maplibre-gl";
+import { MapLibreOverlay, type MapLibreOverlayProps } from "@deck.gl/maplibre";
 import { ScatterplotLayer, ArcLayer } from "@deck.gl/layers";
 import type { PickingInfo } from "@deck.gl/core";
 import { Tooltip } from "antd";
@@ -29,11 +29,57 @@ const INITIAL_VIEW_STATE = {
   bearing: 0,
 };
 
-/** 立体视角的镜头：斜 55°、略向西偏 15°。deck 的 MapView 上限是 60°，55° 时
- *  东亚全图的上缘还在地平线以内（不会露出地图边界外的空白天空）。 */
+/** 立体视角的镜头：斜 55°、略向西偏 15°；3D 下允许手动压到 70°（远处有天空与雾）。 */
 const PITCH_3D = 55;
 const BEARING_3D = -15;
+const MAX_PITCH_3D = 70;
 const VIEW_TRANSITION_MS = 900;
+
+/** 地形夸张系数。东亚全图（zoom 4–5）下 1 倍高差几乎看不出起伏；1.6 倍让青藏高原、
+ *  横断山、秦岭立得起来，又不至于把山画成针。点的 z 必须乘同一个系数，否则点会悬空/入地。 */
+const TERRAIN_EXAGGERATION = 1.6;
+const DEM_SOURCE_ID = "fojin-dem";
+const HILLSHADE_SOURCE_ID = "fojin-dem-hillshade";
+/** 高程与渲染同源：MapTiler terrain-rgb-v2。点的海拔由 scripts/build_geo_elevation.py
+ *  从同一数据集离线采样（z9 双线性），见 public/elevation/kg-geo-elev.json。 */
+const demTilesUrl = () => `https://api.maptiler.com/tiles/terrain-rgb-v2/tiles.json?key=${MAPTILER_KEY}`;
+const ELEVATION_URL = "/elevation/kg-geo-elev.json";
+
+/** 海拔表的紧凑格式（见 scripts/build_geo_elevation.py）：id 升序差分 + 以 unit_m 为单位的海拔。 */
+interface ElevationTable {
+  v: number;
+  unit_m: number;
+  id_delta: number[];
+  elev: number[];
+}
+function decodeElevations(t: ElevationTable): Map<number, number> {
+  const out = new globalThis.Map<number, number>();
+  let id = 0;
+  for (let i = 0; i < t.id_delta.length; i++) {
+    id += t.id_delta[i];
+    out.set(id, t.elev[i] * t.unit_m);
+  }
+  return out;
+}
+
+/** 远处的天空与大气透视，颜色跟随主题（宣纸底色 / 深色墨底）。 */
+const skyFor = (isDark: boolean): SkySpecification =>
+  isDark
+    ? { "sky-color": "#1c2330", "horizon-color": "#3a3328", "fog-color": "#2a2620", "sky-horizon-blend": 0.6, "horizon-fog-blend": 0.6, "fog-ground-blend": 0.35, "atmosphere-blend": 0.6 }
+    : { "sky-color": "#b9d3ea", "horizon-color": "#f1ebdf", "fog-color": "#efe8da", "sky-horizon-blend": 0.6, "horizon-fog-blend": 0.55, "fog-ground-blend": 0.3, "atmosphere-blend": 0.7 };
+
+/** deck.gl 以交错模式（interleaved）挂进 MapLibre：与地形共用深度缓冲与相机。
+ *  2026-10-17 实测（spike）：非交错模式开地形后点最多偏 20px、且永远浮在山上；交错模式
+ *  + 点带上真实海拔的 z，偏移 ≤1.4px。 */
+function DeckOverlay(props: MapLibreOverlayProps) {
+  const overlay = useControl(() => new MapLibreOverlay({ ...props, interleaved: true }));
+  useEffect(() => {
+    overlay.setProps(props);
+    // 开发环境挂到 window 上，供贴地精度的自动化校验（比对 deck 投影与 map.project）。
+    if (import.meta.env.DEV) (window as unknown as { __fojinMapOverlay?: unknown }).__fojinMapOverlay = overlay;
+  }, [overlay, props]);
+  return null;
+}
 
 /** MapTiler Streets with Chinese labels — one basemap per theme.
  *  The map canvas covers ~65% of the viewport, so a light basemap under the dark
@@ -43,8 +89,11 @@ const VIEW_TRANSITION_MS = 900;
  *  unchanged. (dataviz-dark and basic-v2-dark are darker still but ship only
  *  11 / 7 label layers — far fewer place names.) */
 const MAPTILER_KEY = "sBS5GCqJuftwymqkp64I";
-const mapStyleUrl = (isDark: boolean) =>
-  `https://api.maptiler.com/maps/streets-v2${isDark ? "-dark" : ""}/style.json?key=${MAPTILER_KEY}&language=zh`;
+const mapStyleUrl = (isDark: boolean, satellite: boolean) =>
+  satellite
+    // 卫星混合底图（影像 + 中文路名地名），只有一种配色，深浅主题共用。
+    ? `https://api.maptiler.com/maps/hybrid/style.json?key=${MAPTILER_KEY}&language=zh`
+    : `https://api.maptiler.com/maps/streets-v2${isDark ? "-dark" : ""}/style.json?key=${MAPTILER_KEY}&language=zh`;
 
 interface DeckGLMapProps {
   geoEntities: KGGeoEntity[];
@@ -84,44 +133,85 @@ export default function DeckGLMap({
   const TYPE_COLORS = useMemo(() => typeColors(isDark), [isDark]);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [arcTooltip, setArcTooltip] = useState<ArcTooltipState | null>(null);
-  const [viewState, setViewState] = useState<typeof INITIAL_VIEW_STATE & { transitionDuration?: number }>(INITIAL_VIEW_STATE);
-  // 2D / 3D 只换镜头，不换数据：每个点仍画在它自己的经纬度上，弧线本来就是 3D 拱。
+  const mapRef = useRef<MapRef>(null);
+  // 地图自己持有相机（非受控）；这里只跟踪 UI 需要的 zoom / bearing。
+  const [camera, setCamera] = useState({ zoom: INITIAL_VIEW_STATE.zoom, bearing: 0 });
+  const handleMove = useCallback((e: ViewStateChangeEvent) => {
+    const { zoom, bearing } = e.viewState;
+    setCamera((prev) => (prev.zoom === zoom && prev.bearing === bearing ? prev : { zoom, bearing }));
+  }, []);
+  // 2D / 3D：3D 打开地形、山体阴影、天空，点与弧线落在各自的真实海拔上。
   // 平面模式下关掉拖拽旋转——否则右键一拖就意外斜过去，又没有回正的入口。
   const [is3D, setIs3D] = useState(false);
+  const [satellite, setSatellite] = useState(false);
   const setViewMode = useCallback((next: boolean) => {
     setIs3D(next);
-    setViewState((prev) => ({
-      ...prev,
-      pitch: next ? PITCH_3D : 0,
-      bearing: next ? BEARING_3D : 0,
-      transitionDuration: VIEW_TRANSITION_MS,
-    }));
+    if (!next) setSatellite(false);
     if (typeof umami !== "undefined") umami.track("map_view_mode", { mode: next ? "3d" : "2d" });
   }, []);
   const resetNorth = useCallback(() => {
-    setViewState((prev) => ({ ...prev, bearing: 0, transitionDuration: VIEW_TRANSITION_MS / 2 }));
+    mapRef.current?.easeTo({ bearing: 0, duration: VIEW_TRANSITION_MS / 2 });
   }, []);
-  const mapRef = useRef<MapRef>(null);
+
+  // 海拔表：第一次进 3D 才拉（gzip 约 250 KB），之后常驻。
+  const [elevations, setElevations] = useState<ReadonlyMap<number, number> | null>(null);
+  const [elevationError, setElevationError] = useState(false);
+  useEffect(() => {
+    if (!is3D || elevations || elevationError) return;
+    let cancelled = false;
+    fetch(ELEVATION_URL)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json() as Promise<ElevationTable>;
+      })
+      .then((data) => { if (!cancelled) setElevations(decodeElevations(data)); })
+      .catch((e) => {
+        console.warn("[map] elevation table unavailable, 3D falls back to flat", e);
+        if (!cancelled) setElevationError(true);
+      });
+    return () => { cancelled = true; };
+  }, [is3D, elevations, elevationError]);
+  // 地形只在海拔表就绪后才打开：先开地形、点还在 z=0 的话，高原上的点会整片埋进山里。
+  // 海拔表拿不到时退化为「只倾斜、不起伏」，点照样在地图平面上，数据不会画错。
+  const terrainOn = is3D && elevations !== null;
+
+  // 镜头随模式过渡。放在 effect 里而不是点击回调：地形打开那一刻（海拔表到达）相机才该开始抬。
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.easeTo({
+      pitch: is3D ? PITCH_3D : 0,
+      bearing: is3D ? BEARING_3D : 0,
+      duration: VIEW_TRANSITION_MS,
+    });
+  }, [is3D]);
+
+  /** 某个实体的 z（米，已乘夸张系数）。表里没有的（海拔表生成之后新增的实体）当场向
+   *  地图查询；地形瓦片还没到时查不到，就先贴在 0，下一次 idle 再补。 */
+  const [lateElevations, setLateElevations] = useState<ReadonlyMap<number, number>>(() => new globalThis.Map());
+  const elevationOf = useCallback(
+    (id: number) => {
+      if (!terrainOn || !elevations) return 0;
+      const known = elevations.get(id) ?? lateElevations.get(id);
+      return (known ?? 0) * TERRAIN_EXAGGERATION;
+    },
+    [terrainOn, elevations, lateElevations],
+  );
   const isPhone = useNarrowViewport(PHONE_QUERY);
   // A boolean, not the raw zoom, so the layers below rebuild only when the
   // threshold is crossed — not on every frame of a pinch.
-  const denseOverview = isPhone && viewState.zoom < DENSE_ZOOM;
+  const denseOverview = isPhone && camera.zoom < DENSE_ZOOM;
 
-  // Fly to focused entity when it changes (state adjusted during render so the
-  // transition starts on the same commit, without an effect-driven extra pass)
-  const [prevFocusEntity, setPrevFocusEntity] = useState(focusEntity);
-  if (prevFocusEntity !== focusEntity) {
-    setPrevFocusEntity(focusEntity);
-    if (focusEntity && focusEntity.longitude != null && focusEntity.latitude != null) {
-      setViewState((prev) => ({
-        ...prev,
-        longitude: focusEntity.longitude,
-        latitude: focusEntity.latitude,
-        zoom: Math.max(prev.zoom, 9),
-        transitionDuration: 1200,
-      }));
-    }
-  }
+  // Fly to focused entity when it changes.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !focusEntity || focusEntity.longitude == null || focusEntity.latitude == null) return;
+    map.flyTo({
+      center: [focusEntity.longitude, focusEntity.latitude],
+      zoom: Math.max(map.getZoom(), 9),
+      duration: 1200,
+    });
+  }, [focusEntity]);
 
   // Pulse animation for highlight ring
   const [pulseScale, setPulseScale] = useState(1.0);
@@ -140,10 +230,11 @@ export default function DeckGLMap({
 
   /** Fetch + patch MapTiler style to force zh labels and replace Taiwan name */
   const [patchedStyle, setPatchedStyle] = useState<StyleSpecification | null>(null);
+  const [firstSymbolId, setFirstSymbolId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     let cancelled = false;
-    fetch(mapStyleUrl(isDark))
+    fetch(mapStyleUrl(isDark, satellite))
       .then((r) => r.json())
       .then((style: { layers?: Array<{ id: string; type: string; layout?: Record<string, unknown> }> }) => {
         if (cancelled || !style.layers) return;
@@ -185,7 +276,14 @@ export default function DeckGLMap({
           if (!orig.includes("name")) continue;
           layer.layout["text-field"] = twReplace;
         }
+        // 换底图（卫星 / 主题）会整体重建样式。地形若还开着，MapLibre 会在新样式的着色器
+        // 就绪前画地形深度，抛 `shaderPreludeCode` of undefined（2026-10-17 本地复现）。
+        // 先关地形，新样式 style.load 后由上面的 effect 重新挂上。
+        const liveMap = mapRef.current?.getMap();
+        if (liveMap?.getTerrain()) liveMap.setTerrain(null);
         setPatchedStyle(style as unknown as StyleSpecification);
+        // 山体阴影插在第一个文字图层之下：阴影压住地面与道路，但不压地名。
+        setFirstSymbolId(style.layers.find((l) => l.type === "symbol")?.id);
       })
       .catch((e) => {
         console.error("[style fetch err]", e);
@@ -193,7 +291,38 @@ export default function DeckGLMap({
     return () => {
       cancelled = true;
     };
-  }, [isDark]);
+  }, [isDark, satellite]);
+
+  // 地形命令式开关。不用 <Map terrain> 声明式属性：它在 DEM 源还没挂上时就调 setTerrain，
+  // 失败后不重试——2026-10-17 本地实测地形一直是平的（queryTerrainElevation 恒为 0），
+  // 而点已抬到真实海拔，于是全体悬空（拉萨 z11 偏 160px）。换主题 / 换卫星底图会整体
+  // 重建样式、清掉源与地形，所以每次 style.load 后再挂一次。
+  useEffect(() => {
+    const map = mapRef.current?.getMap();
+    if (!map) return;
+    const apply = () => {
+      if (!terrainOn) {
+        if (map.getTerrain()) map.setTerrain(null);
+        return;
+      }
+      if (!map.getSource(DEM_SOURCE_ID)) {
+        map.addSource(DEM_SOURCE_ID, { type: "raster-dem", url: demTilesUrl(), tileSize: 512 });
+      }
+      map.setTerrain({ source: DEM_SOURCE_ID, exaggeration: TERRAIN_EXAGGERATION });
+    };
+    // 不用 isStyleLoaded() 判断：它要等所有瓦片都到齐才为真，平移中会一直是 false，
+    // 而 style.load 早已发过，地形就永远挂不上。样式本身没加载完时 addSource 会抛错，
+    // 那就等下一次 style.load。
+    try {
+      apply();
+    } catch {
+      /* style not ready yet — the style.load listener below will apply it */
+    }
+    map.on("style.load", apply);
+    return () => {
+      map.off("style.load", apply);
+    };
+  }, [terrainOn, patchedStyle]);
 
   const filteredEntities = useMemo(() => {
     return geoEntities.filter((e) => {
@@ -221,6 +350,22 @@ export default function DeckGLMap({
       return Math.abs(a.year - currentYear) <= 100;
     });
   }, [lineageArcs, showArcs, currentYear]);
+
+  // 海拔表里没有的实体（表生成之后新增的）：地形瓦片到齐后（idle）向地图补查一次。
+  // queryTerrainElevation 返回的值已乘夸张系数，存的是原始海拔。
+  const handleIdle = useCallback(() => {
+    const map = mapRef.current;
+    if (!map || !terrainOn || !elevations) return;
+    const found: Array<[number, number]> = [];
+    for (const e of filteredEntities) {
+      if (found.length >= 2000) break;
+      if (elevations.has(e.id) || lateElevations.has(e.id)) continue;
+      const q = map.queryTerrainElevation([e.longitude, e.latitude]);
+      if (q == null) continue;
+      found.push([e.id, Math.max(0, q / TERRAIN_EXAGGERATION)]);
+    }
+    if (found.length > 0) setLateElevations((prev) => new globalThis.Map([...prev, ...found]));
+  }, [terrainOn, elevations, filteredEntities, lateElevations]);
 
   const handleHover = useCallback((info: PickingInfo) => {
     if (info.object && info.x !== undefined && info.y !== undefined) {
@@ -270,7 +415,7 @@ export default function DeckGLMap({
       new ScatterplotLayer<KGGeoEntity>({
         id,
         data,
-        getPosition: (d) => [d.longitude, d.latitude],
+        getPosition: (d) => [d.longitude, d.latitude, elevationOf(d.id)],
         getFillColor: (d) => {
           const c = TYPE_COLORS[d.entity_type] ?? [128, 128, 128];
           return [c[0], c[1], c[2], 200];
@@ -282,8 +427,12 @@ export default function DeckGLMap({
         radiusMinPixels: denseOverview ? 2 : 3,
         radiusMaxPixels: 9,
         // 斜视时贴地的圆会被压成扁椭圆、远处挤成一条线；立起来正对镜头。
-        // 只影响点的朝向，锚点仍是它的经纬度。
+        // 只影响点的朝向，锚点仍是它的经纬度与海拔。
         billboard: is3D,
+        // 交错模式下点与地形共用深度缓冲：起伏的山体会把贴地的圆切掉一块（spike 实测
+        // 40 个视角里 18 个可见 <80%）。标注是数据，不该被山挡住，一律画在最上层。
+        parameters: { depthCompare: "always" },
+        updateTriggers: { getPosition: [elevationOf] },
         pickable: true,
         autoHighlight: true,
         highlightColor: [255, 215, 0, 220],
@@ -303,7 +452,7 @@ export default function DeckGLMap({
         new ScatterplotLayer<KGGeoEntity>({
           id: "highlight-pulse",
           data: [focusEntity],
-          getPosition: (d) => [d.longitude, d.latitude],
+          getPosition: (d) => [d.longitude, d.latitude, elevationOf(d.id)],
           getFillColor: [255, 69, 0, 40],
           getLineColor: [255, 69, 0, Math.round(120 + 80 * (pulseScale - 1))],
           stroked: true,
@@ -313,8 +462,10 @@ export default function DeckGLMap({
           radiusMinPixels: Math.round(12 * pulseScale),
           radiusMaxPixels: Math.round(22 * pulseScale),
           billboard: is3D,
+          parameters: { depthCompare: "always" },
           pickable: false,
           updateTriggers: {
+            getPosition: [elevationOf],
             getLineColor: [pulseScale],
             radiusScale: [pulseScale],
           },
@@ -328,8 +479,10 @@ export default function DeckGLMap({
         new ArcLayer<KGLineageArc>({
           id: "lineage-arcs",
           data: filteredArcs,
-          getSourcePosition: (d) => [d.teacher_lng, d.teacher_lat],
-          getTargetPosition: (d) => [d.student_lng, d.student_lat],
+          // 两端是师、徒两个实体，与散点用同一张海拔表：弧线正好从点上升起、落回点上。
+          getSourcePosition: (d) => [d.teacher_lng, d.teacher_lat, elevationOf(d.teacher_id)],
+          getTargetPosition: (d) => [d.student_lng, d.student_lat, elevationOf(d.student_id)],
+          updateTriggers: { getSourcePosition: [elevationOf], getTargetPosition: [elevationOf] },
           getSourceColor: [234, 179, 8, 200],
           getTargetColor: [234, 179, 8, 200],
           getWidth: 1.5,
@@ -349,29 +502,58 @@ export default function DeckGLMap({
     }
 
     return result;
-  }, [filteredEntities, filteredArcs, showArcs, handleHover, handleClick, focusEntity, pulseScale, TYPE_COLORS, denseOverview, is3D]);
+  }, [filteredEntities, filteredArcs, showArcs, handleHover, handleClick, focusEntity, pulseScale, TYPE_COLORS, denseOverview, is3D, elevationOf]);
 
   return (
     <>
-      <DeckGL
-        viewState={viewState}
-        onViewStateChange={(e) => setViewState(e.viewState as typeof viewState)}
-        controller={{ dragRotate: is3D, touchRotate: is3D }}
-        layers={layers}
-        // Smaller dots on phones must not mean harder taps: let a fingertip
-        // within 8px pick the nearest dot. Desktop keeps exact mouse picking.
-        pickingRadius={isPhone ? 8 : 0}
-        useDevicePixels={true}
-        style={{ position: "absolute", inset: "0" }}
-      >
-        {patchedStyle && (
-          <Map
-            ref={mapRef}
-            mapStyle={patchedStyle}
-            onLoad={(e) => collapseAttributionIfNarrow(e.target)}
+      {patchedStyle && (
+        <Map
+          ref={mapRef}
+          initialViewState={INITIAL_VIEW_STATE}
+          onMove={handleMove}
+          onIdle={handleIdle}
+          mapStyle={patchedStyle}
+          onLoad={(e) => {
+            collapseAttributionIfNarrow(e.target);
+            if (import.meta.env.DEV) (window as unknown as { __fojinMap?: unknown }).__fojinMap = e.target;
+          }}
+          style={{ position: "absolute", inset: 0 }}
+          // 平面模式不许旋转、倾斜（防误触且没有回正入口）；3D 才放开。
+          dragRotate={is3D}
+          touchPitch={is3D}
+          maxPitch={is3D ? MAX_PITCH_3D : 60}
+          sky={is3D ? skyFor(isDark) : undefined}
+        >
+          {terrainOn && (
+            <>
+              {/* 地形的 DEM 源在 effect 里命令式挂（见上）；山体阴影单独一个源——MapLibre 不建议
+                  二者共用同一个源（会互相抢瓦片分辨率）。 */}
+              {!satellite && (
+                <Source id={HILLSHADE_SOURCE_ID} type="raster-dem" url={demTilesUrl()} tileSize={512}>
+                  <Layer
+                    id="fojin-hillshade"
+                    type="hillshade"
+                    beforeId={firstSymbolId}
+                    paint={{
+                      "hillshade-exaggeration": isDark ? 0.45 : 0.4,
+                      "hillshade-shadow-color": isDark ? "#000000" : "#5c4f3d",
+                      "hillshade-highlight-color": isDark ? "#7a6c55" : "#ffffff",
+                      "hillshade-accent-color": isDark ? "#1a1612" : "#3d3326",
+                      "hillshade-illumination-direction": 315,
+                    }}
+                  />
+                </Source>
+              )}
+            </>
+          )}
+          <DeckOverlay
+            layers={layers}
+            // Smaller dots on phones must not mean harder taps: let a fingertip
+            // within 8px pick the nearest dot. Desktop keeps exact mouse picking.
+            pickingRadius={isPhone ? 8 : 0}
           />
-        )}
-      </DeckGL>
+        </Map>
+      )}
 
       <div className="kg-map-view-controls">
         {/* 指北针放在切换钮之上：容器贴底排列，它出现/消失时切换钮不挪位，
@@ -380,12 +562,22 @@ export default function DeckGLMap({
           <Tooltip title={t("geo.reset_north")} placement="left">
             <button type="button" className="kg-map-compass" aria-label={t("geo.reset_north")} onClick={resetNorth}>
               {/* 指针跟着地图转：bearing 是地图相对正北的旋转，指针反向转回去仍指北。 */}
-              <svg viewBox="0 0 24 24" width="18" height="18" style={{ transform: `rotate(${-viewState.bearing}deg)` }} aria-hidden>
+              <svg viewBox="0 0 24 24" width="18" height="18" style={{ transform: `rotate(${-camera.bearing}deg)` }} aria-hidden>
                 <path d="M12 3 L15.5 12 L12 10.6 L8.5 12 Z" fill="var(--fj-cinnabar, #b5452c)" />
                 <path d="M12 21 L8.5 12 L12 13.4 L15.5 12 Z" fill="currentColor" opacity="0.45" />
               </svg>
             </button>
           </Tooltip>
+        )}
+        {is3D && (
+          <div className="kg-map-view-toggle" role="group" aria-label={t("geo.basemap")}>
+            <button type="button" aria-pressed={!satellite} className={!satellite ? "is-active" : undefined} onClick={() => setSatellite(false)}>
+              {t("geo.basemap_terrain")}
+            </button>
+            <button type="button" aria-pressed={satellite} className={satellite ? "is-active" : undefined} onClick={() => setSatellite(true)}>
+              {t("geo.basemap_satellite")}
+            </button>
+          </div>
         )}
         <div className="kg-map-view-toggle" role="group" aria-label={t("geo.view_mode")}>
           <Tooltip title={t("geo.view_2d_tooltip")} placement="left">
