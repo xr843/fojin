@@ -11,12 +11,13 @@ import {
   SearchOutlined, VerticalAlignTopOutlined, CloseOutlined, MessageOutlined,
   FileTextOutlined, RobotOutlined, TranslationOutlined,
 } from "@ant-design/icons";
-import { searchTexts, searchContent, searchDictionary, searchCrossLanguage, searchSemantic, searchUnified, searchParallelSentences, getSources, getSearchSuggestions, searchDictionaryGrouped, getCbetaRedirect } from "../api/client";
+import { searchTexts, searchContent, searchDictionary, searchCrossLanguage, searchSemantic, searchUnified, searchParallelSentences, getSources, getSearchSuggestions, searchDictionaryGrouped, getCbetaRedirect, resolveUrn } from "../api/client";
 import type { DictGroupedSearchResponse } from "../api/client";
 import { hasDirectSearchUrl } from "../utils/sourceUrls";
 import { addSearchHistory, getSearchHistory, type SearchHistoryItem } from "../utils/history";
 import { askAiKind, buildAskAiUrl } from "../utils/searchAskAi";
 import { clampSearchQuery } from "../utils/searchQuery";
+import { parseCbetaLocator } from "../utils/cbetaCitation";
 import { ResultCard, ExternalSourcesSection, ContentCard, CrossLangCard, SemanticCard, UnifiedResults } from "../components/search";
 import ParallelSentenceCard from "../components/search/ParallelSentenceCard";
 import SearchFilterSidebar from "../components/search/SearchFilterSidebar";
@@ -106,6 +107,21 @@ export default function SearchPage() {
         umami.track("cbeta-shortcut", { cbeta_id: result.cbeta_id });
       }
       navigate(result.redirect_to, { replace: true });
+    })();
+    return () => { cancelled = true; };
+  }, [query, navigate]);
+
+  // CBETA 行首 / 书目格式出处（从 CBETA Online 或论文里复制来的）→ 直跳阅读器那一行。
+  // 只在库里真有这一行时跳（reader_url 带 anchor）；找不到就照常显示检索结果。
+  useEffect(() => {
+    const loc = parseCbetaLocator(query);
+    if (!loc) return;
+    let cancelled = false;
+    (async () => {
+      const r = await resolveUrn(`fojin:cbeta/${loc.cbetaId}#p${loc.ref}`);
+      if (cancelled || !r?.exists || !r.reader_url?.includes("anchor=")) return;
+      if (typeof umami !== "undefined") umami.track("cbeta-linehead-goto", { cbeta_id: loc.cbetaId });
+      navigate(r.reader_url, { replace: true });
     })();
     return () => { cancelled = true; };
   }, [query, navigate]);

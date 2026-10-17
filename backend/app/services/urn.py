@@ -32,11 +32,13 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.models.text import TextLineAnchor
 from app.services.text import get_text_id_by_cbeta
 
 logger = logging.getLogger(__name__)
@@ -267,6 +269,42 @@ def _expand_work_id(parsed: ParsedURN) -> str:
     """
     prefix = _SCHEME_PREFIXES.get(parsed.scheme, "")
     return f"{prefix}{parsed.work_id}"
+
+
+async def juan_for_line(db: AsyncSession, text_id: int, anchor: str) -> int | None:
+    """The juan that holds CBETA line ``anchor`` (``p0749a05`` / ``0749a05``) in ``text_id``.
+
+    A bare CBETA line head (``T08n0235_p0749a05``, as scholars paste it from CBETA
+    Online's 引用複製) names the line but not the juan. Page/column/line is unique
+    within a volume, and multi-volume works restart page numbers per volume — so
+    when the same ref occurs in more than one juan the earliest juan is returned
+    (deterministic; such collisions are confined to the few cross-volume works).
+    """
+    ref = anchor[1:] if anchor.startswith("p") else anchor
+    result = await db.execute(
+        select(func.min(TextLineAnchor.juan_num)).where(
+            TextLineAnchor.text_id == text_id, TextLineAnchor.line_ref == ref
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def resolve_urn_full(
+    db: AsyncSession, parsed: ParsedURN
+) -> tuple[ParsedURN, int | None, str | None]:
+    """Like :func:`resolve_urn`, but also fills in the juan of an anchor-only URN.
+
+    ``fojin:cbeta/T0235#p0749a05`` carries a line but no juan; before this the
+    anchor was dropped and the reader opened at juan 1's top. Returns the
+    (possibly juan-completed) parsed URN alongside the resolution.
+    """
+    text_id, reader_url = await resolve_urn(db, parsed)
+    if text_id is not None and parsed.anchor and parsed.juan is None:
+        juan = await juan_for_line(db, text_id, parsed.anchor)
+        if juan is not None:
+            parsed = replace(parsed, juan=juan)
+            reader_url = build_reader_url(parsed, text_id=text_id)
+    return parsed, text_id, reader_url
 
 
 async def resolve_urn(

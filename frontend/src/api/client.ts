@@ -593,6 +593,16 @@ export interface CbetaRedirect {
  *
  * 用户在搜索栏输入 CBETA 编号时直跳经文页。
  */
+/** fojin URN → 阅读器地址。行级 URN 没写卷号时后端按行号反查卷号（见 services/urn.py）。 */
+export async function resolveUrn(urn: string): Promise<{ reader_url: string | null; exists: boolean } | null> {
+  try {
+    const { data } = await api.get<{ reader_url: string | null; exists: boolean }>("/urn/resolve", { params: { urn } });
+    return data;
+  } catch {
+    return null;
+  }
+}
+
 export async function getCbetaRedirect(cbetaId: string): Promise<CbetaRedirect | null> {
   try {
     const { data } = await api.get<CbetaRedirect>(

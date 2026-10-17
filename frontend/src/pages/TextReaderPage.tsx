@@ -23,6 +23,8 @@ import {
   ExportOutlined,
   EllipsisOutlined,
   CheckOutlined,
+  UnorderedListOutlined,
+  NumberOutlined,
 } from "@ant-design/icons";
 import { trackAudio } from "../audio/telemetry";
 import { useAudioPlayer } from "../audio/useAudioPlayback";
@@ -40,6 +42,15 @@ function readAiPanelPref(): "open" | "closed" | null {
 }
 import { useAuthStore } from "../stores/authStore";
 import { satLineUrl } from "../utils/satUrls";
+import {
+  CBETA_STEMS_URL,
+  formatCbetaCitation,
+  lineHead,
+  lineLevelSupported,
+  stemFor,
+  type CbetaStems,
+} from "../utils/cbetaCitation";
+import ReaderTocDrawer, { type TocEntry } from "../components/ReaderTocDrawer";
 import CitationGenerator from "../components/CitationGenerator";
 import SourceAttribution from "../components/SourceAttribution";
 import AnnotationPanel from "../components/AnnotationPanel";
@@ -79,7 +90,8 @@ type TFn = (key: string, opts?: Record<string, unknown>) => string;
 interface ApparatusNumbered { entry: ApparatusEntryItem; no: number; start: number; end: number }
 // off = UTF-16 offset of a CBETA <lb> line anchor within the content.
 interface LineAnchorConv { off: number; ref: string }
-type ReaderCtx = { numbered: ApparatusNumbered[]; lineAnchors: LineAnchorConv[]; t: TFn } | null;
+/** stem：本卷的 CBETA 文件主名（如 T08n0235），用于行首显示；null = 不显示行首。 */
+type ReaderCtx = { numbered: ApparatusNumbered[]; lineAnchors: LineAnchorConv[]; stem: string | null; t: TFn } | null;
 
 /** Build a map from Python code-point index → JS UTF-16 index for `raw`.
  * Backend offsets are code-point indices; supplementary-plane CJK (surrogate
@@ -94,6 +106,14 @@ function cpToU16Map(raw: string): number[] {
   }
   map.push(u);
   return map;
+}
+
+/** 校注的文字形式，接在引用后面，照 CBETA：「[1] 來【大】，不來【明】」；脱文写〔－〕。 */
+function formatApparatusNote(no: number, entry: ApparatusEntryItem): string {
+  const variants = entry.readings
+    .map((r) => `${r.is_omission ? "〔－〕" : r.reading}${r.witnesses.join("")}`)
+    .join("，");
+  return `[${no}] ${entry.lemma}${entry.lemma_siglum ?? ""}${variants ? `，${variants}` : ""}`;
 }
 
 /** CBETA-style inline apparatus marker: a clickable superscript [n] placed
@@ -131,7 +151,7 @@ function ApparatusMarker({ no, entry, t }: { no: number; entry: ApparatusEntryIt
  * markers (校勘 [n]) after each lemma, and zero-width line-anchor spans (carrying
  * the CBETA page-col-line ref) for the on-demand citation locator and URN scroll. */
 function renderSegmentChildren(seg: Extract<TextSegment, { text: string }>, ctx: NonNullable<ReaderCtx>): ReactNode {
-  const { numbered, lineAnchors, t } = ctx;
+  const { numbered, lineAnchors, stem, t } = ctx;
   const { text, offsets } = seg;
   if (!offsets.length || (!numbered.length && !lineAnchors.length)) return text;
   const segStart = offsets[0];
@@ -145,7 +165,20 @@ function renderSegmentChildren(seg: Extract<TextSegment, { text: string }>, ctx:
     if (la.off < segStart || la.off > segEnd || !offToLocal.has(la.off)) continue;
     const pos = offToLocal.get(la.off)!;
     // Zero-width anchor for the citation locator + URN scroll.
-    ins.push({ pos, order: 0, node: <span key={`ln${la.ref}`} className="cbeta-line" data-ref={la.ref} /> });
+    // data-lh：完整行首（T08n0235_p0749a05），「行首 / 原书换行」开关打开时由 CSS 显示出来。
+    ins.push({
+      pos,
+      order: 0,
+      // 段首那一行标 cbeta-line-start：「原书换行」时它不必再换一次行（否则每段开头空一行）。
+      node: (
+        <span
+          key={`ln${la.ref}`}
+          className={pos === 0 ? "cbeta-line cbeta-line-start" : "cbeta-line"}
+          data-ref={la.ref}
+          data-lh={stem ? lineHead(stem, la.ref) : undefined}
+        />
+      ),
+    });
   }
   for (const m of numbered) {
     const cs = m.start;
@@ -176,6 +209,44 @@ function renderSegment(seg: TextSegment, i: number, ctx?: ReaderCtx) {
   return <p key={i} className={`text-${seg.type}`}>{children}</p>;
 }
 
+/** 高亮深链的目标行——从这一行的锚点到下一行的锚点（CBETA 自己只滚到段落、不标行）。
+ * 用 CSS Custom Highlight API：不改 DOM、不打断选区与校勘标记；不支持的浏览器退回整段闪烁。
+ * 返回清理函数。 */
+function highlightCbetaLine(container: HTMLElement, el: HTMLElement): () => void {
+  const p = el.closest("p");
+  if (typeof CSS !== "undefined" && "highlights" in CSS && typeof Highlight !== "undefined") {
+    const all = Array.from(container.querySelectorAll<HTMLElement>(".cbeta-line"));
+    const next = all[all.indexOf(el) + 1];
+    const range = document.createRange();
+    range.setStartAfter(el);
+    if (next) range.setEndBefore(next);
+    else if (p) range.setEnd(p, p.childNodes.length);
+    CSS.highlights.set("cbeta-target-line", new Highlight(range));
+    const timer = setTimeout(() => CSS.highlights.delete("cbeta-target-line"), 4000);
+    return () => {
+      clearTimeout(timer);
+      CSS.highlights.delete("cbeta-target-line");
+    };
+  }
+  if (!p) return () => {};
+  p.classList.add("cbeta-line-flash");
+  const timer = setTimeout(() => p.classList.remove("cbeta-line-flash"), 2200);
+  return () => {
+    clearTimeout(timer);
+    p.classList.remove("cbeta-line-flash");
+  };
+}
+
+/** 选区边界落在元素上（三击选段、拖到段尾等）时，startContainer 是整个 <p>，按它找
+ * 「之前最近的行号」会退到上一段末行。换成边界处的那个子节点：起点取 offset 处的子节点，
+ * 终点取 offset 之前的那个。文本节点原样返回。 */
+function boundaryNode(container: Node, offset: number, side: "start" | "end"): Node {
+  if (container.nodeType === Node.TEXT_NODE) return container;
+  const kids = container.childNodes;
+  if (side === "start") return kids[offset] ?? kids[kids.length - 1] ?? container;
+  return kids[offset - 1] ?? kids[0] ?? container;
+}
+
 /** CBETA line ref (e.g. "0001a09") of the embedded <span class="cbeta-line">
  * nearest before `startNode` — i.e. the page-col-line the selection sits in. */
 function nearestLineRef(container: HTMLElement, startNode: Node): string | null {
@@ -189,6 +260,30 @@ function nearestLineRef(container: HTMLElement, startNode: Node): string | null 
     }
   }
   return ref;
+}
+
+/** 静态参考文件：缺失时 SPA 兜底会回 200 + index.html，按内容类型判断，拿不到就当没有。 */
+async function fetchStaticJson<T>(url: string): Promise<T | null> {
+  const r = await fetch(url);
+  if (!r.ok || !(r.headers.get("content-type") ?? "").includes("json")) return null;
+  try {
+    return (await r.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
+/** 行首显示：关 / 行首（行内小字页栏行）/ 原书换行（每行另起，行首写全，同 CBETA「原書換行 + 顯示行首」）。 */
+type LineHeadMode = "off" | "labels" | "orig";
+const LINE_HEAD_KEY = "fojin-reader-linehead";
+function readLineHeadMode(): LineHeadMode {
+  try {
+    const v = localStorage.getItem(LINE_HEAD_KEY);
+    if (v === "labels" || v === "orig") return v;
+  } catch {
+    /* noop */
+  }
+  return "off";
 }
 
 function getInitialFontSize(): number {
@@ -350,7 +445,15 @@ export default function TextReaderPage() {
   // 划词查辞典
   const [dictPopover, setDictPopover] = useState<DictPopoverState>(DICT_POPOVER_INIT);
   // On-demand citation locator: the CBETA line ref at the current selection.
-  const [lineLocator, setLineLocator] = useState<{ ref: string; x: number; y: number } | null>(null);
+  // ref / endRef：选区起止所在的页栏行；quote：选中的原文；markerNos：选区里的校勘 [n]（校勘打开时）。
+  const [lineLocator, setLineLocator] = useState<{
+    ref: string;
+    endRef: string | null;
+    x: number;
+    y: number;
+    quote: string;
+    markerNos: number[];
+  } | null>(null);
   const closeDictPopover = useCallback(() => {
     setDictPopover(DICT_POPOVER_INIT);
     setLineLocator(null);
@@ -383,8 +486,16 @@ export default function TextReaderPage() {
 
     // Citation locator: CBETA page-col-line at the selection (needs embedded anchors).
     const containerEl = readerContentRef.current;
-    const ref = containerEl ? nearestLineRef(containerEl, range.startContainer) : null;
-    setLineLocator(ref ? { ref, x, y: rect.top } : null);
+    const ref = containerEl ? nearestLineRef(containerEl, boundaryNode(range.startContainer, range.startOffset, "start")) : null;
+    const endRef = containerEl ? nearestLineRef(containerEl, boundaryNode(range.endContainer, range.endOffset, "end")) : null;
+    // 选区里的校勘标记：引用时把对应的校注接在出处后面（同 CBETA 引用複製）。
+    const markerNos = containerEl
+      ? Array.from(containerEl.querySelectorAll<HTMLElement>(".apparatus-marker"))
+          .filter((el) => range.intersectsNode(el))
+          .map((el) => Number(el.textContent?.replace(/[[\]]/g, "")))
+          .filter((n) => Number.isFinite(n))
+      : [];
+    setLineLocator(ref ? { ref, endRef, x, y: rect.top, quote: text, markerNos } : null);
 
     // 短词查辞典；整句选择只显示「问小津」，不查辞典
     const isWord = text.length <= MAX_WORD_LEN;
@@ -433,7 +544,9 @@ export default function TextReaderPage() {
     if (!dictPopover.visible) return;
     const onDocClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (!target.closest(".reader-dict-popover")) {
+      // 行号浮条（复制引用 / 行首 / 链接 / SAT）也算浮层内部：此前不在豁免里，按下鼠标
+      // 那一刻浮条就被关掉，click 落空——这几颗按钮自上线起就点不动（2026-10-17 实测）。
+      if (!target.closest(".reader-dict-popover, .cbeta-line-locator")) {
         closeDictPopover();
       }
     };
@@ -737,10 +850,49 @@ export default function TextReaderPage() {
     return lineAnchorData.anchors.map((a) => ({ off: conv(a.char_offset), ref: a.line_ref }));
   }, [lineAnchorData, content?.content]);
 
+  // CBETA 参考数据（静态文件，见 backend/scripts/build_cbeta_reader_refs.py）：
+  // 册号表（引用的「T08, no. 235」与行首「T08n0235_p0749a05」）和品/分目次。
+  const cbetaId = content?.cbeta_id ?? null;
+  const isCbeta = !!cbetaId && /^[TX]\d/.test(cbetaId);
+  const { data: cbetaStems } = useQuery({
+    queryKey: ["cbetaStems"],
+    queryFn: () => fetchStaticJson<CbetaStems>(CBETA_STEMS_URL),
+    enabled: isCbeta,
+    staleTime: Infinity,
+  });
+  const stem = cbetaId ? stemFor(cbetaStems, cbetaId, juanNum) : null;
+  // 行级（页栏行）只对大正藏开放：库里卍续藏的行号混着 R 版页码，见 utils/cbetaCitation.ts。
+  const lineLevel = !!cbetaId && !!stem && lineLevelSupported(cbetaId);
+  const { data: toc } = useQuery({
+    queryKey: ["cbetaToc", cbetaId],
+    queryFn: () => fetchStaticJson<TocEntry[]>(`/cbeta-toc/${cbetaId}.json`),
+    enabled: isCbeta,
+    staleTime: Infinity,
+  });
+  const [tocOpen, setTocOpen] = useState(false);
+  const [jumpTarget, setJumpTarget] = useState<{ ref: string; seq: number } | null>(null);
+  const jumpSeq = useRef(0);
+  const jumpToLine = (juan: number, ref: string) => {
+    setJuanNum(juan);
+    jumpSeq.current += 1;
+    setJumpTarget({ ref, seq: jumpSeq.current });
+    setTocOpen(false);
+  };
+  const [lineHeadMode, setLineHeadMode] = useState<LineHeadMode>(readLineHeadMode);
+  const changeLineHeadMode = useCallback((m: LineHeadMode) => {
+    setLineHeadMode(m);
+    try {
+      localStorage.setItem(LINE_HEAD_KEY, m);
+    } catch {
+      /* 隐私模式：记不住就算了 */
+    }
+  }, []);
+  const effectiveLineHeadMode: LineHeadMode = lineLevel ? lineHeadMode : "off";
+
   // One context drives the inline layers: apparatus markers (only when toggled on)
   // and always-embedded zero-width line anchors (so selection/URN can locate a line).
   const readerCtx: ReaderCtx = (apparatusOn && apparatusNumbered.length) || lineAnchors.length
-    ? { numbered: apparatusOn ? apparatusNumbered : [], lineAnchors, t }
+    ? { numbered: apparatusOn ? apparatusNumbered : [], lineAnchors, stem: lineLevel ? stem : null, t }
     : null;
 
   // URN deep-link: ?anchor=p0001a09 → scroll to that CBETA line + brief flash.
@@ -753,21 +905,30 @@ export default function TextReaderPage() {
   // down) and scrollIntoView on it worked when called by hand, but the page
   // sat at the top of the juan. Every URN, verify_quote hit and commentary
   // link that carried an anchor silently dropped the reader at the top.
+  // 目次点击也走这里：jumpTarget 优先于 URL 的 ?anchor=。seq 让「再点同一条」也会重新定位。
+  const anchorTarget = jumpTarget?.ref ?? searchParams.get("anchor")?.replace(/^p/, "") ?? null;
   useEffect(() => {
-    const anchorParam = searchParams.get("anchor");
-    if (!anchorParam || !lineAnchors.length) return;
-    const ref = anchorParam.replace(/^p/, "");
+    if (!anchorTarget || !lineAnchors.length) return;
+    // 目标行号不在本卷的锚点里时：大正藏落到它之后最近的一行（目次指向的品名行在导入正文
+    // 时被去掉了，品名之后紧接正文，落点正确）；卍续藏不猜——库里混着 R 版页码，「之后最近」
+    // 可能落到另一版的页上。
+    let ref = anchorTarget;
+    if (!lineAnchors.some((a) => a.ref === ref)) {
+      if (!lineLevel) return;
+      const after = lineAnchors.map((a) => a.ref).filter((r) => r > ref).sort()[0];
+      if (!after) return;
+      ref = after;
+    }
     let raf = 0;
-    let flash: ReturnType<typeof setTimeout> | undefined;
+    let clear: (() => void) | undefined;
     let cancelled = false;
     let tries = 0;
 
     const attempt = () => {
       if (cancelled) return;
-      const el = readerContentRef.current?.querySelector<HTMLElement>(
-        `.cbeta-line[data-ref="${CSS.escape(ref)}"]`,
-      );
-      if (!el) {
+      const container = readerContentRef.current;
+      const el = container?.querySelector<HTMLElement>(`.cbeta-line[data-ref="${CSS.escape(ref)}"]`);
+      if (!container || !el) {
         // ~1s at 60fps. Give up quietly after that: the anchor may belong to
         // another juan, and nudging the reader somewhere arbitrary is worse
         // than leaving it where the reader put it.
@@ -781,20 +942,16 @@ export default function TextReaderPage() {
       // over that distance in this container. Instant is also what a deep link
       // wants: arrive at the line, don't animate past everything before it.
       el.scrollIntoView({ block: "center" });
-      const p = el.closest("p");
-      if (p) {
-        p.classList.add("cbeta-line-flash");
-        flash = setTimeout(() => p.classList.remove("cbeta-line-flash"), 2200);
-      }
+      clear = highlightCbetaLine(container, el);
     };
 
     raf = requestAnimationFrame(attempt);
     return () => {
       cancelled = true;
       cancelAnimationFrame(raf);
-      if (flash) clearTimeout(flash);
+      clear?.();
     };
-  }, [searchParams, lineAnchors, juanNum]);
+  }, [anchorTarget, jumpTarget?.seq, lineAnchors, juanNum, lineLevel]);
 
   // 播到哪，高亮到哪。复用 URN 深链已有的 .cbeta-line 定位机制 ——
   // 那里是瞬时 flash，这里是持续态。
@@ -938,6 +1095,13 @@ export default function TextReaderPage() {
   // 手机「更多」：2026-10-10 生产 390px 实测，两排 9 颗工具按钮 + 字号行把首段正文推到
   // y=480，首屏只剩约 12 行经文。收进一个菜单，工具栏只剩一行。
   const checkMark = (on: boolean) => (on ? <CheckOutlined /> : null);
+  // 行首：关 / 行首 / 原书换行（同 CBETA「顯示行首」「原書換行」）。只对大正藏提供，见 lineLevel。
+  const lineHeadItems: MenuProps["items"] = (["off", "labels", "orig"] as const).map((m) => ({
+    key: `lh-${m}`,
+    label: t(`reader.lineref.mode_${m}`),
+    extra: checkMark(effectiveLineHeadMode === m),
+    onClick: () => changeLineHeadMode(m),
+  }));
   const moreMenuItems: MenuProps["items"] = [
     {
       key: "bookmark",
@@ -947,7 +1111,13 @@ export default function TextReaderPage() {
       onClick: toggleBookmark,
     },
     { key: "annotation", icon: <EditOutlined />, label: t("reader.annotation.button"), onClick: () => setAnnotationOpen(true) },
+    ...(toc?.length
+      ? [{ key: "toc", icon: <UnorderedListOutlined />, label: t("reader.toc.title"), onClick: () => setTocOpen(true) }]
+      : []),
     { key: "citation", icon: <BookOutlined />, label: t("reader.citation.button"), onClick: () => setCitationOpen(true) },
+    ...(lineLevel
+      ? [{ key: "linehead", icon: <NumberOutlined />, label: t("reader.lineref.toggle"), children: lineHeadItems, popupClassName: "reader-more-dropdown" }]
+      : []),
     { key: "export", icon: <DownloadOutlined />, label: t("reader.export.button"), children: exportItems, popupClassName: "reader-more-dropdown" },
     {
       key: "apparatus",
@@ -1135,6 +1305,13 @@ export default function TextReaderPage() {
             </Dropdown>
           ) : (
             <>
+              {toc?.length ? (
+                <Tooltip title={t("reader.toc.tooltip")}>
+                  <Button size="small" icon={<UnorderedListOutlined />} onClick={() => setTocOpen(true)}>
+                    {t("reader.toc.title")}
+                  </Button>
+                </Tooltip>
+              ) : null}
               <Button
                 size="small"
                 icon={bookmarked ? <HeartFilled style={{ color: "var(--fj-accent)" }} /> : <HeartOutlined />}
@@ -1175,6 +1352,19 @@ export default function TextReaderPage() {
                   {t("reader.apparatus.toggle")}
                 </Button>
               </Tooltip>
+              {lineLevel && (
+                <Dropdown trigger={["click"]} menu={{ items: lineHeadItems }}>
+                  <Tooltip title={t("reader.lineref.tooltip")}>
+                    <Button
+                      size="small"
+                      type={effectiveLineHeadMode !== "off" ? "primary" : "default"}
+                      icon={<NumberOutlined />}
+                    >
+                      {t("reader.lineref.toggle")}
+                    </Button>
+                  </Tooltip>
+                </Dropdown>
+              )}
               {audioData && (
                 <Tooltip title={t("reader.audio.tooltip")}>
                   <Button
@@ -1233,7 +1423,11 @@ export default function TextReaderPage() {
       </div>
 
       {/* Content */}
-      <div ref={readerContentRef} style={{ position: "relative" }}>
+      <div
+        ref={readerContentRef}
+        className={effectiveLineHeadMode === "off" ? undefined : `reader-lh-${effectiveLineHeadMode}`}
+        style={{ position: "relative" }}
+      >
       {isLoading ? (
         <div style={{ textAlign: "center", padding: 80 }}>
           <Spin size="large" />
@@ -1306,22 +1500,56 @@ export default function TextReaderPage() {
           className="cbeta-line-locator"
           style={{ position: "fixed", left: lineLocator.x, top: Math.max(lineLocator.y - 40, 8), transform: "translateX(-50%)" }}
         >
-          <span className="cbeta-line-locator-ref">{content.cbeta_id} · {lineLocator.ref}</span>
+          {/* 大正藏给 CBETA 行首（T08n0235_p0749a05）；卍续藏的行号混着 R 版页码，只标经号与卷。 */}
+          <span className="cbeta-line-locator-ref">
+            {lineLevel && stem ? lineHead(stem, lineLocator.ref) : `${content.cbeta_id} · ${t("reader.toc.juan", { n: juanNum })}`}
+          </span>
           <button
             type="button"
             onClick={() => {
+              const notes = lineLocator.markerNos
+                .map((no) => apparatusNumbered.find((m) => m.no === no))
+                .filter((m): m is ApparatusNumbered => !!m)
+                .map((m) => formatApparatusNote(m.no, m.entry));
               navigator.clipboard?.writeText(
-                t("reader.lineref.citation", { title: content.title_zh, juan: juanNum, id: content.cbeta_id, ref: lineLocator.ref }),
+                formatCbetaCitation({
+                  title: content.title_zh,
+                  juan: juanNum,
+                  juanCount: content.total_juans ?? juanList?.total_juans ?? 1,
+                  quote: lineLocator.quote,
+                  cbetaId: content.cbeta_id,
+                  stem,
+                  startRef: lineLocator.ref,
+                  endRef: lineLocator.endRef,
+                  notes,
+                }),
               );
               message.success(t("reader.lineref.copied"));
+              if (typeof umami !== "undefined") umami.track("reader_cite_copy", { id: textId, line: lineLevel ? 1 : 0 });
             }}
           >
             {t("reader.lineref.copy_citation")}
           </button>
+          {lineLevel && stem && (
+            <button
+              type="button"
+              title={t("reader.lineref.copy_linehead_tip")}
+              onClick={() => {
+                navigator.clipboard?.writeText(lineHead(stem, lineLocator.ref));
+                message.success(t("reader.lineref.copied"));
+              }}
+            >
+              {t("reader.lineref.copy_linehead")}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {
-              navigator.clipboard?.writeText(`fojin:cbeta/${content.cbeta_id}.${juanNum}#p${lineLocator.ref}`);
+              // 可以直接打开的网址：大正藏带到那一行，卍续藏带到那一卷。
+              const url = new URL(`/texts/${textId}/read`, window.location.origin);
+              url.searchParams.set("juan", String(juanNum));
+              if (lineLevel) url.searchParams.set("anchor", `p${lineLocator.ref}`);
+              navigator.clipboard?.writeText(url.toString());
               message.success(t("reader.lineref.copied"));
             }}
           >
@@ -1370,6 +1598,16 @@ export default function TextReaderPage() {
         </div>
       )}
 
+      {toc?.length ? (
+        <ReaderTocDrawer
+          open={tocOpen}
+          onClose={() => setTocOpen(false)}
+          toc={toc}
+          currentJuan={juanNum}
+          onJump={jumpToLine}
+          placement={phone ? "bottom" : "left"}
+        />
+      ) : null}
       <CitationGenerator
         textId={textId}
         textData={textDetail}

@@ -229,3 +229,56 @@ def test_build_urn_drops_invalid_anchor_but_keeps_urn() -> None:
 
 def test_build_urn_ignores_non_positive_juan() -> None:
     assert build_urn("T0001", 0) == "fojin:cbeta/T0001"
+
+
+# ──────────────────────────────────────────────────────────────────────
+# resolve_urn_full — anchor-only URN (a pasted CBETA line head) gets its juan
+
+
+@pytest.mark.asyncio
+async def test_resolve_full_fills_juan_from_anchor(monkeypatch: pytest.MonkeyPatch) -> None:
+    import app.services.urn as urn_mod
+
+    async def fake_text_id(_db, cbeta_id):
+        return 42 if cbeta_id == "T0235" else None
+
+    async def fake_juan(_db, text_id, anchor):
+        assert (text_id, anchor) == (42, "p0749a05")
+        return 1
+
+    monkeypatch.setattr(urn_mod, "get_text_id_by_cbeta", fake_text_id)
+    monkeypatch.setattr(urn_mod, "juan_for_line", fake_juan)
+    parsed, text_id, url = await urn_mod.resolve_urn_full(None, parse_urn("fojin:cbeta/T0235#p0749a05"))
+    assert (parsed.juan, text_id, url) == (1, 42, "/texts/42/read?juan=1&anchor=p0749a05")
+
+
+@pytest.mark.asyncio
+async def test_resolve_full_unknown_line_falls_back_to_text_page(monkeypatch: pytest.MonkeyPatch) -> None:
+    import app.services.urn as urn_mod
+
+    async def fake_text_id(_db, _cbeta_id):
+        return 42
+
+    async def fake_juan(_db, _text_id, _anchor):
+        return None
+
+    monkeypatch.setattr(urn_mod, "get_text_id_by_cbeta", fake_text_id)
+    monkeypatch.setattr(urn_mod, "juan_for_line", fake_juan)
+    parsed, text_id, url = await urn_mod.resolve_urn_full(None, parse_urn("fojin:cbeta/T0235#p9999a01"))
+    assert (parsed.juan, text_id, url) == (None, 42, "/texts/42")
+
+
+@pytest.mark.asyncio
+async def test_resolve_full_keeps_explicit_juan(monkeypatch: pytest.MonkeyPatch) -> None:
+    import app.services.urn as urn_mod
+
+    async def fake_text_id(_db, _cbeta_id):
+        return 42
+
+    async def boom(*_a):
+        raise AssertionError("juan given explicitly — must not look it up")
+
+    monkeypatch.setattr(urn_mod, "get_text_id_by_cbeta", fake_text_id)
+    monkeypatch.setattr(urn_mod, "juan_for_line", boom)
+    _, _, url = await urn_mod.resolve_urn_full(None, parse_urn("fojin:cbeta/T0235.1#p0749a05"))
+    assert url == "/texts/42/read?juan=1&anchor=p0749a05"

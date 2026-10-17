@@ -868,6 +868,42 @@
   height: 0;
   overflow: hidden;
 }
+/* 行首显示（同 CBETA「顯示行首」「原書換行」）。伪元素不进选区，复制正文不会带上行号。 */
+.reader-lh-labels .cbeta-line,
+.reader-lh-orig .cbeta-line {
+  width: auto;
+  height: auto;
+  overflow: visible;
+  display: inline;
+}
+.reader-lh-labels .cbeta-line::before {
+  content: attr(data-ref);
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.55em;
+  color: var(--fj-ink-muted);
+  vertical-align: super;
+  margin: 0 0.2em;
+  letter-spacing: 0;
+  user-select: none;
+}
+/* 原书换行：每个 <lb> 另起一行，行首写全（T08n0235_p0749a05：）。"\A" + pre 让伪元素自带换行。 */
+.reader-lh-orig .cbeta-line::before {
+  content: "\A" attr(data-lh) "：";
+  white-space: pre;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.6em;
+  color: var(--fj-ink-muted);
+  user-select: none;
+}
+/* 段首那一行不需要再换一次行（否则每段开头空一行）。 */
+.reader-lh-orig .cbeta-line-start::before {
+  content: attr(data-lh) "：";
+}
+/* 深链的目标行（CSS Custom Highlight API，见 highlightCbetaLine）。 */
+::highlight(cbeta-target-line) {
+  background-color: rgba(212, 160, 23, 0.32);
+}
+
 .cbeta-line-flash {
   animation: cbeta-line-flash-kf 2.2s ease-out;
 }
@@ -1010,4 +1046,49 @@
 
 .reader-more-font .reader-font-controls .ant-btn {
   height: 40px;
+}
+
+/* ---------- 目次抽屉 ---------- */
+.reader-toc-list {
+  display: flex;
+  flex-direction: column;
+}
+.reader-toc-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 16px;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  text-align: start;
+  color: var(--fj-ink);
+  cursor: pointer;
+  line-height: 1.5;
+}
+.reader-toc-item:hover,
+.reader-toc-item:focus-visible {
+  background: color-mix(in srgb, var(--fj-accent) 7%, transparent);
+  color: var(--fj-accent);
+}
+.reader-toc-item.is-current {
+  background: color-mix(in srgb, var(--fj-accent) 10%, transparent);
+}
+.reader-toc-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+}
+.reader-toc-title.level-1 {
+  font-weight: 600;
+}
+.reader-toc-title.level-3 {
+  font-size: 13px;
+  color: var(--fj-ink-light);
+}
+.reader-toc-juan {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--fj-ink-muted);
 }

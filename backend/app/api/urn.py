@@ -14,7 +14,7 @@ from app.services.urn import (
     URNParseError,
     absolute_reader_url,
     parse_urn,
-    resolve_urn,
+    resolve_urn_full,
 )
 
 router = APIRouter(tags=["urn"])
@@ -71,7 +71,7 @@ async def urn_resolve(
     except URNParseError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    text_id, reader_url = await resolve_urn(db, parsed)
+    parsed, text_id, reader_url = await resolve_urn_full(db, parsed)
 
     return URNResolveResponse(
         urn=parsed.raw,
