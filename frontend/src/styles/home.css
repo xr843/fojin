@@ -640,7 +640,7 @@
 /* ---------- 功能导航卡片 ---------- */
 .home-features {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 16px;
   /* 1080 → 920：与搜索栏/统计对齐；margin-top 32 → 24 抵消字号带来的高度 */
   max-width: 920px;
@@ -780,6 +780,8 @@
   .home-stat-lbl { font-size: 12px; letter-spacing: 1px; }
 
   .home-features { grid-template-columns: repeat(2, 1fr); max-width: 360px; gap: 12px; margin-top: 20px; }
+  /* 5 张卡两列排：最后一张单出来时占满一行，不留半边空位。 */
+  .home-feature-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
   .home-feature-card { padding: 14px 12px; }
   .home-feature-icon { font-size: 22px; }
   .home-feature-desc { display: none; }

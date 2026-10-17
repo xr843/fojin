@@ -12,7 +12,6 @@ import {
   RobotOutlined,
   SafetyCertificateOutlined,
   FileTextOutlined,
-  GlobalOutlined,
 } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { InfoCircleOutlined, CloseOutlined } from "@ant-design/icons";
@@ -315,18 +314,8 @@ export default function HomePage() {
                 : t("home.feature_kg_desc")}
             </div>
           </div>
-          <div className="home-feature-card" onClick={() => navigate("/map")}>
-            <GlobalOutlined className="home-feature-icon" />
-            <div className="home-feature-title">{t("home.feature_geo_title")}</div>
-            <div className="home-feature-desc">
-              {sc.geo
-                ? t("home.sc_geo", {
-                    count: sc.geo.count.toLocaleString(),
-                    places: sc.geo.places.join("、"),
-                  })
-                : t("home.feature_geo_desc")}
-            </div>
-          </div>
+          {/* 佛教地理卡暂撤（2026-10-17 用户要求，与顶部导航一致）；/map 仍可直达。
+              恢复时从 git 历史取回这张卡（navigate("/map")），并把 .home-features 改回 6 列。 */}
         </div>
 
         {!user && !tipDismissed && (
