@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import { Map, Source, Layer, useControl, type MapRef, type ViewStateChangeEvent } from "react-map-gl/maplibre";
+import { Map, useControl, type MapRef, type ViewStateChangeEvent } from "react-map-gl/maplibre";
 import type { StyleSpecification, SkySpecification } from "maplibre-gl";
 import { MapLibreOverlay, type MapLibreOverlayProps } from "@deck.gl/maplibre";
 import { ScatterplotLayer, ArcLayer } from "@deck.gl/layers";
@@ -40,6 +40,14 @@ const VIEW_TRANSITION_MS = 900;
 const TERRAIN_EXAGGERATION = 1.6;
 const DEM_SOURCE_ID = "fojin-dem";
 const HILLSHADE_SOURCE_ID = "fojin-dem-hillshade";
+const HILLSHADE_LAYER_ID = "fojin-hillshade";
+const hillshadePaint = (isDark: boolean) => ({
+  "hillshade-exaggeration": isDark ? 0.45 : 0.4,
+  "hillshade-shadow-color": isDark ? "#000000" : "#5c4f3d",
+  "hillshade-highlight-color": isDark ? "#7a6c55" : "#ffffff",
+  "hillshade-accent-color": isDark ? "#1a1612" : "#3d3326",
+  "hillshade-illumination-direction": 315,
+});
 /** 高程与渲染同源：MapTiler terrain-rgb-v2。点的海拔由 scripts/build_geo_elevation.py
  *  从同一数据集离线采样（z9 双线性），见 public/elevation/kg-geo-elev.json。 */
 const demTilesUrl = () => `https://api.maptiler.com/tiles/terrain-rgb-v2/tiles.json?key=${MAPTILER_KEY}`;
@@ -230,7 +238,6 @@ export default function DeckGLMap({
 
   /** Fetch + patch MapTiler style to force zh labels and replace Taiwan name */
   const [patchedStyle, setPatchedStyle] = useState<StyleSpecification | null>(null);
-  const [firstSymbolId, setFirstSymbolId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     let cancelled = false;
@@ -282,8 +289,6 @@ export default function DeckGLMap({
         const liveMap = mapRef.current?.getMap();
         if (liveMap?.getTerrain()) liveMap.setTerrain(null);
         setPatchedStyle(style as unknown as StyleSpecification);
-        // 山体阴影插在第一个文字图层之下：阴影压住地面与道路，但不压地名。
-        setFirstSymbolId(style.layers.find((l) => l.type === "symbol")?.id);
       })
       .catch((e) => {
         console.error("[style fetch err]", e);
@@ -301,6 +306,25 @@ export default function DeckGLMap({
     const map = mapRef.current?.getMap();
     if (!map) return;
     const apply = () => {
+      // 山影：只在「3D + 街道底图」下画（卫星影像自带光影）。与地形各用一个 DEM 源——
+      // MapLibre 不建议二者共用（会互相抢瓦片分辨率）。插在当前样式第一个文字图层之下：
+      // 压住地面与道路，不压地名；该图层名每次从当前样式现取，换样式后也不会指向不存在的图层。
+      const wantHillshade = terrainOn && !satellite;
+      if (!wantHillshade) {
+        if (map.getLayer(HILLSHADE_LAYER_ID)) map.removeLayer(HILLSHADE_LAYER_ID);
+        if (map.getSource(HILLSHADE_SOURCE_ID)) map.removeSource(HILLSHADE_SOURCE_ID);
+      } else {
+        if (!map.getSource(HILLSHADE_SOURCE_ID)) {
+          map.addSource(HILLSHADE_SOURCE_ID, { type: "raster-dem", url: demTilesUrl(), tileSize: 512 });
+        }
+        const paint = hillshadePaint(isDark);
+        if (!map.getLayer(HILLSHADE_LAYER_ID)) {
+          const firstSymbol = map.getStyle().layers.find((l) => l.type === "symbol")?.id;
+          map.addLayer({ id: HILLSHADE_LAYER_ID, type: "hillshade", source: HILLSHADE_SOURCE_ID, paint }, firstSymbol);
+        } else {
+          for (const [k, v] of Object.entries(paint)) map.setPaintProperty(HILLSHADE_LAYER_ID, k, v);
+        }
+      }
       if (!terrainOn) {
         if (map.getTerrain()) map.setTerrain(null);
         return;
@@ -322,7 +346,7 @@ export default function DeckGLMap({
     return () => {
       map.off("style.load", apply);
     };
-  }, [terrainOn, patchedStyle]);
+  }, [terrainOn, satellite, isDark, patchedStyle]);
 
   const filteredEntities = useMemo(() => {
     return geoEntities.filter((e) => {
@@ -513,6 +537,10 @@ export default function DeckGLMap({
           onMove={handleMove}
           onIdle={handleIdle}
           mapStyle={patchedStyle}
+          // 底图切换（街道 ↔ 卫星、深浅主题）整体重建，不做差分：两套样式图层结构不同，
+          // 再叠上交错模式的 deck 图层和我们的山影图层，差分会报「图层已存在 / 源仍被引用」
+          // （2026-10-17 生产真机 25 条错误）。地形与山影在 style.load 后由 effect 重新挂。
+          styleDiffing={false}
           onLoad={(e) => {
             collapseAttributionIfNarrow(e.target);
             if (import.meta.env.DEV) (window as unknown as { __fojinMap?: unknown }).__fojinMap = e.target;
@@ -524,28 +552,6 @@ export default function DeckGLMap({
           maxPitch={is3D ? MAX_PITCH_3D : 60}
           sky={is3D ? skyFor(isDark) : undefined}
         >
-          {terrainOn && (
-            <>
-              {/* 地形的 DEM 源在 effect 里命令式挂（见上）；山体阴影单独一个源——MapLibre 不建议
-                  二者共用同一个源（会互相抢瓦片分辨率）。 */}
-              {!satellite && (
-                <Source id={HILLSHADE_SOURCE_ID} type="raster-dem" url={demTilesUrl()} tileSize={512}>
-                  <Layer
-                    id="fojin-hillshade"
-                    type="hillshade"
-                    beforeId={firstSymbolId}
-                    paint={{
-                      "hillshade-exaggeration": isDark ? 0.45 : 0.4,
-                      "hillshade-shadow-color": isDark ? "#000000" : "#5c4f3d",
-                      "hillshade-highlight-color": isDark ? "#7a6c55" : "#ffffff",
-                      "hillshade-accent-color": isDark ? "#1a1612" : "#3d3326",
-                      "hillshade-illumination-direction": 315,
-                    }}
-                  />
-                </Source>
-              )}
-            </>
-          )}
           <DeckOverlay
             layers={layers}
             // Smaller dots on phones must not mean harder taps: let a fingertip
