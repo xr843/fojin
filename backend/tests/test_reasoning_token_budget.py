@@ -10,6 +10,7 @@ from app.services.chat import _is_reasoning_model, _with_reasoning_headroom
 def test_deepseek_v4_and_reasoners_detected():
     assert _is_reasoning_model("deepseek-v4-flash")
     assert _is_reasoning_model("deepseek-v4-pro")
+    assert _is_reasoning_model("deepseek-flash")  # V4.1-Flash-1017 的官方新名
     assert _is_reasoning_model("deepseek-reasoner")
     assert _is_reasoning_model("qwen3-thinking")
 

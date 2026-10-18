@@ -43,10 +43,11 @@ class TestThinkingParams:
 
     def test_high_and_max_pass_through(self):
         for effort in ("high", "max"):
-            assert thinking_params("deepseek-v4-flash", effort) == {
-                "thinking": {"type": "enabled"},
-                "reasoning_effort": effort,
-            }
+            for model in ("deepseek-v4-flash", "deepseek-flash"):
+                assert thinking_params(model, effort) == {
+                    "thinking": {"type": "enabled"},
+                    "reasoning_effort": effort,
+                }
 
     def test_off_disables_thinking(self):
         """关闭用的是 thinking.type=disabled，不是 reasoning_effort=none —— 后者

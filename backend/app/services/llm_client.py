@@ -129,9 +129,11 @@ def _convert_messages_for_anthropic(messages: list[dict]) -> tuple[str, list[dic
 # consumed by the reasoning trace, leaving content empty / answers truncated.
 # bare "reasoner"/"thinking" are intentional broad substring matches (catch any
 # provider's *-reasoner / *-thinking variant); "deepseek-v4" is explicit since
-# its reasoning isn't reflected in the name.
+# its reasoning isn't reflected in the name. "deepseek-flash" 是 2026-10-17 起官方
+# 推荐的新名（V4.1-Flash-1017）——旧名 deepseek-v4-flash 只是「暂时」路由过去；
+# 漏认它实测 45/90 答案被 length 截断（总额度只剩 2000）。
 _REASONING_MODEL_MARKERS = (
-    "deepseek-v4", "reasoner", "thinking", "-o1", "-o3", "/o1", "/o3",
+    "deepseek-v4", "deepseek-flash", "reasoner", "thinking", "-o1", "-o3", "/o1", "/o3",
 )
 
 
@@ -169,7 +171,7 @@ def _with_reasoning_headroom(model: str | None, max_tokens: int) -> int:
 # OpenAI 兼容 body builder，把 DeepSeek 的字段发给 OpenAI / Gemini 会被 400 拒掉，
 # 那位自带 Key 的用户直接问不出话。所以这里只列**官方文档写明支持**的型号。
 # 见 api-docs.deepseek.com/guides/thinking_mode/
-_THINKING_CAPABLE_MARKERS = ("deepseek-v4",)
+_THINKING_CAPABLE_MARKERS = ("deepseek-v4", "deepseek-flash")
 
 # 官方接受的档位。"off" 是我们这侧的叫法，映射到 thinking.type=disabled；
 # 不要用 Anthropic 格式的 reasoning.effort=none，DeepSeek 的兼容端点不认。
