@@ -42,6 +42,7 @@ PRICE_PER_1K_USD: dict[str, float] = {
     "deepseek-chat": 0.00028,       # legacy alias → deepseek-v4-flash
     "deepseek-reasoner": 0.0014,    # legacy alias (thinking)
     "deepseek-v4-flash": 0.00028,
+    "deepseek-flash": 0.00028,      # V4.1 Flash 新名，官方称价格不变（2026-10-17 changelog）
     "deepseek-v4-pro": 0.00087,
     # 官方定价页 2026-07-31：输入(未命中缓存) ¥20/M、输出 ¥100/M。
     # 按 (20+100)/2 ÷ 7.2 折算 = 0.00833。

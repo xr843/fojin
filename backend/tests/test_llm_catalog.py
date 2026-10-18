@@ -18,6 +18,7 @@ from app.core.exceptions import ServiceError
 # _resolve_* and their settings/decrypt_api_key collaborators live in
 # llm_client after the P1-3 chat-service split; patch targets follow the code.
 from app.services import llm_client as llm_module
+from app.services import llm_cost
 from app.services.llm_catalog import CATALOG, CATALOG_BY_ID, DEFAULT_MODEL_ID
 from app.services.llm_client import (
     PROVIDER_URLS,
@@ -146,7 +147,7 @@ def test_resolve_platform_deepseek_flash(monkeypatch):
     url, key, model, is_byok, provider = _resolve_with_model_override(None, "deepseek:v4-flash")
     assert url == PROVIDER_URLS["deepseek"]
     assert key == "platform-key"
-    assert model == "deepseek-v4-flash"   # 上游真实模型名，不是目录 id
+    assert model == "deepseek-flash"   # 上游真实模型名（V4.1 官方新名），不是目录 id
     assert is_byok is False
     assert provider == "deepseek"
 
@@ -157,6 +158,9 @@ def test_flash_counts_as_a_reasoning_model():
     的进度提示都靠它。若有人把标记收窄成精确匹配，这条会红。"""
     assert llm_module._is_reasoning_model("deepseek-v4-flash") is True
     assert llm_module._is_reasoning_model("deepseek-v4-pro") is True
+    flash_upstream = CATALOG_BY_ID["deepseek:v4-flash"].model
+    assert llm_module._is_reasoning_model(flash_upstream) is True
+    assert flash_upstream in llm_cost.PRICE_PER_1K_USD, "目录里的上游名必须有估价，否则成本告警按 Haiku 价算"
 
 
 def test_flash_gets_the_same_reasoning_headroom_as_pro():

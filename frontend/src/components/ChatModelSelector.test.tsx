@@ -28,7 +28,7 @@ function model(over: Partial<ChatModelOption> & { id: string }): ChatModelOption
 /** 目录里多数厂商没有平台 Key，所以 available 为假的是常态而非例外。 */
 const CATALOG: ChatModelOption[] = [
   model({ id: "deepseek:v4-pro", label: "DeepSeek V4 Pro" }),
-  model({ id: "deepseek:v4-flash", label: "DeepSeek V4 Flash" }),
+  model({ id: "deepseek:v4-flash", label: "DeepSeek V4.1 Flash" }),
   model({ id: "moonshot:kimi-k3", label: "Kimi K3", provider: "moonshot", available: false, requires_byok: true }),
   model({ id: "openai:gpt-5.6-sol", label: "GPT-5.6 Sol", provider: "openai", available: false, requires_byok: true }),
   model({ id: "gemini:gemini-3.6-flash", label: "Gemini 3.6 Flash", provider: "gemini", available: false, requires_byok: true }),
@@ -73,7 +73,7 @@ describe("ChatModelSelector", () => {
     const listed = optionTexts();
     expect(listed).toEqual([
       "DeepSeek V4 Pro",
-      "DeepSeek V4 Flash",
+      "DeepSeek V4.1 Flash",
       "配置其他厂商模型…",
     ]);
   });
@@ -98,7 +98,7 @@ describe("ChatModelSelector", () => {
 
   it("点真模型正常回传 id", async () => {
     await openDropdown();
-    fireEvent.click(screen.getByText("DeepSeek V4 Flash"));
+    fireEvent.click(screen.getByText("DeepSeek V4.1 Flash"));
     await waitFor(() => {
       expect(onChange).toHaveBeenCalledWith("deepseek:v4-flash");
     });

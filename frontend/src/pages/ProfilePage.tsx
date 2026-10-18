@@ -15,7 +15,7 @@ const { Title } = Typography;
 // instead of exact prices to avoid drift; check provider docs for current pricing.
 const PROVIDER_MODELS: Record<string, Array<{ value: string; label: string; hintKey: string }>> = {
   deepseek: [
-    { value: "deepseek-v4-flash", label: "V4 Flash", hintKey: "profile.modelHint.economy_daily" },
+    { value: "deepseek-flash", label: "V4.1 Flash", hintKey: "profile.modelHint.economy_daily" },
     { value: "deepseek-v4-pro", label: "V4 Pro", hintKey: "profile.modelHint.flagship" },
   ],
   // 2026-07-31 按厂商官方模型列表核对。这些是"点一下就填进去"的建议值，指向已下线

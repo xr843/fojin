@@ -24,7 +24,7 @@ class ModelOption:
 # Order matters — first entry is the default when no localStorage value exists.
 # 每个模型商只保留最新的一个旗舰模型。
 #
-# DeepSeek 是这条规则唯一的例外，且是有意的：flash 不是第二个旗舰，而是同一代
+# DeepSeek 是这条规则唯一的例外，且是有意的：flash 不是第二个旗舰，而是同一系列
 # 模型的轻快档 —— 上下文（1M）与最大输出（384K）和 pro 完全相同，价格是 1/3
 # （输入 1 vs 3、输出 2 vs 6 元/百万 token），并发上限 2500 vs 500，两者都支持
 # 思考模式。放进目录是让人能自己选着比，默认仍是 pro。
@@ -33,13 +33,19 @@ class ModelOption:
 # 9.7s vs pro 52.5s，但逐字引用保真度 67.7% vs 94.8%、卷号准确率 85.5% vs 95.5%，
 # 配对 17:2（p=0.001）——引得更多（490 vs 275 条）也引得更错。默认换 flash 判死；
 # 留在目录里给想要快的人自选，说明里必须如实写出代价。
+#
+# 2026-10-18 换到 V4.1-Flash-1017 复测（同窗配对）：首字 6.3s vs pro 19.4s，逐字
+# 77.3% vs 89.8%、卷号 87.6% vs 94.6%，配对 pro 胜 12:4——差距缩小但仍在，默认不变。
+# 上游名改用官方新名 deepseek-flash：旧名 deepseek-v4-flash 只是「暂时」路由到它。
+# 标签不写快照日期（1017）：deepseek-flash 是滚动别名，官方升级时日期会悄悄变成错的；
+# 目录 id 保持 deepseek:v4-flash 不变，免得用户存下的选择失效。
 CATALOG: list[ModelOption] = [
     ModelOption("deepseek:v4-pro", "deepseek", "deepseek-v4-pro",
                 "DeepSeek V4 Pro", "旗舰模型，复杂推理", False),
     # 描述里不提价格（那是运营侧的事），只写读者要权衡的：快多少、准不准。
-    # 数字见上方 2026-10-14 实测；改说明前先重跑那组配对。
-    ModelOption("deepseek:v4-flash", "deepseek", "deepseek-v4-flash",
-                "DeepSeek V4 Flash", "回答快约 5 倍，但引文准确率明显低于 Pro；需要核对出处时请用 Pro", False),
+    # 数字见上方 2026-10-14 / 10-18 实测；改说明前先重跑那组配对。
+    ModelOption("deepseek:v4-flash", "deepseek", "deepseek-flash",
+                "DeepSeek V4.1 Flash", "回答快约 3–5 倍，但引文准确率低于 Pro；需要核对出处时请用 Pro", False),
     # 这三家都只对自带 Key 的用户可选（平台没有配它们的 Key）。上游模型名写错的
     # 后果不是"退回默认"，而是那位用户直接吃一个 model not found —— 所以每次更新
     # 都以厂商官方模型列表为准，不采信二手文章。2026-07-31 核对：
