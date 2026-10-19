@@ -464,3 +464,78 @@ async def test_state_saved_only_after_baidu_accepts(monkeypatch, tmp_path):
     monkeypatch.setattr(baidu_push, "push_urls", AsyncMock(return_value={"success": 1, "remain": 9}))
     assert await baidu_push.main(["--kind", "texts", "--state-file", str(state)]) == 0
     assert baidu_push.load_state(str(state)) == {"texts": 1}
+
+
+# ---------------------------------------------------------------------------
+# 2026-10-19: priority order (most-visited first) + never re-push
+# ---------------------------------------------------------------------------
+
+
+def test_canonical_page_folds_variants_onto_the_sitemap_url():
+    cp = baidu_push.canonical_page
+    assert cp("/texts/12") == ("texts", "12")
+    assert cp("/texts/12/read") == ("texts", "12")
+    assert cp("/texts/12/juan/3") == ("texts", "12")
+    assert cp("/texts/12。") == ("texts", "12")  # link that swallowed punctuation
+    assert cp("/texts/{text_id}") is None
+    assert cp("/texts/T01") is None
+    assert cp("/persons/182806") == ("persons", "182806")
+    assert cp("/dict/慧能") == ("dict", "慧能")
+    assert cp("/dict/%E6%85%A7%E8%83%BD") == ("dict", "慧能")
+    assert cp("/dict/") is None
+    assert cp("/dictionary/x") is None
+    assert baidu_push.page_url("dict", "慧能") == f"{baidu_push.BASE_URL}/dict/%E6%85%A7%E8%83%BD"
+
+
+def test_load_priority_merges_variants_and_sorts_by_visits(tmp_path):
+    f = tmp_path / "p.tsv"
+    f.write_text("/texts/5\t3\n/texts/9\t6\n/texts/5/read\t4\n/dict/慧能\t2\n/admin\t99\nbroken\n", encoding="utf-8")
+    # texts/5 = 3+4 = 7 beats texts/9 = 6
+    assert baidu_push.load_priority(str(f)) == [("texts", "5"), ("texts", "9"), ("dict", "慧能")]
+
+
+async def test_prioritized_skips_pushed_and_missing_then_falls_back_to_cursor(monkeypatch, offset_collectors):
+    priority = [("texts", "9"), ("texts", "1"), ("dict", "无此词"), ("persons", "7")]
+
+    async def _exists(session, pages):
+        return {p for p in pages if p != ("dict", "无此词")}
+
+    monkeypatch.setattr(baidu_push, "existing_pages", _exists)
+    pushed = {f"{baidu_push.BASE_URL}/texts/1"}
+
+    urls, _ = await baidu_push.collect_prioritized(None, priority, "all", 4, {}, pushed)
+
+    assert urls[:2] == [f"{baidu_push.BASE_URL}/texts/9", f"{baidu_push.BASE_URL}/persons/7"]
+    # remaining budget comes from the id cursor (fake collectors here)
+    assert urls[2:] == ["texts-0", "texts-1"]
+    assert f"{baidu_push.BASE_URL}/texts/1" not in urls
+
+
+async def test_priority_file_requires_state_file(capsys):
+    assert await baidu_push.main(["--priority-file", "x.tsv"]) == 1
+    assert "--state-file" in capsys.readouterr().err
+
+
+async def test_successful_push_is_remembered_and_not_repushed(monkeypatch, tmp_path):
+    state = tmp_path / "state.json"
+    prio = tmp_path / "p.tsv"
+    prio.write_text("/texts/9\t5\n/texts/3\t4\n", encoding="utf-8")
+    monkeypatch.setattr(settings, "baidu_push_token", "tok")
+
+    async def _exists(session, pages):
+        return set(pages)
+
+    monkeypatch.setattr(baidu_push, "existing_pages", _exists)
+    monkeypatch.setattr(baidu_push, "collect_with_cursor", AsyncMock(return_value=([], {})))
+    push_mock = AsyncMock(return_value={"success": 1, "remain": 9})
+    monkeypatch.setattr(baidu_push, "push_urls", push_mock)
+
+    args = ["--limit", "1", "--state-file", str(state), "--priority-file", str(prio)]
+    assert await baidu_push.main(args) == 0
+    assert push_mock.await_args.args[0] == [f"{baidu_push.BASE_URL}/texts/9"]
+    assert await baidu_push.main(args) == 0
+    assert push_mock.await_args.args[0] == [f"{baidu_push.BASE_URL}/texts/3"]
+    assert baidu_push.load_pushed(str(state)) == {
+        f"{baidu_push.BASE_URL}/texts/9",
+        f"{baidu_push.BASE_URL}/texts/3",
+    }

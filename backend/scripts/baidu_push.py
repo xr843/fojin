@@ -53,7 +53,7 @@ import socket
 import ssl
 import sys
 from collections.abc import Awaitable, Callable
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 # Allow `python scripts/baidu_push.py` to find the `app` package regardless
 # of invocation cwd — same fix as scripts/audit_sources.py and
@@ -69,6 +69,7 @@ from app.api.seo_dict import get_distinct_headwords
 from app.api.sitemap import BASE_URL
 from app.config import settings
 from app.database import async_session
+from app.models.dictionary import DictionaryEntry
 from app.models.knowledge_graph import KGEntity
 from app.services.text import get_all_text_ids_with_dates
 
@@ -194,19 +195,138 @@ async def collect_urls(session: AsyncSession, kind: str, limit: int) -> list[str
     return urls
 
 
-def load_state(path: str | None) -> dict[str, int]:
+def _read_state(path: str | None) -> dict:
     if not path or not os.path.exists(path):
         return {}
     with open(path, encoding="utf-8") as fh:
-        data = json.load(fh)
+        return json.load(fh)
+
+
+def load_state(path: str | None) -> dict[str, int]:
+    data = _read_state(path)
     return {k: int(v) for k, v in data.get("offsets", {}).items() if k in _COLLECTORS}
 
 
-def save_state(path: str, offsets: dict[str, int]) -> None:
+def load_pushed(path: str | None) -> set[str]:
+    """URLs Baidu has already accepted — never spend quota on them twice."""
+    return set(_read_state(path).get("pushed", []))
+
+
+def save_state(path: str, offsets: dict[str, int], pushed: set[str] | None = None) -> None:
+    data = {"offsets": offsets}
+    if pushed is not None:
+        data["pushed"] = sorted(pushed)
     tmp = f"{path}.tmp"
     with open(tmp, "w", encoding="utf-8") as fh:
-        json.dump({"offsets": offsets}, fh)
+        json.dump(data, fh, ensure_ascii=False)
     os.replace(tmp, path)
+
+
+# ---------------------------------------------------------------------------
+# Priority order: most-visited pages first (2026-10-19)
+# ---------------------------------------------------------------------------
+# The daily quota is 10 URLs, so ~280 pages in the 4-week trial. Pushing by id
+# would spend it on texts/1..280 regardless of whether anyone reads them; the
+# trial only means something if the pages Baidu is told about are the ones
+# people actually visit. baidu_priority.sql (run on the host against Umami)
+# emits raw url_path <TAB> visits; this side normalises, merges and validates.
+
+_TEXT_PATH = re.compile(r"^/texts/(\d+)")
+_PERSON_PATH = re.compile(r"^/persons/(\d+)")
+_DICT_PATH = re.compile(r"^/dict/([^?#]+)")
+
+
+def _clean_headword(raw: str) -> str | None:
+    hw = unquote(raw).strip()
+    if not hw or "/" in hw or len(hw) > 200 or "\n" in hw or "\t" in hw:
+        return None
+    return hw
+
+
+def canonical_page(path: str) -> tuple[str, str] | None:
+    """Map a visited path onto the sitemap URL it belongs to, or None.
+
+    ``/texts/12/read``, ``/texts/12/juan/3`` and a link that swallowed trailing
+    punctuation (``/texts/12。``) all count towards ``/texts/12`` — the page
+    Baidu should index. Returns (kind, key).
+    """
+    if m := _TEXT_PATH.match(path):
+        return "texts", m.group(1)
+    if m := _PERSON_PATH.match(path):
+        return "persons", m.group(1)
+    if m := _DICT_PATH.match(path):
+        hw = _clean_headword(m.group(1))
+        return ("dict", hw) if hw else None
+    return None
+
+
+def page_url(kind: str, key: str) -> str:
+    if kind == "dict":
+        return f"{BASE_URL}/dict/{quote(key, safe='')}"
+    return f"{BASE_URL}/{kind}/{key}"
+
+
+def load_priority(path: str) -> list[tuple[str, str]]:
+    """(kind, key) pairs from the priority TSV, merged and sorted by visits desc."""
+    visits: dict[tuple[str, str], int] = {}
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            parts = line.rstrip("\n").split("\t")
+            if len(parts) != 2 or not parts[1].isdigit():
+                continue
+            page = canonical_page(parts[0])
+            if page:
+                visits[page] = visits.get(page, 0) + int(parts[1])
+    return sorted(visits, key=lambda p: (-visits[p], p))
+
+
+async def existing_pages(session: AsyncSession, pages: list[tuple[str, str]]) -> set[tuple[str, str]]:
+    """Which of these pages exist — a 404 would waste one of ten daily slots."""
+    ok: set[tuple[str, str]] = set()
+    text_ids = {k for kind, k in pages if kind == "texts"}
+    if text_ids:
+        live = {str(tid) for tid, _ in await get_all_text_ids_with_dates(session)}
+        ok |= {("texts", k) for k in text_ids & live}
+    person_ids = [int(k) for kind, k in pages if kind == "persons"]
+    if person_ids:
+        rows = await session.execute(
+            select(KGEntity.id).where(KGEntity.entity_type == "person", KGEntity.id.in_(person_ids))
+        )
+        ok |= {("persons", str(pid)) for (pid,) in rows.all()}
+    headwords = [k for kind, k in pages if kind == "dict"]
+    if headwords:
+        rows = await session.execute(
+            select(DictionaryEntry.headword).where(DictionaryEntry.headword.in_(headwords)).distinct()
+        )
+        ok |= {("dict", hw) for (hw,) in rows.all()}
+    return ok
+
+
+async def collect_prioritized(
+    session: AsyncSession,
+    priority: list[tuple[str, str]],
+    kind: str,
+    limit: int,
+    offsets: dict[str, int],
+    pushed: set[str],
+) -> tuple[list[str], dict[str, int]]:
+    """Most-visited unpushed pages first; when those run out, the id cursor."""
+    wanted = [p for p in priority if kind in ("all", p[0]) and page_url(*p) not in pushed]
+    urls: list[str] = []
+    if wanted:
+        live = await existing_pages(session, wanted)
+        urls = [page_url(*p) for p in wanted if p in live][:limit]
+    new_offsets = dict(offsets)
+    # Fill from the id cursor, skipping anything already pushed via priority.
+    # A few rounds at most: each round advances the cursor past what it saw.
+    for _ in range(5):
+        if len(urls) >= limit:
+            break
+        more, new_offsets = await collect_with_cursor(session, kind, limit - len(urls), new_offsets)
+        if not more:
+            break
+        urls.extend(u for u in more if u not in pushed and u not in urls)
+    return urls[:limit], new_offsets
 
 
 async def collect_with_cursor(
@@ -298,6 +418,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="JSON file holding per-kind offsets; each run continues where the last one stopped",
     )
     parser.add_argument(
+        "--priority-file",
+        help="TSV of url_path<TAB>visits (baidu_priority.sql); pushes most-visited pages first. "
+        "Requires --state-file, which remembers what was already pushed",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="print the URLs that would be pushed; make no network request",
@@ -310,6 +435,10 @@ async def main(argv: list[str] | None = None) -> int:
 
     if args.limit < 1:
         print("ERROR: --limit must be >= 1", file=sys.stderr)
+        return 1
+
+    if args.priority_file and not args.state_file:
+        print("ERROR: --priority-file needs --state-file (to skip pages already pushed)", file=sys.stderr)
         return 1
 
     # Checked first and unconditionally — dry-run included. A cron job that
@@ -327,9 +456,14 @@ async def main(argv: list[str] | None = None) -> int:
         return 1
 
     offsets = load_state(args.state_file)
+    pushed = load_pushed(args.state_file)
+    priority = load_priority(args.priority_file) if args.priority_file else []
     async with async_session() as session:
-        if args.state_file:
+        if args.priority_file:
+            urls, new_offsets = await collect_prioritized(session, priority, args.kind, args.limit, offsets, pushed)
+        elif args.state_file:
             urls, new_offsets = await collect_with_cursor(session, args.kind, args.limit, offsets)
+            urls = [u for u in urls if u not in pushed]
         else:
             urls, new_offsets = await collect_urls(session, args.kind, args.limit), None
 
@@ -360,7 +494,7 @@ async def main(argv: list[str] | None = None) -> int:
         return 1
 
     if args.state_file and new_offsets is not None:
-        save_state(args.state_file, new_offsets)
+        save_state(args.state_file, new_offsets, pushed | set(urls))
 
     print(f"pushed={len(urls)} success={result.get('success')} remain={result.get('remain')}")
     if result.get("not_same_site"):
