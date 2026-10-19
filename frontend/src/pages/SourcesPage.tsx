@@ -9,6 +9,7 @@ import { getSources, type DataSource } from "../api/client";
 import { SUPPORTED_UI_LANGS } from "../i18n";
 import { getLangName, hasDirectSearchUrl, localizedLangName, normalizeLangCode } from "../utils/sourceUrls";
 import SourceCard from "./sources/SourceCard";
+import FeaturedSources from "./sources/FeaturedSources";
 import SuggestSourceForm from "./sources/SuggestSourceForm";
 import {
   FIELD_NAMES,
@@ -511,44 +512,7 @@ export default function SourcesPage() {
         </div>
       </div>
 
-      <div className="sources-hero-search">
-        <div className="sources-hero-search-head">
-          <ThunderboltOutlined className="sources-hero-search-icon" />
-          <div className="sources-hero-search-copy">
-            <div className="sources-hero-search-title">{t("sources.hero_title", { n: counters.directSearch })}</div>
-            <div className="sources-hero-search-sub">
-              {t("sources.hero_sub")}
-            </div>
-          </div>
-        </div>
-        <Input.Search
-          placeholder={t("sources.hero_placeholder")}
-          size="large"
-          enterButton={t("sources.hero_button")}
-          allowClear
-          value={tryInput}
-          onChange={(e) => setTryInput(e.target.value)}
-          onSearch={(v) => {
-            setSearchQuery(v);
-            if (v) {
-              // Without this the URL updates silently but the viewport stays
-              // on the hero — users don't see the per-card direct links and
-              // think the button did nothing.
-              requestAnimationFrame(() => {
-                const prefersReduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-                document
-                  .querySelector(".sources-stats-bar")
-                  ?.scrollIntoView({ behavior: prefersReduced ? "auto" : "smooth", block: "start" });
-              });
-            }
-          }}
-        />
-        {searchQuery && (
-          <div className="sources-hero-search-result" role="status" aria-live="polite">
-            {t("sources.hero_result", { n: counters.directSearch, query: searchQuery })}
-          </div>
-        )}
-      </div>
+      {!filtersActive && sources && <FeaturedSources sources={sources} />}
 
       {!phone && trustBlock}
 
@@ -606,6 +570,45 @@ export default function SourcesPage() {
             { value: "lang", label: t("sources.group_by_lang") },
           ]}
         />
+      </div>
+
+      <div className="sources-hero-search">
+        <div className="sources-hero-search-head">
+          <ThunderboltOutlined className="sources-hero-search-icon" />
+          <div className="sources-hero-search-copy">
+            <div className="sources-hero-search-title">{t("sources.hero_title", { n: counters.directSearch })}</div>
+            <div className="sources-hero-search-sub">
+              {t("sources.hero_sub")}
+            </div>
+          </div>
+        </div>
+        <Input.Search
+          placeholder={t("sources.hero_placeholder")}
+          size="large"
+          enterButton={t("sources.hero_button")}
+          allowClear
+          value={tryInput}
+          onChange={(e) => setTryInput(e.target.value)}
+          onSearch={(v) => {
+            setSearchQuery(v);
+            if (v) {
+              // Without this the URL updates silently but the viewport stays
+              // on the hero — users don't see the per-card direct links and
+              // think the button did nothing.
+              requestAnimationFrame(() => {
+                const prefersReduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+                document
+                  .querySelector(".sources-stats-bar")
+                  ?.scrollIntoView({ behavior: prefersReduced ? "auto" : "smooth", block: "start" });
+              });
+            }
+          }}
+        />
+        {searchQuery && (
+          <div className="sources-hero-search-result" role="status" aria-live="polite">
+            {t("sources.hero_result", { n: counters.directSearch, query: searchQuery })}
+          </div>
+        )}
       </div>
 
       <div className="sources-stats-bar">

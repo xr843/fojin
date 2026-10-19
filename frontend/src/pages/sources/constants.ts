@@ -70,3 +70,23 @@ export function trackSourceClick(
   if (typeof window === "undefined" || !window.umami) return;
   window.umami.track("source_click", { code, kind, ...extra });
 }
+
+// 「常用数据源」：读者把 /sources 当导航用——36% 的访问直接从这页进站、26% 点外链
+// 出站，而点击高度集中：205 个被点过的源里，前 10 个拿走 46%（Umami 2026-07-20 ~
+// 10-18，剔除爬虫与站长）。这些站原本埋在按地区分的 35 个组里，手机上分组默认收起，
+// 首屏一张卡都看不到。名单按那 13 周的实际点击排序、人工固定（不做实时排行，免得
+// 热门自我强化）；每季度按新数据复核一次。
+export const FEATURED_SOURCE_CODES = [
+  "books-fo",
+  "cbeta-archive",
+  "fanfoyan-dict",
+  "cbeta",
+  "yuezang",
+  "dianjin",
+  "shidianguji",
+  "xuefo",
+  "cbeta-tripitaka",
+  "foyan",
+  "84000",
+  "dunhuang-iiif",
+] as const;

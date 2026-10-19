@@ -925,6 +925,8 @@
   "sources.page_desc_default": "Aggregating Buddhist digital resources worldwide, covering libraries, universities, research institutes, and digital projects.",
   "sources.heading": "Data Source Navigator",
   "sources.subtitle": "Aggregating {{n}} Buddhist digital resources worldwide · Click a capability below to filter",
+  "sources.featured_title": "Most-used sources",
+  "sources.featured_note": "Based on what readers actually clicked over the last three months",
   "sources.filter_by_capability_aria": "Filter by capability",
   "sources.cap_direct": "Direct search",
   "sources.cap_direct_tip": "A direct-search URL template is registered — click “Search” on a card to jump straight to that site's results page",

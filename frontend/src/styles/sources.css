@@ -108,6 +108,80 @@
 }
 
 /* ---------- 跨源搜索 Hero ---------- */
+/* 常用数据源：页首的导航条。紧凑链接块而非完整卡片——手机单列 12 块约一屏半，
+   完整卡片要四五屏，又把「首屏看不到数据源」带回来。 */
+.sources-featured {
+  margin: 0 0 18px;
+}
+
+.sources-featured-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-bottom: 10px;
+}
+
+.sources-featured-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--fj-ink);
+}
+
+.sources-featured-note {
+  font-size: 13px;
+  color: var(--fj-ink-muted);
+}
+
+.sources-featured-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
+  gap: 10px;
+}
+
+.sources-featured-link {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  height: 100%;
+  padding: 10px 14px;
+  background: var(--fj-surface);
+  border: 1px solid var(--fj-border);
+  border-radius: 8px;
+  color: var(--fj-ink);
+  text-decoration: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.sources-featured-link:hover,
+.sources-featured-link:focus-visible {
+  border-color: var(--fj-gold);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  color: var(--fj-ink);
+}
+
+.sources-featured-name {
+  font-size: 15px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sources-featured-desc {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--fj-ink-light);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .sources-hero-search {
   background: linear-gradient(135deg, #fdf7ea 0%, #fbeed0 100%);
   border: 1px solid #e9d9a8;

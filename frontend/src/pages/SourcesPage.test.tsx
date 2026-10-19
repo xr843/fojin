@@ -132,8 +132,9 @@ function catalog(): DataSource[] {
 }
 
 function groupOf(text: string): HTMLDetailsElement {
-  const el = screen.getByText(text);
-  const details = el.closest("details");
+  // 常用区也会列出同名源，只取分组目录里的那一张卡片。
+  const el = screen.getAllByText(text).find((e) => e.closest("details"));
+  const details = el?.closest("details");
   if (!details) throw new Error(`${text} is not inside a <details> group`);
   return details as HTMLDetailsElement;
 }
@@ -225,5 +226,50 @@ describe("SourcesPage 手机目录折叠", () => {
       expect(trustBeforeGroups).toBe(!phone);
       unmount();
     }
+  });
+});
+
+describe("SourcesPage 常用数据源", () => {
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia;
+  });
+
+  function featuredLinks(container: HTMLElement) {
+    return Array.from(container.querySelectorAll(".sources-featured-link")) as HTMLAnchorElement[];
+  }
+
+  it("未筛选时在页首按名单顺序列出，目录里没有的源跳过", async () => {
+    mockPhone(true);
+    mockGetSources.mockResolvedValue([
+      ...catalog(),
+      source({ id: 9 as DataSource["id"], code: "books-fo", name_zh: "AI佛书网", region: "中国大陆" }),
+    ]);
+    const { container } = renderPage();
+    await screen.findByText("SuttaCentral 巴利经藏");
+    const links = featuredLinks(container);
+    // books-fo 在名单第一、cbeta 第四；名单里其余的码目录里没有，静默跳过
+    expect(links.map((a) => a.textContent?.split(/\s/)[0])).toEqual(["AI佛书网", "CBETA"]);
+    expect(links[0].getAttribute("target")).toBe("_blank");
+    // 手机上分组默认收起，常用区是首屏唯一可直接点的数据源，必须排在目录之前
+    const groups = container.querySelector(".sources-groups")!;
+    expect(container.querySelector(".sources-featured")!.compareDocumentPosition(groups) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("有筛选或搜索时收起，不和结果抢位置", async () => {
+    mockPhone(false);
+    mockGetSources.mockResolvedValue(catalog());
+    const { container } = renderPage("/sources?q=SuttaCentral");
+    await screen.findByText("SuttaCentral 巴利经藏");
+    expect(container.querySelector(".sources-featured")).toBeNull();
+  });
+
+  it("「一键直达」在筛选栏之后，不再压在页首", async () => {
+    mockPhone(false);
+    mockGetSources.mockResolvedValue(catalog());
+    const { container } = renderPage();
+    await screen.findByText("SuttaCentral 巴利经藏");
+    const toolbar = container.querySelector(".sources-toolbar")!;
+    const hero = container.querySelector(".sources-hero-search")!;
+    expect(toolbar.compareDocumentPosition(hero) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
