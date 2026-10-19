@@ -592,6 +592,11 @@ export default function SourcesPage() {
           onSearch={(v) => {
             setSearchQuery(v);
             if (v) {
+              // 此前只有「点了生成的直链」才有埋点（source_click kind=search），提交本身
+              // 量不到，「一键直达用得少」只能算下限。
+              if (typeof window !== "undefined" && window.umami) {
+                window.umami.track("sources_direct_search", { query: v.slice(0, 30) });
+              }
               // Without this the URL updates silently but the viewport stays
               // on the hero — users don't see the per-card direct links and
               // think the button did nothing.
