@@ -74,7 +74,7 @@ from app.services.text import get_all_text_ids_with_dates
 
 PUSH_API_HOST = "data.zz.baidu.com"
 PUSH_API_URL = f"https://{PUSH_API_HOST}/urls"
-DEFAULT_LIMIT = 100
+DEFAULT_LIMIT = 10  # fojin.app's daily quota on 2026-10-19 (Baidu's remain field)
 
 # Baidu's own docs give the endpoint as plain http://, which would put the token
 # on the wire in clear text. https works, but the certificate is issued for
@@ -244,16 +244,28 @@ async def collect_with_cursor(
 async def push_urls(urls: list[str], token: str) -> dict:
     """POST urls to Baidu's active-push endpoint; return the parsed JSON body.
 
-    Raises httpx.HTTPError (connection/timeout/4xx/5xx) on transport or HTTP
-    failure — callers decide how to report that.
+    The query string is built by hand: Baidu rejects a percent-encoded ``site``
+    (``site=https%3A%2F%2Ffojin.app`` → 400, while ``site=https://fojin.app`` is
+    accepted — both measured on 2026-10-19), and httpx's ``params=`` encodes it.
+
+    Baidu answers quota/site/token problems with a 4xx *and* a JSON body such as
+    ``{"error": 400, "message": "over quota"}``; that body is returned so main()
+    can print the reason. Raises httpx.HTTPError for transport failures and for
+    error responses without a JSON body.
     """
     async with httpx.AsyncClient(timeout=30, verify=_baidu_ssl_context()) as client:
         resp = await client.post(
-            PUSH_API_URL,
-            params={"site": BASE_URL, "token": token},
+            f"{PUSH_API_URL}?site={BASE_URL}&token={token}",
             content="\n".join(urls),
             headers={"Content-Type": "text/plain"},
         )
+    if resp.is_client_error:
+        try:
+            body = resp.json()
+        except ValueError:
+            body = None
+        if isinstance(body, dict) and "error" in body:
+            return body
     resp.raise_for_status()
     return resp.json()
 

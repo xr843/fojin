@@ -193,14 +193,17 @@ async def test_person_urls_only_includes_person_entities(kg_db):
 
 
 class _FakeResponse:
-    def __init__(self, payload):
+    def __init__(self, payload, status=200):
         self._payload = payload
+        self.status_code = status
+        self.is_client_error = 400 <= status < 500
 
     def json(self):
         return self._payload
 
     def raise_for_status(self):
-        pass
+        if self.status_code >= 400:
+            raise baidu_push.httpx.HTTPStatusError("boom", request=None, response=None)
 
 
 class _FakeAsyncClient:
@@ -235,10 +238,20 @@ async def test_push_urls_sends_expected_request_shape(monkeypatch):
     assert client is not None
     assert len(client.post_calls) == 1
     url, kwargs = client.post_calls[0]
-    assert url == baidu_push.PUSH_API_URL
-    assert kwargs["params"] == {"site": baidu_push.BASE_URL, "token": "tok123"}
+    # site must go out un-encoded: Baidu 400s on site=https%3A%2F%2Ffojin.app
+    assert url == f"{baidu_push.PUSH_API_URL}?site=https://fojin.app&token=tok123"
+    assert "params" not in kwargs
     assert kwargs["content"] == "https://fojin.app/texts/1\nhttps://fojin.app/texts/2"
     assert kwargs["headers"] == {"Content-Type": "text/plain"}
+
+
+async def test_push_urls_returns_baidus_reason_on_4xx(monkeypatch):
+    _FakeAsyncClient.response = _FakeResponse({"error": 400, "message": "over quota"}, status=400)
+    monkeypatch.setattr(baidu_push.httpx, "AsyncClient", _FakeAsyncClient)
+
+    result = await baidu_push.push_urls(["https://fojin.app/texts/1"], "tok123")
+
+    assert result == {"error": 400, "message": "over quota"}
 
 
 # ---------------------------------------------------------------------------
