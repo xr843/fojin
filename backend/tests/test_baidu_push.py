@@ -30,6 +30,12 @@ from app.models.dictionary import DictionaryEntry
 from app.models.knowledge_graph import KGEntity
 
 
+@pytest.fixture(autouse=True)
+def _no_real_endpoint_check(monkeypatch):
+    """main() handshakes with Baidu before sending the token; never in tests."""
+    monkeypatch.setattr(baidu_push, "verify_push_endpoint", lambda *a, **k: None)
+
+
 def _fake_collector(prefix: str, available: int):
     """An AsyncMock collector that, like the real ones, never returns more
     than the `limit` it's called with."""
@@ -81,8 +87,14 @@ async def test_all_fills_budget_in_order_and_skips_once_full(fake_collectors):
     urls = await baidu_push.collect_urls(session=None, kind="all", limit=8)
 
     assert urls == [
-        "text-0", "text-1", "text-2", "text-3", "text-4",
-        "person-0", "person-1", "person-2",
+        "text-0",
+        "text-1",
+        "text-2",
+        "text-3",
+        "text-4",
+        "person-0",
+        "person-1",
+        "person-2",
     ]
     fake_collectors["texts"].assert_awaited_once_with(None, 8)
     fake_collectors["persons"].assert_awaited_once_with(None, 3)
@@ -216,9 +228,7 @@ async def test_push_urls_sends_expected_request_shape(monkeypatch):
     _FakeAsyncClient.response = _FakeResponse({"success": 2, "remain": 98})
     monkeypatch.setattr(baidu_push.httpx, "AsyncClient", _FakeAsyncClient)
 
-    result = await baidu_push.push_urls(
-        ["https://fojin.app/texts/1", "https://fojin.app/texts/2"], "tok123"
-    )
+    result = await baidu_push.push_urls(["https://fojin.app/texts/1", "https://fojin.app/texts/2"], "tok123")
 
     assert result == {"success": 2, "remain": 98}
     client = _FakeAsyncClient.last_instance
@@ -304,9 +314,7 @@ async def test_successful_run_prints_success_and_remain(monkeypatch, capsys):
 async def test_error_response_from_baidu_is_surfaced_as_failure(monkeypatch, capsys):
     monkeypatch.setattr(settings, "baidu_push_token", "tok")
     monkeypatch.setattr(baidu_push, "collect_urls", AsyncMock(return_value=["https://fojin.app/texts/1"]))
-    monkeypatch.setattr(
-        baidu_push, "push_urls", AsyncMock(return_value={"error": 401, "message": "token is invalid"})
-    )
+    monkeypatch.setattr(baidu_push, "push_urls", AsyncMock(return_value={"error": 401, "message": "token is invalid"}))
 
     rc = await baidu_push.main(["--kind", "texts"])
 
@@ -324,3 +332,122 @@ async def test_empty_result_set_is_not_an_error(monkeypatch, capsys):
 
     assert rc == 0
     push_mock.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# 2026-10-19: https + identity pin, token never in logs, token via stdin, cursor
+# ---------------------------------------------------------------------------
+
+
+def test_endpoint_is_https():
+    assert baidu_push.PUSH_API_URL.startswith("https://")
+
+
+def test_cert_pin_rejects_a_verified_cert_that_is_not_baidus():
+    import ssl
+
+    good = {
+        "subject": ((("organizationName", baidu_push._EXPECTED_ORG),),),
+        "subjectAltName": (("DNS", "*.baidu.com"),),
+    }
+    baidu_push._check_baidu_cert(good)
+    for bad in (
+        {**good, "subject": ((("organizationName", "Evil Inc"),),)},
+        {**good, "subjectAltName": (("DNS", "*.evil.com"),)},
+    ):
+        with pytest.raises(ssl.SSLError):
+            baidu_push._check_baidu_cert(bad)
+
+
+async def test_endpoint_check_failure_never_sends_the_token(monkeypatch, capsys):
+    import ssl
+
+    def _boom(*a, **k):
+        raise ssl.SSLError("unexpected certificate")
+
+    monkeypatch.setattr(baidu_push, "verify_push_endpoint", _boom)
+    monkeypatch.setattr(settings, "baidu_push_token", "tok")
+    monkeypatch.setattr(baidu_push, "collect_urls", AsyncMock(return_value=["https://fojin.app/texts/1"]))
+    push_mock = AsyncMock()
+    monkeypatch.setattr(baidu_push, "push_urls", push_mock)
+
+    rc = await baidu_push.main(["--kind", "texts"])
+
+    assert rc == 1
+    push_mock.assert_not_called()
+    assert "refusing to send the token" in capsys.readouterr().err
+
+
+async def test_transport_error_never_prints_the_token(monkeypatch, capsys):
+    secret = "SeCrEt1234567890"
+    monkeypatch.setattr(settings, "baidu_push_token", secret)
+    monkeypatch.setattr(baidu_push, "collect_urls", AsyncMock(return_value=["https://fojin.app/texts/1"]))
+    err = baidu_push.httpx.ConnectError(f"failed: https://data.zz.baidu.com/urls?site=x&token={secret}")
+    monkeypatch.setattr(baidu_push, "push_urls", AsyncMock(side_effect=err))
+
+    rc = await baidu_push.main(["--kind", "texts"])
+
+    captured = capsys.readouterr()
+    assert rc == 1
+    assert secret not in captured.err + captured.out
+    assert "***" in captured.err
+
+
+async def test_token_is_read_from_stdin_and_overrides_env(monkeypatch):
+    import io
+
+    monkeypatch.setattr(settings, "baidu_push_token", "")
+    monkeypatch.setattr(baidu_push.sys, "stdin", io.StringIO("fromstdin\n"))
+    monkeypatch.setattr(baidu_push, "collect_urls", AsyncMock(return_value=["https://fojin.app/texts/1"]))
+    push_mock = AsyncMock(return_value={"success": 1, "remain": 9})
+    monkeypatch.setattr(baidu_push, "push_urls", push_mock)
+
+    rc = await baidu_push.main(["--kind", "texts", "--token-stdin"])
+
+    assert rc == 0
+    assert push_mock.await_args.args[1] == "fromstdin"
+
+
+def _offset_collector(prefix: str, available: int):
+    async def _collect(session, limit, offset=0):
+        return [f"{prefix}-{i}" for i in range(offset, min(available, offset + limit))]
+
+    return AsyncMock(side_effect=_collect)
+
+
+@pytest.fixture
+def offset_collectors(monkeypatch):
+    for kind, n in (("texts", 5), ("persons", 3), ("dict", 4)):
+        monkeypatch.setitem(baidu_push._COLLECTORS, kind, _offset_collector(kind, n))
+
+
+async def test_cursor_continues_across_runs_and_kinds(offset_collectors):
+    urls, off = await baidu_push.collect_with_cursor(None, "all", 4, {})
+    assert urls == ["texts-0", "texts-1", "texts-2", "texts-3"]
+    urls, off = await baidu_push.collect_with_cursor(None, "all", 4, off)
+    # texts runs out after one more, the rest of the budget moves on to persons
+    assert urls == ["texts-4", "persons-0", "persons-1", "persons-2"]
+    urls, off = await baidu_push.collect_with_cursor(None, "all", 4, off)
+    assert urls == ["dict-0", "dict-1", "dict-2", "dict-3"]
+
+
+async def test_cursor_wraps_to_start_once_everything_was_pushed(offset_collectors):
+    done = {"texts": 5, "persons": 3, "dict": 4}
+    urls, off = await baidu_push.collect_with_cursor(None, "all", 2, done)
+    assert urls == ["texts-0", "texts-1"]
+    assert off["texts"] == 2
+
+
+async def test_state_saved_only_after_baidu_accepts(monkeypatch, tmp_path):
+    state = tmp_path / "state.json"
+    monkeypatch.setattr(settings, "baidu_push_token", "tok")
+    monkeypatch.setattr(
+        baidu_push, "collect_with_cursor", AsyncMock(return_value=(["https://fojin.app/texts/1"], {"texts": 1}))
+    )
+    monkeypatch.setattr(baidu_push, "push_urls", AsyncMock(return_value={"error": 400, "message": "over quota"}))
+    assert await baidu_push.main(["--kind", "texts", "--state-file", str(state)]) == 1
+    assert not state.exists()
+
+    monkeypatch.setattr(baidu_push, "push_urls", AsyncMock(return_value={"success": 1, "remain": 9}))
+    assert await baidu_push.main(["--kind", "texts", "--state-file", str(state)]) == 0
+    assert baidu_push.load_state(str(state)) == {"texts": 1}
