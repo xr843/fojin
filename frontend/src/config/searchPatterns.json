@@ -20,7 +20,7 @@
   "harvard-yenching": "https://hollis.harvard.edu/primo-explore/search?query=any,contains,{q}&vid=HVD2",
   "waseda-kotenseki": "https://www.wul.waseda.ac.jp/kotenseki/search.php?cndbn={q}",
   "kyoto-univ": "https://rmda.kulib.kyoto-u.ac.jp/search?q={q}",
-  "ntu-buddhism": "https://buddhism.lib.ntu.edu.tw/search?q={q}",
+  "ccbs-ntu": "https://dlbs.liberal.ntu.edu.tw/search/?q={q}",
   "stanford-buddhism": "https://searchworks.stanford.edu/catalog?q={q}",
   "columbia-starr": "https://clio.columbia.edu/catalog?q={q}",
   "academia-sinica": "https://hanchi.ihp.sinica.edu.tw/ihpc/hanjiquery?keyword={q}",
