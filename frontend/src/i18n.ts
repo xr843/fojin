@@ -2,6 +2,7 @@ import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import HttpBackend from "i18next-http-backend";
 import LanguageDetector from "i18next-browser-languagedetector";
+import { UI_LANG_STORAGE_KEY, chineseFromLanguages, dropLegacyUILang } from "./i18nDetect";
 // Inline zh so the default language is available synchronously (no FOUT)
 import zhTranslation from "../public/locales/zh/translation.json";
 
@@ -29,9 +30,19 @@ export function currentUILang(instance: typeof i18n = i18n): string {
   return instance.resolvedLanguage ?? "zh";
 }
 
+dropLegacyUILang();
+
+// 见 i18nDetect.ts：语言列表里有中文就优先中文（#1340）。
+const detector = new LanguageDetector();
+detector.addDetector({
+  name: "navigatorChinese",
+  lookup: () =>
+    chineseFromLanguages(typeof navigator !== "undefined" ? navigator.languages : undefined),
+});
+
 i18n
   .use(HttpBackend)
-  .use(LanguageDetector)
+  .use(detector)
   .use(initReactI18next)
   .init({
     fallbackLng: "zh",
@@ -49,9 +60,12 @@ i18n
       loadPath: "/locales/{{lng}}/translation.json",
     },
     detection: {
-      order: ["querystring", "localStorage", "navigator"],
+      order: ["querystring", "localStorage", "navigatorChinese", "navigator"],
       lookupQuerystring: "lang",
-      caches: ["localStorage"],
+      lookupLocalStorage: UI_LANG_STORAGE_KEY,
+      // 不自动缓存检测结果：?lang= 只管这一次访问，只有语言菜单里的主动选择才落盘
+      // （rememberUILang，见 i18nDetect.ts 与 #1340）。
+      caches: [],
     },
     interpolation: {
       escapeValue: false,

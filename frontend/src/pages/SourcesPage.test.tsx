@@ -242,13 +242,15 @@ describe("SourcesPage 常用数据源", () => {
     mockPhone(true);
     mockGetSources.mockResolvedValue([
       ...catalog(),
-      source({ id: 9 as DataSource["id"], code: "books-fo", name_zh: "AI佛书网", region: "中国大陆" }),
+      source({ id: 9 as DataSource["id"], code: "books-fo", name_zh: "AI佛书网", base_url: "https://books.fo/", region: "中国大陆" }),
     ]);
     const { container } = renderPage();
     await screen.findByText("SuttaCentral 巴利经藏");
     const links = featuredLinks(container);
-    // books-fo 在名单第一、cbeta 第四；名单里其余的码目录里没有，静默跳过
-    expect(links.map((a) => a.textContent?.split(/\s/)[0])).toEqual(["AI佛书网", "CBETA"]);
+    // books-fo 在名单第一、cbeta 第四；名单里其余的码目录里没有，静默跳过。
+    // 按链接地址比对而不是显示名：全量跑时界面语言偶尔被异步加载的 en 盖掉，
+    // 显示名会变成 name_en（曾在 master 上 1/2 偶发失败）。
+    expect(links.map((a) => a.getAttribute("href"))).toEqual(["https://books.fo/", "https://cbetaonline.dila.edu.tw"]);
     expect(links[0].getAttribute("target")).toBe("_blank");
     // 手机上分组默认收起，常用区是首屏唯一可直接点的数据源，必须排在目录之前
     const groups = container.querySelector(".sources-groups")!;

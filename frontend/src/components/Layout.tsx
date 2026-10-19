@@ -28,6 +28,7 @@ import {
 } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { currentUILang } from "../i18n";
+import { rememberUILang } from "../i18nDetect";
 import ThemeToggle from "./ThemeToggle";
 import { useAuthStore } from "../stores/authStore";
 import { useXiaojinStore } from "../stores/xiaojinStore";
@@ -350,6 +351,7 @@ export default function Layout() {
                 { key: "en", label: "English" },
               ],
               onClick: ({ key }) => {
+                rememberUILang(key);
                 void i18n.changeLanguage(key);
                 navigate(
                   { pathname: location.pathname, search: searchWithLang(location.search, key), hash: location.hash },
