@@ -137,6 +137,8 @@ export const LANG_NAMES: Record<string, string> = {
   ru: "俄文", // i18n-exempt
   nl: "荷兰文", // i18n-exempt
   pt: "葡萄牙文", // i18n-exempt
+  id: "印尼文", // i18n-exempt
+  ta: "泰米尔文", // i18n-exempt
   ne: "尼泊尔文", // i18n-exempt
   hi: "印地文", // i18n-exempt
   jv: "爪哇文", // i18n-exempt

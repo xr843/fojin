@@ -1,4 +1,6 @@
 {
+  "study-buddhism-berzin": "https://studybuddhism.com/en/search?q={q}",
+  "japan-search": "https://jpsearch.go.jp/csearch/jps-cross?csid=jps-cross&keyword={q}",
   "suttacentral": "https://suttacentral.net/search?query={q}",
   "accesstoinsight": "https://www.accesstoinsight.org/search_results.html?q={q}",
   "bdrc": "https://library.bdrc.io/search?q={q}&lg=zh",
