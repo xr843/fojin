@@ -12,7 +12,8 @@ from app.models.chat import ChatAnswerDiagnostic
 from app.schemas.chat import ChatCheckedQuote, ChatSource, ChatTrustStatus
 from app.services.quote_verifier import iter_quote_citations
 
-_CITATION_RE = re.compile(r"【《[^》]+》(?:第[^】]+?卷)?】")
+# Same bounds as citation_guard._CITATION_RE: a mistyped 】 must not make one citation span paragraphs.
+_CITATION_RE = re.compile(r"【《[^》【】\n]+》(?:第[^】》【\n]{1,10}?卷)?】")
 
 
 def _valid_sources(sources: Iterable[ChatSource]) -> list[ChatSource]:

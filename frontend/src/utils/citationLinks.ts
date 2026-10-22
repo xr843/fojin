@@ -99,8 +99,11 @@ export function injectCitationLinks(
   // Pass 1 — explicit 【《title》…】 markers. The replace callback receives the
   // marker's offset in the original string; the text just before it carries
   // the passage the LLM is attributing.
+  // Neither group may cross a line or the next 【: a mistyped closing 】
+  // (【《X》第1卷》) would otherwise turn every paragraph up to the next
+  // citation into one giant link label (backend citation_guard has the same bound).
   let withExplicit = content.replace(
-    /【《([^》]+)》([^】]*)】/g,
+    /【《([^》【】\n]+)》([^】【\n]*)】/g,
     (_match, rawTitle: string, tail: string, offset: number, full: string) => {
       const title = rawTitle.trim();
       const simplifiedTitle = toSimplified(title);

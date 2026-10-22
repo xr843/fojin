@@ -125,3 +125,18 @@ describe("injectCitationLinks — 可见经名跟随界面语言", () => {
     expect(urlOf(out)).toContain(encodeURIComponent("阿毘达磨俱舍论"));
   });
 });
+
+describe("injectCitationLinks — 右括号打错的引文", () => {
+  // 模型偶尔把 】 打成 》。旧写法会一路连到下一条引文的 】，把中间几段正文
+  // 整个做成一个链接文字（生产消息 22948 那种形状）。
+  it("不把后面的段落吞进链接文字", () => {
+    const out = injectCitationLinks(
+      "前文【《阿毘達磨俱舍論》第9卷》\n\n这一段要原样保留。\n\n后文【《阿毘達磨俱舍論》第9卷】",
+      [src()],
+    );
+    const links = out.match(/\[【[^\]]*\]\(/g) ?? [];
+    expect(links).toHaveLength(1);
+    expect(links[0]).not.toContain("这一段要原样保留");
+    expect(out).toContain("\n\n这一段要原样保留。\n\n");
+  });
+});

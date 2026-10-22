@@ -318,3 +318,39 @@ def test_min_fallback_survives_when_no_quote_precedes_the_citation():
     answer = "详见【《阿毘達磨俱舍論》第99卷】所述。"
     out, _ = enforce_citation_whitelist(answer, [_kosa(13, _J13), _kosa(16, _J16)])
     assert "第13卷" in out
+
+
+# ── 括号打错的引文不能吞掉后面的正文 ─────────────────────────────────────
+# 生产事故（2026-10-22，消息 22948）：模型把引文的右括号打成了 》——
+# 「【《法華文句記》第1卷》」。卷号部分原先能匹配除 】 以外的任何字符（含换行、》），
+# 于是一路连到下一条引文的 】，把中间 216 字的解释、一句引文和另一条出处整段
+# 换成了一条引文。7 月以来 8 条回答被这样删掉 92–270 字，存库与用户所见皆为删后版本。
+
+_MALFORMED = (
+    "这是前文。【《法華文句記》第1卷》\n\n"
+    "这一段解释必须原样保留。\n\n"
+    "> 「引句」【《觀音玄義記》第1卷】"
+)
+
+
+def test_malformed_close_bracket_does_not_swallow_following_text():
+    sources = [_src(1, "法華文句記", 1), _src(2, "觀音玄義記", 1)]
+    out, muts = enforce_citation_whitelist(_MALFORMED, sources)
+    assert "这一段解释必须原样保留。" in out
+    assert "【《觀音玄義記》第1卷】" in out
+    assert all("\n" not in m.original for m in muts)
+
+
+def test_malformed_close_bracket_survives_the_no_sources_strip_path():
+    out, muts = enforce_citation_whitelist(_MALFORMED, [])
+    assert "这一段解释必须原样保留。" in out
+    assert all("\n" not in m.original for m in muts)
+
+
+def test_fascicle_slot_does_not_reach_across_another_title():
+    # 同一行里也不能跨过下一条引文的经名：右括号打错时，卷号槽里出现 》或【 就不是卷号
+    answer = "甲【《心经》第1卷》乙说丙【《金刚经》第1卷】"
+    sources = [_src(7, "心经", 1), _src(8, "金刚经", 1)]
+    out, _ = enforce_citation_whitelist(answer, sources)
+    assert "乙说丙" in out
+    assert "【《金刚经》第1卷】" in out

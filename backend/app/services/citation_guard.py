@@ -74,7 +74,14 @@ def _norm_title(title: str) -> str:
 # the prompt's 【《经名》第N卷】 template verbatim and leaves a literal "N"
 # in place. Capturing it lets _rewrite replace that placeholder with a real
 # retrieved fascicle instead of letting "第N卷" reach the user untouched.
-_CITATION_RE = re.compile(r"【《([^》]+)》(?:第([^】]+?)卷)?】")
+#
+# Loose, but bounded: neither group may cross a line or another bracket. When
+# the model mistypes the closing 】 as 》 (【《X》第1卷》), an unbounded group
+# ran on to the NEXT citation's 】 and the rewrite replaced everything in
+# between — 8 production answers lost 92–270 chars of prose, quotes and other
+# citations this way (2026-07 → 10-22). A malformed citation now simply doesn't
+# match and stays as the model wrote it.
+_CITATION_RE = re.compile(r"【《([^》【】\n]+)》(?:第([^】》【\n]{1,10}?)卷)?】")
 
 
 def _parse_juan(juan_str: str | None) -> tuple[int | None, bool]:
