@@ -47,6 +47,14 @@ logger = logging.getLogger(__name__)
 #   accesstoinsight  frozen archive site; rss.xml serves HTML, content stopped
 #                    updating years ago
 #
+# Removed 2026-10-23 — blocked at the source since 2026-07-29:
+#   iabs  journals.ub.uni-heidelberg.de (JIABS) now sits behind Anubis, which
+#         answers every non-browser client with its "Oh noes!" deny page (200,
+#         text/html) — an honest UA is refused too, so this is a policy, not a
+#         challenge to solve. The fetcher logged an XML parse error daily for
+#         three months while inserting nothing. The 17 entries already stored
+#         stay; re-add only if Heidelberg offers an allowed feed endpoint.
+#
 # Removed 2026-09-13 — not a reachability problem, a licensing one:
 #   suttacentral_forum  discourse.suttacentral.net/latest.rss. Forum posts are not
 #                       SuttaCentral's CC0 dedication: the forum ToS §3 licenses
@@ -73,12 +81,6 @@ FEED_REGISTRY: list[dict] = [
         "name": "tricycle",
         "url": "https://tricycle.org/feed/",
         "category": "news",
-        "language": "en",
-    },
-    {
-        "name": "iabs",
-        "url": "https://journals.ub.uni-heidelberg.de/index.php/jiabs/gateway/plugin/WebFeedGatewayPlugin/atom",
-        "category": "paper",
         "language": "en",
     },
     # Added 2026-06-11, verified reachable from the VPS with real items:
