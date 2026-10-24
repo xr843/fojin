@@ -1,0 +1,8 @@
+[Unit]
+Description=Restrict port 80 to Cloudflare ranges (fojin)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/fojin-cf-firewall.sh apply
