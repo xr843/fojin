@@ -1,6 +1,6 @@
 import axios from "axios";
 import { clearSessionExpired, markSessionExpired, useAuthStore } from "../stores/authStore";
-import i18n from "../i18n";
+import i18n, { currentUILang } from "../i18n";
 import type {
   TextId,
   SourceId,
@@ -2484,6 +2484,9 @@ export function sendChatMessageStream(
       message,
       session_id: sessionId ?? null,
       master_id: masterId,
+      // 界面语言（zh / zh-Hant / en）：后端据此在系统提示词末尾钉住作答语言，
+      // 否则阅读器模式下模型按繁体经文上下文用繁体作答（简体用户实测投诉）。
+      ui_lang: currentUILang(i18n),
       ...(modelId ? { model_id: modelId } : {}),
       ...(hotQuestionId != null ? { hot_question_id: hotQuestionId } : {}),
       ...(regenerate ? { regenerate: true } : {}),
