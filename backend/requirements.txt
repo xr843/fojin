@@ -1,10 +1,10 @@
-fastapi==0.143.0
+fastapi==0.151.0
 uvicorn[standard]==0.54.0
 prometheus-client==0.26.0
 asyncpg==0.32.0
 sqlalchemy[asyncio]==2.1.6
 alembic==1.20.0
-pydantic-settings==2.15.0
+pydantic-settings==2.16.0
 pydantic[email]==2.14.1
 elasticsearch[async]==8.17.0
 redis[hiredis]==8.1.0
