@@ -19,6 +19,6 @@ tiktoken==0.14.0
 opencc-python-reimplemented==0.1.7
 Pillow==13.0.0
 python-multipart==0.0.32
-pypdf==6.21.1
+pypdf==6.21.2
 python-docx==1.2.0
 beautifulsoup4==4.15.0
