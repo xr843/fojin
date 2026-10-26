@@ -21,6 +21,8 @@ renumber chunk_index and break alignment references for texts that were fine —
 hence test_leaves_densely_chunked_juan_alone, which the ratio alone fails.
 """
 
+import json
+
 import pytest
 import pytest_asyncio
 from scripts.repair_stale_embeddings import _find_candidates
@@ -53,22 +55,25 @@ async def conn():
             await c.run_sync(model.__table__.create)
         for tid in (1, 2, 3, 4, 5):
             await c.execute(
-                sql_text("INSERT INTO buddhist_texts (id, cbeta_id, title_zh, lang) "
-                         "VALUES (:i, :c, '測試經', 'lzh')"),
+                sql_text("INSERT INTO buddhist_texts (id, cbeta_id, title_zh, lang) VALUES (:i, :c, '測試經', 'lzh')"),
                 {"i": tid, "c": f"T{tid:04d}"},
             )
 
         async def add(tid, jn, body, chunks):
             await c.execute(
-                sql_text("INSERT INTO text_contents (text_id, juan_num, content, lang, char_count) "
-                         "VALUES (:t, :j, :body, 'lzh', :n)"),
+                sql_text(
+                    "INSERT INTO text_contents (text_id, juan_num, content, lang, char_count) "
+                    "VALUES (:t, :j, :body, 'lzh', :n)"
+                ),
                 {"t": tid, "j": jn, "body": body, "n": len(body)},
             )
             if chunks:
                 await c.execute(
-                    sql_text("INSERT INTO text_embeddings "
-                             "(text_id, juan_num, chunk_index, chunk_text) "
-                             "VALUES (:t, :j, :i, :x)"),
+                    sql_text(
+                        "INSERT INTO text_embeddings "
+                        "(text_id, juan_num, chunk_index, chunk_text) "
+                        "VALUES (:t, :j, :i, :x)"
+                    ),
                     [{"t": tid, "j": jn, "i": i, "x": x} for i, x in enumerate(chunks)],
                 )
 
@@ -89,9 +94,7 @@ async def conn():
 
 
 async def _keys(conn, over_ratio: float = 1.3):
-    cands = await _find_candidates(
-        conn, ratio=0.9, min_content=500, over_ratio=over_ratio
-    )
+    cands = await _find_candidates(conn, ratio=0.9, min_content=500, over_ratio=over_ratio)
     return {(t, j) for t, j, _c, _e in cands}
 
 
@@ -162,8 +165,73 @@ async def test_gate_settings_select_only_the_spilled_juans(conn):
 
     rows = await _find_candidates(conn, _UNDER_SIDE_OFF, _MIN_CONTENT, _OVER_RATIO)
     keys = {(t, j) for t, j, _c, _e in rows}
-    assert (3, 13) in keys      # spilled — the whole point of the gate
-    assert (2, 1) not in keys   # under-embedded — a different defect, not this gate's
-    assert (5, 1) not in keys   # dense but intact
-    assert (1, 1) not in keys   # healthy
-    assert (4, 1) not in keys   # content stub
+    assert (3, 13) in keys  # spilled — the whole point of the gate
+    assert (2, 1) not in keys  # under-embedded — a different defect, not this gate's
+    assert (5, 1) not in keys  # dense but intact
+    assert (1, 1) not in keys  # healthy
+    assert (4, 1) not in keys  # content stub
+
+
+# ── 卷中间夹着别卷文字（2026-10-26）────────────────────────────────────────
+# 《妙法蓮華經玄義》(text 7889) 第 10 卷第 19 块整块是第 8 卷的原文，但这一卷的
+# 块数、字数都正常，末块也在本卷——上面 _find_candidates 的倍数预筛和末块判据都放
+# 它过去。scan_embedding_juan_labels 逐块判归属，补上这个盲区。
+
+
+@pytest_asyncio.fixture
+async def mid_juan_conn():
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as c:
+        for model in (BuddhistText, TextContent, TextEmbedding):
+            await c.run_sync(model.__table__.create)
+        await c.execute(
+            sql_text("INSERT INTO buddhist_texts (id, cbeta_id, title_zh, lang) VALUES (6, 'T1716', '測試經', 'lzh')")
+        )
+        juan10 = _slices(FOREIGN, 450)
+        juan10[5:9] = _slices(BODY, 450)[5:9]  # four chunks of juan 8's text filed under juan 10, mid-juan
+        for jn, body, chunks in ((8, BODY, _slices(BODY, 450)), (10, FOREIGN, juan10), (11, "文" * 100, [])):
+            await c.execute(
+                sql_text(
+                    "INSERT INTO text_contents (text_id, juan_num, content, lang, char_count) VALUES (6, :j, :b, 'lzh', :n)"
+                ),
+                {"j": jn, "b": body, "n": len(body)},
+            )
+            if chunks:
+                await c.execute(
+                    sql_text(
+                        "INSERT INTO text_embeddings (text_id, juan_num, chunk_index, chunk_text) VALUES (6, :j, :i, :x)"
+                    ),
+                    [{"j": jn, "i": i, "x": x} for i, x in enumerate(chunks)],
+                )
+    async with engine.connect() as c:
+        yield c
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_ratio_and_last_chunk_test_miss_a_mid_juan_mislabel(mid_juan_conn):
+    """Pins the blind spot that let 4,000+ prod chunks through: if this ever starts
+    passing, _find_candidates learned to see the shape and the scanner may be redundant."""
+    assert (6, 10) not in await _keys(mid_juan_conn)
+
+
+@pytest.mark.asyncio
+async def test_scanner_flags_mid_juan_mislabel_and_names_its_real_juan(mid_juan_conn):
+    from scripts.scan_embedding_juan_labels import _scan_text, classify_chunk
+
+    bad = await _scan_text(mid_juan_conn, 6, lambda s: s)
+    assert bad == {10: 4}  # exactly the four transplanted chunks, nothing in juan 8
+    juans = {8: BODY, 10: FOREIGN}
+    assert classify_chunk(_slices(BODY, 450)[6], 10, juans) == 8
+    assert classify_chunk(_slices(FOREIGN, 450)[6], 10, juans) is None  # its own text
+    assert classify_chunk("".join(chr(0x9F00 + i % 40) for i in range(500)), 10, juans) is None  # placeable nowhere
+
+
+@pytest.mark.asyncio
+async def test_pairs_file_targets_listed_juans_but_keeps_the_stub_guard(mid_juan_conn, tmp_path):
+    from scripts.repair_stale_embeddings import _load_pairs
+
+    path = tmp_path / "pairs.json"
+    path.write_text(json.dumps([[6, 10, 4], [6, 11, 1]]))
+    rows = await _load_pairs(mid_juan_conn, str(path), min_content=500)
+    assert [(t, j) for t, j, _c, _e in rows] == [(6, 10)]  # juan 11 is a 100-char stub: never re-embedded
