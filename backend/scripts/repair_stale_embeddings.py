@@ -65,6 +65,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import logging
 import os
 import sys
@@ -161,6 +162,37 @@ async def _find_candidates(conn, ratio: float, min_content: int, over_ratio: flo
         )
     ).fetchall()
     return [(int(r[0]), int(r[1]), int(r[2]), int(r[3])) for r in rows]
+
+
+async def _load_pairs(conn, path: str, min_content: int):
+    """(text_id, juan_num, content_chars, embedded_chars) for an explicit juan list.
+
+    ``path`` is the ``pairs.json`` written by scan_embedding_juan_labels.py —
+    juans with chunks of another juan's text filed mid-juan, a shape the ratio
+    prefilter and last-chunk test of ``_find_candidates`` both let through. The
+    same ``min_content`` guard applies: a juan whose text_contents is a stub is
+    never re-embedded down to nothing.
+    """
+    with open(path) as f:
+        pairs = json.load(f)
+    out = []
+    for text_id, juan_num, *_ in pairs:
+        row = (
+            await conn.execute(
+                sql_text(
+                    "SELECT length(tc.content), "
+                    "(SELECT COALESCE(sum(length(chunk_text)), 0) FROM text_embeddings te "
+                    " WHERE te.text_id = tc.text_id AND te.juan_num = tc.juan_num) "
+                    "FROM text_contents tc WHERE tc.text_id = :t AND tc.juan_num = :j AND tc.lang = 'lzh'"
+                ),
+                {"t": int(text_id), "j": int(juan_num)},
+            )
+        ).fetchone()
+        if row is None or row[0] <= min_content:
+            print(f"  skip text {text_id} juan {juan_num}: no lzh content > {min_content} chars", flush=True)
+            continue
+        out.append((int(text_id), int(juan_num), int(row[0]), int(row[1])))
+    return out
 
 
 async def _content_of(conn, text_id: int, juan_num: int) -> str | None:
@@ -260,6 +292,9 @@ async def main() -> int:
                          "re-embedded down to nothing")
     ap.add_argument("--dry-run", action="store_true", help="report scope, write nothing")
     ap.add_argument("--limit", type=int, default=0, help="cap juans processed (0 = all)")
+    ap.add_argument("--pairs-file", default="",
+                    help="repair exactly the juans in this pairs.json (from "
+                         "scan_embedding_juan_labels.py) instead of the ratio-selected set")
     args = ap.parse_args()
 
     engine = create_async_engine(settings.database_url, poolclass=NullPool)
@@ -268,9 +303,12 @@ async def main() -> int:
     failed: list[tuple[int, int]] = []
     try:
         async with engine.connect() as conn:
-            cands = await _find_candidates(
-                conn, args.ratio, args.min_content, args.over_ratio
-            )
+            if args.pairs_file:
+                cands = await _load_pairs(conn, args.pairs_file, args.min_content)
+            else:
+                cands = await _find_candidates(
+                    conn, args.ratio, args.min_content, args.over_ratio
+                )
             await conn.rollback()  # close the read tx auto-begun by the candidate query
             # Split the two sides: summing (c - e) over both would net a spilled
             # juan's surplus against a truncated one's deficit and report a
@@ -278,6 +316,9 @@ async def main() -> int:
             under = [x for x in cands if x[3] < args.ratio * x[2]]
             over = [x for x in cands if x[3] > args.over_ratio * x[2]]
             repaired_text_ids: set[int] = set()
+            if args.pairs_file:
+                print(f"pairs-file {args.pairs_file}: {len(cands)} juans across "
+                      f"{len({t for t, _, _, _ in cands})} texts (mid-juan mislabels)", flush=True)
             print(
                 f"candidates: {len(cands)} juans across "
                 f"{len({t for t, _, _, _ in cands})} texts "
