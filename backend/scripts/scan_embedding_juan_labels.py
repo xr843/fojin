@@ -94,24 +94,28 @@ def classify_chunk(chunk: str, label: int, index: JuanIndex | dict[int, str]) ->
 
 async def _scan_text(session, text_id: int, normalise) -> Counter:
     """{juan_num: mislabelled chunk count} for one text."""
-    juans = {
-        j: normalise(c or "")
-        for j, c in (
-            await session.execute(
-                sql_text("SELECT juan_num, content FROM text_contents WHERE text_id = :t"),
-                {"t": text_id},
-            )
-        ).all()
-    }
+    contents = (
+        await session.execute(
+            sql_text("SELECT juan_num, content FROM text_contents WHERE text_id = :t"),
+            {"t": text_id},
+        )
+    ).all()
+    rows = (
+        await session.execute(
+            sql_text("SELECT juan_num, chunk_text FROM text_embeddings WHERE text_id = :t"),
+            {"t": text_id},
+        )
+    ).all()
+    # End the read transaction before any CPU work: prod kills a session idle in a
+    # transaction for 60s, and normalising + classifying the largest texts takes
+    # longer than that — the first two full runs both died on text #4,815.
+    await session.rollback()
     bad: Counter = Counter()
+    juans = {j: normalise(c or "") for j, c in contents}
     if not juans:
         return bad
     index = JuanIndex(juans)
-    rows = await session.execute(
-        sql_text("SELECT juan_num, chunk_text FROM text_embeddings WHERE text_id = :t"),
-        {"t": text_id},
-    )
-    for j, chunk in rows.all():
+    for j, chunk in rows:
         if classify_chunk(normalise(chunk or ""), j, index) is not None:
             bad[j] += 1
     return bad
