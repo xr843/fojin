@@ -1,6 +1,7 @@
 import type { Options } from "react-markdown";
 import remarkCjkFriendly from "remark-cjk-friendly";
 import remarkGfm from "remark-gfm";
+import remarkCjkAutolinkBoundary from "./remarkCjkAutolinkBoundary";
 
 /**
  * Remark plugins for every place that renders model-written Markdown.
@@ -11,5 +12,8 @@ import remarkGfm from "remark-gfm";
  * prod that hit ~40% of /chat answers over 30 days (506/1258, 2026-10-16).
  * remark-cjk-friendly relaxes exactly that rule for CJK and changes nothing else,
  * so citation markers 【《经名》第N卷】 and links parse as before.
+ *
+ * remarkCjkAutolinkBoundary must run after remark-gfm: it trims the bare-URL links
+ * GFM made at the first CJK character (GFM only ends them at whitespace).
  */
-export const MARKDOWN_REMARK_PLUGINS: NonNullable<Options["remarkPlugins"]> = [remarkGfm, remarkCjkFriendly];
+export const MARKDOWN_REMARK_PLUGINS: NonNullable<Options["remarkPlugins"]> = [remarkGfm, remarkCjkAutolinkBoundary, remarkCjkFriendly];
