@@ -235,3 +235,33 @@ async def test_pairs_file_targets_listed_juans_but_keeps_the_stub_guard(mid_juan
     path.write_text(json.dumps([[6, 10, 4], [6, 11, 1]]))
     rows = await _load_pairs(mid_juan_conn, str(path), min_content=500)
     assert [(t, j) for t, j, _c, _e in rows] == [(6, 10)]  # juan 11 is a 100-char stub: never re-embedded
+
+
+def test_relocalize_moves_rows_to_the_new_chunk_and_keeps_unlocatable_ones():
+    """After a juan is re-embedded its chunk_index scheme changes; mitra rows must
+    follow their zh_text to the new chunk (or another juan, if that is where it lives),
+    and rows that cannot be placed are counted, not silently rewritten."""
+    from scripts.import_mitra_alignments import _SEP, _norm
+    from scripts.relocalize_mitra_alignments import plan_updates
+
+    j10 = [_norm(BODY[i : i + 500]) for i in range(0, 2000, 450)]
+    j8 = [_norm(FOREIGN[i : i + 500]) for i in range(0, 2000, 450)]
+
+    def idx(chunks):
+        offs, cur = [], 0
+        for c in chunks:
+            offs.append(cur)
+            cur += len(c) + len(_SEP)
+        return (_SEP.join(chunks), offs, list(range(len(chunks))))
+
+    tj = {10: idx(j10), 8: idx(j8)}
+    t_index = [(j, *tj[j]) for j in tj]
+    rows = [
+        (1, 10, 0, BODY[600:620]),  # only in new chunk 1 of juan 10 (outside the 50-char overlap) → moved_chunk
+        (2, 10, 3, FOREIGN[10:40]),  # really juan 8's text (30 chars, unique) → moved_juan
+        (3, 10, 1, BODY[600:620]),  # already right → unchanged
+        (4, 10, 0, "不在任何一卷裡的句子啊啊啊啊啊啊"),  # → unlocated, left alone
+    ]
+    updates, tally = plan_updates(rows, lambda j: j, tj, t_index)
+    assert (1, 1, 10) in updates and (2, 0, 8) in updates
+    assert tally == {"moved_chunk": 1, "moved_juan": 1, "unchanged": 1, "unlocated": 1}
