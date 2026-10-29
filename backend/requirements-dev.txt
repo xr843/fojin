@@ -1,7 +1,7 @@
 # Development / testing dependencies (install with: pip install -r requirements-dev.txt)
 -r requirements.txt
 pytest>=9.1.1
-pytest-asyncio>=1.4.0
+pytest-asyncio>=1.4.1
 pytest-cov>=7.1.0
 anyio>=4.14.2
 pytest-anyio==0.0.0
