@@ -177,7 +177,7 @@ async def test_followup_without_cjk_in_a_chinese_session_is_still_guarded(monkey
 def _install_fallback(monkeypatch, hits: list[dict] | Exception) -> list[int]:
     calls: list[int] = []
 
-    async def _bq(session, emb, limit=15, candidates=200):
+    async def _bq(session, emb, limit=15, candidates=1000):
         calls.append(limit)
         if isinstance(hits, Exception):
             raise hits

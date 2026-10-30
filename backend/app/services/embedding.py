@@ -191,9 +191,10 @@ async def similarity_search(
     ]
 
 
-# 二值量化粗筛取多少条候选再按真余弦精排。生产实测 200 与 1000 的前几名几乎一样，
-# 而 200 的精排只要 ~100 ms。
-LZH_BQ_CANDIDATES = 200
+# 二值量化粗筛取多少条候选再按真余弦精排。2026-10-30 生产实测（35 道漏空首问，对照
+# 关索引的精确扫描）：200 → 前 5 重合 4.09/5、首条一致 32/35、中位 259 ms；
+# 1000 → 4.71/5、35/35、530 ms。兜底路径本就少见，取更接近精确扫描的 1000。
+LZH_BQ_CANDIDATES = 1000
 
 
 async def lzh_quantized_search(
@@ -207,7 +208,7 @@ async def lzh_quantized_search(
     HNSW 对部分查询够不到汉文区域，``similarity_search(lang_list=['lzh'])`` 就返回
     0 行。这里先按 1024 位二值码的汉明距离精扫整张汉文表（~71 MB，常驻内存）取
     ``candidates`` 条，再回主表按真余弦精排——结果与关索引的精确扫描几乎相同，
-    耗时 200–300 ms 而不是 19 秒。返回与 ``similarity_search`` 同形的 dict。
+    耗时约 0.5 秒而不是 14–19 秒。返回与 ``similarity_search`` 同形的 dict。
     """
     embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
     raw_conn = await session.connection()
