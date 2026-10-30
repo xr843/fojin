@@ -40,6 +40,12 @@ class ChatRequest(BaseModel):
     # 那一轮（否则模型多半照抄上一个答案），新答案成功落库时删旧的那对。
     # 只对最后一轮生效；不做从中间分叉。
     regenerate: bool = False
+    # UI language of the calling client ("zh" / "zh-Hant" / "en", see frontend
+    # SUPPORTED_UI_LANGS). Pinned into the system prompt so the answer body
+    # follows the user's UI language. Unknown values are ignored server-side
+    # (rolling-deploy safe: a newer frontend may send codes this backend
+    # doesn't know yet).
+    ui_lang: str | None = Field(None, max_length=20)
     # Per-message model override — id from llm_catalog.CATALOG (e.g. "deepseek:v4-pro").
     # Unknown ids fall back gracefully so stale localStorage doesn't break chat.
     model_id: str | None = None
