@@ -77,6 +77,8 @@ class Settings(BaseSettings):
     vernacular_model: str = "deepseek-v4-flash"
     # /chat：用户贴了经文时，把那段原文所在的检索块放进上下文第 1 位（passage_locator）
     enable_paste_locate: bool = True
+    # /chat：会话首问的中文检索臂被 HNSW 漏空时改扫二值量化旁路表（迁移 0186）
+    enable_lzh_empty_fallback: bool = True
     # /chat 多轮上下文窗口（prompt_builder._build_llm_messages）。
     # chat_max_input_tokens 是「系统提示 + 检索片段 + 本轮提问 + 历史」的总预算；
     # 本轮提问/附件钳制与检索片段截断仍按固定的 6000 基础预算算（行为不随窗口变），
