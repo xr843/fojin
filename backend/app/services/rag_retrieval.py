@@ -18,7 +18,12 @@ from app.core.metrics import timed_rag_retrieval
 from app.database import async_session
 from app.models.dictionary import DictionaryEntry
 from app.schemas.chat import ChatSource
-from app.services.embedding import generate_embedding, similarity_search, source_similarity_search
+from app.services.embedding import (
+    generate_embedding,
+    lzh_quantized_search,
+    similarity_search,
+    source_similarity_search,
+)
 from app.services.named_works import MAX_NAMED_WORKS, resolve_named_work
 from app.services.passage_locator import inject_located, locate_pasted_passage
 from app.services.precise_retrieval import try_precise_text_retrieval
@@ -49,6 +54,9 @@ RERANK_CANDIDATE_LIMIT = 32
 ENABLE_PARALLEL_RAG = settings.enable_parallel_rag if hasattr(settings, "enable_parallel_rag") else True
 # 贴原文定位（passage_locator）。上线依据见 eval/paste_locate/GATE.md。
 ENABLE_PASTE_LOCATE = settings.enable_paste_locate
+
+# 中文检索臂漏空兜底（_lzh_empty_fallback）。上线依据见迁移 0186 的文档串。
+ENABLE_LZH_EMPTY_FALLBACK = settings.enable_lzh_empty_fallback
 
 # Feed imported MITRA parallels (mitra_alignments, ~908K Skt/Tib↔汉 sentence
 # pairs, chunk-anchored on the 汉 side) into the LLM context alongside the
@@ -990,6 +998,33 @@ async def _lookup_dictionary_terms(db: AsyncSession, query: str) -> str:
 
 
 @timed_rag_retrieval
+async def _lzh_empty_fallback(query: str, query_embedding: list[float]) -> list[dict]:
+    """中文检索臂被 HNSW 漏空时，改扫二值量化旁路表补回本该有的那一路。
+
+    补回的片段之后照样过阈值、重排、正藏先验——相关性标准与正常请求完全相同，
+    不另设门槛。只在会话首问上用：2026-10-28 的配对评测只覆盖了首问（追问的检索
+    词拼了上一问，漏空的形状没量过）；10 月那次把闲聊、修行笔记一起算进去，补出
+    的出处约六成不相关，就是因为样本里混着这类提问。
+
+    任何失败（旁路表还没建、超时）都退回 0 行，即改动前的「诚实无出处」路径。
+    """
+    t = time.monotonic()
+    try:
+        async with async_session() as s:
+            hits = await lzh_quantized_search(s, query_embedding, limit=PARALLEL_LZH_K)
+    except Exception:
+        logger.warning("lzh_fallback failed; serving without Chinese sources", exc_info=True)
+        return []
+    logger.info(
+        "lzh_fallback: 旁路表补回 %d 行, top=%.3f, took %.2fs (query=%r)",
+        len(hits),
+        hits[0]["score"] if hits else 0.0,
+        time.monotonic() - t,
+        query[:60],
+    )
+    return hits
+
+
 async def _locate_pasted_passage_safe(query: str):
     """Run the pasted-passage locator on its own session; never raise.
 
@@ -1139,6 +1174,8 @@ async def retrieve_rag_context(
                     len(pi_hits),
                     len(bo_hits),
                 )
+                if ENABLE_LZH_EMPTY_FALLBACK and not prev_query:
+                    lzh_hits = await _lzh_empty_fallback(query, query_embedding)
             text_results = _merge_with_alignment_sync(lzh_hits, pi_hits, bo_hits)
         else:
             text_results = await similarity_search(

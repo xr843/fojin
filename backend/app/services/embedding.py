@@ -191,6 +191,58 @@ async def similarity_search(
     ]
 
 
+# 二值量化粗筛取多少条候选再按真余弦精排。2026-10-30 生产实测（35 道漏空首问，对照
+# 关索引的精确扫描）：200 → 前 5 重合 4.09/5、首条一致 32/35、中位 259 ms；
+# 1000 → 4.71/5、35/35、530 ms。兜底路径本就少见，取更接近精确扫描的 1000。
+LZH_BQ_CANDIDATES = 1000
+
+
+async def lzh_quantized_search(
+    session: AsyncSession,
+    query_embedding: list[float],
+    limit: int = 15,
+    candidates: int = LZH_BQ_CANDIDATES,
+) -> list[dict]:
+    """汉文片段的近似精确检索：不走 HNSW，扫 ``text_embeddings_bq``（迁移 0186）。
+
+    HNSW 对部分查询够不到汉文区域，``similarity_search(lang_list=['lzh'])`` 就返回
+    0 行。这里先按 1024 位二值码的汉明距离精扫整张汉文表（~71 MB，常驻内存）取
+    ``candidates`` 条，再回主表按真余弦精排——结果与关索引的精确扫描几乎相同，
+    耗时约 0.5 秒而不是 14–19 秒。返回与 ``similarity_search`` 同形的 dict。
+    """
+    embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
+    raw_conn = await session.connection()
+    # 精排按算出来的 score 排序（不是 ORDER BY embedding <=> q），规划器不会改走 HNSW。
+    sql = (
+        "WITH cand AS ("
+        "  SELECT id FROM text_embeddings_bq"
+        "  ORDER BY b <~> binary_quantize($1::vector)::bit(1024) LIMIT $2"
+        ") "
+        "SELECT te.text_id, te.juan_num, te.chunk_index, te.chunk_text, "
+        "1 - (te.embedding <=> $1::vector) AS score, "
+        "COALESCE(bt.title_zh, '') AS title_zh, bt.lang, bt.source_id, bt.cbeta_id "
+        "FROM cand JOIN text_embeddings te ON te.id = cand.id "
+        "JOIN buddhist_texts bt ON bt.id = te.text_id "
+        "WHERE bt.lang = 'lzh' "
+        "ORDER BY score DESC LIMIT $3"
+    )
+    result = await raw_conn.exec_driver_sql(sql, (embedding_str, candidates, limit))
+    return [
+        {
+            "text_id": row[0],
+            "juan_num": row[1],
+            "chunk_index": row[2],
+            "chunk_text": row[3],
+            "score": float(row[4]),
+            "title_zh": row[5],
+            "lang": row[6] or "lzh",
+            "source_id": row[7],
+            "cbeta_id": row[8],
+        }
+        for row in result.fetchall()
+    ]
+
+
 def _escape_lang(lang: str) -> str:
     """Defense-in-depth for lang_list inlining. Only alphanumeric + underscore allowed."""
     return "".join(c for c in lang if c.isalnum() or c == "_")[:10]

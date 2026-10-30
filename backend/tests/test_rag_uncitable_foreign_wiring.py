@@ -66,6 +66,8 @@ def stub_io(monkeypatch):
     monkeypatch.setattr(R, "_attach_mitra_parallels", _noop_attach)
     monkeypatch.setattr(R, "_lookup_dictionary_terms", _no_dict)
     monkeypatch.setattr(R, "_inject_root_sutra_slot", _no_injection)
+    # 漏空兜底默认也补不回东西：上面这些用例测的是「兜底之后仍然一条汉文都没有」的形状
+    monkeypatch.setattr(R, "lzh_quantized_search", _no_sources)
 
 
 def _install_pool(monkeypatch, *, lzh: list[dict], pi: list[dict], bo: list[dict]):
@@ -164,4 +166,98 @@ async def test_followup_without_cjk_in_a_chinese_session_is_still_guarded(monkey
         bo=[_chunk(201, "bo", "Toh 113 (Kangyur)", 0.44)],
     )
     sources, _ = await R.retrieve_rag_context(object(), "more?", prev_query="华严宗与天台宗的判教体系有什么不同？")
+    assert sources == []
+
+
+# ──────────────────────────────────────────────────────────────────────
+# 漏空兜底：会话首问的 lzh 臂 0 行时改扫二值量化旁路表
+# ──────────────────────────────────────────────────────────────────────
+
+
+def _install_fallback(monkeypatch, hits: list[dict] | Exception) -> list[int]:
+    calls: list[int] = []
+
+    async def _bq(session, emb, limit=15, candidates=1000):
+        calls.append(limit)
+        if isinstance(hits, Exception):
+            raise hits
+        return hits
+
+    monkeypatch.setattr(R, "lzh_quantized_search", _bq)
+    return calls
+
+
+_FOREIGN_ONLY = {
+    "lzh": [],
+    "pi": [_chunk(101, "pi", "With Sakka ", 0.42)],
+    "bo": [_chunk(201, "bo", "Toh 113 (Kangyur)", 0.44)],
+}
+
+
+@pytest.mark.asyncio
+async def test_first_question_with_empty_chinese_arm_gets_fallback_sources(monkeypatch, stub_io):
+    """生产 09-22 的形状：HNSW 漏空、池里只剩外语条目——兜底补回的汉文来源要被送出去。"""
+    _install_pool(monkeypatch, **_FOREIGN_ONLY)
+    calls = _install_fallback(monkeypatch, [_chunk(1, "lzh", "釋門正統", 0.596), _chunk(2, "lzh", "佛祖統紀", 0.55)])
+    sources, context_text = await R.retrieve_rag_context(object(), "华严宗与天台宗的判教体系有什么不同？")
+    assert calls == [R.PARALLEL_LZH_K]
+    assert [s.title_zh for s in sources] == ["釋門正統", "佛祖統紀"]
+    assert "Toh 113" not in context_text
+
+
+@pytest.mark.asyncio
+async def test_fallback_hits_still_pass_the_relevance_threshold(monkeypatch, stub_io):
+    """兜底不另开门槛，也不绕过已有门槛：低于 MIN_RELEVANCE_SCORE 的照样丢。"""
+    _install_pool(monkeypatch, **_FOREIGN_ONLY)
+    _install_fallback(monkeypatch, [_chunk(1, "lzh", "釋門正統", R.MIN_RELEVANCE_SCORE - 0.01)])
+    sources, _ = await R.retrieve_rag_context(object(), "华严宗与天台宗的判教体系有什么不同？")
+    assert sources == []
+
+
+@pytest.mark.asyncio
+async def test_followup_question_does_not_use_fallback(monkeypatch, stub_io):
+    """评测只覆盖了会话首问；追问的检索词拼了上一问，保持改动前的行为。"""
+    _install_pool(monkeypatch, **_FOREIGN_ONLY)
+    calls = _install_fallback(monkeypatch, [_chunk(1, "lzh", "釋門正統", 0.596)])
+    sources, _ = await R.retrieve_rag_context(object(), "那天台呢？", prev_query="华严宗的判教体系是什么？")
+    assert calls == []
+    assert sources == []
+
+
+@pytest.mark.asyncio
+async def test_fallback_not_called_when_chinese_arm_is_healthy(monkeypatch, stub_io):
+    _install_pool(monkeypatch, lzh=[_chunk(1, "lzh", "雜阿含經", 0.5)], pi=[], bo=[])
+    calls = _install_fallback(monkeypatch, [_chunk(2, "lzh", "釋門正統", 0.6)])
+    sources, _ = await R.retrieve_rag_context(object(), "什么是四念处？")
+    assert calls == []
+    assert [s.title_zh for s in sources] == ["雜阿含經"]
+
+
+@pytest.mark.asyncio
+async def test_fallback_not_called_for_non_cjk_question(monkeypatch, stub_io):
+    """俄文/英文提问兜底出来的汉文片段实测相似度 ~0.47，多是不相干的。"""
+    _install_pool(monkeypatch, **_FOREIGN_ONLY)
+    calls = _install_fallback(monkeypatch, [_chunk(1, "lzh", "釋門正統", 0.6)])
+    await R.retrieve_rag_context(object(), "What is dependent origination?")
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_fallback_failure_degrades_to_no_sources(monkeypatch, stub_io, caplog):
+    """旁路表不存在 / 超时：退回改动前的「诚实无出处」，不打断回答。"""
+    _install_pool(monkeypatch, **_FOREIGN_ONLY)
+    _install_fallback(monkeypatch, RuntimeError('relation "text_embeddings_bq" does not exist'))
+    with caplog.at_level(logging.WARNING, logger="app.services.rag_retrieval"):
+        sources, _ = await R.retrieve_rag_context(object(), "华严宗与天台宗的判教体系有什么不同？")
+    assert sources == []
+    assert any("lzh_fallback failed" in rec.getMessage() for rec in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_fallback_can_be_switched_off(monkeypatch, stub_io):
+    _install_pool(monkeypatch, **_FOREIGN_ONLY)
+    monkeypatch.setattr(R, "ENABLE_LZH_EMPTY_FALLBACK", False)
+    calls = _install_fallback(monkeypatch, [_chunk(1, "lzh", "釋門正統", 0.6)])
+    sources, _ = await R.retrieve_rag_context(object(), "华严宗与天台宗的判教体系有什么不同？")
+    assert calls == []
     assert sources == []
