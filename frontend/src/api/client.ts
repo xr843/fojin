@@ -668,8 +668,11 @@ export async function getStats(): Promise<Stats> {
 export interface HomeShowcase {
   sources: { sources: number; texts: number; names?: string[] } | null;
   chat: { questions: string[] } | null;
-  dictionary: { terms: { term: string; definition: string | null }[] } | null;
-  kg: { triples: { subject: string; predicate: string; object: string }[] } | null;
+  // *_hans：后端用 OpenCC 转好的简体版（辞典释义、人名经名多是 CBETA 繁体）。旧缓存可能没有，可选。
+  dictionary: { terms: { term: string; definition: string | null; definition_hans?: string | null }[] } | null;
+  kg: {
+    triples: { subject: string; predicate: string; object: string; subject_hans?: string; object_hans?: string }[];
+  } | null;
   geo: { count: number; places: string[] } | null;
 }
 

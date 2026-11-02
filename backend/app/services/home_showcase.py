@@ -23,6 +23,7 @@ from __future__ import annotations
 import logging
 from itertools import zip_longest
 
+from opencc import OpenCC
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
@@ -35,10 +36,12 @@ from app.services.hot_questions import get_hot_questions
 
 logger = logging.getLogger(__name__)
 
+_t2s = OpenCC("t2s")
+
 # Cache TTL for the whole aggregate, and the rotation bucket size. 15 min keeps
 # the homepage lively without hammering the DB.
 SHOWCASE_TTL = 900
-_SHOWCASE_CACHE_KEY = "home:showcase:v3"  # v3: sources.names pool added
+_SHOWCASE_CACHE_KEY = "home:showcase:v4"  # v4: *_hans simplified fields on dict/kg pools
 
 # A small candidate pool size for rotation-by-seed queries: fetch a bounded set
 # cheaply, then pick one deterministically per time bucket.
@@ -186,7 +189,7 @@ async def _dictionary_card(db: AsyncSession) -> dict | None:
         # Only surface terms whose chosen gloss is actually Chinese — drop any
         # term left with only a non-Chinese gloss rather than show it.
         terms = [
-            {"term": t, "definition": by_term[t]}
+            {"term": t, "definition": by_term[t], "definition_hans": _t2s.convert(by_term[t])}
             for t in HOT_TERMS
             if by_term.get(t) and _has_cjk(by_term[t])
         ]
@@ -236,6 +239,10 @@ async def _kg_card(db: AsyncSession) -> dict | None:
                 "subject": r[0],
                 "predicate": _PREDICATE_LABELS.get(r[1], r[1]),
                 "object": r[2],
+                # 辞典释义与人名/经名多是 CBETA 繁体；简体界面显示 *_hans，避免卡片繁简混排。
+                # 在后端转而不在前端转：前端 OpenCC 词库 1.2 MB，首页不值得为一行预览加载它。
+                "subject_hans": _t2s.convert(r[0]),
+                "object_hans": _t2s.convert(r[2]),
             }
             for r in rows
         ]

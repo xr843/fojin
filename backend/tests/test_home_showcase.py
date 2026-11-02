@@ -52,10 +52,18 @@ async def test_showcase_returns_pools_per_card(seeded_db):
     assert out["sources"]["sources"] == 1 and out["sources"]["texts"] == 1
     assert out["sources"]["names"] == ["CBETA"]          # active source name pool
     # KG returns a POOL of triples; the seeded translated→译 triple is in it.
-    assert {"subject": "玄奘", "predicate": "译", "object": "大般若經"} in out["kg"]["triples"]
+    assert {
+        "subject": "玄奘",
+        "predicate": "译",
+        "object": "大般若經",
+        "subject_hans": "玄奘",
+        "object_hans": "大般若经",  # 简体界面用这个，免得卡片繁简混排
+    } in out["kg"]["triples"]
     # Dictionary returns a POOL of {term, definition}; 般若 (seeded) is present.
     terms = {e["term"] for e in out["dictionary"]["terms"]}
     assert "般若" in terms
+    for e in out["dictionary"]["terms"]:
+        assert e["definition_hans"] == home_showcase._t2s.convert(e["definition"])
     # count is the live geo total (1 seeded monastery); places are the CURATED
     # featured pool (not sampled from the DB, so foreign native names never leak
     # onto the homepage). The seeded 那烂陀寺 therefore does NOT appear.
