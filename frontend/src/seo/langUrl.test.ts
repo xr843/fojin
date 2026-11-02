@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { langUrl, ogLocaleFor, seoTitle, toSeoLang } from "./langUrl";
+import { langUrl, ogLocaleFor, toSeoLang } from "./langUrl";
+import { seoTitle } from "./seoTitle";
+import langUrlSource from "./langUrl.ts?raw";
 
 // Must stay byte-identical to backend/app/services/seo_lang.py (see its tests).
 describe("langUrl", () => {
@@ -35,5 +37,11 @@ describe("seoTitle", () => {
   it("keeps the stored form elsewhere", () => {
     expect(seoTitle("般若波羅蜜多心經", "zh-Hant")).toBe("般若波羅蜜多心經");
     expect(seoTitle("般若波羅蜜多心經", "en")).toBe("般若波羅蜜多心經");
+  });
+});
+
+describe("langUrl 保持轻量", () => {
+  it("不引入 OpenCC——main.tsx 静态导入本文件，引入会让每个页面首屏多下 ~550 KB", () => {
+    expect(langUrlSource).not.toMatch(/from\s+["'][^"']*(hanScript|opencc)/);
   });
 });
