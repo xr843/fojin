@@ -31,7 +31,10 @@ concurrency:
 jobs:
   smoke:
     name: Smoke against production
-    runs-on: ubuntu-latest
+    # ubuntu-latest 自 2026-10 底切到 Ubuntu 26，Playwright 1.60 装不上 chromium（--with-deps
+    # 直接报 unsupported），smoke 从 10-31 起每次在安装步骤就红、一个用例都没跑。
+    # 升级到支持 26.04 的 Playwright 后再改回 latest。
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: e2e
