@@ -23,7 +23,8 @@ import SameTitleTexts from "../components/SameTitleTexts";
 import CitationGenerator from "../components/CitationGenerator";
 import { addViewHistory } from "../utils/history";
 import { LangAlternates } from "../seo/LangAlternates";
-import { langUrl, ogLocaleFor, seoTitle, toSeoLang } from "../seo/langUrl";
+import { langUrl, ogLocaleFor, toSeoLang } from "../seo/langUrl";
+import { seoTitle } from "../seo/seoTitle";
 import { currentUILang } from "../i18n";
 
 const { Title } = Typography;
