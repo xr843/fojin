@@ -6,8 +6,12 @@
 
 /* ---------- 页面容器 ---------- */
 .home-page {
-  height: calc(100vh - 52px - 50px);
-  overflow: hidden;
+  /* 至少一屏、内容多了就往下长。原先是固定一屏 + overflow:hidden：可视区不够高时
+     （1366×768 屏浏览器里约 650px、1280×720、1536×864@125%）内容上下两头被裁——
+     「佛津」被导航压掉半截、登录提示与信任说明压在页脚下，且无法滚动看到。
+     2026-11 Umami：首页桌面访客约三分之一落在这档屏幕。 */
+  min-height: calc(100vh - 52px - 50px);
+  overflow-x: clip;
   background: var(--fj-bg);
 }
 
@@ -20,7 +24,7 @@
   padding: 60px 24px 48px;
   position: relative;
   overflow: hidden;
-  height: 100%;
+  min-height: calc(100vh - 52px - 50px);
 }
 
 /* 山水背景图 */
@@ -420,6 +424,9 @@
   color: var(--fj-ink);
   line-height: 1;
   margin-bottom: 10px;
+  /* 背景画里画着飞鸟，视口一变就可能正好横穿数字，像一道删除线。给字一圈宣纸色晕，
+     鸟线在字周围淡出；暗色主题由上方更具体的 :root[data-theme="dark"] 规则覆盖。 */
+  text-shadow: 0 0 6px rgba(248, 245, 239, 0.95), 0 0 2px rgba(248, 245, 239, 0.95);
 }
 
 .home-stat-lbl {
@@ -749,6 +756,23 @@
   line-clamp: 2;
   overflow: hidden;
   height: 35px;
+}
+
+/* ---------- 矮屏桌面：收紧纵向间距 ----------
+   让 1280×720、1536×864@125% 这类可视区 ~650–760px 的笔记本尽量一屏放下全部内容；
+   放不下时上面的 min-height 让页面自然可滚，不再裁切。 */
+@media (min-width: 769px) and (max-height: 820px) {
+  .home-hero { padding: 28px 24px 24px; }
+  .home-title { font-size: 64px; margin-bottom: 2px; }
+  .home-subtitle { margin-bottom: 20px; }
+  .search-combo { margin-bottom: 14px; }
+  .home-hot-tags { margin-bottom: 18px; }
+  .home-stat-num { font-size: 30px; margin-bottom: 6px; }
+  .home-features { margin-top: 18px; }
+  .home-feature-card { padding: 14px 14px; }
+  .home-feature-icon { font-size: 24px; margin-bottom: 6px; }
+  .home-tip { margin-top: 16px; }
+  .home-trust { margin-top: 14px; }
 }
 
 /* ---------- 响应式：平板 ----------

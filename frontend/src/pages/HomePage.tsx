@@ -22,6 +22,7 @@ import { askQueryFrom, buildHomeSuggestOptions, itemsFromSuggestResponse, type S
 import { getLangName } from "../utils/sourceUrls";
 import { getReadingHistory } from "../utils/readingHistory";
 import { getLocalizedCollections } from "../data/collections";
+import { fitSourceNames, pickHan } from "./homeShowcase";
 import { useAuthStore } from "../stores/authStore";
 import "../styles/home.css"; // mobile-responsive v2.1
 import { LangAlternates } from "../seo/LangAlternates";
@@ -276,7 +277,7 @@ export default function HomePage() {
               {sc.sources && sc.sources.names.length > 0
                 ? t("home.sc_sources_names", {
                     sources: sc.sources.count.toLocaleString(),
-                    names: sc.sources.names.join("、"),
+                    names: fitSourceNames(sc.sources.names).join("、"),
                   })
                 : t("home.feature_sources_desc")}
             </div>
@@ -303,7 +304,7 @@ export default function HomePage() {
             <div className="home-feature-title">{t("home.feature_dict_title")}</div>
             <div className="home-feature-desc">
               {sc.dict
-                ? `${sc.dict.term}${sc.dict.definition ? ` — ${sc.dict.definition}` : ""}`
+                ? `${sc.dict.term}${sc.dict.definition ? ` — ${pickHan(sc.dict.definition, sc.dict.definition_hans, i18n.language)}` : ""}`
                 : t("home.feature_dict_desc")}
             </div>
           </div>
@@ -312,7 +313,7 @@ export default function HomePage() {
             <div className="home-feature-title">{t("home.feature_kg_title")}</div>
             <div className="home-feature-desc">
               {sc.kg
-                ? `${sc.kg.subject} → ${sc.kg.predicate} → ${sc.kg.object}`
+                ? `${pickHan(sc.kg.subject, sc.kg.subject_hans, i18n.language)} → ${sc.kg.predicate} → ${pickHan(sc.kg.object, sc.kg.object_hans, i18n.language)}`
                 : t("home.feature_kg_desc")}
             </div>
           </div>

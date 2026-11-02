@@ -11,27 +11,13 @@
  * already folds with), so offsets are preserved and non-Han text is untouched.
  */
 import * as OpenCC from "opencc-js";
-
-export type HanScript = "simplified" | "traditional";
+import { scriptForLanguage, type HanScript } from "./hanLocale";
 
 const toSimplified = OpenCC.Converter({ from: "tw", to: "cn" });
 const toTraditional = OpenCC.Converter({ from: "cn", to: "tw" });
 
-/**
- * The traditional-script locales, mirroring `normalizeCollectionLocale` in
- * data/collections.ts. Everything else — including `en`, whose curated titles
- * are simplified Chinese — renders simplified.
- */
-export function scriptForLanguage(language: string): HanScript {
-  if (
-    language.startsWith("zh-Hant") ||
-    language.startsWith("zh-TW") ||
-    language.startsWith("zh-HK")
-  ) {
-    return "traditional";
-  }
-  return "simplified";
-}
+export { scriptForLanguage };
+export type { HanScript };
 
 /** Convert `text` into the Han script matching `language`. */
 export function localizeHan(text: string, language: string): string {
