@@ -27,7 +27,57 @@ const RANGES: Array<[number, number, string]> = [
   [2121, 2136, "事彙部"], // i18n-exempt
   [2137, 2144, "外教部"], // i18n-exempt
   [2145, 2184, "目錄部"], // i18n-exempt
+  // 第 56–85 册（日本撰述与敦煌古逸、疑伪经）。读经页的部类浏览要覆盖生产里全部 T 号
+  //（最大 T2920），跨藏对照页原本只到 2184。
+  [2185, 2245, "續經疏部"], // i18n-exempt
+  [2246, 2248, "續律疏部"], // i18n-exempt
+  [2249, 2295, "續論疏部"], // i18n-exempt
+  [2296, 2700, "續諸宗部"], // i18n-exempt
+  [2701, 2731, "悉曇部"], // i18n-exempt
+  [2732, 2864, "古逸部"], // i18n-exempt
+  [2865, 2920, "疑似部"], // i18n-exempt
 ];
+
+// 简体界面用的部名（只有与繁体不同的才列）。部名是学术专名，英文界面也显示汉字。
+const SIMPLIFIED: Record<string, string> = {
+  本緣部: "本缘部", // i18n-exempt
+  法華部: "法华部", // i18n-exempt
+  華嚴部: "华严部", // i18n-exempt
+  寶積部: "宝积部", // i18n-exempt
+  經集部: "经集部", // i18n-exempt
+  釋經論部: "释经论部", // i18n-exempt
+  毗曇部: "毗昙部", // i18n-exempt
+  中觀部: "中观部", // i18n-exempt
+  論集部: "论集部", // i18n-exempt
+  經疏部: "经疏部", // i18n-exempt
+  論疏部: "论疏部", // i18n-exempt
+  諸宗部: "诸宗部", // i18n-exempt
+  史傳部: "史传部", // i18n-exempt
+  事彙部: "事汇部", // i18n-exempt
+  目錄部: "目录部", // i18n-exempt
+  續經疏部: "续经疏部", // i18n-exempt
+  續律疏部: "续律疏部", // i18n-exempt
+  續論疏部: "续论疏部", // i18n-exempt
+  續諸宗部: "续诸宗部", // i18n-exempt
+  悉曇部: "悉昙部", // i18n-exempt
+};
+
+export interface TaishoSectionRange {
+  /** 繁体部名（与 taishoSection() 返回值一致，可作 key） */
+  name: string;
+  /** 简体部名 */
+  nameHans: string;
+  from: number;
+  to: number;
+}
+
+/** 大正藏各部的编号区间，按册序。读经页「按部类浏览」用。 */
+export const TAISHO_SECTIONS: TaishoSectionRange[] = RANGES.map(([from, to, name]) => ({
+  name,
+  nameHans: SIMPLIFIED[name] ?? name,
+  from,
+  to,
+}));
 
 const OTHER = "其他"; // i18n-exempt
 

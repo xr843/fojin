@@ -2869,3 +2869,20 @@ export async function getCommentarySource(
   });
   return data;
 }
+
+export interface TaishoBrowseItem {
+  id: number;
+  cbeta_id: string;
+  title_zh: string;
+  translator: string | null;
+  dynasty: string | null;
+  fascicle_count: number | null;
+}
+
+/** 读经页：大正藏某一编号区间（含两端）里有正文的经目。 */
+export async function browseTaisho(fromNo: number, toNo: number): Promise<TaishoBrowseItem[]> {
+  const { data } = await api.get<TaishoBrowseItem[]>("/texts/browse/taisho", {
+    params: { from_no: fromNo, to_no: toNo },
+  });
+  return data;
+}

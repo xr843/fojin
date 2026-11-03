@@ -11,7 +11,7 @@ import {
   LoginOutlined,
   ApartmentOutlined,
   DatabaseOutlined,
-  BookOutlined,
+  ReadOutlined,
   FileTextOutlined,
   MenuOutlined,
   DashboardOutlined,
@@ -102,8 +102,12 @@ export default function Layout() {
     path: string;
     children?: Array<{ label: string; path: string; count?: number }>;
   }> = [
-    { icon: <DatabaseOutlined />, label: t("nav.sources"), path: "/sources" },
+    // 顺序按 2026-11 Umami 30 天真实使用：问答（959 访客、40 人 ≥4 天回访）· 读经（阅读页 1,669 访客，
+    // 原导航无入口）· 辞典 595 · 数据源 393 · 图谱 220。首页功能卡与此一一对应、同顺序，改一处要同步改另一处。
     { icon: <RobotOutlined />, label: t("nav.chat"), path: "/chat" },
+    { icon: <ReadOutlined />, label: t("nav.read"), path: "/read" },
+    { icon: <FileTextOutlined />, label: t("nav.dictionary"), path: "/dictionary" },
+    { icon: <DatabaseOutlined />, label: t("nav.sources"), path: "/sources" },
     // 「这句经，佛真的说过吗？」核对页（全球增长子项目 ②）：2026-10-16 用户要求暂从导航撤下。
     // 路由 /verify 仍可直达（首页卡片、分享链接、SEO 收录不受影响），恢复时取消下一行注释。
     // { icon: <SafetyCertificateOutlined />, label: t("nav.verify"), path: "/verify" },
@@ -115,12 +119,12 @@ export default function Layout() {
     // 差异化，等重构(跨藏对比表 + 内联可点证据 + 流式)后再上线。后端 API 与
     // fojin-mcp 保留，/research 路由仍可直达。
     // { icon: <ExperimentOutlined />, label: t("nav.research"), path: "/research" },
-    { icon: <FileTextOutlined />, label: t("nav.dictionary"), path: "/dictionary" },
     { icon: <ApartmentOutlined />, label: t("nav.kg"), path: "/kg" },
     // 佛教地理暂从导航撤下（2026-10-17 用户要求）。路由 /map 仍可直达（首页卡片、分享链接、
     // SEO 收录不受影响），恢复时取消下一行注释。
     // { icon: <GlobalOutlined />, label: t("nav.geo"), path: "/map" },
-    { icon: <BookOutlined />, label: t("nav.collections"), path: "/collections" },
+    // 经典专题由「读经」（/read）取代（2026-11-03）：/read 底部「专题导读」链到各专题，
+    // /collections 与 /collections/:id 网址不变（已被收录）。
     // 在线读诵(/read-aloud)不占导航位：读诵是**读一部经时的一个动作**，不是与
     // 辞典/知识图谱并列的一个板块 —— 它的入口已经在阅读页工具栏上，和跨藏对照、
     // 高麗藏、校勘排在同一排（那正是这类"就地展开"功能该待的地方，见上面

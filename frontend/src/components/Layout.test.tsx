@@ -40,12 +40,21 @@ describe("Layout 顶部导航", () => {
     expect(screen.queryByText("开放数据")).toBeNull();
   });
 
-  it("既有导航项不受影响", () => {
-    renderLayout();
+  it("导航按真实使用量排序：AI 问答 · 读经 · 佛学辞典 · 数据源 · 知识图谱", () => {
+    const { container } = renderLayout();
 
-    for (const label of ["数据源", "AI 问答", "佛学辞典", "知识图谱", "经典专题"]) {
+    const order = ["AI 问答", "读经", "佛学辞典", "数据源", "知识图谱"];
+    for (const label of order) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
+    const text = container.textContent ?? "";
+    const positions = order.map((label) => text.indexOf(label));
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+  });
+
+  it("经典专题已由读经取代，不在导航里（/collections 仍可直达）", () => {
+    renderLayout();
+    expect(screen.queryByText("经典专题")).toBeNull();
   });
 
   it("佛教地理暂不在导航里（路由 /map 仍可直达）", () => {

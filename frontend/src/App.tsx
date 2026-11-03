@@ -35,6 +35,7 @@ const VerifyPage = lazy(() => import("./pages/VerifyPage"));
 const SutraLandingPage = lazy(() => import("./pages/SutraLandingPage"));
 const WorkDetailPage = lazy(() => import("./pages/WorkDetailPage"));
 const CollectionsPage = lazy(() => import("./pages/CollectionsPage"));
+const ReadPage = lazy(() => import("./pages/ReadPage"));
 const ReadAloudPage = lazy(() => import("./pages/ReadAloudPage"));
 const CrossCanonPage = lazy(() => import("./pages/CrossCanonPage"));
 const AdminDashboardPage = lazy(() => import("./pages/AdminDashboardPage"));
@@ -74,6 +75,7 @@ function App() {
             <Route path="/texts/:id/read" element={<TextReaderRoute />} />
             <Route path="/sources" element={<SourcesPage />} />
             <Route path="/read-aloud" element={<ReadAloudPage />} />
+            <Route path="/read" element={<ReadPage />} />
             <Route path="/collections" element={<CollectionsPage />} />
             <Route path="/collections/:collectionId" element={<CollectionsPage />} />
             <Route path="/cross-canon" element={<CrossCanonPage />} />

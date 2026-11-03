@@ -5,6 +5,7 @@ import { Helmet } from "react-helmet-async";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Typography, Spin, Button, Select, Breadcrumb, Row, Col, message, Tooltip, Tag, Popover, Dropdown, Drawer, theme, type MenuProps } from "antd";
 import { getLastPosition, recordReading } from "../utils/readingHistory";
+import { localizeHan } from "../utils/hanScript";
 import {
   HomeOutlined,
   LeftOutlined,
@@ -352,7 +353,7 @@ export default function TextReaderPage() {
   const resumeRef = useRef<{ juan: number; ratio: number } | null>(initialReading.resume);
   const [juanNum, setJuanNum] = useState(initialReading.juan);
   const [fontSize, setFontSize] = useState(getInitialFontSize);
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const getLangLabel = useCallback((lang: string) => {
     const key = LANG_LABEL_KEYS[lang];
     return key ? t(key) : lang;
@@ -665,7 +666,11 @@ export default function TextReaderPage() {
       if (rect.height <= 0) return;
       recordReading({
         textId,
-        title: content.title_zh || t("reader.text_fallback", { id: textId }),
+        // 按当前界面语言存经名：首页「读经」卡与「继续阅读」不能加载 OpenCC（550 KB），
+        // 只能原样显示存下来的标题；存繁体会让简体界面混排。阅读页本就加载了 OpenCC。
+        title: content.title_zh
+          ? localizeHan(content.title_zh, i18n.language)
+          : t("reader.text_fallback", { id: textId }),
         juan: juanNum,
         ratio: (window.innerHeight / 3 - rect.top) / rect.height,
       });
@@ -683,7 +688,7 @@ export default function TextReaderPage() {
         record(); // flush：离开页面/换卷前把最后 1.5s 内的滚动落盘
       }
     };
-  }, [content, textId, juanNum, t]);
+  }, [content, textId, juanNum, t, i18n.language]);
 
   // 回到顶部：滚过 ~一屏后浮现按钮。和续读同理，AI 面板打开时滚动发生在
   // .reader-container（不冒泡），只能在 window 捕获阶段收到 scroll 事件；

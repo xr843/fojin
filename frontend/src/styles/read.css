@@ -1,0 +1,197 @@
+/* 读经页（/read）。外框复用 sources.css 的 .sources-page / header，本页规则一律挂 .read-page 下。 */
+
+.read-page .read-section {
+  margin-top: 28px;
+}
+
+.read-page .read-h2 {
+  font-family: "Noto Serif SC", serif;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--fj-ink);
+  margin: 0 0 12px;
+  letter-spacing: 1px;
+}
+
+.read-page .read-hint {
+  font-size: 13px;
+  color: var(--fj-ink-muted);
+  margin: -6px 0 12px;
+}
+
+.read-page .read-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.read-page .read-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  background: var(--fj-surface);
+  border: 1px solid var(--fj-border);
+  border-radius: 8px;
+  color: var(--fj-ink);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.read-page .read-card:hover,
+.read-page .read-card:focus-visible {
+  border-color: var(--fj-accent);
+  box-shadow: 0 2px 10px rgba(139, 37, 0, 0.08);
+}
+
+.read-page .read-card-title {
+  font-family: "Noto Serif SC", serif;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.read-page .read-card-meta {
+  font-size: 12px;
+  color: var(--fj-ink-muted);
+}
+
+.read-page .read-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.read-page .read-chip {
+  font-family: "Noto Serif SC", serif;
+  font-size: 14px;
+  padding: 5px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--fj-border);
+  background: var(--fj-surface);
+  color: var(--fj-ink-light);
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.read-page .read-chip:hover {
+  border-color: var(--fj-accent);
+  color: var(--fj-accent);
+}
+
+.read-page .read-chip-active {
+  background: var(--fj-accent);
+  border-color: var(--fj-accent);
+  color: #fff;
+}
+
+.read-page .read-chip-active:hover {
+  color: #fff;
+}
+
+.read-page .read-list-wrap {
+  margin-top: 16px;
+  background: var(--fj-surface);
+  border: 1px solid var(--fj-border);
+  border-radius: 8px;
+  padding: 14px 18px;
+}
+
+.read-page .read-list-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--fj-border);
+  color: var(--fj-ink);
+}
+
+.read-page .read-list-range,
+.read-page .read-list-count {
+  font-size: 12px;
+  color: var(--fj-ink-muted);
+}
+
+.read-page .read-list-state {
+  padding: 24px;
+  text-align: center;
+  color: var(--fj-ink-muted);
+}
+
+.read-page .read-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.read-page .read-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px dashed var(--fj-border);
+}
+
+.read-page .read-list li:last-child {
+  border-bottom: none;
+}
+
+.read-page .read-list-title {
+  font-family: "Noto Serif SC", serif;
+  font-size: 15px;
+  color: var(--fj-ink);
+  min-width: 0;
+}
+
+.read-page .read-list-title:hover {
+  color: var(--fj-accent);
+}
+
+.read-page .read-list-meta {
+  font-size: 12px;
+  color: var(--fj-ink-muted);
+  flex: 1;
+  min-width: 0;
+}
+
+.read-page .read-list-id {
+  font-size: 12px;
+  color: var(--fj-ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.read-page .read-topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.read-page .read-topic {
+  font-size: 14px;
+  color: var(--fj-ink-light);
+}
+
+.read-page .read-topic:hover {
+  color: var(--fj-accent);
+}
+
+.read-page .read-topic-all {
+  color: var(--fj-accent);
+}
+
+@media (max-width: 480px) {
+  .read-page .read-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .read-page .read-card {
+    padding: 12px;
+  }
+  .read-page .read-list li {
+    flex-wrap: wrap;
+    gap: 2px 10px;
+  }
+  .read-page .read-list-meta {
+    flex-basis: 100%;
+    order: 3;
+  }
+}

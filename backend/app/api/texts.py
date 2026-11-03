@@ -22,7 +22,14 @@ from app.services.content import (
     get_juan_line_anchors,
     get_juan_list,
 )
-from app.services.text import get_text_by_id, get_text_count, get_text_id_by_cbeta
+from app.services.text import (
+    TAISHO_MAX_NO,
+    TAISHO_MAX_SPAN,
+    browse_taisho,
+    get_text_by_id,
+    get_text_count,
+    get_text_id_by_cbeta,
+)
 from app.services.text_export import FORMATS as EXPORT_FORMATS
 from app.services.text_export import build_export_doc, render
 
@@ -158,6 +165,29 @@ class ChunkContextResponse(BaseModel):
     chunks: list[ChunkContextItem]
     has_more_before: bool
     has_more_after: bool
+
+
+class TaishoBrowseItem(BaseModel):
+    id: int
+    cbeta_id: str
+    title_zh: str
+    translator: str | None = None
+    dynasty: str | None = None
+    fascicle_count: int | None = None
+
+
+@router.get("/texts/browse/taisho", response_model=list[TaishoBrowseItem])
+async def browse_taisho_texts(
+    response: Response,
+    from_no: int = Query(..., ge=1, le=TAISHO_MAX_NO, description="大正藏起始编号（含）"),
+    to_no: int = Query(..., ge=1, le=TAISHO_MAX_NO, description="大正藏结束编号（含）"),
+    db: AsyncSession = Depends(get_db),
+):
+    """读经页「按部类浏览」：列出大正藏某一编号区间内有正文的经目。"""
+    if to_no < from_no or to_no - from_no > TAISHO_MAX_SPAN:
+        raise HTTPException(status_code=422, detail="invalid taisho range")
+    response.headers["Cache-Control"] = "public, max-age=3600"
+    return await browse_taisho(db, from_no, to_no)
 
 
 @router.get("/texts/{text_id}", response_model=TextResponseBase)
