@@ -80,3 +80,46 @@ async def get_all_text_ids_with_dates(session: AsyncSession) -> list[tuple[int, 
         select(BuddhistText.id, BuddhistText.created_at).order_by(BuddhistText.id)
     )
     return [(row[0], row[1].strftime("%Y-%m-%d")) for row in result.all()]
+
+
+# ── 读经页：按大正藏编号区间列经目 ────────────────────────────────
+TAISHO_MAX_NO = 2920
+TAISHO_MAX_SPAN = 700  # 最大的部（密教部）573 个编号；限制单次查询规模
+
+
+async def browse_taisho(session: AsyncSession, from_no: int, to_no: int) -> list[dict]:
+    """大正藏 T{from_no}..T{to_no}（含两端、含 a/b 变体）里有正文的经目，按编号排序。
+
+    cbeta_id 是四位补零（T0001、T0235b），所以编号区间可以直接用字符串比较表达，
+    不依赖 Postgres 正则（测试用的 SQLite 也能跑）。
+    """
+    lo, hi = f"T{from_no:04d}", f"T{to_no + 1:04d}"
+    rows = (
+        await session.execute(
+            select(
+                BuddhistText.id,
+                BuddhistText.cbeta_id,
+                BuddhistText.title_zh,
+                BuddhistText.translator,
+                BuddhistText.dynasty,
+                BuddhistText.fascicle_count,
+            )
+            .where(
+                BuddhistText.cbeta_id >= lo,
+                BuddhistText.cbeta_id < hi,
+                BuddhistText.has_content.is_(True),
+            )
+            .order_by(BuddhistText.cbeta_id)
+        )
+    ).all()
+    return [
+        {
+            "id": r.id,
+            "cbeta_id": r.cbeta_id,
+            "title_zh": r.title_zh,
+            "translator": r.translator,
+            "dynasty": r.dynasty,
+            "fascicle_count": r.fascicle_count,
+        }
+        for r in rows
+    ]

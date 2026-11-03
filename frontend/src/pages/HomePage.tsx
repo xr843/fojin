@@ -10,7 +10,7 @@ import {
   DownOutlined,
   ApartmentOutlined,
   RobotOutlined,
-  BookOutlined,
+  ReadOutlined,
   FileTextOutlined,
 } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
@@ -21,7 +21,6 @@ import { getStats, getSources, getFilters, getSearchSuggestItems, getHomeShowcas
 import { askQueryFrom, buildHomeSuggestOptions, itemsFromSuggestResponse, type SuggestGroup } from "./homeSuggest";
 import { getLangName } from "../utils/sourceUrls";
 import { getReadingHistory } from "../utils/readingHistory";
-import { getLocalizedCollections } from "../data/collections";
 import { fitSourceNames, pickHan } from "./homeShowcase";
 import { useAuthStore } from "../stores/authStore";
 import "../styles/home.css"; // mobile-responsive v2.1
@@ -59,16 +58,9 @@ export default function HomePage() {
   // any extra backend round-trip.
   const [rand] = useState(() => ({
     sources: Math.random(), chat: Math.random(), dict: Math.random(),
-    kg: Math.random(), geo: Math.random(), col: Math.random(),
+    kg: Math.random(), geo: Math.random(),
   }));
 
-  // 经典专题卡：随机起点取三个专题名，每次进首页看到的不同。
-  const collectionsDesc = useMemo(() => {
-    const cols = getLocalizedCollections(i18n.language).map((c) => c.name).filter(Boolean);
-    if (cols.length === 0) return null;
-    const start = Math.floor(rand.col * cols.length) % cols.length;
-    return [0, 1, 2].map((i) => cols[(start + i) % cols.length]).join(" · ");
-  }, [i18n.language, rand.col]);
 
   // Pick one item from each cached pool using the per-mount random values.
   const sc = useMemo(() => {
@@ -270,7 +262,66 @@ export default function HomePage() {
         </div>
 
         <div className="home-features">
-          <div className="home-feature-card" onClick={() => navigate("/sources")}>
+          {/* 首页功能卡与顶部导航一一对应、同顺序：AI 问答 · 读经 · 佛学辞典 · 数据源 · 知识图谱
+              （2026-11-03 按 30 天真实使用重排，读经取代经典专题）。核对经文、佛教地理不在导航，
+              卡片也不放；/verify、/map、/collections 路由仍可直达。导航增减时这里同步改。 */}
+          <div
+            className="home-feature-card"
+            data-umami-event="home_card"
+            data-umami-event-card="chat"
+            onClick={() =>
+              navigate(sc.chat ? `/chat?q=${encodeURIComponent(sc.chat)}` : "/chat")
+            }
+          >
+            <RobotOutlined className="home-feature-icon" />
+            <div className="home-feature-title">{t("home.feature_chat_title")}</div>
+            <div className="home-feature-desc">
+              {sc.chat || t("home.feature_chat_desc")}
+            </div>
+          </div>
+          {/* 读经卡：有本地阅读记录就直达上次读到的卷，否则去 /read。 */}
+          <div
+            className="home-feature-card"
+            data-umami-event="home_card"
+            data-umami-event-card={recentReading[0] ? "read_continue" : "read"}
+            onClick={() =>
+              navigate(
+                recentReading[0]
+                  ? `/texts/${recentReading[0].textId}/read?juan=${recentReading[0].juan}`
+                  : "/read",
+              )
+            }
+          >
+            <ReadOutlined className="home-feature-icon" />
+            <div className="home-feature-title">{t("home.feature_read_title")}</div>
+            <div className="home-feature-desc">
+              {recentReading[0]
+                ? t("home.feature_read_continue", { title: truncateTitle(recentReading[0].title) })
+                : t("home.feature_read_desc")}
+            </div>
+          </div>
+          <div
+            className="home-feature-card"
+            data-umami-event="home_card"
+            data-umami-event-card="dict"
+            onClick={() =>
+              navigate(sc.dict ? `/dictionary?q=${encodeURIComponent(sc.dict.term)}` : "/dictionary")
+            }
+          >
+            <FileTextOutlined className="home-feature-icon" />
+            <div className="home-feature-title">{t("home.feature_dict_title")}</div>
+            <div className="home-feature-desc">
+              {sc.dict
+                ? `${sc.dict.term}${sc.dict.definition ? ` — ${pickHan(sc.dict.definition, sc.dict.definition_hans, i18n.language)}` : ""}`
+                : t("home.feature_dict_desc")}
+            </div>
+          </div>
+          <div
+            className="home-feature-card"
+            data-umami-event="home_card"
+            data-umami-event-card="sources"
+            onClick={() => navigate("/sources")}
+          >
             <DatabaseOutlined className="home-feature-icon" />
             <div className="home-feature-title">{t("home.feature_sources_title")}</div>
             <div className="home-feature-desc">
@@ -284,47 +335,16 @@ export default function HomePage() {
           </div>
           <div
             className="home-feature-card"
-            onClick={() =>
-              navigate(sc.chat ? `/chat?q=${encodeURIComponent(sc.chat)}` : "/chat")
-            }
+            data-umami-event="home_card"
+            data-umami-event-card="kg"
+            onClick={() => navigate("/kg")}
           >
-            <RobotOutlined className="home-feature-icon" />
-            <div className="home-feature-title">{t("home.feature_chat_title")}</div>
-            <div className="home-feature-desc">
-              {sc.chat || t("home.feature_chat_desc")}
-            </div>
-          </div>
-          <div
-            className="home-feature-card"
-            onClick={() =>
-              navigate(sc.dict ? `/dictionary?q=${encodeURIComponent(sc.dict.term)}` : "/dictionary")
-            }
-          >
-            <FileTextOutlined className="home-feature-icon" />
-            <div className="home-feature-title">{t("home.feature_dict_title")}</div>
-            <div className="home-feature-desc">
-              {sc.dict
-                ? `${sc.dict.term}${sc.dict.definition ? ` — ${pickHan(sc.dict.definition, sc.dict.definition_hans, i18n.language)}` : ""}`
-                : t("home.feature_dict_desc")}
-            </div>
-          </div>
-          <div className="home-feature-card" onClick={() => navigate("/kg")}>
             <ApartmentOutlined className="home-feature-icon" />
             <div className="home-feature-title">{t("home.feature_kg_title")}</div>
             <div className="home-feature-desc">
               {sc.kg
                 ? `${pickHan(sc.kg.subject, sc.kg.subject_hans, i18n.language)} → ${sc.kg.predicate} → ${pickHan(sc.kg.object, sc.kg.object_hans, i18n.language)}`
                 : t("home.feature_kg_desc")}
-            </div>
-          </div>
-          {/* 首页功能卡与顶部导航一一对应、同顺序（2026-10-17 用户要求）：数据源 · AI 问答 ·
-              佛学辞典 · 知识图谱 · 经典专题。核对经文、佛教地理已从导航暂撤，卡片也不放；
-              /verify、/map 路由仍可直达。导航增减时这里同步改。 */}
-          <div className="home-feature-card" onClick={() => navigate("/collections")}>
-            <BookOutlined className="home-feature-icon" />
-            <div className="home-feature-title">{t("home.feature_collections_title")}</div>
-            <div className="home-feature-desc">
-              {collectionsDesc || t("home.feature_collections_desc")}
             </div>
           </div>
         </div>
