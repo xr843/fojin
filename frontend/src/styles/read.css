@@ -1,7 +1,17 @@
 /* 读经页（/read）。外框复用 sources.css 的 .sources-page / header，本页规则一律挂 .read-page 下。 */
 
+/* 标题区收紧：本页要的是「继续读」「常读经典」在首屏，标题只是路标。
+   沿用 .sources-header 会在标题上下各留出 ~60px。 */
+.read-page .sources-header {
+  padding: 8px 0 0;
+}
+
+.read-page .sources-desc {
+  margin-bottom: 0;
+}
+
 .read-page .read-section {
-  margin-top: 28px;
+  margin-top: 24px;
 }
 
 .read-page .read-h2 {
@@ -21,8 +31,15 @@
 
 .read-page .read-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  /* 桌面固定 5 列：常读经典 10 部正好两整行（auto-fill 在 1200 宽下排成 6+4，第二行缺两格）。 */
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .read-page .read-cards {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .read-page .read-card {

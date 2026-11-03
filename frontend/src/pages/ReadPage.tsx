@@ -28,7 +28,11 @@ export default function ReadPage() {
   const traditional = scriptForLanguage(lang) === "traditional";
 
   const [history] = useState(() => getReadingHistory().slice(0, 4));
-  const popular = useMemo(() => getLocalizedPopularSutras(lang), [lang]);
+  // 已在「继续读」里的经不再在常读经典重复出现
+  const popular = useMemo(() => {
+    const reading = new Set(history.map((e) => e.textId));
+    return getLocalizedPopularSutras(lang).filter((s) => !reading.has(s.text_id));
+  }, [lang, history]);
   const collections = useMemo(() => getLocalizedCollections(lang), [lang]);
 
   const [searchParams, setSearchParams] = useSearchParams();
