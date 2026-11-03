@@ -75,6 +75,18 @@ describe("读经页", () => {
     expect(link).toHaveAttribute("href", "/texts/9/read?juan=1");
   });
 
+  it("已在「继续读」里的经不在常读经典里重复", () => {
+    localStorage.setItem(
+      "fojin-reading-history",
+      JSON.stringify([{ textId: 7, title: "金刚般若波罗蜜经", juan: 1, ratio: 0.1, ts: 1 }]),
+    );
+    renderPage();
+    // 金刚经（text 7）只在继续读里出现一次，指向续读位置
+    const links = [...document.querySelectorAll('a[href^="/texts/7"]')].map((a) => a.getAttribute("href"));
+    expect(links).toEqual(["/texts/7/read?juan=1"]);
+    expect(document.querySelector('a[href="/texts/9"]')).not.toBeNull(); // 心经仍在常读经典
+  });
+
   it("常读经典链到经文页", () => {
     renderPage();
     expect(screen.getByText("常读经典")).toBeInTheDocument();
