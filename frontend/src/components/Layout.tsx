@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import { Layout as AntLayout, Typography, Button, Dropdown, Space, Drawer, Modal, Badge } from "antd";
 import { Outlet, useNavigate, useLocation } from "react-router";
+import { activeNavPath } from "./navActive";
 
 import AudioPlayerProvider from "../audio/AudioPlayerProvider";
 import PlayerBar from "../audio/PlayerBar";
@@ -45,6 +46,7 @@ export default function Layout() {
   const { user, logout } = useAuthStore();
   const { t, i18n } = useTranslation();
   const isHome = location.pathname === "/";
+  const currentNav = activeNavPath(location.pathname);
   const xiaojinHidden = useXiaojinStore((st) => st.hidden);
   const recallXiaojin = useXiaojinStore((st) => st.show);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -305,10 +307,11 @@ export default function Layout() {
                       <Button
                         type="text"
                         icon={item.icon}
+                        aria-current={currentNav === item.path ? "page" : undefined}
                         style={{
-                          color: inkMuted,
+                          color: currentNav === item.path ? accent : inkMuted,
                           fontSize: 13,
-                          fontWeight: 400,
+                          fontWeight: currentNav === item.path ? 600 : 400,
                           fontFamily: '"Noto Serif SC", serif',
                         }}
                       >
@@ -320,10 +323,11 @@ export default function Layout() {
                       key={item.path}
                       type="text"
                       icon={item.icon}
+                      aria-current={currentNav === item.path ? "page" : undefined}
                       style={{
-                        color: inkMuted,
+                        color: currentNav === item.path ? accent : inkMuted,
                         fontSize: 13,
-                        fontWeight: 400,
+                        fontWeight: currentNav === item.path ? 600 : 400,
                         fontFamily: '"Noto Serif SC", serif',
                       }}
                       onClick={() => navigate(item.path)}
@@ -506,7 +510,12 @@ export default function Layout() {
                   type="text"
                   icon={item.icon}
                   block
-                  style={{ textAlign: "left", color: inkMuted, fontWeight: 500 }}
+                  aria-current={currentNav === item.path ? "page" : undefined}
+                  style={{
+                    textAlign: "left",
+                    color: currentNav === item.path ? accent : inkMuted,
+                    fontWeight: currentNav === item.path ? 600 : 500,
+                  }}
                   onClick={() => { navigate(item.path); setDrawerOpen(false); }}
                 >
                   {item.label}
@@ -537,7 +546,12 @@ export default function Layout() {
                 type="text"
                 icon={item.icon}
                 block
-                style={{ textAlign: "left", color: inkMuted }}
+                aria-current={currentNav === item.path ? "page" : undefined}
+                style={{
+                  textAlign: "left",
+                  color: currentNav === item.path ? accent : inkMuted,
+                  fontWeight: currentNav === item.path ? 600 : 400,
+                }}
                 onClick={() => { navigate(item.path); setDrawerOpen(false); }}
               >
                 {item.label}
