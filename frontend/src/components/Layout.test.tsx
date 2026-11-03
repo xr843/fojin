@@ -9,9 +9,9 @@ function LocationProbe() {
   return <div data-testid="pathname">{useLocation().pathname}</div>;
 }
 
-function renderLayout() {
+function renderLayout(path = "/") {
   return render(
-    <MemoryRouter initialEntries={["/"]}>
+    <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route element={<Layout />}>
           <Route path="*" element={<LocationProbe />} />
@@ -50,6 +50,18 @@ describe("Layout 顶部导航", () => {
     const text = container.textContent ?? "";
     const positions = order.map((label) => text.indexOf(label));
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
+  });
+
+  it("当前板块高亮：在经文页时「读经」标为当前页，其他项不标", () => {
+    renderLayout("/texts/9");
+    const current = document.querySelectorAll('.nav-desktop [aria-current="page"]');
+    expect(current).toHaveLength(1);
+    expect(current[0].textContent).toContain("读经");
+  });
+
+  it("首页不高亮任何导航项", () => {
+    renderLayout("/");
+    expect(document.querySelectorAll('.nav-desktop [aria-current="page"]')).toHaveLength(0);
   });
 
   it("经典专题已由读经取代，不在导航里（/collections 仍可直达）", () => {
