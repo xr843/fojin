@@ -1815,5 +1815,7 @@
   "read.topics_all": "全部专题 →",
   "home.feature_read_title": "读经",
   "home.feature_read_desc": "心经 · 金刚经 · 法华经 · 华严经",
-  "home.feature_read_continue": "继续读《{{title}}》"
+  "home.feature_read_continue": "继续读《{{title}}》",
+  "chat.stream.recovering": "连接中断了，正在找回已生成的回答…",
+  "chat.stream.recovered": "已找回刚才的回答"
 }
