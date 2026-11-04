@@ -2265,3 +2265,58 @@ describe("操作栏、换模型重答与快捷键", () => {
     expect(screen.queryByText(firstMsg, { selector: ".chat-msg-body" })).toBeNull();
   });
 });
+
+// 2026-11-04 排查：「网络断开」几乎都发生在 Cloudflare → 浏览器这一段，后端早已生成完并存库。
+// 登录用户断流后要先回库里找回答，找到就显示，不能直接报「请求失败」。
+describe("断流后找回已生成的回答", () => {
+  const Q = "「三毒」指的是哪三种毒？";
+
+  it("登录用户：网络断开后从会话里找回回答并显示，不报失败", async () => {
+    let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+    vi.mocked(sendChatMessageStream).mockImplementation(
+      async (_m, _s, _mid, callbacks) => { cb = callbacks; },
+    );
+    const now = new Date().toISOString();
+    vi.mocked(getChatSessionMessages).mockResolvedValue({
+      total: 2, page: 1, size: 50,
+      messages: [
+        { id: 501, role: "user", content: Q, sources: null, created_at: now },
+        { id: 502, role: "assistant", content: "贪、嗔、痴，合称三毒。", sources: null, created_at: now },
+      ],
+    });
+    const { container } = await renderEmpty();
+    fireEvent.click(container.querySelector(".chat-hero-card")!);
+    await waitFor(() => expect(cb).toBeDefined());
+    // 新对话：浏览器一个字没收到，连 session_id 都不知道——只能按标题在会话列表里找
+    vi.mocked(getChatSessions).mockResolvedValue([
+      { id: 77 as ChatSessionId, title: Q, pinned: false, created_at: now },
+    ]);
+
+    cb!.onError("网络错误，请稍后重试", "network");
+    cb!.onDone();
+
+    expect(await screen.findByText(/贪、嗔、痴，合称三毒/)).toBeInTheDocument();
+    expect(vi.mocked(getChatSessionMessages)).toHaveBeenCalledWith(77, 1, 50);
+    expect(screen.queryByText("请求失败，请重试")).toBeNull();
+    expect(vi.mocked(message.error)).not.toHaveBeenCalled();
+    expect(vi.mocked(message.success)).toHaveBeenCalled();
+  });
+
+  it("游客：回答不落库，照旧报失败，不去会话里找", async () => {
+    useAuthStore.setState({ token: null, user: null });
+    let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+    vi.mocked(sendChatMessageStream).mockImplementation(
+      async (_m, _s, _mid, callbacks) => { cb = callbacks; },
+    );
+    const { container } = await renderEmpty();
+    fireEvent.click(container.querySelector(".chat-hero-card")!);
+    await waitFor(() => expect(cb).toBeDefined());
+
+    cb!.onError("网络错误，请稍后重试", "network");
+    cb!.onDone();
+
+    await waitFor(() => expect(screen.getByText("请求失败，请重试")).toBeInTheDocument());
+    expect(vi.mocked(message.error)).toHaveBeenCalled();
+    expect(vi.mocked(getChatSessionMessages)).not.toHaveBeenCalled();
+  });
+});

@@ -49,6 +49,7 @@ import AnswerSummaryBar from "../components/AnswerSummaryBar";
 import CitationSidebar, { type CitationPanelRequest } from "../components/CitationSidebar";
 import AnswerCitationEntry from "../components/AnswerCitationEntry";
 import { getMasters } from "../api/client";
+import { findSavedAnswer } from "./chatRecovery";
 import type { CitationTarget } from "../components/CitationDrawer";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -1000,7 +1001,16 @@ export default function ChatPage() {
 
   /** silent：按 URL 恢复时用。链接可能是旧的（会话已删、或本就不属于自己，
    *  后端会 403/404），一进页面就弹错误提示只是噪音，退回空白首屏即可。 */
-  const loadSession = useCallback(async (sid: number, silent = false) => {
+  // 「当前画面」的代次：发新问题、切会话、新建对话都 +1。断流找回是异步的，
+  // 找回时代次已变（用户已经在看别的）就不能再用找回结果覆盖页面。
+  const viewEpochRef = useRef(0);
+  const bumpViewEpoch = useCallback(() => {
+    viewEpochRef.current += 1;
+    return viewEpochRef.current;
+  }, []);
+
+  const loadSession = useCallback(async (sid: number, silent = false, scrollTo: "top" | "bottom" = "top") => {
+    bumpViewEpoch();
     try {
       const data = await getChatSessionMessages(sid, 1, 50);
       setSessionId(sid);
@@ -1013,6 +1023,12 @@ export default function ChatPage() {
       // 是空操作，会让这个「滚到顶」的意图静默失效；而且这里是一次离散跳转，
       // 本来就不需要动画。
       setTimeout(() => {
+        if (scrollTo === "bottom") {
+          // 断流找回：用户刚才在等的是最新那条回答，停在底部
+          scrollToBottom(true);
+          handleMessagesScroll();
+          return;
+        }
         messagesTopRef.current?.scrollIntoView({ behavior: "auto" });
         // 跳到顶部后底部有大量未读内容，把「回到底部」按钮的状态同步过来 ——
         // 程序化滚动不一定触发 scroll 事件，不能只靠事件更新。
@@ -1022,7 +1038,7 @@ export default function ChatPage() {
       syncSessionParam(undefined);   // 别把打不开的 id 留在地址栏里
       if (!silent) message.error(t("chat.load_session_failed"));
     }
-  }, [syncSessionParam, handleMessagesScroll, t]);
+  }, [syncSessionParam, handleMessagesScroll, scrollToBottom, bumpViewEpoch, t]);
 
   // 按 ?s= 恢复会话。**只在挂载后判这一次**，之后 URL 里的 s 一律视为本页面自己
   // 写进去的，不再回头去"恢复"。
@@ -1065,6 +1081,7 @@ export default function ChatPage() {
   };
 
   const handleNewChat = () => {
+    bumpViewEpoch();
     setSessionId(undefined);
     syncSessionParam(undefined);
     setMessages([]);
@@ -1206,6 +1223,8 @@ export default function ChatPage() {
   ) => {
     const msg = text.trim();
     if (!msg || sending) return;
+    const myEpoch = bumpViewEpoch();
+    const sessionIdAtSend = sessionId ?? null;
     const effectiveModelId = options?.modelOverride ?? modelId;
     const hotQuestionId = options?.hotQuestionId ?? null;
 
@@ -1265,6 +1284,8 @@ export default function ChatPage() {
     // 根本不建 session、完全不落库。只有前端知道「这一条流吐没吐过 token」。
     let tokenCount = 0;
     let sawError = false;
+    // 断流后正在回库里找已生成的回答：期间气泡保持「生成中」，onDone 不得把它改成失败
+    let recovering = false;
 
     // 响应耗时。和上面两个计数同理放在闭包里：每次发送要一份全新的，且绝不能在
     // setMessages 的 updater 里读时钟（StrictMode 下 updater 会跑两遍）。
@@ -1414,6 +1435,46 @@ export default function ChatPage() {
             reason: code ?? "unknown",
           });
         }
+        // 连接断了不等于回答没生成：生产上这类断开几乎都在 Cloudflare→浏览器这一段，
+        // 后端早已生成完并存库（排查见 chatRecovery.ts）。登录用户的回答在库里，先去找；
+        // 游客不落库，找不回，照旧报错。
+        if ((code === "network" || code === "client_timeout") && user) {
+          recovering = true;
+          message.info(t("chat.stream.recovering"));
+          void (async () => {
+            const sid = await findSavedAnswer(
+              { question: msg, sessionId: sessionIdAtSend, startedAt },
+              {
+                getSessions: getChatSessions,
+                getLatestMessages: async (id) => (await getChatSessionMessages(id, 1, 50)).messages,
+                sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+                now: Date.now,
+              },
+            );
+            if (sid != null) {
+              const applied = viewEpochRef.current === myEpoch;
+              if (typeof umami !== "undefined") {
+                umami.track("chat_recovered", {
+                  reason: code,
+                  stage: tokenCount > 0 ? "mid_stream" : "no_token",
+                  applied: applied ? 1 : 0,
+                  seconds: Math.round((Date.now() - startedAt) / 1000),
+                });
+              }
+              // 用户已经在看别的（发了新问题 / 切了会话）：回答已在会话列表里，不抢画面
+              if (!applied) return;
+              await loadSession(sid, true, "bottom");
+              if (!sessionIdAtSend) refetchSessions();
+              message.success(t("chat.stream.recovered"));
+              return;
+            }
+            patchLive((m) =>
+              m.content === THINKING_SENTINEL ? { ...m, content: REQUEST_FAILED_SENTINEL } : m,
+            );
+            message.error(errMsg);
+          })();
+          return;
+        }
         message.error(errMsg);
         patchLive((m) =>
           m.content === THINKING_SENTINEL ? { ...m, content: REQUEST_FAILED_SENTINEL } : m,
@@ -1442,7 +1503,7 @@ export default function ChatPage() {
         // 也照记 —— 渲染层负责不给失败哨兵显示耗时，判据留在一处就够了。
         const totalMs = Date.now() - startedAt;
         patchLive((m) => {
-          const settled = m.content === THINKING_SENTINEL
+          const settled = m.content === THINKING_SENTINEL && !recovering
             ? { ...m, content: REQUEST_FAILED_SENTINEL }
             : m;
           return { ...settled, firstTokenMs, totalMs };
@@ -1466,7 +1527,7 @@ export default function ChatPage() {
       modelId: effectiveModelId === "deepseek:v4-pro" ? null : effectiveModelId,
       attachmentIds: attachmentIdsForSend.length ? attachmentIdsForSend : null,
     });
-  }, [sending, sessionId, masterId, modelId, user, attachments, refetchSessions, refetchQuota, queryClient, scrollToBottom, setShowJumpToBottom, syncSessionParam]);
+  }, [sending, sessionId, masterId, modelId, user, attachments, refetchSessions, refetchQuota, queryClient, scrollToBottom, setShowJumpToBottom, syncSessionParam, loadSession, bumpViewEpoch, t]);
 
   const handleSend = useCallback(async () => {
     await handleSendMessage(input);

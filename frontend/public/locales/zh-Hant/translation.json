@@ -1815,5 +1815,7 @@
   "read.topics_all": "全部專題 →",
   "home.feature_read_title": "讀經",
   "home.feature_read_desc": "心經 · 金剛經 · 法華經 · 華嚴經",
-  "home.feature_read_continue": "繼續讀《{{title}}》"
+  "home.feature_read_continue": "繼續讀《{{title}}》",
+  "chat.stream.recovering": "連線中斷了，正在找回已生成的回答…",
+  "chat.stream.recovered": "已找回剛才的回答"
 }
