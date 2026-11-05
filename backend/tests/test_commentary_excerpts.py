@@ -156,3 +156,38 @@ async def test_excerpts_endpoint(pkg, monkeypatch):
             assert miss["matched"] is False and miss["excerpts"] == []
     finally:
         app.dependency_overrides.pop(get_db, None)
+
+
+def test_quote_that_starts_mid_previous_line_is_not_cut_in_half(tmp_path, monkeypatch):
+    # 宝疏实例：牒文「論「又此非一切至為同類因」」从上一行句号之后起
+    mid = [list(r) for r in COMM]
+    mid[3] = ["0100a04", "此下明第五同類因。論「謂相似法至為"]
+    mid[4] = ["0100a05", "同類因」者，謂善與善等。相似法與相似法為同類因。"]
+    monkeypatch.setattr(svc, "PACKAGE_DIR", _write(tmp_path, comm=mid))
+    svc.packages.cache_clear()
+    try:
+        e = _ex(svc.packages()[0], "相似法與相似法為同類因謂善五蘊")[0]
+        assert e["text"].startswith("論「謂相似法至為同類因」者")
+        assert e["line_from"] == "0100a04" and e["anchor"] == f"{W}_p0100a04"
+    finally:
+        svc.packages.cache_clear()
+
+
+def test_previous_line_ending_at_a_full_stop_adds_nothing(pkg):
+    # 光记实例：上一行恰好以句号收尾，什么都不补
+    e = _ex(pkg, "相似法與相似法為同類因謂善五蘊")[0]
+    assert e["text"].startswith("相似法與相似法為同類因者")
+
+
+def test_abbreviated_quote_with_zhi_is_kept_whole(tmp_path, monkeypatch):
+    # 光记实例：牒文用「至」缩略（「謂前生至為同類因」者），4 字匹配落在后面的解释上；
+    # 起点仍要回到牒文开头，不能从「答。」之后起把牒文切掉
+    z = [list(r) for r in COMM]
+    z[4] = ["0100a05", "「同類因至為同類因」者，答。謂相似法與相似法為同類因。"]
+    monkeypatch.setattr(svc, "PACKAGE_DIR", _write(tmp_path, comm=z))
+    svc.packages.cache_clear()
+    try:
+        e = _ex(svc.packages()[0], "相似法與相似法為同類因謂善五蘊")[0]
+        assert e["text"].startswith("「同類因至為同類因」者，答。")
+    finally:
+        svc.packages.cache_clear()
