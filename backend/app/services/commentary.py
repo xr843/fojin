@@ -39,6 +39,16 @@ MAX_LIMIT = 50
 # 划的那句的注家顶出去。实测：不设这道门槛时 44 例里有 1 例被下一句占满。
 _CORE_MIN_CHARS = 6
 
+# 「注疏怎么讲这几句」片段（excerpts）：
+# 插值段（前一个对齐点 → 后一个对齐点之间的注文）里必须逐字出现贴文所在论文行的
+# 某个 4 字片段，才算这家确实牒到了这几句——挡住对齐点稀疏处跨品错位的情况。
+# 2026-11-05 实测：人工判对上的 26 条留 25、错位 1 条被挡；5 字只留 22。
+EXCERPT_QUOTE_GRAM = 4
+# 插值段中位 1,196 字（光记）、P90 4,069 字，整段给读者等于让他自己翻卷。
+# 从首个牒引所在行起截约这么多字，断在句号处。
+EXCERPT_CHARS = 500
+_SENTENCE_END = "。"
+
 # CBETA 书号 → fojin 的 cbeta_id：T08n0235 → T0235、X24n0461 → X0461。
 _WORK_ID = re.compile(r"^([A-Z]+)\d*n(\w+)$")
 
@@ -82,6 +92,11 @@ class Package:
     _flat: str = ""
     _owner: list[str] = field(default_factory=list)
     _len: dict = field(default_factory=dict)
+    # 注疏全文（可选，schema ≥ 2 的包才有）：work → 逐行 [行标, 原文]。
+    # 只有带全文的注疏才能给「怎么讲这几句」的片段。
+    comm_lines: dict = field(default_factory=dict)
+    # work → (行标 → 行序, 归一化全书拼接, 每个归一化字符属于第几行, 每行在拼接里的起点)
+    _comm_idx: dict = field(default_factory=dict)
 
     @classmethod
     def load(cls, path: Path) -> Package:
@@ -108,6 +123,19 @@ class Package:
             pkg._owner.extend([ln["id"]] * len(t))
             pkg._len[ln["id"]] = len(t)
         pkg._flat = "".join(parts)
+        for work, rows in (d.get("commentary_lines") or {}).items():
+            pkg.comm_lines[work] = rows
+            ref_pos, flat, owner, starts = {}, [], [], []
+            n = 0
+            for k, (ref, txt) in enumerate(rows):
+                ref_pos[ref] = k
+                starts.append(n)
+                t = normalise_for_match(txt)
+                flat.append(t)
+                owner.extend([k] * len(t))
+                n += len(t)
+            starts.append(n)
+            pkg._comm_idx[work] = (ref_pos, "".join(flat), owner, starts)
         return pkg
 
     def find(self, quote: str) -> str | None:
@@ -179,6 +207,67 @@ class Package:
             ),
         )
         return span, ranked[:limit], len(ranked)
+
+    def excerpts(self, i0: int, i1: int) -> list[dict]:
+        """各家注疏讲第 i0–i1 行论文的那一段原文（只对带全文的注疏）。
+
+        对齐点只覆盖约 12% 的论文行，直接命中很少（俱舍实测 8.5%）。但注疏是顺着论
+        一句句往下讲的——对齐点按注疏行序排后论文行号 100% 单调——所以取「i0 之前
+        最后一个对齐点」到「i1 之后第一个对齐点」之间的注文，必然包住讲这几句的那段。
+        再在里面找首个逐字牒引（EXCERPT_QUOTE_GRAM 字），从那一行起截取。找不到牒引
+        就不给这家：宁缺，不给讲别处的注。
+
+        按注疏行序给出；每条带行标区间与锚点，调用方据此链回原书。
+        """
+        if not self._comm_idx or i0 is None:
+            return []
+        base = "".join(normalise_for_match(self.text.get(self.ids[k], "")) for k in range(i0, i1 + 1))
+        k = EXCERPT_QUOTE_GRAM
+        grams = list(dict.fromkeys(base[j:j + k] for j in range(max(0, len(base) - k + 1))))
+        if not grams:
+            return []
+        out = []
+        for work, (ref_pos, flat, owner, starts) in self._comm_idx.items():
+            prev = nxt = None
+            for _ref, n in self.by_anchor.get(work, ()):
+                p = self.pos.get(n["base_line"])
+                if p is None or (r := line_ref(n["anchor"])) not in ref_pos:
+                    continue
+                if p <= i0:
+                    prev = r
+                elif p > i1:
+                    nxt = r
+                    break
+            rows = self.comm_lines[work]
+            c0 = ref_pos[prev] if prev else 0
+            c1 = ref_pos[nxt] if nxt else len(rows)
+            lo, hi = starts[c0], starts[c1]
+            hits = [h for g in grams if (h := flat.find(g, lo, hi)) >= 0]
+            if not hits:
+                continue
+            first = owner[min(hits)]
+            text, last = "", first
+            for li in range(first, c1):
+                text += rows[li][1]
+                last = li
+                if len(text) >= EXCERPT_CHARS:
+                    break
+            more = last + 1 < c1 or len(text) > EXCERPT_CHARS
+            if len(text) > EXCERPT_CHARS:
+                cut = text.rfind(_SENTENCE_END, int(EXCERPT_CHARS * 0.6), EXCERPT_CHARS + 80)
+                text = text[: cut + 1] if cut >= 0 else text[:EXCERPT_CHARS]
+            meta = self.comms.get(work) or {}
+            out.append({
+                "work": work,
+                "title": meta.get("title"),
+                "tier": meta.get("tier"),
+                "text": text,
+                "line_from": rows[first][0],
+                "line_to": rows[last][0],
+                "anchor": f"{work}_p{rows[first][0]}",
+                "truncated": more,
+            })
+        return out
 
     def source(self, work: str, ref_from: str, ref_to: str, limit: int) -> list[dict]:
         """一段注文（注疏自己的行标区间）在解释论的哪几句。
@@ -269,6 +358,8 @@ def available() -> list[dict]:
             "base_work": p.meta["base_work"],
             "base_title": p.meta.get("base_title"),
             "commentary_count": p.meta.get("commentary_count"),
+            # 能给「注疏怎么讲这几句」片段（包里带注疏全文）
+            "excerpts": bool(p.comm_lines),
             "line_coverage_pct": (
                 p.meta["lines_with_notes"] * 100 // p.meta["line_count"]
                 if p.meta.get("line_count") else None

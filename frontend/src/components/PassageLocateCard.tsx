@@ -5,6 +5,7 @@ import type { ChatRetrieval, ChatSource } from "../api/client";
 import type { TextId } from "../types/branded";
 import { localizeHan } from "../utils/hanScript";
 import { locateInfoFrom, snippetOf } from "../utils/passageLocate";
+import CommentaryExcerpts from "./CommentaryExcerpts";
 
 /**
  * 「原文定位」卡片：用户在 /chat 贴了一段经文（约占全部提问的 19%），后端
@@ -94,6 +95,7 @@ export default function PassageLocateCard({ sources, retrieval, onOpen }: Props)
         </button>
         <span className="chat-locate-note">{t("chat.locate.note")}</span>
       </div>
+      {info.window && <CommentaryExcerpts textId={Number(info.textId)} quote={info.window} />}
     </div>
   );
 }

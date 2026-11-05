@@ -137,6 +137,12 @@ async def lifespan(app: FastAPI):
 
     app.state.catalog_warm_task = asyncio.create_task(catalog_warm_loop(app.state.redis))
 
+    # 经注对读包启动后在后台线程里先装载：带注疏全文的俱舍包约 7 MB，冷装载 ~4s，
+    # 不预热的话每次部署后第一个贴俱舍原文的人要多等这 4 秒。不阻塞启动。
+    from app.services.commentary import packages as _commentary_packages
+
+    app.state.commentary_warm_task = asyncio.create_task(asyncio.to_thread(_commentary_packages))
+
     # Same idea for the map's /kg/geo payload: a cold recompute is ~7s (two seq
     # scans of kg_entities + serializing ~65k rows). With HTTP caching now in
     # front of it, organic traffic no longer keeps the Redis key warm, so the

@@ -1817,5 +1817,13 @@
   "home.feature_read_desc": "Heart · Diamond · Lotus · Avataṃsaka",
   "home.feature_read_continue": "Continue: {{title}}",
   "chat.stream.recovering": "The connection dropped — retrieving the answer that was already generated…",
-  "chat.stream.recovered": "Recovered the answer"
+  "chat.stream.recovered": "Recovered the answer",
+  "chat.locate.comm_button": "How the commentaries explain these lines",
+  "chat.locate.comm_hide": "Hide commentaries",
+  "chat.locate.comm_loading": "Finding the commentary text…",
+  "chat.locate.comm_failed": "Couldn't load the commentary excerpts. Please try again later.",
+  "chat.locate.comm_none": "None of the included commentaries quotes these lines verbatim, so no excerpt is shown.",
+  "chat.locate.comm_open_reader": "Open in reader",
+  "chat.locate.comm_more": "… continues",
+  "chat.locate.comm_note": "Excerpted verbatim from the commentaries, not rewritten; the position is inferred from alignment and may occasionally land on a neighbouring passage."
 }

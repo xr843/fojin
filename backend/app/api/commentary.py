@@ -11,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.schemas.commentary import (
+    CommentaryExcerpt,
+    CommentaryExcerpts,
     CommentaryHit,
     CommentarySource,
     CommentarySourcePassage,
@@ -231,6 +233,48 @@ async def passage(
             "定位是逐字的（简繁通吃，忽略标点），不做模糊匹配；引文有异文就会找不到。",
         ],
     )
+
+
+@router.get("/excerpts", response_model=CommentaryExcerpts)
+async def excerpts(
+    q: str = Query(..., min_length=2, max_length=200, description="一段论文（通常是读者贴的原文）"),
+    db: AsyncSession = Depends(get_db),
+):
+    """这几句论文，各家注疏原文怎么讲。
+
+    与 /passage 的区别：/passage 只返回对齐点附近的一小段注（直接命中率低），这里
+    在两个对齐点之间按牒文截取，覆盖整部论；但只对带注疏全文的包、只给逐字牒到
+    这几句的注家。只给原文，不做归属判断。
+    """
+    for pkg in svc.packages():
+        if not pkg.comm_lines:
+            continue
+        loc = pkg.locate(q)
+        if not loc:
+            continue
+        _core, i0, i1 = loc
+        items = pkg.excerpts(i0, i1)
+        located = await _locate(db, [(e["work"], e["anchor"]) for e in items])
+        return CommentaryExcerpts(
+            query=q,
+            matched=True,
+            base_work=pkg.meta["base_work"],
+            base_title=pkg.meta.get("base_title"),
+            excerpts=[
+                CommentaryExcerpt(
+                    **e,
+                    urn=located.get((e["work"], e["anchor"]), (None, None))[0],
+                    reader_url=located.get((e["work"], e["anchor"]), (None, None))[1],
+                )
+                for e in items
+            ],
+            caveats=[
+                "片段是从注疏原文截取的，未经改写；起点是该注疏逐字牒引这几句论文之处，约 500 字。",
+                "两个对齐点之间按牒文推定：对齐由程序产出、非人工校订，偶有落到相邻段落的情况。",
+                "原文出自 CBETA（CC BY-NC-SA 4.0，非营利使用）。",
+            ],
+        )
+    return CommentaryExcerpts(query=q, matched=False, caveats=["已装载的论里没有逐字找到这一段，或该论尚无注疏全文。"])
 
 
 _CHUNK = sql_text(
