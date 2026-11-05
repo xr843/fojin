@@ -5,6 +5,9 @@ import { locateInfoFrom, snippetOf, LOCATE_SNIPPET_MAX } from "../utils/passageL
 import type { ChatRetrieval, ChatSource } from "../api/client";
 import type { TextId } from "../types/branded";
 
+// 注疏片段区有自己的测试（CommentaryExcerpts.test.tsx），且依赖 react-query；卡片本身的用例不关心它
+vi.mock("./CommentaryExcerpts", () => ({ default: () => null }));
+
 const WINDOW = "凡所有相，皆是虛妄。若見諸相非相，則見如來。";
 
 function src(over: Partial<ChatSource> = {}): ChatSource {

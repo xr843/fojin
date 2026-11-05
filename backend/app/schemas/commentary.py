@@ -9,6 +9,8 @@ wrote is not aligned — so a response that reads as exhaustive would be a lie.
 from pydantic import BaseModel
 
 __all__ = [
+    "CommentaryExcerpt",
+    "CommentaryExcerpts",
     "CommentaryHit",
     "CommentarySource",
     "CommentarySourcePassage",
@@ -100,4 +102,32 @@ class CorpusInfo(BaseModel):
     # 哪些注疏可以反查（fojin 书号），抽屉据此决定要不要问。放在这里是为了让
     # 前端一次取到、就地判断，而不是每开一条引文都去试一次反查接口。
     commentaries: list[dict] = []
+    caveats: list[str] = []
+
+
+class CommentaryExcerpt(BaseModel):
+    """一家注疏讲这几句的那段原文（截取，不改写）。"""
+
+    work: str
+    title: str | None = None
+    tier: str | None = None
+    text: str
+    # 片段在注疏自己书里的行标区间；anchor 是片段起点的完整行标，引用用它。
+    line_from: str
+    line_to: str
+    anchor: str
+    # 这家讲这几句的注文还没完：片段只截到约 500 字，后面接着讲，去阅读器读全。
+    truncated: bool = False
+    urn: str | None = None
+    reader_url: str | None = None
+
+
+class CommentaryExcerpts(BaseModel):
+    """一段论文，各家注疏怎么讲——给原文，不给判断。"""
+
+    query: str
+    matched: bool
+    base_work: str | None = None
+    base_title: str | None = None
+    excerpts: list[CommentaryExcerpt] = []
     caveats: list[str] = []

@@ -2807,6 +2807,8 @@ export interface CommentaryCorpusSutra {
   commentary_count: number | null;
   line_coverage_pct: number | null;
   text_id: number | null;
+  /** 包里带注疏全文，能给「注疏怎么讲这几句」片段。旧后端没有这个字段。 */
+  excerpts?: boolean;
 }
 
 export interface CommentaryCorpusCommentary {
@@ -2828,6 +2830,34 @@ export interface CommentaryCorpus {
 
 export async function getCommentaryCorpus(): Promise<CommentaryCorpus> {
   const { data } = await api.get<CommentaryCorpus>("/commentary/corpus");
+  return data;
+}
+
+/** 一家注疏讲这几句的那段原文（服务端截取，不改写）。 */
+export interface CommentaryExcerpt {
+  work: string;
+  title: string | null;
+  tier: string | null;
+  text: string;
+  line_from: string;
+  line_to: string;
+  anchor: string;
+  truncated: boolean;
+  urn: string | null;
+  reader_url: string | null;
+}
+
+export interface CommentaryExcerptsResponse {
+  query: string;
+  matched: boolean;
+  base_work: string | null;
+  base_title: string | null;
+  excerpts: CommentaryExcerpt[];
+  caveats: string[];
+}
+
+export async function getCommentaryExcerpts(q: string): Promise<CommentaryExcerptsResponse> {
+  const { data } = await api.get<CommentaryExcerptsResponse>("/commentary/excerpts", { params: { q } });
   return data;
 }
 

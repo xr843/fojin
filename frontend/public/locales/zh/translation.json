@@ -1817,5 +1817,13 @@
   "home.feature_read_desc": "心经 · 金刚经 · 法华经 · 华严经",
   "home.feature_read_continue": "继续读《{{title}}》",
   "chat.stream.recovering": "连接中断了，正在找回已生成的回答…",
-  "chat.stream.recovered": "已找回刚才的回答"
+  "chat.stream.recovered": "已找回刚才的回答",
+  "chat.locate.comm_button": "注疏怎么讲这几句",
+  "chat.locate.comm_hide": "收起注疏",
+  "chat.locate.comm_loading": "正在找注疏原文…",
+  "chat.locate.comm_failed": "注疏片段加载失败，请稍后再试",
+  "chat.locate.comm_none": "已收录的注疏里没有逐字牒到这几句，暂不提供片段。",
+  "chat.locate.comm_open_reader": "在阅读器打开",
+  "chat.locate.comm_more": "……下文未完",
+  "chat.locate.comm_note": "注疏原文截取，未经改写；位置按对齐推定，偶有落到相邻段落。"
 }

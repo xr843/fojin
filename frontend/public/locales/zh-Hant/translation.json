@@ -1817,5 +1817,13 @@
   "home.feature_read_desc": "心經 · 金剛經 · 法華經 · 華嚴經",
   "home.feature_read_continue": "繼續讀《{{title}}》",
   "chat.stream.recovering": "連線中斷了，正在找回已生成的回答…",
-  "chat.stream.recovered": "已找回剛才的回答"
+  "chat.stream.recovered": "已找回剛才的回答",
+  "chat.locate.comm_button": "注疏怎麼講這幾句",
+  "chat.locate.comm_hide": "收起注疏",
+  "chat.locate.comm_loading": "正在找注疏原文…",
+  "chat.locate.comm_failed": "注疏片段載入失敗，請稍後再試",
+  "chat.locate.comm_none": "已收錄的注疏裡沒有逐字牒到這幾句，暫不提供片段。",
+  "chat.locate.comm_open_reader": "在閱讀器打開",
+  "chat.locate.comm_more": "……下文未完",
+  "chat.locate.comm_note": "注疏原文截取，未經改寫；位置按對齊推定，偶有落到相鄰段落。"
 }
