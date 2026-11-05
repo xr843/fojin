@@ -246,12 +246,33 @@ class Package:
             if not hits:
                 continue
             first = owner[min(hits)]
-            text, last = "", first
-            for li in range(first, c1):
-                text += rows[li][1]
-                last = li
+            # 起点对齐到「这处牒文」的开头，而不是命中行的行首。在「上一行＋命中行」里、
+            # 命中位置之前找：
+            #   1. 最后一处牒文起点——「論「……」」或「「……」者」。牒文常用「至」缩略
+            #      （「謂前生至為同類因」者），4 字匹配会落在后面的解释上，只看句号会把
+            #      牒文本身切掉；
+            #   2. 没有牒文标志就从最后一个句号之后起（行首常是上一句的尾巴）；
+            #   3. 都没有就从命中行行首起。
+            last = first
+            line_from = rows[first][0]
+            prev_line = rows[first - 1][1] if first > c0 else ""
+            win = prev_line + rows[first][1]
+            cut = len(prev_line) + _raw_offset(rows[first][1], min(hits) - starts[first])
+            start = _quote_start(win, cut)
+            if start is None:
+                j = win.rfind(_SENTENCE_END, 0, cut)
+                start = j + 1 if j >= 0 else len(prev_line)
+            while start < cut and win[start] in "」』":
+                start += 1
+            if start < len(prev_line):
+                line_from = rows[first - 1][0]
+            head = win[start:]
+            text = head
+            for li in range(first + 1, c1):
                 if len(text) >= EXCERPT_CHARS:
                     break
+                text += rows[li][1]
+                last = li
             more = last + 1 < c1 or len(text) > EXCERPT_CHARS
             if len(text) > EXCERPT_CHARS:
                 cut = text.rfind(_SENTENCE_END, int(EXCERPT_CHARS * 0.6), EXCERPT_CHARS + 80)
@@ -262,9 +283,9 @@ class Package:
                 "title": meta.get("title"),
                 "tier": meta.get("tier"),
                 "text": text,
-                "line_from": rows[first][0],
+                "line_from": line_from,
                 "line_to": rows[last][0],
-                "anchor": f"{work}_p{rows[first][0]}",
+                "anchor": f"{work}_p{line_from}",
                 "truncated": more,
             })
         return out
@@ -295,6 +316,32 @@ class Package:
                 best[n["base_line"]] = n
         ordered = sorted(best.values(), key=lambda n: self.pos.get(n["base_line"], 1 << 30))
         return ordered[:limit]
+
+
+def _raw_offset(raw: str, norm_off: int) -> int:
+    """归一化文本里的第 norm_off 个字，对应原文行里的第几个字符（标点在归一化时被去掉）。"""
+    n = 0
+    for i, ch in enumerate(raw):
+        if n >= norm_off:
+            return i
+        n += len(normalise_for_match(ch))
+    return len(raw)
+
+
+_QUOTE_OPEN = re.compile(r"論?「")
+
+
+def _quote_start(win: str, cut: int) -> int | None:
+    """win[:cut] 里最后一处牒文的起点：「論「」，或后面紧跟「者」的「「…」」。"""
+    best = None
+    for m in _QUOTE_OPEN.finditer(win, 0, cut):
+        if m.group().startswith("論"):
+            best = m.start()
+            continue
+        close = win.find("」", m.end(), m.end() + 60)
+        if close >= 0 and win[close + 1:close + 2] == "者":
+            best = m.start()
+    return best
 
 
 def available_commentaries() -> list[dict]:
