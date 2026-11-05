@@ -97,7 +97,7 @@ async def chat(
         client_ip=client_ip, redis=redis, master_id=data.master_id,
         text_id=data.text_id, juan_num=data.juan_num, selected_text=data.selected_text, page_content=data.page_content,
         hot_question_id=data.hot_question_id, model_id=data.model_id,
-        attachment_ids=data.attachment_ids,
+        attachment_ids=data.attachment_ids, ui_lang=data.ui_lang,
     )
 
 
@@ -131,6 +131,7 @@ async def chat_stream(
             text_id=data.text_id, juan_num=data.juan_num, selected_text=data.selected_text, page_content=data.page_content,
             hot_question_id=data.hot_question_id, model_id=data.model_id,
             attachment_ids=data.attachment_ids, regenerate=data.regenerate,
+            ui_lang=data.ui_lang,
         ),
         media_type="text/event-stream",
         headers={
