@@ -865,7 +865,7 @@ export default function ChatPage() {
   // quota answer is only true for the credential it was fetched with, so the
   // credential belongs in the key. A renewed token (#1198) changes it too and
   // costs one extra 2ms fetch per rotation; that is the right trade.
-  const { data: quota, refetch: refetchQuota } = useQuery({
+  const { data: quota, refetch: refetchQuota, isPending: quotaPending } = useQuery({
     queryKey: ["chatQuota", user?.id ?? "anon", token ?? "anon"],
     queryFn: getChatQuota,
   });
@@ -2074,6 +2074,19 @@ export default function ChatPage() {
                   <span>{t("chat.quota_info", { limit: quota?.limit, remaining: quota?.remaining })}<a onClick={() => navigate("/login")}>{t("chat.login")}</a>{t("chat.login_quota_hint")}</span>
                 )}
               />
+            ) : !user && !expired && quotaPending ? (
+              /* 游客配额横幅的占位：配额接口回来前横幅不存在，回来后在输入框上方插进
+                 约 75px，把输入框和建议卡片整体往下推（2026-11-08 本地 360×641 游客实测，
+                 与建议卡片晚到叠加 CLS 0.182）。游客身份此刻已确定，先放一条文案与尺寸
+                 都相同、但不可见的横幅占住高度；数字只影响排版，取默认额度。 */
+              <Alert
+                aria-hidden="true"
+                type="info"
+                showIcon
+                closable
+                style={{ marginBottom: 8, fontSize: 12, visibility: "hidden" }}
+                message={<span>{t("chat.quota_info", { limit: 10, remaining: 10 })}<a>{t("chat.login")}</a>{t("chat.login_quota_hint")}</span>}
+              />
             ) : null}
             {/* 宗风 selector lives in the composer toolbar below (.chat-lineage-btn).
                 It used to be a grey <Select> reading "通用助手" — the 15 master
@@ -2245,6 +2258,27 @@ export default function ChatPage() {
               {selectedMaster && (
                 <div className="mg-disclaimer" style={{ marginTop: 8 }}>
                   {t("chat.master_disclaimer")}
+                </div>
+              )}
+              {/* 建议卡片的占位。空态整组（标题/输入框/卡片）由 lead 与 trail 两个撑高块
+                  上下均分剩余高度而居中，卡片却要等接口回来才渲染：卡片一出现整组变高，
+                  居中点上移，输入框连同标题往上跳 113px（2026-11-08 真机 Chrome
+                  360×641 实测 CLS 0.125 / 0.151，跳在打开后约 1.3s）。首次请求期间先按
+                  真卡同结构摆出同样数量的空卡，把高度占住。
+                  不用 .chat-hero-card 类名：点击逻辑与测试都按它找真卡。
+                  只在「还没有数据」时出现；「换一批」重取时旧卡片还在，不需要占位。 */}
+              {messages.length === 0 && welcomeCardsData === undefined && welcomeCardsLoading && (
+                <div aria-hidden="true">
+                  <div className="chat-hero-cards">
+                    {Object.keys(HOT_QUESTION_CATEGORY_SLUGS).map((k) => (
+                      <div key={k} className="chat-hero-card-skeleton">
+                        <span className="chat-hero-card-tag">&nbsp;</span>
+                        <span>&nbsp;</span>
+                      </div>
+                    ))}
+                  </div>
+                  {/* 与下方「换一批」那一行（marginTop 8 + small 按钮 24px）等高 */}
+                  <div style={{ marginTop: 8, height: 24 }} />
                 </div>
               )}
               {messages.length === 0 && (welcomeCardsData?.questions?.length ?? 0) > 0 && (

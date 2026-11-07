@@ -490,6 +490,27 @@ em {
   cursor: pointer;
   transition: border-color 0.2s, color 0.2s, background 0.2s;
 }
+/* 卡片接口回来前的占位（ChatPage 里有缘由：不占位输入框会上跳 113px）。
+   盒模型必须与 .chat-hero-card 一致——内边距、边框、行高、字号全照抄，
+   里面放与真卡同结构的标签胶囊 + 一行文字，高度才对得上。 */
+.chat-hero-card-skeleton {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--fj-border);
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.chat-hero-card-skeleton .chat-hero-card-tag {
+  width: 4.5em;
+}
+.chat-hero-card-skeleton > span:last-child {
+  flex: 0 1 60%;
+  border-radius: 4px;
+  background: rgba(176, 141, 87, 0.08);
+}
 .chat-hero-card:hover {
   border-color: var(--fj-accent);
   color: var(--fj-accent);
