@@ -261,6 +261,7 @@
 }
 
 .dict-entry-def-preview {
+  font-family: var(--fj-font-gloss);
   font-size: 13px;
   color: var(--fj-ink-light);
   margin-top: 4px;
@@ -268,6 +269,7 @@
 }
 
 .dict-entry-def-full {
+  font-family: var(--fj-font-gloss);
   font-size: 14px;
   color: var(--fj-ink);
   margin-top: 8px;
