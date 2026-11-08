@@ -1,6 +1,10 @@
 @import './fonts.css';
 
 :root {
+  /* 辞典释义正文：梵巴藏转写（ū ṃ ś、带下圆圈的 r 这类带附加符号的拉丁字母）先用一款收全了 IAST 字形的
+     西文衬线体，汉字再落到中文字体。只写中文字体时，它的 web 子集缺这些字形，浏览器逐字换用
+     别的字体，同一个词里两种字体混排、附加符号错位（2026-11-08 用户截图「色即是空」的 rūpaṃ）。 */
+  --fj-font-gloss: "Noto Serif", "Gentium Plus", "Charis SIL", "Times New Roman", Cambria, "Noto Serif SC", "Source Han Serif SC", serif;
   /* 布局铬高度：顶栏 / 页脚 / 内容区上下内边距。任何页面要「铺满视口减去铬」都
      从这三枚 token 算，Layout 的内联样式也只许引用它们 —— 2026-08-25 之前 /chat
      自己写死 calc(100vh - 120px)，而实际 52 + 24×2 + 50 = 150，文档比视口高 30px，

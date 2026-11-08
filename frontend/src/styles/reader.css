@@ -297,6 +297,7 @@
 }
 
 .reader-dict-popover-def {
+  font-family: var(--fj-font-gloss);
   font-size: 12.5px;
   line-height: 1.5;
   color: var(--fj-ink, #555);
