@@ -163,6 +163,10 @@ async function renderEmpty() {
   return r;
 }
 
+/** 按文字找游客配额横幅时跳过「请求期间的不可见占位」那一条（它与真横幅同文案，
+ *  只为占住高度、防输入框跳动）——否则会先命中占位，点到占位的关闭钮。 */
+const SKIP_HIDDEN = { ignore: '[aria-hidden="true"] *, script, style' };
+
 const FOLLOWING = 4; // Node.DOCUMENT_POSITION_FOLLOWING
 const CONTAINED_BY = 16; // Node.DOCUMENT_POSITION_CONTAINED_BY
 
@@ -192,6 +196,58 @@ describe("ChatPage 首屏结构", () => {
     fireEvent.click(container.querySelector(".chat-hero-card")!);
     await waitFor(() => expect(cb).toBeDefined());
     expect(shell.classList.contains("chat-shell--empty")).toBe(false);
+  });
+
+  // 卡片接口晚到 ~1s，空态整组靠上下撑高块居中：卡片一出现输入框就上跳 113px
+  // （2026-11-08 真机 CLS 0.125/0.151）。请求期间必须先有同数量的占位把高度占住，
+  // 数据回来后占位消失、真卡出现；占位不能带 .chat-hero-card（点击与测试都按它找真卡）。
+  it("建议卡片请求期间先显示 4 张占位，回来后换成真卡", async () => {
+    let resolve!: (v: { questions: typeof CARDS }) => void;
+    vi.mocked(getRandomHotQuestions).mockReturnValue(new Promise((r) => { resolve = r; }));
+    const { container } = renderPage();
+    await waitFor(() => {
+      expect(container.querySelectorAll(".chat-hero-card-skeleton")).toHaveLength(4);
+    });
+    expect(container.querySelector(".chat-hero-card")).toBeNull();
+
+    resolve({ questions: CARDS });
+    await waitFor(() => {
+      expect(screen.getByText("「三毒」指的是哪三种毒？")).toBeInTheDocument();
+    });
+    expect(container.querySelectorAll(".chat-hero-card-skeleton")).toHaveLength(0);
+  });
+
+  it("建议卡片接口返回空列表时，占位不会一直留着", async () => {
+    vi.mocked(getRandomHotQuestions).mockResolvedValue({ questions: [] });
+    const { container } = renderPage();
+    await waitFor(() => {
+      expect(container.querySelector(".chat-input-shell")).not.toBeNull();
+    });
+    await waitFor(() => {
+      expect(container.querySelectorAll(".chat-hero-card-skeleton")).toHaveLength(0);
+    });
+    expect(container.querySelector(".chat-hero-cards")).toBeNull();
+  });
+
+  // 游客配额横幅等 /chat/quota 回来才出现，会在输入框上方插进约 75px（2026-11-08 本地
+  // 360×641 实测，与卡片晚到叠加 CLS 0.182）。请求期间先放一条不可见的同款横幅占高。
+  it("游客：配额请求期间先有不可见的横幅占位，回来后换成真横幅", async () => {
+    useAuthStore.setState({ token: null, user: null });
+    let resolve!: (v: Awaited<ReturnType<typeof getChatQuota>>) => void;
+    vi.mocked(getChatQuota).mockReturnValue(new Promise((r) => { resolve = r; }));
+    const { container } = renderPage();
+    await waitFor(() => {
+      expect(container.querySelector('.ant-alert[aria-hidden="true"]')).not.toBeNull();
+    });
+    expect((container.querySelector('.ant-alert[aria-hidden="true"]') as HTMLElement).style.visibility).toBe("hidden");
+
+    resolve({ limit: 10, used: 3, remaining: 7, has_byok: false, authenticated: false });
+    await waitFor(() => {
+      expect(container.querySelector('.ant-alert[aria-hidden="true"]')).toBeNull();
+    });
+    const real = container.querySelector(".ant-alert") as HTMLElement;
+    expect(real).not.toBeNull();
+    expect(real.style.visibility).toBe("");
   });
 
   it("空状态渲染出标题与建议卡片（脚手架自检）", async () => {
@@ -1232,7 +1288,7 @@ describe("额度提醒", () => {
       has_api_key: false, provider: null, model: null, key_preview: null,
     });
     loggedIn({ limit: 10, used: 2, remaining: 8, has_byok: false, authenticated: false });
-    expect(await screen.findByText(/每日免费/)).toBeInTheDocument();
+    expect(await screen.findByText(/每日免费/, SKIP_HIDDEN)).toBeInTheDocument();
     expect(screen.queryByText(/登录状态已过期/)).toBeNull();
   });
 
@@ -1375,7 +1431,7 @@ describe("游客横幅合并", () => {
     );
     const r = renderPage();
     // 前置：空态只有配额那一条（否则下面的「只剩一条」可能是因为配额根本没出来）
-    expect(await screen.findByText(/每日免费 10 次问答/)).toBeInTheDocument();
+    expect(await screen.findByText(/每日免费 10 次问答/, SKIP_HIDDEN)).toBeInTheDocument();
     await screen.findByText("「三毒」指的是哪三种毒？");
     fireEvent.click(r.container.querySelector(".chat-hero-card")!);
     await waitFor(() => expect(cb).toBeDefined());
@@ -1414,8 +1470,8 @@ describe("游客横幅合并", () => {
       async (_m, _s, _mid, callbacks) => { cb = callbacks; },
     );
     const { container } = renderPage();
-    await screen.findByText(/每日免费 10 次问答/);
-    fireEvent.click(container.querySelector(".chat-main-column .ant-alert .ant-alert-close-icon") as HTMLElement);
+    await screen.findByText(/每日免费 10 次问答/, SKIP_HIDDEN);
+    fireEvent.click(container.querySelector('.chat-main-column .ant-alert:not([aria-hidden="true"]) .ant-alert-close-icon') as HTMLElement);
     await screen.findByText("「三毒」指的是哪三种毒？");
     fireEvent.click(container.querySelector(".chat-hero-card")!);
     await waitFor(() => expect(cb).toBeDefined());
