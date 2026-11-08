@@ -523,15 +523,19 @@ export default function TextReaderPage() {
     setDictPopover({ visible: true, text, x, y, loading: isWord, result: null });
     // 划选是读者「卡住了」的最直接信号：先量有多少（2026-11-08 起），再决定要不要在
     // 这里主动给「这段什么意思 / 注疏怎么讲」。同一段连按不重复记。
-    if (typeof umami !== "undefined" && lastSelectRef.current !== text) {
-      lastSelectRef.current = text;
+    const isNewSelection = lastSelectRef.current !== text;
+    lastSelectRef.current = text;
+    if (typeof umami !== "undefined" && isNewSelection) {
       umami.track("reader_select", { id: textId, kind: isWord ? "word" : "passage" });
     }
     if (!isWord) return;
 
     try {
       const result = await searchDictionaryGrouped({ q: text });
-      if (typeof umami !== "undefined") umami.track("reader_dict_result", { id: textId, hit: result.total > 0 ? 1 : 0 });
+      // 与 reader_select 同一个去重：同一个词重复触发（再按一下、点浮层旁边）不重复计
+      if (typeof umami !== "undefined" && isNewSelection) {
+        umami.track("reader_dict_result", { id: textId, hit: result.total > 0 ? 1 : 0 });
+      }
       setDictPopover((prev) =>
         prev.text === text ? { ...prev, loading: false, result } : prev,
       );
@@ -547,10 +551,15 @@ export default function TextReaderPage() {
     const container = readerContentRef.current;
     if (!container) return;
 
+    // mouseup 挂在 document 上，而不是正文容器：划一句话时手一滑拖出正文右缘（很常见），
+    // 松手点落在容器外，挂在容器上就收不到——浮层（问小津 / 白话 / 查辞典）一声不响地
+    // 不出现（2026-11-08 真机实测）。改为只看「选区是不是起于正文里」。
     const onMouseUp = (e: MouseEvent) => {
-      // 点击浮层内部不处理
+      // 点浮层 / 行号浮条内部不处理
       const target = e.target as HTMLElement;
-      if (target.closest(".reader-dict-popover")) return;
+      if (target.closest(".reader-dict-popover, .cbeta-line-locator")) return;
+      const anchor = window.getSelection()?.anchorNode;
+      if (!anchor || !container.contains(anchor)) return;
       handleTextSelect();
     };
 
@@ -559,10 +568,10 @@ export default function TextReaderPage() {
       setTimeout(handleTextSelect, 100);
     };
 
-    container.addEventListener("mouseup", onMouseUp);
+    document.addEventListener("mouseup", onMouseUp);
     container.addEventListener("touchend", onTouchEnd);
     return () => {
-      container.removeEventListener("mouseup", onMouseUp);
+      document.removeEventListener("mouseup", onMouseUp);
       container.removeEventListener("touchend", onTouchEnd);
     };
   }, [handleTextSelect]);
