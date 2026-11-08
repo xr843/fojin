@@ -6,7 +6,7 @@
 
 /* 面板内的空态/提示文字（与阅读页浮层的同名规则一致） */
 .reader-dict-popover-empty {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--fj-ink-muted, #999);
   padding: 2px 0;
 }
@@ -17,7 +17,7 @@
   background: none;
   cursor: pointer;
   padding: 0;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--fj-ink-muted, #999);
   font-family: inherit;
 }
@@ -25,7 +25,7 @@
 .reader-dict-popover-tab.is-active { color: var(--fj-accent, #8b6914); }
 .reader-dict-popover-tab.is-active { font-weight: 600; }
 
-.reader-similar-list { max-height: 260px; overflow-y: auto; }
+.reader-similar-list { max-height: 320px; overflow-y: auto; }
 .reader-similar-item {
   display: block;
   padding: 5px 0;
@@ -33,28 +33,28 @@
   color: inherit !important;
 }
 .reader-similar-item:hover { background: var(--fj-hover, rgba(139, 105, 20, 0.06)); text-decoration: none !important; }
-.reader-similar-title { font-size: 12.5px; font-weight: 600; color: var(--fj-ink, #333); }
-.reader-similar-meta { margin-left: 6px; font-size: 10.5px; font-weight: 400; color: var(--fj-ink-muted, #999); }
-.reader-similar-snippet { font-size: 12px; line-height: 1.5; color: var(--fj-ink, #555); word-break: break-word; }
+.reader-similar-title { font-size: 13.5px; font-weight: 600; color: var(--fj-ink, #333); }
+.reader-similar-meta { margin-left: 6px; font-size: 11.5px; font-weight: 400; color: var(--fj-ink-muted, #999); }
+.reader-similar-snippet { font-size: 13.5px; line-height: 1.6; color: var(--fj-ink, #555); word-break: break-word; }
 .reader-similar-snippet em { font-style: normal; color: var(--fj-accent, #8b6914); font-weight: 600; }
-.reader-similar-all { display: inline-block; margin-top: 6px; font-size: 11px; color: var(--fj-accent, #8b6914); }
+.reader-similar-all { display: inline-block; margin-top: 6px; font-size: 12px; color: var(--fj-accent, #8b6914); }
 
-.reader-vernacular { max-height: 260px; overflow-y: auto; }
-.reader-vernacular-text { font-size: 13px; line-height: 1.7; color: var(--fj-ink, #333); white-space: pre-wrap; }
-.reader-vernacular-uncertain { margin-top: 4px; font-size: 11.5px; color: #d48806; }
+.reader-vernacular { max-height: 320px; overflow-y: auto; }
+.reader-vernacular-text { font-size: 14px; line-height: 1.75; color: var(--fj-ink, #333); white-space: pre-wrap; }
+.reader-vernacular-uncertain { margin-top: 4px; font-size: 12.5px; color: #d48806; }
 .reader-vernacular-label {
   margin-top: 6px;
   padding-top: 4px;
   border-top: 1px dashed var(--fj-border, #eee);
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--fj-ink-muted, #999);
 }
 
 .reader-report-form { display: flex; flex-direction: column; gap: 6px; }
-.reader-report-where { font-size: 11px; color: var(--fj-ink-muted, #999); }
+.reader-report-where { font-size: 12px; color: var(--fj-ink-muted, #999); }
 .reader-report-note {
   width: 100%;
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-family: inherit;
   padding: 4px 6px;
   border: 1px solid var(--fj-border, #ddd);
@@ -68,17 +68,17 @@
   border: none;
   border-radius: 4px;
   padding: 3px 12px;
-  font-size: 12px;
+  font-size: 13px;
   cursor: pointer;
   background: var(--fj-accent, #8b6914);
   color: #fff;
   font-family: inherit;
 }
 .reader-report-submit:disabled { opacity: 0.6; cursor: default; }
-.reader-report-error { font-size: 11.5px; color: #cf1322; }
+.reader-report-error { font-size: 12.5px; color: #cf1322; }
 .reader-report-link {
   border: none; background: none; padding: 0; cursor: pointer;
-  font-size: 12px; color: var(--fj-accent, #8b6914); font-family: inherit;
+  font-size: 13px; color: var(--fj-accent, #8b6914); font-family: inherit;
 }
 
 /* 引文抽屉：经文下方的「白话 / 全藏出处」 */
