@@ -61,6 +61,33 @@ function tightenLists(md: string): string {
   return md.replace(/^(\d+\.)\s*\n\n+/gm, "$1 ").replace(/\n\n+(?=\d+\.\s)/g, "\n");
 }
 
+/** 划选原文进提示词的上限。全文另随 reading_context.selected_text 发给后端，
+ *  这里只是让问题本身读得懂；太长就改称「所选经文」，不把半截原文塞进问题里。 */
+const SELECTION_QUOTE_MAX = 200;
+
+/** 划选了原文时的快捷问题：针对这一段，而不是整卷。
+ *  此前带着划选打开面板，只有「全文解读 / 全文概要」两个按钮——与划选无关，
+ *  用户还得自己打字（2026-11-08 真机截图）。 */
+function getSelectionActions(selectedText: string, textTitle: string, juanNum: number, t: TFn) {
+  const quote = selectedText.length <= SELECTION_QUOTE_MAX
+    ? t("reader.ai.selection_quote", { text: selectedText })
+    : t("reader.ai.selection_ref");
+  return [
+    {
+      key: "sel_explain",
+      icon: <ReadOutlined />,
+      label: t("reader.ai.quick.sel_explain"),
+      prompt: t("reader.ai.prompt.sel_explain", { title: textTitle, quote }),
+    },
+    {
+      key: "sel_context",
+      icon: <FileTextOutlined />,
+      label: t("reader.ai.quick.sel_context"),
+      prompt: t("reader.ai.prompt.sel_context", { title: textTitle, n: juanNum, quote }),
+    },
+  ];
+}
+
 function getQuickActions(textTitle: string, juanNum: number, t: TFn) {
   return [
     {
@@ -189,7 +216,7 @@ export default function ReaderAIPanel({
     page_content: juanContent,
   }), [textId, juanNum, selectedText, juanContent]);
 
-  const handleSendMessage = useCallback(async (msg: string) => {
+  const handleSendMessage = useCallback(async (msg: string, quick?: string) => {
     msg = msg.trim();
     if (!msg || sending) return;
 
@@ -217,7 +244,11 @@ export default function ReaderAIPanel({
     // 阅读页 AI 用了多少（2026-11-08 起量）：面板桌面默认展开，「开着」不代表在用，
     // 所以记的是真的发问；from 区分带着划选原文问 vs 自己打字问。
     if (typeof umami !== "undefined") {
-      umami.track("reader_ai_ask", { id: textId, from: selectedText ? "selection" : "typed" });
+      umami.track("reader_ai_ask", {
+        id: textId,
+        from: selectedText ? "selection" : "typed",
+        quick: quick ?? "none",   // 点了哪个快捷问题；none = 自己打字
+      });
     }
     // Clear selected text after first message
     if (selectedText) onSelectedTextConsumed?.();
@@ -375,12 +406,17 @@ export default function ReaderAIPanel({
       {/* Quick actions */}
       {messages.length === 0 && (
         <div className="reader-ai-quick-actions">
-          {getQuickActions(textTitle, juanNum, t).map((action) => (
+          {[
+            ...(selectedText ? getSelectionActions(selectedText, textTitle, juanNum, t) : []),
+            ...getQuickActions(textTitle, juanNum, t),
+          ].map((action) => (
             <Button
               key={action.key}
               size="small"
               icon={action.icon}
-              onClick={() => handleSendMessage(action.prompt)}
+              type={action.key.startsWith("sel_") ? "primary" : "default"}
+              ghost={action.key.startsWith("sel_")}
+              onClick={() => handleSendMessage(action.prompt, action.key)}
               disabled={sending}
             >
               {action.label}
