@@ -801,8 +801,10 @@
     flex: 1;
   }
 
+  /* 与桌面同宽（ReaderDictPopover.tsx 的 POP_WIDTH）：字号放大后 320 每行字太少；
+     窄于 376px 的屏幕由 calc 收住，不会伸出视口 */
   .reader-dict-popover {
-    width: min(320px, calc(100vw - 16px));
+    width: min(360px, calc(100vw - 16px));
   }
 }
 
