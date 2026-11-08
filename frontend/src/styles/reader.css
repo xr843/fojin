@@ -525,13 +525,13 @@
 }
 
 .reader-ai-context-label {
-  font-size: 11px;
+  font-size: 12px;
   color: #8b7355;
   margin-bottom: 4px;
 }
 
 .reader-ai-context-text {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--fj-ink, #333);
   line-height: 1.5;
   font-family: "Noto Serif SC", serif;

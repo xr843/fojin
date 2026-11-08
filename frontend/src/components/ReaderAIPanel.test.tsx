@@ -286,7 +286,7 @@ describe("ReaderAIPanel 埋点", () => {
   it("自己打字发问：记 reader_ai_ask from=typed", async () => {
     const { container } = renderPanel();
     await ask(container);
-    expect(track).toHaveBeenCalledWith("reader_ai_ask", { id: 1, from: "typed" });
+    expect(track).toHaveBeenCalledWith("reader_ai_ask", { id: 1, from: "typed", quick: "none" });
   });
 
   it("带着划选原文发问：记 from=selection", async () => {
@@ -296,11 +296,59 @@ describe("ReaderAIPanel 埋点", () => {
       </MemoryRouter>,
     );
     await ask(container);
-    expect(track).toHaveBeenCalledWith("reader_ai_ask", { id: 1, from: "selection" });
+    expect(track).toHaveBeenCalledWith("reader_ai_ask", { id: 1, from: "selection", quick: "none" });
   });
 
   it("只是打开面板、没有发问：不记", () => {
     renderPanel();
     expect(track).not.toHaveBeenCalledWith("reader_ai_ask", expect.anything());
+  });
+});
+
+// 划选原文后打开面板，此前只有与划选无关的「全文解读 / 全文概要」（2026-11-08 真机截图）。
+describe("ReaderAIPanel 划选快捷问题", () => {
+  const track = vi.fn();
+  beforeEach(() => {
+    track.mockReset();
+    (globalThis as unknown as { umami: { track: typeof track } }).umami = { track };
+  });
+  afterEach(() => {
+    delete (globalThis as unknown as { umami?: unknown }).umami;
+  });
+
+  function renderWithSelection(selectedText?: string) {
+    return render(
+      <MemoryRouter>
+        <ReaderAIPanel textId={1} juanNum={3} textTitle="金剛經" juanContent="如是我聞" selectedText={selectedText} />
+      </MemoryRouter>,
+    );
+  }
+
+  it("有划选时给出针对这段的问题，点了就把原文带进提问", async () => {
+    renderWithSelection("應無所住而生其心");
+    // 整卷按钮仍在，排在划选按钮之后
+    expect(screen.getByRole("button", { name: /全文解读/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /白话讲解这段/ }));
+    await waitFor(() => expect(cb).toBeDefined());
+    const sent = vi.mocked(sendChatMessageStream).mock.lastCall![0];
+    expect(sent).toContain("「應無所住而生其心」");
+    expect(sent).toContain("《金剛經》");
+    expect(track).toHaveBeenCalledWith("reader_ai_ask", { id: 1, from: "selection", quick: "sel_explain" });
+  });
+
+  it("划选过长时不把原文塞进问题（全文另走 reading_context）", async () => {
+    renderWithSelection("如".repeat(201));
+    fireEvent.click(screen.getByRole("button", { name: /前后文脉络/ }));
+    await waitFor(() => expect(cb).toBeDefined());
+    const sent = vi.mocked(sendChatMessageStream).mock.lastCall![0];
+    expect(sent).toContain("我所选的这段经文");
+    expect(sent).toContain("第3卷");
+    expect(sent).not.toContain("如如如");
+  });
+
+  it("没有划选时不出现这两个按钮", () => {
+    renderWithSelection(undefined);
+    expect(screen.queryByRole("button", { name: /白话讲解这段/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /前后文脉络/ })).toBeNull();
   });
 });
