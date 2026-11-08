@@ -214,6 +214,11 @@ export default function ReaderAIPanel({
     setMessages((prev) => [...prev, userMsg, assistantMsg]);
     setInput("");
     setSending(true);
+    // 阅读页 AI 用了多少（2026-11-08 起量）：面板桌面默认展开，「开着」不代表在用，
+    // 所以记的是真的发问；from 区分带着划选原文问 vs 自己打字问。
+    if (typeof umami !== "undefined") {
+      umami.track("reader_ai_ask", { id: textId, from: selectedText ? "selection" : "typed" });
+    }
     // Clear selected text after first message
     if (selectedText) onSelectedTextConsumed?.();
     atBottomRef.current = true;   // 自己刚发了一句，必然是想看新内容
@@ -318,7 +323,7 @@ export default function ReaderAIPanel({
         );
       },
     }, { signal: abortController.signal, readingContext });
-  }, [sending, sessionId, selectedText, onSelectedTextConsumed, scrollToBottom, readingContext]);
+  }, [sending, sessionId, selectedText, onSelectedTextConsumed, scrollToBottom, readingContext, textId]);
 
   const handleClearChat = useCallback(() => {
     if (sending) {

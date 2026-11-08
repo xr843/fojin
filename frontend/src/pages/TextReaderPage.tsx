@@ -391,6 +391,7 @@ export default function TextReaderPage() {
   }, [aiPanelOpen, narrow]);
   const [aiPanelWidth, setAiPanelWidth] = useState(420);
   const [aiSelectedText, setAiSelectedText] = useState<string | undefined>();
+  const lastSelectRef = useRef("");
   const isDraggingRef = useRef(false);
 
   // 多语对读 panel state (inline flex sidebar, same pattern as AI panel)
@@ -398,9 +399,17 @@ export default function TextReaderPage() {
   const isDraggingParallelRef = useRef(false);
 
   const handleAskXiaojin = useCallback((text: string) => {
+    if (typeof umami !== "undefined") umami.track("reader_ask_xiaojin", { id: textId, chars: text.length });
     setAiSelectedText(text);
     setAiPanelOpen(true);
-  }, []);
+  }, [textId]);
+
+  // 手动开关 AI 面板（不含首次按偏好恢复）：面板桌面默认展开，主动关掉的人多少，
+  // 说明它是帮手还是挡路。
+  const toggleAiPanel = useCallback((open: boolean) => {
+    if (typeof umami !== "undefined") umami.track("reader_ai_toggle", { id: textId, open: open ? 1 : 0 });
+    setAiPanelOpen(open);
+  }, [textId]);
 
   // Drag to resize 多语对读 panel
   const handleParallelDragStart = useCallback((e: React.MouseEvent) => {
@@ -512,10 +521,17 @@ export default function TextReaderPage() {
     // 短词查辞典；整句选择只显示「问小津」，不查辞典
     const isWord = text.length <= MAX_WORD_LEN;
     setDictPopover({ visible: true, text, x, y, loading: isWord, result: null });
+    // 划选是读者「卡住了」的最直接信号：先量有多少（2026-11-08 起），再决定要不要在
+    // 这里主动给「这段什么意思 / 注疏怎么讲」。同一段连按不重复记。
+    if (typeof umami !== "undefined" && lastSelectRef.current !== text) {
+      lastSelectRef.current = text;
+      umami.track("reader_select", { id: textId, kind: isWord ? "word" : "passage" });
+    }
     if (!isWord) return;
 
     try {
       const result = await searchDictionaryGrouped({ q: text });
+      if (typeof umami !== "undefined") umami.track("reader_dict_result", { id: textId, hit: result.total > 0 ? 1 : 0 });
       setDictPopover((prev) =>
         prev.text === text ? { ...prev, loading: false, result } : prev,
       );
@@ -524,7 +540,7 @@ export default function TextReaderPage() {
         prev.text === text ? { ...prev, loading: false, result: { total: 0, page: null, page_size: null, groups: [] } } : prev,
       );
     }
-  }, []);
+  }, [textId]);
 
   // 监听 mouseup / touchend 划词事件
   useEffect(() => {
@@ -1181,7 +1197,7 @@ export default function TextReaderPage() {
         shape="circle"
         size="large"
         icon={<RobotOutlined />}
-        onClick={() => setAiPanelOpen(true)}
+        onClick={() => toggleAiPanel(true)}
         aria-label={t("reader.ai.title")}
       />
     </Tooltip>
@@ -1666,7 +1682,7 @@ export default function TextReaderPage() {
           placement="bottom"
           height="62vh"
           open={aiPanelOpen}
-          onClose={() => setAiPanelOpen(false)}
+          onClose={() => toggleAiPanel(false)}
           title={<span className="reader-ai-sidebar-title"><RobotOutlined /> {t("reader.ai.title")}</span>}
           rootClassName="reader-ai-drawer"
         >
@@ -1687,7 +1703,7 @@ export default function TextReaderPage() {
         <div className="reader-ai-sidebar" style={{ width: aiPanelWidth }}>
           <div className="reader-ai-sidebar-header">
             <span className="reader-ai-sidebar-title"><RobotOutlined /> {t("reader.ai.title")}</span>
-            <Button type="text" size="small" onClick={() => setAiPanelOpen(false)}>✕</Button>
+            <Button type="text" size="small" onClick={() => toggleAiPanel(false)}>✕</Button>
           </div>
           <ReaderAIPanel
             textId={textId}

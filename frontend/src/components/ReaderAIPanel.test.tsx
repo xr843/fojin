@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import i18n from "../i18n";
@@ -268,5 +268,39 @@ describe("ReaderAIPanel 滚动跟随", () => {
     expect(link.getAttribute("href")).toContain("juan=1");
     expect(link.getAttribute("href")).toContain("highlight_chunk=3");
     expect(link.textContent).toBe("【《金刚般若波罗蜜经》第1卷】");
+  });
+});
+
+// 阅读页 AI 的使用量（2026-11-08 起量）：面板桌面默认展开，「开着」不代表在用，
+// 记的必须是真的发问，并分清是带着划选原文问还是自己打字问。
+describe("ReaderAIPanel 埋点", () => {
+  const track = vi.fn();
+  beforeEach(() => {
+    track.mockReset();
+    (globalThis as unknown as { umami: { track: typeof track } }).umami = { track };
+  });
+  afterEach(() => {
+    delete (globalThis as unknown as { umami?: unknown }).umami;
+  });
+
+  it("自己打字发问：记 reader_ai_ask from=typed", async () => {
+    const { container } = renderPanel();
+    await ask(container);
+    expect(track).toHaveBeenCalledWith("reader_ai_ask", { id: 1, from: "typed" });
+  });
+
+  it("带着划选原文发问：记 from=selection", async () => {
+    const { container } = render(
+      <MemoryRouter>
+        <ReaderAIPanel textId={1} juanNum={1} textTitle="金剛經" juanContent="如是我聞" selectedText="應無所住而生其心" />
+      </MemoryRouter>,
+    );
+    await ask(container);
+    expect(track).toHaveBeenCalledWith("reader_ai_ask", { id: 1, from: "selection" });
+  });
+
+  it("只是打开面板、没有发问：不记", () => {
+    renderPanel();
+    expect(track).not.toHaveBeenCalledWith("reader_ai_ask", expect.anything());
   });
 });
