@@ -132,3 +132,58 @@ describe("阅读器桌面端：AI 面板记忆与外链标识", () => {
     expect(container.querySelector(".reader-ai-sidebar")).not.toBeNull();
   });
 });
+
+// 2026-11-08 真机实测：划一句话时拖出正文右缘再松手，浮层（问小津 / 白话 / 查辞典）不出现——
+// mouseup 只挂在正文容器上，松手点在容器外就收不到。
+describe("阅读器划选：拖出正文再松手", () => {
+  const track = vi.fn();
+  beforeAll(() => {
+    // jsdom 没实现 Range 的几何方法；浮层定位要用
+    const rect = { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0, x: 0, y: 0, toJSON: () => ({}) };
+    Range.prototype.getBoundingClientRect = () => rect as DOMRect;
+    Range.prototype.getClientRects = () => [] as unknown as DOMRectList;
+  });
+  beforeEach(() => {
+    track.mockReset();
+    (globalThis as unknown as { umami: { track: typeof track } }).umami = { track };
+  });
+  afterEach(() => {
+    delete (globalThis as unknown as { umami?: unknown }).umami;
+    window.getSelection()?.removeAllRanges();
+  });
+
+  function selectInBody(text: string) {
+    const node = [...document.querySelectorAll("*")]
+      .flatMap((el) => [...el.childNodes])
+      .find((n) => n.nodeType === Node.TEXT_NODE && n.textContent?.includes(text)) as Text;
+    const start = node.textContent!.indexOf(text);
+    const range = document.createRange();
+    range.setStart(node, start);
+    range.setEnd(node, start + text.length);
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  it("选区在正文里、松手在正文外：浮层照样出现，同一段只记一次 reader_select", async () => {
+    await renderReader();
+    selectInBody("如是我聞：一時，薄伽梵住最勝光曜七寶莊嚴。"); // 21 字 > MAX_WORD_LEN(20)，算整句
+    fireEvent.mouseUp(document.body);
+    await waitFor(() => expect(document.querySelector(".reader-dict-popover")).not.toBeNull());
+    fireEvent.mouseUp(document.body);
+    expect(track.mock.calls.filter(([n]) => n === "reader_select")).toHaveLength(1);
+    expect(track).toHaveBeenCalledWith("reader_select", { id: 69, kind: "passage" });
+  });
+
+  it("选区不在正文里（比如页面别处的文字）：不弹浮层", async () => {
+    await renderReader();
+    const outside = document.createElement("p");
+    outside.textContent = "页面别处的一段说明文字";
+    document.body.appendChild(outside);
+    selectInBody("页面别处的一段说明文字");
+    fireEvent.mouseUp(document.body);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(document.querySelector(".reader-dict-popover")).toBeNull();
+    outside.remove();
+  });
+});
