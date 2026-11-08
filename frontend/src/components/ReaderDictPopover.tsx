@@ -32,6 +32,9 @@ function orderedGroups(result: DictGroupedSearchResponse | null) {
  * 阅读器划词浮层：短词显示多部辞典释义（全文可滚动）+ 发音，长选择只显示问小津。
  * 取代了旧的「截断 30 字、只显示一部辞典」实现，并合并了原 AskXiaojinButton。
  */
+
+const POP_WIDTH = 360;
+const POP_HEIGHT = 400;
 export function ReaderDictPopover({
   state,
   onClose,
@@ -71,13 +74,15 @@ export function ReaderDictPopover({
   }
 
   // 计算浮层位置（fixed 定位，避开视口边缘）
-  const popW = 300;
+  // 宽高须与 reader.css 的 .reader-dict-popover 一致（2026-11-08 字号放大后 300→360、
+  // 高约 280→400）；窄屏时不超过视口，与 CSS 的 max-width: calc(100vw - 16px) 同口径。
+  const popW = Math.min(POP_WIDTH, window.innerWidth - 16);
   let left = state.x - popW / 2;
   let top = state.y + 8;
   if (left < 8) left = 8;
   if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
-  if (top + 280 > window.innerHeight - 8) {
-    top = state.y - 288;
+  if (top + POP_HEIGHT > window.innerHeight - 8) {
+    top = state.y - POP_HEIGHT - 8;
     if (top < 8) top = 8;
   }
 
