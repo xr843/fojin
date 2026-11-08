@@ -229,7 +229,9 @@
 .reader-dict-popover {
   position: fixed;
   z-index: 1050;
-  width: 300px;
+  /* 2026-11-08 字号放大（释义 12.5→14px）后同步加宽，每行字数不至于变少；
+     宽高与 ReaderDictPopover.tsx 的 POP_WIDTH / POP_HEIGHT 一致 */
+  width: 360px;
   max-width: calc(100vw - 16px);
   background: #fffef8;
   border: 1px solid var(--fj-border);
@@ -248,7 +250,7 @@
 
 .reader-dict-popover-keyword {
   font-weight: 600;
-  font-size: 14px;
+  font-size: 16px;
   color: var(--fj-accent, #8b6914);
 }
 
@@ -278,12 +280,18 @@
 }
 
 .reader-dict-popover-groups {
-  max-height: 240px;
+  max-height: 320px;
   overflow-y: auto;
 }
 
 .reader-dict-popover-group {
-  margin-bottom: 7px;
+  margin-bottom: 10px;
+}
+
+/* 几本辞典连排时，一眼分出每本从哪里开始 */
+.reader-dict-popover-group + .reader-dict-popover-group {
+  border-top: 1px dashed var(--fj-border);
+  padding-top: 8px;
 }
 
 .reader-dict-popover-group:last-child {
@@ -291,15 +299,17 @@
 }
 
 .reader-dict-popover-source {
-  font-size: 10px;
-  color: var(--fj-ink-muted, #999);
-  margin-bottom: 1px;
+  /* 辞典名要醒目：此前 10px 浅灰，几本连排时分不清是哪一本的释义 */
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--fj-ink, #333);
+  margin-bottom: 3px;
 }
 
 .reader-dict-popover-def {
   font-family: var(--fj-font-gloss);
-  font-size: 12.5px;
-  line-height: 1.5;
+  font-size: 14px;
+  line-height: 1.65;
   color: var(--fj-ink, #555);
   margin-bottom: 2px;
   white-space: pre-wrap;
