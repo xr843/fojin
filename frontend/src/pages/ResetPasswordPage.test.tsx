@@ -33,7 +33,7 @@ function renderAt(hash: string) {
 }
 
 function fill(pw: string, confirm: string) {
-  fireEvent.change(screen.getByPlaceholderText("新密码（至少8位，含字母和数字）"), { target: { value: pw } });
+  fireEvent.change(screen.getByPlaceholderText("新密码"), { target: { value: pw } });
   fireEvent.change(screen.getByPlaceholderText("再输入一次新密码"), { target: { value: confirm } });
   fireEvent.click(screen.getByRole("button", { name: "设置新密码" }));
 }
