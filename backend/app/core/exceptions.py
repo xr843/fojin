@@ -187,6 +187,16 @@ class QuotaExceededError(FoJinError):
         self.limit = limit
 
 
+class ResetLinkInvalidError(FoJinError):
+    """忘记密码的一次性重置链接无效、已用过、已过期，或期间密码已被改过。
+
+    单独成类、映射 400：继承 InvalidCredentialsError 会因 STATUS_MAP 按类型精确查表
+    而落到 500（#1435 上线后实测）；而 401 又会被前端当成「登录失效」。
+    """
+
+    message = "链接无效或已过期，请重新申请"
+
+
 # ---- Converter: FoJinError -> HTTPException ----
 
 STATUS_MAP: dict[type, int] = {
@@ -205,6 +215,7 @@ STATUS_MAP: dict[type, int] = {
     InvalidCredentialsError: status.HTTP_401_UNAUTHORIZED,
     TokenExpiredError: status.HTTP_401_UNAUTHORIZED,
     AccountDisabledError: status.HTTP_403_FORBIDDEN,
+    ResetLinkInvalidError: status.HTTP_400_BAD_REQUEST,
     AccessDeniedError: status.HTTP_403_FORBIDDEN,
     ValidationError: status.HTTP_422_UNPROCESSABLE_ENTITY,
     QuotaExceededError: status.HTTP_429_TOO_MANY_REQUESTS,

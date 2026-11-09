@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.core.exceptions import InvalidCredentialsError
+from app.core.exceptions import InvalidCredentialsError, ResetLinkInvalidError
 from app.models.feedback import Feedback
 from app.models.user import PasswordChangeAudit
 from app.services import password_reset as pr
@@ -107,7 +107,7 @@ async def test_link_sets_password_once_and_revokes_old_sessions():
     assert len(audit) == 1 and audit[0].via == "reset_link" and audit[0].user_id == 7
 
     # 第二次用同一链接：失效
-    with pytest.raises(pr.ResetLinkInvalidError):
+    with pytest.raises(ResetLinkInvalidError):
         await pr.reset_password_with_token(_db_returning(user), redis, token, "another123")
 
 
@@ -116,7 +116,7 @@ async def test_new_link_voids_previous_one():
     redis, user = FakeRedis(), _user()
     first = await pr.issue_reset_token(redis, user)
     second = await pr.issue_reset_token(redis, user)
-    with pytest.raises(pr.ResetLinkInvalidError):
+    with pytest.raises(ResetLinkInvalidError):
         await pr.reset_password_with_token(_db_returning(user), redis, first, "newpass123")
     with patch("app.services.password_reset.hash_password", return_value="hash:new"):
         await pr.reset_password_with_token(_db_returning(user), redis, second, "newpass123")
@@ -128,7 +128,7 @@ async def test_link_dies_if_user_changed_password_meanwhile():
     redis, user = FakeRedis(), _user(pv=2)
     token = await pr.issue_reset_token(redis, user)
     user.password_version = 3  # 用户自己改过密码 / 退出了所有设备
-    with pytest.raises(pr.ResetLinkInvalidError):
+    with pytest.raises(ResetLinkInvalidError):
         await pr.reset_password_with_token(_db_returning(user), redis, token, "newpass123")
     assert user.hashed_password == "hash:old"
 
@@ -138,13 +138,13 @@ async def test_link_refused_for_disabled_account():
     redis, user = FakeRedis(), _user()
     token = await pr.issue_reset_token(redis, user)
     user.is_active = False
-    with pytest.raises(pr.ResetLinkInvalidError):
+    with pytest.raises(ResetLinkInvalidError):
         await pr.reset_password_with_token(_db_returning(user), redis, token, "newpass123")
 
 
 @pytest.mark.anyio
 async def test_bogus_token_rejected():
-    with pytest.raises(pr.ResetLinkInvalidError):
+    with pytest.raises(ResetLinkInvalidError):
         await pr.reset_password_with_token(_db_returning(_user()), FakeRedis(), "x" * 43, "newpass123")
 
 
@@ -233,3 +233,14 @@ async def test_login_counter_never_breaks_login_when_redis_is_down():
     db = _db_returning(None)
     with patch("app.services.auth.verify_password", return_value=False), pytest.raises(InvalidCredentialsError):
         await login_user(db, "huiming", "wrong", broken)
+
+
+@pytest.mark.anyio
+async def test_bogus_token_is_a_400_not_a_500(client):
+    """#1435 上线实测：伪造令牌回了 500（STATUS_MAP 按类型精确查表，子类没登记）。"""
+    from app.main import app
+
+    app.state.redis = FakeRedis()
+    r = await client.post("/api/auth/reset-password", json={"token": "A" * 43, "new_password": "newpass123"})
+    assert r.status_code == 400
+    assert r.json()["detail"] == "链接无效或已过期，请重新申请"
