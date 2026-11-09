@@ -26,7 +26,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import hash_password
-from app.core.exceptions import InvalidCredentialsError
+from app.core.exceptions import ResetLinkInvalidError
 from app.models.feedback import Feedback
 from app.models.user import PasswordChangeAudit, User
 
@@ -45,10 +45,6 @@ LOGIN_BADPW_KEY = "login:badpw"  # zset uid → 最近一次「账号存在但�
 LOGIN_FAIL_TTL = 120 * 24 * 3600
 
 REQUEST_CONTENT_PREFIX = "【找回密码申请】"
-
-
-class ResetLinkInvalidError(InvalidCredentialsError):
-    message = "链接无效或已过期，请重新申请"
 
 
 def _digest(token: str) -> str:
