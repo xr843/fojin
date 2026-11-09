@@ -1,12 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
-import { Table, Tag, Input, Select, Space, Typography, message, Popconfirm, Switch } from "antd";
+import { Alert, Button, Table, Tag, Input, Modal, Select, Space, Typography, message, Popconfirm, Switch } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 import {
+  createAdminResetLink,
   getAdminUsers,
   updateAdminUser,
+  type AdminResetLink,
   type AdminUserItem,
 } from "../api/client";
 import { useAuthStore } from "../stores/authStore";
@@ -28,6 +30,7 @@ export default function AdminUsersPage() {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("created_at");
   const [sortOrder, setSortOrder] = useState("desc");
+  const [resetLink, setResetLink] = useState<AdminResetLink | null>(null);
 
   const fetchData = useCallback(() => {
     return getAdminUsers({
@@ -82,6 +85,24 @@ export default function AdminUsersPage() {
       await updateAdminUser(record.id, { role });
       message.success(t("admin_crud.users.role_updated"));
       refresh();
+    } catch {
+      message.error(t("admin_crud.common.action_failed"));
+    }
+  };
+
+  const handleResetLink = async (record: AdminUserItem) => {
+    try {
+      setResetLink(await createAdminResetLink(record.id));
+    } catch {
+      message.error(t("admin_crud.common.action_failed"));
+    }
+  };
+
+  const copyResetLink = async () => {
+    if (!resetLink) return;
+    try {
+      await navigator.clipboard.writeText(resetLink.url);
+      message.success(t("admin_crud.users.reset_link_copied"));
     } catch {
       message.error(t("admin_crud.common.action_failed"));
     }
@@ -161,6 +182,22 @@ export default function AdminUsersPage() {
       sorter: true,
       render: (value: string | null) => formatAdminDate(value, i18n.language),
     },
+    {
+      title: t("admin_crud.column.actions"),
+      key: "actions",
+      width: 110,
+      render: (_: unknown, record: AdminUserItem) =>
+        record.is_active ? (
+          <Popconfirm
+            title={t("admin_crud.users.reset_link_confirm")}
+            onConfirm={() => handleResetLink(record)}
+            okText={t("admin_crud.common.confirm")}
+            cancelText={t("admin_crud.common.cancel")}
+          >
+            <Button size="small">{t("admin_crud.users.reset_link")}</Button>
+          </Popconfirm>
+        ) : null,
+    },
   ];
 
   return (
@@ -208,6 +245,29 @@ export default function AdminUsersPage() {
           size="middle"
         />
       </div>
+      <Modal
+        open={resetLink !== null}
+        title={resetLink ? t("admin_crud.users.reset_link_title", { username: resetLink.username }) : ""}
+        onCancel={() => setResetLink(null)}
+        footer={null}
+        destroyOnHidden
+      >
+        {resetLink && (
+          <>
+            <Alert type="warning" showIcon message={t("admin_crud.users.reset_link_note")} style={{ marginBottom: 12 }} />
+            <Typography.Paragraph style={{ marginBottom: 8 }}>
+              {t("admin_crud.users.reset_link_email", { email: resetLink.email })}
+              {!resetLink.email_verified && (
+                <Typography.Text type="secondary"> {t("admin_crud.users.reset_link_unverified")}</Typography.Text>
+              )}
+            </Typography.Paragraph>
+            <Input.TextArea value={resetLink.url} readOnly autoSize style={{ fontFamily: "monospace", fontSize: 12 }} />
+            <Button type="primary" style={{ marginTop: 12 }} onClick={copyResetLink}>
+              {t("admin_crud.users.reset_link_copy")}
+            </Button>
+          </>
+        )}
+      </Modal>
     </>
   );
 }

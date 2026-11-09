@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import { Card, Form, Input, Button, Typography, Tabs, Divider, message, Space } from "antd";
+import { Alert, Card, Form, Input, Button, Modal, Typography, Tabs, Divider, message, Space } from "antd";
 import { UserOutlined, LockOutlined, MailOutlined, GithubOutlined, GoogleOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { Helmet } from "react-helmet-async";
 import axios from "axios";
 import { useAuthStore } from "../stores/authStore";
-import api from "../api/client";
+import api, { submitPasswordResetRequest } from "../api/client";
 
 const { Title, Text } = Typography;
 
@@ -173,9 +173,16 @@ export default function LoginPage() {
                     <Form.Item name="username" rules={[{ required: true, message: t("auth.username_required") }]}>
                       <Input prefix={<UserOutlined />} placeholder={t("auth.username")} size="large" />
                     </Form.Item>
-                    <Form.Item name="password" rules={[{ required: true, message: t("auth.password_required") }]}>
+                    <Form.Item
+                      name="password"
+                      rules={[{ required: true, message: t("auth.password_required") }]}
+                      style={{ marginBottom: 8 }}
+                    >
                       <Input.Password prefix={<LockOutlined />} placeholder={t("auth.password")} size="large" />
                     </Form.Item>
+                    <div style={{ textAlign: "right", marginBottom: 16 }}>
+                      <ForgotPasswordLink />
+                    </div>
                     <Form.Item>
                       <Button type="primary" htmlType="submit" loading={loading} block size="large">
                         {t("auth.login")}
@@ -259,6 +266,81 @@ function SocialLoginButtons() {
           {t("auth.google_login")}
         </Button>
       </Space>
+    </>
+  );
+}
+
+
+/**
+ * 「忘记密码？」：没有发信服务，所以是「提交申请 → 管理员核实 → 发一次性链接」。
+ * 申请接口不论账号是否存在都回同一句话；这里的文案也照此写，不说「已找到你的账号」。
+ * 打开与提交各记一次埋点，用来判断值不值得做邮件自助重置（2026-11-09 定）。
+ */
+function ForgotPasswordLink() {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const show = () => {
+    setOpen(true);
+    if (typeof umami !== "undefined") umami.track("forgot_password_open");
+  };
+
+  const onFinish = async (values: { account: string; contact: string }) => {
+    setSending(true);
+    try {
+      await submitPasswordResetRequest(values.account, values.contact);
+      setDone(true);
+      if (typeof umami !== "undefined") umami.track("forgot_password_submit");
+    } catch {
+      message.error(t("auth.forgot.fail"));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <>
+      <Button type="link" size="small" style={{ padding: 0 }} onClick={show}>
+        {t("auth.forgot_password")}
+      </Button>
+      <Modal
+        open={open}
+        title={t("auth.forgot.title")}
+        footer={null}
+        onCancel={() => setOpen(false)}
+        destroyOnHidden
+      >
+        {done ? (
+          <Alert type="success" showIcon message={t("auth.forgot.done")} />
+        ) : (
+          <>
+            <Alert type="info" message={t("auth.forgot.oauth_hint")} style={{ marginBottom: 12 }} />
+            <Text style={{ display: "block", marginBottom: 12 }}>{t("auth.forgot.how")}</Text>
+            <Form layout="vertical" onFinish={onFinish}>
+              <Form.Item
+                name="account"
+                label={t("auth.forgot.account")}
+                rules={[{ required: true, whitespace: true, message: t("auth.forgot.account_required") }]}
+              >
+                <Input maxLength={200} autoComplete="username" />
+              </Form.Item>
+              <Form.Item
+                name="contact"
+                label={t("auth.forgot.contact")}
+                extra={t("auth.forgot.contact_note")}
+                rules={[{ required: true, whitespace: true, min: 3, message: t("auth.forgot.contact_required") }]}
+              >
+                <Input maxLength={200} />
+              </Form.Item>
+              <Button type="primary" htmlType="submit" loading={sending} block>
+                {t("auth.forgot.submit")}
+              </Button>
+            </Form>
+          </>
+        )}
+      </Modal>
     </>
   );
 }

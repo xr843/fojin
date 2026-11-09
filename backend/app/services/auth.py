@@ -13,6 +13,7 @@ from app.core.exceptions import (
 )
 from app.models.user import PasswordChangeAudit, User
 from app.schemas.user import TokenResponse, UserRegister
+from app.services.password_reset import record_login_failure
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,7 @@ async def register_user(db: AsyncSession, data: UserRegister) -> User:
     return user
 
 
-async def login_user(db: AsyncSession, username: str, password: str) -> TokenResponse:
+async def login_user(db: AsyncSession, username: str, password: str, redis=None) -> TokenResponse:
     result = await db.execute(select(User).where(User.username == username))
     user = result.scalar_one_or_none()
 
@@ -51,9 +52,17 @@ async def login_user(db: AsyncSession, username: str, password: str) -> TokenRes
     # is indistinguishable from an incorrect-password attempt.
     _dummy_hash = "$2b$12$LJ3m4ys3Lz0Y1vVTqHKZaeflVbOBGSJl6Nnb3CiZ3sCImt9Ghmiy"
     if not verify_password(password, user.hashed_password if user else _dummy_hash) or user is None:
+        # 失败原因只进计数（不进响应，响应仍是同一句「用户名或密码错误」）：
+        # 用来判断有多少人是「账号在、密码忘了」，多少人是把邮箱填进了用户名框。
+        if user is None:
+            reason = "no_user_email_shape" if "@" in username else "no_user"
+            await record_login_failure(redis, reason)
+        else:
+            await record_login_failure(redis, "bad_password", user.id)
         raise InvalidCredentialsError()
 
     if not user.is_active:
+        await record_login_failure(redis, "disabled")
         raise AccountDisabledError()
 
     user.last_active_at = datetime.now(UTC)
