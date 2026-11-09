@@ -1,7 +1,7 @@
 import re
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 # Synthetic domain minted by services.oauth for accounts with no usable
 # provider email. Reserved so no self-service registration can squat it.
@@ -64,6 +64,33 @@ class ChangePasswordRequest(BaseModel):
         if not re.search(r"\d", v):
             raise ValueError("新密码必须包含数字")
         return v
+
+
+def _check_password_strength(v: str) -> str:
+    if len(v) < 8:
+        raise ValueError("新密码长度至少8位")
+    if not re.search(r"[a-zA-Z]", v):
+        raise ValueError("新密码必须包含字母")
+    if not re.search(r"\d", v):
+        raise ValueError("新密码必须包含数字")
+    return v
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(..., min_length=20, max_length=128)
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def new_password_strength(cls, v: str) -> str:
+        return _check_password_strength(v)
+
+
+class ResetRequestCreate(BaseModel):
+    """登录页「忘记密码」申请：用户名或注册邮箱 + 管理员怎么联系到你。"""
+
+    account: str = Field(..., min_length=1, max_length=200)
+    contact: str = Field(..., min_length=3, max_length=200)
 
 
 class TokenResponse(BaseModel):

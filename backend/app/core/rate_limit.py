@@ -21,6 +21,9 @@ STRICT_PATHS: dict[str, int] = {
     # every token the account holds. Nobody signs out of everywhere six times a
     # minute, and the default 200/min bucket is no bucket at all here.
     "/api/auth/logout-all": 5,
+    # 忘记密码：申请会写进管理员收件箱，重置接口要挡令牌爆破（令牌 256 位，挡的是噪声）。
+    "/api/auth/reset-request": 3,
+    "/api/auth/reset-password": 10,
     "/api/auth/sms/send-code": settings.rate_limit_sms_send,
     "/api/auth/sms/login": settings.rate_limit_sms_verify,
     "/api/search": 60,

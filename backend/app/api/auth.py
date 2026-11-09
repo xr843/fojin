@@ -19,6 +19,8 @@ from app.schemas.user import (
     ApiKeyStatus,
     ChangePasswordRequest,
     OAuthExchangeRequest,
+    ResetPasswordRequest,
+    ResetRequestCreate,
     TokenResponse,
     UserLogin,
     UserProfile,
@@ -39,6 +41,7 @@ from app.services.oauth import (
     sms_login,
     verify_sms_code,
 )
+from app.services.password_reset import reset_password_with_token, submit_reset_request
 
 logger = logging.getLogger(__name__)
 
@@ -176,9 +179,33 @@ async def register(data: UserRegister, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
+async def login(data: UserLogin, request: Request, db: AsyncSession = Depends(get_db)):
     """用户登录，返回 JWT token。"""
-    return await login_user(db, data.username, data.password)
+    return await login_user(db, data.username, data.password, getattr(request.app.state, "redis", None))
+
+
+@router.post("/reset-request")
+async def reset_request(data: ResetRequestCreate, request: Request, db: AsyncSession = Depends(get_db)):
+    """登录页「忘记密码」申请。不论账号是否存在都回同一句话，防止借此探测账号。"""
+    await submit_reset_request(db, getattr(request.app.state, "redis", None), data.account, data.contact)
+    return {"ok": True}
+
+
+@router.post("/reset-password")
+async def reset_password(data: ResetPasswordRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    """凭管理员发出的一次性链接设新密码。成功后所有设备上的旧登录失效，需用新密码重新登录。"""
+    redis_client = getattr(request.app.state, "redis", None)
+    if redis_client is None:
+        raise HTTPException(status_code=503, detail="服务暂时不可用，请稍后再试")
+    await reset_password_with_token(
+        db,
+        redis_client,
+        data.token,
+        data.new_password,
+        client_ip=get_real_client_ip(request, default=None),
+        user_agent=request.headers.get("user-agent"),
+    )
+    return {"ok": True}
 
 
 @router.post("/change-password", response_model=TokenResponse)

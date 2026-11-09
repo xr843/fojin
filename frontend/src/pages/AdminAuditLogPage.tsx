@@ -10,12 +10,14 @@ const actionLabelKeyMap: Record<string, string> = {
   update_user: "admin_crud.audit.action.update_user",
   update_suggestion: "admin_crud.audit.action.update_suggestion",
   delete_suggestion: "admin_crud.audit.action.delete_suggestion",
+  issue_reset_link: "admin_crud.audit.action.issue_reset_link",
 };
 
 const actionColor: Record<string, string> = {
   update_user: "blue",
   update_suggestion: "green",
   delete_suggestion: "red",
+  issue_reset_link: "orange",
 };
 
 const fieldLabelKeyMap: Record<string, string> = {
@@ -154,6 +156,7 @@ export default function AdminAuditLogPage() {
               { value: "update_user", label: t("admin_crud.audit.action.update_user") },
               { value: "update_suggestion", label: t("admin_crud.audit.action.update_suggestion") },
               { value: "delete_suggestion", label: t("admin_crud.audit.action.delete_suggestion") },
+              { value: "issue_reset_link", label: t("admin_crud.audit.action.issue_reset_link") },
             ]}
           />
         </div>

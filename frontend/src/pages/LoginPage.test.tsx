@@ -5,10 +5,13 @@ import { MemoryRouter, Route, Routes, useLocation, useNavigationType } from "rea
 import i18n from "../i18n";
 import enTranslation from "../../public/locales/en/translation.json";
 import { useAuthStore, type UserProfile } from "../stores/authStore";
-import api from "../api/client";
+import api, { submitPasswordResetRequest } from "../api/client";
 import LoginPage from "./LoginPage";
 
-vi.mock("../api/client", () => ({ default: { get: vi.fn(), post: vi.fn() } }));
+vi.mock("../api/client", () => ({
+  default: { get: vi.fn(), post: vi.fn() },
+  submitPasswordResetRequest: vi.fn(),
+}));
 
 beforeAll(() => {
   if (!window.matchMedia) {
@@ -173,5 +176,48 @@ describe("LoginPage when already signed in", () => {
     // 再等一拍，确认没有第二次跳转把人拽回首页。
     await new Promise((r) => setTimeout(r, 50));
     expect(screen.getByTestId("landed")).toHaveTextContent("dict /dictionary");
+  });
+});
+
+
+// 此前登录页没有任何「忘记密码」入口；用户名+密码注册的 814 个账号忘了密码就只能
+// 重新注册（2026-11-09 日志里看到两段「连续输错 → 新注册」）。
+describe("LoginPage 忘记密码", () => {
+  beforeEach(async () => {
+    await i18n.changeLanguage("zh");
+    vi.mocked(submitPasswordResetRequest).mockReset().mockResolvedValue(undefined);
+  });
+
+  it("点「忘记密码？」填用户名和联系方式即可提交申请，提交后不暴露账号是否存在", async () => {
+    render(
+      <HelmetProvider>
+        <MemoryRouter initialEntries={["/login"]}>
+          <LoginPage />
+        </MemoryRouter>
+      </HelmetProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "忘记密码？" }));
+    const account = await screen.findByLabelText("用户名或注册邮箱");
+    fireEvent.change(account, { target: { value: "huiming" } });
+    fireEvent.change(screen.getByLabelText("怎么联系你（邮箱或微信号）"), { target: { value: "微信 hm123" } });
+    fireEvent.click(screen.getByRole("button", { name: "提交申请" }));
+
+    await waitFor(() => expect(submitPasswordResetRequest).toHaveBeenCalledWith("huiming", "微信 hm123"));
+    expect(await screen.findByText(/如果这个账号存在/)).toBeInTheDocument();
+  });
+
+  it("没留联系方式不能提交", async () => {
+    render(
+      <HelmetProvider>
+        <MemoryRouter initialEntries={["/login"]}>
+          <LoginPage />
+        </MemoryRouter>
+      </HelmetProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "忘记密码？" }));
+    fireEvent.change(await screen.findByLabelText("用户名或注册邮箱"), { target: { value: "huiming" } });
+    fireEvent.click(screen.getByRole("button", { name: "提交申请" }));
+    expect(await screen.findByText("请留一个能联系到你的方式")).toBeInTheDocument();
+    expect(submitPasswordResetRequest).not.toHaveBeenCalled();
   });
 });

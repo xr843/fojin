@@ -1,9 +1,10 @@
 from datetime import date as date_cls
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.core.role_guard import require_role
 from app.database import get_db
 from app.models.annotation import Annotation
@@ -46,6 +47,7 @@ from app.services.answer_quality import (
     review_stats,
     upsert_review,
 )
+from app.services.password_reset import RESET_TTL_SECONDS, issue_reset_token
 from app.services.usage_service import get_module_usage
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -134,6 +136,40 @@ async def user_list(
 ):
     total, items = await list_users(db, page, size, q, sort_by, sort_order)
     return {"total": total, "page": page, "size": size, "items": items}
+
+
+@router.post("/users/{user_id}/reset-link")
+async def issue_user_reset_link(
+    user_id: int,
+    request: Request,
+    current_user: User = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    """为忘记密码的用户生成一次性重置链接（24 小时内有效，只能用一次）。
+
+    链接由管理员自己发给用户；生成一次即作废该用户此前的链接。
+    返回注册邮箱，方便管理员核对「申请里留的联系方式」是不是本人。
+    """
+    redis_client = getattr(request.app.state, "redis", None)
+    if redis_client is None:
+        raise HTTPException(status_code=503, detail="Redis 不可用，暂时无法生成链接")
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    if not user.is_active:
+        raise HTTPException(status_code=400, detail="该账号已停用，请先启用")
+
+    token = await issue_reset_token(redis_client, user)
+    # 审计只记谁给谁生成过，不记令牌本身。
+    record_audit(db, actor_id=current_user.id, action="issue_reset_link", target_type="user", target_id=user.id)
+    await db.commit()
+    return {
+        "url": f"{settings.oauth_redirect_base}/reset-password#token={token}",
+        "expires_in": RESET_TTL_SECONDS,
+        "username": user.username,
+        "email": user.email,
+        "email_verified": user.email_verified,
+    }
 
 
 @router.patch("/users/{user_id}", response_model=AdminUserItem)

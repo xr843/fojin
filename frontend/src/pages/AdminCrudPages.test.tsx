@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { HelmetProvider } from "react-helmet-async";
 import { MemoryRouter } from "react-router";
 import type { ReactElement } from "react";
@@ -15,6 +15,7 @@ import {
   getAdminAnnotations,
   getAdminAuditLog,
   getAdminFeedbacks,
+  createAdminResetLink,
   getAdminUsers,
   getSourceSuggestions,
   type AdminAnnotationItem,
@@ -32,6 +33,7 @@ vi.mock("../api/client", async () => {
     getAdminAuditLog: vi.fn(),
     getAdminFeedbacks: vi.fn(),
     getAdminUsers: vi.fn(),
+    createAdminResetLink: vi.fn(),
     getSourceSuggestions: vi.fn(),
     reviewAnnotation: vi.fn(),
     updateAdminUser: vi.fn(),
@@ -219,5 +221,27 @@ describe("Admin CRUD pages", () => {
     expect(screen.getByText("Last active")).toBeInTheDocument();
     expect(screen.getByText("Active")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Search username or email")).toBeInTheDocument();
+  });
+
+  // 忘记密码的用户此前只能靠改数据库；后台加「重置链接」（2026-11-09）。
+  it("user management can issue a one-time reset link and shows the unverified email warning", async () => {
+    vi.mocked(createAdminResetLink).mockResolvedValue({
+      url: "https://fojin.app/reset-password#token=abc",
+      expires_in: 86400,
+      username: "reader",
+      email: "reader@example.com",
+      email_verified: false,
+    });
+    // 自己那一行也能生成（管理员给自己重置不算误操作）；这里换一个非本人账号更贴近真实用法
+    useAuthStore.setState({ token: "token", user: { ...useAuthStore.getState().user!, id: 1, role: "admin" } });
+    renderPage(<AdminUsersPage />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Reset link" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm" }));
+
+    await waitFor(() => expect(createAdminResetLink).toHaveBeenCalledWith(5));
+    // antd 的 autoSize 文本框会多渲染一个隐藏的测量副本，所以用 findAll
+    expect((await screen.findAllByDisplayValue("https://fojin.app/reset-password#token=abc")).length).toBeGreaterThan(0);
+    expect(screen.getByText(/never verified/)).toBeInTheDocument();
   });
 });

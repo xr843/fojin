@@ -24,6 +24,7 @@ const TextReaderRoute = lazy(() => import("./pages/TextReaderRoute"));
 
 const SourcesPage = lazy(() => import("./pages/SourcesPage"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
+const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 const ParallelReaderPage = lazy(() => import("./pages/ParallelReaderPage"));
 const KnowledgeGraphPage = lazy(() => import("./pages/KnowledgeGraphPage"));
@@ -84,6 +85,7 @@ function App() {
             <Route path="/sutras/:slug" element={<SutraLandingPage />} />
             <Route path="/works/:slug" element={<RouteErrorBoundary><WorkDetailPage /></RouteErrorBoundary>} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/dictionary" element={<DictionaryPage />} />
             <Route path="/verify" element={<RouteErrorBoundary><VerifyPage /></RouteErrorBoundary>} />
             <Route path="/chat" element={<RouteErrorBoundary><ChatPage /></RouteErrorBoundary>} />

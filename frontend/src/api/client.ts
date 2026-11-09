@@ -1459,6 +1459,30 @@ export async function getAdminUsers(params: {
   return data;
 }
 
+export interface AdminResetLink {
+  url: string;
+  expires_in: number;
+  username: string;
+  email: string;
+  email_verified: boolean;
+}
+
+/** 为忘记密码的用户生成一次性重置链接（24 小时、一次有效；再生成即作废旧的）。 */
+export async function createAdminResetLink(id: number): Promise<AdminResetLink> {
+  const { data } = await api.post<AdminResetLink>(`/admin/users/${id}/reset-link`);
+  return data;
+}
+
+/** 登录页「忘记密码」申请：不论账号是否存在，后端都回同一句话。 */
+export async function submitPasswordResetRequest(account: string, contact: string): Promise<void> {
+  await api.post("/auth/reset-request", { account, contact });
+}
+
+/** 凭一次性链接里的令牌设新密码。 */
+export async function resetPasswordWithToken(token: string, newPassword: string): Promise<void> {
+  await api.post("/auth/reset-password", { token, new_password: newPassword });
+}
+
 export async function updateAdminUser(
   id: number,
   payload: { role?: string; is_active?: boolean },
