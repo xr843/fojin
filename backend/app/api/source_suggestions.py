@@ -198,6 +198,9 @@ async def _create_data_source(db: AsyncSession, suggestion: SourceSuggestion) ->
         base_url=suggestion.url,
         description=suggestion.description,
         access_type="external",
-        is_active=True,
+        # 建成下线的草稿，等补齐简介/语言/许可再上线（走迁移）。此前直接上线：
+        # 2026-11-09 一个活动日历（站主自荐）点了「采纳」当场就挂进了数据源目录，
+        # 名字之外全是空的；三月的「无尽藏」也空着简介挂了八个月。
+        is_active=False,
     )
     db.add(data_source)
