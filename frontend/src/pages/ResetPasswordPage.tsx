@@ -74,6 +74,7 @@ export default function ResetPasswordPage() {
             {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
             <Form.Item
               name="password"
+              extra={t("auth.reset.rule")}
               rules={[
                 { required: true, message: t("auth.password_required") },
                 { min: 8, message: t("auth.password_min") },

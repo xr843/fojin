@@ -302,7 +302,7 @@ function ForgotPasswordLink() {
 
   return (
     <>
-      <Button type="link" size="small" style={{ padding: 0 }} onClick={show}>
+      <Button type="link" size="small" style={{ padding: 0, color: "var(--fj-accent)" }} onClick={show}>
         {t("auth.forgot_password")}
       </Button>
       <Modal
