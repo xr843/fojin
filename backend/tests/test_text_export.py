@@ -292,6 +292,10 @@ def test_cbeta_export_carries_statement_version_and_licence(fmt):
         text = _docx_text(doc)
     else:
         text = render(doc, fmt)[0].decode("utf-8")
+    if fmt in ("html", "epub"):
+        import re
+
+        text = re.sub(r"<a [^>]*>|</a>", "", text)  # URLs are linkified there
     assert _REDISTRIBUTION_CLAUSE in text
     for line in CBETA_STATEMENT:
         assert line in text
@@ -371,3 +375,36 @@ async def test_build_export_doc_loads_source_licence():
     assert doc.source.code == "84000"
     assert doc.source.license_spdx == "CC-BY-NC-ND-4.0"
     assert doc.text_id == 7 and doc.lang == "bo"
+
+
+# --- juan labels & clickable rights links ------------------------------------
+
+from app.services.text_export import cn_number
+
+
+@pytest.mark.parametrize(
+    "n,expected",
+    [(1, "一"), (10, "十"), (11, "十一"), (20, "二十"), (21, "二十一"), (100, "一百"),
+     (101, "一百一"), (110, "一百一十"), (235, "二百三十五"), (600, "六百")],
+)
+def test_cn_number_follows_cbeta_style(n, expected):
+    assert cn_number(n) == expected
+
+
+def test_juan_headings_use_chinese_numerals_everywhere():
+    doc = _doc()
+    files = _epub_files(doc)
+    assert "卷第一" in files["OEBPS/juan1.xhtml"] and "卷第二" in files["OEBPS/nav.xhtml"]
+    assert "卷第1" not in "".join(files.values())
+    assert "卷第一" in render_txt(doc) and "卷第1" not in render_txt(doc)
+    assert "卷第一" in _docx_text(doc)
+
+
+def test_colophon_urls_are_links_in_epub_and_html():
+    doc = _doc()
+    doc.text_id = 7
+    colophon = _epub_files(doc)["OEBPS/colophon.xhtml"]
+    assert '<a href="https://fojin.app/texts/7">https://fojin.app/texts/7</a>' in colophon
+    assert f'<a href="{CBETA_LICENSE_URL}">' in colophon
+    html = render_html(doc)
+    assert '<a href="https://www.cbeta.org/copyright.php">' in html

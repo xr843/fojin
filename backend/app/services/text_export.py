@@ -13,6 +13,7 @@ Design notes:
   bytes, so they are unit-testable without a database.
 """
 
+import re
 from dataclasses import dataclass, field
 from html import escape
 from io import BytesIO
@@ -107,8 +108,34 @@ def _byline(doc: ExportDoc) -> str:
     return " ".join(p for p in (doc.dynasty, doc.translator) if p)
 
 
+_CN_DIGITS = "〇一二三四五六七八九"
+
+
+def cn_number(n: int) -> str:
+    """1..9999 in the canon's own style: 十, 十一, 二十一, 一百, 一百五, 一百一十, 六百."""
+    if n <= 0 or n >= 10000:
+        return str(n)
+    parts = []
+    for value, unit in ((1000, "千"), (100, "百"), (10, "十")):
+        d, n = divmod(n, value)
+        if d:
+            parts.append(("" if (unit == "十" and not parts and d == 1) else _CN_DIGITS[d]) + unit)
+        # A skipped place gets no 零: CBETA writes 一百五, not 一百零五.
+    if n:
+        parts.append(_CN_DIGITS[n])
+    return "".join(parts)
+
+
 def _juan_label(juan_num: int) -> str:
-    return f"卷第{juan_num}"
+    return f"卷第{cn_number(juan_num)}"
+
+
+_URL_RE = re.compile(r"https?://[^\s，。；（）()<>\"]+")
+
+
+def _linkify(escaped: str) -> str:
+    """Make bare URLs in already-escaped (X)HTML text clickable."""
+    return _URL_RE.sub(lambda m: f'<a href="{m.group(0)}">{m.group(0)}</a>', escaped)
 
 
 def _is_cbeta(doc: ExportDoc) -> bool:
@@ -243,7 +270,7 @@ def render_html(doc: ExportDoc) -> str:
         parts.append(f'<h2 class="juan">{escape(_juan_label(j.juan_num))}</h2>')
         parts.extend(html for html in (_seg_html(s) for s in j.segments) if html)
     parts.append(f'<section class="colophon"><h2>{COLOPHON_TITLE}</h2>')
-    parts.extend(f"<p>{escape(line)}</p>" for line in colophon_lines(doc))
+    parts.extend(f"<p>{_linkify(escape(line))}</p>" for line in colophon_lines(doc))
     parts.append("</section>")
     parts.append("</body>")
     parts.append("</html>")
@@ -329,7 +356,7 @@ _COLOPHON_FILE = "colophon.xhtml"
 
 
 def _epub_colophon_xhtml(doc: ExportDoc) -> str:
-    body = "\n".join(f"    <p>{xml_escape(line)}</p>" for line in colophon_lines(doc))
+    body = "\n".join(f"    <p>{_linkify(xml_escape(line))}</p>" for line in colophon_lines(doc))
     return (
         '<?xml version="1.0" encoding="utf-8"?>\n'
         '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="zh-Hant">\n'
