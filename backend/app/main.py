@@ -200,10 +200,10 @@ All data is used in compliance with its respective license.
 
 | Source | License | Note |
 |--------|---------|------|
-| **[CBETA 中华电子佛典协会](https://www.cbeta.org/)** | CC BY-NC-SA 4.0 | 经文数据由 CBETA 中华电子佛典协会提供 / Buddhist text data provided by CBETA |
+| **[CBETA 中华电子佛典协会](https://www.cbeta.org/)** | CC BY-NC-SA 3.0 TW | 经文数据由 CBETA 中华电子佛典协会提供 / Buddhist text data provided by CBETA |
 | **[SuttaCentral](https://suttacentral.net/)** | CC0 1.0 | Early Buddhist texts and translations |
-| **[84000](https://read.84000.co/)** | CC BY-NC-ND 3.0 | Translating the Words of the Buddha |
-| **[GRETIL](http://gretil.sub.uni-goettingen.de/)** | Academic use | Goettingen Register of Electronic Texts in Indian Languages |
+| **[84000](https://read.84000.co/)** | CC BY-NC-ND 4.0 | Translating the Words of the Buddha |
+| **[GRETIL](http://gretil.sub.uni-goettingen.de/)** | Not stated（未查得许可声明） | Goettingen Register of Electronic Texts in Indian Languages |
 | **[DILA 法鼓佛教学院](https://www.dila.edu.tw/)** | Various | Buddhist authority databases and dictionaries |
 | Other sources | Various | See `/api/sources` for full list with individual licenses |
 

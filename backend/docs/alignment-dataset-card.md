@@ -50,7 +50,7 @@ which case line 1 of the JSONL is already the first record.
   "granularity": "chunk",
   "license": "CC-BY-SA-4.0",
   "source_licenses": [
-    {"source": "CBETA", "spdx": "CC-BY-NC-SA-4.0", "url": "https://www.cbeta.org/copyright.php", "attribution_required": true},
+    {"source": "CBETA", "spdx": "CC-BY-NC-SA-3.0", "url": "https://www.cbeta.org/copyright.php", "attribution_required": true},
     {"source": "SuttaCentral", "spdx": "CC0-1.0", "url": "https://suttacentral.net/licensing", "attribution_required": false}
   ],
   "provenance_note": "Alignment annotations … are FoJin's own contribution and are released under CC BY-SA 4.0. The quoted segment text belongs to the upstream canonical sources …",
@@ -81,8 +81,8 @@ which case line 1 of the JSONL is already the first record.
   "tgt": {
     "text_id": 300, "canonical_id": "T0026", "title": "中阿含經",
     "juan": 2, "chunk_index": 7,
-    "license": {"spdx": "CC-BY-NC-SA-4.0", "url": "https://www.cbeta.org/copyright.php"},
-    "attribution": "CBETA (CC-BY-NC-SA-4.0)"
+    "license": {"spdx": "CC-BY-NC-SA-3.0", "url": "https://www.cbeta.org/copyright.php"},
+    "attribution": "CBETA (CC-BY-NC-SA-3.0)"
   },
   "segment_src": "Evaṃ me sutaṃ …",
   "segment_tgt": "我聞如是 …",
@@ -122,8 +122,8 @@ Field notes:
   "tgt": {
     "text_id": 300, "title": "中阿含經", "juan": 2,
     "char_start": 0, "char_end": 40, "lang": "lzh", "text": "我聞如是",
-    "license": {"spdx": "CC-BY-NC-SA-4.0", "url": "https://www.cbeta.org/copyright.php"},
-    "attribution": "CBETA (CC-BY-NC-SA-4.0)"
+    "license": {"spdx": "CC-BY-NC-SA-3.0", "url": "https://www.cbeta.org/copyright.php"},
+    "attribution": "CBETA (CC-BY-NC-SA-3.0)"
   }
 }
 ```
@@ -142,7 +142,7 @@ canon's license. Representative sources (authoritative values live on
 
 | Source | SPDX | Commercial | Notes |
 | --- | --- | --- | --- |
-| CBETA (中華電子佛典協會) | `CC-BY-NC-SA-4.0` | No | Commercial use needs separate CBETA authorization. Caps combined exports to non-commercial. |
+| CBETA (中華電子佛典協會) | `CC-BY-NC-SA-3.0` | No | Commercial use needs separate CBETA authorization. Caps combined exports to non-commercial. |
 | SuttaCentral | `CC0-1.0` | Yes | Pāli root texts and translations alike — see [bilara-data `LICENSE.md`](https://github.com/suttacentral/bilara-data/blob/published/LICENSE.md). |
 | 84000 | `CC-BY-NC-ND-4.0` | No | No-derivatives ceiling; treat as reference-only. |
 | MITRA / Dharmamitra | `CC-BY-SA-4.0` | Yes (SA) | Sanskrit/Tibetan ↔ Chinese; see [`mitra-license.md`](mitra-license.md). |
@@ -160,7 +160,7 @@ licenses.
 - **The quoted segment text** stays under its source's license (see the table).
   Redistribution must preserve **every** source's attribution and license terms.
 - **NonCommercial ceiling**: when an export includes CBETA text
-  (`CC-BY-NC-SA-4.0`) or 84000 text (`CC-BY-NC-ND-4.0`), the *combined* dataset
+  (`CC-BY-NC-SA-3.0`, Taiwan port) or 84000 text (`CC-BY-NC-ND-4.0`), the *combined* dataset
   is effectively **non-commercial** — CC BY-SA and CC BY-NC-SA are not
   compatible for adaptation, so the NC term of the included text caps commercial
   reuse of the combined rows. The safe reading treats a redistributed export as
@@ -175,7 +175,7 @@ licenses.
 > Text Platform, https://fojin.org. Alignment annotations licensed CC BY-SA 4.0.
 
 When redistributing records, also carry the attribution string of each included
-source (e.g. `CBETA (CC-BY-NC-SA-4.0)`, `MITRA / Dharmamitra (Nehrdich &
+source (e.g. `CBETA (CC-BY-NC-SA-3.0)`, `MITRA / Dharmamitra (Nehrdich &
 Keutzer), CC BY-SA 4.0, arXiv:2601.06400`).
 
 ## Versioning policy

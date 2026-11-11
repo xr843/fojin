@@ -42,17 +42,17 @@ Flagged in `docs/research/2026-06-30-peer-projects-borrow-research.md`
 (the MITRA item, "ShareAlike 约束叠 CBETA NC/84000 许可天花板评估", and the
 action item "正式确认 … MITRA ShareAlike 与 CBETA NC 叠加边界" — around
 line 90–98): the Chinese side of every MITRA pair is CBETA text, and CBETA is
-**CC BY-NC-SA 4.0** (non-commercial). A combined artifact that contains both
+**CC BY-NC-SA 3.0 Taiwan** (non-commercial; CBETA's copyright page, re-read 2026-11-11 — earlier versions of this note said 4.0). A combined artifact that contains both
 the MITRA alignment structure (BY-SA) and CBETA sentence text (BY-NC-SA)
 cannot simply be relicensed either way:
 
-- CC BY-SA 4.0 and CC BY-NC-SA 4.0 are **not compatible licenses** for
+- CC BY-SA 4.0 and CC BY-NC-SA 3.0 TW are **not compatible licenses** for
   adaptation purposes — BY-SA adaptations may not add the NC restriction, and
   NC-SA material may not have NC stripped.
 - The likely-safe reading is that a redistributed FoJin alignment dataset is a
   *collection/combination*: MITRA-originated fields (segment ids, foreign
   text, alignment structure, scores) under CC BY-SA 4.0, CBETA-quoted
-  `zh_text` under CC BY-NC-SA 4.0, with the NC term effectively capping
+  `zh_text` under CC BY-NC-SA 3.0 TW, with the NC term effectively capping
   commercial redistribution of the combined rows. **This reading has not been
   legally confirmed.**
 - Until it is, treat combined exports as NC-capped and keep both attributions

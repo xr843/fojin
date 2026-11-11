@@ -220,7 +220,7 @@ async def passage(
                 "它落在这条注所在的那一卷、同页最近的一行上（卍续藏诸书的行号"
                 "索引与对齐所用的不是同一套，落点可能差一两行）。要引用请用 anchor，"
                 "那是这条注真正的出处。",
-                "原文出自 CBETA（CC BY-NC-SA 4.0，非营利使用）。",
+                "原文出自 CBETA（CC BY-NC-SA 3.0 台湾，非营利使用）。",
             ],
         )
     return PassageCommentaries(
@@ -271,7 +271,7 @@ async def excerpts(
             caveats=[
                 "片段是从注疏原文截取的，未经改写；起点是该注疏逐字牒引这几句论文之处，约 500 字。",
                 "两个对齐点之间按牒文推定：对齐由程序产出、非人工校订，偶有落到相邻段落的情况。",
-                "原文出自 CBETA（CC BY-NC-SA 4.0，非营利使用）。",
+                "原文出自 CBETA（CC BY-NC-SA 3.0 台湾，非营利使用）。",
             ],
         )
     return CommentaryExcerpts(query=q, matched=False, caveats=["已装载的论里没有逐字找到这一段，或该论尚无注疏全文。"])
@@ -453,6 +453,6 @@ async def source(
             "这块注文里没有对齐出来的牒文。覆盖不完整：一部注疏实际所注，约一半"
             "没有被对齐出来——「这里没有」不等于「这段没在解释任何一句」。",
             "base_text 给的是被牒那一行及前后各一行；要读上下文请点 reader_url。",
-            "原文出自 CBETA（CC BY-NC-SA 4.0，非营利使用）。",
+            "原文出自 CBETA（CC BY-NC-SA 3.0 台湾，非营利使用）。",
         ],
     )
