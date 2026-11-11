@@ -81,6 +81,7 @@ from app.api import (
     knowledge_graph,
     notification,
     og,
+    opds,
     reader,
     relations,
     research,
@@ -555,6 +556,9 @@ app.include_router(works.router, prefix="/api")
 
 # Citations
 app.include_router(citations.router, prefix="/api")
+
+# OPDS catalogue — e-book readers browse and download EPUB
+app.include_router(opds.router, prefix="/api")
 
 # URN resolver — stable text references
 app.include_router(urn.router, prefix="/api")
