@@ -252,6 +252,13 @@ class Settings(BaseSettings):
     # 结果图（/api/og/verify）同价——两者共用这一档。
     rate_limit_verify_claim: int = 10
     rate_limit_commentary: int = 60
+    # OPDS EPUB downloads (/api/opds/download/*.epub): a whole text is rendered per
+    # request (T0001, 22 juan: 2.4 s), so cap per IP well below the default.
+    rate_limit_opds_download: int = 10
+    # Data-source codes whose full text the OPDS catalogue may list and serve.
+    # A source also needs data_sources.redistribution_allowed = true. Add a code
+    # only after its licence has been checked for bulk redistribution.
+    opds_sources: list[str] = ["cbeta"]
     # Chat (AI Q&A) — the most expensive endpoint: RAG retrieval always uses the
     # platform embedding key (even for BYOK users) plus a long streaming LLM
     # call and a DB pool slot. 30/min/IP is generous for real use (a stream

@@ -61,6 +61,12 @@ STRICT_PATHS: dict[str, int] = {
 }
 
 
+# Prefix-matched limits for parameterised paths; one shared window per prefix,
+# so /download/1.epub and /download/2.epub draw on the same budget.
+STRICT_PREFIXES: dict[str, int] = {
+    "/api/opds/download/": settings.rate_limit_opds_download,
+}
+
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """Global rate limit middleware based on client IP."""
 
@@ -91,11 +97,17 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         # Determine rate limit for this path
         strict_limit = STRICT_PATHS.get(path)
+        strict_key = path
+        if strict_limit is None:
+            for prefix, limit in STRICT_PREFIXES.items():
+                if path.startswith(prefix):
+                    strict_limit, strict_key = limit, prefix
+                    break
         rate_limit = strict_limit if strict_limit is not None else settings.rate_limit_default
 
         # Use path-specific key for strict paths to avoid sharing budget
         if strict_limit is not None:
-            window_key = f"ratelimit:{client_ip}:{path}:{minute_window}"
+            window_key = f"ratelimit:{client_ip}:{strict_key}:{minute_window}"
         else:
             window_key = f"ratelimit:{client_ip}:{minute_window}"
 
