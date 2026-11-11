@@ -57,7 +57,7 @@ PROVENANCE_NOTE = (
     "sources listed in `source_licenses` and remains under each source's own "
     "license; redistribution must preserve every source's attribution and "
     "license terms. Sources under a NonCommercial license (e.g. CBETA "
-    "CC BY-NC-SA 4.0) cap the combined dataset to non-commercial reuse — see "
+    "CC BY-NC-SA 3.0 TW) cap the combined dataset to non-commercial reuse — see "
     "backend/docs/mitra-license.md for the ShareAlike x NC analysis."
 )
 

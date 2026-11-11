@@ -40,16 +40,29 @@ Texts stored locally  (only these four hold full text)
 
 --------------------------------------------------------------------------------
 CBETA (Chinese Buddhist Electronic Text Association)          169.4M chars, 60.8%
+  — since 2023-08-07 run by 財團法人佛教電子佛典基金會 (CBETA Foundation)
 https://cbeta.org
-License: CC BY-NC-SA 4.0  (verified: https://www.cbeta.org/copyright.php)
+License: CC BY-NC-SA 3.0 Taiwan (中華民國)
+  https://creativecommons.org/licenses/by-nc-sa/3.0/tw/
+  (verified 2026-11-11 against https://www.cbeta.org/copyright.php, which
+   states "本資料庫未特別說明處則採用「Creative Commons 姓名標示-非商業性-相同方式分享
+   3.0 台灣 (中華民國) 授權條款」授權". Earlier revisions of this file said 4.0 —
+   that was wrong.)
   Attribution required; commercial use prohibited; derivatives must be shared
-  under the same license and must not alter the substantive content.
-Usage: Full text of the Chinese Buddhist Canon imported and indexed locally.
-IMPORTANT — the CC license does NOT cover CBETA's "Category B" collections
-  (印順法師佛學著作集, 呂澂佛學著作集 and similar modern authored works); those
+  under the same license.
+CBETA's own conditions (使用說明) on top of the CC licence: redistribution
+  "以不改變實質內容為原則，並需於成品附上本說明及版本資訊". FoJin's TXT / HTML /
+  DOCX / EPUB exports append CBETA's statement, version information and the
+  licence URI on a closing 版權說明 page (backend/app/services/text_export.py).
+Usage: Full text of the Chinese Buddhist Canon imported and indexed locally
+  (cbeta-org/xml-p5, imported 2026-03/04; only the T 大正藏 and X 卍續藏
+  collections hold full text on FoJin).
+IMPORTANT — the CC license does NOT cover 《印順法師佛學著作集》、《太虛大師全書》
+  (印順文教基金會) or 《呂澂佛學著作集》 (copyright with the publishers); those
   require separate permission from the copyright holders.
-  Verified 2026-08-13: FoJin has NOT imported any Category B text — searches for
-  印順 / 呂澂 / 妙雲集 return 0 results. Keep it that way, or obtain permission.
+  Verified 2026-11-11: FoJin holds no full text from any of them — on prod, every
+  CBETA text with content has a T or X number (2,390 + 1,230), and no title
+  matches 印順 / 太虛 / 呂澂 / 妙雲. Keep it that way, or obtain permission.
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------

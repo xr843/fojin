@@ -5,7 +5,7 @@
         --works T41n1821 T41n1822 --out kosa-T1558.v3.json
 
 对齐包只带每条对齐点附近的一小段注文；要在两个对齐点之间按牒文截取，需要整部
-注疏的逐行原文。原文取自 CBETA XML（CC BY-NC-SA 4.0），与包里已有文本同源。
+注疏的逐行原文。原文取自 CBETA XML（CC BY-NC-SA 3.0 台湾），与包里已有文本同源。
 
 产物不进仓库：对齐包以带外方式部署到 /data/commentary（见 services/commentary）。
 **新包要替换旧包，不能并存**——packages() 会加载目录里的全部 *.json。

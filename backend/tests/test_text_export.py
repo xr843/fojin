@@ -170,6 +170,7 @@ def _bt(**kw):
     m.translator = kw.get("translator", "佛陀耶舍")
     m.dynasty = kw.get("dynasty", "後秦")
     m.lang = kw.get("lang", "lzh")
+    m.source_id = kw.get("source_id")
     return m
 
 
@@ -243,3 +244,130 @@ async def test_export_endpoint_404_when_missing(client):
         resp = await client.get("/api/texts/999/export?format=txt")
     assert resp.status_code == 404
 
+
+
+# --- attribution / 版權說明 ----------------------------------------------------
+# CBETA's copyright page makes "附上本說明及版本資訊" a condition of redistribution,
+# and CC BY-NC-SA 3.0 requires the licence URI on every copy. Non-CBETA texts
+# used to be labelled "CBETA …" in every format.
+
+from app.services.text_export import (
+    CBETA_LICENSE_URL,
+    CBETA_STATEMENT,
+    CBETA_VERSION,
+    ExportSource,
+)
+
+_REDISTRIBUTION_CLAUSE = "需於成品附上本說明及版本資訊"
+
+_SRC_84000 = ExportSource(
+    code="84000",
+    name_zh="84000 藏传佛典翻译",
+    name_en="84000: Translating the Words of the Buddha",
+    base_url="https://read.84000.co",
+    license_spdx="CC-BY-NC-ND-4.0",
+    license_url="https://creativecommons.org/licenses/by-nc-nd/4.0/",
+)
+_SRC_GRETIL = ExportSource(code="gretil", name_zh="GRETIL 梵文文献库", name_en="GRETIL")
+
+
+def _epub_files(doc) -> dict[str, str]:
+    with zipfile.ZipFile(BytesIO(render_epub(doc))) as zf:
+        return {n: zf.read(n).decode("utf-8") for n in zf.namelist()}
+
+
+def _docx_text(doc) -> str:
+    from docx import Document
+
+    return "\n".join(p.text for p in Document(BytesIO(render_docx(doc))).paragraphs)
+
+
+@pytest.mark.parametrize("fmt", ["txt", "html", "docx", "epub"])
+def test_cbeta_export_carries_statement_version_and_licence(fmt):
+    doc = _doc()
+    doc.text_id = 42
+    if fmt == "epub":
+        text = "\n".join(_epub_files(doc).values())
+    elif fmt == "docx":
+        text = _docx_text(doc)
+    else:
+        text = render(doc, fmt)[0].decode("utf-8")
+    assert _REDISTRIBUTION_CLAUSE in text
+    for line in CBETA_STATEMENT:
+        assert line in text
+    assert CBETA_VERSION in text
+    assert CBETA_LICENSE_URL in text
+    assert "https://fojin.app/texts/42" in text
+
+
+def test_epub_colophon_is_in_spine_nav_and_rights_metadata():
+    files = _epub_files(_doc())
+    assert "OEBPS/colophon.xhtml" in files
+    opf = files["OEBPS/content.opf"]
+    assert '<itemref idref="colophon"/>' in opf
+    assert "<dc:rights>" in opf and "3.0" in opf and CBETA_LICENSE_URL in opf
+    assert "<dc:publisher>" in opf
+    assert 'href="colophon.xhtml"' in files["OEBPS/nav.xhtml"]
+    # still well-formed XML everywhere
+    import xml.dom.minidom
+
+    for name, body in files.items():
+        if name.endswith((".xhtml", ".opf", ".xml")):
+            xml.dom.minidom.parseString(body.encode("utf-8"))
+
+
+@pytest.mark.parametrize("fmt", ["txt", "html", "docx", "epub"])
+def test_non_cbeta_text_is_not_labelled_cbeta(fmt):
+    doc = _doc(cbeta_id="84K-toh1", title="Toh 1")
+    doc.source = _SRC_84000
+    doc.lang = "bo"
+    if fmt == "epub":
+        text = "\n".join(_epub_files(doc).values())
+    elif fmt == "docx":
+        text = _docx_text(doc)
+    else:
+        text = render(doc, fmt)[0].decode("utf-8")
+    assert "CBETA" not in text
+    # 84000's terms: attribution must name 84000 itself, not just the translator.
+    assert "84000: Translating the Words of the Buddha" in text
+    assert "https://creativecommons.org/licenses/by-nc-nd/4.0/" in text
+
+
+def test_non_cbeta_epub_identifier_and_language():
+    doc = _doc(cbeta_id="84K-toh1")
+    doc.source = _SRC_84000
+    doc.lang = "bo"
+    opf = _epub_files(doc)["OEBPS/content.opf"]
+    assert "urn:fojin:84K-toh1" in opf
+    assert "<dc:language>bo</dc:language>" in opf
+
+
+def test_unknown_licence_is_stated_honestly():
+    doc = _doc(cbeta_id="GRETIL-x")
+    doc.source = _SRC_GRETIL
+    text = render_txt(doc)
+    assert "未查得該來源的許可聲明" in text
+    assert "CBETA" not in text
+
+
+async def test_build_export_doc_loads_source_licence():
+    bt = _bt(id=7, cbeta_id="84K-toh1", lang="bo", source_id=3)
+    ds = MagicMock()
+    ds.code = "84000"
+    ds.name_zh = "84000 藏传佛典翻译"
+    ds.name_en = "84000: Translating the Words of the Buddha"
+    ds.base_url = "https://read.84000.co"
+    ds.license_spdx = "CC-BY-NC-ND-4.0"
+    ds.license_url = "https://creativecommons.org/licenses/by-nc-nd/4.0/"
+    text_result = MagicMock()
+    text_result.scalar_one_or_none.return_value = bt
+    content_result = MagicMock()
+    content_result.scalars.return_value.all.return_value = [_content_row(1, "x")]
+    src_result = MagicMock()
+    src_result.scalar_one_or_none.return_value = ds
+    session = AsyncMock()
+    session.execute.side_effect = [text_result, content_result, src_result]
+    doc = await build_export_doc(session, text_id=7, juan_num=None)
+    assert doc.source.code == "84000"
+    assert doc.source.license_spdx == "CC-BY-NC-ND-4.0"
+    assert doc.text_id == 7 and doc.lang == "bo"

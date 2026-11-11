@@ -50,7 +50,7 @@ def _chunk_row(**kw):
         tgt_title="中阿含經",
         tgt_juan=2,
         tgt_chunk=7,
-        tgt_license_spdx="CC-BY-NC-SA-4.0",
+        tgt_license_spdx="CC-BY-NC-SA-3.0",
         tgt_license_url="https://www.cbeta.org/copyright.php",
         tgt_source_name_zh="中華電子佛典協會",
         tgt_source_name_en="CBETA",
@@ -90,7 +90,7 @@ def _sentence_row(**kw):
         tgt_char_end=40,
         tgt_lang="lzh",
         tgt_text="我聞如是",
-        tgt_license_spdx="CC-BY-NC-SA-4.0",
+        tgt_license_spdx="CC-BY-NC-SA-3.0",
         tgt_license_url="https://www.cbeta.org/copyright.php",
         tgt_source_name_zh="中華電子佛典協會",
         tgt_source_name_en="CBETA",
@@ -125,10 +125,10 @@ def test_chunk_record_adds_per_side_license_and_attribution():
     assert rec["src"]["license"] == {"spdx": "CC0-1.0", "url": "https://suttacentral.net/licensing"}
     assert rec["src"]["attribution"] == "SuttaCentral (CC0-1.0)"
     assert rec["tgt"]["license"] == {
-        "spdx": "CC-BY-NC-SA-4.0",
+        "spdx": "CC-BY-NC-SA-3.0",
         "url": "https://www.cbeta.org/copyright.php",
     }
-    assert rec["tgt"]["attribution"] == "CBETA (CC-BY-NC-SA-4.0)"
+    assert rec["tgt"]["attribution"] == "CBETA (CC-BY-NC-SA-3.0)"
 
 
 def test_chunk_record_missing_source_license_is_null_not_error():
@@ -143,7 +143,7 @@ def test_chunk_record_missing_source_license_is_null_not_error():
     assert rec["src"]["license"] is None
     assert rec["src"]["attribution"] is None
     # tgt side still populated — one missing source must not blank the other.
-    assert rec["tgt"]["license"]["spdx"] == "CC-BY-NC-SA-4.0"
+    assert rec["tgt"]["license"]["spdx"] == "CC-BY-NC-SA-3.0"
 
 
 def test_chunk_record_is_json_serializable():
@@ -165,7 +165,7 @@ def test_sentence_record_shape():
     assert rec["src"]["text"] == "Evaṃ me sutaṃ"
     assert rec["src"]["license"] == {"spdx": "CC0-1.0", "url": "https://suttacentral.net/licensing"}
     assert rec["tgt"]["text"] == "我聞如是"
-    assert rec["tgt"]["attribution"] == "CBETA (CC-BY-NC-SA-4.0)"
+    assert rec["tgt"]["attribution"] == "CBETA (CC-BY-NC-SA-3.0)"
     # sentence records have no chunk_index / confidence / verified keys.
     assert "chunk_index" not in rec["src"]
     assert "confidence" not in rec
@@ -177,9 +177,9 @@ def test_sentence_record_shape():
 def test_aggregate_source_licenses_dedups_and_sorts():
     # rows: (spdx, url, name_zh, name_en, attribution_required)
     rows = [
-        ("CC-BY-NC-SA-4.0", "https://cbeta", "中華電子佛典協會", "CBETA", True),
+        ("CC-BY-NC-SA-3.0", "https://cbeta", "中華電子佛典協會", "CBETA", True),
         ("CC0-1.0", "https://sc", "巴利圣典协会", "SuttaCentral", False),
-        ("CC-BY-NC-SA-4.0", "https://cbeta", "中華電子佛典協會", "CBETA", True),  # dup
+        ("CC-BY-NC-SA-3.0", "https://cbeta", "中華電子佛典協會", "CBETA", True),  # dup
         ("CC-BY-NC-ND-4.0", "https://84000", None, "84000", True),
         (None, None, None, None, None),  # no source info → dropped
     ]
@@ -187,7 +187,7 @@ def test_aggregate_source_licenses_dedups_and_sorts():
     names = [x["source"] for x in out]
     assert names == ["84000", "CBETA", "SuttaCentral"]  # sorted, deduped
     cbeta = next(x for x in out if x["source"] == "CBETA")
-    assert cbeta["spdx"] == "CC-BY-NC-SA-4.0"
+    assert cbeta["spdx"] == "CC-BY-NC-SA-3.0"
     assert cbeta["attribution_required"] is True
     sc = next(x for x in out if x["source"] == "SuttaCentral")
     assert sc["attribution_required"] is False
@@ -201,7 +201,7 @@ def test_aggregate_source_licenses_empty():
 
 
 def test_build_card_full():
-    licenses = [{"source": "CBETA", "spdx": "CC-BY-NC-SA-4.0", "url": "x", "attribution_required": True}]
+    licenses = [{"source": "CBETA", "spdx": "CC-BY-NC-SA-3.0", "url": "x", "attribution_required": True}]
     card = build_card(
         granularity="chunk",
         version="1.0.0",
@@ -303,7 +303,7 @@ async def test_collect_card_facts_counts_and_aggregates_licenses():
     # execute order: COUNT, then side-A distinct licenses, then side-B.
     count_result = [(2,)]
     side_a = [("CC0-1.0", "https://sc", "巴利圣典协会", "SuttaCentral", False)]
-    side_b = [("CC-BY-NC-SA-4.0", "https://cbeta", "中華電子佛典協會", "CBETA", True)]
+    side_b = [("CC-BY-NC-SA-3.0", "https://cbeta", "中華電子佛典協會", "CBETA", True)]
     factory = _FakeFactory(count_result, side_a, side_b)
     count, licenses = await collect_card_facts(granularity="chunk", session_factory=factory)
     assert count == 2
@@ -334,7 +334,7 @@ async def _fake_iter_records(**kwargs):
 @pytest.mark.asyncio
 async def test_endpoint_streams_card_then_records(exports_client):
     facts = AsyncMock(
-        return_value=(2, [{"source": "CBETA", "spdx": "CC-BY-NC-SA-4.0", "url": "x", "attribution_required": True}])
+        return_value=(2, [{"source": "CBETA", "spdx": "CC-BY-NC-SA-3.0", "url": "x", "attribution_required": True}])
     )
     with (
         patch("app.services.alignment_export.collect_card_facts", facts),

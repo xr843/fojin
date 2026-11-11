@@ -22,6 +22,8 @@ from zipfile import ZIP_DEFLATED, ZIP_STORED, ZipFile, ZipInfo
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
+from app.models.source import DataSource
 from app.models.text import BuddhistText, TextContent
 from app.services.text_reflow import Segment, reflow
 
@@ -49,12 +51,55 @@ class ExportJuan:
 
 
 @dataclass
+class ExportSource:
+    """Where the text came from and under what terms — drives the source line,
+    the EPUB rights metadata and the closing 版權說明 page of every export."""
+
+    code: str | None = None
+    name_zh: str | None = None
+    name_en: str | None = None
+    base_url: str | None = None
+    license_spdx: str | None = None
+    license_url: str | None = None
+
+
+# CBETA's own statement (https://www.cbeta.org/copyright.php, read 2026-11-11).
+# Its 使用說明 makes this a condition of redistribution: "將本資料庫以網路、光碟或
+# 其它媒體再傳播……需於成品附上本說明及版本資訊". Keep the wording verbatim.
+CBETA_STATEMENT: tuple[str, ...] = (
+    "CBETA 電子佛典資料庫使用說明：",
+    "本資料庫之使用限定於個人或團體非營利性用途。若運用於營利性目的時，"
+    "必須事先取得本會與該底本版權者之同意。",
+    "將本資料庫以網路、光碟或其它媒體再傳播、節錄引用及再加工發行時，"
+    "以不改變實質內容為原則，並需於成品附上本說明及版本資訊，以利使用者查詢相關修訂資訊。",
+    "若發現本資料庫中任何錯誤之處，請與本會聯絡。",
+    "若因使用本資料庫所產生之任何損害，本會一概不負任何責任。",
+)
+CBETA_LICENSE_NAME = "Creative Commons 姓名標示-非商業性-相同方式分享 3.0 台灣 (中華民國) 授權條款"
+CBETA_LICENSE_URL = "https://creativecommons.org/licenses/by-nc-sa/3.0/tw/"
+CBETA_COPYRIGHT_URL = "https://www.cbeta.org/copyright.php"
+# 版本資訊: which CBETA release the text was taken from. FoJin imported the
+# cbeta-org/xml-p5 repository in 2026-03/04 (text_contents.created_at on prod).
+CBETA_VERSION = "CBETA XML P5（https://github.com/cbeta-org/xml-p5），佛津於 2026 年 3–4 月匯入"
+
+# FoJin's own processing, stated so readers can tell it apart from the source.
+# Deliberately not "未改動經文文字": import normalises gaiji and joins hard-wrapped
+# lines, and nobody has diffed the result against CBETA character by character.
+FOJIN_PROCESSING = "佛津（FoJin）依原文重新排版（分段、偈頌縮排）；如與原始來源有出入，以原始來源為準。"
+
+_LANG_TAGS = {"lzh": "zh-Hant", "pi": "pi", "sa": "sa", "bo": "bo", "en": "en"}
+
+
+@dataclass
 class ExportDoc:
     title: str
     cbeta_id: str
     translator: str | None = None
     dynasty: str | None = None
     juans: list[ExportJuan] = field(default_factory=list)
+    text_id: int | None = None
+    lang: str = "lzh"
+    source: ExportSource = field(default_factory=lambda: ExportSource(code="cbeta"))
 
 
 def _byline(doc: ExportDoc) -> str:
@@ -66,6 +111,70 @@ def _juan_label(juan_num: int) -> str:
     return f"卷第{juan_num}"
 
 
+def _is_cbeta(doc: ExportDoc) -> bool:
+    return doc.source.code == "cbeta"
+
+
+def _lang_tag(doc: ExportDoc) -> str:
+    return _LANG_TAGS.get(doc.lang, doc.lang or "und")
+
+
+def source_line(doc: ExportDoc) -> str:
+    """Short source label under the title: 'CBETA T0001', or the real source's
+    name for non-CBETA texts (they used to be mislabelled 'CBETA …')."""
+    if _is_cbeta(doc):
+        return f"CBETA {doc.cbeta_id}"
+    name = doc.source.name_en or doc.source.name_zh
+    return f"{name} {doc.cbeta_id}" if name else doc.cbeta_id
+
+
+def reader_url(doc: ExportDoc) -> str | None:
+    if doc.text_id is None:
+        return None
+    return f"{settings.site_base_url.rstrip('/')}/texts/{doc.text_id}"
+
+
+def rights_summary(doc: ExportDoc) -> str:
+    """One-line rights statement for EPUB dc:rights."""
+    if _is_cbeta(doc):
+        return f"CBETA 電子佛典資料庫，{CBETA_LICENSE_NAME}（{CBETA_LICENSE_URL}）；限非營利使用。"
+    src = doc.source
+    name = src.name_en or src.name_zh or "原始來源"
+    if src.license_spdx:
+        tail = f"（{src.license_url}）" if src.license_url else ""
+        return f"{name}，{src.license_spdx}{tail}"
+    return f"{name}，許可條款未標明"
+
+
+def colophon_lines(doc: ExportDoc) -> list[str]:
+    """The closing 版權說明 page, as plain lines (each format renders them)."""
+    out: list[str] = []
+    if _is_cbeta(doc):
+        out.append("經文出處：CBETA 電子佛典資料庫，財團法人佛教電子佛典基金會（原中華電子佛典協會）")
+        out.append(f"經號：{doc.cbeta_id}")
+        out.append(f"版本資訊：{CBETA_VERSION}")
+        out.append(f"授權條款：{CBETA_LICENSE_NAME}，{CBETA_LICENSE_URL}")
+        out.extend(CBETA_STATEMENT)
+        out.append(f"完整版權宣告：{CBETA_COPYRIGHT_URL}")
+    else:
+        src = doc.source
+        names = " / ".join(n for n in (src.name_zh, src.name_en) if n)
+        out.append(f"經文出處：{names or '原始來源'}" + (f"，{src.base_url}" if src.base_url else ""))
+        out.append(f"編號：{doc.cbeta_id}")
+        if src.license_spdx:
+            out.append(f"授權條款：{src.license_spdx}" + (f"，{src.license_url}" if src.license_url else ""))
+        else:
+            out.append("授權條款：佛津未查得該來源的許可聲明，再利用前請向原始來源確認。")
+    out.append(FOJIN_PROCESSING)
+    url = reader_url(doc)
+    if url:
+        out.append(f"佛津線上閱讀（校勘、注疏、引文核對）：{url}")
+    return out
+
+
+COLOPHON_TITLE = "版權說明"
+
+
 # --- TXT ---------------------------------------------------------------------
 
 def render_txt(doc: ExportDoc) -> str:
@@ -73,12 +182,15 @@ def render_txt(doc: ExportDoc) -> str:
     byline = _byline(doc)
     if byline:
         out.append(byline)
-    out.append(f"CBETA {doc.cbeta_id}")
+    out.append(source_line(doc))
     for j in doc.juans:
         out.append("")
         out.append(_juan_label(j.juan_num))
         out.append("")
         out.extend(j.lines)
+    out.append("")
+    out.append(f"—— {COLOPHON_TITLE} ——")
+    out.extend(colophon_lines(doc))
     return "\n".join(out) + "\n"
 
 
@@ -99,6 +211,8 @@ _HTML_STYLE = (
     ".section{text-align:center;margin:1.5em 0 1em;font-size:1.05em}"
     ".prose{text-indent:2em;margin:0 0 1em}"
     ".verse{margin:0;padding-left:4em;text-indent:0}"
+    ".colophon{margin-top:3em;padding-top:1em;border-top:1px solid #ddd;color:#666;font-size:.85em}"
+    ".colophon h2{font-size:1em;color:#666}"
 )
 
 
@@ -111,7 +225,7 @@ def _seg_html(seg: Segment) -> str:
 def render_html(doc: ExportDoc) -> str:
     parts: list[str] = [
         "<!DOCTYPE html>",
-        '<html lang="zh-Hant">',
+        f'<html lang="{_lang_tag(doc)}">',
         "<head>",
         '<meta charset="utf-8">',
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
@@ -124,10 +238,13 @@ def render_html(doc: ExportDoc) -> str:
     byline = _byline(doc)
     if byline:
         parts.append(f'<p class="byline-doc">{escape(byline)}</p>')
-    parts.append(f'<p class="src">CBETA {escape(doc.cbeta_id)}</p>')
+    parts.append(f'<p class="src">{escape(source_line(doc))}</p>')
     for j in doc.juans:
         parts.append(f'<h2 class="juan">{escape(_juan_label(j.juan_num))}</h2>')
         parts.extend(html for html in (_seg_html(s) for s in j.segments) if html)
+    parts.append(f'<section class="colophon"><h2>{COLOPHON_TITLE}</h2>')
+    parts.extend(f"<p>{escape(line)}</p>" for line in colophon_lines(doc))
+    parts.append("</section>")
     parts.append("</body>")
     parts.append("</html>")
     return "\n".join(parts) + "\n"
@@ -145,7 +262,7 @@ def render_docx(doc: ExportDoc) -> bytes:
     byline = _byline(doc)
     if byline:
         d.add_paragraph(byline)
-    d.add_paragraph(f"CBETA {doc.cbeta_id}")
+    d.add_paragraph(source_line(doc))
     for j in doc.juans:
         d.add_heading(_juan_label(j.juan_num), level=1)
         for seg in j.segments:
@@ -164,6 +281,9 @@ def render_docx(doc: ExportDoc) -> bytes:
                 p.paragraph_format.first_line_indent = Pt(24)
             elif seg.type == "verse":
                 p.paragraph_format.left_indent = Pt(48)
+    d.add_heading(COLOPHON_TITLE, level=1)
+    for line in colophon_lines(doc):
+        d.add_paragraph(line)
     buf = BytesIO()
     d.save(buf)
     return buf.getvalue()
@@ -189,11 +309,11 @@ def _seg_xhtml(seg: Segment) -> str:
     return f'    <p class="{seg.type}">{xml_escape(seg.text)}</p>'
 
 
-def _epub_juan_xhtml(title: str, j: ExportJuan) -> str:
+def _epub_juan_xhtml(title: str, j: ExportJuan, lang: str = "zh-Hant") -> str:
     body = "\n".join(x for x in (_seg_xhtml(s) for s in j.segments) if x)
     return (
         '<?xml version="1.0" encoding="utf-8"?>\n'
-        '<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="zh-Hant">\n'
+        f'<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="{lang}">\n'
         f"  <head><title>{xml_escape(title)} {_juan_label(j.juan_num)}</title>\n"
         '  <meta charset="utf-8"/>\n'
         f"  <style>{_EPUB_CSS}</style></head>\n"
@@ -205,16 +325,40 @@ def _epub_juan_xhtml(title: str, j: ExportJuan) -> str:
     )
 
 
+_COLOPHON_FILE = "colophon.xhtml"
+
+
+def _epub_colophon_xhtml(doc: ExportDoc) -> str:
+    body = "\n".join(f"    <p>{xml_escape(line)}</p>" for line in colophon_lines(doc))
+    return (
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="zh-Hant">\n'
+        f"  <head><title>{COLOPHON_TITLE}</title>\n"
+        '  <meta charset="utf-8"/>\n'
+        "  <style>body{font-family:'Noto Serif SC',serif;line-height:1.7;font-size:.9em}"
+        "h2{font-size:1.1em;text-align:center;margin:1em 0}p{margin:0 0 .8em}</style></head>\n"
+        '  <body epub:type="colophon">\n'
+        f"    <h2>{COLOPHON_TITLE}</h2>\n"
+        f"{body}\n"
+        "  </body>\n"
+        "</html>\n"
+    )
+
+
 def render_epub(doc: ExportDoc) -> bytes:
     # Deterministic id so re-exports are byte-stable and the OPF is verifiable.
-    book_id = f"urn:cbeta:{doc.cbeta_id}"
+    # Only CBETA texts carry a CBETA number; others get a FoJin URN.
+    book_id = f"urn:cbeta:{doc.cbeta_id}" if _is_cbeta(doc) else f"urn:fojin:{doc.cbeta_id}"
+    lang = _lang_tag(doc)
     juan_files = [(f"juan{j.juan_num}.xhtml", j) for j in doc.juans]
 
     manifest_items = "\n".join(
         f'    <item id="j{j.juan_num}" href="{fn}" media-type="application/xhtml+xml"/>'
         for fn, j in juan_files
     )
+    manifest_items += f'\n    <item id="colophon" href="{_COLOPHON_FILE}" media-type="application/xhtml+xml"/>'
     spine_items = "\n".join(f'    <itemref idref="j{j.juan_num}"/>' for _, j in juan_files)
+    spine_items += '\n    <itemref idref="colophon"/>'
     byline = _byline(doc)
     creator = f"<dc:creator>{xml_escape(byline)}</dc:creator>" if byline else ""
     opf = (
@@ -223,9 +367,11 @@ def render_epub(doc: ExportDoc) -> bytes:
         '  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">\n'
         f'    <dc:identifier id="bookid">{xml_escape(book_id)}</dc:identifier>\n'
         f"    <dc:title>{xml_escape(doc.title)}</dc:title>\n"
-        "    <dc:language>zh-Hant</dc:language>\n"
+        f"    <dc:language>{xml_escape(lang)}</dc:language>\n"
         f"    {creator}\n"
-        f"    <dc:source>CBETA {xml_escape(doc.cbeta_id)}</dc:source>\n"
+        f"    <dc:source>{xml_escape(source_line(doc))}</dc:source>\n"
+        f"    <dc:rights>{xml_escape(rights_summary(doc))}</dc:rights>\n"
+        "    <dc:publisher>佛津 FoJin（fojin.app）</dc:publisher>\n"
         f'    <meta property="dcterms:modified">{_EPUB_MODIFIED}</meta>\n'
         "  </metadata>\n"
         "  <manifest>\n"
@@ -242,6 +388,7 @@ def render_epub(doc: ExportDoc) -> bytes:
         f'      <li><a href="{fn}">{xml_escape(_juan_label(j.juan_num))}</a></li>'
         for fn, j in juan_files
     )
+    nav_links += f'\n      <li><a href="{_COLOPHON_FILE}">{COLOPHON_TITLE}</a></li>'
     nav = (
         '<?xml version="1.0" encoding="utf-8"?>\n'
         '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="zh-Hant">\n'
@@ -274,7 +421,8 @@ def render_epub(doc: ExportDoc) -> bytes:
         zf.writestr("OEBPS/content.opf", opf)
         zf.writestr("OEBPS/nav.xhtml", nav)
         for fn, j in juan_files:
-            zf.writestr(f"OEBPS/{fn}", _epub_juan_xhtml(doc.title, j))
+            zf.writestr(f"OEBPS/{fn}", _epub_juan_xhtml(doc.title, j, lang))
+        zf.writestr(f"OEBPS/{_COLOPHON_FILE}", _epub_colophon_xhtml(doc))
     return buf.getvalue()
 
 
@@ -331,10 +479,26 @@ async def build_export_doc(
         )
         for r in rows
     ]
+    source = ExportSource()
+    if bt.source_id is not None:
+        result = await session.execute(select(DataSource).where(DataSource.id == bt.source_id))
+        ds = result.scalar_one_or_none()
+        if ds is not None:
+            source = ExportSource(
+                code=ds.code,
+                name_zh=ds.name_zh,
+                name_en=ds.name_en,
+                base_url=ds.base_url,
+                license_spdx=ds.license_spdx,
+                license_url=ds.license_url,
+            )
     return ExportDoc(
         title=bt.title_zh,
         cbeta_id=bt.cbeta_id,
         translator=bt.translator,
         dynasty=bt.dynasty,
         juans=juans,
+        text_id=bt.id,
+        lang=bt.lang or "lzh",
+        source=source,
     )
