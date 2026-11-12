@@ -287,7 +287,9 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
 
         if tag == f"{{{TEI_NS}}}lb":
             n = elem.get("n")
-            if n:
+            # 卍续藏每行并列两个 <lb>：本藏 ed="X" 与新文丰版 ed="R022" 等，编号会撞车
+            # （X0288 的 R022 0005a10 在卷首、X 0005a10 在后面）。只认本藏的。
+            if n and not re.match(r"R\d", elem.get("ed", "")):
                 pending_lb.append(f"\x00L:{n}\x00")
             return
 

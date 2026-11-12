@@ -119,6 +119,20 @@ def test_line_anchor_outside_paragraph_is_kept(tmp_path):
     assert "0395a01" not in {la["line"] for la in juan["line_anchors"]}
 
 
+def test_line_anchor_outside_paragraph_ignores_r_edition(tmp_path):
+    """卍续藏段外并列的 R 版 <lb> 编号会和本藏撞车，不能拿来当行号（X0288 原样节选）。"""
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+<TEI xmlns="http://www.tei-c.org/ns/1.0" xmlns:cb="http://www.cbeta.org/ns/1.0"><teiHeader/><text><body>
+<lb ed="X" n="0002c18"/><lb ed="R022" n="0005a10"/><p>閱正</p>
+<lb ed="X" n="0005a10"/><lb ed="R022" n="0008a02"/><p>寔無可讚</p>
+</body></text></TEI>
+"""
+    juan = parse_tei_xml(_write(tmp_path, xml))[0]
+    assert _ref_at(juan, "閱正") == "0002c18"
+    assert _ref_at(juan, "寔無可讚") == "0005a10"
+    assert {la["line"] for la in juan["line_anchors"]} == {"0002c18", "0005a10"}
+
+
 def test_line_anchor_outside_paragraph_leaves_content_unchanged(tmp_path):
     """只多记行号，正文一个字不变（校勘偏移依赖正文，不能动）。"""
     juan = parse_tei_xml(_write(tmp_path, LB_OUTSIDE_XML))[0]
