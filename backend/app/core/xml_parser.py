@@ -250,6 +250,19 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
     current_juan = 1
     current_lines: list[str] = []
     preface_lines: list[str] = []  # sidelined <cb:div type="xu"> paratext
+    # CBETA 段首那一行的 <lb> 写在 <p>/<head>/<byline> 外面（<lb n="0395a07"/><p>如是我聞…），
+    # _extract_text 只看得见元素内部的 <lb>，这些行号原先整条丢失：段首行的字被算到
+    # 上一段末行，复制引用 / 行首 / SAT 原页都指错一行（2026-11-12 T0278 普賢菩薩 b11→b10）。
+    # 先记着，贴到下一段正文的开头。连续几个 <lb> 之间没有正文（卷首空行、被跳过的经号行）
+    # 时只留最后一个：前面那几行没有字可选，贴上去只会让「行首」显示叠出空行号。
+    pending_lb: list[str] = []
+
+    def with_pending_lb(text: str) -> str:
+        if not pending_lb:
+            return text
+        out = pending_lb[-1] + text
+        pending_lb.clear()
+        return out
 
     def flush_juan():
         nonlocal current_lines
@@ -271,6 +284,12 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
         nonlocal current_juan, current_lines, preface_lines
 
         tag = elem.tag
+
+        if tag == f"{{{TEI_NS}}}lb":
+            n = elem.get("n")
+            if n:
+                pending_lb.append(f"\x00L:{n}\x00")
+            return
 
         # Check for juan boundaries
         if tag == f"{{{TEI_NS}}}milestone":
@@ -301,14 +320,14 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
                 # Extract juan title text (e.g. "阿毘達磨俱舍論卷第一")
                 juan_text = _extract_text(elem).strip()
                 if juan_text:
-                    current_lines.append(juan_text)
+                    current_lines.append(with_pending_lb(juan_text))
             return
 
         # Extract byline (author/translator info)
         if tag == f"{{{TEI_NS}}}byline":
             text = _extract_text(elem).strip()
             if text:
-                current_lines.append(text)
+                current_lines.append(with_pending_lb(text))
             return
 
         # Skip certain elements
@@ -324,7 +343,7 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
                 # by only breaking when the previous line ends with punctuation.
                 if tag == f"{{{TEI_NS}}}p" and current_lines:
                     current_lines.append("")
-                current_lines.append(text)
+                current_lines.append(with_pending_lb(text))
             return
 
         # For <lg> (verse group), process children
@@ -342,6 +361,7 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
         # CBETA fragments are preface-only) — never silently emptied.
         # Deliberately narrow: only type="xu", not a general front-matter filter.
         if tag == f"{{{CB_NS}}}div" and elem.get("type") == "xu":
+            pending_lb.clear()  # 序文前的行号不属于正文，别贴到正文开头
             preface_text = _extract_text(elem).strip()
             if preface_text:
                 preface_lines.append(preface_text)

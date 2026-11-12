@@ -80,6 +80,52 @@ def test_line_anchors_recorded(tmp_path):
     assert {"offset": 0, "line": "0001a01"} in lines
 
 
+# 真实 CBETA 的写法：段首那一行的 <lb> 在 <p> / <head> / <byline> 外面（T09n0278 原样节选）。
+LB_OUTSIDE_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<TEI xmlns="http://www.tei-c.org/ns/1.0" xmlns:cb="http://www.cbeta.org/ns/1.0">
+<teiHeader/>
+<text><body>
+<lb n="0395a01" ed="T"/>
+<lb n="0395a03" ed="T"/><cb:juan n="001" fun="open"><cb:jhead><title>大方廣佛華嚴經</title>卷第一</cb:jhead></cb:juan>
+<lb n="0395a05" ed="T"/><byline>東晉天竺三藏佛馱跋陀羅譯</byline>
+<lb n="0395a06" ed="T"/><cb:div type="pin"><head>世間淨眼品第一</head>
+<lb n="0395a07" ed="T"/><p>如是我聞：</p><p cb:place="inline">一時，佛在摩竭提國寂滅道場始
+<lb n="0395a08" ed="T"/>成正覺。</p>
+<lb n="0395b11" ed="T"/><p>與十佛世界微塵數等大菩薩俱，其名曰：普
+<lb n="0395b12" ed="T"/>賢菩薩、普德智光菩薩。</p>
+</cb:div>
+</body></text></TEI>
+"""
+
+
+def _ref_at(juan: dict, needle: str) -> str:
+    """选区起点落在 needle 首字时，前端取「之前最近的行号」——这里照同一规则算。"""
+    pos = juan["content"].index(needle)
+    return [la["line"] for la in juan["line_anchors"] if la["offset"] <= pos][-1]
+
+
+def test_line_anchor_outside_paragraph_is_kept(tmp_path):
+    """段首行的 <lb> 在 <p> 外面：原先整条丢失，段首行的字被算到上一段末行。"""
+    juan = parse_tei_xml(_write(tmp_path, LB_OUTSIDE_XML))[0]
+    assert _ref_at(juan, "如是我聞") == "0395a07"
+    assert _ref_at(juan, "成正覺") == "0395a08"
+    assert _ref_at(juan, "與十佛") == "0395b11"  # 修前是 0395a08
+    assert _ref_at(juan, "普\n賢") == "0395b11"
+    assert _ref_at(juan, "賢菩薩") == "0395b12"
+    assert _ref_at(juan, "世間淨眼品") == "0395a06"
+    assert _ref_at(juan, "東晉") == "0395a05"
+    assert _ref_at(juan, "大方廣佛華嚴經") == "0395a03"
+    # 卷首空行 a01 没有字，不单独占一个锚点
+    assert "0395a01" not in {la["line"] for la in juan["line_anchors"]}
+
+
+def test_line_anchor_outside_paragraph_leaves_content_unchanged(tmp_path):
+    """只多记行号，正文一个字不变（校勘偏移依赖正文，不能动）。"""
+    juan = parse_tei_xml(_write(tmp_path, LB_OUTSIDE_XML))[0]
+    assert not any(ord(c) < 0x20 and c != "\n" for c in juan["content"])
+    assert juan["content"].startswith("大方廣佛華嚴經卷第一\n東晉天竺三藏佛馱跋陀羅譯\n世間淨眼品第一\n\n如是我聞：")
+
+
 def test_apparatus_entry_substitution(tmp_path):
     """A substitution app resolves lemma, sigla, readings, and offsets."""
     result = parse_tei_apparatus(_write(tmp_path, APP_XML))
