@@ -4,7 +4,7 @@ import { Spin } from "antd";
 import { useTranslation } from "react-i18next";
 import { MessageOutlined } from "@ant-design/icons";
 import type { DictGroupedSearchResponse, DictEntry } from "../api/client";
-import { MAX_WORD_LEN, type DictPopoverState } from "./ReaderDictPopover.types";
+import { MAX_WORD_LEN, dictPopoverAbove, type DictPopoverState } from "./ReaderDictPopover.types";
 import { ReportErrorForm, SimilarPassages, VernacularPanel } from "./ReaderSelectionExtras";
 import type { SelectionContext } from "./ReaderSelectionExtras.types";
 
@@ -34,7 +34,6 @@ function orderedGroups(result: DictGroupedSearchResponse | null) {
  */
 
 const POP_WIDTH = 360;
-const POP_HEIGHT = 400;
 export function ReaderDictPopover({
   state,
   onClose,
@@ -78,13 +77,13 @@ export function ReaderDictPopover({
   // 高约 280→400）；窄屏时不超过视口，与 CSS 的 max-width: calc(100vw - 16px) 同口径。
   const popW = Math.min(POP_WIDTH, window.innerWidth - 16);
   let left = state.x - popW / 2;
-  let top = state.y + 8;
   if (left < 8) left = 8;
   if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
-  if (top + POP_HEIGHT > window.innerHeight - 8) {
-    top = state.y - POP_HEIGHT - 8;
-    if (top < 8) top = 8;
-  }
+  // 翻到上方时用 bottom 锚在选区顶边之上。旧写法 top = 选区底 − 高度 − 8：
+  // 浮层实际比估计矮时底边会落进选区那一行，把选中的字盖住。
+  const pos = dictPopoverAbove(state.y, window.innerHeight)
+    ? { left, bottom: window.innerHeight - state.selTop + 8, maxHeight: Math.max(state.selTop - 16, 160), overflowY: "auto" as const }
+    : { left, top: state.y + 8 };
 
   const handleAsk = () => {
     onAsk(state.text);
@@ -94,7 +93,7 @@ export function ReaderDictPopover({
   return (
     <div
       className="reader-dict-popover"
-      style={{ left, top }}
+      style={pos}
       onMouseDown={(e) => e.stopPropagation()}
     >
       <div className="reader-dict-popover-header">

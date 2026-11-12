@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { ReaderDictPopover } from "./ReaderDictPopover";
-import type { DictPopoverState } from "./ReaderDictPopover.types";
+import { dictPopoverAbove, type DictPopoverState } from "./ReaderDictPopover.types";
 import type { DictEntry, DictGroupedSearchResponse } from "../api/client";
 
 const LONG_DEF =
@@ -26,7 +26,7 @@ function makeResult(groups: DictGroupedSearchResponse["groups"]): DictGroupedSea
 }
 
 function makeState(o: Partial<DictPopoverState> = {}): DictPopoverState {
-  return { visible: true, text: "般若", x: 100, y: 100, loading: false, result: null, ...o };
+  return { visible: true, text: "般若", x: 100, y: 100, selTop: 80, loading: false, result: null, ...o };
 }
 
 function renderPopover(state: DictPopoverState) {
@@ -134,5 +134,23 @@ describe("ReaderDictPopover 划词词典浮层", () => {
     screen.getByRole("button", { name: /问小津/ }).click();
     expect(onAsk).toHaveBeenCalledWith("涅槃");
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("选区靠视口底部时浮层翻到上方，底边停在选区顶边之上、不压住选中的字", () => {
+    // jsdom 默认视口 1024×768；选区 700–730 下方放不下 400 高的浮层
+    expect(dictPopoverAbove(730, window.innerHeight)).toBe(true);
+    renderPopover(makeState({ y: 730, selTop: 700 }));
+    const pop = document.querySelector<HTMLElement>(".reader-dict-popover")!;
+    expect(pop.style.top).toBe("");
+    // bottom = 视口高 − 选区顶 + 8 → 浮层底边在选区顶边上方 8px
+    expect(pop.style.bottom).toBe(`${window.innerHeight - 700 + 8}px`);
+  });
+
+  it("下方放得下时浮层仍在选区下方", () => {
+    expect(dictPopoverAbove(100, window.innerHeight)).toBe(false);
+    renderPopover(makeState({ y: 100, selTop: 80 }));
+    const pop = document.querySelector<HTMLElement>(".reader-dict-popover")!;
+    expect(pop.style.top).toBe("108px");
+    expect(pop.style.bottom).toBe("");
   });
 });

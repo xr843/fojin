@@ -56,7 +56,7 @@ import CitationGenerator from "../components/CitationGenerator";
 import SourceAttribution from "../components/SourceAttribution";
 import AnnotationPanel from "../components/AnnotationPanel";
 import { ReaderDictPopover } from "../components/ReaderDictPopover";
-import { DICT_POPOVER_INIT, MAX_WORD_LEN, type DictPopoverState } from "../components/ReaderDictPopover.types";
+import { DICT_POPOVER_INIT, MAX_WORD_LEN, dictPopoverAbove, type DictPopoverState } from "../components/ReaderDictPopover.types";
 import ReaderAIPanel from "../components/ReaderAIPanel";
 import ReaderParallelPanel from "../components/ReaderParallelPanel";
 
@@ -471,7 +471,9 @@ export default function TextReaderPage() {
     ref: string;
     endRef: string | null;
     x: number;
-    y: number;
+    /** 选区顶边 / 底边（视口坐标） */
+    top: number;
+    bottom: number;
     quote: string;
     markerNos: number[];
   } | null>(null);
@@ -516,11 +518,11 @@ export default function TextReaderPage() {
           .map((el) => Number(el.textContent?.replace(/[[\]]/g, "")))
           .filter((n) => Number.isFinite(n))
       : [];
-    setLineLocator(ref ? { ref, endRef, x, y: rect.top, quote: text, markerNos } : null);
+    setLineLocator(ref ? { ref, endRef, x, top: rect.top, bottom: rect.bottom, quote: text, markerNos } : null);
 
     // 短词查辞典；整句选择只显示「问小津」，不查辞典
     const isWord = text.length <= MAX_WORD_LEN;
-    setDictPopover({ visible: true, text, x, y, loading: isWord, result: null });
+    setDictPopover({ visible: true, text, x, y, selTop: rect.top, loading: isWord, result: null });
     // 划选是读者「卡住了」的最直接信号：先量有多少（2026-11-08 起），再决定要不要在
     // 这里主动给「这段什么意思 / 注疏怎么讲」。同一段连按不重复记。
     const isNewSelection = lastSelectRef.current !== text;
@@ -1542,7 +1544,15 @@ export default function TextReaderPage() {
       {lineLocator && content && (
         <div
           className="cbeta-line-locator"
-          style={{ position: "fixed", left: lineLocator.x, top: Math.max(lineLocator.y - 40, 8), transform: "translateX(-50%)" }}
+          style={{
+            position: "fixed",
+            left: lineLocator.x,
+            // 辞典浮层翻到选区上方时，浮条改到选区下方，两者不再叠在一起
+            top: dictPopoverAbove(lineLocator.bottom, window.innerHeight)
+              ? Math.min(lineLocator.bottom + 8, window.innerHeight - 40)
+              : Math.max(lineLocator.top - 40, 8),
+            transform: "translateX(-50%)",
+          }}
         >
           {/* 大正藏给 CBETA 行首（T08n0235_p0749a05）；卍续藏的行号混着 R 版页码，只标经号与卷。 */}
           <span className="cbeta-line-locator-ref">

@@ -230,7 +230,7 @@
   position: fixed;
   z-index: 1050;
   /* 2026-11-08 字号放大（释义 12.5→14px）后同步加宽，每行字数不至于变少；
-     宽高与 ReaderDictPopover.tsx 的 POP_WIDTH / POP_HEIGHT 一致 */
+     宽高与 ReaderDictPopover.tsx 的 POP_WIDTH、ReaderDictPopover.types.ts 的 DICT_POPOVER_HEIGHT 一致 */
   width: 360px;
   max-width: calc(100vw - 16px);
   background: #fffef8;

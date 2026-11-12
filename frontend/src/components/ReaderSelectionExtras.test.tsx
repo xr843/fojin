@@ -53,7 +53,7 @@ function hit(textId: number, title: string, juan = 1) {
 }
 
 function state(text = SELECTED): DictPopoverState {
-  return { visible: true, text, x: 100, y: 100, loading: false, result: null };
+  return { visible: true, text, x: 100, y: 100, selTop: 80, loading: false, result: null };
 }
 
 function renderPopover(o: { text?: string; context?: SelectionContext; loggedIn?: boolean } = {}) {
