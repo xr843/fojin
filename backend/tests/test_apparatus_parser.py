@@ -133,6 +133,18 @@ def test_line_anchor_outside_paragraph_ignores_r_edition(tmp_path):
     assert {la["line"] for la in juan["line_anchors"]} == {"0002c18", "0005a10"}
 
 
+def test_line_anchor_outside_paragraph_ignores_old_type(tmp_path):
+    """印順著作集段外并列 type="old" 的旧版 <lb>，同样不能当行号（Y13n0013 原样节选）。"""
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+<TEI xmlns="http://www.tei-c.org/ns/1.0" xmlns:cb="http://www.cbeta.org/ns/1.0"><teiHeader/><text><body>
+<lb n="0002a04" ed="Y"/><lb n="0002a05" ed="Y" type="old"/><p>唯心，為大師出家之法名
+<lb n="0002a05" ed="Y"/><lb n="0002a06" ed="Y" type="old"/>覺昌隆</p>
+</body></text></TEI>
+"""
+    juan = parse_tei_xml(_write(tmp_path, xml))[0]
+    assert _ref_at(juan, "唯心") == "0002a04"
+
+
 def test_line_anchor_outside_paragraph_leaves_content_unchanged(tmp_path):
     """只多记行号，正文一个字不变（校勘偏移依赖正文，不能动）。"""
     juan = parse_tei_xml(_write(tmp_path, LB_OUTSIDE_XML))[0]

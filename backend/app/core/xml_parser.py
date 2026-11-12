@@ -287,9 +287,10 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
 
         if tag == f"{{{TEI_NS}}}lb":
             n = elem.get("n")
-            # 卍续藏每行并列两个 <lb>：本藏 ed="X" 与新文丰版 ed="R022" 等，编号会撞车
-            # （X0288 的 R022 0005a10 在卷首、X 0005a10 在后面）。只认本藏的。
-            if n and not re.match(r"R\d", elem.get("ed", "")):
+            # 并列的别版行号不算：卍续藏 ed="R022" 等（新文丰版）、印順著作集 type="old"（旧版）。
+            # 它们的编号会和本藏撞车（X0288 的 R022 0005a10 在卷首、X 0005a10 在后面），
+            # 段外只留最后一个 <lb>，混进来就会把行号贴错位置。
+            if n and not re.match(r"R\d", elem.get("ed", "")) and elem.get("type") != "old":
                 pending_lb.append(f"\x00L:{n}\x00")
             return
 
