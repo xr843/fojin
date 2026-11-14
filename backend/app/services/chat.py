@@ -488,6 +488,7 @@ async def _prepare_chat(
     model_id: str | None = None,
     attachment_ids: list[int] | None = None,
     regenerate: bool = False,
+    ui_lang: str | None = None,
 ) -> tuple[ChatSession | None, str, str, str, bool, str, list[ChatSource], list[dict[str, str]], list[ChatAttachment]]:
     """Shared setup for send_message and send_message_stream.
 
@@ -593,6 +594,7 @@ async def _prepare_chat(
         history, context_text, message, master_id=master_id,
         reading_context=reading_context,
         llm_message_override=llm_message_override,
+        ui_lang=ui_lang,
     )
 
     return (
@@ -617,6 +619,7 @@ async def send_message(
     hot_question_id: int | None = None,
     model_id: str | None = None,
     attachment_ids: list[int] | None = None,
+    ui_lang: str | None = None,
 ) -> ChatResponse:
     _t0 = _time.monotonic()
     (
@@ -626,6 +629,7 @@ async def send_message(
         db, user_id, message, session_id, user, client_ip=client_ip, redis=redis, master_id=master_id,
         text_id=text_id, juan_num=juan_num, selected_text=selected_text, page_content=page_content,
         hot_question_id=hot_question_id, model_id=model_id, attachment_ids=attachment_ids,
+        ui_lang=ui_lang,
     )
     _t1 = _time.monotonic()
     logger.info("TIMING: _prepare_chat took %.2fs", _t1 - _t0)
@@ -860,6 +864,7 @@ async def send_message_stream(
     model_id: str | None = None,
     attachment_ids: list[int] | None = None,
     regenerate: bool = False,
+    ui_lang: str | None = None,
     # token: production SSE path passes the raw bearer token; the user is then
     # resolved INSIDE the prep-phase session (see Phase-1 below) instead of via
     # Depends(get_optional_user), which would pin a PG connection for the whole
@@ -930,6 +935,7 @@ async def send_message_stream(
                 selected_text=selected_text, page_content=page_content,
                 hot_question_id=hot_question_id, model_id=model_id,
                 attachment_ids=attachment_ids, regenerate=regenerate,
+                ui_lang=ui_lang,
             )
             # Capture the ORM rows' plain scalar values WHILE the instances
             # are still bound to db_prep. On block exit, close() rolls back the
