@@ -26,6 +26,11 @@ const GROUP_LABEL_KEY: Record<SearchSuggestionType, string> = {
 // 问号，或常见疑问词/句式。经名、词头、人名不会命中。
 const QUESTION_RE = /[?？]|是什么|什么是|为什么|為什麼|为何|如何|怎么|怎樣|怎样|哪|吗$|嗎$|意思|区别|區別|含义|含義|\bwhat\b|\bwhy\b|\bhow\b|\bwho\b/i;
 
+/** 带问号或疑问词（不含「长度 ≥12 就当问题」那条——那条只适合联想框的排序）。 */
+export function hasQuestionCue(q: string): boolean {
+  return QUESTION_RE.test(q.trim());
+}
+
 export function looksLikeQuestion(q: string): boolean {
   const s = q.trim();
   if (!s) return false;

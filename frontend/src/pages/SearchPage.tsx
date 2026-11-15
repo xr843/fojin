@@ -14,6 +14,7 @@ import {
 import { searchTexts, searchContent, searchDictionary, searchCrossLanguage, searchSemantic, searchUnified, searchParallelSentences, getSources, getSearchSuggestions, searchDictionaryGrouped, getCbetaRedirect, resolveUrn } from "../api/client";
 import type { DictGroupedSearchResponse } from "../api/client";
 import { hasDirectSearchUrl } from "../utils/sourceUrls";
+import SearchSourceCard from "../components/SearchSourceCard";
 import { addSearchHistory, getSearchHistory, type SearchHistoryItem } from "../utils/history";
 import { askAiKind, buildAskAiUrl } from "../utils/searchAskAi";
 import { clampSearchQuery } from "../utils/searchQuery";
@@ -377,6 +378,8 @@ export default function SearchPage() {
             : t("search.subtitle_content")}
         </div>
       </div>
+
+      <SearchSourceCard query={query} />
 
       {askKind && (
         <div className="s-ask-ai">

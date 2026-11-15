@@ -705,6 +705,40 @@
   }
 }
 
+/* 「出处」卡片：贴一段原文来搜时，结果上方直接写出原典（见 SearchSourceCard） */
+.s-source-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 760px;
+  margin: 0 auto 14px;
+  padding: 10px 14px;
+  background: var(--fj-card-bg);
+  border: 1px solid var(--fj-border);
+  border-left: 3px solid var(--fj-gold, #b08d57);
+  border-radius: 6px;
+}
+.s-source-icon { color: var(--fj-highlight); font-size: 16px; margin-top: 3px; }
+.s-source-body { min-width: 0; flex: 1; }
+.s-source-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.s-source-label { color: var(--fj-ink-muted); font-size: 12px; letter-spacing: 1px; }
+.s-source-title {
+  color: var(--fj-highlight);
+  font-family: "Noto Serif SC", serif;
+  font-size: 15px;
+  font-weight: 600;
+}
+.s-source-title:hover { text-decoration: underline; }
+.s-source-id { color: var(--fj-ink-muted); font-size: 12px; }
+.s-source-verify { color: var(--fj-ink-light); font-size: 13px; margin-left: auto; }
+.s-source-verify:hover { color: var(--fj-highlight); text-decoration: underline; }
+.s-source-hint { margin-top: 4px; color: var(--fj-ink-muted); font-size: 12px; line-height: 1.5; }
+
+@media (max-width: 768px) {
+  .s-source-card { margin: 0 0 12px; }
+  .s-source-verify { margin-left: 0; flex-basis: 100%; min-height: 32px; display: inline-flex; align-items: center; }
+}
+
 /* 「问小津」：查到出处之后，直接把这句话交给 AI 解释（/chat 深链） */
 .s-ask-ai {
   display: flex;

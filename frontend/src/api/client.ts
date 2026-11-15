@@ -2137,6 +2137,29 @@ export interface ClaimVerdict {
   segments: ClaimSegment[];
 }
 
+/** One fascicle where /verify/quote confirmed the text verbatim; earliest in canon first. */
+export interface QuoteMatch {
+  text_id: number;
+  cbeta_id: string | null;
+  title_zh: string | null;
+  juan_num: number;
+  reader_url: string | null;
+  canon_class: CanonClass | null;
+}
+
+/** Subset of the backend QuoteVerdict the search page uses. */
+export interface QuoteVerdict {
+  quote: string;
+  verbatim: boolean;
+  matches: QuoteMatch[];
+  matches_capped: boolean;
+}
+
+export async function verifyQuote(q: string): Promise<QuoteVerdict> {
+  const { data } = await api.get<QuoteVerdict>("/verify/quote", { params: { q } });
+  return data;
+}
+
 export async function verifyClaim(q: string): Promise<ClaimVerdict> {
   const { data } = await api.get<ClaimVerdict>("/verify/claim", { params: { q } });
   return data;
