@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import re
 from collections import defaultdict
@@ -19,6 +20,7 @@ from app.schemas.text import (
     SemanticSearchHit,
     SemanticSearchResponse,
 )
+from app.services.canon_class import CANON_ORDER_SCRIPT, canon_order_key
 from app.services.embedding import generate_embedding
 from app.services.gaiji import GaijiNormalizer, expand_for_query
 from app.services.passage_locator import fast_normalise
@@ -418,6 +420,8 @@ PHRASE_MIN_CLAUSE = 2
 PHRASE_MAX_CLAUSES = 8
 # 粗筛取多少部作品去逐字核对。前端只展示 6 部，粗筛的精确率实测约四成。
 PHRASE_CANDIDATE_WORKS = 30
+# 按藏经编号补进来的候选部数：原典几乎总在最靠前的几部里；多取只会多拉全文、拖慢核对。
+PHRASE_CANON_WORKS = 10
 # 每多少个二元组允许丢一个：CBETA 原文每 17–20 字一个硬换行，换行处不生成二元组。
 PHRASE_BIGRAMS_PER_WRAP = 16
 
@@ -448,6 +452,17 @@ def _phrase_clauses(query: str) -> list[dict]:
             {"match": {"content": {"query": c, "analyzer": "cjk_content", "minimum_should_match": f"-{allow}"}}}
         )
     return clauses
+
+
+def _canon_pool_query(query: str, bag: list[dict]) -> dict:
+    """Exact recall for the canon-order pool. Ordered by Taishō number, a loose
+    bigram bag fills the first slots with early texts that merely share the
+    characters (bag precision ~40%), and the source falls out again. The
+    ``content.nopunct`` subfield joins hard wraps and drops punctuation between
+    Han characters at index time (es_text_contents_join_wraps.py), so a phrase
+    match there is exact — the same route /verify uses. The bag clauses stay as
+    ``should`` only so the ``content`` field still gets highlight fragments."""
+    return {"bool": {"must": [{"match_phrase": {"content.nopunct": {"query": query}}}], "should": bag}}
 
 
 async def _juan_bodies(es: AsyncElasticsearch, pairs: list[tuple[int, int]]) -> dict[tuple[int, int], str]:
@@ -482,8 +497,22 @@ async def _verified_phrase_hits(
     must = _phrase_clauses(query)
     if not must:
         return empty
-    cand = await _run_content_search(es, {"bool": {"must": must}}, 1, PHRASE_CANDIDATE_WORKS, sources, lang)
-    pairs = [(w["text_id"], mj["juan_num"]) for w in cand["results"] for mj in w["matched_juans"]]
+    # Two candidate pools, verified together. BM25 alone drops the source: a
+    # famous line is quoted many times in each commentary fascicle, so dozens of
+    # commentaries outscore the sūtra and it falls outside the top
+    # PHRASE_CANDIDATE_WORKS (measured 2026-11-15: 應無所住而生其心 → T0235 at
+    # BM25 rank 40, absent from all 28 verified hits). The canon-order pool
+    # (Taishō number = sūtra → vinaya → treatise → commentary, same as
+    # /verify) brings the earliest texts in; BM25 keeps later texts that match
+    # well. See canon_class.py.
+    cand, early = await asyncio.gather(
+        _run_content_search(es, {"bool": {"must": must}}, 1, PHRASE_CANDIDATE_WORKS, sources, lang),
+        _run_content_search(es, _canon_pool_query(query, must), 1, PHRASE_CANON_WORKS, sources, lang, canon_order=True),
+    )
+    works: dict[int, dict] = {w["text_id"]: w for w in cand["results"]}
+    for w in early["results"]:
+        works.setdefault(w["text_id"], w)
+    pairs = [(w["text_id"], mj["juan_num"]) for w in works.values() for mj in w["matched_juans"]]
     bodies = {k: fast_normalise(v) for k, v in (await _juan_bodies(es, pairs)).items()}
     needles = [fast_normalise(c) for c in _phrase_clause_texts(query)]
 
@@ -492,7 +521,7 @@ async def _verified_phrase_hits(
         return body is not None and all(n in body for n in needles)
 
     verified = []
-    for w in cand["results"]:
+    for w in works.values():
         juans = [mj for mj in w["matched_juans"] if contains_all((w["text_id"], mj["juan_num"]))]
         if not juans:
             continue
@@ -503,11 +532,13 @@ async def _verified_phrase_hits(
             "matched_juan_count": len(juans),
             "matched_juans": juans,
         })
+    # Earliest in canon first, so the source leads and its commentaries follow.
+    verified.sort(key=lambda w: canon_order_key(w.get("cbeta_id")))
     return {
         "total": len(verified),
         # Only the top PHRASE_CANDIDATE_WORKS bag hits are checked; past that the
         # true count is unknown, so say "at least" rather than a wrong number.
-        "total_capped": cand["total"] > PHRASE_CANDIDATE_WORKS,
+        "total_capped": cand["total"] > len(works),
         "total_juans": sum(w["matched_juan_count"] for w in verified),
         "page": page,
         "size": size,
@@ -596,6 +627,7 @@ async def _run_content_search(
     canon: str | None = None,
     section: str | None = None,
     facets: bool = False,
+    canon_order: bool = False,
 ) -> dict:
     active = facet_clauses(canon=canon, lang=lang, dynasty=dynasty, section=section)
     inline = {} if facets else active
@@ -644,6 +676,9 @@ async def _run_content_search(
         "from": (page - 1) * size,
         "size": size,
     }
+    if canon_order:
+        body["sort"] = [{"_script": {"type": "number", "script": {"source": CANON_ORDER_SCRIPT}, "order": "asc"}}]
+        body["track_scores"] = True  # a script sort leaves _score null otherwise
 
     # Use a separate cardinality aggregation to get total unique works
     totals = {

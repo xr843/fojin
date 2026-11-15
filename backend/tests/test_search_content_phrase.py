@@ -17,6 +17,7 @@ import pytest
 
 from app.services.search import (
     PHRASE_CANDIDATE_WORKS,
+    PHRASE_CANON_WORKS,
     PHRASE_MAX_CLAUSES,
     _phrase_clause_texts,
     _phrase_clauses,
@@ -164,3 +165,54 @@ async def test_default_mode_is_unchanged_plain_match() -> None:
     await search_content(es, "應無所住而生其心")
     query = es.search.await_args.kwargs["body"]["query"]
     assert query == {"match": {"content": {"query": "應無所住而生其心", "analyzer": "cjk_content"}}}
+
+
+def _cworked(text_id: int, cbeta_id: str, juan: int = 1) -> dict:
+    w = _work(text_id, [juan])
+    w["_source"]["cbeta_id"] = cbeta_id
+    return w
+
+
+def _two_pool_es(bm25: list[dict], canon: list[dict], bodies: dict[tuple[int, int], str]) -> AsyncMock:
+    """BM25 pool = no ``sort``; canon-order pool = script sort (see _run_content_search)."""
+
+    async def search(index: str, body: dict, **_: object) -> dict:
+        if "collapse" in body:
+            works = canon if "sort" in body else bm25
+            n = len(works)
+            return {"hits": {"hits": works}, "aggregations": {"total_works": {"value": n}, "total_juans": {"value": n}}}
+        hits = [{"_source": {"text_id": t, "juan_num": j, "content": c}} for (t, j), c in bodies.items()]
+        return {"hits": {"hits": hits}}
+
+    es = AsyncMock()
+    es.search.side_effect = search
+    return es
+
+
+@pytest.mark.asyncio
+async def test_source_outranked_by_commentaries_is_still_found_and_leads() -> None:
+    # 生产 2026-11-15：「應無所住而生其心」BM25 下《金剛經》T0235 排第 40，前 30 全是注疏，
+    # 逐字核对的候选里根本没有它。按藏经编号的那组候选把它带回来，并排在注疏前面。
+    passage = "應無所住而生其心"
+    commentaries = [_cworked(500 + i, f"X{468 + i:04d}") for i in range(3)]
+    bodies = {(w["_source"]["text_id"], 1): f"注云{passage}也" for w in commentaries}
+    bodies[(7, 1)] = "不應住聲香味觸法生心，應無所\n住而生其心。"
+    es = _two_pool_es(bm25=commentaries, canon=[_cworked(7, "T0235"), *commentaries], bodies=bodies)
+
+    out = await search_content(es, passage, phrase=True)
+
+    assert [w["cbeta_id"] for w in out["results"]] == ["T0235", "X0468", "X0469", "X0470"]
+    canon_bodies = [c.kwargs["body"] for c in es.search.await_args_list if "sort" in c.kwargs["body"]]
+    assert len(canon_bodies) == 1 and canon_bodies[0]["track_scores"] is True
+    # 按编号那组必须是精确匹配：用词袋的话，最靠前的几部会被「字差不多」的早期经占满，原典又被挤掉
+    assert canon_bodies[0]["query"]["bool"]["must"] == [{"match_phrase": {"content.nopunct": {"query": passage}}}]
+    assert canon_bodies[0]["size"] == PHRASE_CANON_WORKS
+
+
+@pytest.mark.asyncio
+async def test_work_in_both_pools_is_listed_once() -> None:
+    es = _two_pool_es(
+        bm25=[_cworked(7, "T0235")], canon=[_cworked(7, "T0235")], bodies={(7, 1): "應無所住而生其心"}
+    )
+    out = await search_content(es, "應無所住而生其心", phrase=True)
+    assert [w["text_id"] for w in out["results"]] == [7]
