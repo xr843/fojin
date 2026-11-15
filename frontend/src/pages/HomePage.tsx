@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { Helmet } from "react-helmet-async";
 import { useQuery } from "@tanstack/react-query";
 import { AutoComplete } from "antd";
@@ -27,6 +27,8 @@ import { useAuthStore } from "../stores/authStore";
 import "../styles/home.css"; // mobile-responsive v2.1
 import { LangAlternates } from "../seo/LangAlternates";
 
+const GUEST_TIP_KEY = "fojin.home.guestTipDismissed";
+
 /** 代码点级截断：CBETA 题名偶含扩展 B 区汉字，String.slice 会撕裂代理对。 */
 function truncateTitle(title: string, max = 12): string {
   const chars = Array.from(title);
@@ -40,7 +42,22 @@ export default function HomePage() {
   const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
   const [sourceOpen, setSourceOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [tipDismissed, setTipDismissed] = useState(false);
+  // 关闭后记住（以前只存在组件 state 里，回到首页又会冒出来）
+  const [tipDismissed, setTipDismissed] = useState(() => {
+    try {
+      return localStorage.getItem(GUEST_TIP_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const dismissTip = () => {
+    setTipDismissed(true);
+    try {
+      localStorage.setItem(GUEST_TIP_KEY, "1");
+    } catch {
+      /* 隐私模式：本次会话内关闭即可 */
+    }
+  };
   const inputRef = useRef<HTMLInputElement>(null);
   // 一次性读取，避免每次 render 触碰 localStorage；「最近阅读」栏移除条目时回写这里，
   // 让下方「读经」卡的「继续读《…》」同步变化
@@ -223,7 +240,13 @@ export default function HomePage() {
         <div className="home-hot-tags">
           <span className="home-hot-label">{t("home.hot_label")}</span>
           {hotTags.map((tag) => (
-            <button key={tag} className="home-hot-tag" onClick={() => handleSearch(tag)}>
+            <button
+              key={tag}
+              className="home-hot-tag"
+              data-umami-event="home_hot_tag"
+              data-umami-event-tag={tag}
+              onClick={() => handleSearch(tag)}
+            >
               {tag}
             </button>
           ))}
@@ -253,31 +276,27 @@ export default function HomePage() {
           {/* 首页功能卡与顶部导航一一对应、同顺序：AI 问答 · 读经 · 佛学辞典 · 数据源 · 知识图谱
               （2026-11-03 按 30 天真实使用重排，读经取代经典专题）。核对经文、佛教地理不在导航，
               卡片也不放；/verify、/map、/collections 路由仍可直达。导航增减时这里同步改。 */}
-          <div
+          <Link
             className="home-feature-card"
             data-umami-event="home_card"
             data-umami-event-card="chat"
-            onClick={() =>
-              navigate(sc.chat ? `/chat?q=${encodeURIComponent(sc.chat)}` : "/chat")
-            }
+            to={sc.chat ? `/chat?q=${encodeURIComponent(sc.chat)}` : "/chat"}
           >
             <RobotOutlined className="home-feature-icon" />
             <div className="home-feature-title">{t("home.feature_chat_title")}</div>
             <div className="home-feature-desc">
               {sc.chat || t("home.feature_chat_desc")}
             </div>
-          </div>
+          </Link>
           {/* 读经卡：有本地阅读记录就直达上次读到的卷，否则去 /read。 */}
-          <div
+          <Link
             className="home-feature-card"
             data-umami-event="home_card"
             data-umami-event-card={recentReading[0] ? "read_continue" : "read"}
-            onClick={() =>
-              navigate(
-                recentReading[0]
-                  ? `/texts/${recentReading[0].textId}/read?juan=${recentReading[0].juan}`
-                  : "/read",
-              )
+            to={
+              recentReading[0]
+                ? `/texts/${recentReading[0].textId}/read?juan=${recentReading[0].juan}`
+                : "/read"
             }
           >
             <ReadOutlined className="home-feature-icon" />
@@ -287,14 +306,12 @@ export default function HomePage() {
                 ? t("home.feature_read_continue", { title: truncateTitle(recentReading[0].title) })
                 : t("home.feature_read_desc")}
             </div>
-          </div>
-          <div
+          </Link>
+          <Link
             className="home-feature-card"
             data-umami-event="home_card"
             data-umami-event-card="dict"
-            onClick={() =>
-              navigate(sc.dict ? `/dictionary?q=${encodeURIComponent(sc.dict.term)}` : "/dictionary")
-            }
+            to={sc.dict ? `/dictionary?q=${encodeURIComponent(sc.dict.term)}` : "/dictionary"}
           >
             <FileTextOutlined className="home-feature-icon" />
             <div className="home-feature-title">{t("home.feature_dict_title")}</div>
@@ -303,12 +320,12 @@ export default function HomePage() {
                 ? `${sc.dict.term}${sc.dict.definition ? ` — ${pickHan(sc.dict.definition, sc.dict.definition_hans, i18n.language)}` : ""}`
                 : t("home.feature_dict_desc")}
             </div>
-          </div>
-          <div
+          </Link>
+          <Link
             className="home-feature-card"
             data-umami-event="home_card"
             data-umami-event-card="sources"
-            onClick={() => navigate("/sources")}
+            to="/sources"
           >
             <DatabaseOutlined className="home-feature-icon" />
             <div className="home-feature-title">{t("home.feature_sources_title")}</div>
@@ -320,12 +337,12 @@ export default function HomePage() {
                   })
                 : t("home.feature_sources_desc")}
             </div>
-          </div>
-          <div
+          </Link>
+          <Link
             className="home-feature-card"
             data-umami-event="home_card"
             data-umami-event-card="kg"
-            onClick={() => navigate("/kg")}
+            to="/kg"
           >
             <ApartmentOutlined className="home-feature-icon" />
             <div className="home-feature-title">{t("home.feature_kg_title")}</div>
@@ -334,7 +351,7 @@ export default function HomePage() {
                 ? `${pickHan(sc.kg.subject, sc.kg.subject_hans, i18n.language)} → ${sc.kg.predicate} → ${pickHan(sc.kg.object, sc.kg.object_hans, i18n.language)}`
                 : t("home.feature_kg_desc")}
             </div>
-          </div>
+          </Link>
         </div>
 
         {!user && !tipDismissed && (
@@ -342,21 +359,20 @@ export default function HomePage() {
             <InfoCircleOutlined style={{ marginRight: 6, flexShrink: 0 }} />
             <span>
               {t("home.guest_tip.before")}
-              <a onClick={() => navigate("/login")} style={{ cursor: "pointer", textDecoration: "underline" }}>
+              <Link to="/login" style={{ textDecoration: "underline" }}>
                 {t("home.guest_tip.login")}
-              </a>
+              </Link>
               {t("home.guest_tip.after")}
             </span>
-            <CloseOutlined
-              onClick={() => setTipDismissed(true)}
-              style={{ marginLeft: 8, cursor: "pointer", flexShrink: 0, fontSize: 12, opacity: 0.6 }}
-            />
+            <button type="button" className="home-tip-close" onClick={dismissTip} aria-label={t("home.guest_tip.dismiss")}>
+              <CloseOutlined />
+            </button>
           </div>
         )}
 
         <div className="home-trust">
           {t("home.trust")} ·{" "}
-          <span className="home-trust-link" onClick={() => navigate("/sources")}>{t("home.trust_link")}</span>
+          <Link className="home-trust-link" to="/sources">{t("home.trust_link")}</Link>
         </div>
 
       </section>
