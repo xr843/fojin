@@ -60,6 +60,38 @@ export function getReadingHistory(): ReadingEntry[] {
   return readAll();
 }
 
+/** 从最近阅读里删掉一部经（首页「最近阅读」的 × 按钮）。返回删除后的列表。 */
+export function removeReading(textId: number): ReadingEntry[] {
+  const rest = readAll().filter((e) => e.textId !== textId);
+  writeAll(rest);
+  return rest;
+}
+
+/**
+ * 「3 天前」「昨天」这类相对时间，跟随界面语言（zh / zh-Hant / en）。
+ * 一分钟内（含设备时钟回拨导致的未来时间）返回 justNow ——
+ * Intl 在 0 秒时给的是「现在」/"now"，用作阅读时间不通顺。
+ */
+export function formatReadAgo(ts: number, now: number, lang: string, justNow: string): string {
+  const sec = Math.max(0, Math.round((now - ts) / 1000));
+  let rtf: Intl.RelativeTimeFormat;
+  try {
+    rtf = new Intl.RelativeTimeFormat(lang, { numeric: "auto" });
+  } catch {
+    rtf = new Intl.RelativeTimeFormat("zh", { numeric: "auto" });
+  }
+  if (sec < 60) return justNow;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return rtf.format(-min, "minute");
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return rtf.format(-hr, "hour");
+  const day = Math.floor(hr / 24);
+  if (day < 30) return rtf.format(-day, "day");
+  const month = Math.floor(day / 30);
+  if (month < 12) return rtf.format(-month, "month");
+  return rtf.format(-Math.floor(month / 12), "year");
+}
+
 /** 某部经的上次阅读位置；无记录返回 null。 */
 export function getLastPosition(textId: number): ReadingEntry | null {
   return readAll().find((e) => e.textId === textId) ?? null;

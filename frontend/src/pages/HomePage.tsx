@@ -17,6 +17,7 @@ import { useTranslation } from "react-i18next";
 import { InfoCircleOutlined, CloseOutlined } from "@ant-design/icons";
 import SourceSelector from "../components/SourceSelector";
 import XiaojinPet from "../components/XiaojinPet";
+import HomeRecentReading from "../components/HomeRecentReading";
 import { getStats, getSources, getFilters, getSearchSuggestItems, getHomeShowcase } from "../api/client";
 import { askQueryFrom, buildHomeSuggestOptions, itemsFromSuggestResponse, type SuggestGroup } from "./homeSuggest";
 import { getLangName } from "../utils/sourceUrls";
@@ -41,8 +42,9 @@ export default function HomePage() {
   const [query, setQuery] = useState("");
   const [tipDismissed, setTipDismissed] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  // 一次性读取，避免每次 render 触碰 localStorage
-  const [recentReading] = useState(() => getReadingHistory().slice(0, 3));
+  // 一次性读取，避免每次 render 触碰 localStorage；「最近阅读」栏移除条目时回写这里，
+  // 让下方「读经」卡的「继续读《…》」同步变化
+  const [recentReading, setRecentReading] = useState(() => getReadingHistory());
 
   const { data: stats } = useQuery({ queryKey: ["stats"], queryFn: getStats });
   const { data: sources } = useQuery({ queryKey: ["sources"], queryFn: getSources, enabled: sourceOpen });
@@ -227,22 +229,8 @@ export default function HomePage() {
           ))}
         </div>
 
-        {/* 续读入口：有本地阅读记录才出现，复用热门检索的样式 */}
-        {recentReading.length > 0 && (
-          <div className="home-hot-tags">
-            <span className="home-hot-label">{t("home.continue_reading")}</span>
-            {recentReading.map((e) => (
-              <button
-                key={e.textId}
-                className="home-hot-tag"
-                onClick={() => navigate(`/texts/${e.textId}/read?juan=${e.juan}`)}
-                title={e.title}
-              >
-                《{truncateTitle(e.title)}》{t("home.juan_n", { n: e.juan })}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* 最近阅读：有本地阅读记录才出现（对标 CBETA Online 首页「最近操作」） */}
+        <HomeRecentReading initial={recentReading} onChange={setRecentReading} />
 
         <div className="home-stats" role="group" aria-label={t("home.stat_label")}>
           <div className="home-stat-item">
