@@ -409,7 +409,9 @@
   "home.selected_sources": "已選 {{n}} 源",
   "home.select_source": "選擇資料來源",
   "home.hot_label": "熱門檢索",
-  "home.continue_reading": "繼續閱讀",
+  "home.recent_reading": "最近閱讀",
+  "home.recent_remove": "從最近閱讀中移除《{{title}}》",
+  "home.read_just_now": "剛剛",
   "home.juan_n": "第{{n}}卷",
   "home.hot_tags": [
     "金剛經",
