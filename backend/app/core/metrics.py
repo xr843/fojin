@@ -82,7 +82,7 @@ RAG_CONTEXT_CHUNKS = Histogram(
 # Anti-hallucination guard rewrites. Rising = the model is inventing citations
 # the whitelist rejects (a retrieval or prompt regression), the single worst
 # failure mode for a scholarly tool. Labelled by CitationMutation.kind
-# (unverified_title / fascicle_corrected).
+# (unverified_title / fascicle_corrected / placeholder_title).
 CITATION_GUARD_MUTATIONS_TOTAL = Counter(
     "fojin_citation_guard_mutations_total",
     "Model citations rewritten/stripped by the anti-hallucination guard",

@@ -51,6 +51,7 @@ from app.services.quote_verifier import (
     normalise_for_match,
     preceding_quote,
 )
+from app.services.text_titles import strip_volume_range
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,15 @@ def _norm_title(title: str) -> str:
     """Whitelist key: 繁→简 folded, stripped. Comparison-only — the answer
     keeps the LLM's original title text (the frontend's injectCitationLinks
     folds the same way, so the rendered citation still resolves)."""
-    return _t2s.convert(title).strip()
+    return _t2s.convert(strip_volume_range(title)).strip()
+
+
+# The prompt's citation template is 【《经名》第N卷】. Now and then the model
+# copies it verbatim; rewriting that to plain 「《经名》」 (as for any other
+# unretrieved title) left the reader looking at a book that does not exist
+# (4 answers in 30 days to 2026-11-16). A placeholder title cites nothing, so
+# the whole marker is dropped.
+_PLACEHOLDER_TITLES = frozenset({"经名", "书名", "典籍名"})
 
 
 # Matches 【《<title>》第<fascicle>卷】 or 【《<title>》】. The fascicle group
@@ -103,7 +112,7 @@ class CitationMutation:
     """Audit record for a single rewrite. Logged for now; a future
     migration can persist these alongside chat_messages for replay."""
 
-    kind: str  # 'unverified_title' | 'fascicle_corrected'
+    kind: str  # 'unverified_title' | 'fascicle_corrected' | 'placeholder_title'
     original: str
     replacement: str
     title: str
@@ -200,10 +209,11 @@ def enforce_citation_whitelist(
         def _strip(match: re.Match[str]) -> str:
             title = match.group(1)
             juan, _ = _parse_juan(match.group(2))
-            replacement = f"《{title}》"
+            placeholder = _norm_title(title) in _PLACEHOLDER_TITLES
+            replacement = "" if placeholder else f"《{title}》"
             mutations.append(
                 CitationMutation(
-                    kind="unverified_title",
+                    kind="placeholder_title" if placeholder else "unverified_title",
                     original=match.group(0),
                     replacement=replacement,
                     title=title,
@@ -224,6 +234,18 @@ def enforce_citation_whitelist(
         original_juan, juan_is_placeholder = _parse_juan(match.group(2))
 
         norm_title = _norm_title(title)
+        if norm_title in _PLACEHOLDER_TITLES:
+            mutations.append(
+                CitationMutation(
+                    kind="placeholder_title",
+                    original=original,
+                    replacement="",
+                    title=title,
+                    original_juan=original_juan,
+                    corrected_juan=None,
+                )
+            )
+            return ""
         if norm_title not in whitelist:
             replacement = f"《{title}》"
             mutations.append(

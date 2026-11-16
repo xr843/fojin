@@ -626,3 +626,12 @@ def test_elided_blockquote_is_verified_too():
     out, muts = verify_quoted_content(answer, [_chunk(0, _JINGANG)])
     assert muts == []
     assert out == answer
+
+
+def test_quote_in_split_work_finds_its_suffixed_source():
+    # 引文挂在《成唯識論證義》下，库里书名是「成唯識論證義(第1卷-第3卷)」——必须能找到这条来源去核对
+    from app.services.quote_verifier import _find_sources
+
+    src = _src(822, "成唯識論證義(第1卷-第3卷)", 2, "異因居過去，熟果即現在，故名異熟。")
+    found = _find_sources([src], "成唯識論證義", 2)
+    assert [s.text_id for s in found] == [822]
