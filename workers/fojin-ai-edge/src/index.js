@@ -10,8 +10,9 @@
 //      Browsers re-fetch a registered SW script at least every 24h, which is
 //      what makes this eventually reach everyone. Do not remove.
 //
-//   2. Send the domain's traffic to fojin.app, path-preserving — except the
-//      bare root, which is the short address of the agent portal.
+//   2. Show the agent portal at the bare root (proxied from fojin.app/agents,
+//      with the few assets it loads), and send every other path to fojin.app,
+//      path-preserving.
 //
 // The worker predates this directory: it was created and routed by hand in
 // the Cloudflare dashboard, and the source lived nowhere. This file is that
@@ -73,6 +74,33 @@ const JS_HEADERS = {
   "service-worker-allowed": "/",
 };
 
+// Paths served from fojin.app as-is when the portal is shown on fojin.ai.
+// The root maps to the portal page; the others are the same-origin assets
+// that page loads. They must be proxied, not redirected: the page's CSP is
+// `script-src 'self'` / `font-src 'self'`, and a redirect to fojin.app would
+// take the script and the title font off-origin, where the CSP blocks them.
+// Add a path here if agents.html starts loading another root-relative asset.
+const PORTAL_PROXY = new Map([
+  ["/", "/agents"],
+  ["/theme-init.js", "/theme-init.js"],
+  ["/favicon.svg", "/favicon.svg"],
+  ["/fonts/MaShanZheng-title-v2.woff2", "/fonts/MaShanZheng-title-v2.woff2"],
+]);
+
+async function proxyFromApp(path, request) {
+  try {
+    const upstream = await fetch("https://fojin.app" + path, {
+      method: request.method,
+      headers: { accept: request.headers.get("accept") || "*/*" },
+      redirect: "manual",
+    });
+    if (upstream.status !== 200) return null;
+    return new Response(upstream.body, upstream);
+  } catch (e) {
+    return null;
+  }
+}
+
 export default {
   async fetch(request) {
     const url = new URL(request.url);
@@ -84,12 +112,20 @@ export default {
       return new Response(KILL_REGISTER_SW, { headers: JS_HEADERS });
     }
 
-    // The bare domain is the agent portal's short address: fojin.ai is the
-    // AI-facing name, and /agents is that front door. 302 rather than 301 —
-    // the previous permanent redirect to fojin.app/ is already cached in some
-    // clients, so a permanent one here would be just as hard to take back.
-    if (url.pathname === "/") {
-      return Response.redirect("https://fojin.app/agents", 302);
+    // The bare domain *is* the agent portal: fojin.ai is the AI-facing name,
+    // so the page is served here instead of bouncing the visitor to
+    // fojin.app/agents. The page's own <link rel=canonical> still names
+    // fojin.app/agents, so search engines see one page, not two.
+    const upstreamPath = PORTAL_PROXY.get(url.pathname);
+    if (upstreamPath && (request.method === "GET" || request.method === "HEAD")) {
+      const served = await proxyFromApp(upstreamPath, request);
+      if (served) return served;
+      // fojin.app unreachable or not 2xx: fall back to the old redirect so the
+      // root never breaks harder than it did before this change. 302 rather
+      // than 301 — a permanent redirect cached in clients cannot be taken back.
+      if (url.pathname === "/") {
+        return Response.redirect("https://fojin.app/agents", 302);
+      }
     }
 
     // Every other path keeps its permanent, path-preserving redirect to the

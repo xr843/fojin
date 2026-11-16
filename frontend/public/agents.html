@@ -18,6 +18,12 @@
      the production CSP is `script-src 'self'` with no 'unsafe-inline', so an
      inline block would be silently dropped in prod. -->
 <script src="/theme-init.js"></script>
+<!-- Umami, same site as the SPA (frontend/src/umami.ts injects the identical
+     tag at runtime). This page is not part of the SPA build, so until this tag
+     existed it was the one page nobody could count visits to. External script
+     from analytics.fojin.app is already allowed by the production CSP. It also
+     records hostname, which separates fojin.ai/ visits from fojin.app/agents. -->
+<script defer src="https://analytics.fojin.app/script.js" data-website-id="c757a04c-82e0-4f53-a720-830b0e1a7287"></script>
 <style>
   /* Design tokens mirror frontend/src/styles/global.css. Kept inline (CSP allows
      'unsafe-inline' for styles, not scripts) so this page is one request.

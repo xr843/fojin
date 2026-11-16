@@ -12,7 +12,8 @@ redirects, it is this worker, not a rule.
 | --- | --- |
 | `/sw.js` | A service worker whose only job is to drop every cache, unregister itself, and navigate the client to fojin.app |
 | `/registerSW.js` | The same clean-up from the page side, for clients that fetch the vite-pwa register shim |
-| `/` | **302 → `https://fojin.app/agents`** — the agent portal's short address |
+| `/` | **The agent portal itself**, proxied from `https://fojin.app/agents` (canonical stays on fojin.app). If fojin.app does not answer 200, falls back to **302 → `https://fojin.app/agents`** |
+| `/theme-init.js`, `/favicon.svg`, `/fonts/MaShanZheng-title-v2.woff2` | Proxied from fojin.app — assets the portal loads; the page's CSP (`'self'`) would block them if redirected off-origin |
 | everything else | **301 → `https://fojin.app<path><query>`** |
 
 ### Why the kill-switch still matters
