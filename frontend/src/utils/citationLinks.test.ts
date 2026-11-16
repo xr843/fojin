@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { injectCitationLinks } from "./citationLinks";
 import type { ChatSource } from "../api/client";
+import type { TextId } from "../types/branded";
 
 /**
  * 引文链接里的「卷号」与「段号」必须来自同一处，不能各取一半。
@@ -138,5 +139,31 @@ describe("injectCitationLinks — 右括号打错的引文", () => {
     expect(links).toHaveLength(1);
     expect(links[0]).not.toContain("这一段要原样保留");
     expect(out).toContain("\n\n这一段要原样保留。\n\n");
+  });
+});
+
+describe("injectCitationLinks — 分段存储的长书（书名带「(第x卷-第y卷)」）", () => {
+  // 生产 2026-11-16：《成唯識論證義》等 22 部书在库里拆段、书名带卷册后缀；
+  // 答案写的是不带后缀的书名，以前一律对不上，出处链接出不来。
+  it("不带后缀的书名能链接到带后缀的来源", () => {
+    const sources = [src({ text_id: 822 as TextId, title_zh: "成唯識論證義(第1卷-第3卷)", juan_num: 2, chunk_index: 4, chunk_text: "無關" })];
+    const out = injectCitationLinks("见【《成唯識論證義》第2卷】。", sources);
+    expect(urlOf(out)).toMatch(/^822\/2\/4\//);
+  });
+
+  it("拆成多段时，按引用的卷号选到对应那一段（不能拿别段的编号配这一卷）", () => {
+    const sources = [
+      src({ text_id: 10006 as TextId, title_zh: "大般若波羅蜜多經(第1卷-第200卷)", juan_num: 3, chunk_index: 1, score: 0.95, chunk_text: "甲" }),
+      src({ text_id: 10008 as TextId, title_zh: "大般若波羅蜜多經(第401卷-第600卷)", juan_num: 403, chunk_index: 7, score: 0.6, chunk_text: "乙" }),
+    ];
+    const out = injectCitationLinks("见【《大般若波罗蜜多经》第403卷】。", sources);
+    // 得分更高的是 1–200 卷那段；以前会拼成 10006/403，打开是空白
+    expect(urlOf(out)).toMatch(/^10008\/403\/7\//);
+  });
+
+  it("只去掉末尾的卷册范围，书名不同的照样不链接", () => {
+    const sources = [src({ text_id: 822 as TextId, title_zh: "成唯識論證義(第1卷-第3卷)", juan_num: 2 })];
+    const out = injectCitationLinks("见【《成唯識論》第2卷】。", sources);
+    expect(urlOf(out)).toBeNull();
   });
 });

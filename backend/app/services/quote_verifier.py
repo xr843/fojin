@@ -57,6 +57,7 @@ from difflib import SequenceMatcher
 from opencc import OpenCC
 
 from app.schemas.chat import ChatSource
+from app.services.text_titles import strip_volume_range
 
 logger = logging.getLogger(__name__)
 
@@ -330,11 +331,11 @@ def _find_sources(
     while CBETA stores it in 繁体, and an exact ``==`` would then miss the
     source and false-flag the quote as having no matching source.
     """
-    target_title = _t2s.convert(title)
+    target_title = _t2s.convert(strip_volume_range(title))
     exact: list[ChatSource] = []
     title_only: list[ChatSource] = []
     for s in sources:
-        if s.title_zh and _t2s.convert(s.title_zh) == target_title:
+        if s.title_zh and _t2s.convert(strip_volume_range(s.title_zh)) == target_title:
             if juan is not None and s.juan_num == juan:
                 exact.append(s)
             else:
@@ -343,7 +344,7 @@ def _find_sources(
         # via alignment_pairs as a child of an unrelated lzh source,
         # so the parent's title_zh is never the parallel's title.
         for p in s.parallel_chunks:
-            if not p.title or _t2s.convert(p.title) != target_title:
+            if not p.title or _t2s.convert(strip_volume_range(p.title)) != target_title:
                 continue
             # Adapt the parallel chunk into a ChatSource-shaped carrier
             # so the substring test reads its chunk_text.

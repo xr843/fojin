@@ -354,3 +354,43 @@ def test_fascicle_slot_does_not_reach_across_another_title():
     out, _ = enforce_citation_whitelist(answer, sources)
     assert "乙说丙" in out
     assert "【《金刚经》第1卷】" in out
+
+
+# ── 分段存储的长书：库里书名带「(第x卷-第y卷)」后缀 ──────────────────────────
+# 2026-11-16 生产实测：30 天 124 处「书名核不上」里 27 处是这类——书就在检索结果里，
+# 只因为书名后缀对不上，正确的引用被去掉了可点击出处。
+
+
+def test_citation_of_split_work_matches_its_suffixed_source_title():
+    answer = "「異因居過去，熟果即現在，故名異熟」【《成唯識論證義》第2卷】。"
+    out, muts = enforce_citation_whitelist(answer, [_src(822, "成唯識論證義(第1卷-第3卷)", 2)])
+    assert out == answer
+    assert muts == []
+
+
+def test_split_work_fascicle_is_checked_across_all_parts():
+    # 大般若經拆成多段，卷号是绝对卷号；引第 403 卷，只要 401–600 那段在检索结果里就放行
+    sources = [_src(10006, "大般若波羅蜜多經(第1卷-第200卷)", 3), _src(10008, "大般若波羅蜜多經(第401卷-第600卷)", 403)]
+    out, muts = enforce_citation_whitelist("见【《大般若波罗蜜多经》第403卷】。", sources)
+    assert muts == []
+    # 引了没检索到的卷，照常校正到检索到的卷，而不是判成「书名核不上」
+    out, muts = enforce_citation_whitelist("见【《大般若波罗蜜多经》第999卷】。", sources)
+    assert [m.kind for m in muts] == ["fascicle_corrected"]
+
+
+def test_suffix_strip_does_not_merge_different_titles():
+    # 只去掉末尾的卷册范围；书名本身不同的照样判核不上
+    out, muts = enforce_citation_whitelist("【《成唯識論》第2卷】", [_src(822, "成唯識論證義(第1卷-第3卷)", 2)])
+    assert [m.kind for m in muts] == ["unverified_title"]
+    assert out == "《成唯識論》"
+
+
+def test_placeholder_title_copied_from_prompt_is_dropped_entirely():
+    # 模型照抄提示词模板【《经名》第N卷】：以前改成「《经名》」，读者看到一个不存在的书名
+    out, muts = enforce_citation_whitelist("此即心性本空之义【《经名》第N卷】。", [_src(7, "心经", 1)])
+    assert out == "此即心性本空之义。"
+    assert [m.kind for m in muts] == ["placeholder_title"]
+    # 没有任何检索来源时也一样
+    out, muts = enforce_citation_whitelist("见【《經名》第N卷】。", [])
+    assert out == "见。"
+    assert [m.kind for m in muts] == ["placeholder_title"]
