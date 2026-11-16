@@ -40,6 +40,16 @@ export const CITATION_URL_SCHEME = "fojin-citation";
  * 「已逐字核验」 badge a lie. Defaults to simplified, matching
  * scriptForLanguage's own fallback for any non-Hant locale.
  */
+// Long CBETA works are stored in parts whose title carries the fascicle range —
+// 「大般若波羅蜜多經(第401卷-第600卷)」. Answers cite the bare title, so the
+// index key drops that suffix (backend app/services/text_titles.py does the same
+// for citation_guard and quote_verifier). Fascicle numbers inside the parts are
+// absolute, so the right part is chosen by juan, below.
+const VOLUME_RANGE_RE = /\s*[（(]第\d+卷-第\d+卷[)）]\s*$/; // i18n-exempt — matches CBETA title data
+export function stripVolumeRange(title: string): string {
+  return title.replace(VOLUME_RANGE_RE, "").trim();
+}
+
 export function injectCitationLinks(
   content: string,
   sources: ChatSource[] | null,
@@ -55,7 +65,7 @@ export function injectCitationLinks(
   const titleSources = new Map<string, ChatSource[]>();
   for (const s of sources) {
     if (!s.title_zh || s.text_id <= 0) continue;
-    const key = toSimplified(s.title_zh);
+    const key = toSimplified(stripVolumeRange(s.title_zh));
     const existing = titleMap.get(key);
     if (!existing || s.score > existing.score) titleMap.set(key, s);
     const list = titleSources.get(key);
@@ -77,7 +87,12 @@ export function injectCitationLinks(
   ): { url: string; juan: number } => {
     const candidates = titleSources.get(simplifiedTitle) ?? [];
     const picked = pickSourceForQuote(candidates, quote);
-    const source = picked ?? fallback;
+    // No quote to anchor on: take a retrieved chunk of the cited fascicle when
+    // there is one. For a work split into parts the top-scored chunk may sit in
+    // another part (another text_id), and pairing its text_id with the cited
+    // juan would open a fascicle that part does not have.
+    const sameJuan = juanHint != null ? candidates.find((c) => c.juan_num === juanHint) : undefined;
+    const source = picked ?? sameJuan ?? fallback;
     const juan = picked ? picked.juan_num : (juanHint ?? source.juan_num);
     // chunk_index 只在它确实属于 `juan` 那一卷时才成立。
     //
@@ -106,7 +121,7 @@ export function injectCitationLinks(
     /【《([^》【】\n]+)》([^】【\n]*)】/g,
     (_match, rawTitle: string, tail: string, offset: number, full: string) => {
       const title = rawTitle.trim();
-      const simplifiedTitle = toSimplified(title);
+      const simplifiedTitle = toSimplified(stripVolumeRange(title));
       const source = titleMap.get(simplifiedTitle);
       if (!source) return _match;
       const juanMatch = tail.match(/第(\d+)卷/);
@@ -132,7 +147,7 @@ export function injectCitationLinks(
       if (i % 2 === 1) return part; // preserved markdown link
       return part.replace(/《([^》]+)》/g, (bareMatch, rawTitle: string) => {
         const title = rawTitle.trim();
-        const simplifiedTitle = toSimplified(title);
+        const simplifiedTitle = toSimplified(stripVolumeRange(title));
         const source = titleMap.get(simplifiedTitle);
         if (!source) return bareMatch;
         const { url } = buildCitation(source, simplifiedTitle, null, null);
