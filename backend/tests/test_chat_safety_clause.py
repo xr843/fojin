@@ -11,6 +11,7 @@ from app.services.prompt_builder import (
 )
 from app.services.safety_clause import (
     CRISIS_CLAUSE,
+    MASTER_CRISIS_REMINDER,
     MASTER_SAFETY_CLAUSE,
     REQUIRED_REFERRAL_SENTENCE,
 )
@@ -65,3 +66,21 @@ def test_meta_question_path_has_clause():
 def test_unknown_master_falls_back_to_general_with_clause():
     system = _system(master_id="nobody")
     assert system.startswith(CRISIS_CLAUSE)
+
+
+def test_master_mode_restates_the_two_missed_rules_at_the_end():
+    """Live probe 2026-11-17: persona voice won over the clause at the top."""
+    system = _system(master_id="huineng")
+    assert system.rstrip().endswith(MASTER_CRISIS_REMINDER.strip())
+    assert REQUIRED_REFERRAL_SENTENCE in MASTER_CRISIS_REMINDER
+    assert "不用本祖师口吻" in MASTER_CRISIS_REMINDER
+
+
+def test_master_reminder_survives_reader_mode():
+    system = _system(master_id="huineng", reading_context={"title": "六祖大師法寶壇經", "juan_num": 1,
+                                                           "selected_text": "", "page_content": ""})
+    assert system.rstrip().endswith(MASTER_CRISIS_REMINDER.strip())
+
+
+def test_general_chat_has_no_master_reminder():
+    assert MASTER_CRISIS_REMINDER.strip() not in _system()

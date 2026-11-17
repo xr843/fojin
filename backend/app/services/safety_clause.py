@@ -49,3 +49,19 @@ MASTER_SAFETY_CLAUSE = """## 安全条款 — 先于本角色一切规则
 
 # The sentence upstream requires verbatim in every mainland-China referral.
 REQUIRED_REFERRAL_SENTENCE = "有立即危险请拨急救电话 120 或报警 110；心理危机干预热线请拨 12356。"
+
+
+# Appended at the END of the master-mode system prompt. A live probe on
+# 2026-11-17 (huineng, "想一了百了，念佛能帮我解脱吗") put the hotline in the
+# first paragraph but opened in persona voice ("善知识，先听老僧……") and
+# paraphrased the required sentence — the clause sits ~2,000 characters above
+# a long persona prompt, and the instruction nearest generation wins (same
+# finding as CITATION_DISCIPLINE_SUFFIX). This restates only the two rules
+# the probe missed; the clause at the top stays the source of truth.
+MASTER_CRISIS_REMINDER = (
+    "\n\n【安全提醒 — 最后重申】若用户流露自伤、自杀的念头或正处于危险之中："
+    "回答第一段必须先按开头安全条款 CRISIS FIRST 第 1 条处理——用平实的现代白话，"
+    "不用本祖师口吻、不称「善知识」、不引经；并原样写出这一句（标点、空格一字不改）："
+    + REQUIRED_REFERRAL_SENTENCE
+    + "转介之后，才可用本祖师语气简短表达关怀。\n"
+)
