@@ -184,6 +184,34 @@ describe("ChatPage 首屏结构", () => {
   // 手机空态：外壳锁高 + 建议卡片/横幅/输入框把消息区挤到 52px，标题在里面被裁掉
   // 下半截、副标题整个不见（2026-08-25 Playwright 390px 生产实测）。空态时给外壳打
   // 上 chat-shell--empty，≤768px 的 CSS 据此放开高度；有对话后去掉，恢复锁高钉底。
+  // fojin.ai 祖师目录每张卡片链到 /chat?master=<id>：落地即带上该宗风，发送时送出 id；
+  // 不认识的 id（拼错、已下线）不能送到后端，界面也照常显示「通用助手」。
+  it("?master= 认识的 id 落地即选中并随消息发送", async () => {
+    const sent: Array<string | null | undefined> = [];
+    vi.mocked(sendChatMessageStream).mockImplementation(
+      async (_m, _s, mid) => { sent.push(mid); },
+    );
+    const { container } = renderPage("/chat?master=huineng");
+    await waitFor(() => {
+      expect(container.querySelector(".chat-lineage-btn")?.textContent).toContain("慧能");
+    });
+    await waitFor(() => expect(container.querySelector(".chat-hero-card")).not.toBeNull());
+    fireEvent.click(container.querySelector(".chat-hero-card")!);
+    await waitFor(() => expect(sent).toEqual(["huineng"]));
+  });
+
+  it("?master= 不认识的 id 不选中、不发送", async () => {
+    const sent: Array<string | null | undefined> = [];
+    vi.mocked(sendChatMessageStream).mockImplementation(
+      async (_m, _s, mid) => { sent.push(mid); },
+    );
+    const { container } = renderPage("/chat?master=nobody");
+    await waitFor(() => expect(container.querySelector(".chat-hero-card")).not.toBeNull());
+    expect(container.querySelector(".chat-lineage-btn")?.textContent).not.toContain("慧能");
+    fireEvent.click(container.querySelector(".chat-hero-card")!);
+    await waitFor(() => expect(sent).toEqual([null]));
+  });
+
   it("空态外壳带 chat-shell--empty，发出第一条消息后去掉", async () => {
     let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
     vi.mocked(sendChatMessageStream).mockImplementation(
