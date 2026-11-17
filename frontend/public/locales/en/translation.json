@@ -742,6 +742,7 @@
   "chat.guest_save_hint": "This conversation won't be saved — it's gone after refresh. Sign in to keep your chat history.",
   "chat.guest_save_hint_cta": "Sign in to save",
   "chat.guest_note_quota": "{{n}} free questions left today",
+  "chat.guest_note_exhausted": "No free questions left today",
   "chat.guest_note_unsaved": "this chat won't be saved",
   "chat.guest_note_login": "Sign in for more",
   "chat.guest_note_dismiss": "Dismiss",
