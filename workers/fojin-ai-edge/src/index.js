@@ -82,7 +82,9 @@ const JS_HEADERS = {
 // /_site/ is a deliberately unusual prefix: the old PWA used /assets/, and
 // those URLs must keep redirecting rather than 404 on the new site.
 const SITE_ORIGIN = "https://master-skill.pages.dev";
-const SITE_PATHS = new Set(["/", "/index.html"]);
+// robots.txt / sitemap.xml are fojin.ai's own (written by the Master-skill
+// build) — without them crawlers were sent to fojin.app's.
+const SITE_PATHS = new Set(["/", "/index.html", "/robots.txt", "/sitemap.xml"]);
 const SITE_PREFIX = "/_site/";
 
 // Security headers for pages this worker serves itself. Mirrors the fojin.app
