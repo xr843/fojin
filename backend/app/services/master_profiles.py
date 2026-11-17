@@ -298,11 +298,14 @@ _register(MasterProfile(
     tradition="禅宗",
     dates="638-713",
     description="禅宗六祖，直指人心、见性成佛",
-    # 坛经 T2008(58) + 金刚经 T0235b(63, 罗什译). Corrected 2026-07-12: these were
-    # [8169, 6513] — 8169 is T2013 禪宗永嘉集 (玄覺撰, NOT 慧能), 6513 is T0262 法華經
-    # (NOT 金刚经). The IDs were guessed (the old comment said "approximate"), so this
-    # persona was hard-scoped to a text he did not write and could never cite 壇經.
-    fojin_text_ids=[58, 63],
+    # 坛经 T2008(58) + 金刚经 T0235(7) + 维摩诘经 T0475(28) — the three sources
+    # Master-skill declares for 慧能 (prebuilt/master-huineng/meta.json).
+    # 2026-11-17: was [58, 63]; 63 is T0235b, an entry with NO content (0 chars,
+    # has_content false), so the persona could not retrieve the Diamond Sutra at
+    # all. 7 is the T0235 entry with the text (6,505 chars). Checked live.
+    # Corrected 2026-07-12 before that: [8169, 6513] were guessed IDs for texts
+    # 慧能 did not write (永嘉集, 法華經).
+    fojin_text_ids=[58, 7, 28],
     epigraph=Epigraph(
         quote="菩提本無樹，明鏡亦非臺",
         text_id=58,

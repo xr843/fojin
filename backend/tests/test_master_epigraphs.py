@@ -97,7 +97,9 @@ def test_epigraph_text_lies_inside_the_masters_own_rag_scope():
 EXPECTED_SCOPE = {
     "nagarjuna": [39, 40, 41, 7806, 7708],  # 大智度論/中論/十二門論/迴諍論/十住毘婆沙論
     "zhiyi": [53, 52, 8085, 6513],  # 摩訶止觀/法華文句/小止觀/法華經
-    "huineng": [58, 63],  # 六祖壇經 T2008 / 金剛經 T0235b
+    # 六祖壇經 T2008 / 金剛經 T0235 / 維摩詰經 T0475 — re-verified live 2026-11-17
+    # (/api/texts/{id}: 6,505 and 33,390 chars). The old 63 (T0235b) has no content.
+    "huineng": [58, 7, 28],
     "fazang": [8038],  # 華嚴一乘教義分齊章 T1866
     "kumarajiva": [6513],  # 妙法蓮華經 T0262（其译）
     "xuyun": [],  # 《法彙》不在 CBETA — no indexed corpus

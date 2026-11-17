@@ -72,10 +72,15 @@ class TestLongSessionCarriesMoreHistory:
 
 class TestRollbackReproducesOldWindow:
     def test_6000_10_matches_the_pre_change_numbers(self, window):
-        """回滚值 6000/10：与扩窗前同一输入下带入的历史完全相同（旧代码实测为 6 条）。"""
+        """回滚值 6000/10：除安全条款占用的部分外，与扩窗前同一输入下带入的历史相同。
+
+        旧代码实测为 6 条（Q12–A14）。2026-11-17 起系统提示词开头多了危机转介条款
+        （services/safety_clause.py），它计入同一份预算，所以在最紧的回滚预算下少带
+        一问一答（Q12/A12）。这是有意的取舍：条款必须在场，总输入也必须守住预算；
+        生产预算为 16000，见 TestWiderWindow…。"""
         window(max_input=6000, max_messages=10)
         tags = _history_tags(_build_llm_messages(_session(15), CONTEXT, "下一段怎么解？"))
-        assert tags == ["<Q12>", "<A12>", "<Q13>", "<A13>", "<Q14>", "<A14>"]
+        assert tags == ["<Q13>", "<A13>", "<Q14>", "<A14>"]
 
 
 class TestWiderWindowDoesNotInflateOtherShares:
