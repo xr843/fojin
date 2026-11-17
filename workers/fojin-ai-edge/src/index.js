@@ -10,8 +10,8 @@
 //      Browsers re-fetch a registered SW script at least every 24h, which is
 //      what makes this eventually reach everyone. Do not remove.
 //
-//   2. Serve fojin.ai's own site: the Master-skill home page at / (static,
-//      public/), the agent portal at /developers (proxied from
+//   2. Serve fojin.ai's own site: the Master-skill home page at / (forwarded
+//      from the Master-skill repo's Pages site), the agent portal at /developers (proxied from
 //      fojin.app/agents), and send every other path to fojin.app,
 //      path-preserving.
 //
@@ -75,11 +75,13 @@ const JS_HEADERS = {
   "service-worker-allowed": "/",
 };
 
-// The fojin.ai home page is its own static site (public/, bound as ASSETS):
-// the Master-skill catalogue. Only these paths are answered from it; every
-// other path keeps the behaviour below, so old fojin.ai deep links still 301.
+// The fojin.ai home page (the Master-skill catalogue) is built and published
+// by the Master-skill repository (site/, Cloudflare Pages project
+// `master-skill`). This worker forwards only these paths to it; every other
+// path keeps the behaviour below, so old fojin.ai deep links still 301.
 // /_site/ is a deliberately unusual prefix: the old PWA used /assets/, and
-// those URLs must keep redirecting rather than 404 on this site.
+// those URLs must keep redirecting rather than 404 on the new site.
+const SITE_ORIGIN = "https://master-skill.pages.dev";
 const SITE_PATHS = new Set(["/", "/index.html"]);
 const SITE_PREFIX = "/_site/";
 
@@ -123,24 +125,38 @@ async function proxyFromApp(path, request) {
   }
 }
 
-async function serveSite(request, env) {
+async function serveSite(request) {
   const url = new URL(request.url);
-  const assetUrl = new URL(url.pathname === "/index.html" ? "/" : url.pathname, url.origin);
-  const res = await env.ASSETS.fetch(new Request(assetUrl, { method: request.method, headers: request.headers }));
-  if (res.status !== 200 && res.status !== 304) return null;
+  const path = url.pathname === "/index.html" ? "/" : url.pathname;
+  let res;
+  try {
+    res = await fetch(SITE_ORIGIN + path, {
+      method: request.method,
+      headers: { accept: request.headers.get("accept") || "*/*" },
+      redirect: "manual",
+    });
+  } catch (e) {
+    return null;
+  }
+  if (res.status !== 200) return null;
+  // Pages answers an unknown path with the home page (SPA fallback). A missing
+  // /_site/ asset must be a 404, not a 200 HTML page the browser tries to run.
+  if (path.startsWith(SITE_PREFIX) && (res.headers.get("content-type") || "").startsWith("text/html")) {
+    return null;
+  }
   const out = new Response(res.body, res);
   out.headers.set("content-security-policy", SITE_CSP);
   out.headers.set("x-content-type-options", "nosniff");
   out.headers.set("referrer-policy", "strict-origin-when-cross-origin");
   if ((out.headers.get("content-type") || "").startsWith("text/html")) {
-    // HTML revalidates every visit so a redeploy shows up at once.
+    // HTML revalidates every visit so a new Master-skill deploy shows at once.
     out.headers.set("cache-control", "public, max-age=0, must-revalidate");
   }
   return out;
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request) {
     const url = new URL(request.url);
 
     if (url.pathname === "/sw.js") {
@@ -153,10 +169,10 @@ export default {
     const readOnly = request.method === "GET" || request.method === "HEAD";
 
     if (readOnly && (SITE_PATHS.has(url.pathname) || url.pathname.startsWith(SITE_PREFIX))) {
-      const served = env && env.ASSETS ? await serveSite(request, env) : null;
+      const served = await serveSite(request);
       if (served) return served;
       if (url.pathname === "/" || url.pathname === "/index.html") {
-        // Assets binding missing or broken: send people to the agent portal
+        // Master-skill site unreachable: send people to the agent portal
         // rather than the reader, as fojin.ai/ did before it had a site.
         return Response.redirect("https://fojin.app/agents", 302);
       }
