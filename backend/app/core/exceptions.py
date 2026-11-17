@@ -182,9 +182,17 @@ class QuotaExceededError(FoJinError):
 
     message = "额度已用完"
 
-    def __init__(self, limit: int):
-        super().__init__(f"今日免费额度已用完（{limit}次/天）。配置自己的 API Key 可无限使用。")
+    def __init__(self, limit: int, *, login_limit: int | None = None):
+        # 游客撞上额度时，出路是登录（每天额度高得多），不是配 API Key：
+        # 原文案只提 API Key，生产 30 天 9 个会话撞了 50 次额度、全都接着再问，
+        # 只有 3 个去了登录页（2026-11-17 Umami）。
+        if login_limit is not None:
+            msg = f"今日游客免费提问已用完（{limit} 次）。登录后每天可问 {login_limit} 次。"
+        else:
+            msg = f"今日免费额度已用完（{limit}次/天）。配置自己的 API Key 可无限使用。"
+        super().__init__(msg)
         self.limit = limit
+        self.login_limit = login_limit
 
 
 class ResetLinkInvalidError(FoJinError):

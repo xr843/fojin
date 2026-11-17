@@ -1564,6 +1564,26 @@ describe("游客横幅合并", () => {
     expect(alerts[0].textContent).toMatch(/登录保存/);
   });
 
+  // 游客撞上每日额度：报错原来只在气泡里，提示条还停在「还可提问 N 次」，生产 30 天 9 个会话
+  // 撞了 50 次额度、个个接着再问。现在提示条要重新取额度、换成「已用完」，哪怕之前关掉过。
+  it("游客撞上额度后，提示条换成「今日免费提问已用完」并重新显示", async () => {
+    vi.mocked(getChatQuota)
+      .mockResolvedValueOnce({ limit: 10, used: 9, remaining: 1, has_byok: false, authenticated: false })
+      .mockResolvedValue({ limit: 10, used: 10, remaining: 0, has_byok: false, authenticated: false });
+    let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+    vi.mocked(sendChatMessageStream).mockImplementation(async (_m, _s, _mid, callbacks) => { cb = callbacks; });
+    const { container } = renderPage();
+    await screen.findByText(/今日还可免费提问 1 次/, SKIP_HIDDEN);
+    // 先关掉提示，确认撞额度后它会重新出现
+    fireEvent.click(container.querySelector('.chat-main-column .chat-guest-note:not([aria-hidden="true"]) .chat-guest-note-close') as HTMLElement);
+    await screen.findByText("「三毒」指的是哪三种毒？");
+    fireEvent.click(container.querySelector(".chat-hero-card")!);
+    await waitFor(() => expect(cb).toBeDefined());
+    cb!.onError("今日游客免费提问已用完（10 次）。登录后每天可问 200 次。", "quota");
+    const note = await screen.findByText("今日免费提问已用完");
+    expect(note.closest(".chat-guest-note")?.classList.contains("is-warn")).toBe(true);
+  });
+
   // 合并后关掉这一条，配额横幅不能当场「复活」——用户刚点了关闭。
   it("关掉合并横幅后一条都不剩，且保存提示照旧记下 14 天静默", async () => {
     const { container } = await guestWithAnswer();

@@ -1492,6 +1492,13 @@ export default function ChatPage() {
             reason: code ?? "unknown",
           });
         }
+        // 游客撞上每日额度：把输入框上方的提示换成「已用完 · 登录」并重新显示（哪怕之前
+        // 关掉过）。生产 30 天 9 个会话撞了 50 次额度、个个接着再问，只有 3 个去登录 ——
+        // 报错只在气泡里，提示条还停在「还可提问 N 次」。
+        if (code === "quota" && !user) {
+          setGuestQuotaClosed(false);
+          void refetchQuota();
+        }
         // 连接断了不等于回答没生成：生产上这类断开几乎都在 Cloudflare→浏览器这一段，
         // 后端早已生成完并存库（排查见 chatRecovery.ts）。登录用户的回答在库里，先去找；
         // 游客不落库，找不回，照旧报错。
@@ -2117,7 +2124,11 @@ export default function ChatPage() {
               <GuestNote
                 warn={!!(guestBannerQuota && quota && quota.remaining <= 2)}
                 text={[
-                  guestBannerQuota && quota ? t("chat.guest_note_quota", { n: quota.remaining }) : null,
+                  guestBannerQuota && quota
+                    ? quota.remaining <= 0
+                      ? t("chat.guest_note_exhausted")
+                      : t("chat.guest_note_quota", { n: quota.remaining })
+                    : null,
                   guestBannerSaveHint ? t("chat.guest_note_unsaved") : null,
                 ].filter(Boolean).join(" · ")}
                 cta={guestBannerSaveHint ? t("chat.guest_save_hint_cta") : t("chat.guest_note_login")}

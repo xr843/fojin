@@ -742,6 +742,7 @@
   "chat.guest_save_hint": "当前对话不会被保存，刷新或离开后即丢失。登录后会话自动保存，可随时回看。",
   "chat.guest_save_hint_cta": "登录保存",
   "chat.guest_note_quota": "今日还可免费提问 {{n}} 次",
+  "chat.guest_note_exhausted": "今日免费提问已用完",
   "chat.guest_note_unsaved": "对话不会保存",
   "chat.guest_note_login": "登录后额度更多",
   "chat.guest_note_dismiss": "关闭提示",
