@@ -12,7 +12,7 @@
 //
 //   2. Serve fojin.ai's own site: the Master-skill home page at / (forwarded
 //      from the Master-skill repo's Pages site), the agent portal at /developers (proxied from
-//      fojin.app/agents), and send every other path to fojin.app,
+//      fojin.app/agents.html), and send every other path to fojin.app,
 //      path-preserving.
 //
 // The worker predates this directory: it was created and routed by hand in
@@ -101,13 +101,15 @@ const SITE_CSP = [
 ].join("; ");
 
 // Paths proxied from fojin.app as-is. /developers is the agent portal
-// (fojin.app/agents — MCP endpoint, API, CLI); the others are same-origin
+// (fojin.app/agents.html — MCP endpoint, API, CLI); the others are same-origin
 // assets that page and the home page load. They must be proxied, not
 // redirected: the CSP is `'self'`, and a redirect would take the script and
 // the title font off-origin, where the CSP blocks them.
 // Add a path here if agents.html starts loading another root-relative asset.
 const PORTAL_PROXY = new Map([
-  ["/developers", "/agents"],
+  // The file, not /agents: fojin.app/agents 301s to fojin.ai/developers, so
+  // fetching it would bounce straight back here.
+  ["/developers", "/agents.html"],
   ["/theme-init.js", "/theme-init.js"],
   ["/favicon.svg", "/favicon.svg"],
   ["/fonts/MaShanZheng-title-v2.woff2", "/fonts/MaShanZheng-title-v2.woff2"],
@@ -175,9 +177,9 @@ export default {
       const served = await serveSite(request);
       if (served) return served;
       if (url.pathname === "/" || url.pathname === "/index.html") {
-        // Master-skill site unreachable: send people to the agent portal
-        // rather than the reader, as fojin.ai/ did before it had a site.
-        return Response.redirect("https://fojin.app/agents", 302);
+        // Master-skill site unreachable: send people to the developer portal
+        // on this domain rather than the reader.
+        return Response.redirect(url.origin + "/developers", 302);
       }
       if (url.pathname.startsWith(SITE_PREFIX)) {
         return new Response("Not found", { status: 404 });
@@ -189,11 +191,19 @@ export default {
     const upstreamPath = PORTAL_PROXY.get(url.pathname);
     if (upstreamPath && readOnly) {
       const served = await proxyFromApp(upstreamPath, request);
+      if (served && url.pathname === "/developers") {
+        // A fojin.ai page now (same header, same /_site/ scripts as the home
+        // page), so it gets the home page's headers, not fojin.app's.
+        served.headers.set("content-security-policy", SITE_CSP);
+        served.headers.set("cache-control", "public, max-age=0, must-revalidate");
+        return served;
+      }
       if (served) return served;
       // fojin.app unreachable or not 200: 302 rather than 301 — a permanent
       // redirect cached in clients cannot be taken back.
       if (url.pathname === "/developers") {
-        return Response.redirect("https://fojin.app/agents", 302);
+        // Not fojin.app/agents — that now redirects back to this page.
+        return Response.redirect("https://fojin.app/docs", 302);
       }
     }
 

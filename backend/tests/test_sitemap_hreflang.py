@@ -1,7 +1,7 @@
 """sitemap 的三语 xhtml:link 互指（docs/superpowers/specs/2026-10-11-i18n-seo-design.md）。
 
-只有真有语言版本的页面才互指：/search（结果页不收录、robots 挡）与 /agents
-（无多语）不加；辞典 / 人物 sitemap 不变——那两类页面不做语言版本。
+只有真有语言版本的页面才互指：/search（结果页不收录、robots 挡）不加；
+/agents 已移到 fojin.ai/developers（2026-11-17），不再在 fojin.app 的 sitemap 里；辞典 / 人物 sitemap 不变——那两类页面不做语言版本。
 """
 
 import re
@@ -36,8 +36,9 @@ async def test_static_sitemap_has_alternates():
     assert '<xhtml:link rel="alternate" hreflang="x-default" href="https://fojin.app/chat"/>' in chat
     home = _url_block(xml, "https://fojin.app/")
     assert '<xhtml:link rel="alternate" hreflang="en" href="https://fojin.app/?lang=en"/>' in home
-    for loc in ("https://fojin.app/search", "https://fojin.app/agents"):
-        assert "xhtml:link" not in _url_block(xml, loc)
+    assert "xhtml:link" not in _url_block(xml, "https://fojin.app/search")
+    # /agents 301s to fojin.ai/developers; a sitemap must not list a redirect.
+    assert "<loc>https://fojin.app/agents</loc>" not in xml
 
 
 async def test_texts_sitemap_has_alternates(monkeypatch):

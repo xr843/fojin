@@ -12,8 +12,8 @@ redirects, it is this worker, not a rule.
 | --- | --- |
 | `/sw.js` | A service worker whose only job is to drop every cache, unregister itself, and navigate the client to fojin.app |
 | `/registerSW.js` | The same clean-up from the page side, for clients that fetch the vite-pwa register shim |
-| `/`, `/_site/*`, `/robots.txt`, `/sitemap.xml` | **fojin.ai's own site** — the Master-skill home page, forwarded from `https://master-skill.pages.dev` (built from [Master-skill](https://github.com/xr843/Master-skill) `site/`, published on every push to its `main`). Edit the page there, not here. If that site does not answer 200, `/` falls back to **302 → `https://fojin.app/agents`** |
-| `/developers` | The agent portal (MCP endpoint, API, CLI), proxied from `https://fojin.app/agents`; falls back to 302 there |
+| `/`, `/_site/*`, `/robots.txt`, `/sitemap.xml` | **fojin.ai's own site** — the Master-skill home page, forwarded from `https://master-skill.pages.dev` (built from [Master-skill](https://github.com/xr843/Master-skill) `site/`, published on every push to its `main`). Edit the page there, not here. If that site does not answer 200, `/` falls back to **302 → `/developers`** |
+| `/developers` | The developer portal (MCP endpoint, API, CLI): `frontend/public/agents.html`, fetched from `https://fojin.app/agents.html` (not `/agents`, which 301s back here). Falls back to 302 → `https://fojin.app/docs` |
 | `/theme-init.js`, `/favicon.svg`, `/fonts/MaShanZheng-title-v2.woff2` | Proxied from fojin.app — same-origin assets the pages load; the CSP (`'self'`) would block them if redirected off-origin |
 | everything else | **301 → `https://fojin.app<path><query>`** |
 
