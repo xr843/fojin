@@ -12,10 +12,3 @@ routes = [
   { pattern = "www.fojin.ai/*", zone_name = "fojin.ai" },
 ]
 
-# The fojin.ai home page (Master-skill catalogue). run_worker_first: every
-# request reaches src/index.js first, which decides which paths come from
-# here — the kill-switch and the 301s for old deep links must keep winning.
-[assets]
-directory = "./public"
-binding = "ASSETS"
-run_worker_first = true
