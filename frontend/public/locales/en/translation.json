@@ -1689,6 +1689,8 @@
   "admin_align_review.load_error": "Failed to load, please retry",
   "admin_align_review.back_to_coverage": "Back to coverage",
   "chat.gallery_title": "Master Gallery",
+  "chat.gallery_install_hint": "Want these masters inside your own AI tools (Claude Code, Codex, Cursor…)?",
+  "chat.gallery_install_link": "See fojin.ai →",
   "chat.tradition_all": "All",
   "chat.epigraph_verified": "Verified",
   "chat.epigraph_none": "No verified representative line selected yet",

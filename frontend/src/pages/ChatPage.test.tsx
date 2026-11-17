@@ -216,6 +216,76 @@ describe("ChatPage 首屏结构", () => {
     await waitFor(() => expect(sent).toEqual([["顿悟是什么？", "huineng"]]));
   });
 
+  // 祖师长廊要不要留，取决于 fojin.app 自己的读者用不用法师模式，还是只有 fojin.ai
+  // 跳过来的人在用 —— 统计必须分得开来源。
+  it("Umami：?master= 落地记 master_link，带祖师的提问记 master + master_via=link", async () => {
+    const track = vi.fn();
+    (globalThis as unknown as { umami: unknown }).umami = { track };
+    try {
+      vi.mocked(sendChatMessageStream).mockImplementation(async () => {});
+      const { container } = renderPage("/chat?master=huineng&utm_source=fojin.ai");
+      await waitFor(() => expect(track).toHaveBeenCalledWith(
+        "master_link", { master: "huineng", source: "fojin.ai" },
+      ));
+      await waitFor(() => expect(container.querySelector(".chat-hero-card")).not.toBeNull());
+      fireEvent.click(container.querySelector(".chat-hero-card")!);
+      await waitFor(() => expect(track).toHaveBeenCalledWith(
+        "chat", expect.objectContaining({ master: "huineng", master_via: "link" }),
+      ));
+      expect(track.mock.calls.filter(([e]) => e === "master_link")).toHaveLength(1);
+    } finally {
+      delete (globalThis as unknown as { umami?: unknown }).umami;
+    }
+  });
+
+  it("Umami：未选祖师的提问记 master=none、不带 master_via", async () => {
+    const track = vi.fn();
+    (globalThis as unknown as { umami: unknown }).umami = { track };
+    try {
+      vi.mocked(sendChatMessageStream).mockImplementation(async () => {});
+      const { container } = renderPage("/chat");
+      await waitFor(() => expect(container.querySelector(".chat-hero-card")).not.toBeNull());
+      fireEvent.click(container.querySelector(".chat-hero-card")!);
+      await waitFor(() => expect(track).toHaveBeenCalledWith("chat", expect.objectContaining({ master: "none" })));
+      const chat = track.mock.calls.find(([e]) => e === "chat")![1];
+      expect(chat).not.toHaveProperty("master_via");
+      expect(track.mock.calls.some(([e]) => e === "master_link")).toBe(false);
+    } finally {
+      delete (globalThis as unknown as { umami?: unknown }).umami;
+    }
+  });
+
+  it("祖师长廊：底部有指向 fojin.ai 的链接；选祖师记 master_select，之后提问记 master_via=gallery", async () => {
+    const track = vi.fn();
+    (globalThis as unknown as { umami: unknown }).umami = { track };
+    try {
+      vi.mocked(sendChatMessageStream).mockImplementation(async () => {});
+      const { container } = renderPage("/chat");
+      await waitFor(() => expect(container.querySelector(".chat-hero-card")).not.toBeNull());
+      fireEvent.click(container.querySelector(".chat-lineage-btn")!);
+      const link = await waitFor(() => {
+        const a = document.querySelector<HTMLAnchorElement>(".mg-footer a");
+        expect(a).not.toBeNull();
+        return a!;
+      });
+      expect(link.href).toContain("https://fojin.ai/");
+      fireEvent.click(link);
+      expect(track).toHaveBeenCalledWith("master_gallery_to_fojin_ai");
+      fireEvent.click(await waitFor(() => {
+        const card = document.querySelector<HTMLButtonElement>(".mg-card");
+        expect(card).not.toBeNull();
+        return card!;
+      }));
+      expect(track).toHaveBeenCalledWith("master_select", { master: "huineng" });
+      fireEvent.click(container.querySelector(".chat-hero-card")!);
+      await waitFor(() => expect(track).toHaveBeenCalledWith(
+        "chat", expect.objectContaining({ master: "huineng", master_via: "gallery" }),
+      ));
+    } finally {
+      delete (globalThis as unknown as { umami?: unknown }).umami;
+    }
+  });
+
   it("?master= 不认识的 id 不选中、不发送", async () => {
     const sent: Array<string | null | undefined> = [];
     vi.mocked(sendChatMessageStream).mockImplementation(

@@ -263,3 +263,12 @@
   border-left: 2px solid var(--fj-border, var(--fj-border));
   border-radius: 3px;
 }
+
+/* Link to fojin.ai under the grid — quiet, it is not the gallery's job. */
+.mg-footer {
+  margin: 14px 2px 2px;
+  font-size: 13px;
+  color: var(--fj-ink-muted);
+}
+.mg-footer a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.mg-footer a:hover { color: var(--fj-accent); }
