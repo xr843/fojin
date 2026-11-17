@@ -629,7 +629,10 @@ export default function ChatPage() {
     // 不能再灌进输入框，否则消息发出后草稿里还躺着一份同文。
     () => (searchParams.get("context") || searchParams.get("send") === "1" ? "" : searchParams.get("q")) ?? "",
   );
-  const [masterId, setMasterId] = useState<string | null>(null);
+  // 外部入口（fojin.ai 祖师目录的「依此宗风提问」）用 ?master=<id> 带上宗风。只在挂载时
+  // 读一次。id 不认识时 selectedMaster 为 null：界面照常显示「通用助手」，发送时也不带它
+  // （见 activeMasterId），所以一个拼错或已下线的链接不会把未知 id 送到后端。
+  const [masterId, setMasterId] = useState<string | null>(() => searchParams.get("master"));
   // 祖师长廊: opened from .chat-lineage-btn in the composer toolbar — the sole
   // entry point, in every state (empty and mid-thread alike).
   const [galleryOpen, setGalleryOpen] = useState(false);
@@ -642,6 +645,7 @@ export default function ChatPage() {
     () => mastersData?.find((m) => m.id === masterId) ?? null,
     [mastersData, masterId],
   );
+  const activeMasterId = selectedMaster?.id ?? null;
   // 「换模型重答」下拉的模型列表。与 ChatModelSelector 各取各的：那边挂载时要校正
   // 陈旧的 localStorage 选择，这里只读。只列真能用的。
   const { data: chatModelsData } = useQuery({
@@ -1313,7 +1317,7 @@ export default function ChatPage() {
       setMessages((prev) => prev.map((m) => (m.id === id ? patch(m) : m)));
     };
 
-    await sendChatMessageStream(msg, sessionId, masterId, {
+    await sendChatMessageStream(msg, sessionId, activeMasterId, {
       onToken: (content: string) => {
         tokenCount += 1;
         if (firstTokenMs === null) {
@@ -1527,7 +1531,7 @@ export default function ChatPage() {
       modelId: effectiveModelId === "deepseek:v4-pro" ? null : effectiveModelId,
       attachmentIds: attachmentIdsForSend.length ? attachmentIdsForSend : null,
     });
-  }, [sending, sessionId, masterId, modelId, user, attachments, refetchSessions, refetchQuota, queryClient, scrollToBottom, setShowJumpToBottom, syncSessionParam, loadSession, bumpViewEpoch, t]);
+  }, [sending, sessionId, activeMasterId, modelId, user, attachments, refetchSessions, refetchQuota, queryClient, scrollToBottom, setShowJumpToBottom, syncSessionParam, loadSession, bumpViewEpoch, t]);
 
   const handleSend = useCallback(async () => {
     await handleSendMessage(input);

@@ -10,8 +10,9 @@
 //      Browsers re-fetch a registered SW script at least every 24h, which is
 //      what makes this eventually reach everyone. Do not remove.
 //
-//   2. Show the agent portal at the bare root (proxied from fojin.app/agents,
-//      with the few assets it loads), and send every other path to fojin.app,
+//   2. Serve fojin.ai's own site: the Master-skill home page at / (static,
+//      public/), the agent portal at /developers (proxied from
+//      fojin.app/agents), and send every other path to fojin.app,
 //      path-preserving.
 //
 // The worker predates this directory: it was created and routed by hand in
@@ -74,14 +75,35 @@ const JS_HEADERS = {
   "service-worker-allowed": "/",
 };
 
-// Paths served from fojin.app as-is when the portal is shown on fojin.ai.
-// The root maps to the portal page; the others are the same-origin assets
-// that page loads. They must be proxied, not redirected: the page's CSP is
-// `script-src 'self'` / `font-src 'self'`, and a redirect to fojin.app would
-// take the script and the title font off-origin, where the CSP blocks them.
+// The fojin.ai home page is its own static site (public/, bound as ASSETS):
+// the Master-skill catalogue. Only these paths are answered from it; every
+// other path keeps the behaviour below, so old fojin.ai deep links still 301.
+// /_site/ is a deliberately unusual prefix: the old PWA used /assets/, and
+// those URLs must keep redirecting rather than 404 on this site.
+const SITE_PATHS = new Set(["/", "/index.html"]);
+const SITE_PREFIX = "/_site/";
+
+// Security headers for pages this worker serves itself. Mirrors the fojin.app
+// policy: no inline script, analytics only from analytics.fojin.app.
+const SITE_CSP = [
+  "default-src 'self'",
+  "script-src 'self' https://analytics.fojin.app",
+  "connect-src 'self' https://analytics.fojin.app",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: https:",
+  "font-src 'self'",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+].join("; ");
+
+// Paths proxied from fojin.app as-is. /developers is the agent portal
+// (fojin.app/agents — MCP endpoint, API, CLI); the others are same-origin
+// assets that page and the home page load. They must be proxied, not
+// redirected: the CSP is `'self'`, and a redirect would take the script and
+// the title font off-origin, where the CSP blocks them.
 // Add a path here if agents.html starts loading another root-relative asset.
 const PORTAL_PROXY = new Map([
-  ["/", "/agents"],
+  ["/developers", "/agents"],
   ["/theme-init.js", "/theme-init.js"],
   ["/favicon.svg", "/favicon.svg"],
   ["/fonts/MaShanZheng-title-v2.woff2", "/fonts/MaShanZheng-title-v2.woff2"],
@@ -101,8 +123,24 @@ async function proxyFromApp(path, request) {
   }
 }
 
+async function serveSite(request, env) {
+  const url = new URL(request.url);
+  const assetUrl = new URL(url.pathname === "/index.html" ? "/" : url.pathname, url.origin);
+  const res = await env.ASSETS.fetch(new Request(assetUrl, { method: request.method, headers: request.headers }));
+  if (res.status !== 200 && res.status !== 304) return null;
+  const out = new Response(res.body, res);
+  out.headers.set("content-security-policy", SITE_CSP);
+  out.headers.set("x-content-type-options", "nosniff");
+  out.headers.set("referrer-policy", "strict-origin-when-cross-origin");
+  if ((out.headers.get("content-type") || "").startsWith("text/html")) {
+    // HTML revalidates every visit so a redeploy shows up at once.
+    out.headers.set("cache-control", "public, max-age=0, must-revalidate");
+  }
+  return out;
+}
+
 export default {
-  async fetch(request) {
+  async fetch(request, env) {
     const url = new URL(request.url);
 
     if (url.pathname === "/sw.js") {
@@ -112,18 +150,26 @@ export default {
       return new Response(KILL_REGISTER_SW, { headers: JS_HEADERS });
     }
 
-    // The bare domain *is* the agent portal: fojin.ai is the AI-facing name,
-    // so the page is served here instead of bouncing the visitor to
-    // fojin.app/agents. The page's own <link rel=canonical> still names
-    // fojin.app/agents, so search engines see one page, not two.
+    const readOnly = request.method === "GET" || request.method === "HEAD";
+
+    if (readOnly && (SITE_PATHS.has(url.pathname) || url.pathname.startsWith(SITE_PREFIX))) {
+      const served = env && env.ASSETS ? await serveSite(request, env) : null;
+      if (served) return served;
+      if (url.pathname === "/" || url.pathname === "/index.html") {
+        // Assets binding missing or broken: send people to the agent portal
+        // rather than the reader, as fojin.ai/ did before it had a site.
+        return Response.redirect("https://fojin.app/agents", 302);
+      }
+      return new Response("Not found", { status: 404 });
+    }
+
     const upstreamPath = PORTAL_PROXY.get(url.pathname);
-    if (upstreamPath && (request.method === "GET" || request.method === "HEAD")) {
+    if (upstreamPath && readOnly) {
       const served = await proxyFromApp(upstreamPath, request);
       if (served) return served;
-      // fojin.app unreachable or not 2xx: fall back to the old redirect so the
-      // root never breaks harder than it did before this change. 302 rather
-      // than 301 — a permanent redirect cached in clients cannot be taken back.
-      if (url.pathname === "/") {
+      // fojin.app unreachable or not 200: 302 rather than 301 — a permanent
+      // redirect cached in clients cannot be taken back.
+      if (url.pathname === "/developers") {
         return Response.redirect("https://fojin.app/agents", 302);
       }
     }
