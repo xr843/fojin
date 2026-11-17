@@ -1600,6 +1600,64 @@ em {
   }
 }
 
+/* ========== /chat 游客提示（一行小字，替代原来的蓝色 Alert） ========== */
+.chat-guest-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  margin: 0 2px 6px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--fj-ink-muted);
+}
+.chat-guest-note-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-guest-note.is-warn .chat-guest-note-text { color: var(--fj-highlight); }
+.chat-guest-note-cta {
+  flex-shrink: 0;
+  padding: 4px 2px;
+  font-size: 12px;
+  color: var(--fj-highlight);
+  background: none;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.chat-guest-note-cta:hover,
+.chat-guest-note-cta:focus-visible { text-decoration: underline; }
+.chat-guest-note-close {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-left: auto;
+  padding: 0;
+  font-size: 11px;
+  color: var(--fj-ink-muted);
+  background: none;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.chat-guest-note-close:hover,
+.chat-guest-note-close:focus-visible { background: rgba(0, 0, 0, 0.06); color: var(--fj-ink); }
+:root[data-theme="dark"] .chat-guest-note-close:hover { background: rgba(255, 255, 255, 0.1); }
+
+/* 手机上 /chat 不显示页脚：版权一行对聊天没有用，却和输入框一起压缩回答可读区。
+   页脚高度写在外壳的高度计算里（--fj-footer-h），在承载 /chat 的那一层把它置 0，
+   外壳才真的多出这 50px。 */
+@media (max-width: 768px) {
+  .layout-content-inner:has(.chat-shell) { --fj-footer-h: 0px; }
+  body:has(.chat-shell) .ant-layout-footer { display: none; }
+}
+
 /* ========== Layout Content ========== */
 .layout-content-inner {
   padding: var(--fj-content-pad-y) var(--fj-content-pad-x);

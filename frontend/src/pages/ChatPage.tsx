@@ -27,6 +27,7 @@ import {
   EditOutlined,
   PushpinOutlined,
   PushpinFilled,
+  CloseOutlined,
 } from "@ant-design/icons";
 const ShareCard = lazy(() => import("../components/ShareCard"));
 import CommunityInvite from "../components/CommunityInvite";
@@ -604,6 +605,38 @@ export const MessageBubble = memo(
     prev.expectedFirstTokenS === next.expectedFirstTokenS &&
     prev.regenerateModels === next.regenerateModels,
 );
+
+/**
+ * 游客输入区提示：一行小字（剩余次数 / 对话不会保存）+ 一个登录入口 + 关闭。
+ * 原来是 antd 的蓝色 Alert，两行字、约 75px 高，手机上和输入框、页脚一起占掉
+ * 844px 屏幕的约 274px（2026-11-17 生产 390px 实测）；颜色也不是站内配色。
+ */
+function GuestNote({ text, cta, onCta, onClose, closeLabel, warn = false, hidden = false }: {
+  text: string;
+  cta: string;
+  onCta?: () => void;
+  onClose?: () => void;
+  closeLabel: string;
+  warn?: boolean;
+  hidden?: boolean;
+}) {
+  return (
+    <div
+      className={`chat-guest-note${warn ? " is-warn" : ""}`}
+      role={hidden ? undefined : "status"}
+      aria-hidden={hidden || undefined}
+      style={hidden ? { visibility: "hidden" } : undefined}
+    >
+      <span className="chat-guest-note-text">{text}</span>
+      <button type="button" className="chat-guest-note-cta" onClick={onCta} tabIndex={hidden ? -1 : undefined}>
+        {cta}
+      </button>
+      <button type="button" className="chat-guest-note-close" aria-label={closeLabel} onClick={onClose} tabIndex={hidden ? -1 : undefined}>
+        <CloseOutlined />
+      </button>
+    </div>
+  );
+}
 
 export default function ChatPage() {
   const navigate = useNavigate();
@@ -2081,40 +2114,29 @@ export default function ChatPage() {
                 「登录状态已过期」（见 guestBannerSaveHint 的注释）——三条横幅
                 （此条 / 过期 / 登录用户额度）由此两两互斥，输入区上方最多一条。 */}
             {guestBannerSaveHint || guestBannerQuota ? (
-              <Alert
-                type={guestBannerQuota && quota && quota.remaining <= 2 ? "warning" : "info"}
-                showIcon
-                closable
+              <GuestNote
+                warn={!!(guestBannerQuota && quota && quota.remaining <= 2)}
+                text={[
+                  guestBannerQuota && quota ? t("chat.guest_note_quota", { n: quota.remaining }) : null,
+                  guestBannerSaveHint ? t("chat.guest_note_unsaved") : null,
+                ].filter(Boolean).join(" · ")}
+                cta={guestBannerSaveHint ? t("chat.guest_save_hint_cta") : t("chat.guest_note_login")}
+                onCta={guestBannerSaveHint ? goLoginKeepingTranscript : () => navigate("/login")}
+                closeLabel={t("chat.guest_note_dismiss")}
                 onClose={() => {
                   if (guestBannerSaveHint) dismissSaveHint();
                   if (guestBannerQuota) setGuestQuotaClosed(true);
                 }}
-                style={{ marginBottom: 8, fontSize: 12 }}
-                message={guestBannerSaveHint ? (
-                  <span>
-                    {guestBannerQuota && quota
-                      ? t("chat.guest_quota_save_hint", { n: quota.remaining })
-                      : t("chat.guest_save_hint")}
-                    <a onClick={goLoginKeepingTranscript} style={{ marginLeft: 4 }}>
-                      {t("chat.guest_save_hint_cta")}
-                    </a>
-                  </span>
-                ) : (
-                  <span>{t("chat.quota_info", { limit: quota?.limit, remaining: quota?.remaining })}<a onClick={() => navigate("/login")}>{t("chat.login")}</a>{t("chat.login_quota_hint")}</span>
-                )}
               />
             ) : !user && !expired && quotaPending ? (
-              /* 游客配额横幅的占位：配额接口回来前横幅不存在，回来后在输入框上方插进
-                 约 75px，把输入框和建议卡片整体往下推（2026-11-08 本地 360×641 游客实测，
-                 与建议卡片晚到叠加 CLS 0.182）。游客身份此刻已确定，先放一条文案与尺寸
-                 都相同、但不可见的横幅占住高度；数字只影响排版，取默认额度。 */
-              <Alert
-                aria-hidden="true"
-                type="info"
-                showIcon
-                closable
-                style={{ marginBottom: 8, fontSize: 12, visibility: "hidden" }}
-                message={<span>{t("chat.quota_info", { limit: 10, remaining: 10 })}<a>{t("chat.login")}</a>{t("chat.login_quota_hint")}</span>}
+              /* 游客配额提示的占位：配额接口回来前提示不存在，回来后插进输入框上方，
+                 把输入框和建议卡片往下推（2026-11-08 本地 360×641 游客实测 CLS 0.182）。
+                 游客身份此刻已确定，先放一条同尺寸但不可见的提示占住高度。 */
+              <GuestNote
+                hidden
+                text={t("chat.guest_note_quota", { n: 10 })}
+                cta={t("chat.guest_note_login")}
+                closeLabel={t("chat.guest_note_dismiss")}
               />
             ) : null}
             {/* 宗风 selector lives in the composer toolbar below (.chat-lineage-btn).
