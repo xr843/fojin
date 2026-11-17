@@ -84,7 +84,7 @@ async def _check_anonymous_quota(redis, client_ip: str) -> None:
         if current == 1:
             await redis.expire(key, 86400)  # 24h TTL
         if current > FREE_DAILY_LIMIT_ANONYMOUS:
-            raise QuotaExceededError(limit=FREE_DAILY_LIMIT_ANONYMOUS)
+            raise QuotaExceededError(limit=FREE_DAILY_LIMIT_ANONYMOUS, login_limit=FREE_DAILY_LIMIT_USER)
     except QuotaExceededError:
         raise
     except Exception:
