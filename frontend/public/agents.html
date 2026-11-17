@@ -33,14 +33,16 @@
   /* fojin.ai palette (mirrors xr843/Master-skill site/template.html), mapped
      onto this page's --fj-* names so the rest of the sheet is unchanged.
      Light is the default; dark only via the header toggle, as on fojin.ai.
+     Checked against WCAG AA with axe in both themes — re-run before lightening
+     --fj-ink-muted or --fj-accent, they sit just above 4.5:1.
      Body copy uses the local serif stack — /fonts/noto-serif-sc.css is 331 KB
      of @font-face shards, too heavy here. Only the 3 KB brush subset for
      「佛津」 is loaded. */
   :root {
     --fj-bg: #f7f8fa; --fj-bg-alt: #eef0f4;
-    --fj-ink: #14161b; --fj-ink-light: #4c525e; --fj-ink-muted: #6f7684;
-    --fj-accent: #b5600a; --fj-accent-hover: #8a4706; --fj-cinnabar: #b3361f;
-    --fj-gold: #b5600a; --fj-border: #e1e4ea;
+    --fj-ink: #14161b; --fj-ink-light: #4c525e; --fj-ink-muted: #626978;
+    --fj-accent: #a35507; --fj-accent-hover: #8a4706; --fj-cinnabar: #b3361f;
+    --fj-gold: #a35507; --fj-border: #e1e4ea;
     --fj-surface: #ffffff; --fj-surface-alt: #f4f5f8;
     --fj-on-accent: #ffffff; --fj-seal: #b3361f;
     --fj-hero: radial-gradient(60% 50% at 70% 0%, rgba(181,96,10,.10), transparent 70%),
@@ -82,6 +84,8 @@
   }
   a { color: var(--fj-accent); text-decoration: none; }
   a:hover { color: var(--fj-accent-hover); text-decoration: underline; }
+  /* Links inside running text must not rely on colour alone. */
+  p a, li a, td a { text-decoration: underline; text-underline-offset: 2px; }
   code, pre, .mono {
     font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
     font-size: 0.875em;
@@ -267,7 +271,7 @@
       托管在 <code>mcp.fojin.ai</code>，匿名可用、按客户端限流、全部只读。
       同一套工具也可以用 <code>uvx fojin-mcp</code> 在本地以 stdio 方式运行。
     </p>
-    <div class="table-wrap"><div class="table-scroll">
+    <div class="table-wrap"><div class="table-scroll" tabindex="0" role="group" aria-label="工具列表">
     <table>
       <thead>
         <tr><th>工具</th><th>返回什么</th></tr>
@@ -325,14 +329,14 @@
 
     <div class="demo">
       <p class="demo-head">请求 — 一句真经文，配一个常见但错误的出处</p>
-<pre><code>GET https://fojin.app/api/verify/quote
+<pre tabindex="0"><code>GET https://fojin.app/api/verify/quote
       ?q=諸行無常，是生滅法，生滅滅已，寂滅為樂
       &amp;cite=T0374</code></pre>
     </div>
 
     <div class="demo">
       <p class="demo-head">响应（节选）</p>
-<pre><code>{
+<pre tabindex="0"><code>{
   "verbatim": true,
   "bucket": "exact",
   "cite_resolved": true,
@@ -354,7 +358,7 @@
 
     <div class="demo">
       <p class="demo-head">对照 — 一句听起来很像佛经的伪造引文</p>
-<pre><code>{
+<pre tabindex="0"><code>{
   "verbatim": false,
   "bucket": "absent",
   "similarity": 0.818,
