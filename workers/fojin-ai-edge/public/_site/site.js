@@ -85,6 +85,26 @@
     });
   });
 
+  // ---- light / dark toggle ----------------------------------------------------
+  var root = document.documentElement;
+  var toggle = document.querySelector(".theme-toggle");
+  var themeMeta = document.querySelector('meta[name="theme-color"]');
+  function syncToggle() {
+    var dark = root.getAttribute("data-theme") === "dark";
+    if (toggle) toggle.setAttribute("aria-label", dark ? "切换浅色模式" : "切换深色模式");
+    if (themeMeta) themeMeta.setAttribute("content", dark ? "#0f0e0c" : "#f7f8fa");
+  }
+  if (toggle) {
+    toggle.addEventListener("click", function () {
+      var dark = root.getAttribute("data-theme") !== "dark";
+      if (dark) root.setAttribute("data-theme", "dark");
+      else root.removeAttribute("data-theme");
+      try { localStorage.setItem("fojin-ai-theme", dark ? "dark" : "light"); } catch (e) {}
+      syncToggle();
+    });
+  }
+  syncToggle();
+
   // ---- install tabs ---------------------------------------------------------
   var itabs = Array.prototype.slice.call(document.querySelectorAll('.install [role="tab"]'));
   itabs.forEach(function (tab) {
