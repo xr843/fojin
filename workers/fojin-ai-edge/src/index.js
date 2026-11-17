@@ -82,7 +82,9 @@ const JS_HEADERS = {
 // /_site/ is a deliberately unusual prefix: the old PWA used /assets/, and
 // those URLs must keep redirecting rather than 404 on the new site.
 const SITE_ORIGIN = "https://master-skill.pages.dev";
-const SITE_PATHS = new Set(["/", "/index.html"]);
+// robots.txt / sitemap.xml are fojin.ai's own (written by the Master-skill
+// build) — without them crawlers were sent to fojin.app's.
+const SITE_PATHS = new Set(["/", "/index.html", "/robots.txt", "/sitemap.xml"]);
 const SITE_PREFIX = "/_site/";
 
 // Security headers for pages this worker serves itself. Mirrors the fojin.app
@@ -139,9 +141,10 @@ async function serveSite(request) {
     return null;
   }
   if (res.status !== 200) return null;
-  // Pages answers an unknown path with the home page (SPA fallback). A missing
-  // /_site/ asset must be a 404, not a 200 HTML page the browser tries to run.
-  if (path.startsWith(SITE_PREFIX) && (res.headers.get("content-type") || "").startsWith("text/html")) {
+  // Pages answers an unknown path with the home page (SPA fallback). Only "/"
+  // is meant to be HTML; any other path that comes back as HTML does not exist
+  // on the site (a missing /_site/ asset, or robots.txt before it is built).
+  if (path !== "/" && (res.headers.get("content-type") || "").startsWith("text/html")) {
     return null;
   }
   const out = new Response(res.body, res);
@@ -176,7 +179,11 @@ export default {
         // rather than the reader, as fojin.ai/ did before it had a site.
         return Response.redirect("https://fojin.app/agents", 302);
       }
-      return new Response("Not found", { status: 404 });
+      if (url.pathname.startsWith(SITE_PREFIX)) {
+        return new Response("Not found", { status: 404 });
+      }
+      // robots.txt / sitemap.xml not on the site yet: fall through to the
+      // reader's copy (the 301 below), as before.
     }
 
     const upstreamPath = PORTAL_PROXY.get(url.pathname);
