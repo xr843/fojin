@@ -1689,6 +1689,8 @@
   "admin_align_review.load_error": "加载失败，请重试",
   "admin_align_review.back_to_coverage": "返回覆盖率",
   "chat.gallery_title": "祖师长廊",
+  "chat.gallery_install_hint": "想把祖师装进自己的 AI 工具（Claude Code、Codex、Cursor 等）？",
+  "chat.gallery_install_link": "到 fojin.ai 看看 →",
   "chat.tradition_all": "全部",
   "chat.epigraph_verified": "已核验",
   "chat.epigraph_none": "暂未选定经核验的代表法语",

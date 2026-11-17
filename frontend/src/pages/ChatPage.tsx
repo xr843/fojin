@@ -646,6 +646,22 @@ export default function ChatPage() {
     [mastersData, masterId],
   );
   const activeMasterId = selectedMaster?.id ?? null;
+  // Umami: where the current lineage came from — "link" = arrived with ?master=
+  // (fojin.ai's catalogue / ask box), "gallery" = picked in 祖师长廊 here. Lets
+  // us tell whether 法师模式 is used by fojin.app's own readers or only by
+  // visitors sent from fojin.ai (the open question behind keeping the gallery).
+  const masterViaRef = useRef<"link" | "gallery" | null>(searchParams.get("master") ? "link" : null);
+  const masterLinkTrackedRef = useRef(false);
+  useEffect(() => {
+    if (masterLinkTrackedRef.current || masterViaRef.current !== "link" || !selectedMaster) return;
+    masterLinkTrackedRef.current = true;
+    if (typeof umami !== "undefined") {
+      umami.track("master_link", {
+        master: selectedMaster.id,
+        source: searchParams.get("utm_source") ?? "direct",
+      });
+    }
+  }, [selectedMaster, searchParams]);
   // 「换模型重答」下拉的模型列表。与 ChatModelSelector 各取各的：那边挂载时要校正
   // 陈旧的 localStorage 选择，这里只读。只列真能用的。
   const { data: chatModelsData } = useQuery({
@@ -1236,7 +1252,11 @@ export default function ChatPage() {
     // 函数，此前也无条件记一次 —— 30 天里 94 次 chat_retry 每次都把「提问数」多灌
     // 一次，而重发率、断流率的分母正是 chat。派生动作各记各的事件（见 CHAT_EVENTS）。
     if (typeof umami !== "undefined" && !options?.origin) {
-      umami.track("chat", { question: msg.slice(0, 30) });
+      umami.track("chat", {
+        question: msg.slice(0, 30),
+        master: activeMasterId ?? "none",
+        ...(activeMasterId ? { master_via: masterViaRef.current ?? "gallery" } : {}),
+      });
     }
 
     const userMsg: ChatMessageItem = {
@@ -2116,6 +2136,10 @@ export default function ChatPage() {
                 onSelect={(id) => {
                   setMasterId(id);
                   setGalleryOpen(false);
+                  masterViaRef.current = id ? "gallery" : null;
+                  if (typeof umami !== "undefined") {
+                    umami.track("master_select", { master: id ?? "general" });
+                  }
                 }}
                 onOpenSource={(textId, juan) =>
                   window.open(`/texts/${textId}/read?juan=${juan}`, "_blank", "noopener")
