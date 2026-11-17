@@ -11,7 +11,7 @@ import logging
 from app.config import settings
 from app.models.chat import ChatMessage
 from app.services.master_profiles import get_master
-from app.services.safety_clause import CRISIS_CLAUSE, MASTER_SAFETY_CLAUSE
+from app.services.safety_clause import CRISIS_CLAUSE, MASTER_CRISIS_REMINDER, MASTER_SAFETY_CLAUSE
 
 logger = logging.getLogger(__name__)
 
@@ -368,6 +368,9 @@ def _build_llm_messages(
     # Safety first, on every path — see services/safety_clause.py. Prepended
     # last so the reader-mode additions above cannot push it down.
     enhanced_prompt = (MASTER_SAFETY_CLAUSE if master else CRISIS_CLAUSE) + "\n" + enhanced_prompt
+    if master:
+        # Restated at the end too: nearest-to-generation wins over persona voice.
+        enhanced_prompt += MASTER_CRISIS_REMINDER
     llm_messages: list[dict[str, str]] = [{"role": "system", "content": enhanced_prompt}]
     budget = _MAX_INPUT_TOKENS - _estimate_tokens(enhanced_prompt) - _estimate_tokens(reader_data_block)
 
