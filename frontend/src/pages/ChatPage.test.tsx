@@ -351,15 +351,15 @@ describe("ChatPage 首屏结构", () => {
     vi.mocked(getChatQuota).mockReturnValue(new Promise((r) => { resolve = r; }));
     const { container } = renderPage();
     await waitFor(() => {
-      expect(container.querySelector('.ant-alert[aria-hidden="true"]')).not.toBeNull();
+      expect(container.querySelector('.chat-guest-note[aria-hidden="true"]')).not.toBeNull();
     });
-    expect((container.querySelector('.ant-alert[aria-hidden="true"]') as HTMLElement).style.visibility).toBe("hidden");
+    expect((container.querySelector('.chat-guest-note[aria-hidden="true"]') as HTMLElement).style.visibility).toBe("hidden");
 
     resolve({ limit: 10, used: 3, remaining: 7, has_byok: false, authenticated: false });
     await waitFor(() => {
-      expect(container.querySelector('.ant-alert[aria-hidden="true"]')).toBeNull();
+      expect(container.querySelector('.chat-guest-note[aria-hidden="true"]')).toBeNull();
     });
-    const real = container.querySelector(".ant-alert") as HTMLElement;
+    const real = container.querySelector(".chat-guest-note") as HTMLElement;
     expect(real).not.toBeNull();
     expect(real.style.visibility).toBe("");
   });
@@ -1402,7 +1402,7 @@ describe("额度提醒", () => {
       has_api_key: false, provider: null, model: null, key_preview: null,
     });
     loggedIn({ limit: 10, used: 2, remaining: 8, has_byok: false, authenticated: false });
-    expect(await screen.findByText(/每日免费/, SKIP_HIDDEN)).toBeInTheDocument();
+    expect(await screen.findByText(/今日还可免费提问 8 次/, SKIP_HIDDEN)).toBeInTheDocument();
     expect(screen.queryByText(/登录状态已过期/)).toBeNull();
   });
 
@@ -1545,7 +1545,7 @@ describe("游客横幅合并", () => {
     );
     const r = renderPage();
     // 前置：空态只有配额那一条（否则下面的「只剩一条」可能是因为配额根本没出来）
-    expect(await screen.findByText(/每日免费 10 次问答/, SKIP_HIDDEN)).toBeInTheDocument();
+    expect(await screen.findByText(/今日还可免费提问 9 次/, SKIP_HIDDEN)).toBeInTheDocument();
     await screen.findByText("「三毒」指的是哪三种毒？");
     fireEvent.click(r.container.querySelector(".chat-hero-card")!);
     await waitFor(() => expect(cb).toBeDefined());
@@ -1557,19 +1557,20 @@ describe("游客横幅合并", () => {
 
   it("游客有回答后只出现一条横幅，且同时说明剩余次数与登录可保存", async () => {
     const { container } = await guestWithAnswer();
-    const alerts = container.querySelectorAll(".chat-main-column .ant-alert");
+    const alerts = container.querySelectorAll(".chat-main-column .ant-alert, .chat-main-column .chat-guest-note");
     expect(alerts).toHaveLength(1);
     expect(alerts[0].textContent).toMatch(/9 次/);
+    expect(alerts[0].textContent).toMatch(/对话不会保存/);
     expect(alerts[0].textContent).toMatch(/登录保存/);
   });
 
   // 合并后关掉这一条，配额横幅不能当场「复活」——用户刚点了关闭。
   it("关掉合并横幅后一条都不剩，且保存提示照旧记下 14 天静默", async () => {
     const { container } = await guestWithAnswer();
-    const close = container.querySelector(".chat-main-column .ant-alert .ant-alert-close-icon") as HTMLElement;
+    const close = container.querySelector(".chat-main-column .chat-guest-note-close") as HTMLElement;
     fireEvent.click(close);
     await waitFor(() => {
-      expect(container.querySelectorAll(".chat-main-column .ant-alert")).toHaveLength(0);
+      expect(container.querySelectorAll(".chat-main-column .ant-alert, .chat-main-column .chat-guest-note")).toHaveLength(0);
     });
     expect(localStorage.getItem("fojin.chat.saveHintDismissedAt")).not.toBeNull();
   });
@@ -1584,8 +1585,8 @@ describe("游客横幅合并", () => {
       async (_m, _s, _mid, callbacks) => { cb = callbacks; },
     );
     const { container } = renderPage();
-    await screen.findByText(/每日免费 10 次问答/, SKIP_HIDDEN);
-    fireEvent.click(container.querySelector('.chat-main-column .ant-alert:not([aria-hidden="true"]) .ant-alert-close-icon') as HTMLElement);
+    await screen.findByText(/今日还可免费提问 9 次/, SKIP_HIDDEN);
+    fireEvent.click(container.querySelector('.chat-main-column .chat-guest-note:not([aria-hidden="true"]) .chat-guest-note-close') as HTMLElement);
     await screen.findByText("「三毒」指的是哪三种毒？");
     fireEvent.click(container.querySelector(".chat-hero-card")!);
     await waitFor(() => expect(cb).toBeDefined());
@@ -1615,7 +1616,7 @@ describe("游客横幅合并", () => {
     await screen.findByText("贪、嗔、痴。");
     // 前置：首答确已落地且不在发送中（保存提示的两个触发条件都已满足）
     await waitFor(() => expect(container.querySelector(".chat-send-btn")).not.toBeNull());
-    const alerts = container.querySelectorAll(".chat-main-column .ant-alert");
+    const alerts = container.querySelectorAll(".chat-main-column .ant-alert, .chat-main-column .chat-guest-note");
     expect(alerts).toHaveLength(1);
     expect(alerts[0].textContent).toMatch(/登录状态已过期/);
     expect(alerts[0].textContent).toMatch(/重新登录/);
