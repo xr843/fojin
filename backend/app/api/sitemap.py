@@ -31,8 +31,9 @@ STATIC_PAGES = [
     ("/chat", "weekly", "0.6"),
     # 「这句经，佛真的说过吗？」核对页（入口页可收录；?q= 结果页 noindex）。
     ("/verify", "monthly", "0.8"),
-    # Agent portal — the AI-facing front door (hosted MCP, verify_quote, URNs).
-    ("/agents", "monthly", "0.6"),
+    # (/agents left this sitemap on 2026-11-17: the developer portal now lives
+    # at https://fojin.ai/developers and fojin.app/agents 301s there; it is
+    # listed in fojin.ai's own sitemap instead.)
     # Sutra landing pages
     ("/sutras/heart-sutra", "monthly", "0.9"),
     ("/sutras/diamond-sutra", "monthly", "0.9"),
@@ -67,8 +68,8 @@ STATIC_PAGES = [
 
 
 # Pages that have no per-language variants: /search results are not indexed
-# (robots.txt disallows /search?), /agents is a single-language standalone page.
-_NO_ALTERNATES = {"/search", "/agents"}
+# (robots.txt disallows /search?).
+_NO_ALTERNATES = {"/search"}
 _URLSET_WITH_XHTML = (
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">'
 )
