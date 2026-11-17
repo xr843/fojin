@@ -200,6 +200,22 @@ describe("ChatPage 首屏结构", () => {
     await waitFor(() => expect(sent).toEqual(["huineng"]));
   });
 
+  // fojin.ai 首屏提问框跳到 /chat?q=…&send=1&master=<id>。祖师列表是异步加载的：
+  // 若列表回来之前就自动发送，activeMasterId 还是 null，这条问题会以「通用助手」发出。
+  it("?q=&send=1&master= 等祖师列表加载完才自动发送，并带上该宗风", async () => {
+    let resolveMasters!: (v: typeof MASTERS) => void;
+    vi.mocked(getMasters).mockReturnValue(new Promise((r) => { resolveMasters = r; }));
+    const sent: Array<[string, string | null | undefined]> = [];
+    vi.mocked(sendChatMessageStream).mockImplementation(
+      async (m, _s, mid) => { sent.push([m, mid]); },
+    );
+    renderPage("/chat?q=" + encodeURIComponent("顿悟是什么？") + "&send=1&master=huineng");
+    await new Promise((r) => setTimeout(r, 50));
+    expect(sent).toEqual([]);
+    await act(async () => { resolveMasters(MASTERS); });
+    await waitFor(() => expect(sent).toEqual([["顿悟是什么？", "huineng"]]));
+  });
+
   it("?master= 不认识的 id 不选中、不发送", async () => {
     const sent: Array<string | null | undefined> = [];
     vi.mocked(sendChatMessageStream).mockImplementation(
