@@ -636,7 +636,7 @@ export default function ChatPage() {
   // 祖师长廊: opened from .chat-lineage-btn in the composer toolbar — the sole
   // entry point, in every state (empty and mid-thread alike).
   const [galleryOpen, setGalleryOpen] = useState(false);
-  const { data: mastersData } = useQuery({
+  const { data: mastersData, isError: mastersError } = useQuery({
     queryKey: ["chat-masters"],
     queryFn: getMasters,
     staleTime: 60 * 60 * 1000, // curated data; effectively static
@@ -1656,6 +1656,11 @@ export default function ChatPage() {
     onToggleHelp: toggleShortcutsHelp,
   });
 
+  // 带 ?master= 的自动发送链接（fojin.ai 首屏提问框）要等祖师列表回来：列表未到时
+  // activeMasterId 为 null，此刻发送会把问题当「通用助手」发出。列表请求失败就不再等，
+  // 按通用助手发，总比吞掉用户已经按过的回车好。
+  const waitForMasters = !!searchParams.get("master") && mastersData === undefined && !mastersError;
+
   // Handle pre-filled message from URL params (e.g. from "Ask XiaoJin" button on reader page)
   useEffect(() => {
     const q = searchParams.get("q");
@@ -1667,7 +1672,7 @@ export default function ChatPage() {
     // 那种 URL 会被收藏分享，自动发送等于每打开一次烧一次配额。别在这儿
     // setInput：react-hooks/set-state-in-effect 会红（实测），而且多绕一帧。
     const send = searchParams.get("send") === "1";
-    if (!q || (!context && !send) || autoSentRef.current) return;
+    if (!q || (!context && !send) || autoSentRef.current || waitForMasters) return;
 
     autoSentRef.current = true;
     // 发送前把参数从 URL 抹掉：send=1 的链接刷新/回退时不该重发重扣配额。
@@ -1679,7 +1684,7 @@ export default function ChatPage() {
         : `关于这段经文：\n\n> ${context}\n\n${q}` // i18n-exempt — chat message payload sent to the zh RAG pipeline
       : q;
     handleSendMessage(msg);
-  }, [searchParams, setSearchParams, handleSendMessage]);
+  }, [searchParams, setSearchParams, handleSendMessage, waitForMasters]);
 
   /** 去配 Key。带上来源与当前会话，好让 /profile 给出一个能真正返回原会话的按钮 ——
    *  sessionId 只是组件 state，离开 /chat 就没了，光有「返回」会落在空白新对话上。 */
