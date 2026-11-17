@@ -9,6 +9,7 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import resolve_optional_user
+from app.core.elasticsearch import get_es
 from app.core.exceptions import (
     AccessDeniedError,
     QuotaExceededError,
@@ -46,6 +47,7 @@ from app.services.chat_sessions import (  # noqa: F401
 )
 from app.services.chat_trust import AnswerTiming, build_trust_status, persist_answer_diagnostic
 from app.services.citation_guard import enforce_citation_whitelist, log_mutations
+from app.services.citation_rescue import rescue_candidates, rescue_unretrieved_citations
 from app.services.daily_metrics import ANONYMOUS_MESSAGES, increment_daily_metric
 
 # Moved to app.services.hot_questions in the P1-3 split; re-imported here so
@@ -700,6 +702,7 @@ async def send_message(
         model=model, provider=provider, is_byok=is_byok,
         prompt_messages=llm_messages, completion=answer,
     )
+    sources = await _with_rescued_sources(answer, sources, async_session)
     answer, _citation_mutations = enforce_citation_whitelist(answer, sources)
     # Quote verifier runs after the citation guard so quotes attached
     # to citations the guard already stripped don't get double-flagged.
@@ -842,6 +845,39 @@ async def _interleave_heartbeat(inner_gen, heartbeat_interval: float):
                 await task
             except BaseException:
                 pass
+
+
+# Rescue budget: the whole step (title lookup + a few verify_quote calls) must
+# never hold up the answer. On timeout or error the guard runs exactly as before.
+RESCUE_TIMEOUT_S = 4.0
+
+
+async def _with_rescued_sources(answer: str, sources: list[ChatSource], sessionmaker) -> list[ChatSource]:
+    """``sources`` plus any fascicle that verbatim-confirms a citation of a text
+    retrieval did not surface (see app/services/citation_rescue). Fail-open.
+
+    The candidate scan is pure text; most answers have nothing to check, and
+    then no DB session is opened at all (the stream path must not take a pool
+    slot it does not need — see test_chat_stream_session_lifecycle)."""
+    if not rescue_candidates(answer, sources):
+        return sources
+    try:
+        async with sessionmaker() as db_rescue:
+            extra = await asyncio.wait_for(
+                rescue_unretrieved_citations(answer, sources, db_rescue, get_es()),
+                timeout=RESCUE_TIMEOUT_S,
+            )
+    except Exception:
+        logger.warning("chat: citation rescue skipped", exc_info=True)
+        return sources
+    if extra:
+        logger.info(
+            "chat: citation rescue added %d source(s): %s",
+            len(extra),
+            ", ".join(f"{x.title_zh}#{x.juan_num}" for x in extra),
+        )
+        return [*sources, *extra]
+    return sources
 
 
 async def send_message_stream(
@@ -1401,6 +1437,7 @@ async def send_message_stream(
         model=model, provider=provider, is_byok=is_byok,
         prompt_messages=llm_messages, completion=full_answer,
     )
+    sources = await _with_rescued_sources(full_answer, sources, sessionmaker)
     corrected_answer, _citation_mutations = enforce_citation_whitelist(full_answer, sources)
     # Quote verifier runs after citation_guard so flagged-and-stripped
     # citations don't carry their quotes into a second annotation. Chunk

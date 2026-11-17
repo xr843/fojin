@@ -167,3 +167,16 @@ describe("injectCitationLinks — 分段存储的长书（书名带「(第x卷-�
     expect(urlOf(out)).toBeNull();
   });
 });
+
+describe("injectCitationLinks — 后端补救的来源（检索没调出、引文核对上后补进来）", () => {
+  // citation_rescue 补进来的来源没有段号（chunk_index=-1），chunk_text 就是那句引文：
+  // 链接要指向那一卷、段号 -1（右栏整卷打开并高亮引文），不能退回别的来源。
+  it("链接到补救来源的那一卷，段号为 -1", () => {
+    const sources = [
+      src({ text_id: 7 as TextId, title_zh: "金剛般若波羅蜜經", juan_num: 1, chunk_index: 3, score: 0.9, chunk_text: "如是我聞" }),
+      src({ text_id: 1915 as TextId, title_zh: "修習止觀坐禪法要", juan_num: 1, chunk_index: -1, score: 0, chunk_text: "依因此戒，得生諸禪定，及滅苦智慧" }),
+    ];
+    const out = injectCitationLinks("智者大师说：「依因此戒，得生諸禪定，及滅苦智慧」【《修習止觀坐禪法要》第1卷】。", sources);
+    expect(urlOf(out)).toMatch(/^1915\/1\/-1\//);
+  });
+});
