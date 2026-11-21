@@ -85,6 +85,7 @@ import {
 import { expectedFirstTokenSeconds, recordFirstTokenMs } from "../utils/firstTokenStats";
 import type { TextId } from "../types/branded";
 import { useNarrowViewport } from "../hooks/useNarrowViewport";
+import { COMPOSER_SHORT_VIEWPORT_QUERY, composerAutoSize } from "./chatComposer";
 import { MOD_KEY_LABEL, useChatShortcuts } from "../hooks/useChatShortcuts";
 import { InlineCitation } from "../components/CitationPreview";
 import { CitationPreviewContext } from "../components/citationPreviewContext";
@@ -1686,6 +1687,12 @@ export default function ChatPage() {
 
   // 同一个 matchMedia 包装，这里判的是「宽屏」而非窄屏。
   const wideDesktop = useNarrowViewport(SIDEBAR_WIDE_QUERY);
+  const shortViewport = useNarrowViewport(COMPOSER_SHORT_VIEWPORT_QUERY);
+  const inConversation = messages.length > 0;
+  const composerRows = useMemo(
+    () => composerAutoSize(inConversation, shortViewport),
+    [inConversation, shortViewport],
+  );
   const sidebarExpandedW = wideDesktop ? SIDEBAR_EXPANDED_W_WIDE : SIDEBAR_EXPANDED_W;
 
   // 键盘快捷键（Esc 停止 / Ctrl·⌘+K 新对话 / ↑ 召回上一问 / 「/」聚焦 / ? 说明）。
@@ -2241,7 +2248,7 @@ export default function ChatPage() {
                 placeholder={t("chat.input_placeholder")}
                 // 生成中照样可以打字（首字常要等 20–60 秒，用户可以先写下一问）；
                 // 只是发不出去 —— 回车在 handleSendMessage 里被 sending 挡下，草稿原样留着。
-                autoSize={{ minRows: 2, maxRows: 8 }}
+                autoSize={composerRows}
                 variant="borderless"
                 style={{ fontFamily: '"Noto Serif SC", serif', fontSize: 16, resize: "none" }}
               />
