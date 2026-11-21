@@ -8,6 +8,7 @@ import { browseTaisho } from "../api/client";
 import { getLocalizedCollections } from "../data/collections";
 import { getLocalizedPopularSutras } from "../data/popularSutras";
 import { TAISHO_SECTIONS } from "../data/taishoSections";
+import { satTextUrl } from "../utils/satUrls";
 import { LangAlternates } from "../seo/LangAlternates";
 import { scriptForLanguage } from "../utils/hanLocale";
 import { localizeHan } from "../utils/hanScript";
@@ -46,6 +47,19 @@ export default function ReadPage() {
     enabled: section !== null,
     staleTime: 60 * 60_000,
   });
+
+  // 第 56–84 册（T2185–T2731，日本撰述）CBETA 未收，佛津只有目录。这几个部类原本只给
+  // 一个「暂无可在线阅读」的空态（2026-11-21 用户反馈：SAT 里有日系俱舍注疏，佛津
+  // 续论疏部却是 0 部）。没有可读经文时改为列出经目、每部外链 SAT 原页 —— SAT 条款
+  // 当前禁止再分发全文，只能外链。
+  const satOnlySection = section !== null && section.from >= 2185 && section.to <= 2731;
+  const { data: catalogTexts } = useQuery({
+    queryKey: ["taishoBrowseCatalog", section?.from, section?.to],
+    queryFn: () => browseTaisho(section!.from, section!.to, true),
+    enabled: satOnlySection && texts !== undefined && texts.length === 0,
+    staleTime: 60 * 60_000,
+  });
+  const showSatCatalog = satOnlySection && texts?.length === 0 && !!catalogTexts && catalogTexts.length > 0;
 
   // 点开一个部类后把经目滚进视野——桌面上部类按钮已在首屏底部，列表会落在折线以下。
   // 只在点击时滚；带 ?bu= 直接打开时不抢用户的滚动位置。
@@ -131,12 +145,53 @@ export default function ReadPage() {
               <span className="read-list-range">
                 T{String(section.from).padStart(4, "0")}–T{String(section.to).padStart(4, "0")}
               </span>
-              {texts && <span className="read-list-count">{t("read.count", { n: texts.length })}</span>}
+              {showSatCatalog ? (
+                <span className="read-list-count">{t("read.sat_count", { n: catalogTexts!.length })}</span>
+              ) : (
+                texts && <span className="read-list-count">{t("read.count", { n: texts.length })}</span>
+              )}
             </div>
             {isLoading ? (
               <div className="read-list-state"><Spin /></div>
             ) : isError ? (
               <div className="read-list-state">{t("read.load_failed")}</div>
+            ) : showSatCatalog ? (
+              <>
+                <p className="read-sat-note">{t("read.sat_note")}</p>
+                <ol className="read-list">
+                  {catalogTexts!.map((x) => (
+                    <li key={x.id}>
+                      <a
+                        className="read-list-title"
+                        href={satTextUrl(x.cbeta_id) ?? undefined}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-umami-event="read_sat_out"
+                        data-umami-event-id={x.cbeta_id}
+                      >
+                        {localizeHan(x.title_zh, lang)}
+                      </a>
+                      <span className="read-list-meta">
+                        {[x.dynasty && localizeHan(x.dynasty, lang), x.translator && localizeHan(x.translator, lang)]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                      {/* 与标题同一个去处；读屏和 Tab 只认标题那一个链接，避免重复播报 */}
+                      <a
+                        className="read-list-sat"
+                        href={satTextUrl(x.cbeta_id) ?? undefined}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        tabIndex={-1}
+                        aria-hidden="true"
+                      >
+                        {t("read.sat_link")} ↗
+                      </a>
+                      <span className="read-list-id">{x.cbeta_id}</span>
+                    </li>
+                  ))}
+                </ol>
+              </>
             ) : !texts || texts.length === 0 ? (
               <Empty description={t("read.empty")} />
             ) : (

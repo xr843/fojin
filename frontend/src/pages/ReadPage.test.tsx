@@ -130,3 +130,27 @@ describe("读经页", () => {
     }
   });
 });
+
+describe("第 56–84 册（CBETA 未收）的部类列经目并外链 SAT", () => {
+  it("续论疏部没有可读经文时，列出目录条目，标题链到 SAT 原页", async () => {
+    mockBrowse.mockImplementation(async (_from, _to, catalogOnly) =>
+      catalogOnly
+        ? [{ id: 9001, cbeta_id: "T2249", title_zh: "倶舍論本義抄", translator: null, dynasty: null, fascicle_count: null }]
+        : [],
+    );
+    renderPage("/read?bu=" + encodeURIComponent("續論疏部"));
+    const link = await screen.findByRole("link", { name: /本[義义]抄/ });
+    expect(link.getAttribute("href")).toBe("https://21dzk.l.u-tokyo.ac.jp/SAT2018/T2249.html");
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(screen.queryByText("这一部暂无可在线阅读的经文")).toBeNull();
+    expect(screen.getByText(/CBETA 没有收录/)).toBeInTheDocument();
+    expect(mockBrowse).toHaveBeenCalledWith(2249, 2295, true);
+  });
+
+  it("CBETA 收录的部类不去取目录条目，空了仍是原来的空态", async () => {
+    mockBrowse.mockResolvedValue([]);
+    renderPage("/read?bu=" + encodeURIComponent("古逸部"));
+    expect(await screen.findByText("这一部暂无可在线阅读的经文")).toBeInTheDocument();
+    expect(mockBrowse).not.toHaveBeenCalledWith(expect.anything(), expect.anything(), true);
+  });
+});

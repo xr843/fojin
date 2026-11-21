@@ -2957,9 +2957,10 @@ export interface TaishoBrowseItem {
 }
 
 /** 读经页：大正藏某一编号区间（含两端）里有正文的经目。 */
-export async function browseTaisho(fromNo: number, toNo: number): Promise<TaishoBrowseItem[]> {
+export async function browseTaisho(fromNo: number, toNo: number, catalogOnly = false): Promise<TaishoBrowseItem[]> {
   const { data } = await api.get<TaishoBrowseItem[]>("/texts/browse/taisho", {
-    params: { from_no: fromNo, to_no: toNo },
+    // catalogOnly：只列没有正文的目录条目（第 56–84 册日本撰述，CBETA 未收）
+    params: catalogOnly ? { from_no: fromNo, to_no: toNo, catalog_only: true } : { from_no: fromNo, to_no: toNo },
   });
   return data;
 }

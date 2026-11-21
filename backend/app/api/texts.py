@@ -181,13 +181,14 @@ async def browse_taisho_texts(
     response: Response,
     from_no: int = Query(..., ge=1, le=TAISHO_MAX_NO, description="大正藏起始编号（含）"),
     to_no: int = Query(..., ge=1, le=TAISHO_MAX_NO, description="大正藏结束编号（含）"),
+    catalog_only: bool = Query(False, description="只列没有正文的目录条目（第 56–84 册等 CBETA 未收者）"),
     db: AsyncSession = Depends(get_db),
 ):
     """读经页「按部类浏览」：列出大正藏某一编号区间内有正文的经目。"""
     if to_no < from_no or to_no - from_no > TAISHO_MAX_SPAN:
         raise HTTPException(status_code=422, detail="invalid taisho range")
     response.headers["Cache-Control"] = "public, max-age=3600"
-    return await browse_taisho(db, from_no, to_no)
+    return await browse_taisho(db, from_no, to_no, catalog_only=catalog_only)
 
 
 @router.get("/texts/{text_id}", response_model=TextResponseBase)
