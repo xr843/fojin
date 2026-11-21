@@ -103,3 +103,39 @@ describe("辞典词条的出口", () => {
     expect(toggle.querySelector("a")).toBeNull();
   });
 });
+
+/**
+ * 2026-11-21 用户反馈（附录屏）：在词条释义上拖选文字想复制，松开鼠标那一下被当成
+ * 「点击词条」，词条随之展开/收起，选区跟着跳走，复制不了。
+ */
+describe("在词条里选文字不会触发展开/收起", () => {
+  function selectTextIn(el: Element) {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  it("词条内有选中文字时点击不切换；没有选区时照常切换", async () => {
+    const { container } = renderAt(`/dictionary?q=${encodeURIComponent(HEADWORD)}`);
+    await waitFor(() => expect(screen.getByText(HEADWORD)).toBeInTheDocument());
+    const main = container.querySelector(".dict-entry-main")!;
+
+    // 折叠态拖选预览文字：不应展开
+    selectTextIn(container.querySelector(".dict-entry-def-preview")!);
+    fireEvent.click(main);
+    expect(container.querySelector(".dict-entry-def-full")).toBeNull();
+
+    // 清掉选区后点击：照常展开
+    window.getSelection()!.removeAllRanges();
+    fireEvent.click(main);
+    expect(container.querySelector(".dict-entry-def-full")).not.toBeNull();
+
+    // 展开态拖选全文：不应收起
+    selectTextIn(container.querySelector(".dict-entry-def-full")!);
+    fireEvent.click(main);
+    expect(container.querySelector(".dict-entry-def-full")).not.toBeNull();
+    window.getSelection()!.removeAllRanges();
+  });
+});
