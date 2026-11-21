@@ -92,7 +92,13 @@ function EntryItem({
           键盘用户 Tab 不到里面的出口。 */}
       <div
         className="dict-entry-main"
-        onClick={() => setExpanded(!expanded)}
+        onClick={(e) => {
+          // 拖选文字松开鼠标也会派发 click：此时切换展开会让选区跟着跳走，
+          // 用户复制不了释义（2026-11-21 用户录屏反馈）。词条内有选区就不切换。
+          const sel = window.getSelection();
+          if (sel && !sel.isCollapsed && sel.toString().trim() && e.currentTarget.contains(sel.anchorNode)) return;
+          setExpanded(!expanded);
+        }}
         role="button"
         tabIndex={0}
         onKeyDown={(e) => {
