@@ -1652,8 +1652,10 @@ em {
 
 /* 手机上 /chat 不显示页脚：版权一行对聊天没有用，却和输入框一起压缩回答可读区。
    页脚高度写在外壳的高度计算里（--fj-footer-h），在承载 /chat 的那一层把它置 0，
-   外壳才真的多出这 50px。 */
-@media (max-width: 768px) {
+   外壳才真的多出这 50px。
+   矮屏同理（2026-11-21 用户反馈：笔记本矮窗口里输入框把回答区挤小）；
+   高度阈值与 chatComposer.ts 的 COMPOSER_SHORT_VIEWPORT_QUERY 同一个数。 */
+@media (max-width: 768px), (max-height: 760px) {
   .layout-content-inner:has(.chat-shell) { --fj-footer-h: 0px; }
   body:has(.chat-shell) .ant-layout-footer { display: none; }
 }
