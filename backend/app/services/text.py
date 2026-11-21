@@ -87,8 +87,11 @@ TAISHO_MAX_NO = 2920
 TAISHO_MAX_SPAN = 700  # 最大的部（密教部）573 个编号；限制单次查询规模
 
 
-async def browse_taisho(session: AsyncSession, from_no: int, to_no: int) -> list[dict]:
+async def browse_taisho(session: AsyncSession, from_no: int, to_no: int, catalog_only: bool = False) -> list[dict]:
     """大正藏 T{from_no}..T{to_no}（含两端、含 a/b 变体）里有正文的经目，按编号排序。
+
+    catalog_only=True 时反过来只列**没有正文**的目录条目：第 56–84 册（日本撰述）
+    CBETA 未收，库里只有目录，读经页据此列经目并外链 SAT。
 
     cbeta_id 是四位补零（T0001、T0235b），所以编号区间可以直接用字符串比较表达，
     不依赖 Postgres 正则（测试用的 SQLite 也能跑）。
@@ -107,7 +110,7 @@ async def browse_taisho(session: AsyncSession, from_no: int, to_no: int) -> list
             .where(
                 BuddhistText.cbeta_id >= lo,
                 BuddhistText.cbeta_id < hi,
-                BuddhistText.has_content.is_(True),
+                BuddhistText.has_content.is_(not catalog_only),
             )
             .order_by(BuddhistText.cbeta_id)
         )

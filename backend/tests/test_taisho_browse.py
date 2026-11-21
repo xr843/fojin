@@ -56,3 +56,23 @@ async def test_endpoint_returns_list_and_validates_range(db):
             assert (await c.get("/api/texts/browse/taisho", params={"from_no": 1, "to_no": 2000})).status_code == 422
     finally:
         app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.mark.anyio
+async def test_catalog_only_lists_entries_without_content(db):
+    """第 56–84 册（日本撰述）CBETA 未收，库里只有目录。读经页对这些部类要列出
+    经目并外链 SAT，而不是给一个空列表（2026-11-21 用户反馈：续论疏部「0 部可读」）。"""
+    rows = await browse_taisho(db, 1, 151, catalog_only=True)
+    assert [r["cbeta_id"] for r in rows] == ["T0100"]
+
+    async def _db():
+        yield db
+
+    app.dependency_overrides[get_db] = _db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+            r = await c.get("/api/texts/browse/taisho", params={"from_no": 1, "to_no": 151, "catalog_only": "true"})
+            assert r.status_code == 200
+            assert [x["cbeta_id"] for x in r.json()] == ["T0100"]
+    finally:
+        app.dependency_overrides.pop(get_db, None)
