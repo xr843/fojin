@@ -15,8 +15,10 @@ from elasticsearch import AsyncElasticsearch
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.verification import ClaimSegment, ClaimVerdict, ClosestMiss, QuoteVerdict
+from app.services.line_locate import line_anchor
 from app.services.quote_lookup import MIN_LOOKUP_QUOTE_CHARS, verify_quote
 from app.services.quote_verifier import normalise_for_match
+from app.services.urn import absolute_reader_url, reader_path
 
 MAX_CLAUSES = 8
 # A clause shorter than this, found verbatim but with no neighbouring clause
@@ -94,6 +96,31 @@ def _segment(text: str, verdict: QuoteVerdict) -> ClaimSegment:
     )
 
 
+def _anchored_url(text_id: int, juan: int, anchor: str) -> str | None:
+    return absolute_reader_url(reader_path(text_id, juan, anchor))
+
+
+async def _locate(db: AsyncSession, seg: ClaimSegment) -> ClaimSegment:
+    """Point the link the page shows at the line the text starts on.
+
+    Only the first source (the one the page names) and the near-miss window are
+    located — one fascicle read each. No line found keeps the fascicle link.
+    User feedback 2026-11-22: 「点击查看原文后，如果能直接定位到所查的那句」."""
+    if seg.found and seg.sources:
+        first = seg.sources[0]
+        anchor = await line_anchor(db, first.text_id, first.juan_num, seg.text)
+        if anchor:
+            first = first.model_copy(update={"reader_url": _anchored_url(first.text_id, first.juan_num, anchor)})
+            return seg.model_copy(update={"sources": [first, *seg.sources[1:]]})
+    elif seg.close is not None:
+        close = seg.close
+        anchor = await line_anchor(db, close.text_id, close.juan_num, close.window_normalised)
+        if anchor:
+            close = close.model_copy(update={"reader_url": _anchored_url(close.text_id, close.juan_num, anchor)})
+            return seg.model_copy(update={"close": close})
+    return seg
+
+
 def _discount_isolated_short_hits(segments: list[ClaimSegment]) -> list[ClaimSegment]:
     found = [s.found for s in segments]
     out = []
@@ -148,6 +175,7 @@ async def check_claim(db: AsyncSession, es: AsyncElasticsearch, text: str) -> Cl
     else:
         segments = [_segment(c, await verify_quote(db, es, c, strict=True)) for c in clauses]
         segments = _discount_isolated_short_hits(segments)
+    segments = [await _locate(db, seg) for seg in segments]
     result = _overall(text, segments)
 
     if len(_CACHE) >= _CACHE_MAX:
@@ -179,7 +207,7 @@ async def credit_runs(db: AsyncSession, es: AsyncElasticsearch, verdict: ClaimVe
             j += 1
         if j > i:
             run_text = "，".join(seg.text for seg in segments[i : j + 1])
-            run = _segment(run_text, await verify_quote(db, es, run_text, strict=True))
+            run = await _locate(db, _segment(run_text, await verify_quote(db, es, run_text, strict=True)))
             if run.found and run.sources:
                 for k in range(i, j + 1):
                     segments[k] = segments[k].model_copy(update={"sources": run.sources})
