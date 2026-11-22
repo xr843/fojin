@@ -99,9 +99,7 @@ const SITE_PREFIX = "/_site/";
 const SITE_CSP = [
   "default-src 'self'",
   "script-src 'self' https://analytics.fojin.app",
-  // fojin.app: the 引文溯源 page calls /api/verify/trace there directly
-  // (CORS allows fojin.ai), so the rate limit sees each visitor's own IP.
-  "connect-src 'self' https://fojin.app https://analytics.fojin.app",
+  "connect-src 'self' https://analytics.fojin.app",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https:",
   "font-src 'self'",
@@ -173,9 +171,48 @@ async function serveSite(request) {
   return out;
 }
 
+// The 引文溯源 page posts to /api/verify/trace on its own origin; this worker
+// passes it to fojin.app. Calling fojin.app cross-origin does not work: the
+// host nginx adds `Access-Control-Allow-Origin: *` to every /api/ response on
+// top of FastAPI's own `https://fojin.ai`, and browsers reject the doubled
+// header (deploy/host-nginx/README.md, known conflict 2). Cost: rate limiting
+// sees this worker's address, so fojin.ai visitors share one per-minute window
+// (6 calls) — fine at today's traffic; the page waits out a 429 and resumes.
+const API_PASSTHROUGH = new Set(["/api/verify/trace"]);
+
+async function passApi(request, url) {
+  try {
+    const upstream = await fetch("https://fojin.app" + url.pathname + url.search, {
+      method: request.method,
+      headers: {
+        "content-type": request.headers.get("content-type") || "application/json",
+        accept: "application/json",
+      },
+      body: request.method === "POST" ? await request.text() : undefined,
+      redirect: "manual",
+    });
+    const out = new Response(upstream.body, upstream);
+    // Same-origin now: drop the doubled CORS headers fojin.app sends.
+    for (const h of [...out.headers.keys()]) {
+      if (h.startsWith("access-control-")) out.headers.delete(h);
+    }
+    out.headers.set("cache-control", "no-store");
+    return out;
+  } catch (e) {
+    return new Response(JSON.stringify({ detail: "upstream unavailable" }), {
+      status: 502,
+      headers: { "content-type": "application/json" },
+    });
+  }
+}
+
 export default {
   async fetch(request) {
     const url = new URL(request.url);
+
+    if (API_PASSTHROUGH.has(url.pathname) && request.method === "POST") {
+      return passApi(request, url);
+    }
 
     if (url.pathname === "/sw.js") {
       return new Response(KILL_SW, { headers: JS_HEADERS });
