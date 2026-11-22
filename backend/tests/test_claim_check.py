@@ -456,3 +456,81 @@ async def test_credited_run_links_to_the_line_of_the_whole_run(monkeypatch, fake
     out = await credit_runs(None, None, await check_claim(None, None, "一切有为法，如梦幻泡影，看开便是福"))
     assert out.segments[0].sources[0].cbeta_id == "T0235"
     assert out.segments[0].sources[0].reader_url.endswith("anchor=p0752b03&hl=300-310")
+
+
+# ── 整段核对：常见短句按上下文认出处（用户截图 2026-11-22：一整段《俱舍论》里，
+#    「所以者何？」被单独认成《长阿含经》） ──────────────────────────────────
+
+AGAMA = _match("T0001", "長阿含經", "sutra", 1)
+
+
+def _ctx(monkeypatch, located_in=(7, 1)):
+    calls = []
+
+    async def locate(db, text_id, juan, quote):
+        calls.append((text_id, juan, quote))
+        return ("p0752a01", 10, 14) if (text_id, juan) == located_in else None
+
+    monkeypatch.setattr(claim_check, "locate_quote", locate)
+    monkeypatch.setitem(TABLE, "所以者何", [AGAMA])
+    return calls
+
+
+async def test_a_common_phrase_between_lines_of_one_text_is_credited_to_that_text(monkeypatch, fake_lookup):
+    from app.services.claim_check import attribute_by_context
+
+    _ctx(monkeypatch)
+    verdicts = [await check_claim(None, None, q) for q in ("如露亦如电", "所以者何", "应作如是观")]
+    out, dominant = await attribute_by_context(None, verdicts, prefer=None)
+    assert dominant.cbeta_id == "T0235"
+    mid = out[1]
+    assert mid.segments[0].sources[0].cbeta_id == "T0235"
+    assert mid.segments[0].sources[0].reader_url.endswith("anchor=p0752a01&hl=10-14")
+    assert mid.verdict == "sutra" and mid.source_class == "sutra"
+    # the other occurrence is kept, second
+    assert [s.cbeta_id for s in mid.segments[0].sources[1:]] == ["T0001"]
+
+
+async def test_the_text_from_the_previous_batch_counts_as_context(monkeypatch, fake_lookup):
+    from app.services.claim_check import attribute_by_context
+
+    _ctx(monkeypatch)
+    out, dominant = await attribute_by_context(None, [await check_claim(None, None, "所以者何")], prefer=DIAMOND)
+    assert out[0].segments[0].sources[0].cbeta_id == "T0235"
+    assert dominant.cbeta_id == "T0235"
+
+
+async def test_one_line_is_not_enough_context(monkeypatch, fake_lookup):
+    from app.services.claim_check import attribute_by_context
+
+    calls = _ctx(monkeypatch)
+    verdicts = [await check_claim(None, None, q) for q in ("如露亦如电", "所以者何")]
+    before = len(calls)
+    out, dominant = await attribute_by_context(None, verdicts, prefer=None)
+    assert dominant is None
+    assert out[1].segments[0].sources[0].cbeta_id == "T0001"
+    assert len(calls) == before  # no extra lookups without context
+
+
+async def test_a_line_not_in_the_context_text_keeps_its_own_source(monkeypatch, fake_lookup):
+    from app.services.claim_check import attribute_by_context
+
+    _ctx(monkeypatch, located_in=(999, 9))  # not found in the Diamond Sūtra
+    verdicts = [await check_claim(None, None, q) for q in ("如露亦如电", "所以者何", "应作如是观")]
+    out, _ = await attribute_by_context(None, verdicts, prefer=None)
+    assert out[1].segments[0].sources[0].cbeta_id == "T0001"
+
+
+async def test_trace_endpoint_takes_prefer_and_returns_the_dominant_text(monkeypatch, fake_lookup):
+    from app.api import verification
+
+    monkeypatch.setattr(verification, "get_es", lambda: None)
+    _ctx(monkeypatch)
+    resp = await _post(
+        "/api/verify/trace",
+        {"sentences": ["所以者何"], "prefer": {"text_id": 7, "juan_num": 1, "cbeta_id": "T0235",
+                                             "title_zh": "金剛般若波羅蜜經", "canon_class": "sutra"}},
+    )
+    body = resp.json()
+    assert body["items"][0]["result"]["segments"][0]["sources"][0]["cbeta_id"] == "T0235"
+    assert body["dominant"]["cbeta_id"] == "T0235"

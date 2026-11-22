@@ -14,7 +14,7 @@ import time
 from elasticsearch import AsyncElasticsearch
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.schemas.verification import ClaimSegment, ClaimVerdict, ClosestMiss, QuoteVerdict
+from app.schemas.verification import ClaimSegment, ClaimVerdict, ClosestMiss, QuoteMatch, QuoteVerdict
 from app.services.line_locate import locate_quote
 from app.services.quote_lookup import MIN_LOOKUP_QUOTE_CHARS, verify_quote
 from app.services.quote_verifier import normalise_for_match
@@ -218,3 +218,82 @@ async def credit_runs(db: AsyncSession, es: AsyncElasticsearch, verdict: ClaimVe
         i = j + 1
     # A copy: check_claim caches the verdict it returned.
     return verdict.model_copy(update={"segments": segments})
+
+
+def _whole_found(v: ClaimVerdict | None) -> bool:
+    return (
+        v is not None
+        and v.verdict in ("sutra", "not_sutra")
+        and len(v.segments) == 1
+        and v.segments[0].found
+        and bool(v.segments[0].sources)
+    )
+
+
+async def attribute_by_context(
+    db: AsyncSession,
+    verdicts: list[ClaimVerdict | None],
+    prefer: QuoteMatch | None,
+) -> tuple[list[ClaimVerdict | None], QuoteMatch | None]:
+    """Credit lines of a pasted passage to the fascicle the passage comes from.
+
+    Checked one by one, a common phrase inside a passage — 「所以者何？」 in a page
+    of the 俱舍論 — is credited to whichever early text happens to use it first
+    (the 長阿含經; user screenshot, 2026-11-22). When most lines of the batch,
+    plus ``prefer`` (the previous batch's answer, sent back by the page), come
+    from one fascicle, a line credited elsewhere is looked up in that fascicle;
+    if it is there verbatim, that fascicle becomes its first source and decides
+    its verdict. Its other sources are kept after it.
+
+    Returns the verdicts and the dominant fascicle (None without at least two
+    votes; ``prefer`` counts as two), for the page to send with its next batch.
+    """
+    counts: dict[tuple[int, int], int] = {}
+    template: dict[tuple[int, int], QuoteMatch] = {}
+    for v in verdicts:
+        if _whole_found(v):
+            m = v.segments[0].sources[0]
+            key = (m.text_id, m.juan_num)
+            counts[key] = counts.get(key, 0) + 1
+            template.setdefault(key, m)
+    if prefer is not None:
+        key = (prefer.text_id, prefer.juan_num)
+        counts[key] = counts.get(key, 0) + 2
+        template.setdefault(key, prefer)
+    if not counts:
+        return verdicts, None
+    key, votes = max(counts.items(), key=lambda kv: kv[1])
+    if votes < 2:
+        return verdicts, None
+    dominant = template[key].model_copy(update={"reader_url": None, "juan_matched": None})
+
+    out: list[ClaimVerdict | None] = []
+    for v in verdicts:
+        if not _whole_found(v):
+            out.append(v)
+            continue
+        seg = v.segments[0]
+        if (seg.sources[0].text_id, seg.sources[0].juan_num) == key:
+            out.append(v)
+            continue
+        same = [m for m in seg.sources if (m.text_id, m.juan_num) == key]
+        if same:
+            first = same[0].model_copy(update={"reader_url": None})
+        elif await locate_quote(db, key[0], key[1], seg.text):
+            first = dominant
+        else:
+            out.append(v)
+            continue
+        rest = [m for m in seg.sources if (m.text_id, m.juan_num) != key]
+        new_seg = await _locate(db, seg.model_copy(update={"sources": [first, *rest]}))
+        cls = first.canon_class
+        out.append(
+            v.model_copy(
+                update={
+                    "segments": [new_seg],
+                    "verdict": "sutra" if cls == "sutra" else "not_sutra",
+                    "source_class": cls,
+                }
+            )
+        )
+    return out, dominant

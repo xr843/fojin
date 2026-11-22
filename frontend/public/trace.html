@@ -25,7 +25,7 @@
 <!-- ?v= busts Cloudflare's edge cache, which keeps .js for 4 hours across
      deploys. Bump it whenever trace.js changes (the fojin.ai worker passes the
      query through to fojin.app). -->
-<script defer src="/trace.js?v=3"></script>
+<script defer src="/trace.js?v=4"></script>
 <script defer src="https://analytics.fojin.app/script.js" data-website-id="c757a04c-82e0-4f53-a720-830b0e1a7287"></script>
 <style>
   :root {
@@ -113,6 +113,11 @@
   .k-absent .tag { color: var(--none); background: var(--none-bg); }
   .meta a { text-decoration: underline; text-underline-offset: 2px; }
   .ask { margin-left: auto; font-size: 13px; }
+  .meta .runinfo { font-size: 12.5px; color: var(--ink-muted); }
+  details.each { margin-top: 6px; font-size: 14px; color: var(--ink-light); }
+  details.each summary { cursor: pointer; font-size: 13px; color: var(--ink-muted); }
+  details.each ol { margin: 6px 0 0; padding-left: 1.6em; }
+  ol#result details.each li { padding: 2px 0; margin: 0; border: 0; border-radius: 0; background: none; }
   .share { margin-top: 12px; font-size: 14px; }
   .share button { font: inherit; font-size: 13px; padding: 3px 12px; border-radius: 6px; cursor: pointer;
     border: 1px solid var(--border); background: var(--surface); color: var(--ink-light); }

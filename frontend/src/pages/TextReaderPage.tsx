@@ -823,14 +823,14 @@ export default function TextReaderPage() {
       if (!spans.length && near > 0) spans = findQuoteSpans(raw, quoteParam);
       if (!spans.length) return null;
       const [start, end] = extendToSentenceEnd(raw, [spans[0][0], spans[spans.length - 1][1]]);
-      return end - start <= 2000 ? { start, end } : null;
+      return end - start <= 8000 ? { start, end } : null;
     }
     if (!raw || !m) return null;
     const first = Number(m[1]);
     const last = Number(m[2]);
     const map = cpToU16Map(raw);
-    // map 比码位数多一项（末尾）；last 必须是正文里的一个字，一句不会超过 2000 字。
-    if (last < first || last + 1 >= map.length || last - first > 2000) return null;
+    // map 比码位数多一项（末尾）；last 必须是正文里的一个字，整段合并的高亮也不超过 8000 字。
+    if (last < first || last + 1 >= map.length || last - first > 8000) return null;
     return { start: map[first], end: map[last + 1] };
   }, [hlParam, quoteParam, highlightChunkIndex, content?.content]);
 

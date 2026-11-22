@@ -218,21 +218,96 @@
 
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
-  function post(sentences, attempt) {
+  // prefer：上一批的主出处（上一次响应的 dominant）。一段原文跨批时，夹在中间的
+  // 常见短句（「所以者何？」）仍按这段原文认出处，而不是认到最早用这几个字的经。
+  function post(sentences, attempt, prefer) {
+    var payload = { sentences: sentences };
+    if (prefer) payload.prefer = prefer;
     return fetch(API, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ sentences: sentences })
+      body: JSON.stringify(payload)
     }).then(function (res) {
       if (res.status === 429 && attempt < 4) {
         var wait = parseInt(res.headers.get("retry-after") || "15", 10);
         if (!(wait > 0 && wait < 120)) wait = 15;
         status.textContent = "查询较多，" + wait + " 秒后继续……";
-        return sleep(wait * 1000).then(function () { return post(sentences, attempt + 1); });
+        return sleep(wait * 1000).then(function () { return post(sentences, attempt + 1, prefer); });
       }
       if (!res.ok) throw new Error("http " + res.status);
       return res.json();
     });
+  }
+
+  // ── 原文里连成一段的句子，合成一张卡片 ────────────────────────────────
+  // 每句出处链接带着它在原文里的起止（hl=起-止）。相邻几句出自同一卷、位置首尾
+  // 相接（中间至多隔几个标点），就是原文里连着的一段：合成一张卡片，链接高亮整段。
+  var RUN_GAP = 4;
+
+  function locOf(item) {
+    var r = item && item.result;
+    if (!r || (r.verdict !== "sutra" && r.verdict !== "not_sutra") || !r.segments || r.segments.length !== 1) return null;
+    var seg = r.segments[0];
+    if (!seg.found || !seg.sources || !seg.sources.length || !seg.sources[0].reader_url) return null;
+    var u;
+    try { u = new URL(seg.sources[0].reader_url); } catch (e) { return null; }
+    var m = /^(\d+)-(\d+)$/.exec(u.searchParams.get("hl") || "");
+    if (!m) return null;
+    return { key: u.pathname + "|" + u.searchParams.get("juan"), first: +m[1], last: +m[2], url: u, src: seg.sources[0] };
+  }
+
+  function renderRun(lis, results, parts, locs, i, j) {
+    var head = locs[i];
+    var li = lis[i];
+    li.className = "k-" + results[i].result.verdict + " run";
+    li.textContent = "";
+    var s = el("div", "s");
+    var whole = "";
+    for (var k = i; k <= j; k++) {
+      var piece = (parts[k].prefix || "") + results[k].text;
+      whole += piece;
+      s.appendChild(document.createTextNode(piece));
+    }
+    li.appendChild(s);
+    var meta = el("div", "meta");
+    meta.appendChild(el("span", "tag", tagText(results[i].result)));
+    var url = new URL(head.url.href);
+    url.searchParams.set("hl", head.first + "-" + locs[j].last);
+    meta.appendChild(sourceLink(Object.assign({}, head.src, { reader_url: url.href })));
+    meta.appendChild(el("span", "runinfo", "第 " + (i + 1) + "–" + (j + 1) + " 句，原文连成一段"));
+    var ask = el("a", "ask", "问小津这段什么意思");
+    ask.href = "https://fojin.app/chat?send=1&utm_source=fojin.ai&utm_medium=trace&q=" +
+      encodeURIComponent("请解释这段话的意思与出处：" + whole.slice(0, 300));
+    ask.target = "_blank";
+    ask.rel = "noopener";
+    ask.addEventListener("click", function () { track("trace_ask", { verdict: "run" }); });
+    meta.appendChild(ask);
+    li.appendChild(meta);
+    var det = el("details", "each");
+    det.appendChild(el("summary", null, "逐句查看"));
+    var ol = el("ol");
+    for (var n = i; n <= j; n++) ol.appendChild(el("li", null, (parts[n].prefix || "") + results[n].text));
+    det.appendChild(ol);
+    li.appendChild(det);
+    for (var r = i + 1; r <= j; r++) lis[r].remove();
+  }
+
+  function mergeRuns(lis, results, parts) {
+    var locs = results.map(locOf);
+    var merged = 0;
+    var i = 0;
+    while (i < locs.length) {
+      if (!locs[i]) { i++; continue; }
+      var j = i;
+      while (j + 1 < locs.length && locs[j + 1] && locs[j + 1].key === locs[i].key &&
+             locs[j + 1].first > locs[j].last && locs[j + 1].first - locs[j].last - 1 <= RUN_GAP) j++;
+      if (j > i) {
+        renderRun(lis, results, parts, locs, i, j);
+        merged += j - i + 1;
+      }
+      i = j + 1;
+    }
+    return merged;
   }
 
   var running = false;
@@ -266,14 +341,18 @@
     });
     var tally = {};
     var done = 0;
+    var prefer = null;
+    var results = new Array(sentences.length);
     status.textContent = "正在核对 0 / " + sentences.length + " 句……";
 
     var chain = Promise.resolve();
     for (var b = 0; b < sentences.length; b += BATCH) {
       (function (start) {
         chain = chain.then(function () {
-          return post(bodies.slice(start, start + BATCH), 0).then(function (data) {
+          return post(bodies.slice(start, start + BATCH), 0, prefer).then(function (data) {
+            prefer = data.dominant || prefer;
             (data.items || []).forEach(function (item, j) {
+              results[start + j] = item;
               var kind = renderItem(items[start + j], item, parts[start + j].prefix);
               if (kind !== "skip") tally[kind] = (tally[kind] || 0) + 1;
             });
@@ -286,6 +365,8 @@
     chain.then(function () {
       var checked = Object.keys(tally).reduce(function (n, k) { return n + tally[k]; }, 0);
       var found = renderSummary(tally, checked);
+      var merged = mergeRuns(items, results, parts);
+      if (merged) track("trace_merge", { n: merged });
       status.textContent = dropped ? "只核对了前 " + MAX_SENTENCES + " 句，其余 " + dropped + " 句请分开再贴。" : "";
       if (text.length <= SHARE_MAX_CHARS) share.hidden = false;
       track("trace_done", { n: checked, found: found, absent: tally.absent || 0, partial: tally.partial || 0 });
