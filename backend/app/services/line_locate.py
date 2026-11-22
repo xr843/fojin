@@ -48,14 +48,24 @@ def _index(content: str) -> tuple[str, list[int]]:
     return "".join(chars), origin
 
 
-def locate_offset(content: str, quote: str, index: tuple[str, list[int]] | None = None) -> int | None:
-    """Offset in ``content`` where ``quote`` starts, compared in normalised space."""
+def locate_span(content: str, quote: str, index: tuple[str, list[int]] | None = None) -> tuple[int, int] | None:
+    """Offsets in ``content`` of the quote's first and last character
+    (inclusive), compared in normalised space. Punctuation the source has
+    inside the quote is covered; punctuation after its last character is not."""
     needle = _normalise(quote)
     if not needle:
         return None
     normalised, origin = index if index is not None else _index(content)
     at = normalised.find(needle)
-    return origin[at] if at >= 0 else None
+    if at < 0:
+        return None
+    return origin[at], origin[at + len(needle) - 1]
+
+
+def locate_offset(content: str, quote: str, index: tuple[str, list[int]] | None = None) -> int | None:
+    """Offset in ``content`` where ``quote`` starts, compared in normalised space."""
+    span = locate_span(content, quote, index)
+    return span[0] if span else None
 
 
 # (text_id, juan) → (normalised text, source offsets, line markers). A sentence
@@ -71,10 +81,13 @@ def nearest_line(anchors: list[tuple[int, str]], offset: int) -> str | None:
     return anchors[i][1] if i >= 0 else None
 
 
-async def line_anchor(db: AsyncSession, text_id: int, juan: int, quote: str) -> str | None:
-    """``p<line_ref>`` for the reader's ``?anchor=``, or None when the quote,
-    the fascicle or its line markers cannot be found (the caller then keeps
-    its fascicle-level link)."""
+async def locate_quote(
+    db: AsyncSession, text_id: int, juan: int, quote: str
+) -> tuple[str | None, int, int] | None:
+    """Where the quote sits in the fascicle: ``(p<line_ref> or None, first, last)``
+    — the line for the reader's ``?anchor=`` and the character span for its
+    ``?hl=`` (the whole quote stays highlighted). None when the fascicle or
+    the quote cannot be found; the caller then keeps its fascicle-level link."""
     key = (text_id, juan)
     cached = _FASCICLES.get(key)
     if cached is None:
@@ -105,8 +118,8 @@ async def line_anchor(db: AsyncSession, text_id: int, juan: int, quote: str) -> 
             _FASCICLES.pop(next(iter(_FASCICLES)))
         _FASCICLES[key] = cached
     normalised, origin, anchors = cached
-    offset = locate_offset("", quote, index=(normalised, origin))
-    if offset is None:
+    span = locate_span("", quote, index=(normalised, origin))
+    if span is None:
         return None
-    ref = nearest_line(anchors, offset)
-    return f"p{ref}" if ref else None
+    ref = nearest_line(anchors, span[0])
+    return (f"p{ref}" if ref else None), span[0], span[1]
