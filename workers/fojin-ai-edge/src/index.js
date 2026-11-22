@@ -99,7 +99,11 @@ const SITE_PREFIX = "/_site/";
 const SITE_CSP = [
   "default-src 'self'",
   "script-src 'self' https://analytics.fojin.app",
-  "connect-src 'self' https://analytics.fojin.app",
+  // fojin.app: the 引文溯源 page calls /api/verify/trace there directly, so the
+  // rate limit counts each visitor's own IP (via this Worker it saw the
+  // Worker's egress address for everyone). Possible since the host nginx stopped
+  // doubling the CORS header (deploy/host-nginx/README.md, conflict 2).
+  "connect-src 'self' https://fojin.app https://analytics.fojin.app",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https:",
   "font-src 'self'",
@@ -171,7 +175,10 @@ async function serveSite(request) {
   return out;
 }
 
-// The 引文溯源 page posts to /api/verify/trace on its own origin; this worker
+// Fallback only: the 引文溯源 page now calls fojin.app directly (per-visitor
+// rate limit). This same-origin pass-through stays for pages still cached with
+// the old script; it can go once that cache has turned over.
+// The 引文溯源 page used to post to /api/verify/trace on its own origin; this worker
 // passes it to fojin.app. Calling fojin.app cross-origin does not work: the
 // host nginx adds `Access-Control-Allow-Origin: *` to every /api/ response on
 // top of FastAPI's own `https://fojin.ai`, and browsers reject the doubled

@@ -18,14 +18,14 @@
      files because the CSP forbids inline script: /_site/theme.js and
      /_site/site.js come from the Master-skill site (light/dark toggle, shared
      with /masters and /developers); /trace.js is this page's own. The API is
-     called same-origin (/api/verify/trace): on fojin.ai the worker passes it to
-     fojin.app. -->
+     called cross-origin at fojin.app (CORS allows fojin.ai) so the rate limit
+     counts each visitor's own IP. -->
 <script src="/_site/theme.js"></script>
 <script defer src="/_site/site.js"></script>
 <!-- ?v= busts Cloudflare's edge cache, which keeps .js for 4 hours across
      deploys. Bump it whenever trace.js changes (the fojin.ai worker passes the
      query through to fojin.app). -->
-<script defer src="/trace.js?v=6"></script>
+<script defer src="/trace.js?v=7"></script>
 <script defer src="https://analytics.fojin.app/script.js" data-website-id="c757a04c-82e0-4f53-a720-830b0e1a7287"></script>
 <style>
   :root {

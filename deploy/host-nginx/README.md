@@ -82,11 +82,14 @@ back to the edge IP. Re-fetch periodically from <https://www.cloudflare.com/ips/
    duplicate header from another layer. Ideally this file stops setting XFO at
    all.
 
-2. **CORS on `/api/` (lines 65-66).** `Access-Control-Allow-Origin: *` is added
-   unconditionally, on top of FastAPI's own env-driven origin allowlist. Two
-   `Access-Control-Allow-Methods` headers on a preflight is the visible symptom.
-   It is currently fail-safe (browsers reject `*` together with credentials) but
-   it means the app's CORS policy is not the one actually served.
+2. **CORS on `/api/` — fixed 2026-11-22.** This file used to add
+   `Access-Control-Allow-Origin: *` unconditionally, on top of FastAPI's own
+   env-driven origin allowlist, so an allowlisted origin got two values and
+   browsers rejected the response (fojin.ai's cross-origin `POST
+   /api/verify/trace` failed). Two `map`s at the top of `fojin.conf` now send
+   nothing for the origins FastAPI already answers (fojin.ai, fojin.app,
+   stream.fojin.ai); every other origin still gets the read-only `*`. Applied on
+   the host with backup `/etc/nginx/conf.d/fojin.conf.bak-cors-dedupe-1795350353`.
 
 3. **`stream.fojin.ai` preflight (lines 118-125)** reflects `$http_origin` with
    `Access-Control-Allow-Credentials: true`, i.e. it approves preflight for *any*
