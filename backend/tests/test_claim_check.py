@@ -91,6 +91,11 @@ def fake_lookup(monkeypatch):
         return _verdict(quote, TABLE.get(quote, []))
 
     monkeypatch.setattr(claim_check, "verify_quote", fake_verify)
+
+    async def no_anchor(db, text_id, juan, quote):
+        return None
+
+    monkeypatch.setattr(claim_check, "line_anchor", no_anchor)
     claim_check._CACHE.clear()
     return calls
 
@@ -401,3 +406,53 @@ async def test_trace_credits_adjacent_found_clauses_to_where_they_occur_together
     assert [s["found"] for s in segs] == [True, True, False]
     assert segs[0]["sources"][0]["cbeta_id"] == "T0235"
     assert segs[1]["sources"][0]["cbeta_id"] == "T0235"
+
+
+# ── 出处链接定位到行（用户反馈 2026-11-22） ───────────────────────────────
+
+
+async def test_first_source_links_to_the_line_the_quote_starts_on(monkeypatch, fake_lookup):
+    seen = []
+
+    async def anchor(db, text_id, juan, quote):
+        seen.append((text_id, juan, quote))
+        return "p0749a01"
+
+    monkeypatch.setattr(claim_check, "line_anchor", anchor)
+    out = await check_claim(None, None, "一切有为法，如梦幻泡影")
+    src = out.segments[0].sources[0]
+    assert src.cbeta_id == "T0235"
+    assert src.reader_url.endswith("/texts/7/read?juan=1&anchor=p0749a01")
+    assert seen == [(7, 1, "一切有为法，如梦幻泡影")]
+    # only the source the page shows is located
+    assert out.segments[0].sources[1].reader_url is None
+
+
+async def test_no_line_found_keeps_the_fascicle_link(fake_lookup):
+    out = await check_claim(None, None, "一切有为法，如梦幻泡影")
+    assert out.segments[0].sources[0].reader_url is None  # unchanged (the fake has none)
+
+
+async def test_wording_variant_links_to_the_line_of_the_canon_text(monkeypatch, fake_lookup):
+    async def anchor(db, text_id, juan, quote):
+        return "p0749c10" if quote == "亦如日月不着空" else None
+
+    monkeypatch.setattr(claim_check, "line_anchor", anchor)
+    out = await check_claim(None, None, "犹如莲花不著水，亦如日月不住空")
+    assert out.verdict == "variant"
+    close = next(seg.close for seg in out.segments if seg.close is not None)
+    # located by the canon's own wording, not the caller's
+    assert close.reader_url.endswith("/texts/7/read?juan=1&anchor=p0749c10")
+
+
+async def test_credited_run_links_to_the_line_of_the_whole_run(monkeypatch, fake_lookup):
+    from app.services.claim_check import credit_runs
+
+    async def anchor(db, text_id, juan, quote):
+        return "p0752b03" if quote == "一切有为法，如梦幻泡影" else None
+
+    monkeypatch.setattr(claim_check, "line_anchor", anchor)
+    monkeypatch.setitem(TABLE, "一切有为法", [_match("T0003", "毘婆尸佛經", "sutra", 3)])
+    out = await credit_runs(None, None, await check_claim(None, None, "一切有为法，如梦幻泡影，看开便是福"))
+    assert out.segments[0].sources[0].cbeta_id == "T0235"
+    assert out.segments[0].sources[0].reader_url.endswith("anchor=p0752b03")
