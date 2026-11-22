@@ -9,15 +9,24 @@ serving its readers an invented citation. Read-only; strict-rate-limited
 (paid nothing, but ES + source-text reads are not free).
 """
 
+from typing import Annotated
+
 from elasticsearch import AsyncElasticsearch
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field, StringConstraints
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.elasticsearch import get_es
 from app.database import get_db
 from app.schemas.verification import ClaimVerdict, QuoteVerdict
 from app.services.claim_check import check_claim
-from app.services.quote_lookup import QuoteTooShortError, SearchUnavailableError, verify_quote
+from app.services.quote_lookup import (
+    MIN_LOOKUP_QUOTE_CHARS,
+    QuoteTooShortError,
+    SearchUnavailableError,
+    verify_quote,
+)
+from app.services.quote_verifier import normalise_for_match
 
 router = APIRouter(prefix="/verify", tags=["verification"])
 
@@ -63,3 +72,52 @@ async def verify_claim_endpoint(
     except SearchUnavailableError as exc:
         raise HTTPException(status_code=503, detail="search temporarily unavailable") from exc
 
+
+
+# ── fojin.ai 首页「引文溯源」：整段文字逐句核对 ─────────────────────────────
+# 页面在浏览器里把一段文字切成句子，每次送最多 TRACE_MAX_SENTENCES 句，
+# 边查边显示。每句走与 /claim 相同的 check_claim（整句 → 分句，共用缓存）。
+
+TRACE_MAX_SENTENCES = 8
+
+TraceSentence = Annotated[str, StringConstraints(min_length=1, max_length=200)]
+
+
+class TraceRequest(BaseModel):
+    sentences: list[TraceSentence] = Field(..., min_length=1, max_length=TRACE_MAX_SENTENCES)
+
+
+class TraceItem(BaseModel):
+    text: str
+    result: ClaimVerdict | None = None
+    # "too_short"：去掉标点后不足以查找（如「好的。」），原样显示、不着色
+    skipped: str | None = None
+
+
+class TraceResponse(BaseModel):
+    items: list[TraceItem]
+
+
+@router.post("/trace", response_model=TraceResponse)
+async def trace_endpoint(
+    body: TraceRequest,
+    db: AsyncSession = Depends(get_db),
+) -> TraceResponse:
+    """逐句核对一段文字里哪些句子出自藏经（fojin.ai 首页）。
+
+    Up to 8 sentences per call, each checked like /claim (whole sentence, then
+    clause by clause), hence its own limit (rate_limit_verify_trace). A search
+    outage fails the whole call (503) rather than reading as "not found"."""
+    es: AsyncElasticsearch = get_es()
+    items: list[TraceItem] = []
+    for sentence in body.sentences:
+        if len(normalise_for_match(sentence)) < MIN_LOOKUP_QUOTE_CHARS:
+            items.append(TraceItem(text=sentence, skipped="too_short"))
+            continue
+        try:
+            items.append(TraceItem(text=sentence, result=await check_claim(db, es, sentence)))
+        except QuoteTooShortError:
+            items.append(TraceItem(text=sentence, skipped="too_short"))
+        except SearchUnavailableError as exc:
+            raise HTTPException(status_code=503, detail="search temporarily unavailable") from exc
+    return TraceResponse(items=items)

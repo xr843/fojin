@@ -79,8 +79,25 @@ _VARIANT_FOLD = str.maketrans({
     "沈": "沉", "麁": "粗", "麄": "粗", "麤": "粗", "葢": "盖", "繇": "由",
     "玅": "妙", "挍": "校", "柰": "奈", "黙": "默", "瞖": "翳", "劒": "剑",
     "劔": "剑", "劎": "剑", "戹": "厄", "隣": "邻", "雑": "杂", "彊": "强",
-    "蕰": "蕴",
+    "蕰": "蕴", "罣": "挂",
 })
+
+# 检索阶段的反向写法：简体常用字在藏经里另有写法，而 OpenCC 与索引的繁→简
+# 过滤器都不会把两者对上（挂→掛，藏经作罣；索引把罣原样留着）。上面的归并只管
+# 「找到候选之后」的逐字比对；候选要先被 ES 召回，所以短语查询要另带一份藏经写法。
+# 只收会让整句召回失败的字，且限定词形，免得把「挂」字的其他用法也改掉。
+CANON_SPELLINGS: dict[str, str] = {
+    "挂碍": "罣碍",
+    "挂礙": "罣礙",
+}
+
+
+def canon_spelling_variants(s: str) -> list[str]:
+    """``s`` with each simplified word rewritten in its canon spelling, if any."""
+    alt = s
+    for modern, canon in CANON_SPELLINGS.items():
+        alt = alt.replace(modern, canon)
+    return [alt] if alt != s else []
 
 
 def fold_variants(s: str) -> str:
