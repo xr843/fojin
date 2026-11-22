@@ -8,11 +8,13 @@
 
 Ask a question in plain language and FoJin's assistant **"XiaoJin"** answers from the canon itself — Retrieval-Augmented Generation over 670K+ embedded passages, optional cross-encoder reranking and root-sutra recall, **clickable 【《sutra》juan N】 citations** that open the exact source text, anti-hallucination guards, and a citation drawer with **side-by-side 汉 / 巴利 / 藏文 cross-canon parallels**. You can also ask in the voice of **15 historical Buddhist masters**, each scoped to their own tradition's scriptures.
 
-What makes those answers trustworthy is the corpus underneath. FoJin aggregates **612 data sources** into one searchable platform — 10,500+ texts with 19,000+ volumes of full content in Classical Chinese, Pali, Tibetan and Sanskrit, **the first LLM-driven trilingual cross-canon parallel reading platform** (CBETA × SuttaCentral × 84000) with LLM-verified chunk-level alignment, a 110K+ entity knowledge graph on a Deck.GL geo map, and 39 dictionaries with 747K entries. Every feature exists to make the answers more grounded — and to let you go deeper once you have one.
+What makes those answers trustworthy is the corpus underneath. FoJin aggregates **660+ data sources** into one searchable platform — 10,500+ texts with 19,000+ volumes of full content in Classical Chinese, Pali, Tibetan and Sanskrit, **the first LLM-driven trilingual cross-canon parallel reading platform** (CBETA × SuttaCentral × 84000) with LLM-verified chunk-level alignment, a 110K+ entity knowledge graph on a Deck.GL geo map, and 39 dictionaries with 747K entries. Every feature exists to make the answers more grounded — and to let you go deeper once you have one.
 
 FoJin is built to be **open, cross-canon, verifiable Buddhist knowledge infrastructure** — not just a site to read, but a corpus other tools can *call*. Every passage carries a stable, resolvable cross-canon **URN** (`fojin:cbeta/T0001.1`), and the **[`fojin-mcp`](https://pypi.org/project/fojin-mcp/)** server lets AI assistants (Claude, ChatGPT, any [MCP](https://modelcontextprotocol.io) client) answer from FoJin's cited passages directly — hosted at **`mcp.fojin.ai`**, anonymous, no key required. Any model can also check its own work through the open **[`/api/verify/quote`](https://fojin.ai/developers)** endpoint: hand it a sentence and a citation, and it answers *is this quote real* and *is the citation right* as two separate questions. See **[fojin.ai/developers](https://fojin.ai/developers)**.
 
-[Live Demo](https://fojin.app) &nbsp;&middot;&nbsp; [API Docs](https://fojin.app/docs) &nbsp;&middot;&nbsp; [中文文档](./docs/README_zh.md) &nbsp;&middot;&nbsp; [Discussions](https://github.com/xr843/fojin/discussions) &nbsp;&middot;&nbsp; [Discord](https://discord.gg/76SZeuJekq) &nbsp;&middot;&nbsp; [Report Bug](https://github.com/xr843/fojin/issues)
+For people rather than models, **[fojin.ai](https://fojin.ai)** runs the same check on a whole passage: paste an article, a viral "the Buddha said…", or an AI's answer, and it marks sentence by sentence what is in the Chinese canon and where — sutra, treatise, commentary or a school's own works — and what is not; every source opens the reader at that line with the passage highlighted.
+
+[Live Demo](https://fojin.app) &nbsp;&middot;&nbsp; [fojin.ai — is this from the canon?](https://fojin.ai) &nbsp;&middot;&nbsp; [API Docs](https://fojin.app/docs) &nbsp;&middot;&nbsp; [中文文档](./docs/README_zh.md) &nbsp;&middot;&nbsp; [Discussions](https://github.com/xr843/fojin/discussions) &nbsp;&middot;&nbsp; [Discord](https://discord.gg/76SZeuJekq) &nbsp;&middot;&nbsp; [Report Bug](https://github.com/xr843/fojin/issues)
 
 [![CI](https://github.com/xr843/fojin/actions/workflows/ci.yml/badge.svg)](https://github.com/xr843/fojin/actions/workflows/ci.yml)
 [![Security Scan](https://github.com/xr843/fojin/actions/workflows/security.yml/badge.svg)](https://github.com/xr843/fojin/actions/workflows/security.yml)
@@ -30,7 +32,7 @@ FoJin is built to be **open, cross-canon, verifiable Buddhist knowledge infrastr
 
 Buddhist texts are scattered across hundreds of databases worldwide — CBETA, SuttaCentral, BDRC, SAT, 84000, GRETIL, and many more. Each has its own interface, language, and data format. When you have a *question* — "what does the Heart Sutra mean by 'form is emptiness'?", "how do the Pali and Chinese versions of this passage differ?" — you spend more time hunting for the right passage than understanding it.
 
-**FoJin answers the question for you.** Ask in plain language; XiaoJin retrieves the relevant passages from 612 sources and answers with clickable citations you can verify. Everything else FoJin does — full-text reading, cross-canon alignment, the knowledge graph, 39 dictionaries — exists to make those answers more grounded, and to let you go deeper once you have one:
+**FoJin answers the question for you.** Ask in plain language; XiaoJin retrieves the relevant passages from 660+ sources and answers with clickable citations you can verify. Everything else FoJin does — full-text reading, cross-canon alignment, the knowledge graph, 39 dictionaries — exists to make those answers more grounded, and to let you go deeper once you have one:
 
 | What you need | How FoJin helps |
 |---|---|
@@ -38,11 +40,12 @@ Buddhist texts are scattered across hundreds of databases worldwide — CBETA, S
 | **Trust the answer** | **Verifiable answers** — deterministic citation whitelist + verbatim-quote downgrade + per-answer trust state; ~98% of *citing* answers served-trustworthy at temp 0 |
 | Research a hard, multi-step question | **Research Assistant** (`/research`) — plans across corpus + dictionaries + knowledge graph, then synthesises a cited answer behind the same guards |
 | Call FoJin from an AI assistant | **MCP server** — hosted at `mcp.fojin.ai` (no install, no key) or [`uvx fojin-mcp`](https://pypi.org/project/fojin-mcp/); 8 read-only, URN-addressable tools for Claude / ChatGPT |
+| **Check a whole passage against the canon** | **[fojin.ai](https://fojin.ai)** — paste up to 3,000 characters (an article, a viral quote, an AI answer); every sentence is matched against the Chinese canon, labelled sutra / treatise / commentary / school works / not found, and linked to the exact line, which the reader keeps highlighted; consecutive lines of one source collapse into one passage |
 | **Check whether a quotation is real** | **Open verbatim verification** (`/api/verify/quote`) — for *any* sentence, not just ours: exact / near-miss / absent, with a character-level diff and the right juan when the citation points at the wrong one |
 | See how the tradition read a passage | **Commentary alignment** (`/api/commentary/passage`) — for one passage, what the historical commentators wrote on it, anchored to juan and line |
 | Listen while you read | **Read-aloud** (`/read-aloud`) — sentence-by-sentence highlighting synced to audio, lock-screen playback |
 | Ask in a master's voice | **Master Persona Mode** — 15 historical masters, each with tradition-scoped RAG |
-| Find a sutra across databases | **Multi-dimensional search** across 10,500+ texts from 612 sources |
+| Find a sutra across databases | **Multi-dimensional search** across 10,500+ texts from 660+ sources |
 | Read the full text online | **8,900+ texts** with 19,000+ volumes of full content, CBETA-style layout |
 | Compare translations | **Parallel reading** in 30+ languages side by side |
 | Compare sutras across Buddhist canons | **Trilingual cross-canon parallel reading** — 4,000+ LLM-verified chunk alignments across Chinese / Pali / Tibetan covering Heart Sutra, Vimalakīrti, **Lotus Sutra (法华 ↔ Toh 113, 259 pairs)**, **8,000-verse Prajñāpāramitā (小品般若 ↔ Toh 11, 127 pairs)**, Satipaṭṭhāna + the full Āgama ↔ Nikāya corpus (MN/DN/SN/AN), Dhammapada |
@@ -50,7 +53,7 @@ Buddhist texts are scattered across hundreds of databases worldwide — CBETA, S
 | Explore relationships | **Knowledge graph** with 110K+ entities and 27,900+ relations (22K+ lineage chains) |
 | Discover similar texts | **Semantic similarity** powered by 670K+ embedding vectors (pgvector + HNSW) |
 | Explore Buddhist geography | **Knowledge Graph Map** — geo-enabled entities, monastery locations, lineage arcs on Deck.GL |
-| Track source updates | **Activity Feed** — real-time updates from 612 data sources |
+| Track source updates | **Activity Feed** — real-time updates from 660+ data sources |
 | Explore history visually | **Timeline & Dashboard** — dynasty charts, translation trends, category analytics |
 | Save and organize | **Collections, bookmarks, annotations** for personal study |
 | Cite in research | **Citation export** (BibTeX, RIS, APA) for academic use |
@@ -240,7 +243,7 @@ RAG layer automatically includes parallel_chunks in the LLM context when a retri
 - **Clickable citations** in 【《经名》第N卷】 format — click to open a side drawer with surrounding context, plus **multi-language tabs for cross-canon parallels** when available (see Trilingual section above)
 - **GFM markdown tables** — comparative answers (e.g., "Madhyamaka vs Yogācāra") render as proper tables instead of raw pipe syntax
 - **Progressive follow-up suggestions** (concept → related texts → practice)
-- **Smart data source recommendations** — when users ask about finding databases, AI automatically recommends relevant sources from 612 data sources via semantic similarity
+- **Smart data source recommendations** — when users ask about finding databases, AI automatically recommends relevant sources from 660+ data sources via semantic similarity
 - **Meta-question handling** — detects self-introduction queries ("who are you" / "what can you do") and skips RAG to give a clean functional overview, instead of randomly citing scriptures
 - **Anti-hallucination citation rules** — the system prompt strictly forbids wrapping a text name in 【…】 unless that exact source appeared in the retrieved context, preventing broken citation links
 - **Inline split-view in reader** — AI panel opens by default beside the text with a draggable divider; independent scrolling on each side, resizable width persisted to localStorage
@@ -261,6 +264,19 @@ Trust is the point. Every answer passes three **deterministic** guards before it
 Measured on the eval harness at temperature 0, the raw model is verbatim-faithful only a small fraction of the time — but after the guards **~98% of citing answers are trustworthy**: FoJin either points you to a real source or honestly hedges, and never fabricates scripture. The metric (`served_trustworthy_rate`) is tracked in `backend/eval/faithfulness.py` as a regression gate.
 
 Read that denominator precisely, because we'd rather you knew than were impressed: it counts **answers that cite at all**. An answer that reaches you with no 【…】 citation cites nothing, so it verifies nothing, and it is not in that 98% — the guards can only vouch for claims that name a source. Quote fidelity is reported separately (`verbatim_quote_rate`), on purpose: a run must not be able to improve its score by quoting less.
+
+### Passage tracing — fojin.ai (这段话，出自佛经吗？)
+
+**[fojin.ai](https://fojin.ai)** answers one question for a whole passage: *which of these sentences are from the Buddhist canon, and where?* Paste up to 3,000 characters — a "the Buddha said…" circulating on social media, an article, an answer from ChatGPT — and each sentence comes back as:
+
+- **出自佛经 / 论典 / 注疏 / 宗派与祖师著作 …** — found verbatim (traditional/simplified and punctuation folded), with the text and juan; the link opens the reader **at that line with the whole passage highlighted** (`?anchor=p<line>&hl=<start>-<end>`), and the highlight stays;
+- **用字略异** — the canon has it with one or two characters different;
+- **部分见于藏经** — some clauses are found, the rest is greyed out (the typical fake: a real line plus an invented tail);
+- **藏经中未见** — not in the indexed Chinese canon. *Not found is not "forged"*: it may be paraphrase, or from a text not in the corpus.
+
+Lines that run on in the source (same juan, adjacent positions) collapse into one card ("lines 1–12 form one passage"), and a common phrase inside such a passage — 「所以者何？」 in a page of the 俱舍論 — is credited to that passage's text, not to whichever early sutra happens to use the words first. Attribution prefixes (「佛说：」「《金刚经》说：」) are dropped only when the whole sentence is not itself a canon line (「論曰：」 is). Measured before launch on 1,218 sentences from real user questions: 689 of 690 "found in 《X》" claims verified against the CBETA XML.
+
+Under the hood: `POST /api/verify/trace` (≤ 8 sentences per call, per-visitor rate limit), the same clause-by-clause check as `/verify`, plus line location from `text_line_anchors`. The page is `frontend/public/trace.html`, served at fojin.ai by the edge worker in `workers/fojin-ai-edge/` (which also serves the Master-skill catalogue at [fojin.ai/masters](https://fojin.ai/masters) and the developer portal at [fojin.ai/developers](https://fojin.ai/developers)). Chinese canon only for now; Pali, Tibetan and Sanskrit originals are not yet checked. Pasted text is not written to the database or the logs (results sit in an in-memory cache for up to an hour) and is kept out of the analytics.
 
 ### Research Assistant (研究助手)
 
@@ -304,7 +320,7 @@ Visualize 50,000+ geo-enabled Buddhist entities on an interactive world map — 
 
 ### Activity Feed (佛学动态)
 
-Track real-time updates from 612 data sources — new texts added, translation releases, manuscript scans, and schema changes. Includes academic content aggregation and platform-wide activity summary.
+Track real-time updates from 660+ data sources — new texts added, translation releases, manuscript scans, and schema changes. Includes academic content aggregation and platform-wide activity summary.
 
 ### Similar Passages Discovery
 
@@ -328,7 +344,7 @@ Available in 9 languages: Simplified Chinese, Traditional Chinese, English, Japa
 
 ## Data Sources
 
-<p align="center"><img src="./docs/screenshots/sources.png" alt="612 data sources from 30 countries" width="800"></p>
+<p align="center"><img src="./docs/screenshots/sources.png" alt="660+ data sources from 30 countries" width="800"></p>
 
 FoJin aggregates data from major Buddhist digital projects worldwide. Sources are categorized by research field (Han, Theravada, Tibetan, Sanskrit, Dunhuang, Art, Dictionary, Digital Humanities) and filterable by region, language, and type:
 
@@ -486,6 +502,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 - [x] **Hosted MCP endpoint** — `https://mcp.fojin.ai/mcp` over streamable HTTP; anonymous, rate-limited, no key to obtain
 - [x] **Open verbatim quote verification** (`GET /api/verify/quote` + `verify_quote` tool) — works on *any* quotation, not only FoJin's own answers: ES shortlists, Postgres decides, exact / near-miss / absent with a character-level diff; never silently accepts a match in a different juan
 - [x] **Commentary alignment** (`GET /api/commentary/passage` + `commentaries` tool) — historical commentaries keyed to a passage, anchored to juan and line; first corpus is the Diamond Sutra (52 commentators, 5,683 aligned segments)
+- [x] **fojin.ai — passage tracing** ("这段话，出自佛经吗？") — paste a passage, get sentence-by-sentence canon sources with line-level links that open the reader on the passage, highlighted; contextual attribution and run merging for pasted canon pages (`POST /api/verify/trace`)
 - [x] **Developer portal** ([fojin.ai/developers](https://fojin.ai/developers), formerly `/agents`) + `llms.txt` — one page telling an AI what FoJin exposes and how to call it
 - [x] **Read-aloud** (`/read-aloud`) — sentence-synced audio with line highlighting and lock-screen playback (Heart Sutra first)
 - [x] **XiaoJin on the homepage** — a draggable companion that answers inline, streaming, without leaving the page
