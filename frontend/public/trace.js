@@ -106,6 +106,44 @@
     return p && item.text.indexOf(p) === 0 ? item.text.slice(p.length) : item.text;
   }
 
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  function sourceLink(src, close) {
+    var title = src.title_zh || src.cbeta_id || "原典";
+    var label = "《" + title + "》" + (src.juan_num ? "卷" + src.juan_num : "");
+    if (!src.reader_url) return el("span", null, label);
+    var a = el("a", null, label);
+    a.href = src.reader_url + (src.reader_url.indexOf("?") < 0 ? "?" : "&") + "utm_source=fojin.ai&utm_medium=trace";
+    a.target = "_blank";
+    a.rel = "noopener";
+    if (close) a.title = "藏经原文与这句用字略有不同";
+    return a;
+  }
+
+  function firstSource(result) {
+    var segs = result.segments || [];
+    for (var i = 0; i < segs.length; i++) {
+      if (segs[i].found && segs[i].sources && segs[i].sources.length) return { src: segs[i].sources[0] };
+      if (segs[i].close) return { src: segs[i].close, close: true };
+    }
+    return null;
+  }
+
+  function tagText(result) {
+    switch (result.verdict) {
+      case "sutra": return "出自佛经";
+      case "not_sutra": return "出自" + (CLASS_LABEL[result.source_class] || "其他典籍");
+      case "variant": return "经中有此句，用字略异";
+      case "partial": return "部分见于藏经";
+      default: return "藏经中未见";
+    }
+  }
+
   function renderItem(li, item) {
     var prefix = item.prefix || "";
     li.className = "";
