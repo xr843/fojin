@@ -387,8 +387,7 @@ def test_trace_endpoint_is_strict_rate_limited():
     from app.core.rate_limit import STRICT_PATHS
 
     assert STRICT_PATHS["/api/verify/trace"] == settings.rate_limit_verify_trace
-    # 一次最多 8 句、每句最多 9 次查找：必须比单句核对的额度更紧
-    assert settings.rate_limit_verify_trace <= settings.rate_limit_verify_claim
+    # 有自己的额度（不落进 200/min 的默认桶）；具体数值见 test_cors_rate_limit_order
 
 
 async def test_trace_credits_adjacent_found_clauses_to_where_they_occur_together(monkeypatch, fake_lookup):
