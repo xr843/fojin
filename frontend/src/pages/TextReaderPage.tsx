@@ -92,7 +92,15 @@ interface ApparatusNumbered { entry: ApparatusEntryItem; no: number; start: numb
 // off = UTF-16 offset of a CBETA <lb> line anchor within the content.
 interface LineAnchorConv { off: number; ref: string }
 /** stem：本卷的 CBETA 文件主名（如 T08n0235），用于行首显示；null = 不显示行首。 */
-type ReaderCtx = { numbered: ApparatusNumbered[]; lineAnchors: LineAnchorConv[]; stem: string | null; t: TFn } | null;
+/** ?hl= 所查整句的范围（UTF-16 偏移，[start, end)）：在两端插零宽 .quote-mark，标记之间常亮。 */
+interface QuoteSpan { start: number; end: number }
+type ReaderCtx = {
+  numbered: ApparatusNumbered[];
+  lineAnchors: LineAnchorConv[];
+  stem: string | null;
+  t: TFn;
+  quote?: QuoteSpan | null;
+} | null;
 
 /** Build a map from Python code-point index → JS UTF-16 index for `raw`.
  * Backend offsets are code-point indices; supplementary-plane CJK (surrogate
@@ -152,9 +160,9 @@ function ApparatusMarker({ no, entry, t }: { no: number; entry: ApparatusEntryIt
  * markers (校勘 [n]) after each lemma, and zero-width line-anchor spans (carrying
  * the CBETA page-col-line ref) for the on-demand citation locator and URN scroll. */
 function renderSegmentChildren(seg: Extract<TextSegment, { text: string }>, ctx: NonNullable<ReaderCtx>): ReactNode {
-  const { numbered, lineAnchors, stem, t } = ctx;
+  const { numbered, lineAnchors, stem, t, quote } = ctx;
   const { text, offsets } = seg;
-  if (!offsets.length || (!numbered.length && !lineAnchors.length)) return text;
+  if (!offsets.length || (!numbered.length && !lineAnchors.length && !quote)) return text;
   const segStart = offsets[0];
   const segEnd = offsets[offsets.length - 1];
   const offToLocal = new Map<number, number>();
@@ -180,6 +188,16 @@ function renderSegmentChildren(seg: Extract<TextSegment, { text: string }>, ctx:
         />
       ),
     });
+  }
+  if (quote) {
+    // 起点标记排在同位置的行号之后、校勘标记之前；终点标记跟在所查最后一个字后面。
+    if (offToLocal.has(quote.start)) {
+      ins.push({ pos: offToLocal.get(quote.start)!, order: 0.5, node: <span key="qs" className="quote-mark" data-q="start" /> });
+    }
+    const last = quote.end - 1;
+    if (offToLocal.has(last)) {
+      ins.push({ pos: offToLocal.get(last)! + 1, order: 2, node: <span key="qe" className="quote-mark" data-q="end" /> });
+    }
   }
   for (const m of numbered) {
     const cs = m.start;
@@ -893,6 +911,20 @@ export default function TextReaderPage() {
     return lineAnchorData.anchors.map((a) => ({ off: conv(a.char_offset), ref: a.line_ref }));
   }, [lineAnchorData, content?.content]);
 
+  // ?hl=<起>-<止>：fojin.ai / 核对页算出的所查整句（正文码位偏移，止含末字）。换成 UTF-16 偏移。
+  const hlParam = searchParams.get("hl");
+  const quoteSpan = useMemo<QuoteSpan | null>(() => {
+    const raw = content?.content;
+    const m = hlParam ? /^(\d+)-(\d+)$/.exec(hlParam) : null;
+    if (!raw || !m) return null;
+    const first = Number(m[1]);
+    const last = Number(m[2]);
+    const map = cpToU16Map(raw);
+    // map 比码位数多一项（末尾）；last 必须是正文里的一个字，一句不会超过 2000 字。
+    if (last < first || last + 1 >= map.length || last - first > 2000) return null;
+    return { start: map[first], end: map[last + 1] };
+  }, [hlParam, content?.content]);
+
   // CBETA 参考数据（静态文件，见 backend/scripts/build_cbeta_reader_refs.py）：
   // 册号表（引用的「T08, no. 235」与行首「T08n0235_p0749a05」）和品/分目次。
   const cbetaId = content?.cbeta_id ?? null;
@@ -934,8 +966,8 @@ export default function TextReaderPage() {
 
   // One context drives the inline layers: apparatus markers (only when toggled on)
   // and always-embedded zero-width line anchors (so selection/URN can locate a line).
-  const readerCtx: ReaderCtx = (apparatusOn && apparatusNumbered.length) || lineAnchors.length
-    ? { numbered: apparatusOn ? apparatusNumbered : [], lineAnchors, stem: lineLevel ? stem : null, t }
+  const readerCtx: ReaderCtx = (apparatusOn && apparatusNumbered.length) || lineAnchors.length || quoteSpan
+    ? { numbered: apparatusOn ? apparatusNumbered : [], lineAnchors, stem: lineLevel ? stem : null, t, quote: quoteSpan }
     : null;
 
   // URN deep-link: ?anchor=p0001a09 → scroll to that CBETA line + brief flash.
@@ -971,6 +1003,9 @@ export default function TextReaderPage() {
     const attempt = () => {
       if (cancelled) return;
       const container = readerContentRef.current;
+      // 带 ?hl= 且整句标记已画出：由下面的整句高亮负责滚动与高亮，这里不再闪整行
+      // （整行会把同一行里不属于这句的字也亮出来）。
+      if (container?.querySelector(".quote-mark")) return;
       const startEl = container ? find(container, prevRef) : null;
       const endEl = container ? find(container, nextRef) : null;
       const target = exact ? startEl : endEl ?? startEl;
@@ -998,6 +1033,49 @@ export default function TextReaderPage() {
       clear?.();
     };
   }, [anchorTarget, jumpTarget?.seq, lineAnchors, juanNum, lineLevel]);
+
+  // ?hl= 所查整句：滚到句首，两个 .quote-mark 之间常亮（不定时消失），换卷或离开时清掉。
+  // 与上面同样等 React 画出标记（最多约 1 秒）。不支持 CSS Highlight API 的浏览器
+  // 给句子所在段落加常亮底色。
+  useEffect(() => {
+    if (!quoteSpan) return;
+    let raf = 0;
+    let tries = 0;
+    let cancelled = false;
+    let clear: (() => void) | undefined;
+    const attempt = () => {
+      if (cancelled) return;
+      const container = readerContentRef.current;
+      const startEl = container?.querySelector<HTMLElement>(".quote-mark[data-q='start']") ?? null;
+      const endEl = container?.querySelector<HTMLElement>(".quote-mark[data-q='end']") ?? null;
+      if (!startEl || !endEl) {
+        if (tries++ < 60) raf = requestAnimationFrame(attempt);
+        return;
+      }
+      startEl.scrollIntoView({ block: "center" });
+      if (typeof CSS !== "undefined" && "highlights" in CSS && typeof Highlight !== "undefined") {
+        const range = document.createRange();
+        range.setStartAfter(startEl);
+        range.setEndBefore(endEl);
+        CSS.highlights.set("fojin-quote", new Highlight(range));
+        clear = () => CSS.highlights.delete("fojin-quote");
+      } else {
+        const paras = new Set<HTMLElement>();
+        for (const el of [startEl, endEl]) {
+          const p = el.closest("p");
+          if (p) paras.add(p);
+        }
+        paras.forEach((p) => p.classList.add("quote-target-fallback"));
+        clear = () => paras.forEach((p) => p.classList.remove("quote-target-fallback"));
+      }
+    };
+    raf = requestAnimationFrame(attempt);
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
+      clear?.();
+    };
+  }, [quoteSpan, juanNum, lineAnchors]);
 
   // 播到哪，高亮到哪。复用 URN 深链已有的 .cbeta-line 定位机制 ——
   // 那里是瞬时 flash，这里是持续态。

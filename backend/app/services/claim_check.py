@@ -15,7 +15,7 @@ from elasticsearch import AsyncElasticsearch
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.verification import ClaimSegment, ClaimVerdict, ClosestMiss, QuoteVerdict
-from app.services.line_locate import line_anchor
+from app.services.line_locate import locate_quote
 from app.services.quote_lookup import MIN_LOOKUP_QUOTE_CHARS, verify_quote
 from app.services.quote_verifier import normalise_for_match
 from app.services.urn import absolute_reader_url, reader_path
@@ -96,8 +96,12 @@ def _segment(text: str, verdict: QuoteVerdict) -> ClaimSegment:
     )
 
 
-def _anchored_url(text_id: int, juan: int, anchor: str) -> str | None:
-    return absolute_reader_url(reader_path(text_id, juan, anchor))
+def _located_url(text_id: int, juan: int, located: tuple[str | None, int, int]) -> str | None:
+    """Reader link that jumps to the quote's line and keeps the whole quote
+    highlighted (``&hl=<first>-<last>``, character offsets in the fascicle)."""
+    anchor, first, last = located
+    url = absolute_reader_url(reader_path(text_id, juan, anchor))
+    return f"{url}&hl={first}-{last}" if url else None
 
 
 async def _locate(db: AsyncSession, seg: ClaimSegment) -> ClaimSegment:
@@ -108,15 +112,15 @@ async def _locate(db: AsyncSession, seg: ClaimSegment) -> ClaimSegment:
     User feedback 2026-11-22: 「点击查看原文后，如果能直接定位到所查的那句」."""
     if seg.found and seg.sources:
         first = seg.sources[0]
-        anchor = await line_anchor(db, first.text_id, first.juan_num, seg.text)
-        if anchor:
-            first = first.model_copy(update={"reader_url": _anchored_url(first.text_id, first.juan_num, anchor)})
+        located = await locate_quote(db, first.text_id, first.juan_num, seg.text)
+        if located:
+            first = first.model_copy(update={"reader_url": _located_url(first.text_id, first.juan_num, located)})
             return seg.model_copy(update={"sources": [first, *seg.sources[1:]]})
     elif seg.close is not None:
         close = seg.close
-        anchor = await line_anchor(db, close.text_id, close.juan_num, close.window_normalised)
-        if anchor:
-            close = close.model_copy(update={"reader_url": _anchored_url(close.text_id, close.juan_num, anchor)})
+        located = await locate_quote(db, close.text_id, close.juan_num, close.window_normalised)
+        if located:
+            close = close.model_copy(update={"reader_url": _located_url(close.text_id, close.juan_num, located)})
             return seg.model_copy(update={"close": close})
     return seg
 

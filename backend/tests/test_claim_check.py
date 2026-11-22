@@ -92,10 +92,10 @@ def fake_lookup(monkeypatch):
 
     monkeypatch.setattr(claim_check, "verify_quote", fake_verify)
 
-    async def no_anchor(db, text_id, juan, quote):
+    async def not_located(db, text_id, juan, quote):
         return None
 
-    monkeypatch.setattr(claim_check, "line_anchor", no_anchor)
+    monkeypatch.setattr(claim_check, "locate_quote", not_located)
     claim_check._CACHE.clear()
     return calls
 
@@ -416,13 +416,13 @@ async def test_first_source_links_to_the_line_the_quote_starts_on(monkeypatch, f
 
     async def anchor(db, text_id, juan, quote):
         seen.append((text_id, juan, quote))
-        return "p0749a01"
+        return ("p0749a01", 120, 130)
 
-    monkeypatch.setattr(claim_check, "line_anchor", anchor)
+    monkeypatch.setattr(claim_check, "locate_quote", anchor)
     out = await check_claim(None, None, "一切有为法，如梦幻泡影")
     src = out.segments[0].sources[0]
     assert src.cbeta_id == "T0235"
-    assert src.reader_url.endswith("/texts/7/read?juan=1&anchor=p0749a01")
+    assert src.reader_url.endswith("/texts/7/read?juan=1&anchor=p0749a01&hl=120-130")
     assert seen == [(7, 1, "一切有为法，如梦幻泡影")]
     # only the source the page shows is located
     assert out.segments[0].sources[1].reader_url is None
@@ -435,24 +435,24 @@ async def test_no_line_found_keeps_the_fascicle_link(fake_lookup):
 
 async def test_wording_variant_links_to_the_line_of_the_canon_text(monkeypatch, fake_lookup):
     async def anchor(db, text_id, juan, quote):
-        return "p0749c10" if quote == "亦如日月不着空" else None
+        return ("p0749c10", 40, 46) if quote == "亦如日月不着空" else None
 
-    monkeypatch.setattr(claim_check, "line_anchor", anchor)
+    monkeypatch.setattr(claim_check, "locate_quote", anchor)
     out = await check_claim(None, None, "犹如莲花不著水，亦如日月不住空")
     assert out.verdict == "variant"
     close = next(seg.close for seg in out.segments if seg.close is not None)
     # located by the canon's own wording, not the caller's
-    assert close.reader_url.endswith("/texts/7/read?juan=1&anchor=p0749c10")
+    assert close.reader_url.endswith("/texts/7/read?juan=1&anchor=p0749c10&hl=40-46")
 
 
 async def test_credited_run_links_to_the_line_of_the_whole_run(monkeypatch, fake_lookup):
     from app.services.claim_check import credit_runs
 
     async def anchor(db, text_id, juan, quote):
-        return "p0752b03" if quote == "一切有为法，如梦幻泡影" else None
+        return ("p0752b03", 300, 310) if quote == "一切有为法，如梦幻泡影" else None
 
-    monkeypatch.setattr(claim_check, "line_anchor", anchor)
+    monkeypatch.setattr(claim_check, "locate_quote", anchor)
     monkeypatch.setitem(TABLE, "一切有为法", [_match("T0003", "毘婆尸佛經", "sutra", 3)])
     out = await credit_runs(None, None, await check_claim(None, None, "一切有为法，如梦幻泡影，看开便是福"))
     assert out.segments[0].sources[0].cbeta_id == "T0235"
-    assert out.segments[0].sources[0].reader_url.endswith("anchor=p0752b03")
+    assert out.segments[0].sources[0].reader_url.endswith("anchor=p0752b03&hl=300-310")

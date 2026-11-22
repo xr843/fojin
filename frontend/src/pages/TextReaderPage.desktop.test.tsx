@@ -187,3 +187,56 @@ describe("阅读器划选：拖出正文再松手", () => {
     outside.remove();
   });
 });
+
+// 2026-11-22 用户反馈：从 fojin.ai 核对结果点进来，要高亮「所查的那一整句」，而且一直亮着——
+// 之前只闪 CBETA 的一整行 4 秒，还会把同一行里不属于这句的「如是我聞：」也亮了。
+// 链接带 ?hl=<起>-<止>（正文偏移，后端核对时算出），阅读器在这两处插零宽标记，标记之间常亮。
+describe("阅读器：?hl= 高亮所查的整句", () => {
+  async function renderAt(url: string) {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const r = render(
+      <HelmetProvider>
+        <QueryClientProvider client={client}>
+          <MemoryRouter initialEntries={[url]}>
+            <Routes>
+              <Route path="/texts/:id/read" element={<TextReaderPage />} />
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>
+      </HelmetProvider>,
+    );
+    await screen.findByText(/如是我聞/);
+    return r;
+  }
+
+  function between(container: HTMLElement) {
+    const start = container.querySelector(".quote-mark[data-q='start']");
+    const end = container.querySelector(".quote-mark[data-q='end']");
+    if (!start || !end) return null;
+    const range = document.createRange();
+    range.setStartAfter(start);
+    range.setEndBefore(end);
+    return range.toString();
+  }
+
+  it("标记圈住的正好是所查的那一段，不含同一行前面的字", async () => {
+    vi.mocked(getJuanLineAnchors).mockResolvedValue({
+      text_id: TEXT_ID, juan_num: 1, anchors: [{ char_offset: 0, line_ref: "0688c05" }],
+    });
+    const { container } = await renderAt("/texts/69/read?juan=1&anchor=p0688c05&hl=5-10");
+    await waitFor(() => expect(between(container)).toBe("一時，薄伽梵"));
+  });
+
+  it("没有行号数据时也能圈出来", async () => {
+    const { container } = await renderAt("/texts/69/read?juan=1&hl=5-10");
+    await waitFor(() => expect(between(container)).toBe("一時，薄伽梵"));
+  });
+
+  it("不合法的 hl 不插标记", async () => {
+    for (const bad of ["10-5", "abc", "5-99999", "-1-3"]) {
+      const { container, unmount } = await renderAt(`/texts/69/read?juan=1&hl=${bad}`);
+      expect(container.querySelector(".quote-mark")).toBeNull();
+      unmount();
+    }
+  });
+});

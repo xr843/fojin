@@ -916,6 +916,13 @@
 ::highlight(cbeta-target-line) {
   background-color: rgba(212, 160, 23, 0.32);
 }
+/* ?hl= 所查的整句：常亮，不随时间消失（fojin.ai 核对结果点进来）。 */
+::highlight(fojin-quote) {
+  background-color: rgba(212, 160, 23, 0.36);
+}
+.quote-target-fallback {
+  background-color: rgba(212, 160, 23, 0.18);
+}
 
 .cbeta-line-flash {
   animation: cbeta-line-flash-kf 2.2s ease-out;
