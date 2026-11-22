@@ -12,7 +12,8 @@ redirects, it is this worker, not a rule.
 | --- | --- |
 | `/sw.js` | A service worker whose only job is to drop every cache, unregister itself, and navigate the client to fojin.app |
 | `/registerSW.js` | The same clean-up from the page side, for clients that fetch the vite-pwa register shim |
-| `/`, `/_site/*`, `/robots.txt`, `/sitemap.xml` | **fojin.ai's own site** — the Master-skill home page, forwarded from `https://master-skill.pages.dev` (built from [Master-skill](https://github.com/xr843/Master-skill) `site/`, published on every push to its `main`). Edit the page there, not here. If that site does not answer 200, `/` falls back to **302 → `/developers`** |
+| `/`, `/trace.js` | **fojin.ai's home page** — 引文溯源 (「这段话，出自佛经吗？」): `frontend/public/trace.html` + `trace.js`, fetched from `https://fojin.app`. The page calls `https://fojin.app/api/verify/trace` directly (CORS allows fojin.ai; the CSP's `connect-src` lists fojin.app). Falls back to **302 → `https://fojin.app/verify`** |
+| `/masters`, `/_site/*`, `/robots.txt`, `/sitemap.xml` | The Master-skill catalogue (its site's `/` served at `/masters`) and fojin.ai's crawler files, forwarded from `https://master-skill.pages.dev` (built from [Master-skill](https://github.com/xr843/Master-skill) `site/`, published on every push to its `main`). Edit the page there, not here. If that site does not answer 200, `/masters` falls back to 302 → the Master-skill README |
 | `/developers` | The developer portal (MCP endpoint, API, CLI): `frontend/public/agents.html`, fetched from `https://fojin.app/agents.html` (not `/agents`, which 301s back here). Falls back to 302 → `https://fojin.app/docs` |
 | `/theme-init.js`, `/favicon.svg`, `/fonts/MaShanZheng-title-v2.woff2` | Proxied from fojin.app — same-origin assets the pages load; the CSP (`'self'`) would block them if redirected off-origin |
 | everything else | **301 → `https://fojin.app<path><query>`** |
