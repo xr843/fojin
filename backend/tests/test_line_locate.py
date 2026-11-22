@@ -70,3 +70,18 @@ def test_no_trailing_punctuation_in_the_quote_means_no_extension():
     content = "演說甚深根聚法門。爾時"
     first, last = locate_span(content, "演說甚深根聚法門")
     assert content[first : last + 1] == "演說甚深根聚法門"
+
+
+# 2026-11-22 用户截图：「何謂對法？」定位到了前一句「其論者何？謂對法藏」里——去掉标点后
+# 「者何謂對法藏」恰好含这四个字。一句话出现多次时，取前后都挨着标点的那一处。
+def test_prefers_the_occurrence_that_starts_and_ends_on_punctuation():
+    content = "其論者何？謂對法藏。何謂對法？頌曰："
+    first, last = locate_span(content, "何謂對法？")
+    assert content[first : last + 1] == "何謂對法？"
+    assert first == content.index("。何謂") + 1
+
+
+def test_falls_back_to_the_first_occurrence_without_a_clean_one():
+    content = "者何謂對法藏"
+    first, last = locate_span(content, "何謂對法")
+    assert content[first : last + 1] == "何謂對法"

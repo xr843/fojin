@@ -58,6 +58,38 @@ def _is_punct(ch: str) -> bool:
     return ch.strip() != "" and _norm_char(ch) == ""
 
 
+def _at_boundary_before(content: str, i: int) -> bool:
+    return i == 0 or _is_punct(content[i - 1]) or not content[i - 1].strip()
+
+
+def _at_boundary_after(content: str, i: int) -> bool:
+    return i + 1 >= len(content) or _is_punct(content[i + 1]) or not content[i + 1].strip()
+
+
+def _best_occurrence(content: str, normalised: str, origin: list[int], needle: str, limit: int = 50) -> int:
+    """Index in ``normalised`` of the occurrence to report. Punctuation is folded
+    away, so a short sentence can also "occur" straddling two others —
+    「何謂對法」 inside 「其論者何？謂對法藏」 (user screenshot, 2026-11-22). Prefer the
+    occurrence that starts and ends on a source boundary (punctuation or line
+    break), then one that starts on one, then the first. Without ``content``
+    (offsets only) the first occurrence is used."""
+    first = normalised.find(needle)
+    if first < 0 or not content:
+        return first
+    best, best_score = first, -1
+    at, seen = first, 0
+    while at >= 0 and seen < limit:
+        start, end = origin[at], origin[at + len(needle) - 1]
+        score = 2 * _at_boundary_before(content, start) + _at_boundary_after(content, end)
+        if score > best_score:
+            best, best_score = at, score
+            if score == 3:
+                break
+        at = normalised.find(needle, at + 1)
+        seen += 1
+    return best
+
+
 def locate_span(content: str, quote: str, index: tuple[str, list[int]] | None = None) -> tuple[int, int] | None:
     """Offsets in ``content`` of the quote's first and last character
     (inclusive), compared in normalised space. Punctuation the source has
@@ -68,7 +100,7 @@ def locate_span(content: str, quote: str, index: tuple[str, list[int]] | None = 
     if not needle:
         return None
     normalised, origin = index if index is not None else _index(content)
-    at = normalised.find(needle)
+    at = _best_occurrence(content, normalised, origin, needle)
     if at < 0:
         return None
     first, last = origin[at], origin[at + len(needle) - 1]
