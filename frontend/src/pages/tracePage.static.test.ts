@@ -1,0 +1,59 @@
+// fojin.ai 首页 public/trace.html + trace.js 不在 React 构建里，tsc / eslint 都不检查它。
+// 2026-11-22 一次重构误删了 el()/sourceLink() 等函数，node --check 只查语法没拦住，
+// 线上首页每次核对都抛 ReferenceError。这里在测试环境（jsdom）里把页面脚本真正跑一遍：
+// 模拟接口返回 → 逐句渲染 → 原文连着的句子合成一张卡片 → 引语前缀灰显。
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+const PUBLIC = resolve(__dirname, "../../public");
+
+const src = (hl: string) => ({
+  text_id: 7, juan_num: 1, title_zh: "般若波羅蜜多心經", cbeta_id: "T0251", canon_class: "sutra",
+  reader_url: `https://fojin.app/texts/7/read?juan=1&anchor=p0848c06&hl=${hl}`,
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  document.body.innerHTML = "";
+});
+
+describe("fojin.ai 首页脚本 trace.js", () => {
+  it("核对一段文字：不抛错，原文相接的句子合成一张卡片，前缀灰显", async () => {
+    const html = readFileSync(resolve(PUBLIC, "trace.html"), "utf8");
+    document.body.innerHTML = html.slice(html.indexOf("<body>") + 6, html.indexOf("</body>"));
+    const errors: string[] = [];
+    const onError = (e: ErrorEvent) => errors.push(String(e.error ?? e.message));
+    window.addEventListener("error", onError);
+    const sent: { sentences: string[] }[] = [];
+    vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
+      const body = JSON.parse(init.body) as { sentences: string[] };
+      sent.push(body);
+      const items = body.sentences.map((t, i) =>
+        i < 2
+          ? { text: t, result: { verdict: "sutra", source_class: "sutra",
+              segments: [{ text: t, found: true, sources: [src(i === 0 ? "19-47" : "51-89")] }] } }
+          : { text: t, prefix: "佛言：", result: { verdict: "absent", segments: [{ text: t, found: false, sources: [] }] } },
+      );
+      return { ok: true, status: 200, headers: { get: () => null }, json: async () => ({ items, dominant: null }) };
+    });
+
+    new Function(readFileSync(resolve(PUBLIC, "trace.js"), "utf8"))();
+    (document.getElementById("trace-text") as HTMLTextAreaElement).value =
+      "观自在菩萨，行深般若波罗蜜多时。舍利子，色不异空。佛言：放下执念便得自在。";
+    document.getElementById("trace-form")!.dispatchEvent(new Event("submit", { cancelable: true }));
+    await new Promise((r) => setTimeout(r, 300));
+    window.removeEventListener("error", onError);
+
+    expect(errors).toEqual([]);
+    expect(document.getElementById("status")?.textContent).toBe("");
+    // 整句送检（前缀由后端判断），不在页面里去掉
+    expect(sent[0].sentences[2]).toBe("佛言：放下执念便得自在。");
+    const cards = [...document.querySelectorAll("#result > li")];
+    expect(cards).toHaveLength(2);
+    expect(cards[0].querySelector(".runinfo")?.textContent).toBe("第 1–2 句，原文连成一段");
+    expect(cards[0].querySelector(".meta a")?.getAttribute("href")).toContain("hl=19-89");
+    expect(cards[1].querySelector(".pre")?.textContent).toBe("佛言：");
+    expect(document.getElementById("summary")?.textContent).toBe("共 3 句，2 句出自佛经，1 句藏经中未见。");
+  });
+});
