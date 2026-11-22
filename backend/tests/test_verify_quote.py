@@ -402,3 +402,23 @@ async def test_strict_mode_raises_on_search_outage_default_degrades():
     with pytest.raises(SearchUnavailableError):
         await verify_quote(DB, _BrokenES(), SNOW_VERSE, strict=True)
 
+
+
+@pytest.mark.asyncio
+async def test_phrase_pass_also_asks_for_the_canon_spelling_of_simplified_words():
+    """《心经》「心无挂碍」: CBETA writes 罣礙, OpenCC turns 挂 into 掛, and the
+    index's 繁→简 filter leaves 罣 alone — so the phrase never matched and a
+    Heart Sūtra line came back absent (留出集复测, 2026-11-22). The phrase pass
+    must also ask for the canon spelling."""
+    es = FakeES({"match_phrase": [_hit(15, 13)]})
+    await verify_quote(DB, es, "心无挂碍，无挂碍故，无有恐怖")
+    should = _open_world_phrase_body(es)["query"]["bool"]["must"][0]["bool"]["should"]
+    queries = [next(iter(c["match_phrase"].values()))["query"] for c in should]
+    assert any("罣碍" in q for q in queries)
+    assert any("挂碍" in q for q in queries)
+
+
+def test_canon_spelling_folds_onto_the_simplified_word():
+    from app.services.quote_verifier import normalise_for_match
+
+    assert normalise_for_match("心無罣礙") == normalise_for_match("心无挂碍")

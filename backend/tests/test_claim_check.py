@@ -316,3 +316,88 @@ async def test_claim_endpoint_maps_search_outage_to_503(monkeypatch):
     monkeypatch.setattr(verification, "check_claim", down)
     assert (await _get("/api/verify/claim?q=应无所住而生其心")).status_code == 503
 
+
+
+# ── /api/verify/trace：整段文字逐句核对（fojin.ai 首页） ─────────────────
+
+
+async def _post(path, payload):
+    from httpx import ASGITransport, AsyncClient
+
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
+        return await c.post(path, json=payload)
+
+
+async def test_trace_checks_each_sentence_in_order(monkeypatch, fake_lookup):
+    from app.api import verification
+
+    monkeypatch.setattr(verification, "get_es", lambda: None)
+    resp = await _post(
+        "/api/verify/trace",
+        {"sentences": ["一切有为法，如梦幻泡影", "今天天气很好，我们去散步吧"]},
+    )
+    assert resp.status_code == 200
+    items = resp.json()["items"]
+    assert [i["text"] for i in items] == ["一切有为法，如梦幻泡影", "今天天气很好，我们去散步吧"]
+    assert items[0]["result"]["verdict"] == "sutra"
+    assert items[1]["result"]["verdict"] == "absent"
+
+
+async def test_trace_skips_sentences_too_short_to_look_up(monkeypatch, fake_lookup):
+    from app.api import verification
+
+    monkeypatch.setattr(verification, "get_es", lambda: None)
+    resp = await _post("/api/verify/trace", {"sentences": ["好的。", "一切有为法，如梦幻泡影"]})
+    items = resp.json()["items"]
+    assert items[0]["result"] is None and items[0]["skipped"] == "too_short"
+    assert items[1]["result"]["verdict"] == "sutra"
+
+
+async def test_trace_rejects_oversized_batches(monkeypatch):
+    from app.api import verification
+
+    monkeypatch.setattr(verification, "get_es", lambda: None)
+    assert (await _post("/api/verify/trace", {"sentences": []})).status_code == 422
+    nine = ["一切有为法，如梦幻泡影"] * 9
+    assert (await _post("/api/verify/trace", {"sentences": nine})).status_code == 422
+    assert (await _post("/api/verify/trace", {"sentences": ["佛" * 201]})).status_code == 422
+
+
+async def test_trace_maps_search_outage_to_503(monkeypatch):
+    from app.api import verification
+    from app.services.quote_lookup import SearchUnavailableError
+
+    monkeypatch.setattr(verification, "get_es", lambda: None)
+
+    async def down(db, es, text):
+        raise SearchUnavailableError("es down")
+
+    monkeypatch.setattr(verification, "check_claim", down)
+    resp = await _post("/api/verify/trace", {"sentences": ["一切有为法，如梦幻泡影"]})
+    assert resp.status_code == 503
+
+
+def test_trace_endpoint_is_strict_rate_limited():
+    from app.config import settings
+    from app.core.rate_limit import STRICT_PATHS
+
+    assert STRICT_PATHS["/api/verify/trace"] == settings.rate_limit_verify_trace
+    # 一次最多 8 句、每句最多 9 次查找：必须比单句核对的额度更紧
+    assert settings.rate_limit_verify_trace <= settings.rate_limit_verify_claim
+
+
+async def test_trace_credits_adjacent_found_clauses_to_where_they_occur_together(monkeypatch, fake_lookup):
+    """「一切有为法」alone first occurs in an early sūtra that happens to use the
+    phrase; the line people mean — 「一切有为法，如梦幻泡影」— is the Diamond
+    Sūtra's. A partial sentence must re-check each run of adjacent found clauses
+    as one string and show where the run occurs (seen in the browser, 2026-11-22)."""
+    from app.api import verification
+
+    monkeypatch.setattr(verification, "get_es", lambda: None)
+    monkeypatch.setitem(TABLE, "一切有为法", [_match("T0003", "毘婆尸佛經", "sutra", 3)])
+    resp = await _post("/api/verify/trace", {"sentences": ["一切有为法，如梦幻泡影，看开便是福"]})
+    segs = resp.json()["items"][0]["result"]["segments"]
+    assert resp.json()["items"][0]["result"]["verdict"] == "partial"
+    assert [s["found"] for s in segs] == [True, True, False]
+    assert segs[0]["sources"][0]["cbeta_id"] == "T0235"
+    assert segs[1]["sources"][0]["cbeta_id"] == "T0235"

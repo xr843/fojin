@@ -154,3 +154,35 @@ async def check_claim(db: AsyncSession, es: AsyncElasticsearch, text: str) -> Cl
         _CACHE.pop(next(iter(_CACHE)))  # oldest insertion
     _CACHE[key] = (now, result)
     return result
+
+
+async def credit_runs(db: AsyncSession, es: AsyncElasticsearch, verdict: ClaimVerdict) -> ClaimVerdict:
+    """For a partial verdict, look up each run of adjacent found clauses as one
+    string and give the run's clauses the run's sources.
+
+    Clause by clause, 「一切有为法」 first occurs in whichever early text happens to
+    use the phrase; the line the reader means — 「一切有为法，如梦幻泡影」 — is the
+    Diamond Sūtra's, and that is the source the page should name. Only partial
+    verdicts have such runs (a fully found sentence was found whole), so this
+    costs one lookup per run, on a minority of sentences. A run that is not
+    verbatim as a whole keeps its clause-level sources."""
+    if verdict.verdict != "partial":
+        return verdict
+    segments = list(verdict.segments)
+    i = 0
+    while i < len(segments):
+        if not segments[i].found:
+            i += 1
+            continue
+        j = i
+        while j + 1 < len(segments) and segments[j + 1].found:
+            j += 1
+        if j > i:
+            run_text = "，".join(seg.text for seg in segments[i : j + 1])
+            run = _segment(run_text, await verify_quote(db, es, run_text, strict=True))
+            if run.found and run.sources:
+                for k in range(i, j + 1):
+                    segments[k] = segments[k].model_copy(update={"sources": run.sources})
+        i = j + 1
+    # A copy: check_claim caches the verdict it returned.
+    return verdict.model_copy(update={"segments": segments})

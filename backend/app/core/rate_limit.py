@@ -41,6 +41,8 @@ STRICT_PATHS: dict[str, int] = {
     # trusts a verdict in the URL), so it costs the same.
     "/api/verify/claim": settings.rate_limit_verify_claim,
     "/api/og/verify": settings.rate_limit_verify_claim,
+    # fojin.ai 首页逐句核对：一次最多 8 句，每句同 /claim 的开销。
+    "/api/verify/trace": settings.rate_limit_verify_trace,
     # 经注对读：包常驻内存，单次查询只是子串定位——比核验便宜，
     # 但仍是全文检索，别落进 200/min 的默认桶。
     "/api/commentary/passage": settings.rate_limit_commentary,

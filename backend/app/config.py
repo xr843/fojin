@@ -251,6 +251,9 @@ class Settings(BaseSettings):
     # 核对页「这句经，佛真的说过吗？」：一次最多 1 + 8 次 verify_quote 查找，
     # 结果图（/api/og/verify）同价——两者共用这一档。
     rate_limit_verify_claim: int = 10
+    # fojin.ai 首页逐句核对：一次最多 8 句、每句最多 1 + 8 次查找。
+    # 一段 40 句的文字分 5 次送，6 次/分钟够一个人正常用。
+    rate_limit_verify_trace: int = 6
     rate_limit_commentary: int = 60
     # OPDS EPUB downloads (/api/opds/download/*.epub): a whole text is rendered per
     # request (T0001, 22 juan: 2.4 s), so cap per IP well below the default.
