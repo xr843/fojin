@@ -78,7 +78,7 @@ export default defineConfig({
         // never used by the SW: every navigation is answered from the precached
         // root index.html (navigateFallback). Precaching ~100 of them would add
         // ~1.2 MB to every visitor's first load for nothing.
-        globIgnores: ["**/landscape-bg.png", "**/og-image.png", "**/index.*.html", "*/**/index.html"],
+        globIgnores: ["**/landscape-bg.png", "**/og-image.png", "**/index.*.html", "*/**/index.html", "trace.html"],
         // /agents and /llms.txt are real files served outside the SPA, and a
         // navigation to either would otherwise be answered from the precached
         // index.html: /agents has no React Router route (→ 404 page for anyone
@@ -94,6 +94,9 @@ export default defineConfig({
           /^\/api\//,
           /^\/agents(\?|$)/,
           /^\/llms\.txt(\?|$)/,
+          // fojin.ai's home page (引文溯源), a static file the fojin.ai worker
+          // reads from here; opened on fojin.app it must not become the SPA 404.
+          /^\/trace\.html(\?|$)/,
         ],
         skipWaiting: true,
         clientsClaim: true,
