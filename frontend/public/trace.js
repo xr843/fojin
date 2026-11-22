@@ -49,6 +49,8 @@
       // 从电子书、论文里复制来的脚注编号：「元明1，」「六师异辙（1）」——
       // 夹在汉字和标点之间的数字会让整句对不上原文。「第3卷」这种后面接汉字的不动。
       .replace(/[（(]\d{1,3}[）)]/g, "")
+      // CBETA 网页版的标记符号（◥ 段首、※ 校注）不是正文
+      .replace(/[◥◤◣◢◆◇■□▲△▼▽○●◎※]/g, "")
       .replace(/([㐀-鿿])\d{1,3}(?=[，。；：、！？,.;:!?」』”’]|$)/g, "$1")
       .replace(/^\s*(#{1,6}|>|[-*+]|\d+[.、)])\s*/, "")
       .replace(/[*_`]+/g, "")
@@ -56,9 +58,28 @@
   }
 
   // 按换行与句末标点切句；过长的句子再按逗号切开，保证每句 ≤ 200 字。
+  // 从 PDF、电子书复制来的文字常在句中硬换行（「宗謂異部所崇之理，輪謂顯\n能摧之用」），
+  // 按行切会把一句切成两半、两半都对不上原文。前一行没以句末标点收尾、下一行
+  // 也不是 Markdown 标题或列表项时，把两行接回一句。
+  var LIST_MARK = /^\s*(#{1,6}\s|>|[-*+]\s|\d+[.、)]\s?)/;
+  var ENDS_SENTENCE = /[。！？；：!?;:」』”’）)]\s*$/;
+  function joinWrappedLines(text) {
+    var lines = text.split(/\r?\n/), out = [];
+    lines.forEach(function (line) {
+      var prev = out.length ? out[out.length - 1] : null;
+      if (prev && prev.trim() && line.trim() && !ENDS_SENTENCE.test(prev) &&
+          !LIST_MARK.test(prev) && !LIST_MARK.test(line)) {
+        out[out.length - 1] = prev.replace(/\s+$/, "") + line.trim();
+      } else {
+        out.push(line);
+      }
+    });
+    return out.join("\n");
+  }
+
   function splitSentences(text) {
     var out = [];
-    text.split(/\n+/).forEach(function (raw) {
+    joinWrappedLines(text).split(/\n+/).forEach(function (raw) {
       var line = clean(raw);
       if (!line) return;
       var parts = line.match(/[^。！？；!?;]+[。！？；!?;]?[”」』’"]?/g) || [line];
