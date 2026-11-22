@@ -25,8 +25,11 @@
 <!-- ?v= busts Cloudflare's edge cache, which keeps .js for 4 hours across
      deploys. Bump it whenever trace.js changes (the fojin.ai worker passes the
      query through to fojin.app). -->
-<script defer src="/trace.js?v=7"></script>
-<script defer src="https://analytics.fojin.app/script.js" data-website-id="c757a04c-82e0-4f53-a720-830b0e1a7287"></script>
+<script defer src="/trace.js?v=8"></script>
+<!-- data-exclude-search: never record the query string — a shared ?q= link
+     carries the text someone pasted. trace.js (deferred, above) also clears it
+     before this script runs. -->
+<script defer src="https://analytics.fojin.app/script.js" data-website-id="c757a04c-82e0-4f53-a720-830b0e1a7287" data-exclude-search="true"></script>
 <style>
   :root {
     --bg: #f7f8fa; --surface: #ffffff; --surface-alt: #f2f3f6;

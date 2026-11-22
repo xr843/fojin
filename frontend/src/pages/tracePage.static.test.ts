@@ -47,6 +47,8 @@ describe("fojin.ai 首页脚本 trace.js", () => {
 
     expect(errors).toEqual([]);
     expect(document.getElementById("status")?.textContent).toBe("");
+    // 贴进来的文字不进地址栏（统计会记下网址）
+    expect(window.location.search).toBe("");
     // 整句送检（前缀由后端判断），不在页面里去掉
     expect(sent[0].sentences[2]).toBe("佛言：放下执念便得自在。");
     const cards = [...document.querySelectorAll("#result > li")];
@@ -55,5 +57,22 @@ describe("fojin.ai 首页脚本 trace.js", () => {
     expect(cards[0].querySelector(".meta a")?.getAttribute("href")).toContain("hl=19-89");
     expect(cards[1].querySelector(".pre")?.textContent).toBe("佛言：");
     expect(document.getElementById("summary")?.textContent).toBe("共 3 句，2 句出自佛经，1 句藏经中未见。");
+  });
+});
+
+describe("fojin.ai 首页：贴进来的文字不进统计", () => {
+  it("统计脚本带 data-exclude-search", () => {
+    const html = readFileSync(resolve(PUBLIC, "trace.html"), "utf8");
+    expect(html).toMatch(/analytics\.fojin\.app\/script\.js"[^>]*data-exclude-search="true"/);
+  });
+
+  it("打开分享链接：先把 ?q= 从地址栏清掉，再核对", () => {
+    const html = readFileSync(resolve(PUBLIC, "trace.html"), "utf8");
+    document.body.innerHTML = html.slice(html.indexOf("<body>") + 6, html.indexOf("</body>"));
+    window.history.replaceState(null, "", "/?q=" + encodeURIComponent("一切有为法，如梦幻泡影"));
+    vi.stubGlobal("fetch", async () => new Promise(() => {}));  // 核对挂起即可，只看地址栏
+    new Function(readFileSync(resolve(PUBLIC, "trace.js"), "utf8"))();
+    expect(window.location.search).toBe("");
+    expect((document.getElementById("trace-text") as HTMLTextAreaElement).value).toBe("一切有为法，如梦幻泡影");
   });
 });
