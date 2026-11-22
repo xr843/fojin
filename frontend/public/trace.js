@@ -384,11 +384,9 @@
   form.addEventListener("submit", function (e) {
     e.preventDefault();
     var text = input.value.trim();
-    if (text.length <= SHARE_MAX_CHARS) {
-      try { history.replaceState(null, "", "?q=" + encodeURIComponent(text)); } catch (err) {}
-    } else {
-      try { history.replaceState(null, "", location.pathname); } catch (err) {}
-    }
+    // 不把文字写进地址栏：页面装着访问统计，网址变化会被记成一次访问，贴进来的文字
+    // （可能是私人的）就进了统计库（2026-11-22 查实 151 条）。分享链接只在点「复制
+    // 这次核对的链接」时生成，复制到剪贴板。
     run(text, false);
   });
 
@@ -415,8 +413,11 @@
   }
 
   // 分享链接：?q= 带进来的文字直接核对。
+  // 分享链接：?q= 带进来的文字直接核对，并立刻把网址清干净——本脚本先于统计脚本
+  // 执行（同为 defer，排在前面），统计记下的就是不带文字的 fojin.ai/。
   var q = new URLSearchParams(location.search).get("q");
   if (q) {
+    try { history.replaceState(null, "", location.pathname); } catch (err) {}
     input.value = q.slice(0, 3000);
     updateCount();
     run(input.value.trim(), true);
