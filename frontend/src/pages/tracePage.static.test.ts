@@ -64,6 +64,8 @@ describe("fojin.ai 首页：贴进来的文字不进统计", () => {
   it("统计脚本带 data-exclude-search", () => {
     const html = readFileSync(resolve(PUBLIC, "trace.html"), "utf8");
     expect(html).toMatch(/analytics\.fojin\.app\/script\.js"[^>]*data-exclude-search="true"/);
+    // 只在自己的域名上统计：复制走的页面（曾有 lobster-ai.net）不再往统计库里写
+    expect(html).toMatch(/analytics\.fojin\.app\/script\.js"[^>]*data-domains="fojin\.ai,www\.fojin\.ai,fojin\.app,www\.fojin\.app"/);
   });
 
   it("打开分享链接：先把 ?q= 从地址栏清掉，再核对", () => {
