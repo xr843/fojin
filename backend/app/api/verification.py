@@ -100,7 +100,11 @@ def _split_attribution(sentence: str) -> tuple[str, str]:
 
 
 def _found_whole(v: ClaimVerdict) -> bool:
-    return v.verdict in ("sutra", "not_sutra", "variant")
+    """The sentence as typed is a canon line — one segment, verbatim or a
+    wording variant. Clauses that are each found somewhere do not count: the
+    prefix 「《金刚经》说」 merges into one clause that happens to occur in the
+    大智度論, and the sentence would be credited there."""
+    return len(v.segments) == 1 and (v.segments[0].found or v.segments[0].close is not None)
 
 TraceSentence = Annotated[str, StringConstraints(min_length=1, max_length=200)]
 
