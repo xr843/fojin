@@ -13,7 +13,7 @@ import {
   type ChunkContextItem,
   type ParallelPair,
 } from "../api/client";
-import { countQuoteOccurrences, findQuoteSpans, normalizeForMatch } from "../utils/citationMatch";
+import { countQuoteOccurrences, extendToSentenceEnd, findQuoteSpans, normalizeForMatch } from "../utils/citationMatch";
 import DrawerPassageActions from "./DrawerPassageActions";
 import { localizeHan } from "../utils/hanScript";
 import { reflowText } from "../utils/textReflow";
@@ -159,6 +159,18 @@ function snapToSentence(text: string, start: number, end: number): [number, numb
   return [lo, hi];
 }
 
+/** The located quote, widened to its sentence's full stop when it ends where
+ *  the sentence ends (see extendToSentenceEnd). Fragments of an abridged quote
+ *  keep their own edges except the outer two. */
+function withSentenceEnd(text: string, spans: [number, number][]): [number, number][] {
+  if (spans.length === 0) return spans;
+  const out = spans.map((sp) => [sp[0], sp[1]] as [number, number]);
+  const [lo, hi] = extendToSentenceEnd(text, [out[0][0], out[out.length - 1][1]]);
+  out[0][0] = lo;
+  out[out.length - 1][1] = hi;
+  return out;
+}
+
 function stitchChunks(chunks: ChunkContextItem[]): StitchedPassage {
   let text = "";
   let centerStart = 0;
@@ -202,7 +214,7 @@ function CitationBlocks({ chunks, quote }: { chunks: ChunkContextItem[]; quote?:
   // Both spans are in RAW coordinates (newlines included). findQuoteSpan's
   // punctuation-tolerant pass strips \s and maps hits back to raw indices, so
   // a quote whose CBETA original is hard-wrapped mid-word still resolves.
-  const quoteSpans = findQuoteSpans(text, quote);
+  const quoteSpans = withSentenceEnd(text, findQuoteSpans(text, quote));
   // Fallback: the quote could not be located even fragment-by-fragment, so mark
   // the cited chunk. Its edges are ingestion cut points, not sentence ends, so
   // snap them outward to the nearest boundary — a highlight that opens mid-word
@@ -506,8 +518,11 @@ export default function CitationDrawer({ target, onClose }: Props) {
       </>
     );
 
+  // 带上引文本身：阅读器在整卷里用同一套匹配（findQuoteSpans）找到它，整句常亮；
+  // 找不到时仍按 highlight_chunk 滚到大致位置。
   const readerUrl = target
-    ? `/texts/${target.textId}/read?juan=${target.juanNum}&highlight_chunk=${target.chunkIndex}`
+    ? `/texts/${target.textId}/read?juan=${target.juanNum}&highlight_chunk=${target.chunkIndex}` +
+      (effectiveQuote ? `&quote=${encodeURIComponent(effectiveQuote)}` : "")
     : "#";
 
   // 经名的字形跟随读者的界面语言，不跟随语料。两个来源都会走错方向：chip 传来

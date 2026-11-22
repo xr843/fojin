@@ -236,3 +236,32 @@ export function countQuoteOccurrences(haystack: string, quote: string): number {
   return n;
 }
 
+
+
+const SENTENCE_END_MARKS = "。！？；!?;";
+const OPENERS = "「『“‘";
+const CLOSERS = "」』”’";
+
+/**
+ * Widen a located quote to the end of its sentence when the quote stops exactly
+ * where the source's sentence stops: 「……演說甚深根聚法門」 cited out of
+ * 「……演說甚深根聚法門。」 highlights the 。 too (user screenshot, 2026-11-22 —
+ * a full stop left outside the highlight reads as a highlight that stopped
+ * short). A comma after the quote means the sentence goes on, so nothing is
+ * added. A closing quote mark after the full stop is taken only together with
+ * the opening mark right before the quote, never as half a pair.
+ * `span` is [start, end) in `text`; returns the same shape.
+ */
+export function extendToSentenceEnd(text: string, span: [number, number]): [number, number] {
+  let [lo, hi] = span;
+  if (hi > 0 && SENTENCE_END_MARKS.includes(text[hi - 1])) return [lo, hi];
+  let k = hi;
+  while (k < text.length && /\s/.test(text[k])) k++;
+  if (k >= text.length || !SENTENCE_END_MARKS.includes(text[k])) return [lo, hi];
+  hi = k + 1;
+  if (lo > 0 && OPENERS.includes(text[lo - 1]) && hi < text.length && CLOSERS.includes(text[hi])) {
+    lo -= 1;
+    hi += 1;
+  }
+  return [lo, hi];
+}

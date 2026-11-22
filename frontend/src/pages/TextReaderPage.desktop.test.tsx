@@ -240,3 +240,49 @@ describe("阅读器：?hl= 高亮所查的整句", () => {
     }
   });
 });
+
+describe("阅读器：?quote= 从问答页原文面板过来", () => {
+  async function renderAt(url: string) {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const r = render(
+      <HelmetProvider>
+        <QueryClientProvider client={client}>
+          <MemoryRouter initialEntries={[url]}>
+            <Routes>
+              <Route path="/texts/:id/read" element={<TextReaderPage />} />
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>
+      </HelmetProvider>,
+    );
+    await screen.findByText(/如是我聞/);
+    return r;
+  }
+  function between(container: HTMLElement) {
+    const start = container.querySelector(".quote-mark[data-q='start']");
+    const end = container.querySelector(".quote-mark[data-q='end']");
+    if (!start || !end) return null;
+    const range = document.createRange();
+    range.setStartAfter(start);
+    range.setEndBefore(end);
+    return range.toString();
+  }
+
+  it("用引文本身在整卷里定位，简体引文也能对上繁体原文", async () => {
+    const q = encodeURIComponent("一时，薄伽梵住");
+    const { container } = await renderAt(`/texts/69/read?juan=1&highlight_chunk=0&quote=${q}`);
+    await waitFor(() => expect(between(container)).toBe("一時，薄伽梵住"));
+  });
+
+  it("引文止于句末时连句号一起高亮", async () => {
+    const q = encodeURIComponent("最勝光曜七寶莊嚴");
+    const { container } = await renderAt(`/texts/69/read?juan=1&quote=${q}`);
+    await waitFor(() => expect(between(container)).toBe("最勝光曜七寶莊嚴。"));
+  });
+
+  it("找不到引文时不插标记（仍按 highlight_chunk 大致定位）", async () => {
+    const q = encodeURIComponent("一切都是最好的安排");
+    const { container } = await renderAt(`/texts/69/read?juan=1&highlight_chunk=0&quote=${q}`);
+    expect(container.querySelector(".quote-mark")).toBeNull();
+  });
+});
