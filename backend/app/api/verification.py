@@ -9,6 +9,7 @@ serving its readers an invented citation. Read-only; strict-rate-limited
 (paid nothing, but ES + source-text reads are not free).
 """
 
+import re
 from typing import Annotated
 
 from elasticsearch import AsyncElasticsearch
@@ -80,6 +81,27 @@ async def verify_claim_endpoint(
 
 TRACE_MAX_SENTENCES = 8
 
+# 引语前缀：句首十几个字以内、以「说/云/曰/言/道/讲」(+过) 收尾、后接冒号或逗号。
+# 先整句核对——「論曰：」「頌曰：」「佛言：」常是藏经原文的一部分；整句找不到时才去掉
+# 前缀重查（「佛说：一切有为法……」「《金刚经》说：『……』」）。与 trace.js 早先的规则一致。
+_ATTRIBUTION_RE = re.compile(
+    r"^([^，。；：:「“\"]{0,14}?(?:说|說|云|曰|言|道|讲|講|有言|有云)(?:过|過)?)\s*[：:，,]\s*"
+)
+
+
+def _split_attribution(sentence: str) -> tuple[str, str]:
+    m = _ATTRIBUTION_RE.match(sentence)
+    if not m:
+        return "", sentence
+    body = sentence[m.end():]
+    if len(normalise_for_match(body)) < MIN_LOOKUP_QUOTE_CHARS:
+        return "", sentence
+    return m.group(0), body
+
+
+def _found_whole(v: ClaimVerdict) -> bool:
+    return v.verdict in ("sutra", "not_sutra", "variant")
+
 TraceSentence = Annotated[str, StringConstraints(min_length=1, max_length=200)]
 
 
@@ -93,6 +115,9 @@ class TraceRequest(BaseModel):
 class TraceItem(BaseModel):
     text: str
     result: ClaimVerdict | None = None
+    # 「佛说：」「经云：」这类引语前缀：整句在藏经里找不到时去掉它再查，
+    # result 对应的是去掉前缀后的文字；页面把前缀灰显。
+    prefix: str | None = None
     # "too_short"：去掉标点后不足以查找（如「好的。」），原样显示、不着色
     skipped: str | None = None
 
@@ -121,6 +146,12 @@ async def trace_endpoint(
             continue
         try:
             verdict = await credit_runs(db, es, await check_claim(db, es, sentence))
+            prefix, bare_text = _split_attribution(sentence)
+            if prefix and not _found_whole(verdict):
+                bare = await credit_runs(db, es, await check_claim(db, es, bare_text))
+                if bare.verdict != "absent":
+                    items.append(TraceItem(text=sentence, result=bare, prefix=prefix))
+                    continue
             items.append(TraceItem(text=sentence, result=verdict))
         except QuoteTooShortError:
             items.append(TraceItem(text=sentence, skipped="too_short"))

@@ -248,21 +248,32 @@ async def attribute_by_context(
     Returns the verdicts and the dominant fascicle (None without at least two
     votes; ``prefer`` counts as two), for the page to send with its next batch.
     """
+    # Every listed source votes, not only the first: the second line of the
+    # 心經 lists the 大般若經 first (earlier in the canon) and the 心經 second,
+    # and the passage is the 心經's. A vote only ever re-credits a line that
+    # is verbatim in that fascicle, so a wide vote cannot invent a source.
     counts: dict[tuple[int, int], int] = {}
+    firsts: dict[tuple[int, int], int] = {}
     template: dict[tuple[int, int], QuoteMatch] = {}
     for v in verdicts:
         if _whole_found(v):
-            m = v.segments[0].sources[0]
-            key = (m.text_id, m.juan_num)
-            counts[key] = counts.get(key, 0) + 1
-            template.setdefault(key, m)
+            seen: set[tuple[int, int]] = set()
+            for i, m in enumerate(v.segments[0].sources):
+                key = (m.text_id, m.juan_num)
+                if key in seen:
+                    continue
+                seen.add(key)
+                counts[key] = counts.get(key, 0) + 1
+                if i == 0:
+                    firsts[key] = firsts.get(key, 0) + 1
+                template.setdefault(key, m)
     if prefer is not None:
         key = (prefer.text_id, prefer.juan_num)
         counts[key] = counts.get(key, 0) + 2
         template.setdefault(key, prefer)
     if not counts:
         return verdicts, None
-    key, votes = max(counts.items(), key=lambda kv: kv[1])
+    key, votes = max(counts.items(), key=lambda kv: (kv[1], firsts.get(kv[0], 0)))
     if votes < 2:
         return verdicts, None
     dominant = template[key].model_copy(update={"reader_url": None, "juan_matched": None})
