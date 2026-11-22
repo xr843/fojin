@@ -36,6 +36,7 @@ from app.services.canon_class import CANON_ORDER_SCRIPT, canon_class
 from app.services.quote_verifier import (
     MIN_QUOTE_CHARS,
     NEAR_MISS_THRESHOLD,
+    canon_spelling_variants,
     normalise_for_match,
 )
 from app.services.urn import (
@@ -303,15 +304,11 @@ async def _es_candidates(
         #   nothing and the plain route still answers.
         # - content is the original field (hard wraps joined once the index
         #   is rebuilt).
-        content_query: dict = {
-            "bool": {
-                "should": [
-                    {"match_phrase": {"content.nopunct": {"query": quote}}},
-                    {"match_phrase": {"content": {"query": quote, "analyzer": "cjk_content"}}},
-                ],
-                "minimum_should_match": 1,
-            }
-        }
+        should: list[dict] = []
+        for q in [quote, *canon_spelling_variants(quote)]:
+            should.append({"match_phrase": {"content.nopunct": {"query": q}}})
+            should.append({"match_phrase": {"content": {"query": q, "analyzer": "cjk_content"}}})
+        content_query: dict = {"bool": {"should": should, "minimum_should_match": 1}}
     else:
         content_query = {"match": {"content": {"query": quote, "analyzer": "cjk_content"}}}
     filters: list[dict] = [{"term": {"lang": "lzh"}}]

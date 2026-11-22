@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>这段话出自佛经吗？逐句核对出处 — 佛津 AI</title>
+<meta name="description" content="贴进一段文字——网传的「佛说」、文章、AI 的回答——逐句比对汉文大藏经原文：哪句出自哪部经、哪句在藏经里找不到。" />
+<link rel="canonical" href="https://fojin.ai/" />
+<meta name="theme-color" content="#f7f8fa" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="这段话出自佛经吗？— 佛津 AI" />
+<meta property="og:description" content="贴进一段文字，逐句比对汉文大藏经原文，标出每句的出处。" />
+<meta property="og:url" content="https://fojin.ai/" />
+<meta property="og:image" content="https://fojin.app/og-image.png" />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<!-- Served at https://fojin.ai/ — the fojin.ai edge worker reads this file
+     from fojin.app/trace.html (workers/fojin-ai-edge). Scripts are external
+     files because the CSP forbids inline script: /_site/theme.js and
+     /_site/site.js come from the Master-skill site (light/dark toggle, shared
+     with /masters and /developers); /trace.js is this page's own. The API is
+     called cross-origin at fojin.app (CORS allows fojin.ai) so the rate limit
+     counts each visitor's own IP. -->
+<script src="/_site/theme.js"></script>
+<script defer src="/_site/site.js"></script>
+<script defer src="/trace.js"></script>
+<script defer src="https://analytics.fojin.app/script.js" data-website-id="c757a04c-82e0-4f53-a720-830b0e1a7287"></script>
+<style>
+  :root {
+    --bg: #f7f8fa; --surface: #ffffff; --surface-alt: #f2f3f6;
+    --ink: #14161b; --ink-light: #4c525e; --ink-muted: #626978;
+    --border: #e1e4ea; --accent: #a35507; --accent-hover: #8a4706; --seal: #b3361f;
+    --ok: #1f6f43; --ok-bg: #e8f4ec; --mid: #8a5a00; --mid-bg: #fbf1dc;
+    --none: #6b7280; --none-bg: #f1f2f4;
+    color-scheme: light;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f0e0c; --surface: #1b1814; --surface-alt: #221e19;
+    --ink: #efe9df; --ink-light: #b3aa9c; --ink-muted: #9a9183;
+    --border: #2e2923; --accent: #e3a548; --accent-hover: #f2c879; --seal: #c4452d;
+    --ok: #7cc79a; --ok-bg: #16261c; --mid: #e3b35a; --mid-bg: #2a2214;
+    --none: #a39a8c; --none-bg: #1f1c18;
+    color-scheme: dark;
+  }
+  @font-face { font-family: 'Ma Shan Zheng Title'; font-display: swap;
+    src: url('/fonts/MaShanZheng-title-v2.woff2') format('woff2'); }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-size: 16px; line-height: 1.75;
+    font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif; }
+  a { color: var(--accent); }
+  a:hover { color: var(--accent-hover); }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 20px; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  header.top { border-bottom: 1px solid var(--border); background: var(--bg); }
+  header.top .bar { max-width: 1040px; margin: 0 auto; padding: 0 20px; height: 58px;
+    display: flex; align-items: center; gap: 20px; }
+  .brand { display: flex; align-items: baseline; gap: 8px; text-decoration: none; }
+  .brand .mark { font-family: 'Ma Shan Zheng Title', serif; font-size: 25px; color: var(--seal); line-height: 1; }
+  .brand .ai { font-weight: 700; letter-spacing: .08em; font-size: 14px; color: var(--ink); }
+  nav.links { margin-left: auto; display: flex; gap: 20px; font-size: 14px; }
+  nav.links a { color: var(--ink-muted); text-decoration: none; padding: 4px 0; }
+  nav.links a:hover { color: var(--ink); }
+  nav.links a[aria-current="page"] { color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
+  .theme-toggle { display: grid; place-items: center; width: 32px; height: 32px; flex: none; padding: 0;
+    border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--ink-muted); cursor: pointer; }
+  .theme-toggle svg { width: 16px; height: 16px; }
+  .theme-toggle .sun { display: none; }
+  :root[data-theme="dark"] .theme-toggle .sun { display: block; }
+  :root[data-theme="dark"] .theme-toggle .moon { display: none; }
+  @media (max-width: 560px) { nav.links { gap: 14px; } nav.links .opt { display: none; } }
+
+  main .wrap { padding-top: 44px; padding-bottom: 56px; }
+  h1 { margin: 0 0 10px; font-size: clamp(26px, 5vw, 36px); line-height: 1.35; font-weight: 700;
+    font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", STSong, serif; }
+  .lede { margin: 0 0 24px; color: var(--ink-light); }
+
+  form textarea { width: 100%; min-height: 150px; resize: vertical; padding: 14px 16px; font: inherit; line-height: 1.7;
+    color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+  form textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; }
+  .btn { font: inherit; font-size: 15px; font-weight: 600; padding: 8px 20px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--accent); background: var(--accent); color: #fff; }
+  :root[data-theme="dark"] .btn { color: #1a1206; }
+  .btn:disabled { opacity: .55; cursor: wait; }
+  .count { font-size: 13px; color: var(--ink-muted); margin-left: auto; }
+  .try { font-size: 14px; color: var(--ink-muted); }
+  .try button { font: inherit; font-size: 13px; color: var(--ink-light); background: none; cursor: pointer;
+    border: 1px dashed var(--border); border-radius: 999px; padding: 2px 11px; margin: 4px 4px 0 0; }
+  .try button:hover { border-color: var(--accent); color: var(--ink); }
+
+  #status { margin: 22px 0 0; font-size: 14px; color: var(--ink-muted); min-height: 1.5em; }
+  #summary { margin: 6px 0 14px; font-size: 15px; }
+  #summary b { font-weight: 600; }
+  ol#result { list-style: none; margin: 0; padding: 0; }
+  ol#result li { padding: 12px 14px; border-left: 3px solid var(--border); background: var(--surface);
+    border-radius: 0 8px 8px 0; margin-bottom: 8px; }
+  ol#result li.pending { opacity: .6; }
+  ol#result li.k-sutra, ol#result li.k-not_sutra { border-left-color: var(--ok); }
+  ol#result li.k-variant, ol#result li.k-partial { border-left-color: var(--mid); }
+  ol#result li.k-absent { border-left-color: var(--none); }
+  ol#result li.k-skip { background: none; border-left-color: transparent; padding-top: 4px; padding-bottom: 4px; color: var(--ink-muted); }
+  .s { font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", STSong, serif; font-size: 16.5px; }
+  .s .miss { color: var(--none); text-decoration: underline dotted; text-underline-offset: 4px; }
+  .meta { margin-top: 4px; font-size: 13.5px; color: var(--ink-light); display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+  .tag { font-size: 12.5px; font-weight: 600; padding: 0 8px; border-radius: 4px; }
+  .k-sutra .tag, .k-not_sutra .tag { color: var(--ok); background: var(--ok-bg); }
+  .k-variant .tag, .k-partial .tag { color: var(--mid); background: var(--mid-bg); }
+  .k-absent .tag { color: var(--none); background: var(--none-bg); }
+  .meta a { text-decoration: underline; text-underline-offset: 2px; }
+  .ask { margin-left: auto; font-size: 13px; }
+  .share { margin-top: 12px; font-size: 14px; }
+  .share button { font: inherit; font-size: 13px; padding: 3px 12px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--surface); color: var(--ink-light); }
+
+  .notes { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 14px; color: var(--ink-muted); }
+  .notes p { margin: 0 0 10px; }
+  .more { margin-top: 28px; display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); }
+  .more a { display: block; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
+    text-decoration: none; color: var(--ink); font-size: 14px; }
+  .more a span { display: block; color: var(--ink-muted); font-size: 13px; }
+  .more a:hover { border-color: var(--accent); }
+  footer { border-top: 1px solid var(--border); font-size: 13px; color: var(--ink-muted); }
+  footer .wrap { padding-top: 18px; padding-bottom: 28px; display: flex; flex-wrap: wrap; gap: 6px 16px; }
+  footer a { color: var(--ink-muted); }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="/" aria-label="佛津 AI 首页"><span class="mark">佛津</span><span class="ai">AI</span></a>
+    <nav class="links" aria-label="主导航">
+      <a href="/" aria-current="page">核对出处</a>
+      <a href="/masters">祖师</a>
+      <a href="/developers" class="opt">开发者</a>
+      <a href="https://fojin.app" title="佛津读经站 fojin.app：检索、阅读、对照原典">读经站</a>
+    </nav>
+    <button class="theme-toggle" type="button" aria-label="切换深色模式" title="切换深浅色">
+      <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <h1>这段话，出自佛经吗？</h1>
+    <p class="lede">贴进一段文字——网传的「佛说」、一篇文章、AI 的回答——逐句比对汉文大藏经原文：哪句出自哪部经，哪句在藏经里找不到。</p>
+
+    <form id="trace-form" autocomplete="off">
+      <label class="sr" for="trace-text">要核对的文字</label>
+      <textarea id="trace-text" name="q" maxlength="3000" required placeholder="例如：佛说，一切有为法，如梦幻泡影。看开便是福，放下便是自在。"></textarea>
+      <div class="row">
+        <button class="btn" type="submit" id="trace-go">逐句核对</button>
+        <span class="count" id="trace-count" aria-live="polite"></span>
+      </div>
+      <div class="try" aria-label="示例">
+        试试：
+        <button type="button" data-example="fake">网传的「佛说」</button>
+        <button type="button" data-example="ai">一段 AI 回答</button>
+        <button type="button" data-example="sutra">一段经文</button>
+      </div>
+    </form>
+
+    <p id="status" role="status" aria-live="polite"></p>
+    <div id="summary" hidden></div>
+    <ol id="result" aria-label="逐句核对结果"></ol>
+    <p class="share" id="share" hidden><button type="button" id="share-btn">复制这次核对的链接</button></p>
+
+    <div class="notes">
+      <p><b>怎么核对的：</b>每句逐字比对 CBETA 汉文大藏经原文，繁简字、标点不影响结果；先比整句，整句找不到再逐个分句比。目前只覆盖汉文藏经，巴利、藏、梵文原典暂未纳入。</p>
+      <p><b>「未见」不等于「伪造」：</b>它只说明在已收录的汉文大藏经里找不到这几个字，可能是改写、意译，或出自未收录的典籍。「出自佛经」也不等于佛亲口所说——经中也记录菩萨、弟子的话。</p>
+    </div>
+
+    <div class="more">
+      <a href="/masters">向祖师提问<span>十六位祖师的 AI 技能，每条教义附出处</span></a>
+      <a href="https://fojin.app/?utm_source=fojin.ai&amp;utm_medium=trace">读原典<span>佛津读经站：检索、阅读、对照</span></a>
+      <a href="/developers">给 AI 用<span>MCP 与接口：让模型引经前先核对</span></a>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>佛津 AI</span>
+    <a href="https://fojin.app">读经站 fojin.app</a>
+    <a href="/masters">祖师技能</a>
+    <a href="/developers">开发者</a>
+    <a href="https://github.com/xr843/fojin">GitHub</a>
+  </div>
+</footer>
+</body>
+</html>
