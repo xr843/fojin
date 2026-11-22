@@ -573,3 +573,20 @@ async def test_every_listed_source_votes_so_two_lines_of_one_sutra_agree(monkeyp
     out, dominant = await attribute_by_context(None, verdicts, prefer=None)
     assert dominant.cbeta_id == "T0251"
     assert out[1].segments[0].sources[0].cbeta_id == "T0251"
+
+
+async def test_a_prefix_whose_words_happen_to_occur_somewhere_is_still_dropped(monkeypatch, fake_lookup):
+    # 「《金刚经》说：『应无所住而生其心。』」: split by punctuation, 「金刚经」+「说」 merge into the
+    # clause 「金刚经说」, which happens to occur in the 大智度論 — every clause is "found", yet the
+    # sentence as a whole is not a canon line. Only a whole-sentence hit keeps the prefix
+    # (prod, 2026-11-22: the example AI answer came back as 「出自论典《大智度論》」).
+    from app.api import verification
+
+    monkeypatch.setattr(verification, "get_es", lambda: None)
+    monkeypatch.setitem(TABLE, "金刚经说", [_match("T1509", "大智度論", "treatise", 1509)])
+    monkeypatch.setitem(TABLE, "应无所住而生其心", [DIAMOND])  # so every clause is found, as in prod
+    monkeypatch.setitem(TABLE, "“应无所住而生其心。”", [DIAMOND])  # the fake does not fold punctuation
+    item = (await _post("/api/verify/trace", {"sentences": ["《金刚经》说：“应无所住而生其心。”"]})).json()["items"][0]
+    assert item["prefix"] == "《金刚经》说："
+    assert item["result"]["verdict"] == "sutra"
+    assert item["result"]["segments"][0]["sources"][0]["cbeta_id"] == "T0235"
