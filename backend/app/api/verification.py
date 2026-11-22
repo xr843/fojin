@@ -18,8 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.elasticsearch import get_es
 from app.database import get_db
-from app.schemas.verification import ClaimVerdict, QuoteVerdict
-from app.services.claim_check import check_claim, credit_runs
+from app.schemas.verification import ClaimVerdict, QuoteMatch, QuoteVerdict
+from app.services.claim_check import attribute_by_context, check_claim, credit_runs
 from app.services.quote_lookup import (
     MIN_LOOKUP_QUOTE_CHARS,
     QuoteTooShortError,
@@ -85,6 +85,9 @@ TraceSentence = Annotated[str, StringConstraints(min_length=1, max_length=200)]
 
 class TraceRequest(BaseModel):
     sentences: list[TraceSentence] = Field(..., min_length=1, max_length=TRACE_MAX_SENTENCES)
+    # 上一批的主出处（上一次响应的 dominant，原样送回）：一段文字跨批时，常见短句
+    # 仍按这段原文的出处认（见 attribute_by_context）。
+    prefer: QuoteMatch | None = None
 
 
 class TraceItem(BaseModel):
@@ -96,6 +99,8 @@ class TraceItem(BaseModel):
 
 class TraceResponse(BaseModel):
     items: list[TraceItem]
+    # 这一批（连同 prefer）主要出自的那一卷；页面在下一批里作为 prefer 送回。
+    dominant: QuoteMatch | None = None
 
 
 @router.post("/trace", response_model=TraceResponse)
@@ -121,4 +126,6 @@ async def trace_endpoint(
             items.append(TraceItem(text=sentence, skipped="too_short"))
         except SearchUnavailableError as exc:
             raise HTTPException(status_code=503, detail="search temporarily unavailable") from exc
-    return TraceResponse(items=items)
+    attributed, dominant = await attribute_by_context(db, [i.result for i in items], body.prefer)
+    items = [i.model_copy(update={"result": r}) for i, r in zip(items, attributed, strict=True)]
+    return TraceResponse(items=items, dominant=dominant)
