@@ -1,5 +1,7 @@
 // fojin.ai 首页「这段话，出自佛经吗？」——把一段文字切成句子，分批送
-// POST https://fojin.app/api/verify/trace（一次最多 8 句），边查边显示。
+// POST /api/verify/trace（一次最多 8 句），边查边显示。同域请求：在 fojin.ai 上由
+// 边缘脚本代转到 fojin.app（跨域直连会撞上宿主 nginx 叠加的 CORS 头，浏览器拒收），
+// 在 fojin.app 上直接到后端。
 // 每句的判定与 /verify 页同一套（app/services/claim_check.py）：
 //   sutra 出自佛经 · not_sutra 出自论/注疏/祖师著作… · variant 用字略异
 //   partial 部分见于藏经 · absent 藏经中未见
@@ -7,7 +9,7 @@
 (function () {
   "use strict";
 
-  var API = "https://fojin.app/api/verify/trace";
+  var API = "/api/verify/trace";
   var BATCH = 8;            // 与后端 TRACE_MAX_SENTENCES 一致
   var MAX_SENTENCES = 40;
   var MAX_SENTENCE_CHARS = 200;
