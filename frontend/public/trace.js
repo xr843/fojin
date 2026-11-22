@@ -97,6 +97,17 @@
     return out;
   }
 
+  // 「佛说：」「经云：」「《金刚经》说：」这类引语前缀不是引文本身——并进去查，
+  // 「佛说一切有为法」会落到恰好也这么写的别的经上。前缀单独显示、不送去核对。
+  var ATTRIBUTION = /^([^，。；：:「“"]{0,14}?(?:说|說|云|曰|言|道|讲|講|有言|有云)(?:过|過)?)\s*[：:，,]\s*/;
+  function splitAttribution(sentence) {
+    var m = sentence.match(ATTRIBUTION);
+    if (!m) return { prefix: "", body: sentence };
+    var body = sentence.slice(m[0].length);
+    if (hanCount(body) < 4) return { prefix: "", body: sentence };
+    return { prefix: m[0], body: body };
+  }
+
   function el(tag, cls, text) {
     var n = document.createElement(tag);
     if (cls) n.className = cls;
@@ -135,17 +146,18 @@
     }
   }
 
-  function renderItem(li, item) {
+  function renderItem(li, item, prefix) {
     li.className = "";
     li.textContent = "";
     if (!item.result) {
       li.className = "k-skip";
-      li.appendChild(el("div", "s", item.text));
+      li.appendChild(el("div", "s", (prefix || "") + item.text));
       return "skip";
     }
     var r = item.result;
     li.className = "k-" + r.verdict;
     var s = el("div", "s");
+    if (prefix) s.appendChild(el("span", "pre", prefix));
     if (r.verdict === "partial") {
       // 分句着色：找到的照常显示，藏经中找不到的加虚线、变灰。在原句里按顺序
       // 定位每个分句，保留原来的标点；定位不到（分句是并接过的碎片）就逐段拼出。
@@ -168,7 +180,7 @@
       }
       pieces.forEach(function (p) { s.appendChild(el("span", p[1] ? null : "miss", p[0])); });
     } else {
-      s.textContent = item.text;
+      s.appendChild(document.createTextNode(item.text));
     }
     li.appendChild(s);
     var meta = el("div", "meta");
@@ -242,6 +254,8 @@
     go.disabled = true;
     track("trace_submit", { n: sentences.length, link: fromLink ? 1 : 0 });
 
+    var parts = sentences.map(splitAttribution);
+    var bodies = parts.map(function (p) { return p.body; });
     var items = sentences.map(function (t) {
       var li = el("li", "pending");
       li.appendChild(el("div", "s", t));
@@ -256,9 +270,9 @@
     for (var b = 0; b < sentences.length; b += BATCH) {
       (function (start) {
         chain = chain.then(function () {
-          return post(sentences.slice(start, start + BATCH), 0).then(function (data) {
+          return post(bodies.slice(start, start + BATCH), 0).then(function (data) {
             (data.items || []).forEach(function (item, j) {
-              var kind = renderItem(items[start + j], item);
+              var kind = renderItem(items[start + j], item, parts[start + j].prefix);
               if (kind !== "skip") tally[kind] = (tally[kind] || 0) + 1;
             });
             done = Math.min(start + BATCH, sentences.length);

@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.elasticsearch import get_es
 from app.database import get_db
 from app.schemas.verification import ClaimVerdict, QuoteVerdict
-from app.services.claim_check import check_claim
+from app.services.claim_check import check_claim, credit_runs
 from app.services.quote_lookup import (
     MIN_LOOKUP_QUOTE_CHARS,
     QuoteTooShortError,
@@ -115,7 +115,8 @@ async def trace_endpoint(
             items.append(TraceItem(text=sentence, skipped="too_short"))
             continue
         try:
-            items.append(TraceItem(text=sentence, result=await check_claim(db, es, sentence)))
+            verdict = await credit_runs(db, es, await check_claim(db, es, sentence))
+            items.append(TraceItem(text=sentence, result=verdict))
         except QuoteTooShortError:
             items.append(TraceItem(text=sentence, skipped="too_short"))
         except SearchUnavailableError as exc:

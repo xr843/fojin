@@ -384,3 +384,20 @@ def test_trace_endpoint_is_strict_rate_limited():
     assert STRICT_PATHS["/api/verify/trace"] == settings.rate_limit_verify_trace
     # 一次最多 8 句、每句最多 9 次查找：必须比单句核对的额度更紧
     assert settings.rate_limit_verify_trace <= settings.rate_limit_verify_claim
+
+
+async def test_trace_credits_adjacent_found_clauses_to_where_they_occur_together(monkeypatch, fake_lookup):
+    """「一切有为法」alone first occurs in an early sūtra that happens to use the
+    phrase; the line people mean — 「一切有为法，如梦幻泡影」— is the Diamond
+    Sūtra's. A partial sentence must re-check each run of adjacent found clauses
+    as one string and show where the run occurs (seen in the browser, 2026-11-22)."""
+    from app.api import verification
+
+    monkeypatch.setattr(verification, "get_es", lambda: None)
+    monkeypatch.setitem(TABLE, "一切有为法", [_match("T0003", "毘婆尸佛經", "sutra", 3)])
+    resp = await _post("/api/verify/trace", {"sentences": ["一切有为法，如梦幻泡影，看开便是福"]})
+    segs = resp.json()["items"][0]["result"]["segments"]
+    assert resp.json()["items"][0]["result"]["verdict"] == "partial"
+    assert [s["found"] for s in segs] == [True, True, False]
+    assert segs[0]["sources"][0]["cbeta_id"] == "T0235"
+    assert segs[1]["sources"][0]["cbeta_id"] == "T0235"
