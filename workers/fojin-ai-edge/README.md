@@ -12,11 +12,34 @@ redirects, it is this worker, not a rule.
 | --- | --- |
 | `/sw.js` | A service worker whose only job is to drop every cache, unregister itself, and navigate the client to fojin.app |
 | `/registerSW.js` | The same clean-up from the page side, for clients that fetch the vite-pwa register shim |
-| `/`, `/trace.js` | **fojin.ai's home page** — 引文溯源 (「这段话，出自佛经吗？」): `frontend/public/trace.html` + `trace.js`, fetched from `https://fojin.app`. The page calls `https://fojin.app/api/verify/trace` directly (CORS allows fojin.ai; the CSP's `connect-src` lists fojin.app). Falls back to **302 → `https://fojin.app/verify`** |
+| `/`, `/trace.js` | **fojin.ai's home page** — 引文溯源 (「这段话，出自佛经吗？」): `frontend/public/trace.html` + `trace.js`, fetched from `https://fojin.app`. Falls back to **302 → `https://fojin.app/verify`** |
+| `POST /api/verify/trace` | Passed through to `https://fojin.app/api/verify/trace` with fojin.app's CORS headers removed. The page calls its own origin because calling fojin.app cross-origin fails: the host nginx adds `Access-Control-Allow-Origin: *` to every `/api/` response on top of FastAPI's `https://fojin.ai`, and browsers reject the doubled header (`deploy/host-nginx/README.md`, known conflict 2). Cost: rate limiting sees this worker, so fojin.ai visitors share one window |
 | `/masters`, `/_site/*`, `/robots.txt`, `/sitemap.xml` | The Master-skill catalogue (its site's `/` served at `/masters`) and fojin.ai's crawler files, forwarded from `https://master-skill.pages.dev` (built from [Master-skill](https://github.com/xr843/Master-skill) `site/`, published on every push to its `main`). Edit the page there, not here. If that site does not answer 200, `/masters` falls back to 302 → the Master-skill README |
 | `/developers` | The developer portal (MCP endpoint, API, CLI): `frontend/public/agents.html`, fetched from `https://fojin.app/agents.html` (not `/agents`, which 301s back here). Falls back to 302 → `https://fojin.app/docs` |
 | `/theme-init.js`, `/favicon.svg`, `/fonts/MaShanZheng-title-v2.woff2` | Proxied from fojin.app — same-origin assets the pages load; the CSP (`'self'`) would block them if redirected off-origin |
 | everything else | **301 → `https://fojin.app<path><query>`** |
+
+## Where to edit fojin.ai
+
+fojin.ai is one site built from two repositories. **This repository (FoJin) is
+the default home for fojin.ai changes**; only the master catalogue lives in
+Master-skill, because it is generated from that repo's own data (persona
+metadata, skill catalogue, install commands — its tests fail when a persona
+has no card).
+
+| Change | Edit in | Goes live |
+| --- | --- | --- |
+| Home page `/` (引文溯源) | here — `frontend/public/trace.html`, `trace.js` (**bump `?v=` in trace.html whenever trace.js changes**: Cloudflare keeps `.js` for 4 hours across deploys) | merge → deploy.sh |
+| The check itself (`/api/verify/trace`, `/claim`) | here — `backend/app/api/verification.py`, `services/claim_check.py` | merge → deploy.sh |
+| `/developers` | here — `frontend/public/agents.html` | merge → deploy.sh |
+| Routing (which path serves what), headers, CSP | here — `workers/fojin-ai-edge/src/index.js` | merge, then **`npx wrangler deploy` by hand** |
+| `/masters` (the master catalogue) | [Master-skill](https://github.com/xr843/Master-skill) `site/` | merge → Cloudflare Pages |
+| Shared header nav, palette | **all three pages**: `trace.html`, `agents.html`, Master-skill `site/template.html` — they are separate copies today | each repo's own path |
+
+The pages here load `/_site/theme.js` and `/_site/site.js` (light/dark toggle)
+from the Master-skill site. Consolidating the shared header, palette and theme
+script into this repo is the planned clean-up, due the next time the header
+changes.
 
 ### Why the kill-switch still matters
 
