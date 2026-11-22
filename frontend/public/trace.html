@@ -22,7 +22,10 @@
      counts each visitor's own IP. -->
 <script src="/_site/theme.js"></script>
 <script defer src="/_site/site.js"></script>
-<script defer src="/trace.js"></script>
+<!-- ?v= busts Cloudflare's edge cache, which keeps .js for 4 hours across
+     deploys. Bump it whenever trace.js changes (the fojin.ai worker passes the
+     query through to fojin.app). -->
+<script defer src="/trace.js?v=2"></script>
 <script defer src="https://analytics.fojin.app/script.js" data-website-id="c757a04c-82e0-4f53-a720-830b0e1a7287"></script>
 <style>
   :root {
