@@ -612,7 +612,8 @@ describe("注疏反查", () => {
     it("取整卷原文渲染在右栏，不请求段落上下文", async () => {
       juan("前文一句。佛印可此問：大善快問。後文一句。");
       renderDrawer({ target: { ...JUAN_TARGET, quote: "大善快問" } });
-      await waitFor(() => expect(document.querySelector("mark.chat-citation-quote-mark")?.textContent).toBe("大善快問"));
+      // 引文止于句末：连原文的句号一起亮（2026-11-22 起）
+      await waitFor(() => expect(document.querySelector("mark.chat-citation-quote-mark")?.textContent).toBe("大善快問。"));
       expect(mockContext).not.toHaveBeenCalled();
     });
 
@@ -632,3 +633,40 @@ describe("注疏反查", () => {
   });
 });
 
+
+// 2026-11-22 用户截图：问答页原文面板高亮停在「法門」，句号在外；「在阅读器中打开」只按
+// 文本块大致定位、一闪而过。现在：引文止于句末就带上句号；链接带上引文，阅读器整句常亮。
+describe("CitationDrawer：句末标点与「在阅读器中打开」", () => {
+  const ctx = {
+    text_id: 7067,
+    juan_num: 1,
+    title_zh: "占察善惡業報經",
+    center_chunk_index: 0,
+    radius: 2,
+    chunks: [chunk(0, "如是我聞：一時，婆伽婆一切智人，演說甚深根聚法門。爾時，會中有一菩薩", true)],
+    has_more_before: false,
+    has_more_after: true,
+  };
+
+  function renderWithQuote(quote: string) {
+    mockContext.mockResolvedValue(ctx as never);
+    return renderDrawer({ target: { textId: 7067, juanNum: 1, chunkIndex: 0, titleZh: "占察善惡業報經", quote } });
+  }
+
+  it("引文止于原文句末时，高亮带上句号", async () => {
+    renderWithQuote("一時，婆伽婆一切智人，演說甚深根聚法門");
+    await waitFor(() =>
+      expect(document.querySelector("mark.chat-citation-quote-mark")?.textContent).toBe(
+        "一時，婆伽婆一切智人，演說甚深根聚法門。",
+      ),
+    );
+  });
+
+  it("「在阅读器中打开」带上引文，阅读器据此整句高亮", async () => {
+    renderWithQuote("一時，婆伽婆一切智人，演說甚深根聚法門");
+    const link = await screen.findByRole("link", { name: /在阅读器中打开/ });
+    const href = link.getAttribute("href")!;
+    expect(href).toContain("/texts/7067/read?juan=1&highlight_chunk=0");
+    expect(new URLSearchParams(href.split("?")[1]).get("quote")).toBe("一時，婆伽婆一切智人，演說甚深根聚法門");
+  });
+});

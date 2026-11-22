@@ -5,6 +5,7 @@ import {
   pickSourceForQuote,
   findQuoteSpan,
   findQuoteSpans,
+  extendToSentenceEnd,
 } from "./citationMatch";
 import type { ChatSource } from "../api/client";
 
@@ -108,5 +109,43 @@ describe("findQuoteSpans — characters whose 繁→简 fold changes UTF-16 leng
     const hay = `前文。淋過死${COMPAT_HUI}無力，喻聲聞妄修。後文`;
     const [[s, e]] = findQuoteSpans(hay, "淋過死灰無力，喻聲聞妄修");
     expect(hay.slice(s, e)).toBe(`淋過死${COMPAT_HUI}無力，喻聲聞妄修`);
+  });
+});
+
+// 2026-11-22 用户截图：问答页原文面板高亮停在「法門」，句号露在外面——引文取自回答里的
+// 「……」，本身不带句号。所查内容恰好到原文一句话的末尾时，把句末标点一并亮上。
+describe("extendToSentenceEnd", () => {
+  const text = "如是我聞：一時，婆伽婆一切智人，演說甚深根聚法門。爾時，會中";
+
+  it("所查内容止于句末时，带上原文的句号", () => {
+    const span = findQuoteSpan(text, "一時，婆伽婆一切智人，演說甚深根聚法門")!;
+    const [lo, hi] = extendToSentenceEnd(text, span);
+    expect(text.slice(lo, hi)).toBe("一時，婆伽婆一切智人，演說甚深根聚法門。");
+  });
+
+  it("后面是逗号（句子没完）时不扩展", () => {
+    const span = findQuoteSpan(text, "一時，婆伽婆一切智人")!;
+    const [lo, hi] = extendToSentenceEnd(text, span);
+    expect(text.slice(lo, hi)).toBe("一時，婆伽婆一切智人");
+  });
+
+  it("前面有开引号时，句号后的闭引号与开引号一起亮", () => {
+    const t = "佛言：「善男子！隨汝所問，便可說之。」堅淨信";
+    const span = findQuoteSpan(t, "善男子！隨汝所問，便可說之")!;
+    const [lo, hi] = extendToSentenceEnd(t, span);
+    expect(t.slice(lo, hi)).toBe("「善男子！隨汝所問，便可說之。」");
+  });
+
+  it("前面没有开引号时，不单独亮闭引号", () => {
+    const t = "佛言：「善男子！隨汝所問，便可說之。」堅淨信";
+    const span = findQuoteSpan(t, "隨汝所問，便可說之")!;
+    const [lo, hi] = extendToSentenceEnd(t, span);
+    expect(t.slice(lo, hi)).toBe("隨汝所問，便可說之。");
+  });
+
+  it("已经带着句号的不重复扩展", () => {
+    const span = findQuoteSpan(text, "演說甚深根聚法門。")!;
+    const [lo, hi] = extendToSentenceEnd(text, span);
+    expect(text.slice(lo, hi)).toBe("演說甚深根聚法門。");
   });
 });

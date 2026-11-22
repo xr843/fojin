@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo, type ReactNode } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router";
+import { extendToSentenceEnd, findQuoteSpans } from "../utils/citationMatch";
 import { useTranslation } from "react-i18next";
 import { Helmet } from "react-helmet-async";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -808,6 +809,31 @@ export default function TextReaderPage() {
     else window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
+  // ?hl=<起>-<止>：fojin.ai / 核对页算出的所查整句（正文码位偏移，止含末字）。换成 UTF-16 偏移。
+  const hlParam = searchParams.get("hl");
+  // ?quote=<引文>：问答页原文面板的「在阅读器中打开」。用面板同一套匹配在整卷里找，
+  // 先找被引文本块附近（highlight_chunk 约在第 N×450 字），免得短句认到别处。
+  const quoteParam = searchParams.get("quote");
+  const quoteSpan = useMemo<QuoteSpan | null>(() => {
+    const raw = content?.content;
+    const m = hlParam ? /^(\d+)-(\d+)$/.exec(hlParam) : null;
+    if (raw && !m && quoteParam) {
+      const near = highlightChunkIndex !== null && highlightChunkIndex >= 0 ? Math.max(0, highlightChunkIndex * 450 - 600) : 0;
+      let spans = findQuoteSpans(raw.slice(near), quoteParam).map(([a, b]) => [a + near, b + near] as [number, number]);
+      if (!spans.length && near > 0) spans = findQuoteSpans(raw, quoteParam);
+      if (!spans.length) return null;
+      const [start, end] = extendToSentenceEnd(raw, [spans[0][0], spans[spans.length - 1][1]]);
+      return end - start <= 2000 ? { start, end } : null;
+    }
+    if (!raw || !m) return null;
+    const first = Number(m[1]);
+    const last = Number(m[2]);
+    const map = cpToU16Map(raw);
+    // map 比码位数多一项（末尾）；last 必须是正文里的一个字，一句不会超过 2000 字。
+    if (last < first || last + 1 >= map.length || last - first > 2000) return null;
+    return { start: map[first], end: map[last + 1] };
+  }, [hlParam, quoteParam, highlightChunkIndex, content?.content]);
+
   // Deep-link from the chat citation drawer: ?highlight_chunk=N
   // Chunks are 500 chars wide with 50-char overlap (see scripts/archive/misc/generate_embeddings.py),
   // so chunk N starts at approximately char N * 450 in the juan body. After the
@@ -818,6 +844,8 @@ export default function TextReaderPage() {
   useEffect(() => {
     if (highlightChunkIndex === null || !Number.isFinite(highlightChunkIndex) || highlightChunkIndex < 0) return;
     if (!content?.content) return;
+    // 找到了引文本身：由整句高亮负责精确滚动，不再按文本块比例大致滚。
+    if (quoteSpan) return;
     const key = `${textId}-${juanNum}-${highlightChunkIndex}`;
     if (lastHighlightedChunkRef.current === key) return;
     lastHighlightedChunkRef.current = key;
@@ -840,7 +868,7 @@ export default function TextReaderPage() {
       else window.scrollBy({ top: delta, behavior: "smooth" });
     });
     return () => cancelAnimationFrame(raf);
-  }, [highlightChunkIndex, content, textId, juanNum]);
+  }, [highlightChunkIndex, content, textId, juanNum, quoteSpan]);
 
   const { data: compareContent, isLoading: compareLoading } = useQuery({
     queryKey: ["juanContent", textId, juanNum, compareLang],
@@ -911,19 +939,6 @@ export default function TextReaderPage() {
     return lineAnchorData.anchors.map((a) => ({ off: conv(a.char_offset), ref: a.line_ref }));
   }, [lineAnchorData, content?.content]);
 
-  // ?hl=<起>-<止>：fojin.ai / 核对页算出的所查整句（正文码位偏移，止含末字）。换成 UTF-16 偏移。
-  const hlParam = searchParams.get("hl");
-  const quoteSpan = useMemo<QuoteSpan | null>(() => {
-    const raw = content?.content;
-    const m = hlParam ? /^(\d+)-(\d+)$/.exec(hlParam) : null;
-    if (!raw || !m) return null;
-    const first = Number(m[1]);
-    const last = Number(m[2]);
-    const map = cpToU16Map(raw);
-    // map 比码位数多一项（末尾）；last 必须是正文里的一个字，一句不会超过 2000 字。
-    if (last < first || last + 1 >= map.length || last - first > 2000) return null;
-    return { start: map[first], end: map[last + 1] };
-  }, [hlParam, content?.content]);
 
   // CBETA 参考数据（静态文件，见 backend/scripts/build_cbeta_reader_refs.py）：
   // 册号表（引用的「T08, no. 235」与行首「T08n0235_p0749a05」）和品/分目次。
