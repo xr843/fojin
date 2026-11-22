@@ -199,14 +199,14 @@ export default function MasterGallery({ selectedId, onSelect, onOpenSource }: Pr
           );
         })}
       </div>
-      {/* fojin.ai is the Master-skill home (install into Claude Code / Codex /
-          Cursor). This gallery is where those same masters run on the web —
+      {/* fojin.ai/masters is the Master-skill catalogue (install into Claude
+          Code / Codex / Cursor; fojin.ai/ itself is the 引文溯源 page). This gallery is where those same masters run on the web —
           and the only web entry fojin.ai links into — so the two point at
           each other. */}
       <p className="mg-footer">
         {t("chat.gallery_install_hint")}{" "}
         <a
-          href="https://fojin.ai/?utm_source=fojin.app&utm_medium=gallery"
+          href="https://fojin.ai/masters?utm_source=fojin.app&utm_medium=gallery"
           target="_blank"
           rel="noopener"
           onClick={() => {

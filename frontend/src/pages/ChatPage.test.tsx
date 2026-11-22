@@ -268,7 +268,7 @@ describe("ChatPage 首屏结构", () => {
         expect(a).not.toBeNull();
         return a!;
       });
-      expect(link.href).toContain("https://fojin.ai/");
+      expect(link.href).toContain("https://fojin.ai/masters");
       fireEvent.click(link);
       expect(track).toHaveBeenCalledWith("master_gallery_to_fojin_ai");
       fireEvent.click(await waitFor(() => {
