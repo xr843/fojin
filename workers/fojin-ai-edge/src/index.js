@@ -202,7 +202,10 @@ export default {
 
     const upstreamPath = PORTAL_PROXY.get(url.pathname);
     if (upstreamPath && readOnly) {
-      const served = await proxyFromApp(upstreamPath, request);
+      // /trace.js?v=N: the query is the cache-buster for Cloudflare's 4-hour
+      // .js cache at fojin.app, so it must reach fojin.app.
+      const upstream = url.pathname === "/trace.js" ? upstreamPath + url.search : upstreamPath;
+      const served = await proxyFromApp(upstream, request);
       const isPage = url.pathname === "/developers" || url.pathname === "/" || url.pathname === "/index.html";
       if (served && isPage) {
         // A fojin.ai page now (same header, same /_site/ scripts as the home
