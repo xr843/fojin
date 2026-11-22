@@ -48,10 +48,22 @@ def _index(content: str) -> tuple[str, list[int]]:
     return "".join(chars), origin
 
 
+_OPENERS = set("「『“‘《〈（(〔［[")
+_MAX_EDGE_PUNCT = 3
+
+
+def _is_punct(ch: str) -> bool:
+    # Anything the normaliser drops (punctuation, spaces) counts; a Han
+    # character or a letter never does.
+    return ch.strip() != "" and _norm_char(ch) == ""
+
+
 def locate_span(content: str, quote: str, index: tuple[str, list[int]] | None = None) -> tuple[int, int] | None:
     """Offsets in ``content`` of the quote's first and last character
     (inclusive), compared in normalised space. Punctuation the source has
-    inside the quote is covered; punctuation after its last character is not."""
+    inside the quote is covered. Punctuation at its edges is covered only when
+    the quote itself has some there — 「……法門。」 highlights the source's 。
+    too (user screenshot, 2026-11-22), a bare clause 「……法門」 does not."""
     needle = _normalise(quote)
     if not needle:
         return None
@@ -59,7 +71,19 @@ def locate_span(content: str, quote: str, index: tuple[str, list[int]] | None = 
     at = normalised.find(needle)
     if at < 0:
         return None
-    return origin[at], origin[at + len(needle) - 1]
+    first, last = origin[at], origin[at + len(needle) - 1]
+    stripped = quote.strip()
+    if stripped and _is_punct(stripped[-1]):
+        k = 0
+        while k < _MAX_EDGE_PUNCT and last + 1 < len(content) and _is_punct(content[last + 1]):
+            last += 1
+            k += 1
+    if stripped and stripped[0] in _OPENERS:
+        k = 0
+        while k < _MAX_EDGE_PUNCT and first > 0 and content[first - 1] in _OPENERS:
+            first -= 1
+            k += 1
+    return first, last
 
 
 def locate_offset(content: str, quote: str, index: tuple[str, list[int]] | None = None) -> int | None:
@@ -68,10 +92,10 @@ def locate_offset(content: str, quote: str, index: tuple[str, list[int]] | None 
     return span[0] if span else None
 
 
-# (text_id, juan) → (normalised text, source offsets, line markers). A sentence
+# (text_id, juan) → (content, normalised text, source offsets, line markers). A sentence
 # split into clauses, or a page of sentences from one sūtra, hits the same
 # fascicle again and again; a few dozen entries cover a request comfortably.
-_FASCICLES: dict[tuple[int, int], tuple[str, list[int], list[tuple[int, str]]]] = {}
+_FASCICLES: dict[tuple[int, int], tuple[str, str, list[int], list[tuple[int, str]]]] = {}
 _FASCICLES_MAX = 32
 
 
@@ -113,12 +137,12 @@ async def locate_quote(
             ).all()
         ]
         normalised, origin = _index(content)
-        cached = (normalised, origin, anchors)
+        cached = (content, normalised, origin, anchors)
         if len(_FASCICLES) >= _FASCICLES_MAX:
             _FASCICLES.pop(next(iter(_FASCICLES)))
         _FASCICLES[key] = cached
-    normalised, origin, anchors = cached
-    span = locate_span("", quote, index=(normalised, origin))
+    content, normalised, origin, anchors = cached
+    span = locate_span(content, quote, index=(normalised, origin))
     if span is None:
         return None
     ref = nearest_line(anchors, span[0])

@@ -44,3 +44,29 @@ def test_span_starts_mid_line_not_at_the_line_start():
     content = "如是我聞：一時，婆伽婆一切智人，在王舍城"
     first, last = locate_span(content, "一时，婆伽婆一切智人")
     assert content[first : last + 1] == "一時，婆伽婆一切智人"
+
+
+# 2026-11-22 用户截图：查「……演說甚深根聚法門。」，阅读器高亮停在「法門」，句号露在外面。
+def test_span_takes_in_the_sources_closing_punctuation_when_the_quote_ends_with_one():
+    content = "如是我聞：一時，婆伽婆一切智人，演說甚深根聚法門。爾時，會中"
+    first, last = locate_span(content, "一時，婆伽婆一切智人，演說甚深根聚法門。")
+    assert content[first : last + 1] == "一時，婆伽婆一切智人，演說甚深根聚法門。"
+
+
+def test_closing_quote_marks_after_the_full_stop_are_taken_too():
+    content = "佛言：「善男子！隨汝所問，便可說之。」堅淨信"
+    first, last = locate_span(content, "「隨汝所問，便可說之。」")
+    assert content[first : last + 1] == "隨汝所問，便可說之。」"
+
+
+def test_opening_quote_mark_is_taken_when_the_quote_starts_with_one():
+    content = "佛言：「善男子！隨汝所問。」"
+    first, last = locate_span(content, "「善男子！")
+    assert content[first : last + 1] == "「善男子！"
+
+
+def test_no_trailing_punctuation_in_the_quote_means_no_extension():
+    # clause-level checks send bare text; the highlight must not grow past it
+    content = "演說甚深根聚法門。爾時"
+    first, last = locate_span(content, "演說甚深根聚法門")
+    assert content[first : last + 1] == "演說甚深根聚法門"
