@@ -534,3 +534,42 @@ async def test_trace_endpoint_takes_prefer_and_returns_the_dominant_text(monkeyp
     body = resp.json()
     assert body["items"][0]["result"]["segments"][0]["sources"][0]["cbeta_id"] == "T0235"
     assert body["dominant"]["cbeta_id"] == "T0235"
+
+
+# ── 2026-11-22 跟进：引语前缀改在后端判断；上下文投票看全部出处 ──────────────
+
+HEART = _match("T0251", "般若波羅蜜多心經", "sutra", 9)
+DAIBANNYA = _match("T0220c", "大般若波羅蜜多經", "sutra", 220, juan=480)
+
+
+async def test_canon_text_with_a_speech_marker_is_checked_whole(monkeypatch, fake_lookup):
+    # 「論曰：」is part of the 俱舍論 itself: keep it when the whole line is there
+    from app.api import verification
+
+    monkeypatch.setattr(verification, "get_es", lambda: None)
+    monkeypatch.setitem(TABLE, "論曰：今欲造論，為顯自師", [_match("T1558", "阿毘達磨俱舍論", "treatise", 38)])
+    item = (await _post("/api/verify/trace", {"sentences": ["論曰：今欲造論，為顯自師"]})).json()["items"][0]
+    assert item["result"]["verdict"] == "not_sutra"
+    assert item.get("prefix") in (None, "")
+
+
+async def test_a_modern_attribution_is_dropped_when_the_whole_line_is_not_found(monkeypatch, fake_lookup):
+    from app.api import verification
+
+    monkeypatch.setattr(verification, "get_es", lambda: None)
+    item = (await _post("/api/verify/trace", {"sentences": ["佛言：「一切有为法，如梦幻泡影。」"]})).json()["items"][0]
+    assert item["prefix"] == "佛言："
+    assert item["result"]["verdict"] == "sutra"
+    assert item["result"]["segments"][0]["sources"][0]["cbeta_id"] == "T0235"
+
+
+async def test_every_listed_source_votes_so_two_lines_of_one_sutra_agree(monkeypatch, fake_lookup):
+    from app.services.claim_check import attribute_by_context
+
+    _ctx(monkeypatch, located_in=(9, 1))
+    monkeypatch.setitem(TABLE, "观自在菩萨，行深般若波罗蜜多时", [HEART])
+    monkeypatch.setitem(TABLE, "舍利子，色不异空，空不异色", [DAIBANNYA, HEART])
+    verdicts = [await check_claim(None, None, q) for q in ("观自在菩萨，行深般若波罗蜜多时", "舍利子，色不异空，空不异色")]
+    out, dominant = await attribute_by_context(None, verdicts, prefer=None)
+    assert dominant.cbeta_id == "T0251"
+    assert out[1].segments[0].sources[0].cbeta_id == "T0251"

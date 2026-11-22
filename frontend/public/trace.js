@@ -99,61 +99,20 @@
     return out;
   }
 
-  // 「佛说：」「经云：」「《金刚经》说：」这类引语前缀不是引文本身——并进去查，
-  // 「佛说一切有为法」会落到恰好也这么写的别的经上。前缀单独显示、不送去核对。
-  var ATTRIBUTION = /^([^，。；：:「“"]{0,14}?(?:说|說|云|曰|言|道|讲|講|有言|有云)(?:过|過)?)\s*[：:，,]\s*/;
-  function splitAttribution(sentence) {
-    var m = sentence.match(ATTRIBUTION);
-    if (!m) return { prefix: "", body: sentence };
-    var body = sentence.slice(m[0].length);
-    if (hanCount(body) < 4) return { prefix: "", body: sentence };
-    return { prefix: m[0], body: body };
+  // 引语前缀（「佛说：」「经云：」）由后端判断：先整句核对（「論曰：」常是原文的一部分），
+  // 整句找不到才去掉前缀重查，并在 item.prefix 里告诉页面——这里只负责把它灰显。
+  function bodyOf(item) {
+    var p = item.prefix || "";
+    return p && item.text.indexOf(p) === 0 ? item.text.slice(p.length) : item.text;
   }
 
-  function el(tag, cls, text) {
-    var n = document.createElement(tag);
-    if (cls) n.className = cls;
-    if (text != null) n.textContent = text;
-    return n;
-  }
-
-  function sourceLink(src, close) {
-    var title = src.title_zh || src.cbeta_id || "原典";
-    var label = "《" + title + "》" + (src.juan_num ? "卷" + src.juan_num : "");
-    if (!src.reader_url) return el("span", null, label);
-    var a = el("a", null, label);
-    a.href = src.reader_url + (src.reader_url.indexOf("?") < 0 ? "?" : "&") + "utm_source=fojin.ai&utm_medium=trace";
-    a.target = "_blank";
-    a.rel = "noopener";
-    if (close) a.title = "藏经原文与这句用字略有不同";
-    return a;
-  }
-
-  function firstSource(result) {
-    var segs = result.segments || [];
-    for (var i = 0; i < segs.length; i++) {
-      if (segs[i].found && segs[i].sources && segs[i].sources.length) return { src: segs[i].sources[0] };
-      if (segs[i].close) return { src: segs[i].close, close: true };
-    }
-    return null;
-  }
-
-  function tagText(result) {
-    switch (result.verdict) {
-      case "sutra": return "出自佛经";
-      case "not_sutra": return "出自" + (CLASS_LABEL[result.source_class] || "其他典籍");
-      case "variant": return "经中有此句，用字略异";
-      case "partial": return "部分见于藏经";
-      default: return "藏经中未见";
-    }
-  }
-
-  function renderItem(li, item, prefix) {
+  function renderItem(li, item) {
+    var prefix = item.prefix || "";
     li.className = "";
     li.textContent = "";
     if (!item.result) {
       li.className = "k-skip";
-      li.appendChild(el("div", "s", (prefix || "") + item.text));
+      li.appendChild(el("div", "s", item.text));
       return "skip";
     }
     var r = item.result;
@@ -163,7 +122,7 @@
     if (r.verdict === "partial") {
       // 分句着色：找到的照常显示，藏经中找不到的加虚线、变灰。在原句里按顺序
       // 定位每个分句，保留原来的标点；定位不到（分句是并接过的碎片）就逐段拼出。
-      var text = item.text, cursor = 0, ok = true, pieces = [];
+      var text = bodyOf(item), cursor = 0, ok = true, pieces = [];
       (r.segments || []).forEach(function (seg) {
         var at = text.indexOf(seg.text, cursor);
         if (at < 0) { ok = false; return; }
@@ -182,7 +141,7 @@
       }
       pieces.forEach(function (p) { s.appendChild(el("span", p[1] ? null : "miss", p[0])); });
     } else {
-      s.appendChild(document.createTextNode(item.text));
+      s.appendChild(document.createTextNode(bodyOf(item)));
     }
     li.appendChild(s);
     var meta = el("div", "meta");
@@ -256,7 +215,7 @@
     return { key: u.pathname + "|" + u.searchParams.get("juan"), first: +m[1], last: +m[2], url: u, src: seg.sources[0] };
   }
 
-  function renderRun(lis, results, parts, locs, i, j) {
+  function renderRun(lis, results, locs, i, j) {
     var head = locs[i];
     var li = lis[i];
     li.className = "k-" + results[i].result.verdict + " run";
@@ -264,7 +223,7 @@
     var s = el("div", "s");
     var whole = "";
     for (var k = i; k <= j; k++) {
-      var piece = (parts[k].prefix || "") + results[k].text;
+      var piece = results[k].text;
       whole += piece;
       s.appendChild(document.createTextNode(piece));
     }
@@ -286,13 +245,13 @@
     var det = el("details", "each");
     det.appendChild(el("summary", null, "逐句查看"));
     var ol = el("ol");
-    for (var n = i; n <= j; n++) ol.appendChild(el("li", null, (parts[n].prefix || "") + results[n].text));
+    for (var n = i; n <= j; n++) ol.appendChild(el("li", null, results[n].text));
     det.appendChild(ol);
     li.appendChild(det);
     for (var r = i + 1; r <= j; r++) lis[r].remove();
   }
 
-  function mergeRuns(lis, results, parts) {
+  function mergeRuns(lis, results) {
     var locs = results.map(locOf);
     var merged = 0;
     var i = 0;
@@ -302,7 +261,7 @@
       while (j + 1 < locs.length && locs[j + 1] && locs[j + 1].key === locs[i].key &&
              locs[j + 1].first > locs[j].last && locs[j + 1].first - locs[j].last - 1 <= RUN_GAP) j++;
       if (j > i) {
-        renderRun(lis, results, parts, locs, i, j);
+        renderRun(lis, results, locs, i, j);
         merged += j - i + 1;
       }
       i = j + 1;
@@ -331,8 +290,6 @@
     go.disabled = true;
     track("trace_submit", { n: sentences.length, link: fromLink ? 1 : 0 });
 
-    var parts = sentences.map(splitAttribution);
-    var bodies = parts.map(function (p) { return p.body; });
     var items = sentences.map(function (t) {
       var li = el("li", "pending");
       li.appendChild(el("div", "s", t));
@@ -349,11 +306,11 @@
     for (var b = 0; b < sentences.length; b += BATCH) {
       (function (start) {
         chain = chain.then(function () {
-          return post(bodies.slice(start, start + BATCH), 0, prefer).then(function (data) {
+          return post(sentences.slice(start, start + BATCH), 0, prefer).then(function (data) {
             prefer = data.dominant || prefer;
             (data.items || []).forEach(function (item, j) {
               results[start + j] = item;
-              var kind = renderItem(items[start + j], item, parts[start + j].prefix);
+              var kind = renderItem(items[start + j], item);
               if (kind !== "skip") tally[kind] = (tally[kind] || 0) + 1;
             });
             done = Math.min(start + BATCH, sentences.length);
@@ -365,7 +322,7 @@
     chain.then(function () {
       var checked = Object.keys(tally).reduce(function (n, k) { return n + tally[k]; }, 0);
       var found = renderSummary(tally, checked);
-      var merged = mergeRuns(items, results, parts);
+      var merged = mergeRuns(items, results);
       if (merged) track("trace_merge", { n: merged });
       status.textContent = dropped ? "只核对了前 " + MAX_SENTENCES + " 句，其余 " + dropped + " 句请分开再贴。" : "";
       if (text.length <= SHARE_MAX_CHARS) share.hidden = false;
