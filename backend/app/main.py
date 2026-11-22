@@ -338,6 +338,13 @@ _cors_origins = os.environ.get(
     "CORS_ORIGINS", "http://localhost:3000,http://localhost:5173,http://localhost:5174"
 ).split(",")
 
+# Order matters: the middleware added LAST is the OUTERMOST. The rate limiter is
+# added first so CORS wraps it — otherwise its 429 leaves without
+# Access-Control-Allow-Origin, the browser cannot read it or its Retry-After, and
+# a cross-origin page (fojin.ai) reports a failure instead of waiting
+# (2026-11-22). Wrapped this way, CORS preflights are also answered before they
+# reach the limiter and no longer spend the budget.
+app.add_middleware(RateLimitMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
@@ -347,7 +354,6 @@ app.add_middleware(
     # 自定义响应头默认对 JS 不可见；不暴露的话跨源部署下续期头会被静默丢弃。
     expose_headers=["X-Renewed-Token"],
 )
-app.add_middleware(RateLimitMiddleware)
 # GZip handled by nginx — removed from backend to avoid compressing SSE streams
 
 
