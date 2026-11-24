@@ -123,6 +123,8 @@ async def _query_module_usage(days: int) -> dict[str, Any]:
         FROM website_event
         WHERE created_at > now() - make_interval(days => :days)
           AND event_name IS NOT NULL
+          -- 同一 Umami 实例还托管别的站（11-24 昆虫站事件占这块看板 73%），只算 fojin
+          AND website_id IN (SELECT website_id FROM website WHERE domain = :domain AND deleted_at IS NULL)
         GROUP BY event_name
         ORDER BY cnt DESC
         """
@@ -136,6 +138,7 @@ async def _query_module_usage(days: int) -> dict[str, Any]:
         WHERE we.event_name = 'search'
           AND ed.data_key = 'keyword'
           AND we.created_at > now() - make_interval(days => :days)
+          AND we.website_id IN (SELECT website_id FROM website WHERE domain = :domain AND deleted_at IS NULL)
         GROUP BY ed.string_value
         ORDER BY cnt DESC
         LIMIT 10
@@ -143,8 +146,9 @@ async def _query_module_usage(days: int) -> dict[str, Any]:
     )
 
     async with AsyncSession(engine) as session:
-        event_rows = (await session.execute(event_sql, {"days": days})).all()
-        keyword_rows = (await session.execute(keyword_sql, {"days": days})).all()
+        params = {"days": days, "domain": settings.umami_site_domain}
+        event_rows = (await session.execute(event_sql, params)).all()
+        keyword_rows = (await session.execute(keyword_sql, params)).all()
 
     counts = {row[0]: int(row[1]) for row in event_rows}
 

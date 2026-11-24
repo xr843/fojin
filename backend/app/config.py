@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     redis_port: int = 6379
     redis_password: str = ""
 
+    # Umami (self-hosted analytics). The same Umami instance also tracks other
+    # sites, so every query against it must be scoped to fojin's website row —
+    # matched by domain so no UUID has to be copied into the environment.
+    umami_site_domain: str = "fojin.app"
+
     # JWT
     jwt_secret_key: str = os.environ.get("JWT_SECRET_KEY", _DEFAULT_JWT_SECRET)
     jwt_algorithm: str = "HS256"
