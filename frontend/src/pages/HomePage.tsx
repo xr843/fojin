@@ -238,11 +238,12 @@ export default function HomePage() {
 
         {/* 热门检索 */}
         <div className="home-hot-tags">
-          <span className="home-hot-label">{t("home.hot_label")}</span>
-          {/* 每日一段放在热门检索第一个：不加行，首页一屏的高度不变 */}
+          {/* 每日一段不是检索词：放在「热门检索」前面、用竖线隔开；同一行，首页一屏高度不变 */}
           <Link to="/daily" className="home-daily-tag" data-umami-event="home_daily">
             {t("daily.home_tag")}
           </Link>
+          <span className="home-hot-divider" aria-hidden="true" />
+          <span className="home-hot-label">{t("home.hot_label")}</span>
           {hotTags.map((tag) => (
             <button
               key={tag}
