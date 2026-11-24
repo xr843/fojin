@@ -86,8 +86,6 @@ export async function renderShareCard(input: ShareCardInput): Promise<Blob> {
   ctx.fillStyle = "#8b2500";
   ctx.font = `500 34px ${SERIF}`;
   ctx.fillText(input.heading, W / 2, 170);
-  ctx.fillStyle = "#b08d57";
-  ctx.fillRect(W / 2 - 40, 200, 80, 3);
 
   // 正文：长段落自动缩字号，保证落在中间区域
   // 经文 + 出处作为一组，在标题与落款之间居中（出处紧跟经文，不再钉在底部、中间空一大片）。
