@@ -139,6 +139,7 @@ async def test_api_roundtrip_and_isolation(db):
         assert r.status_code == 200, r.text
         body = r.json()
         assert body["enabled"] is True and body["notes"] is None and body["max_notes_chars"] == 300
+        assert body["used_in_answers"] is False
         assert [r["title_zh"] for r in body["reading"]] == ["成唯識論", "阿毘達磨俱舍論"]
 
         r = await c.put("/api/study-memory", json={"enabled": True, "notes": "  我在学唯识\n请对照述记  "})
@@ -177,9 +178,20 @@ def test_migration_columns_match_orm():
         assert type(mig[c.name].type).__name__ == type(c.type).__name__, c.name
 
 
-def test_memory_only_on_the_plain_qa_path():
+def test_memory_off_by_default():
+    from app.services import chat
     from app.services.chat import _memory_applies
 
+    assert chat.settings.study_memory_inject is False
+    assert not _memory_applies(1, None, None, "什么是种子？")
+
+
+def test_memory_only_on_the_plain_qa_path(monkeypatch):
+    from app.services import chat
+    from app.services.chat import _memory_applies
+
+    # 改 chat 模块手里那份 settings：别的测试会重载 app.config，全局对象可能已不是同一个
+    monkeypatch.setattr(chat.settings, "study_memory_inject", True)
     assert _memory_applies(1, None, None, "什么是种子？")
     assert not _memory_applies(None, None, None, "什么是种子？")  # 游客
     assert not _memory_applies(1, "xuanzang", None, "什么是种子？")  # 祖师

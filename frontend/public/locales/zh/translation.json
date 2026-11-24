@@ -1974,5 +1974,8 @@
   "study_memory.continue": "接着研读：",
   "study_memory.manage": "小津记得什么 ›",
   "admin_dashboard.module_usage.event.study_memory_continue": "点「接着研读」",
-  "admin_dashboard.module_usage.event.study_memory_save": "保存回答偏好"
+  "admin_dashboard.module_usage.event.study_memory_save": "保存回答偏好",
+  "study_memory.intro_records_only": "这里是你最近 30 天读过的经卷、问过的主题和存过的摘录。新对话首屏的「接着研读」会用到它们，一点就能接着读、接着问。这些记录只有你自己看得到。",
+  "study_memory.on_records_only": "已开启：新对话首屏显示「接着研读」",
+  "study_memory.off_records_only": "已关闭：不显示「接着研读」"
 }

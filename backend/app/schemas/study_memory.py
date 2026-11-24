@@ -34,6 +34,8 @@ class StudyMemoryResponse(BaseModel):
     topics: list[StudyMemoryTopic]
     excerpts: list[StudyMemoryExcerpt]
     max_notes_chars: int = MAX_NOTES_CHARS
+    # 记忆此刻是否进入作答（服务端总开关）。为 false 时前端不说「小津会参考」，也不收偏好。
+    used_in_answers: bool = False
 
 
 class StudyMemoryUpdate(BaseModel):

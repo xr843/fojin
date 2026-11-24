@@ -8,6 +8,7 @@ import httpx
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.core.deps import resolve_optional_user
 from app.core.elasticsearch import get_es
 from app.core.exceptions import (
@@ -475,8 +476,15 @@ async def _mark_attachments_consumed(
 
 
 def _memory_applies(user_id: int | None, master_id: str | None, reading_context: dict | None, message: str) -> bool:
-    """研读记忆只进普通问答路径：登录、无祖师、非阅读页、非元问题（见 services/study_memory.py）。"""
-    return user_id is not None and not master_id and not reading_context and not _is_meta_question(message)
+    """研读记忆只进普通问答路径：登录、无祖师、非阅读页、非元问题（见 services/study_memory.py），
+    且总开关 settings.study_memory_inject 打开（默认关，理由见 config）。"""
+    return (
+        settings.study_memory_inject
+        and user_id is not None
+        and not master_id
+        and not reading_context
+        and not _is_meta_question(message)
+    )
 
 
 async def _prepare_chat(

@@ -24,6 +24,7 @@ const MEM: StudyMemory = {
   ],
   excerpts: [],
   max_notes_chars: 300,
+  used_in_answers: true,
 };
 
 function wrap(ui: React.ReactNode) {
@@ -65,6 +66,16 @@ describe("研读记忆面板", () => {
     wrap(<StudyMemoryPanel />);
     fireEvent.click(await screen.findByRole("switch"));
     await waitFor(() => expect(mockSave).toHaveBeenCalledWith({ enabled: false, notes: "用繁体" }));
+  });
+});
+
+describe("记忆还没进入作答时", () => {
+  it("说明如实写「只用于接着研读」，不收偏好", async () => {
+    mockGet.mockResolvedValue({ ...MEM, used_in_answers: false });
+    wrap(<StudyMemoryPanel />);
+    expect(await screen.findByText(/新对话首屏的「接着研读」会用到它们/)).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "我的回答偏好" })).toBeNull();
+    expect(screen.queryByText(/小津会参考/)).toBeNull();
   });
 });
 

@@ -1974,5 +1974,8 @@
   "study_memory.continue": "Continue:",
   "study_memory.manage": "What Xiaojin remembers ›",
   "admin_dashboard.module_usage.event.study_memory_continue": "Continue-studying clicks",
-  "admin_dashboard.module_usage.event.study_memory_save": "Answer preferences saved"
+  "admin_dashboard.module_usage.event.study_memory_save": "Answer preferences saved",
+  "study_memory.intro_records_only": "Your last 30 days of reading, questions and excerpts. The “Continue” row on a new chat uses them so you can pick up where you left off. Only you can see this.",
+  "study_memory.on_records_only": "On: new chats show “Continue”",
+  "study_memory.off_records_only": "Off: “Continue” is hidden"
 }

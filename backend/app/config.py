@@ -82,6 +82,10 @@ class Settings(BaseSettings):
     vernacular_model: str = "deepseek-v4-flash"
     # /chat：用户贴了经文时，把那段原文所在的检索块放进上下文第 1 位（passage_locator）
     enable_paste_locate: bool = True
+    # 研读记忆是否进入作答（services/study_memory.py）。默认关：2026-11-24 同窗配对评测
+    # （eval/memory_pair_eval.py）引文准确率不降，但首字等待慢约 23%（门槛 15%），且出现
+    # 「你最近在读…」式复述。关着时「接着研读」入口与个人中心记录页照常可用。
+    study_memory_inject: bool = False
     # /chat：会话首问的中文检索臂被 HNSW 漏空时改扫二值量化旁路表（迁移 0186）
     enable_lzh_empty_fallback: bool = True
     # /chat 多轮上下文窗口（prompt_builder._build_llm_messages）。

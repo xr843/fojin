@@ -5,6 +5,7 @@ from dataclasses import asdict
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.core.deps import get_current_user
 from app.database import get_db
 from app.schemas.study_memory import StudyMemoryResponse, StudyMemoryUpdate
@@ -21,6 +22,7 @@ async def _current(db: AsyncSession, user_id: int) -> StudyMemoryResponse:
         reading=[asdict(r) for r in mem.reading],
         topics=[asdict(t) for t in mem.topics],
         excerpts=[asdict(e) for e in mem.excerpts],
+        used_in_answers=settings.study_memory_inject,
     )
 
 

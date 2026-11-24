@@ -890,6 +890,8 @@ export interface StudyMemory {
   topics: { session_id: number; title: string; last_at: string }[];
   excerpts: { text_id: number; title_zh: string; juan_num: number; quote: string }[];
   max_notes_chars: number;
+  /** 记忆此刻是否进入作答（服务端总开关）。false 时不说「小津会参考」，也不显示偏好输入 */
+  used_in_answers: boolean;
 }
 
 export async function getStudyMemory(): Promise<StudyMemory> {

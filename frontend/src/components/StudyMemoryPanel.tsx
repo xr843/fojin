@@ -39,7 +39,9 @@ export default function StudyMemoryPanel() {
 
   return (
     <div className="study-memory">
-      <p className="study-memory-intro">{t("study_memory.intro")}</p>
+      <p className="study-memory-intro">
+        {t(data.used_in_answers ? "study_memory.intro" : "study_memory.intro_records_only")}
+      </p>
 
       <div className="study-memory-switch">
         <Switch
@@ -48,33 +50,40 @@ export default function StudyMemoryPanel() {
           onChange={(on) => save.mutate({ enabled: on, notes: data.notes })}
           aria-label={t("study_memory.switch")}
         />
-        <span>{data.enabled ? t("study_memory.on") : t("study_memory.off")}</span>
+        <span>
+          {data.enabled
+            ? t(data.used_in_answers ? "study_memory.on" : "study_memory.on_records_only")
+            : t(data.used_in_answers ? "study_memory.off" : "study_memory.off_records_only")}
+        </span>
       </div>
 
-      <section className="study-memory-section">
-        <h4>{t("study_memory.notes_title")}</h4>
-        <p className="study-memory-hint">{t("study_memory.notes_hint")}</p>
-        <Input.TextArea
-          value={notes}
-          onChange={(e) => setDraft(e.target.value)}
-          maxLength={data.max_notes_chars}
-          showCount
-          autoSize={{ minRows: 2, maxRows: 5 }}
-          placeholder={t("study_memory.notes_placeholder")}
-          aria-label={t("study_memory.notes_title")}
-        />
-        <Button
-          type="primary"
-          size="small"
-          style={{ marginTop: 8 }}
-          disabled={!dirty}
-          loading={save.isPending}
-          data-umami-event="study_memory_save"
-          onClick={() => save.mutate({ enabled: data.enabled, notes: cleanNotes })}
-        >
-          {t("study_memory.save")}
-        </Button>
-      </section>
+      {/* 偏好只有在记忆进入作答时才有用：没进之前不收，免得读者以为写了就生效 */}
+      {data.used_in_answers && (
+        <section className="study-memory-section">
+          <h4>{t("study_memory.notes_title")}</h4>
+          <p className="study-memory-hint">{t("study_memory.notes_hint")}</p>
+          <Input.TextArea
+            value={notes}
+            onChange={(e) => setDraft(e.target.value)}
+            maxLength={data.max_notes_chars}
+            showCount
+            autoSize={{ minRows: 2, maxRows: 5 }}
+            placeholder={t("study_memory.notes_placeholder")}
+            aria-label={t("study_memory.notes_title")}
+          />
+          <Button
+            type="primary"
+            size="small"
+            style={{ marginTop: 8 }}
+            disabled={!dirty}
+            loading={save.isPending}
+            data-umami-event="study_memory_save"
+            onClick={() => save.mutate({ enabled: data.enabled, notes: cleanNotes })}
+          >
+            {t("study_memory.save")}
+          </Button>
+        </section>
+      )}
 
       {data.enabled && (
         <section className="study-memory-section">
