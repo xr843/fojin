@@ -74,7 +74,15 @@
   .theme-toggle .sun { display: none; }
   :root[data-theme="dark"] .theme-toggle .sun { display: block; }
   :root[data-theme="dark"] .theme-toggle .moon { display: none; }
-  @media (max-width: 560px) { nav.links { gap: 14px; } nav.links .opt { display: none; } }
+  /* Phones: all four sections stay in the header (2026-11-24). Labels never wrap
+     (they used to break into stacked characters at 360px); spacing tightens so the
+     header fits 360px; anything narrower scrolls the nav row, not the page. */
+  .brand, nav.links a { white-space: nowrap; }
+  .brand { flex: none; }
+  @media (max-width: 420px) {
+    header.top .bar { padding-left: 14px; padding-right: 14px; gap: 12px; }
+    nav.links { gap: 10px; font-size: 13px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  }
 
   main .wrap { padding-top: 44px; padding-bottom: 56px; }
   h1 { margin: 0 0 10px; font-size: clamp(26px, 5vw, 36px); line-height: 1.35; font-weight: 700;
@@ -138,7 +146,7 @@
     <nav class="links" aria-label="主导航">
       <a href="/" aria-current="page">核对出处</a>
       <a href="/masters">祖师</a>
-      <a href="/developers" class="opt">开发者</a>
+      <a href="/developers">开发者</a>
       <a href="https://fojin.app" title="佛津读经站 fojin.app：检索、阅读、对照原典">读经站</a>
     </nav>
     <button class="theme-toggle" type="button" aria-label="切换深色模式" title="切换深浅色">
@@ -178,10 +186,9 @@
 
 <footer>
   <div class="wrap">
-    <!-- Only what the header does not already show: 开发者 is hidden in the
-         phone header, GitHub is nowhere else. 读经站 / 祖师 live in the header. -->
+    <!-- Only what the header does not show: all four sections are in the header
+         at every width (2026-11-24), GitHub is nowhere else. -->
     <span>佛津 AI</span>
-    <a href="/developers">开发者</a>
     <a href="https://github.com/xr843/fojin">GitHub</a>
   </div>
 </footer>
