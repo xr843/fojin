@@ -139,7 +139,7 @@ async def test_api_roundtrip_and_isolation(db):
         assert r.status_code == 200, r.text
         body = r.json()
         assert body["enabled"] is True and body["notes"] is None and body["max_notes_chars"] == 300
-        assert body["used_in_answers"] is False
+        assert body["used_in_answers"] is True
         assert [r["title_zh"] for r in body["reading"]] == ["成唯識論", "阿毘達磨俱舍論"]
 
         r = await c.put("/api/study-memory", json={"enabled": True, "notes": "  我在学唯识\n请对照述记  "})
@@ -178,12 +178,13 @@ def test_migration_columns_match_orm():
         assert type(mig[c.name].type).__name__ == type(c.type).__name__, c.name
 
 
-def test_memory_off_by_default():
+def test_memory_switch(monkeypatch):
     from app.services import chat
     from app.services.chat import _memory_applies
 
-    assert chat.settings.study_memory_inject is False
-    assert not _memory_applies(1, None, None, "什么是种子？")
+    assert chat.settings.study_memory_inject is True  # 评测过关后默认开
+    monkeypatch.setattr(chat.settings, "study_memory_inject", False)
+    assert not _memory_applies(1, None, None, "什么是种子？")  # 回滚开关有效
 
 
 def test_memory_only_on_the_plain_qa_path(monkeypatch):
