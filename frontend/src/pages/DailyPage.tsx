@@ -73,7 +73,7 @@ export default function DailyPage() {
   return (
     <div className="daily-page">
       <Helmet>
-        <title>{t("daily.page_title")} - {t("app.title")}</title>
+        <title>{`${t("daily.page_title")} - ${t("app.title")}`}</title>
         <meta name="description" content={`${text} —— ${sourceLine}`} />
       </Helmet>
 

@@ -315,7 +315,7 @@
   margin-right: 4px;
 }
 
-.home-hot-tag {
+.home-hot-tag, .home-daily-tag {
   font-family: "Noto Serif SC", serif;
   font-size: 12px;
   color: var(--fj-ink-light);
@@ -328,7 +328,7 @@
   white-space: nowrap;
 }
 
-.home-hot-tag:hover {
+.home-hot-tag:hover, .home-daily-tag:hover {
   color: var(--fj-highlight);
   border-color: var(--fj-gold);
   background: var(--fj-surface);
@@ -336,7 +336,7 @@
 
 /* Dark mode: the translucent-white pill turns dark so the (now light) label
    reads over the night hero. */
-:root[data-theme="dark"] .home-hot-tag {
+:root[data-theme="dark"] .home-hot-tag, :root[data-theme="dark"] .home-daily-tag {
   background: rgba(74, 65, 51, 0.72);
 }
 
@@ -943,7 +943,7 @@
   .search-combo-btn { padding: 0 16px; font-size: 14px; }
 
   .home-hot-tags { margin-bottom: 24px; gap: 6px; }
-  .home-hot-tag { padding: 2px 10px; font-size: 12px; }
+  .home-hot-tag, .home-daily-tag { padding: 2px 10px; font-size: 12px; }
 
   /* 手机：标签单独一行，卡片横向滑动（列表自己滚，页面不横向溢出） */
   .home-recent { flex-direction: column; align-items: stretch; gap: 6px; margin: -12px 0 20px; }
@@ -1003,7 +1003,7 @@
 }
 
 /* 热门检索第一个：「今日一段」入口，金边朱字与普通检索词区分 */
-.home-hot-tag.home-daily-tag {
+.home-daily-tag, .home-daily-tag:hover {
   border-color: var(--fj-gold);
   color: var(--fj-accent);
   text-decoration: none;
