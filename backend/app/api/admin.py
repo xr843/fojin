@@ -121,6 +121,7 @@ async def stats_module_usage(
         events=result["events"],
         top_search_keywords=result["top_search_keywords"],
         answer_quality=result["answer_quality"],
+        excluded_staff_events=result.get("excluded_staff_events", 0),
     )
 
 

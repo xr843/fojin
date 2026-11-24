@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Card, Col, Row, Statistic, Spin, Segmented, Empty, Tooltip, Typography, message, DatePicker, Table, Tag } from "antd";
+import { useMemo, useState } from "react";
+import { Card, Col, Collapse, Row, Statistic, Spin, Segmented, Empty, Tooltip, Typography, message, DatePicker, Table, Tag } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import {
   UserOutlined,
@@ -8,14 +8,8 @@ import {
   WarningOutlined,
   LikeOutlined,
   BookOutlined,
-  DatabaseOutlined,
   ArrowUpOutlined,
   ArrowDownOutlined,
-  SearchOutlined,
-  RobotOutlined,
-  ReadOutlined,
-  LinkOutlined,
-  ThunderboltOutlined,
 } from "@ant-design/icons";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
@@ -28,22 +22,14 @@ import {
   getAdminModuleUsage,
   getAdminActiveUsers,
   type AdminOverview,
-  type ModuleEventItem,
   type ActiveUserDetail,
 } from "../api/client";
 import { getPlatformActivity } from "../api/feed";
 import { useEffectiveTheme } from "../hooks/useTheme";
 import { adminLabel, formatAdminDate } from "./adminI18n";
+import { groupModuleEvents, MIN_USERS, type UsageGroup, type UsageRow } from "./adminModuleGroups";
 
 const { Text } = Typography;
-
-const moduleEventLabelKeyMap: Record<string, string> = {
-  search: "admin_dashboard.module_usage.event.search",
-  chat: "admin_dashboard.module_usage.event.chat",
-  read: "admin_dashboard.module_usage.event.read",
-  source_click: "admin_dashboard.module_usage.event.source_click",
-  "cbeta-shortcut": "admin_dashboard.module_usage.event.cbeta_shortcut",
-};
 
 function DeltaSuffix({ today, yesterday }: { today: number; yesterday: number }) {
   const { t } = useTranslation();
@@ -409,16 +395,46 @@ export default function AdminDashboardPage() {
   );
 }
 
-/** Map event_name → antd icon for the module usage card. */
-function _eventIcon(name: string) {
-  switch (name) {
-    case "search":       return <SearchOutlined />;
-    case "chat":         return <RobotOutlined />;
-    case "read":         return <ReadOutlined />;
-    case "source_click": return <LinkOutlined />;
-    case "cbeta-shortcut": return <ThunderboltOutlined />;
-    default:             return <DatabaseOutlined />;
-  }
+function UsageGroupTable({ group }: { group: UsageGroup | { key: "other"; danger: false; rows: UsageRow[] } }) {
+  const { t } = useTranslation();
+  const arrow = (a: number, b: number | undefined, kind: UsageRow["kind"]) => (kind === "funnel" ? `${a} → ${b ?? 0}` : String(a));
+  const hasFunnel = group.rows.some((r) => r.kind === "funnel");
+  return (
+    <Table<UsageRow>
+      size="small"
+      rowKey="key"
+      pagination={false}
+      dataSource={group.rows}
+      columns={[
+        {
+          title: t("admin_dashboard.module_usage.col_feature"),
+          render: (_, r) => adminLabel(t, r.labelKey, r.fallback),
+        },
+        {
+          title: t("admin_dashboard.module_usage.col_users"),
+          align: "right",
+          width: 90,
+          render: (_, r) => <Text strong>{arrow(r.users, r.toUsers, r.kind)}</Text>,
+        },
+        {
+          title: t("admin_dashboard.module_usage.col_count"),
+          align: "right",
+          width: 100,
+          render: (_, r) => <Text type="secondary">{arrow(r.count, r.toCount, r.kind)}</Text>,
+        },
+        ...(hasFunnel
+          ? [
+              {
+                title: t("admin_dashboard.module_usage.col_rate"),
+                align: "right" as const,
+                width: 70,
+                render: (_: unknown, r: UsageRow) => (r.kind === "funnel" && r.rate != null ? `${r.rate}%` : ""),
+              },
+            ]
+          : []),
+      ]}
+    />
+  );
 }
 
 function ModuleUsageCard() {
@@ -429,6 +445,7 @@ function ModuleUsageCard() {
     queryFn: () => getAdminModuleUsage(days),
     staleTime: 300_000,
   });
+  const grouped = useMemo(() => groupModuleEvents(data?.events ?? []), [data]);
 
   return (
     <Card
@@ -453,19 +470,31 @@ function ModuleUsageCard() {
       ) : (
         <>
           <Text type="secondary" style={{ fontSize: 12 }}>
-            {t("admin_dashboard.module_usage.subtitle")}
+            {t("admin_dashboard.module_usage.subtitle_v2", { n: data.excluded_staff_events ?? 0 })}
           </Text>
-          <Row gutter={[16, 16]} style={{ marginTop: 4, marginBottom: 16 }}>
-            {data.events.map((ev: ModuleEventItem) => (
-              <Col xs={12} sm={6} key={ev.event_name}>
-                <Statistic
-                  title={adminLabel(t, moduleEventLabelKeyMap[ev.event_name], ev.label)}
-                  value={ev.count}
-                  prefix={_eventIcon(ev.event_name)}
-                />
+          <Row gutter={[16, 16]} style={{ marginTop: 8, marginBottom: 16 }}>
+            {grouped.groups.map((g) => (
+              <Col xs={24} lg={12} key={g.key}>
+                <Text strong style={g.danger ? { color: "var(--fj-danger)" } : undefined}>
+                  {t(`admin_dashboard.module_usage.group.${g.key}`)}
+                </Text>
+                <UsageGroupTable group={g} />
               </Col>
             ))}
           </Row>
+          {grouped.other.length > 0 && (
+            <Collapse
+              size="small"
+              style={{ marginBottom: 16 }}
+              items={[
+                {
+                  key: "other",
+                  label: t("admin_dashboard.module_usage.group.other", { n: grouped.other.length, min: MIN_USERS }),
+                  children: <UsageGroupTable group={{ key: "other", danger: false, rows: grouped.other }} />,
+                },
+              ]}
+            />
+          )}
 
           {data.answer_quality && (
             <div style={{ marginTop: 8, marginBottom: 16 }}>

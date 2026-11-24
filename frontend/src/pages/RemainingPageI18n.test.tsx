@@ -124,7 +124,7 @@ const activeUsers: ActiveUserDayDetail = {
 
 const moduleUsage: AdminModuleUsage = {
   days: 7,
-  events: [{ event_name: "search", label: "Search", count: 9 }],
+  events: [{ event_name: "search", label: "Search", count: 9, users: 5 }],
   top_search_keywords: [{ keyword: "lotus", count: 3 }],
   answer_quality: {
     chat_questions: 10,

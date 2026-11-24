@@ -140,6 +140,8 @@ class ModuleEventItem(BaseModel):
     event_name: str
     label: str
     count: int
+    # 不同访客数（Umami session，大致 = 设备）。一个人连点会把 count 顶上去，users 不会。
+    users: int = 0
 
 
 class KeywordItem(BaseModel):
@@ -167,7 +169,8 @@ class AdminModuleUsage(BaseModel):
     events: list[ModuleEventItem]
     top_search_keywords: list[KeywordItem]
     answer_quality: AnswerQuality
-
+    # 被排除的站长本人事件数（访问过 /admin 的设备）与本机开发事件数，看板上注明口径用
+    excluded_staff_events: int = 0
 
 # --- Answer-quality bad-answer queue ---
 
