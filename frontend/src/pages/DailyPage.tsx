@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button, Modal, Spin, message } from "antd";
 import { getVernacular } from "../api/client";
 import { pickDaily } from "../utils/dailyPassage";
+import { lunarLabel } from "../utils/lunar";
 import { renderShareCard } from "../utils/shareCard";
 import { localizeHan } from "../utils/hanScript";
 import "../styles/daily.css";
@@ -37,6 +38,9 @@ export default function DailyPage() {
   const [card, setCard] = useState<{ url: string; file: File } | null>(null);
   const [making, setMaking] = useState(false);
 
+  // 农历只给中文界面；超出月表返回 null 就只显示公历
+  const lunar = lang.startsWith("zh") ? lunarLabel(dateKey) : null;
+  const dateLabel = lunar ? `${dateKey} · ${localizeHan(t("daily.lunar", { d: lunar }), lang)}` : dateKey;
   const title = localizeHan(passage.title_zh, lang);
   const sourceLine = `《${title}》${t("daily.juan", { n: passage.juan_num })}`;
   const text = localizeHan(passage.text, lang);
@@ -62,7 +66,7 @@ export default function DailyPage() {
       const blob = await renderShareCard({
         text,
         source: sourceLine,
-        heading: t("daily.card_heading", { date: dateKey }),
+        heading: t("daily.card_heading", { date: dateLabel }),
         footer: t("daily.card_footer"),
       });
       const file = new File([blob], `fojin-${dateKey}.png`, { type: "image/png" });
@@ -85,7 +89,7 @@ export default function DailyPage() {
         <meta name="description" content={`${text} —— ${sourceLine}`} />
       </Helmet>
 
-      <div className="daily-date">{t("daily.heading", { date: dateKey })}</div>
+      <div className="daily-date">{t("daily.heading", { date: dateLabel })}</div>
       <blockquote className="daily-text" lang="zh">
         {text}
       </blockquote>

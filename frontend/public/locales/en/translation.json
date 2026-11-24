@@ -2000,5 +2000,6 @@
   "admin_dashboard.module_usage.event.daily_open_source": "Daily: open source",
   "admin_dashboard.module_usage.event.daily_vernacular": "Daily: plain reading",
   "admin_dashboard.module_usage.event.daily_ask": "Daily: ask",
-  "admin_dashboard.module_usage.event.daily_share": "Daily: share image"
+  "admin_dashboard.module_usage.event.daily_share": "Daily: share image",
+  "daily.lunar": "Lunar {{d}}"
 }
