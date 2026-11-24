@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo, type ReactNode } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo, type ReactNode } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router";
 import { extendToSentenceEnd, findQuoteSpans } from "../utils/citationMatch";
 import { useTranslation } from "react-i18next";
@@ -59,6 +59,7 @@ import AnnotationPanel from "../components/AnnotationPanel";
 import { ReaderDictPopover } from "../components/ReaderDictPopover";
 import { DICT_POPOVER_INIT, MAX_WORD_LEN, dictPopoverAbove, type DictPopoverState } from "../components/ReaderDictPopover.types";
 import ReaderAIPanel from "../components/ReaderAIPanel";
+import { captureScrollAnchor, findScrollContainer, restoreScrollAnchor, type ScrollAnchor } from "../utils/scrollAnchor";
 import ReaderParallelPanel from "../components/ReaderParallelPanel";
 
 import "../styles/versions-panel.css";
@@ -330,17 +331,6 @@ function getInitialFontSize(): number {
  * .reader-with-sidebar 锁高、滚动权交给 .reader-container；面板关闭时滚动
  * 的是 document（返回 null）。续读与 highlight 深链都必须按真实 scroller 操作。
  */
-function findScrollContainer(el: HTMLElement): HTMLElement | null {
-  let p = el.parentElement;
-  while (p) {
-    const style = getComputedStyle(p);
-    if ((style.overflowY === "auto" || style.overflowY === "scroll") && p.scrollHeight > p.clientHeight) {
-      return p;
-    }
-    p = p.parentElement;
-  }
-  return null;
-}
 
 /** 划词查辞典浮层状态 */
 export default function TextReaderPage() {
@@ -417,18 +407,46 @@ export default function TextReaderPage() {
   const [parallelPanelWidth, setParallelPanelWidth] = useState(480);
   const isDraggingParallelRef = useRef(false);
 
+  // 侧栏开合会让经文栏变宽/变窄、真实滚动元素也跟着换（reader-ai-active），读者正在看
+  // 的那句会被甩出视野（2026-11-21 用户录屏）。开合前记锚点，排版后滚回原处。
+  // 手机上面板是底部抽屉、不改经文排版，不需要。
+  const lastSelRangeRef = useRef<Range | null>(null);
+  const pendingAnchorRef = useRef<ScrollAnchor | null>(null);
+  const keepReadingAnchor = useCallback(() => {
+    if (narrow || !readerContentRef.current) return;
+    pendingAnchorRef.current = captureScrollAnchor(readerContentRef.current, lastSelRangeRef.current);
+  }, [narrow]);
+
   const handleAskXiaojin = useCallback((text: string) => {
     if (typeof umami !== "undefined") umami.track("reader_ask_xiaojin", { id: textId, chars: text.length });
+    if (!aiPanelOpen) keepReadingAnchor();
     setAiSelectedText(text);
     setAiPanelOpen(true);
-  }, [textId]);
+  }, [textId, aiPanelOpen, keepReadingAnchor]);
 
   // 手动开关 AI 面板（不含首次按偏好恢复）：面板桌面默认展开，主动关掉的人多少，
   // 说明它是帮手还是挡路。
   const toggleAiPanel = useCallback((open: boolean) => {
     if (typeof umami !== "undefined") umami.track("reader_ai_toggle", { id: textId, open: open ? 1 : 0 });
+    if (open !== aiPanelOpen) keepReadingAnchor();
     setAiPanelOpen(open);
-  }, [textId]);
+  }, [textId, aiPanelOpen, keepReadingAnchor]);
+
+  const toggleParallelPanel = useCallback((open?: boolean) => {
+    keepReadingAnchor();
+    setParallelPanelOpen((v) => (open === undefined ? !v : open));
+  }, [keepReadingAnchor]);
+
+  useLayoutEffect(() => {
+    const anchor = pendingAnchorRef.current;
+    const el = readerContentRef.current;
+    if (!anchor || !el) return;
+    pendingAnchorRef.current = null;
+    restoreScrollAnchor(anchor, el);
+    // 再校一次：面板内容、滚动条出现等会在下一帧再动一下版面
+    const raf = requestAnimationFrame(() => restoreScrollAnchor(anchor, el));
+    return () => cancelAnimationFrame(raf);
+  }, [aiPanelOpen, parallelPanelOpen]);
 
   // Drag to resize 多语对读 panel
   const handleParallelDragStart = useCallback((e: React.MouseEvent) => {
@@ -522,6 +540,7 @@ export default function TextReaderPage() {
     // 获取选中文字的位置
     const range = sel?.getRangeAt(0);
     if (!range) return;
+    lastSelRangeRef.current = range.cloneRange();
     const rect = range.getBoundingClientRect();
     const x = rect.left + rect.width / 2;
     const y = rect.bottom;
@@ -1273,7 +1292,7 @@ export default function TextReaderPage() {
       icon: <GlobalOutlined />,
       label: t("reader.parallel.button"),
       extra: checkMark(parallelPanelOpen),
-      onClick: () => setParallelPanelOpen((v) => !v),
+      onClick: () => toggleParallelPanel(),
     },
     ...(textDetail?.kabc_url
       ? [{
@@ -1521,7 +1540,7 @@ export default function TextReaderPage() {
                   size="small"
                   type={parallelPanelOpen ? "primary" : "default"}
                   icon={<GlobalOutlined />}
-                  onClick={() => setParallelPanelOpen((v) => !v)}
+                  onClick={() => toggleParallelPanel()}
                 >
                   {t("reader.parallel.button")}
                 </Button>
@@ -1778,7 +1797,7 @@ export default function TextReaderPage() {
         <div className="reader-ai-sidebar" style={{ width: parallelPanelWidth }}>
           <div className="reader-ai-sidebar-header">
             <span className="reader-ai-sidebar-title"><GlobalOutlined /> {t("reader.parallel.button")}</span>
-            <Button type="text" size="small" onClick={() => setParallelPanelOpen(false)}>✕</Button>
+            <Button type="text" size="small" onClick={() => toggleParallelPanel(false)}>✕</Button>
           </div>
           <ReaderParallelPanel textId={textId} juanNum={juanNum} />
         </div>
