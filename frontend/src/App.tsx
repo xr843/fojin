@@ -52,6 +52,8 @@ const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const KGMapPage = lazy(() => import("./pages/KGMapPage"));
 const ActivityFeedPage = lazy(() => import("./pages/ActivityFeedPage"));
 const SharedQAPage = lazy(() => import("./pages/SharedQAPage"));
+const TibetanZhListPage = lazy(() => import("./pages/TibetanZhListPage"));
+const TibetanZhReaderPage = lazy(() => import("./pages/TibetanZhReaderPage"));
 
 function Loading() {
   return (
@@ -89,6 +91,9 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/dictionary" element={<DictionaryPage />} />
+            {/* 藏译汉稿：AI 译稿，只展示（不进问答/检索），数据由后端转发 GitHub 上的 tibetan-canon-zh */}
+            <Route path="/tibetan-zh" element={<TibetanZhListPage />} />
+            <Route path="/tibetan-zh/:id" element={<RouteErrorBoundary><TibetanZhReaderPage /></RouteErrorBoundary>} />
             <Route path="/verify" element={<RouteErrorBoundary><VerifyPage /></RouteErrorBoundary>} />
             <Route path="/chat" element={<RouteErrorBoundary><ChatPage /></RouteErrorBoundary>} />
             <Route path="/research" element={<RouteErrorBoundary><ResearchPage /></RouteErrorBoundary>} />

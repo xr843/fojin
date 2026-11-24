@@ -11,6 +11,7 @@ const SECTIONS: Array<[string, string[]]> = [
   ["/dictionary", ["/dictionary"]],
   ["/sources", ["/sources"]],
   ["/kg", ["/kg", "/person"]],
+  ["/tibetan-zh", ["/tibetan-zh"]],
   ["/admin", ["/admin"]],
 ];
 
