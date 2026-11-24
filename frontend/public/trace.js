@@ -199,12 +199,18 @@
     return r.verdict;
   }
 
-  function renderSummary(tally, total) {
+  // 非佛经出处按类别分开写，与卡片标签同一套叫法（「出自论典」「出自注疏」…）。
+  // 早先汇总把它们并成「论疏或祖师著作」，卡片却写「出自论典」（2026-11-24 用户截图）。
+  var CLASS_ORDER = ["vinaya", "treatise", "commentary", "school", "history", "apocrypha", "later", "unknown"];
+
+  function renderSummary(tally, total, byClass) {
     var found = (tally.sutra || 0) + (tally.not_sutra || 0);
     var parts = [];
     parts.push("共 " + total + " 句");
     if (tally.sutra) parts.push("<b>" + tally.sutra + "</b> 句出自佛经");
-    if (tally.not_sutra) parts.push("<b>" + tally.not_sutra + "</b> 句出自论疏或祖师著作");
+    CLASS_ORDER.forEach(function (c) {
+      if (byClass[c]) parts.push("<b>" + byClass[c] + "</b> 句出自" + CLASS_LABEL[c]);
+    });
     if (tally.variant) parts.push("<b>" + tally.variant + "</b> 句经中有、用字略异");
     if (tally.partial) parts.push("<b>" + tally.partial + "</b> 句只有部分见于藏经");
     if (tally.absent) parts.push("<b>" + tally.absent + "</b> 句藏经中未见");
@@ -335,6 +341,7 @@
       return li;
     });
     var tally = {};
+    var byClass = {};
     var done = 0;
     var prefer = null;
     var results = new Array(sentences.length);
@@ -350,6 +357,10 @@
               results[start + j] = item;
               var kind = renderItem(items[start + j], item);
               if (kind !== "skip") tally[kind] = (tally[kind] || 0) + 1;
+              if (kind === "not_sutra") {
+                var c = CLASS_LABEL[item.result.source_class] ? item.result.source_class : "unknown";
+                byClass[c] = (byClass[c] || 0) + 1;
+              }
             });
             done = Math.min(start + BATCH, sentences.length);
             status.textContent = "正在核对 " + done + " / " + sentences.length + " 句……";
@@ -359,7 +370,7 @@
     }
     chain.then(function () {
       var checked = Object.keys(tally).reduce(function (n, k) { return n + tally[k]; }, 0);
-      var found = renderSummary(tally, checked);
+      var found = renderSummary(tally, checked, byClass);
       var merged = mergeRuns(items, results);
       if (merged) track("trace_merge", { n: merged });
       status.textContent = dropped ? "只核对了前 " + MAX_SENTENCES + " 句，其余 " + dropped + " 句请分开再贴。" : "";

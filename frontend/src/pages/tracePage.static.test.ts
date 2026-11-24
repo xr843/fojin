@@ -78,3 +78,33 @@ describe("fojin.ai 首页：贴进来的文字不进统计", () => {
     expect((document.getElementById("trace-text") as HTMLTextAreaElement).value).toBe("一切有为法，如梦幻泡影");
   });
 });
+
+// 2026-11-24 用户截图：卡片标签写「出自论典」，汇总却写「21 句出自论疏或祖师著作」——
+// 汇总把所有非佛经类别并成一类。改为按类别分开计数，与卡片标签同一套叫法。
+describe("fojin.ai 首页：汇总按出处类别分开计数", () => {
+  it("论典与注疏分开写，叫法与卡片标签一致", async () => {
+    const html = readFileSync(resolve(PUBLIC, "trace.html"), "utf8");
+    document.body.innerHTML = html.slice(html.indexOf("<body>") + 6, html.indexOf("</body>"));
+    window.history.replaceState(null, "", "/");
+    const classes = ["treatise", "treatise", "commentary", "sutra"];
+    vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
+      const body = JSON.parse(init.body) as { sentences: string[] };
+      const items = body.sentences.map((t, i) => ({
+        text: t,
+        result: {
+          verdict: classes[i] === "sutra" ? "sutra" : "not_sutra",
+          source_class: classes[i],
+          segments: [{ text: t, found: true, sources: [{ ...src(`${i * 20}-${i * 20 + 5}`), text_id: 10 + i, canon_class: classes[i] }] }],
+        },
+      }));
+      return { ok: true, status: 200, headers: { get: () => null }, json: async () => ({ items, dominant: null }) };
+    });
+    new Function(readFileSync(resolve(PUBLIC, "trace.js"), "utf8"))();
+    (document.getElementById("trace-text") as HTMLTextAreaElement).value = "甲句之文字。乙句之文字。丙句之文字。丁句之文字。";
+    document.getElementById("trace-form")!.dispatchEvent(new Event("submit", { cancelable: true }));
+    await new Promise((r) => setTimeout(r, 300));
+    expect(document.getElementById("summary")?.textContent).toBe(
+      "共 4 句，1 句出自佛经，2 句出自论典，1 句出自注疏。",
+    );
+  });
+});
