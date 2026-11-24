@@ -3,10 +3,11 @@ import { useNavigate, useSearchParams } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { Typography, Card, Tabs, List, Tag, Empty, Spin, Descriptions, Button, Space, Pagination, Input, Select, message, Alert, Form, Popconfirm, Divider } from "antd";
-import { BookOutlined, HistoryOutlined, UserOutlined, ReadOutlined, KeyOutlined, DeleteOutlined, CheckCircleOutlined, LockOutlined, ArrowLeftOutlined, HighlightOutlined } from "@ant-design/icons";
+import { BookOutlined, HistoryOutlined, UserOutlined, ReadOutlined, KeyOutlined, DeleteOutlined, CheckCircleOutlined, LockOutlined, ArrowLeftOutlined, HighlightOutlined, BulbOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../stores/authStore";
 import ExcerptsList from "../components/ExcerptsList";
+import StudyMemoryPanel from "../components/StudyMemoryPanel";
 import { getBookmarks, getHistory, getApiKeyStatus, getChatQuota, saveApiKey, deleteApiKey, changePassword, logoutAllDevices } from "../api/client";
 
 const { Title } = Typography;
@@ -352,6 +353,15 @@ export default function ProfilePage() {
                 </span>
               ),
               children: <ExcerptsList />,
+            },
+            {
+              key: "memory",
+              label: (
+                <span>
+                  <BulbOutlined /> {t("study_memory.tab")}
+                </span>
+              ),
+              children: <StudyMemoryPanel />,
             },
             {
               key: "history",

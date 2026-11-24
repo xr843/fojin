@@ -324,6 +324,7 @@ def _build_llm_messages(
     master_id: str | None = None,
     reading_context: dict | None = None,
     llm_message_override: str | None = None,
+    memory_block: str = "",
 ) -> list[dict[str, str]]:
     """Build the message list for the LLM call, trimming if too long.
 
@@ -331,6 +332,11 @@ def _build_llm_messages(
     final user turn sent to the LLM. The caller keeps ``message`` as the
     user-visible question (used for RAG, history, titles), while the
     override carries the expanded prompt template for richer guidance.
+
+    ``memory_block`` is the reader's study memory (services/study_memory.py),
+    already rendered. It rides at the head of the final user turn as data, like
+    the reader block — the system prompt is untouched. The caller only passes it
+    on the plain Q&A path.
     """
     master = get_master(master_id) if master_id else None
     if master:
@@ -372,7 +378,12 @@ def _build_llm_messages(
         # Restated at the end too: nearest-to-generation wins over persona voice.
         enhanced_prompt += MASTER_CRISIS_REMINDER
     llm_messages: list[dict[str, str]] = [{"role": "system", "content": enhanced_prompt}]
-    budget = _MAX_INPUT_TOKENS - _estimate_tokens(enhanced_prompt) - _estimate_tokens(reader_data_block)
+    budget = (
+        _MAX_INPUT_TOKENS
+        - _estimate_tokens(enhanced_prompt)
+        - _estimate_tokens(reader_data_block)
+        - _estimate_tokens(memory_block)
+    )
 
     # The final user turn is the override when one is given, and attachment
     # text rides in that way — up to 80k chars per file. Budgeting against
@@ -416,7 +427,8 @@ def _build_llm_messages(
         llm_messages.append({
             "role": "user",
             "content": (
-                reader_data_block
+                memory_block
+                + reader_data_block
                 + "【系统自动检索】以下是系统从佛典语料库中检索到的、**可能**与问题相关的片段。"
                 "注意：这些片段由向量检索自动获取，未经人工筛选，**可能与问题无关**。"
                 "请先判断这些片段是否真的切题：\n"
@@ -428,7 +440,7 @@ def _build_llm_messages(
             ),
         })
     else:
-        llm_messages.append({"role": "user", "content": reader_data_block + final_user_message})
+        llm_messages.append({"role": "user", "content": memory_block + reader_data_block + final_user_message})
     return llm_messages
 
 

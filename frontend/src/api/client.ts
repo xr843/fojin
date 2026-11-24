@@ -882,6 +882,28 @@ export async function deleteExcerpt(id: number): Promise<void> {
   await api.delete(`/excerpts/${id}`);
 }
 
+// Study memory（研读记忆）：小津记得什么 + 读者自己写的回答偏好，只有本人可见
+export interface StudyMemory {
+  enabled: boolean;
+  notes: string | null;
+  reading: { text_id: number; title_zh: string; juan_num: number; last_read_at: string }[];
+  topics: { session_id: number; title: string; last_at: string }[];
+  excerpts: { text_id: number; title_zh: string; juan_num: number; quote: string }[];
+  max_notes_chars: number;
+  /** 记忆此刻是否进入作答（服务端总开关）。false 时不说「小津会参考」，也不显示偏好输入 */
+  used_in_answers: boolean;
+}
+
+export async function getStudyMemory(): Promise<StudyMemory> {
+  const { data } = await api.get<StudyMemory>("/study-memory");
+  return data;
+}
+
+export async function saveStudyMemory(body: { enabled: boolean; notes: string | null }): Promise<StudyMemory> {
+  const { data } = await api.put<StudyMemory>("/study-memory", body);
+  return data;
+}
+
 // Bookmarks
 export async function getBookmarks(page: number = 1, size: number = 20): Promise<PaginatedResponse<BookmarkItem>> {
   const { data } = await api.get<PaginatedResponse<BookmarkItem>>("/bookmarks", { params: { page, size } });
