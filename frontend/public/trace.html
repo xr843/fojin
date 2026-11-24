@@ -25,7 +25,7 @@
 <!-- ?v= busts Cloudflare's edge cache, which keeps .js for 4 hours across
      deploys. Bump it whenever trace.js changes (the fojin.ai worker passes the
      query through to fojin.app). -->
-<script defer src="/trace.js?v=9"></script>
+<script defer src="/trace.js?v=10"></script>
 <!-- data-exclude-search: never record the query string — a shared ?q= link
      carries the text someone pasted. trace.js (deferred, above) also clears it
      before this script runs. -->
@@ -125,8 +125,6 @@
   .share button { font: inherit; font-size: 13px; padding: 3px 12px; border-radius: 6px; cursor: pointer;
     border: 1px solid var(--border); background: var(--surface); color: var(--ink-light); }
 
-  .notes { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 14px; color: var(--ink-muted); }
-  .notes p { margin: 0 0 10px; }
     text-decoration: none; color: var(--ink); font-size: 14px; }
   footer { border-top: 1px solid var(--border); font-size: 13px; color: var(--ink-muted); }
   footer .wrap { padding-top: 18px; padding-bottom: 28px; display: flex; flex-wrap: wrap; gap: 6px 16px; }
@@ -175,10 +173,6 @@
     <ol id="result" aria-label="逐句核对结果"></ol>
     <p class="share" id="share" hidden><button type="button" id="share-btn">复制这次核对的链接</button></p>
 
-    <div class="notes">
-      <p>逐字比对 CBETA 汉文大藏经（繁简、标点不影响；巴利、藏、梵文原典暂未收录）。</p>
-      <p>「未见」只表示在已收录的典籍里找不到这几个字，不等于伪造。</p>
-    </div>
   </div>
 </main>
 
