@@ -12,6 +12,7 @@ from app.models.chat import (
 )
 from app.models.daily_metric import DailyMetricCount
 from app.models.dictionary import DictionaryEntry
+from app.models.excerpt import UserExcerpt
 from app.models.feed import AcademicFeed, SourceUpdate
 from app.models.gaiji import Gaiji
 from app.models.hot_question import HotQuestion
@@ -68,6 +69,7 @@ __all__ = [
     "TextLineAnchor",
     "TextRelation",
     "User",
+    "UserExcerpt",
     "Work",
     "WorkAlias",
     "WorkWitness",

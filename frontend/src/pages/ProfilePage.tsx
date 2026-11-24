@@ -3,9 +3,10 @@ import { useNavigate, useSearchParams } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { Typography, Card, Tabs, List, Tag, Empty, Spin, Descriptions, Button, Space, Pagination, Input, Select, message, Alert, Form, Popconfirm, Divider } from "antd";
-import { BookOutlined, HistoryOutlined, UserOutlined, ReadOutlined, KeyOutlined, DeleteOutlined, CheckCircleOutlined, LockOutlined, ArrowLeftOutlined } from "@ant-design/icons";
+import { BookOutlined, HistoryOutlined, UserOutlined, ReadOutlined, KeyOutlined, DeleteOutlined, CheckCircleOutlined, LockOutlined, ArrowLeftOutlined, HighlightOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../stores/authStore";
+import ExcerptsList from "../components/ExcerptsList";
 import { getBookmarks, getHistory, getApiKeyStatus, getChatQuota, saveApiKey, deleteApiKey, changePassword, logoutAllDevices } from "../api/client";
 
 const { Title } = Typography;
@@ -102,7 +103,7 @@ function uiDateLocale(language: string): string {
 export default function ProfilePage() {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, token, setAuth } = useAuthStore();
   const queryClient = useQueryClient();
   const [bmPage, setBmPage] = useState(1);
@@ -272,7 +273,10 @@ export default function ProfilePage() {
         <Title level={3}>{t("auth.profile")}</Title>
 
         <Tabs
-          defaultActiveKey={defaultTab}
+          // 受控：已在个人中心时从头像菜单点「我的摘录 / 收藏」，只有 ?tab= 变，
+          // defaultActiveKey 不会跟着切。
+          activeKey={defaultTab}
+          onChange={(key) => setSearchParams({ tab: key }, { replace: true })}
           items={[
             {
               key: "profile",
@@ -339,6 +343,15 @@ export default function ProfilePage() {
                   )}
                 </>
               ),
+            },
+            {
+              key: "excerpts",
+              label: (
+                <span>
+                  <HighlightOutlined /> {t("profile.tab_excerpts")}
+                </span>
+              ),
+              children: <ExcerptsList />,
             },
             {
               key: "history",

@@ -20,6 +20,7 @@ import {
   // SafetyCertificateOutlined,  // verify nav hidden (2026-10-16 用户要求暂撤；路由仍可直达 /verify)
   GithubOutlined,
   GlobalOutlined,
+  HighlightOutlined,
   // TranslationOutlined,  // cross-canon nav hidden (板块待打磨；路由仍可直达 /cross-canon)
   // DownloadOutlined,   // exports nav hidden (开放数据 暂不对外公开)
   // ExperimentOutlined,  // research nav hidden (研究助手 待重构后再上线)
@@ -393,7 +394,13 @@ export default function Layout() {
                     key: "bookmarks",
                     icon: <HeartOutlined />,
                     label: t("auth.bookmarks"),
-                    onClick: () => navigate("/profile"),
+                    onClick: () => navigate("/profile?tab=bookmarks"),
+                  },
+                  {
+                    key: "excerpts",
+                    icon: <HighlightOutlined />,
+                    label: t("auth.excerpts"),
+                    onClick: () => navigate("/profile?tab=excerpts"),
                   },
                   { type: "divider" },
                   {

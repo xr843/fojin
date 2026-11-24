@@ -30,7 +30,7 @@ import {
 } from "@ant-design/icons";
 import { trackAudio } from "../audio/telemetry";
 import { useAudioPlayer } from "../audio/useAudioPlayback";
-import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBookmark, addBookmark, removeBookmark, searchDictionaryGrouped, getJuanApparatus, getJuanLineAnchors, getJuanAudio, type ApparatusEntryItem } from "../api/client";
+import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBookmark, addBookmark, listExcerpts, removeBookmark, searchDictionaryGrouped, getJuanApparatus, getJuanLineAnchors, getJuanAudio, type ApparatusEntryItem } from "../api/client";
 import { isNarrowViewport, useNarrowViewport, PHONE_VIEWPORT_QUERY } from "../hooks/useNarrowViewport";
 
 const AI_PANEL_PREF_KEY = "fojin.reader.aiPanel";
@@ -59,6 +59,7 @@ import AnnotationPanel from "../components/AnnotationPanel";
 import { ReaderDictPopover } from "../components/ReaderDictPopover";
 import { DICT_POPOVER_INIT, MAX_WORD_LEN, dictPopoverAbove, type DictPopoverState } from "../components/ReaderDictPopover.types";
 import ReaderAIPanel from "../components/ReaderAIPanel";
+import { clearExcerptPaint, paintExcerpts } from "../utils/excerptHighlight";
 import { captureScrollAnchor, findScrollContainer, restoreScrollAnchor, type ScrollAnchor } from "../utils/scrollAnchor";
 import ReaderParallelPanel from "../components/ReaderParallelPanel";
 
@@ -326,12 +327,6 @@ function getInitialFontSize(): number {
   return 18;
 }
 
-/**
- * 找到 el 实际所在的滚动容器。AI 面板打开时（默认即打开）reader.css 把
- * .reader-with-sidebar 锁高、滚动权交给 .reader-container；面板关闭时滚动
- * 的是 document（返回 null）。续读与 highlight 深链都必须按真实 scroller 操作。
- */
-
 /** 划词查辞典浮层状态 */
 export default function TextReaderPage() {
   const { id } = useParams<{ id: string }>();
@@ -447,6 +442,7 @@ export default function TextReaderPage() {
     const raf = requestAnimationFrame(() => restoreScrollAnchor(anchor, el));
     return () => cancelAnimationFrame(raf);
   }, [aiPanelOpen, parallelPanelOpen]);
+
 
   // Drag to resize 多语对读 panel
   const handleParallelDragStart = useCallback((e: React.MouseEvent) => {
@@ -670,6 +666,32 @@ export default function TextReaderPage() {
     queryFn: () => getJuanContent(textId, juanNum),
     enabled: !!textId,
   });
+
+  // 个人摘录：登录后取本卷的摘录，在经文里画底纹（CSS Custom Highlight，不改经文 DOM）。
+  // 经文 DOM 会因繁简切换、校勘显隐等整块重建，旧 Range 随之失效，所以盯着容器变化重画。
+  const { data: juanExcerpts } = useQuery({
+    queryKey: ["excerpts", textId, juanNum],
+    queryFn: () => listExcerpts({ text_id: textId, juan_num: juanNum, size: 500 }),
+    enabled: !!user && !!textId,
+    staleTime: 60_000,
+  });
+  useEffect(() => {
+    const el = readerContentRef.current;
+    const items = user ? juanExcerpts?.items ?? [] : [];
+    if (!el || !content?.content) return;
+    paintExcerpts(el, items);
+    let timer: number | undefined;
+    const obs = new MutationObserver(() => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => paintExcerpts(el, items), 150);
+    });
+    obs.observe(el, { childList: true, subtree: true, characterData: true });
+    return () => {
+      obs.disconnect();
+      window.clearTimeout(timer);
+      clearExcerptPaint();
+    };
+  }, [juanExcerpts, content, user]);
 
   const { data: textDetail } = useQuery({
     queryKey: ["text", textId],
@@ -1640,6 +1662,7 @@ export default function TextReaderPage() {
         onClose={closeDictPopover}
         onAsk={handleAskXiaojin}
         loggedIn={!!user}
+        endLineRef={lineLocator?.endRef ?? null}
         context={
           content
             ? {

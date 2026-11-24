@@ -837,6 +837,51 @@ export async function dismissCommunityInvite(): Promise<void> {
   await api.post("/community/invite/dismiss");
 }
 
+// Excerpts（个人摘录，仅本人可见）
+export interface ExcerptItem {
+  id: number;
+  text_id: number;
+  title_zh: string;
+  cbeta_id: string;
+  juan_num: number;
+  line_ref: string | null;
+  end_line_ref: string | null;
+  quote: string;
+  note: string | null;
+  created_at: string;
+}
+
+export async function listExcerpts(params: {
+  text_id?: number;
+  juan_num?: number;
+  page?: number;
+  size?: number;
+} = {}): Promise<PaginatedResponse<ExcerptItem>> {
+  const { data } = await api.get<PaginatedResponse<ExcerptItem>>("/excerpts", { params });
+  return data;
+}
+
+export async function createExcerpt(body: {
+  text_id: number;
+  juan_num: number;
+  line_ref?: string | null;
+  end_line_ref?: string | null;
+  quote: string;
+  note?: string | null;
+}): Promise<ExcerptItem> {
+  const { data } = await api.post<ExcerptItem>("/excerpts", body);
+  return data;
+}
+
+export async function updateExcerptNote(id: number, note: string | null): Promise<ExcerptItem> {
+  const { data } = await api.patch<ExcerptItem>(`/excerpts/${id}`, { note });
+  return data;
+}
+
+export async function deleteExcerpt(id: number): Promise<void> {
+  await api.delete(`/excerpts/${id}`);
+}
+
 // Bookmarks
 export async function getBookmarks(page: number = 1, size: number = 20): Promise<PaginatedResponse<BookmarkItem>> {
   const { data } = await api.get<PaginatedResponse<BookmarkItem>>("/bookmarks", { params: { page, size } });
