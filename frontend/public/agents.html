@@ -119,7 +119,15 @@
   .theme-toggle .sun { display: none; }
   :root[data-theme="dark"] .theme-toggle .sun { display: block; }
   :root[data-theme="dark"] .theme-toggle .moon { display: none; }
-  @media (max-width: 640px) { nav.links .opt { display: none; } }
+  /* Phones: all four sections stay in the header (2026-11-24). Labels never wrap
+     (they used to break into stacked characters at 360px); spacing tightens so the
+     header fits 360px; anything narrower scrolls the nav row, not the page. */
+  .brand, nav.links a { white-space: nowrap; }
+  .brand { flex: none; }
+  @media (max-width: 420px) {
+    header.top .wrap-wide { padding-left: 14px; padding-right: 14px; gap: 12px; }
+    nav.links { gap: 10px; font-size: 13px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  }
 
   /* ── hero ───────────────────────────────────────────────────── */
   .hero { background: var(--fj-hero); border-bottom: 1px solid var(--fj-border); }
@@ -230,7 +238,7 @@
     <nav class="links" aria-label="主导航">
       <a href="https://fojin.ai/">核对出处</a>
       <a href="https://fojin.ai/masters">祖师</a>
-      <a href="/developers" class="opt" aria-current="page" title="MCP 端点、HTTP API 与命令行工具">开发者</a>
+      <a href="/developers" aria-current="page" title="MCP 端点、HTTP API 与命令行工具">开发者</a>
       <a href="https://fojin.app" title="佛津读经站 fojin.app：检索、阅读、对照原典">读经站</a>
     </nav>
     <button class="theme-toggle" type="button" aria-label="切换深色模式" title="切换深浅色">
