@@ -102,6 +102,7 @@ def _empty_usage() -> dict[str, Any]:
     return {
         "events": [],
         "top_search_keywords": [],
+        "excluded_staff_events": 0,
         "answer_quality": {
             "chat_questions": 0,
             "citation_click": 0,
@@ -117,28 +118,53 @@ def _empty_usage() -> dict[str, Any]:
 async def _query_module_usage(days: int) -> dict[str, Any]:
     engine = _get_engine()
 
+    # 口径（与到期复查脚本、baidu_priority.sql 一致）：
+    # - 只算 fojin 的站点行：同一 Umami 实例还托管别的站（11-24 昆虫站事件占这块看板 73%）；
+    # - 去掉站长本人：近期访问过 /admin 的设备（11-24 实测 trace_done 72 次里 49 次是站长自测）；
+    # - 去掉本机开发（hostname = localhost / 127.0.0.1）。
+    base_cte = """
+        WITH site AS (
+            SELECT website_id FROM website WHERE domain = :domain AND deleted_at IS NULL
+        ),
+        staff AS (
+            SELECT DISTINCT session_id FROM website_event
+            WHERE website_id IN (SELECT website_id FROM site)
+              AND url_path LIKE '/admin%'
+              AND created_at > now() - make_interval(days => :days + 30)
+        ),
+        ev AS (
+            SELECT e.event_id, e.event_name, e.session_id,
+                   (e.session_id IN (SELECT session_id FROM staff)
+                    OR coalesce(e.hostname, '') IN ('localhost', '127.0.0.1')) AS is_staff
+            FROM website_event e
+            WHERE e.website_id IN (SELECT website_id FROM site)
+              AND e.created_at > now() - make_interval(days => :days)
+              AND e.event_name IS NOT NULL
+        )
+    """
+
     event_sql = text(
-        """
-        SELECT event_name, count(*) AS cnt
-        FROM website_event
-        WHERE created_at > now() - make_interval(days => :days)
-          AND event_name IS NOT NULL
-          -- 同一 Umami 实例还托管别的站（11-24 昆虫站事件占这块看板 73%），只算 fojin
-          AND website_id IN (SELECT website_id FROM website WHERE domain = :domain AND deleted_at IS NULL)
+        base_cte
+        + """
+        SELECT event_name,
+               count(*) FILTER (WHERE NOT is_staff) AS cnt,
+               count(DISTINCT session_id) FILTER (WHERE NOT is_staff) AS users,
+               count(*) FILTER (WHERE is_staff) AS staff_cnt
+        FROM ev
         GROUP BY event_name
         ORDER BY cnt DESC
         """
     )
 
     keyword_sql = text(
-        """
+        base_cte
+        + """
         SELECT ed.string_value AS keyword, count(*) AS cnt
         FROM event_data ed
-        JOIN website_event we ON we.event_id = ed.website_event_id
-        WHERE we.event_name = 'search'
+        JOIN ev ON ev.event_id = ed.website_event_id
+        WHERE ev.event_name = 'search'
+          AND NOT ev.is_staff
           AND ed.data_key = 'keyword'
-          AND we.created_at > now() - make_interval(days => :days)
-          AND we.website_id IN (SELECT website_id FROM website WHERE domain = :domain AND deleted_at IS NULL)
         GROUP BY ed.string_value
         ORDER BY cnt DESC
         LIMIT 10
@@ -150,7 +176,9 @@ async def _query_module_usage(days: int) -> dict[str, Any]:
         event_rows = (await session.execute(event_sql, params)).all()
         keyword_rows = (await session.execute(keyword_sql, params)).all()
 
-    counts = {row[0]: int(row[1]) for row in event_rows}
+    counts = {row[0]: int(row[1]) for row in event_rows if int(row[1]) > 0}
+    users = {row[0]: int(row[2]) for row in event_rows}
+    excluded_staff_events = sum(int(row[3]) for row in event_rows)
 
     # Module-usage board: every tracked event EXCEPT the quality signals.
     events = [
@@ -158,6 +186,7 @@ async def _query_module_usage(days: int) -> dict[str, Any]:
             "event_name": name,
             "label": _EVENT_LABELS.get(name, name),
             "count": cnt,
+            "users": users.get(name, 0),
         }
         for name, cnt in counts.items()
         if name not in _QUALITY_EVENTS
@@ -194,4 +223,5 @@ async def _query_module_usage(days: int) -> dict[str, Any]:
         "events": events,
         "top_search_keywords": top_search_keywords,
         "answer_quality": answer_quality,
+        "excluded_staff_events": excluded_staff_events,
     }

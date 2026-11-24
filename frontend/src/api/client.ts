@@ -1571,6 +1571,8 @@ export interface ModuleEventItem {
   event_name: string;
   label: string;
   count: number;
+  /** 不同访客数（大致 = 设备），已排除站长本人 */
+  users: number;
 }
 
 export interface KeywordItem {
@@ -1593,6 +1595,8 @@ export interface AdminModuleUsage {
   events: ModuleEventItem[];
   top_search_keywords: KeywordItem[];
   answer_quality: AnswerQuality;
+  /** 被排除的站长本人 + 本机开发事件数 */
+  excluded_staff_events?: number;
 }
 
 export async function getAdminModuleUsage(days: number = 7): Promise<AdminModuleUsage> {
