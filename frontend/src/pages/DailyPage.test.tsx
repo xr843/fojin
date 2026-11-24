@@ -45,7 +45,7 @@ function renderPage() {
 describe("每日一段页", () => {
   it("经名直达原文那一行；问小津带着原文与经名去问答页", () => {
     renderPage();
-    expect(screen.getByText("今日经句 · 2026-11-24")).toBeInTheDocument();
+    expect(screen.getByText("今日经句 · 2026-11-24 · 农历十月十六")).toBeInTheDocument();
     const src = screen.getByRole("link", { name: /金[剛刚]般若波[羅罗]蜜[經经]》卷1/ });
     expect(src.getAttribute("href")).toBe("/texts/7/read?juan=1&anchor=p0749c22&hl=1949-1957");
     fireEvent.click(screen.getByRole("button", { name: /问小津/ }));

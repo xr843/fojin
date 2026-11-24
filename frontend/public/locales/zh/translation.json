@@ -2000,5 +2000,6 @@
   "admin_dashboard.module_usage.event.daily_open_source": "今日经句：看原文",
   "admin_dashboard.module_usage.event.daily_vernacular": "今日经句：白话",
   "admin_dashboard.module_usage.event.daily_ask": "今日经句：问小津",
-  "admin_dashboard.module_usage.event.daily_share": "今日经句：分享图"
+  "admin_dashboard.module_usage.event.daily_share": "今日经句：分享图",
+  "daily.lunar": "农历{{d}}"
 }
