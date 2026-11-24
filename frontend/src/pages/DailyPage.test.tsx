@@ -5,6 +5,10 @@ import { HelmetProvider } from "react-helmet-async";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import DailyPage from "./DailyPage";
 
+vi.mock("../utils/shareCard", () => ({
+  renderShareCard: vi.fn(async () => new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" })),
+}));
+
 vi.mock("../utils/dailyPassage", () => ({
   pickDaily: () => ({
     dateKey: "2026-11-24",
@@ -49,5 +53,13 @@ describe("每日一段页", () => {
     expect(params.get("context")).toBe("應無所住而生其心"); // 送原文（繁体原字），不送转换后的字形
     expect(params.get("source")).toBe("金剛般若波羅蜜經");
     expect(params.get("q")).toBeTruthy();
+  });
+
+  it("分享图预览用 data: 地址——站点 CSP 的 img-src 不放行 blob:，用了就是坏图", async () => {
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /生成分享图/ }));
+    const img = await screen.findByRole("img", { name: /應無所住|应无所住/ });
+    expect(img.getAttribute("src")).toMatch(/^data:image\/png;base64,/);
+    expect(screen.getByRole("button", { name: /保存图片/ })).toBeInTheDocument();
   });
 });

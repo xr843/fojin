@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
@@ -9,6 +9,15 @@ import { pickDaily } from "../utils/dailyPassage";
 import { renderShareCard } from "../utils/shareCard";
 import { localizeHan } from "../utils/hanScript";
 import "../styles/daily.css";
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(blob);
+  });
+}
 
 function track(name: string, data?: Record<string, string | number>) {
   if (typeof umami !== "undefined") umami.track(name, data);
@@ -45,9 +54,6 @@ export default function DailyPage() {
     return `/chat?${p.toString()}`;
   }, [passage, t]);
 
-  useEffect(() => () => {
-    if (card) URL.revokeObjectURL(card.url);
-  }, [card]);
 
   const makeCard = async () => {
     setMaking(true);
@@ -60,7 +66,9 @@ export default function DailyPage() {
         footer: t("daily.card_footer"),
       });
       const file = new File([blob], `fojin-${dateKey}.png`, { type: "image/png" });
-      setCard({ url: URL.createObjectURL(blob), file });
+      // 必须是 data: 地址：站点 CSP 的 img-src 只放行 'self' data: https:，blob: 会被拦成坏图
+      // （2026-11-24 生产实测；本地 vite 没有 CSP，测不出来）。
+      setCard({ url: await blobToDataUrl(blob), file });
     } catch {
       message.error(t("daily.card_failed"));
     } finally {
@@ -124,9 +132,17 @@ export default function DailyPage() {
             <img src={card.url} alt={`${text} —— ${sourceLine}`} />
             <p className="daily-muted">{t("daily.save_hint")}</p>
             <div className="daily-card-actions">
-              <a href={card.url} download={card.file.name} className="ant-btn ant-btn-default" onClick={() => track("daily_share", { step: "download" })}>
+              <Button
+                onClick={() => {
+                  track("daily_share", { step: "download" });
+                  const a = document.createElement("a");
+                  a.href = card.url;
+                  a.download = card.file.name;
+                  a.click();
+                }}
+              >
                 {t("daily.download")}
-              </a>
+              </Button>
               {canSystemShare && (
                 <Button
                   type="primary"
