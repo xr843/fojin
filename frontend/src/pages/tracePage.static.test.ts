@@ -114,3 +114,34 @@ describe("fojin.ai 首页：汇总按出处类别分开计数", () => {
     expect(document.getElementById("summary")?.textContent).not.toContain("伪造");
   });
 });
+
+// 2026-11-24：贴完一大段文字后可直接 Ctrl/⌘ + 回车核对；普通回车照常换行，
+// 输入法选字时的回车（isComposing）不触发。
+describe("fojin.ai 首页：Ctrl/⌘ + 回车提交", () => {
+  it("Ctrl+回车、⌘+回车提交；普通回车与选字回车不提交", async () => {
+    const html = readFileSync(resolve(PUBLIC, "trace.html"), "utf8");
+    document.body.innerHTML = html.slice(html.indexOf("<body>") + 6, html.indexOf("</body>"));
+    window.history.replaceState(null, "", "/");
+    let calls = 0;
+    vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
+      calls++;
+      const body = JSON.parse(init.body) as { sentences: string[] };
+      const items = body.sentences.map((t) => ({ text: t, result: { verdict: "absent", segments: [{ text: t, found: false, sources: [] }] } }));
+      return { ok: true, status: 200, headers: { get: () => null }, json: async () => ({ items, dominant: null }) };
+    });
+    new Function(readFileSync(resolve(PUBLIC, "trace.js"), "utf8"))();
+    const ta = document.getElementById("trace-text") as HTMLTextAreaElement;
+    ta.value = "甲句之文字。乙句之文字。";
+    const press = (init: KeyboardEventInit) => ta.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true, ...init }));
+    press({});
+    press({ ctrlKey: true, isComposing: true });
+    await new Promise((r) => setTimeout(r, 100));
+    expect(calls).toBe(0);
+    expect(press({ ctrlKey: true })).toBe(false); // default prevented: no newline
+    await new Promise((r) => setTimeout(r, 300));
+    expect(calls).toBe(1);
+    press({ metaKey: true });
+    await new Promise((r) => setTimeout(r, 300));
+    expect(calls).toBe(2);
+  });
+});
