@@ -56,7 +56,11 @@ describe("fojin.ai 首页脚本 trace.js", () => {
     expect(cards[0].querySelector(".runinfo")?.textContent).toBe("第 1–2 句，原文连成一段");
     expect(cards[0].querySelector(".meta a")?.getAttribute("href")).toContain("hl=19-89");
     expect(cards[1].querySelector(".pre")?.textContent).toBe("佛言：");
-    expect(document.getElementById("summary")?.textContent).toBe("共 3 句，2 句出自佛经，1 句藏经中未见。");
+    expect(document.getElementById("summary")?.textContent).toBe(
+      "共 3 句，2 句出自佛经，1 句藏经中未见（未见不等于伪造，可能是改写或出自未收录的典籍）。",
+    );
+    // 底部不再有常驻说明
+    expect(document.querySelector(".notes")).toBeNull();
   });
 });
 
@@ -106,5 +110,7 @@ describe("fojin.ai 首页：汇总按出处类别分开计数", () => {
     expect(document.getElementById("summary")?.textContent).toBe(
       "共 4 句，1 句出自佛经，2 句出自论典，1 句出自注疏。",
     );
+    // 全部找到时不出现「未见不等于伪造」
+    expect(document.getElementById("summary")?.textContent).not.toContain("伪造");
   });
 });

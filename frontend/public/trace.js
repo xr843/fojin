@@ -213,7 +213,9 @@
     });
     if (tally.variant) parts.push("<b>" + tally.variant + "</b> 句经中有、用字略异");
     if (tally.partial) parts.push("<b>" + tally.partial + "</b> 句只有部分见于藏经");
-    if (tally.absent) parts.push("<b>" + tally.absent + "</b> 句藏经中未见");
+    // 「未见」最容易被读成「伪造」：只在结果里真有「未见」时，就地提醒一句
+    // （原先是页面底部一段常驻说明，全部找到时多余、有未见时又常没人看到；2026-11-24）。
+    if (tally.absent) parts.push("<b>" + tally.absent + "</b> 句藏经中未见（未见不等于伪造，可能是改写或出自未收录的典籍）");
     summary.innerHTML = parts.join("，") + "。";
     summary.hidden = false;
     return found;
