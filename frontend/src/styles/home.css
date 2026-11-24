@@ -1002,7 +1002,13 @@
   color: #e0d6c2;
 }
 
-/* 热门检索第一个：「今日一段」入口，金边朱字与普通检索词区分 */
+.home-hot-divider {
+  width: 1px;
+  height: 14px;
+  background: var(--fj-border);
+  margin: 0 4px;
+}
+/* 「今日一段」入口（在「热门检索」前面），金边朱字与普通检索词区分 */
 .home-daily-tag, .home-daily-tag:hover {
   border-color: var(--fj-gold);
   color: var(--fj-accent);
