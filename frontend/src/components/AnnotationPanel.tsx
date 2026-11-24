@@ -121,6 +121,9 @@ export default function AnnotationPanel({
       open={visible}
       onClose={onClose}
     >
+      {/* 2026-11-24 用户反馈「标注好像不是笔记功能」：生产里 4 条标注有 2 条是读者把经文
+          抄进来当摘录、被审核驳回。在入口处说清楚这是公开标注，并指向「摘录」。 */}
+      <div className="annotation-public-hint">{t("annotation.public_hint")}</div>
       <Button
         type="dashed"
         block

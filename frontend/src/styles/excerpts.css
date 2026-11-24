@@ -1,0 +1,63 @@
+/* 个人中心「我的摘录」 */
+.excerpt-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.excerpt-row {
+  padding: 14px 0;
+  border-bottom: 1px dashed var(--fj-border);
+}
+.excerpt-row:last-child {
+  border-bottom: none;
+}
+.excerpt-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+.excerpt-row-title {
+  font-family: "Noto Serif SC", serif;
+  font-size: 15px;
+  color: var(--fj-ink);
+}
+.excerpt-row-title:hover {
+  color: var(--fj-accent);
+}
+.excerpt-row-where {
+  font-size: 12px;
+  color: var(--fj-ink-muted);
+}
+.excerpt-row-quote {
+  margin: 8px 0 6px;
+  padding: 6px 12px;
+  border-left: 3px solid rgba(214, 168, 64, 0.7);
+  background: rgba(214, 168, 64, 0.1);
+  font-family: "Noto Serif SC", serif;
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--fj-ink);
+  white-space: pre-wrap;
+}
+.excerpt-row-note {
+  font-size: 14px;
+  color: var(--fj-ink-light);
+  white-space: pre-wrap;
+  margin-bottom: 4px;
+}
+.excerpt-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px 12px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  margin-top: 4px;
+}
+.excerpt-row-actions .ant-btn-link {
+  padding: 0;
+  height: auto;
+}
+.excerpt-row-edit {
+  margin-top: 6px;
+}

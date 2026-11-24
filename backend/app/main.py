@@ -72,6 +72,7 @@ from app.api import (
     commentary,
     community,
     dictionary,
+    excerpts,
     exports,
     feed,
     feedback,
@@ -264,6 +265,10 @@ _OPENAPI_TAGS = [
     {
         "name": "bookmarks",
         "description": "Personal bookmarks and collections / 个人书签与收藏",
+    },
+    {
+        "name": "excerpts",
+        "description": "Personal passage excerpts with notes (private) / 个人摘录（仅本人可见）",
     },
     {
         "name": "history",
@@ -536,6 +541,7 @@ app.include_router(search.router, prefix="/api")
 app.include_router(search_unified.router, prefix="/api")
 app.include_router(texts.router, prefix="/api")
 app.include_router(bookmarks.router, prefix="/api")
+app.include_router(excerpts.router, prefix="/api")
 app.include_router(history.router, prefix="/api")
 
 # Phase 2 routers

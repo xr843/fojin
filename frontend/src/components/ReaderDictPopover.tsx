@@ -6,9 +6,10 @@ import { MessageOutlined } from "@ant-design/icons";
 import type { DictGroupedSearchResponse, DictEntry } from "../api/client";
 import { MAX_WORD_LEN, dictPopoverAbove, type DictPopoverState } from "./ReaderDictPopover.types";
 import { ReportErrorForm, SimilarPassages, VernacularPanel } from "./ReaderSelectionExtras";
+import { ReaderExcerptForm } from "./ReaderExcerptForm";
 import type { SelectionContext } from "./ReaderSelectionExtras.types";
 
-type PopoverMode = "dict" | "vernacular" | "similar" | "report";
+type PopoverMode = "dict" | "vernacular" | "similar" | "report" | "excerpt";
 
 /** 中文释义类辞典优先（释义信息量大），多语对照类短释义靠后 */
 const HIGH_QUALITY_SOURCES = [
@@ -39,6 +40,7 @@ export function ReaderDictPopover({
   onClose,
   onAsk,
   context,
+  endLineRef,
   loggedIn = false,
 }: {
   state: DictPopoverState;
@@ -46,6 +48,8 @@ export function ReaderDictPopover({
   onAsk: (text: string) => void;
   /** 划词所在经文位置；给了才显示「全藏出处」「报错」 */
   context?: SelectionContext;
+  /** 选区末行行号（摘录存起讫行） */
+  endLineRef?: string | null;
   loggedIn?: boolean;
 }) {
   const { t } = useTranslation();
@@ -55,6 +59,7 @@ export function ReaderDictPopover({
   const mode: PopoverMode = modeFor.text === state.text ? modeFor.mode : "dict";
   const setMode = (m: PopoverMode) => {
     setModeFor({ text: state.text, mode: m });
+    if (m === "excerpt" && typeof umami !== "undefined") umami.track("reader_excerpt_open", { id: context?.textId ?? 0 });
     if ((m === "similar" || m === "report") && typeof umami !== "undefined") {
       umami.track(m === "similar" ? "reader_similar" : "reader_report_open", { id: context?.textId ?? 0 });
     }
@@ -118,6 +123,12 @@ export function ReaderDictPopover({
         </div>
       )}
 
+      {mode === "excerpt" && context && (
+        <div className="reader-dict-popover-body">
+          <ReaderExcerptForm text={state.text} context={context} endLineRef={endLineRef} loggedIn={loggedIn} onDone={onClose} />
+        </div>
+      )}
+
       {mode === "report" && context && (
         <div className="reader-dict-popover-body">
           <ReportErrorForm text={state.text} context={context} loggedIn={loggedIn} onDone={onClose} />
@@ -156,6 +167,13 @@ export function ReaderDictPopover({
         </button>
         {context && (
           <>
+            <button
+              type="button"
+              className={`reader-dict-popover-tab reader-dict-popover-excerpt${mode === "excerpt" ? " is-active" : ""}`}
+              onClick={() => setMode(mode === "excerpt" ? "dict" : "excerpt")}
+            >
+              {t("reader.excerpt.button")}
+            </button>
             <button
               type="button"
               className={`reader-dict-popover-tab${mode === "vernacular" ? " is-active" : ""}`}

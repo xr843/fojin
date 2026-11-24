@@ -71,7 +71,11 @@ export function captureScrollAnchor(container: HTMLElement, preferred?: Range | 
   return top === null ? null : { range, top };
 }
 
-/** 找 el 的实际滚动祖先；没有就是整页滚动。 */
+/**
+ * 找到 el 实际所在的滚动容器。AI 面板打开时 reader.css 把 .reader-with-sidebar 锁高、
+ * 滚动权交给 .reader-container；面板关闭时滚动的是 document（返回 null）。
+ * 续读、深链、锚点保持都必须按真实 scroller 操作。
+ */
 export function findScrollContainer(el: HTMLElement): HTMLElement | null {
   let p = el.parentElement;
   while (p) {
