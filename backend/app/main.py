@@ -97,6 +97,7 @@ from app.api import (
     source_suggestions,
     sources,
     stats,
+    study_memory,
     texts,
     urn,
     verification,
@@ -269,6 +270,10 @@ _OPENAPI_TAGS = [
     {
         "name": "excerpts",
         "description": "Personal passage excerpts with notes (private) / 个人摘录（仅本人可见）",
+    },
+    {
+        "name": "study-memory",
+        "description": "What Xiaojin remembers about your study, and your answer preferences (private) / 研读记忆（仅本人可见）",
     },
     {
         "name": "history",
@@ -542,6 +547,7 @@ app.include_router(search_unified.router, prefix="/api")
 app.include_router(texts.router, prefix="/api")
 app.include_router(bookmarks.router, prefix="/api")
 app.include_router(excerpts.router, prefix="/api")
+app.include_router(study_memory.router, prefix="/api")
 app.include_router(history.router, prefix="/api")
 
 # Phase 2 routers

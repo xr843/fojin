@@ -99,6 +99,7 @@ from app.services.prompt_builder import (  # noqa: F401
 from app.services.quote_fulljuan import load_full_juan_check
 from app.services.quote_verifier import juans_to_recheck, log_quote_mutations, verify_quoted_content
 from app.services.rag_retrieval import retrieve_rag_context
+from app.services.study_memory import build_study_memory, render_memory_block
 
 logger = logging.getLogger(__name__)
 
@@ -473,6 +474,11 @@ async def _mark_attachments_consumed(
         await db.rollback()
 
 
+def _memory_applies(user_id: int | None, master_id: str | None, reading_context: dict | None, message: str) -> bool:
+    """研读记忆只进普通问答路径：登录、无祖师、非阅读页、非元问题（见 services/study_memory.py）。"""
+    return user_id is not None and not master_id and not reading_context and not _is_meta_question(message)
+
+
 async def _prepare_chat(
     db: AsyncSession,
     user_id: int | None,
@@ -591,10 +597,27 @@ async def _prepare_chat(
         else:
             llm_message_override = attachment_prefix + message
 
+    # 研读记忆：只在普通问答路径（无祖师、非阅读页、非元问题）——与引文纪律后缀同一条、
+    # 也是唯一被评测覆盖的路径（见 services/study_memory.py）。读者关掉了就是空串。
+    memory_block = ""
+    if _memory_applies(user_id, master_id, reading_context, message):
+        try:
+            # 包在 SAVEPOINT 里：查询出错只回滚这一小段，不把整个准备阶段的事务
+            # （后面还要提交额度）弄成失败状态。
+            async with db.begin_nested():
+                memory = await build_study_memory(
+                    db, user_id, exclude_session_id=chat_session.id if chat_session else None,
+                )
+            memory_block = render_memory_block(memory)
+        except Exception:
+            # 记忆是锦上添花：查不出来就照常作答，不能让一次提问失败。
+            logger.warning("study memory build failed (user_id=%s)", user_id, exc_info=True)
+
     llm_messages = _build_llm_messages(
         history, context_text, message, master_id=master_id,
         reading_context=reading_context,
         llm_message_override=llm_message_override,
+        memory_block=memory_block,
     )
 
     return (

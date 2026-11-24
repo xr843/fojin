@@ -43,6 +43,8 @@ export const MODULE_GROUPS: GroupDef[] = [
       one("master_link"),
       one("chat_regenerate"),
       one("xiaojin_chat"),
+      one("study_memory_continue"),
+      one("study_memory_save"),
     ],
   },
   {

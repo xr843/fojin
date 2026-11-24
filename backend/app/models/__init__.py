@@ -21,6 +21,7 @@ from app.models.knowledge_graph import KGEntity, KGRelation
 from app.models.relation import TextRelation
 from app.models.sentence_alignment import SentenceAlignment
 from app.models.source import DataSource, SourceDistribution, TextIdentifier
+from app.models.study_memory import UserStudyMemory
 from app.models.term_concept import TermConcept, TermConceptEntry
 from app.models.text import (
     ApparatusReading,
@@ -70,6 +71,7 @@ __all__ = [
     "TextRelation",
     "User",
     "UserExcerpt",
+    "UserStudyMemory",
     "Work",
     "WorkAlias",
     "WorkWitness",

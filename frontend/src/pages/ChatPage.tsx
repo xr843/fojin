@@ -48,6 +48,7 @@ import ReasoningExcerpt from "../components/ReasoningExcerpt";
 import PassageLocateCard from "../components/PassageLocateCard";
 import AnswerSummaryBar from "../components/AnswerSummaryBar";
 import CitationSidebar, { type CitationPanelRequest } from "../components/CitationSidebar";
+import StudyContinueStrip from "../components/StudyContinueStrip";
 import AnswerCitationEntry from "../components/AnswerCitationEntry";
 import { getMasters } from "../api/client";
 import { findSavedAnswer } from "./chatRecovery";
@@ -2333,6 +2334,8 @@ export default function ChatPage() {
                   {t("chat.master_disclaimer")}
                 </div>
               )}
+              {/* 研读记忆「接着研读」：只给登录读者、普通问答（选了祖师时记忆不进提示词，入口也不出） */}
+              {messages.length === 0 && token && !selectedMaster && <StudyContinueStrip />}
               {/* 建议卡片的占位。空态整组（标题/输入框/卡片）由 lead 与 trail 两个撑高块
                   上下均分剩余高度而居中，卡片却要等接口回来才渲染：卡片一出现整组变高，
                   居中点上移，输入框连同标题往上跳 113px（2026-11-08 真机 Chrome
