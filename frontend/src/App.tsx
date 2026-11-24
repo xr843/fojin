@@ -40,6 +40,7 @@ const ReadPage = lazy(() => import("./pages/ReadPage"));
 const ReadAloudPage = lazy(() => import("./pages/ReadAloudPage"));
 const CrossCanonPage = lazy(() => import("./pages/CrossCanonPage"));
 const AdminDashboardPage = lazy(() => import("./pages/AdminDashboardPage"));
+const DailyPage = lazy(() => import("./pages/DailyPage"));
 const AdminAnswerQualityPage = lazy(() => import("./pages/AdminAnswerQualityPage"));
 const AdminUsersPage = lazy(() => import("./pages/AdminUsersPage"));
 const AdminInboxPage = lazy(() => import("./pages/AdminInboxPage"));
@@ -78,6 +79,7 @@ function App() {
             <Route path="/read-aloud" element={<ReadAloudPage />} />
             <Route path="/read" element={<ReadPage />} />
             <Route path="/collections" element={<CollectionsPage />} />
+            <Route path="/daily" element={<DailyPage />} />
             <Route path="/collections/:collectionId" element={<CollectionsPage />} />
             <Route path="/cross-canon" element={<CrossCanonPage />} />
             {/* /topics 已并入 /collections（nginx 对爬虫做 301）；这条兜站内旧链接与 PWA 旧壳。 */}

@@ -1,0 +1,89 @@
+/* 每日一段 */
+.daily-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 40px 20px 60px;
+  text-align: center;
+}
+.daily-date {
+  font-family: "Noto Serif SC", serif;
+  color: var(--fj-accent);
+  letter-spacing: 0.1em;
+  font-size: 15px;
+}
+.daily-text {
+  margin: 36px 0 20px;
+  padding: 0;
+  border: none;
+  font-family: "Noto Serif SC", serif;
+  font-size: 28px;
+  line-height: 1.9;
+  color: var(--fj-ink);
+}
+.daily-source {
+  font-family: "Noto Serif SC", serif;
+  color: var(--fj-ink-light);
+}
+.daily-source a {
+  color: var(--fj-ink-light);
+  border-bottom: 1px dashed var(--fj-gold);
+}
+.daily-source a:hover {
+  color: var(--fj-accent);
+}
+.daily-verified {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 0 8px;
+  font-size: 12px;
+  border: 1px solid var(--fj-border);
+  border-radius: 999px;
+  color: var(--fj-success);
+}
+.daily-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin: 32px 0 20px;
+}
+.daily-vernacular {
+  text-align: left;
+  margin: 0 auto 16px;
+  padding: 14px 18px;
+  border-left: 3px solid var(--fj-gold);
+  background: var(--fj-card-bg);
+  line-height: 1.8;
+  color: var(--fj-ink);
+}
+.daily-vernacular p {
+  margin: 0;
+}
+.daily-vernacular-tag {
+  font-size: 12px;
+  color: var(--fj-warning);
+  margin-bottom: 6px;
+}
+.daily-muted {
+  color: var(--fj-ink-muted);
+  font-size: 13px;
+}
+.daily-note {
+  margin-top: 28px;
+}
+.daily-card-preview {
+  text-align: center;
+}
+.daily-card-preview img {
+  width: 100%;
+  border: 1px solid var(--fj-border);
+}
+.daily-card-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+@media (max-width: 768px) {
+  .daily-page { padding-top: 24px; }
+  .daily-text { font-size: 22px; margin-top: 24px; }
+}
