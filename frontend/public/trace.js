@@ -394,6 +394,19 @@
   }
 
   input.addEventListener("input", updateCount);
+
+  // Ctrl/⌘ + 回车直接核对（贴完长文不必再去点按钮）。普通回车照常换行；
+  // 输入法选字的回车（isComposing）不算。提示只在有鼠标键盘的设备上显示。
+  input.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter" || !(e.ctrlKey || e.metaKey) || e.isComposing) return;
+    e.preventDefault();
+    if (!go.disabled) form.requestSubmit ? form.requestSubmit(go) : go.click();
+  });
+  var kbd = document.getElementById("trace-kbd");
+  if (kbd && window.matchMedia && window.matchMedia("(pointer: fine)").matches) {
+    kbd.textContent = /Mac|iPhone|iPad/.test(navigator.platform || "") ? "⌘ + 回车" : "Ctrl + 回车";
+    kbd.hidden = false;
+  }
   form.addEventListener("submit", function (e) {
     e.preventDefault();
     var text = input.value.trim();
