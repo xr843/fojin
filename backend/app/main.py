@@ -99,7 +99,6 @@ from app.api import (
     stats,
     study_memory,
     texts,
-    tibetan_zh,
     urn,
     verification,
     works,
@@ -617,9 +616,6 @@ app.include_router(alignment_review.router, prefix="/api")
 
 # Notifications
 app.include_router(notification.router, prefix="/api")
-
-# 藏译汉稿：只读转发 tibetan-canon-zh（AI 译稿，不入库、不进 ES/RAG，见 services/tibetan_zh.py）
-app.include_router(tibetan_zh.router, prefix="/api")
 
 # SEO: sitemap at root (no /api prefix)
 app.include_router(sitemap.router)
