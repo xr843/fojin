@@ -21,7 +21,7 @@ import {
   GithubOutlined,
   GlobalOutlined,
   HighlightOutlined,
-  // TranslationOutlined,  // cross-canon nav hidden (板块待打磨；路由仍可直达 /cross-canon)
+  TranslationOutlined,  // 藏译汉稿（cross-canon 导航仍隐藏：板块待打磨，路由仍可直达 /cross-canon）
   // DownloadOutlined,   // exports nav hidden (开放数据 暂不对外公开)
   // ExperimentOutlined,  // research nav hidden (研究助手 待重构后再上线)
   // BarChartOutlined,   // dashboard nav hidden (数据总览 暂不对外公开)
@@ -123,6 +123,8 @@ export default function Layout() {
     // fojin-mcp 保留，/research 路由仍可直达。
     // { icon: <ExperimentOutlined />, label: t("nav.research"), path: "/research" },
     { icon: <ApartmentOutlined />, label: t("nav.kg"), path: "/kg" },
+    // 藏译汉稿：开源项目 tibetan-canon-zh 的 AI 汉译稿（未经专家审定，只展示、不进问答/检索）。
+    { icon: <TranslationOutlined />, label: t("nav.tibetan_zh"), path: "/tibetan-zh" },
     // 佛教地理暂从导航撤下（2026-10-17 用户要求）。路由 /map 仍可直达（首页卡片、分享链接、
     // SEO 收录不受影响），恢复时取消下一行注释。
     // { icon: <GlobalOutlined />, label: t("nav.geo"), path: "/map" },
