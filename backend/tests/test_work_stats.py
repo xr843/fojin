@@ -81,3 +81,34 @@ def test_incomplete_collection_is_flagged():
 def test_split_part_pattern():
     assert ws._PART_RE.match("T0220c").group(1) == "T0220"
     assert ws._PART_RE.match("T0279") is None
+
+
+def test_writing_requirements_are_not_stats_questions():
+    # 2026-11-26 回放生产历史提问：这些含「字数/篇幅」但不是在问经的篇幅
+    for q in (
+        "举个生活实例说明「以无常观，珍惜当下」，字数在300字左右",
+        "请重新生成，字数不少于2000字",
+        "由于整体篇幅受限，我只能准备1-2页的PPT",
+        "选取一位禅师阐述其主要禅法思想。字数不限",
+        "整理成一个表格，表格包括：论中的原文，消文，出处（第几卷）",
+    ):
+        assert not ws.has_stats_intent(q), q
+    for q in ("80卷华严每卷字数", "诵一部解深密经多少字", "阿含经多少卷", "普贤行愿品一共多少字"):
+        assert ws.has_stats_intent(q), q
+
+
+def test_short_names_without_jing_lun():
+    assert ws._SHORT_ALIASES["俱舍"] == "俱舍论"
+    assert ws._SHORT_ALIASES["法华"] == "法华经"
+    # 品名不当整部经：问「普贤行愿品多少字」给 40 卷的数会被当成那一品的数
+    assert not any(k.endswith("品") or v.endswith("品") for k, v in ws._SHORT_ALIASES.items())
+    assert all(len(k) >= 2 for k in ws._SHORT_ALIASES)
+    assert ws._EXTRA_ALIASES["华严"] == ("T0278", "T0279", "T0293")
+
+
+def test_juan_hint():
+    assert ws.juan_hint("80卷华严每卷字数") == 80
+    assert ws.juan_hint("八十卷華嚴") == 80
+    assert ws.juan_hint("四十卷本") == 40
+    assert ws.juan_hint("六十卷") == 60
+    assert ws.juan_hint("华严经有几卷") is None

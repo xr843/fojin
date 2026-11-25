@@ -27,7 +27,10 @@ from app.services.text_titles import strip_volume_range
 logger = logging.getLogger(__name__)
 
 # 问字数/卷数/篇幅才触发。繁简都写上（「數」「卷數」）。
-_STATS_INTENT_RE = re.compile(r"字数|字數|多少字|几个字|幾個字|几字|幾字|多少卷|几卷|幾卷|卷数|卷數|篇幅|总字|總字")
+# 「出处（第几卷）」是问引文在哪一卷，不是问这部经有几卷
+_STATS_INTENT_RE = re.compile(
+    r"字数|字數|多少字|几个字|幾個字|几字|幾字|(?<!第)(?:多少卷|几卷|幾卷)|卷数|卷數|篇幅|总字|總字"
+)
 
 MAX_WORKS = 4  # 同名多译本（华严三译）一起给
 MAX_JUAN_LISTED = 120  # 超过就只给总数（大般若 600 卷之类）
@@ -36,8 +39,50 @@ MIN_TITLE_CHARS = 3  # 两字题名（「中論」）太容易误中，交给《
 _HAN_CLASS = r"一-鿿㐀-䶿豈-﫿\U00020000-\U0003ffff"
 
 
+# 写作要求里的「字数300字左右」「篇幅受限」不是在问经的篇幅（2026-11-26 回放生产历史提问）
+_WRITING_REQ_RE = re.compile(
+    r"字数(?:在|不少于|不多于|不超过|不低于|约|控制在|要求)?\s*[\d一二三四五六七八九十百千万两]+|字左右|字数不限|篇幅(?:受限|所限|有限)"
+)
+
+# 不带「经/论」的简称（「80卷华严每卷字数」「俱舍几卷」）：从别名表派生，去掉末字「经」「论」后
+# 至少两字才收。品名（普贤行愿品、普门品）不收——问的是一品，给整部经的数会被当成那一品的数。
+_SHORT_ALIASES: dict[str, str] = {
+    k[:-1]: k for k in CARD_WORK_ALIASES if k[-1] in "经论" and len(k) >= 3 and not k.endswith("品")
+}
+# 「华严」三译都给，再按问题里的卷数挑（别名表里的「华严经」只指 60/80 卷本，是卡片检索用的）
+_EXTRA_ALIASES: dict[str, tuple[str, ...]] = {"华严": ("T0278", "T0279", "T0293")}
+
+_CN_NUM = {"一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
+_JUAN_HINT_RE = re.compile(r"([\d]+|[一二两三四五六七八九十百]+)\s*卷")
+
+
 def has_stats_intent(question: str) -> bool:
-    return bool(_STATS_INTENT_RE.search(question or ""))
+    q = question or ""
+    return bool(_STATS_INTENT_RE.search(q)) and not _WRITING_REQ_RE.search(q)
+
+
+def _cn_to_int(s: str) -> int | None:
+    if s.isdigit():
+        return int(s)
+    total, cur = 0, 0
+    for ch in s:
+        if ch in _CN_NUM:
+            cur = _CN_NUM[ch]
+        elif ch == "十":
+            total += (cur or 1) * 10
+            cur = 0
+        elif ch == "百":
+            total += (cur or 1) * 100
+            cur = 0
+        else:
+            return None
+    return total + cur or None
+
+
+def juan_hint(question: str) -> int | None:
+    """「80卷华严」「八十卷本」→ 80；问「几卷」时没有数字，返回 None。"""
+    m = _JUAN_HINT_RE.search(question or "")
+    return _cn_to_int(m.group(1)) if m else None
 
 
 def _drop_contained(titles: list[str]) -> list[str]:
@@ -72,12 +117,28 @@ async def _resolve_ids(db: AsyncSession, question: str) -> list[int]:
 
     # 3) 通称别名（「华严经」「俱舍论」）。问题里写了比别名更长的完整题名时以题名为准
     #    （「大方廣佛華嚴經」要连 40 卷本一起给，别名「华严经」只指 60/80 卷本）。
-    for alias in sorted(CARD_WORK_ALIASES, key=len, reverse=True):
+    for alias, ids_or_name in _alias_candidates():
         if alias in question or _to_traditional(alias) in question:
             if len(alias) >= longest_title:
-                return list(dict.fromkeys(await resolve_named_work(db, alias)))
+                if isinstance(ids_or_name, tuple):
+                    rows = await db.execute(
+                        sql_text(
+                            "SELECT id FROM buddhist_texts WHERE cbeta_id = ANY(:c) AND lang = 'lzh' "
+                            "AND has_content ORDER BY cbeta_id"
+                        ),
+                        {"c": list(ids_or_name)},
+                    )
+                    return [r[0] for r in rows]
+                return list(dict.fromkeys(await resolve_named_work(db, ids_or_name)))
             break
     return list(dict.fromkeys(title_ids))
+
+
+def _alias_candidates() -> list[tuple[str, str | tuple[str, ...]]]:
+    """(问题里要找的写法, 别名表键 或 cbeta_id 元组)，长的先试。品名不参与。"""
+    cands: list[tuple[str, str | tuple[str, ...]]] = [(k, k) for k in CARD_WORK_ALIASES if not k.endswith("品")]
+    cands += list(_SHORT_ALIASES.items()) + list(_EXTRA_ALIASES.items())
+    return sorted(cands, key=lambda c: len(c[0]), reverse=True)
 
 
 _PART_RE = re.compile(r"^([A-Z]+\d+)[a-z]$")
@@ -199,6 +260,10 @@ async def lookup_work_stats(db: AsyncSession, question: str, prev_question: str 
                 "juans": [(r[1], int(r[3] or 0)) for r in wrows],
             }
         )
+    # 「80卷华严」：同名多译本里只留卷数对得上的那一部
+    hint = juan_hint(question)
+    if hint and len(works) > 1 and any(w["n_juan"] == hint for w in works):
+        works = [w for w in works if w["n_juan"] == hint]
     if not works:
         return ""
     logger.info("work stats injected: %s", ",".join(w["cbeta_id"] for w in works))
