@@ -21,6 +21,14 @@ from app.services.text import canon_from_cbeta_id, canon_label_zh
         ("VRI-an1", "pali", "巴利三藏"),
         ("84K-toh11", "kangyur", "甘珠尔"),
         ("GRETIL-rama", "gretil", "梵文 GRETIL"),
+        # 大正藏、卍续藏以外的 CBETA 各藏
+        ("JB095", "jiaxing", "嘉兴藏"),
+        ("JA042", "jiaxing", "嘉兴藏"),
+        ("GA0023", "cbeta_ga", "中国佛寺史志汇刊"),
+        ("G2241", "cbeta_g", "佛教大藏经"),
+        ("ZWa044", "cbeta_zw", "藏外佛教文献"),
+        ("Ba001", "cbeta_b", "大藏经补编"),
+        ("N0006", "nanchuan", "汉译南传大藏经"),
     ],
 )
 def test_canon_from_known_prefix(
@@ -31,7 +39,8 @@ def test_canon_from_known_prefix(
     assert canon_label_zh(code) == expected_label
 
 
-@pytest.mark.parametrize("cbeta_id", [None, "", "UNKNOWN-001", "FOO0001"])
+# TX/Y/LC/YP：著作权不在 CBETA 的 CC 授权内、佛津不收——不能因为以 T 开头就被当成大正藏
+@pytest.mark.parametrize("cbeta_id", [None, "", "UNKNOWN-001", "FOO0001", "TX0001", "Y0001", "LC0001", "YP0001"])
 def test_canon_unknown_prefix_returns_none(cbeta_id: str | None) -> None:
     code = canon_from_cbeta_id(cbeta_id)
     assert code is None

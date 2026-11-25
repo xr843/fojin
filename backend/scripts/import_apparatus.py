@@ -28,7 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.config import settings
-from app.core.xml_parser import find_all_xml_files, parse_tei_apparatus
+from app.core.xml_parser import collection_of, find_all_xml_files, parse_tei_apparatus
 from app.models.text import (
     ApparatusReading,
     BuddhistText,
@@ -69,14 +69,27 @@ def clear_checkpoint():
         os.remove(CHECKPOINT_FILE)
 
 
-async def import_work(session: AsyncSession, bt: BuddhistText, xml_dir: str) -> dict:
+def juans_safe_for_anchors(parsed: dict[int, str], stored: dict[int, str]) -> set[int]:
+    """可以写行号的卷：XML 解析出的正文与库里存的逐字相同。行号是正文里的字符偏移，
+    正文对不上（XML 换了 CBETA 版本、卷被手工修过）时写进去会指错字。"""
+    return {jn for jn, c in parsed.items() if stored.get(jn) == c}
+
+
+async def import_work(session: AsyncSession, bt: BuddhistText, xml_dir: str, anchors_only: bool = False) -> dict:
     """Parse + store apparatus and line anchors for one work, then commit.
 
     Alignment is validated against the body content ALREADY STORED in
     text_contents (not the freshly parsed XML), so XML/DB drift can only
     downgrade an entry to aligned=False — never silently misposition it.
 
-    Returns counts: {entries, aligned, skipped_no_juan, readings, line_anchors}.
+    Line anchors are only (re)written for juans whose freshly parsed body equals the stored body
+    character for character: an anchor is an offset into that body, so an XML from a different
+    CBETA release would point every later line at the wrong characters. Mismatched juans keep
+    their existing anchors and are counted in ``anchor_juans_skipped``.
+
+    anchors_only=True leaves text_apparatus untouched (used to rebuild line anchors alone).
+
+    Returns counts: {entries, aligned, skipped_no_juan, readings, line_anchors, anchor_juans_skipped}.
     """
     xml_files = find_all_xml_files(bt.cbeta_id, xml_dir)
     if not xml_files:
@@ -97,8 +110,11 @@ async def import_work(session: AsyncSession, bt: BuddhistText, xml_dir: str) -> 
     seen_app: set[tuple] = set()
     seen_line: set[tuple] = set()
     drift = 0
+    parsed_content: dict[int, str] = {}
     for xml_file in xml_files:
         data = parse_tei_apparatus(xml_file)
+        for jn, c in data.get("contents", {}).items():
+            parsed_content.setdefault(jn, c)
         for e in data["entries"]:
             if e["juan_num"] is None:
                 entries.append(e)  # unlocatable (preface/skipped tag) — counted, not stored
@@ -124,12 +140,24 @@ async def import_work(session: AsyncSession, bt: BuddhistText, xml_dir: str) -> 
     if drift:
         logger.warning("%s: %d entries failed stored-content re-validation (XML/DB drift)", bt.cbeta_id, drift)
 
+    # 行号锚点只写进正文与库里逐字相同的卷（见 docstring）。
+    anchor_juans = juans_safe_for_anchors(parsed_content, stored_content)
+    anchor_skipped = sorted(set(parsed_content) - anchor_juans)
+    if anchor_skipped:
+        logger.warning("%s: juans %s differ from stored content — line anchors left as they were",
+                       bt.cbeta_id, anchor_skipped[:10])
+    line_rows = [la for la in line_rows if la["juan_num"] in anchor_juans]
+
     # Idempotent reinsert.
-    await session.execute(delete(TextApparatus).where(TextApparatus.text_id == bt.id))
-    await session.execute(delete(TextLineAnchor).where(TextLineAnchor.text_id == bt.id))
+    if not anchors_only:
+        await session.execute(delete(TextApparatus).where(TextApparatus.text_id == bt.id))
+    if anchor_juans:
+        await session.execute(
+            delete(TextLineAnchor).where(TextLineAnchor.text_id == bt.id, TextLineAnchor.juan_num.in_(anchor_juans))
+        )
 
     aligned = skipped = readings = 0
-    for e in entries:
+    for e in ([] if anchors_only else entries):
         if e["juan_num"] is None:
             skipped += 1
             continue
@@ -175,6 +203,7 @@ async def import_work(session: AsyncSession, bt: BuddhistText, xml_dir: str) -> 
         "skipped_no_juan": skipped,
         "readings": readings,
         "line_anchors": len(line_rows),
+        "anchor_juans_skipped": len(anchor_skipped),
     }
 
 
@@ -182,10 +211,11 @@ async def get_texts_for_collection(session: AsyncSession, collection: str) -> li
     result = await session.execute(
         select(BuddhistText).where(BuddhistText.cbeta_id.startswith(collection)).order_by(BuddhistText.cbeta_id)
     )
-    return list(result.scalars().all())
+    # startswith 会把 GA/GB 算进 G、TX 算进 T——按经号解析出的藏精确过滤。
+    return [bt for bt in result.scalars().all() if collection_of(bt.cbeta_id) == collection]
 
 
-async def import_collection(session_factory, collection, xml_dir, limit=0, resume_after=None) -> tuple:
+async def import_collection(session_factory, collection, xml_dir, limit=0, resume_after=None, anchors_only=False) -> tuple:
     """Returns (works_with_apparatus, total_entries, total_aligned, last_cbeta_id)."""
     async with session_factory() as session:
         texts = await get_texts_for_collection(session, collection)
@@ -205,10 +235,12 @@ async def import_collection(session_factory, collection, xml_dir, limit=0, resum
         if not texts:
             return 0, 0, 0, None
 
-        works = total_entries = total_aligned = 0
+        works = total_entries = total_aligned = total_lines = skipped_juans = 0
         last_id = None
         for i, bt in enumerate(texts):
-            counts = await import_work(session, bt, xml_dir)
+            counts = await import_work(session, bt, xml_dir, anchors_only=anchors_only)
+            total_lines += counts.get("line_anchors", 0)
+            skipped_juans += counts.get("anchor_juans_skipped", 0)
             if counts.get("entries"):
                 works += 1
                 total_entries += counts["entries"]
@@ -218,10 +250,12 @@ async def import_collection(session_factory, collection, xml_dir, limit=0, resum
                 await session.commit()
                 pct = (100 * total_aligned / total_entries) if total_entries else 0
                 print(f"  [{collection}] {i + 1}/{len(texts)} works, {works} w/ apparatus, "
-                      f"{total_entries} entries ({pct:.1f}% aligned)")
+                      f"{total_entries} entries ({pct:.1f}% aligned), {total_lines} line anchors, "
+                      f"{skipped_juans} juans kept old anchors (content differs)", flush=True)
                 save_checkpoint({"collection": collection, "last_cbeta_id": last_id,
                                  "works": works, "total_entries": total_entries})
         await session.commit()
+        print(f"  [{collection}] line anchors written: {total_lines}; juans kept old anchors: {skipped_juans}")
         return works, total_entries, total_aligned, last_id
 
 
@@ -233,6 +267,8 @@ async def main():
     parser.add_argument("--limit", type=int, default=0, help="Limit works (0=all)")
     parser.add_argument("--all", action="store_true", help="All CBETA collections")
     parser.add_argument("--resume", action="store_true", help="Resume from checkpoint")
+    parser.add_argument("--anchors-only", action="store_true",
+                        help="Only rebuild text_line_anchors; leave text_apparatus untouched")
     args = parser.parse_args()
 
     if not args.collection and not args.work and not args.all:
@@ -250,7 +286,7 @@ async def main():
                 if not bt:
                     print(f"Work {args.work} not found")
                     return
-                counts = await import_work(session, bt, args.xml_dir)
+                counts = await import_work(session, bt, args.xml_dir, anchors_only=args.anchors_only)
                 await session.commit()
                 print(f"{args.work}: {counts}")
         else:
@@ -268,7 +304,8 @@ async def main():
                         continue
                 after = resume_after if col == resume_collection else None
                 works, entries, aligned, _ = await import_collection(
-                    session_factory, col, args.xml_dir, limit=args.limit, resume_after=after
+                    session_factory, col, args.xml_dir, limit=args.limit, resume_after=after,
+                    anchors_only=args.anchors_only,
                 )
                 grand_entries += entries
                 grand_aligned += aligned

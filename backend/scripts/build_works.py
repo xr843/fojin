@@ -99,26 +99,10 @@ def normalize_skt_title(title: str | None) -> str:
 
 
 def canon_from_cbeta_id(cbeta_id: str | None) -> str | None:
-    """Map a cbeta_id prefix to a canon label.
+    """Map a cbeta_id prefix to a canon label — delegates to the runtime helper so the two never drift."""
+    from app.services.text import canon_from_cbeta_id as _runtime
 
-    T... → taisho, X... → xuzang, SC-... → pali, 84K-toh... → kangyur,
-    GRETIL-... → gretil, VRI-... → pali. Unknown → None.
-    """
-    if not cbeta_id:
-        return None
-    if cbeta_id.startswith("SC-"):
-        return "pali"
-    if cbeta_id.startswith("84K-toh"):
-        return "kangyur"
-    if cbeta_id.startswith("GRETIL-"):
-        return "gretil"
-    if cbeta_id.startswith("VRI-"):
-        return "pali"
-    if cbeta_id.startswith("T"):
-        return "taisho"
-    if cbeta_id.startswith("X"):
-        return "xuzang"
-    return None
+    return _runtime(cbeta_id)
 
 
 def role_from_lang(lang: str | None) -> str:

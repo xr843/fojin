@@ -17,6 +17,36 @@ _CANON_LABELS_ZH: dict[str, str] = {
     "gretil": "梵文 GRETIL",
 }
 
+# 大正藏、卍续藏以外的 CBETA 各藏的显示名（简体）。
+# 印順、太虛、呂澂、演培四套著作权不在 CBETA 的 CC 授权内，佛津不收，这里也不列。
+_OTHER_CBETA_CANONS_ZH: dict[str, str] = {
+    "A": "赵城金藏",
+    "B": "大藏经补编",
+    "C": "中华大藏经",
+    "CC": "CBETA 选集",
+    "D": "国图善本佛典",
+    "F": "房山石经",
+    "G": "佛教大藏经",
+    "GA": "中国佛寺史志汇刊",
+    "GB": "中国佛寺志丛刊",
+    "I": "北朝佛教石刻拓片",
+    "J": "嘉兴藏",
+    "K": "高丽藏",
+    "L": "乾隆藏",
+    "M": "卍正藏",
+    "N": "汉译南传大藏经",
+    "P": "永乐北藏",
+    "S": "宋藏遗珍",
+    "U": "洪武南藏",
+    "ZS": "正史佛教资料类编",
+    "ZW": "藏外佛教文献",
+}
+# 嘉兴藏、南传沿用搜索分面里早就预留的码（services/search_facets.CANONS），其余为 cbeta_<藏号小写>。
+_OTHER_CBETA_CANON_CODES: dict[str, str] = {
+    k: {"J": "jiaxing", "N": "nanchuan"}.get(k, f"cbeta_{k.lower()}") for k in _OTHER_CBETA_CANONS_ZH
+}
+_CANON_LABELS_ZH.update({_OTHER_CBETA_CANON_CODES[k]: v for k, v in _OTHER_CBETA_CANONS_ZH.items()})
+
 
 def canon_from_cbeta_id(cbeta_id: str | None) -> str | None:
     """Map a cbeta_id prefix to its canon code.
@@ -34,10 +64,15 @@ def canon_from_cbeta_id(cbeta_id: str | None) -> str | None:
         return "gretil"
     if cbeta_id.startswith("VRI-"):
         return "pali"
-    if cbeta_id.startswith("T"):
+    from app.core.xml_parser import collection_of
+
+    coll = collection_of(cbeta_id)
+    if coll == "T":
         return "taisho"
-    if cbeta_id.startswith("X"):
+    if coll == "X":
         return "xuzang"
+    if coll in _OTHER_CBETA_CANON_CODES:
+        return _OTHER_CBETA_CANON_CODES[coll]
     return None
 
 
