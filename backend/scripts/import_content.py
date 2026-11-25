@@ -29,6 +29,7 @@ from elasticsearch.helpers import async_bulk
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import settings
+from app.core.elasticsearch import init_es
 from app.core.elasticsearch import CONTENT_INDEX_NAME
 from app.core.xml_parser import collection_of, find_all_xml_files, parse_tei_xml
 from app.services.gaiji import GaijiNormalizer, build_normalizer, normalize_for_index
@@ -282,7 +283,7 @@ async def main():
 
     engine = create_async_engine(settings.database_url)
     session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    es = AsyncElasticsearch(settings.es_host)
+    es = await init_es()  # 生产 ES 开了认证
 
     # Build the gaiji normalizer once. ~10MB in-memory snapshot of 31k
     # CBETA gaiji entries. If the gaiji table is empty (script run on a
