@@ -19,6 +19,11 @@
   font-size: 28px;
   line-height: 1.9;
   color: var(--fj-ink);
+  text-wrap: balance;
+}
+/* 只在分句标点处换行，不把一两个字孤零零甩到下一行 */
+.daily-clause {
+  display: inline-block;
 }
 .daily-source {
   font-family: "Noto Serif SC", serif;

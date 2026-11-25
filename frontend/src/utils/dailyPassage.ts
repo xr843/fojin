@@ -46,3 +46,11 @@ export function pickDaily(now: Date, pool: DailyPassage[] = DAILY_PASSAGES): { p
 export function quotePassage(text: string, lang: string): string {
   return lang.startsWith("zh-Hant") || lang === "zh-TW" || lang === "zh-HK" ? `「${text}」` : `“${text}”`;
 }
+
+/**
+ * 把经句切成分句（每段带着自己的标点与引号），页面上每段 inline-block，只在标点处换行——
+ * 否则窄一点的屏幕会把「不能見如來。」」拆成「不能見如」+「來。」」，孤字落到第二行。
+ */
+export function splitClauses(text: string): string[] {
+  return text.match(/[「“]?[^，。；：？！、]+[，。；：？！、]*[」”]?/g) ?? [text];
+}
