@@ -304,11 +304,13 @@
   justify-content: center;
   gap: 8px;
   max-width: 920px;
-  margin: -14px auto 24px;
+  margin: -20px auto 32px;
   font-family: "Noto Serif SC", serif;
   font-size: 13px;
+  /* 浅色底上压着山和飞鸟：加一圈纸色光晕，文字不发虚 */
+  text-shadow: 0 0 6px rgba(248, 245, 239, 0.95), 0 0 2px rgba(248, 245, 239, 0.9);
 }
-.home-recent-label { flex-shrink: 0; color: var(--fj-ink-muted); letter-spacing: 1px; }
+.home-recent-label { flex-shrink: 0; color: var(--fj-ink-light); letter-spacing: 1px; }
 .home-recent-list {
   display: flex;
   align-items: center;
@@ -328,7 +330,7 @@
   align-items: baseline;
   gap: 2px;
   min-width: 0;
-  color: var(--fj-ink-light);
+  color: var(--fj-ink);
   text-decoration: none;
 }
 .home-recent-title {
@@ -337,7 +339,7 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.home-recent-meta { flex-shrink: 0; font-size: 12px; color: var(--fj-ink-muted); }
+.home-recent-meta { flex-shrink: 0; font-size: 12px; color: var(--fj-ink-light); }
 .home-recent-open:hover .home-recent-title,
 .home-recent-open:focus-visible .home-recent-title { color: var(--fj-highlight); text-decoration: underline; }
 .home-recent-del {
@@ -834,7 +836,7 @@
   .home-title { font-size: 64px; margin-bottom: 2px; }
   .home-subtitle { margin-bottom: 20px; }
   .search-combo { margin-bottom: 14px; }
-  .home-recent { margin: -8px auto 16px; }
+  .home-recent { margin: -14px auto 22px; }
   .home-stat-num { font-size: 30px; margin-bottom: 6px; }
   .home-features { margin-top: 18px; }
   .home-feature-card { padding: 14px 14px; }
@@ -865,7 +867,7 @@
 
 
   /* 手机：标签单独一行，卡片横向滑动（列表自己滚，页面不横向溢出） */
-  .home-recent { margin: -6px auto 18px; padding: 0 4px; }
+  .home-recent { margin: -10px auto 22px; padding: 0 4px; }
   /* 手机一行只放得下两部 */
   .home-recent-item:nth-child(n + 3) { display: none; }
   .home-recent-title { max-width: 7em; }
@@ -952,12 +954,19 @@
   display: inline-block;
   margin-left: 10px;
   font-family: "Noto Serif SC", serif;
-  font-size: 13px;
-  color: var(--fj-ink-muted);
+  font-size: 14px;
+  color: var(--fj-ink-light);
+  text-shadow: 0 0 6px rgba(248, 245, 239, 0.95), 0 0 2px rgba(248, 245, 239, 0.9);
 }
 :root[data-theme="dark"] .home-daily,
 :root[data-theme="dark"] .home-daily:hover { color: #f0e8d8; }
 :root[data-theme="dark"] .home-daily:hover { background: rgba(74, 65, 51, 0.5); }
+/* 深色主题首页仍是浅色山水底：与下方「收录典籍」等标签同一套深色描边 */
+:root[data-theme="dark"] .home-daily,
+:root[data-theme="dark"] .home-daily-source,
+:root[data-theme="dark"] .home-recent {
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.9), 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 1px rgba(0, 0, 0, 0.95);
+}
 :root[data-theme="dark"] .home-daily-source { color: #d8cdb8; }
 @media (min-width: 769px) and (max-height: 820px) {
   .home-daily { margin: -4px auto 12px; }
@@ -969,3 +978,5 @@
   .home-daily-text { font-size: 19px; }
   .home-daily-source { display: block; margin: 2px 0 0; }
 }
+/* 深色主题：「今日经句」小标签用深底胶囊（同原热门检索标签），不叠描边 */
+:root[data-theme="dark"] .home-daily-label { text-shadow: none; background: rgba(74, 65, 51, 0.72); }
