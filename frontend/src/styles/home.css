@@ -106,7 +106,6 @@
   color: #ded4c1;
   text-shadow: 0 0 5px rgba(0, 0, 0, 0.85), 0 1px 3px rgba(0, 0, 0, 0.8);
 }
-:root[data-theme="dark"] .home-hot-label,
 :root[data-theme="dark"] .home-stat-lbl {
   color: #d8cdb8;
   text-shadow: 0 0 4px rgba(0, 0, 0, 0.9), 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 1px rgba(0, 0, 0, 0.95);
@@ -295,157 +294,81 @@
   background: #a03000;
 }
 
-/* ---------- 热门检索标签 ---------- */
-.home-hot-tags {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: center;
-  /* 40 → 30：为下方正文字号提升腾出垂直空间，固定视口下不溢出 */
-  margin-bottom: 30px;
-  max-width: 920px;
-}
 
-.home-hot-label {
-  font-family: "Noto Serif SC", serif;
-  font-size: 12px;
-  color: var(--fj-ink-muted);
-  letter-spacing: 2px;
-  margin-right: 4px;
-}
-
-.home-hot-tag {
-  font-family: "Noto Serif SC", serif;
-  font-size: 12px;
-  color: var(--fj-ink-light);
-  background: rgba(255,255,255,0.6);
-  border: 1px solid var(--fj-border);
-  border-radius: 14px;
-  padding: 3px 14px;
-  cursor: pointer;
-  transition: color 0.2s, border-color 0.2s, background 0.2s;
-  white-space: nowrap;
-}
-
-.home-hot-tag:hover {
-  color: var(--fj-highlight);
-  border-color: var(--fj-gold);
-  background: var(--fj-surface);
-}
-
-/* Dark mode: the translucent-white pill turns dark so the (now light) label
-   reads over the night hero. */
-:root[data-theme="dark"] .home-hot-tag {
-  background: rgba(74, 65, 51, 0.72);
-}
-
-/* ---------- 最近阅读（本地记录，对标 CBETA Online「最近操作」） ----------
-   一行最多 5 张小卡：经名 + 「第 N 卷 · 3 天前」，右上角 × 移除。
-   手机端改为横向滑动，不撑高首屏、不产生页面级横向滚动。 */
+/* ---------- 接着读（本地阅读记录，一行文字） ----------
+   2026-11-25 由五张卡片改成一行：「接着读：《经名》第N卷 · 《经名》第N卷」，最多 3 部。
+   × 桌面悬停/聚焦才显示；触屏常显但淡。窄屏时经名过长截断，整行不换成多行。 */
 .home-recent {
   display: flex;
   align-items: center;
-  gap: 10px;
-  max-width: 920px;
-  width: 100%;
   justify-content: center;
-  margin: -12px 0 26px;
-}
-
-.home-recent-label { flex-shrink: 0; margin-right: 0; }
-
-.home-recent-list {
-  display: flex;
   gap: 8px;
-  list-style: none;
-  margin: 0;
-  padding: 2px;
-  min-width: 0;
-}
-
-.home-recent-item {
-  position: relative;
-  flex: 0 1 176px;
-  min-width: 0;
-}
-
-.home-recent-open {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 1px;
-  width: 100%;
-  padding: 6px 24px 6px 12px;
+  max-width: 920px;
+  margin: -14px auto 24px;
   font-family: "Noto Serif SC", serif;
-  text-align: left;
-  color: var(--fj-ink);
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid var(--fj-border);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
-}
-
-.home-recent-open:hover,
-.home-recent-open:focus-visible {
-  border-color: var(--fj-gold);
-  background: var(--fj-surface);
-}
-
-.home-recent-title {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-size: 13px;
 }
-
-.home-recent-open:hover .home-recent-title { color: var(--fj-highlight); }
-
-.home-recent-meta {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 12px;
-  color: var(--fj-ink-muted);
-  white-space: nowrap;
-}
-
-.home-recent-del {
-  position: absolute;
-  top: 3px;
-  right: 3px;
+.home-recent-label { flex-shrink: 0; color: var(--fj-ink-muted); letter-spacing: 1px; }
+.home-recent-list {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
+  min-width: 0;
+  margin: 0;
   padding: 0;
-  font-size: 10px;
+  list-style: none;
+}
+.home-recent-item { position: relative; display: flex; align-items: center; min-width: 0; }
+.home-recent-item + .home-recent-item::before {
+  content: "·";
+  margin: 0 6px;
   color: var(--fj-ink-muted);
-  background: transparent;
+}
+.home-recent-open {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  min-width: 0;
+  color: var(--fj-ink-light);
+  text-decoration: none;
+}
+.home-recent-title {
+  max-width: 13em;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.home-recent-meta { flex-shrink: 0; font-size: 12px; color: var(--fj-ink-muted); }
+.home-recent-open:hover .home-recent-title,
+.home-recent-open:focus-visible .home-recent-title { color: var(--fj-highlight); text-decoration: underline; }
+.home-recent-del {
+  /* 浮在经名右上角、不占行内宽度（否则「·」前面空一块） */
+  position: absolute;
+  top: -8px;
+  right: -12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
   border: none;
   border-radius: 50%;
+  background: var(--fj-surface, #fff);
+  color: var(--fj-ink-muted);
+  font-size: 9px;
   cursor: pointer;
-  opacity: 0.55;
-  transition: opacity 0.2s, background 0.2s;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
 }
-
-.home-recent-del:hover,
-.home-recent-del:focus-visible {
-  opacity: 1;
-  color: var(--fj-highlight);
-  background: rgba(0, 0, 0, 0.06);
-}
-
-:root[data-theme="dark"] .home-recent-open {
-  background: rgba(74, 65, 51, 0.78);
-}
-
-:root[data-theme="dark"] .home-recent-del:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
+.home-recent-item:hover .home-recent-del,
+.home-recent-del:focus-visible { opacity: 0.9; pointer-events: auto; }
+.home-recent-del:hover { color: var(--fj-highlight); }
+/* 触屏没有悬停：不显示 ×（手机是个人设备，记录会随新阅读自然滚走） */
+@media (hover: none) { .home-recent-del { display: none; } }
+:root[data-theme="dark"] .home-recent-open { color: #e0d6c2; }
+:root[data-theme="dark"] .home-recent-label,
+:root[data-theme="dark"] .home-recent-meta { color: #d8cdb8; }
 
 /* ---------- 热门经典标签 ---------- */
 .home-popular-sutras {
@@ -911,9 +834,7 @@
   .home-title { font-size: 64px; margin-bottom: 2px; }
   .home-subtitle { margin-bottom: 20px; }
   .search-combo { margin-bottom: 14px; }
-  .home-hot-tags { margin-bottom: 18px; }
-  .home-recent { margin: -8px 0 16px; }
-  .home-recent-open { padding: 4px 24px 4px 10px; }
+  .home-recent { margin: -8px auto 16px; }
   .home-stat-num { font-size: 30px; margin-bottom: 6px; }
   .home-features { margin-top: 18px; }
   .home-feature-card { padding: 14px 14px; }
@@ -942,16 +863,12 @@
   .search-combo-input::placeholder { font-size: 13px; }
   .search-combo-btn { padding: 0 16px; font-size: 14px; }
 
-  .home-hot-tags { margin-bottom: 24px; gap: 6px; }
-  .home-hot-tag { padding: 2px 10px; font-size: 12px; }
 
   /* 手机：标签单独一行，卡片横向滑动（列表自己滚，页面不横向溢出） */
-  .home-recent { flex-direction: column; align-items: stretch; gap: 6px; margin: -12px 0 20px; }
-  .home-recent-label { text-align: center; }
-  .home-recent-list { overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; }
-  .home-recent-list::-webkit-scrollbar { display: none; }
-  .home-recent-item { flex: 0 0 148px; scroll-snap-align: start; }
-  .home-recent-del { width: 28px; height: 28px; top: 0; right: 0; opacity: 0.7; }
+  .home-recent { margin: -6px auto 18px; padding: 0 4px; }
+  /* 手机一行只放得下两部 */
+  .home-recent-item:nth-child(n + 3) { display: none; }
+  .home-recent-title { max-width: 7em; }
 
   .home-stats { flex-direction: row; max-width: 100%; gap: 0; margin-bottom: 0; }
   .home-stat-item { padding: 8px 12px; }
@@ -983,8 +900,6 @@
   .search-combo-btn { padding: 0 14px; }
   .search-combo-input { padding: 0 10px; font-size: 14px; }
 
-  .home-hot-tags { margin-bottom: 16px; }
-  .home-hot-label { font-size: 12px; }
 
   .home-stat-item { padding: 6px 8px; }
   .home-stat-num { font-size: 20px; }
@@ -1009,7 +924,7 @@
 .home-daily {
   display: block;
   max-width: 820px;
-  margin: -6px auto 18px;
+  margin: -6px auto 28px;
   padding: 4px 12px;
   text-align: center;
   color: var(--fj-ink);

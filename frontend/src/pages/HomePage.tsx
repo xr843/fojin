@@ -163,7 +163,11 @@ export default function HomePage() {
     ? t("home.selected_sources", { n: selectedSources.size })
     : t("home.all_sources");
   const rawTags = t("home.hot_tags", { returnObjects: true });
-  const hotTags = Array.isArray(rawTags) ? rawTags : [];
+  const hotTags: string[] = Array.isArray(rawTags) ? rawTags : [];
+  // 热门检索不再单占一行：输入框为空时点开，下拉里列出这几个词
+  const hotOptions = hotTags.length
+    ? [{ label: t("home.hot_label"), options: hotTags.map((tag) => ({ value: tag, label: tag })) }]
+    : [];
 
   return (
     <div className="home-page">
@@ -198,11 +202,19 @@ export default function HomePage() {
             <div className="search-combo-divider" />
             <AutoComplete
               className="search-combo-ac"
-              options={acOptions.map((g) => ({ label: t(g.label), options: g.options }))}
+              options={
+                query.trim()
+                  ? acOptions.map((g) => ({ label: t(g.label), options: g.options }))
+                  : hotOptions
+              }
               value={query}
               onChange={setQuery}
               onSearch={fetchSuggestions}
               onSelect={(value: string) => {
+                if (!query.trim() && hotTags.includes(value)) {
+                  // 空输入框点开下拉里的热门检索词（2026-11-25 由首页一行标签收进下拉）
+                  if (typeof umami !== "undefined") umami.track("home_hot_tag", { tag: value });
+                }
                 const ask = askQueryFrom(value);
                 if (ask) {
                   // 用户已按下「问小津」—— 等同于在 /chat 里按回车（send=1 深链契约）
@@ -239,22 +251,6 @@ export default function HomePage() {
 
         {/* 今日经句：直接显示当天那一句，点进 /daily */}
         <HomeDaily />
-
-        {/* 热门检索 */}
-        <div className="home-hot-tags">
-          <span className="home-hot-label">{t("home.hot_label")}</span>
-          {hotTags.map((tag) => (
-            <button
-              key={tag}
-              className="home-hot-tag"
-              data-umami-event="home_hot_tag"
-              data-umami-event-tag={tag}
-              onClick={() => handleSearch(tag)}
-            >
-              {tag}
-            </button>
-          ))}
-        </div>
 
         {/* 最近阅读：有本地阅读记录才出现（对标 CBETA Online 首页「最近操作」） */}
         <HomeRecentReading initial={recentReading} onChange={setRecentReading} />
