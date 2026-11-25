@@ -168,7 +168,8 @@ async def main() -> None:
 
     engine = create_async_engine(settings.database_url)
     session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    es = await init_es()  # 生产 ES 开了认证，必须走与网站同一套连接
+    # 生产 ES 开了认证，必须走与网站同一套连接；大部头一次 bulk 几 MB，默认 10 秒会超时（11-25 停在 Ba013 之后）
+    es = (await init_es()).options(request_timeout=120, retry_on_timeout=True, max_retries=3)
     try:
         ids = await insert_catalog(session_factory, es, todo)
         async with session_factory() as s:
