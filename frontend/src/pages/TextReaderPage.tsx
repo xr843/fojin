@@ -984,7 +984,8 @@ export default function TextReaderPage() {
   // CBETA 参考数据（静态文件，见 backend/scripts/build_cbeta_reader_refs.py）：
   // 册号表（引用的「T08, no. 235」与行首「T08n0235_p0749a05」）和品/分目次。
   const cbetaId = content?.cbeta_id ?? null;
-  const isCbeta = !!cbetaId && /^[TX]\d/.test(cbetaId);
+  // 行首/目次数据覆盖佛津收录的 CBETA 各藏（不只 T/X）；判断与行级引用同一份藏列表
+  const isCbeta = !!cbetaId && lineLevelSupported(cbetaId);
   const { data: cbetaStems } = useQuery({
     queryKey: ["cbetaStems"],
     queryFn: () => fetchStaticJson<CbetaStems>(CBETA_STEMS_URL),
