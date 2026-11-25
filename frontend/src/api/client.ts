@@ -3045,7 +3045,13 @@ export interface RelatedTermCard {
   excerpt: string;
 }
 
-export async function getRelatedTerms(q: string): Promise<RelatedTermCard[]> {
-  const { data } = await api.post<{ items: RelatedTermCard[] }>("/dictionary/related", { q });
-  return data.items;
+export interface RelatedTermsResponse {
+  items: RelatedTermCard[];
+  /** 卡片里出现的词头，及全部辞典（含外文）里收了它的部数 —— 给「查看全部 N 部辞典」入口 */
+  headwords: { headword: string; dict_count: number }[];
+}
+
+export async function getRelatedTerms(q: string): Promise<RelatedTermsResponse> {
+  const { data } = await api.post<RelatedTermsResponse>("/dictionary/related", { q });
+  return data;
 }

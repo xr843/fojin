@@ -1226,6 +1226,7 @@
   "chat.master_buddhaghosa": "🌿 Buddhaghosa (Theravāda commentator · Visuddhimagga)",
   "chat.master_mahasi": "🌿 Mahāsi Sayādaw (Burmese vipassanā · noting)",
   "chat.master_ajahn_chah": "🌿 Ajahn Chah (Thai Forest tradition)",
+  "chat.related_terms.all": "“{{term}}” appears in {{n}} dictionaries — see all →",
   "chat.related_terms.note": "Dictionary definitions to help with terms — not scriptural citations",
   "chat.related_terms.tag": "Entry",
   "chat.related_terms.title": "Related dictionary entries",

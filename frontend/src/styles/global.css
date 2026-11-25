@@ -1989,3 +1989,7 @@ em {
   overflow: hidden;
 }
 .chat-related-term-source { font-size: 11px; color: var(--fj-ink-muted); }
+.chat-related-terms-more { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 8px; font-size: 12px; }
+.chat-related-terms-more a { color: var(--fj-ink-light); }
+.chat-related-terms-more a:hover { color: var(--fj-highlight); }
+.chat-related-terms-more:empty { display: none; }

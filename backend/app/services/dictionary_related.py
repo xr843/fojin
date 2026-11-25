@@ -17,7 +17,7 @@
 
 import re
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -92,10 +92,38 @@ def make_excerpt(headword: str, definition: str | None) -> str | None:
     return text if len(text) <= EXCERPT_CHARS else text[:EXCERPT_CHARS] + "…"
 
 
-async def related_terms(db: AsyncSession, question: str) -> list[dict]:
+def pick_cards(candidates: list[dict]) -> list[dict]:
+    """从候选里挑卡片。candidates 已按（问题里出现先后, 辞典优先级, id）排好序。
+
+    第一轮每个词最多 MAX_PER_HEADWORD 部辞典，免得几个词都有词条时四张卡全讲同一个词；
+    第二轮把剩下的位置让给前面的词——问题里只有一个词查得到时（如「般若波罗蜜」字面直译是什么），
+    四个位置都给它，不空着（2026-11-25 用户反馈：五部辞典有此词，只出了两张）。"""
+    cards: list[dict] = []
+    taken: set[tuple[str, str]] = set()
+    per_head: dict[str, int] = {}
+    for capped in (True, False):
+        for c in candidates:
+            if len(cards) >= MAX_CARDS:
+                break
+            key = (c["headword"], c["source_code"])
+            if key in taken:
+                continue
+            if capped and per_head.get(c["headword"], 0) >= MAX_PER_HEADWORD:
+                continue
+            taken.add(key)
+            per_head[c["headword"]] = per_head.get(c["headword"], 0) + 1
+            cards.append(c)
+    # 第二轮追加的卡排在同词卡片后面，读起来按词分组
+    order = {h: i for i, h in enumerate(dict.fromkeys(c["headword"] for c in cards))}
+    return sorted(cards, key=lambda c: order[c["headword"]])
+
+
+async def related_terms(db: AsyncSession, question: str) -> dict:
+    """返回 {"items": 卡片, "headwords": [{headword, dict_count}]}。
+    dict_count = 全部辞典（含外文）里收了这个词头的部数，给「查看全部 N 部辞典」入口用。"""
     terms = extract_terms(question)
     if not terms:
-        return []
+        return {"items": [], "headwords": []}
     variant_to_term: dict[str, int] = {}
     for i, term in enumerate(terms):
         for v in _zh_variants(term):
@@ -124,21 +152,9 @@ async def related_terms(db: AsyncSession, question: str) -> list[dict]:
         excerpt = make_excerpt(e.headword, e.definition)
         if not excerpt:
             continue
-        candidates.append((variant_to_term.get(e.headword, 99), _RANK.get(e.source.code, 99), e.id, e, excerpt))
-    # 问题里先出现的词在前；同一个词按辞典优先级
-    candidates.sort(key=lambda c: (c[0], c[1], c[2]))
-
-    cards: list[dict] = []
-    per_head: dict[str, int] = {}
-    seen_pair: set[tuple[str, str]] = set()
-    for _, _, _, e, excerpt in candidates:
-        key = (e.headword, e.source.code)
-        if key in seen_pair or per_head.get(e.headword, 0) >= MAX_PER_HEADWORD:
-            continue
-        seen_pair.add(key)
-        per_head[e.headword] = per_head.get(e.headword, 0) + 1
-        cards.append(
+        candidates.append(
             {
+                "_order": (variant_to_term.get(e.headword, 99), _RANK.get(e.source.code, 99), e.id),
                 "id": e.id,
                 "headword": e.headword,
                 "source_code": e.source.code,
@@ -146,6 +162,20 @@ async def related_terms(db: AsyncSession, question: str) -> list[dict]:
                 "excerpt": excerpt,
             }
         )
-        if len(cards) >= MAX_CARDS:
-            break
-    return cards
+    # 问题里先出现的词在前；同一个词按辞典优先级
+    candidates.sort(key=lambda c: c["_order"])
+    cards = pick_cards(candidates)
+    for c in cards:
+        c.pop("_order", None)
+
+    headwords: list[dict] = []
+    for hw in dict.fromkeys(c["headword"] for c in cards):
+        n = (
+            await db.execute(
+                select(func.count(func.distinct(DictionaryEntry.source_id))).where(
+                    DictionaryEntry.headword.in_(_zh_variants(hw))
+                )
+            )
+        ).scalar_one()
+        headwords.append({"headword": hw, "dict_count": int(n)})
+    return {"items": cards, "headwords": headwords}
