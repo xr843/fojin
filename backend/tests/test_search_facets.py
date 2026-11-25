@@ -223,8 +223,23 @@ def test_canon_codes_cover_the_live_prefixes():
         ("VRI-dn-patika", "pali"),
         ("84K-toh1", "kangyur"),
         ("GRETIL-bsu056_u", "gretil"),
+        ("JB095", "jiaxing"),
+        ("N0006", "nanchuan"),
+        ("Ba013", "bubian"),
+        ("ZWa044", "zangwai"),
+        ("GA0023", "gazetteer"),
+        ("GB0001", "gazetteer"),
+        ("D0001", "guotu"),
+        ("I0001", "stone"),
+        ("G2241", "othercbeta"),
+        ("S0001", "othercbeta"),
+        ("C1710", "othercbeta"),
+        ("CC0001", "othercbeta"),
+        ("ZS0001", "othercbeta"),
     ]:
-        assert any(cid.startswith(p) for p in CANONS[code])
+        # 恰好落进一个桶：G 不能吞 GA/GB/GRETIL-，S 不能吞 SC-，C 不能吞 CC
+        hits = [c for c, prefixes in CANONS.items() if any(cid.startswith(p) for p in prefixes)]
+        assert hits == [code], (cid, hits)
 
 
 # ── 4. parsing ───────────────────────────────────────────────────────────
