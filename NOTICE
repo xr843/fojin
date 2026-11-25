@@ -232,3 +232,11 @@ redirected to the original platforms.
 
 For questions about data usage and licensing, please open an issue at:
 https://github.com/xr843/fojin/issues
+
+Fonts (frontend/public/fonts/)
+------------------------------
+- Ma Shan Zheng (马善政毛笔楷书) — SIL Open Font License 1.1, see frontend/public/fonts/OFL-MaShanZheng.txt.
+  daily-brush-v*.woff2 is a subset of it; the two glyphs it lacks (槃 罣) are borrowed from LXGW WenKai
+  and emboldened (backend/scripts/build_daily_fonts.py).
+- LXGW WenKai (霞鹜文楷) — SIL Open Font License 1.1, see frontend/public/fonts/OFL-LXGWWenKai.txt.
+  daily-kai-v*.woff2 is a subset of it.

@@ -6,6 +6,7 @@
  * 不靠人记忆写出处，核不到的不收。
  */
 import passages from "../data/dailyPassages.json";
+import { scriptForLanguage } from "./hanLocale";
 
 export interface DailyPassage {
   text: string;
@@ -44,8 +45,21 @@ export function pickDaily(now: Date, pool: DailyPassage[] = DAILY_PASSAGES): { p
  * 不引 hanScript（它会把 OpenCC 拖进首页的静态导入链）。
  */
 export function quotePassage(text: string, lang: string): string {
-  return lang.startsWith("zh-Hant") || lang === "zh-TW" || lang === "zh-HK" ? `「${text}」` : `“${text}”`;
+  return scriptForLanguage(lang) === "traditional" ? `「${text}」` : `“${text}”`;
 }
+
+/**
+ * 经句字体：简体界面用毛笔体（马善政），标点落到文楷；繁体界面整句文楷（马善政没有繁体字形）。
+ * 页面 CSS 与分享图 canvas 共用这一串。
+ */
+export function passageFontFamily(lang: string): string {
+  return scriptForLanguage(lang) === "traditional"
+    ? '"FoJin Daily Kai", "Noto Serif SC", serif'
+    : '"FoJin Daily Brush", "FoJin Daily Kai", "Noto Serif SC", serif';
+}
+
+/** 一行放得下就单行显示（桌面）；超过这个字数（含引号标点）按分句换行。 */
+export const ONE_LINE_MAX_CHARS = 36;
 
 /**
  * 把经句切成分句（每段带着自己的标点与引号），页面上每段 inline-block，只在标点处换行——

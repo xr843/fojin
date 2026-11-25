@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { Link, useNavigate } from "react-router";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Modal, Spin, message } from "antd";
 import { getVernacular } from "../api/client";
-import { pickDaily, quotePassage, splitClauses } from "../utils/dailyPassage";
+import { ONE_LINE_MAX_CHARS, passageFontFamily, pickDaily, quotePassage, splitClauses } from "../utils/dailyPassage";
 import { lunarLabel } from "../utils/lunar";
 import { renderShareCard } from "../utils/shareCard";
 import { localizeHan } from "../utils/hanScript";
@@ -44,6 +44,8 @@ export default function DailyPage() {
   const title = localizeHan(passage.title_zh, lang);
   const sourceLine = `《${title}》${t("daily.juan", { n: passage.juan_num })}`;
   const text = quotePassage(localizeHan(passage.text, lang), lang);
+  const textChars = Array.from(text).length;
+  const fontFamily = passageFontFamily(lang);
 
   const vernacular = useQuery({
     queryKey: ["daily-vernacular", passage.text_id, passage.text],
@@ -68,6 +70,7 @@ export default function DailyPage() {
         source: sourceLine,
         heading: t("daily.card_heading", { date: dateLabel }),
         footer: t("daily.card_footer"),
+        textFont: fontFamily,
       });
       const file = new File([blob], `fojin-${dateKey}.png`, { type: "image/png" });
       // 必须是 data: 地址：站点 CSP 的 img-src 只放行 'self' data: https:，blob: 会被拦成坏图
@@ -90,7 +93,11 @@ export default function DailyPage() {
       </Helmet>
 
       <div className="daily-date">{t("daily.heading", { date: dateLabel })}</div>
-      <blockquote className="daily-text" lang="zh">
+      <blockquote
+        className={`daily-text${textChars <= ONE_LINE_MAX_CHARS ? " daily-text--one-line" : ""}`}
+        lang="zh"
+        style={{ fontFamily, "--daily-chars": textChars } as CSSProperties}
+      >
         {splitClauses(text).map((c, i) => (
           <span key={i} className="daily-clause">
             {c}

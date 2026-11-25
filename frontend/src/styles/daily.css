@@ -11,15 +11,26 @@
   letter-spacing: 0.1em;
   font-size: 15px;
 }
+/* 字体由页面按繁简内联给出（passageFontFamily），这里只管排版 */
 .daily-text {
   margin: 36px 0 20px;
   padding: 0;
   border: none;
-  font-family: "Noto Serif SC", serif;
-  font-size: 28px;
-  line-height: 1.9;
+  font-size: 34px;
+  line-height: 1.8;
+  letter-spacing: 0.04em;
   color: var(--fj-ink);
   text-wrap: balance;
+}
+/* 桌面单行：经句比正文栏（720px）宽，撑出栏外到 1000px 居中；字号按字数算，
+   每字约 1.04em（全角字 + 字距），放不下的长句（> ONE_LINE_MAX_CHARS）不加这个类、按分句换行。 */
+.daily-text--one-line {
+  position: relative;
+  left: 50%;
+  width: min(1000px, calc(100vw - 48px));
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: clamp(18px, calc(min(1000px, 100vw - 48px) / var(--daily-chars) / 1.06), 46px);
 }
 /* 只在分句标点处换行，不把一两个字孤零零甩到下一行 */
 .daily-clause {
@@ -90,5 +101,13 @@
 }
 @media (max-width: 768px) {
   .daily-page { padding-top: 24px; }
-  .daily-text { font-size: 22px; margin-top: 24px; }
+  .daily-text { font-size: 24px; margin-top: 24px; }
+  /* 手机屏放不下一整句：回到按分句换行 */
+  .daily-text--one-line {
+    left: auto;
+    width: auto;
+    transform: none;
+    white-space: normal;
+    font-size: 24px;
+  }
 }

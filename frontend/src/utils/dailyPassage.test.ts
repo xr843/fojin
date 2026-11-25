@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { beijingDateKey, dailyIndex, pickDaily, quotePassage, splitClauses, DAILY_PASSAGES, type DailyPassage } from "./dailyPassage";
+import { beijingDateKey, dailyIndex, pickDaily, passageFontFamily, quotePassage, splitClauses, DAILY_PASSAGES, type DailyPassage } from "./dailyPassage";
 import { wrapCjk } from "./shareCard";
+import { localizeHan } from "./hanScript";
+import glyphs from "../data/dailyFontGlyphs.json";
 
 const P = (n: number): DailyPassage => ({
   text: `段${n}`, title_zh: "經", cbeta_id: `T${n}`, text_id: n, juan_num: 1, reader_path: `/texts/${n}/read?juan=1`,
@@ -48,6 +50,27 @@ describe("经句引号", () => {
     expect(quotePassage("應無所住而生其心。", "zh-Hant")).toBe("「應無所住而生其心。」");
     expect(quotePassage("应无所住而生其心。", "zh")).toBe("“应无所住而生其心。”");
     expect(quotePassage("应无所住而生其心。", "en")).toBe("“应无所住而生其心。”");
+  });
+});
+
+describe("经句字体子集", () => {
+  it("池里每句在简体、繁体界面要显示的字，都在 /daily 专用字体子集里（加了新句要重跑 build_daily_fonts.py）", () => {
+    const brush = new Set(Array.from(glyphs.brush));
+    const kai = new Set(Array.from(glyphs.kai));
+    const PUNCT = "，。；：？！、“”「」";
+    for (const p of DAILY_PASSAGES) {
+      for (const lang of ["zh", "zh-Hant"]) {
+        for (const c of Array.from(quotePassage(localizeHan(p.text, lang), lang))) {
+          expect(kai.has(c), `文楷子集缺「${c}」（${p.text}）`).toBe(true);
+          if (lang === "zh" && !PUNCT.includes(c)) expect(brush.has(c), `毛笔子集缺「${c}」（${p.text}）`).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("繁体界面不用毛笔体（马善政没有繁体字形）", () => {
+    expect(passageFontFamily("zh-Hant")).not.toMatch(/Brush/);
+    expect(passageFontFamily("zh")).toMatch(/^"FoJin Daily Brush", "FoJin Daily Kai"/);
   });
 });
 
