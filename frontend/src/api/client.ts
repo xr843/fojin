@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
 import { clearSessionExpired, markSessionExpired, useAuthStore } from "../stores/authStore";
 import i18n from "../i18n";
 import type {
@@ -63,12 +63,52 @@ function adoptRenewedToken(headers: unknown): void {
   useAuthStore.getState().setAuth(fresh, user);
 }
 
+// ---------- 读取类请求遇到网络抖动自动重试 ----------
+// 2026-11-25 用户反馈「点开历史会话常弹『加载会话失败』，连着几次后又正常」。宿主 nginx 日志实测：
+// 那一分钟里同一会话被请求 7 次、7 次都是 200 且整段发出（5,339 字节）——服务器没错，数据丢在
+// Cloudflare→大陆浏览器这一段（与 11-04 查清的 /chat 断流同源）。前一天有 8 个大陆 IP 出现过
+// 「1 分钟内同一会话被点 ≥3 次」，最多 12 次。GET 是幂等的，安静地再试两次即可。
+// 只重试：没有收到任何响应的网络错误（不含超时、不含主动取消），以及 502/503/504。
+// 超时不重试——15 秒再乘三，用户早就走了。
+const GET_RETRY_DELAYS_MS = [600, 1500];
+type RetryConfig = InternalAxiosRequestConfig & { __retryCount?: number };
+
+export function isRetryableGetError(error: AxiosError): boolean {
+  const cfg = error.config as RetryConfig | undefined;
+  if (!cfg || (cfg.method ?? "get").toLowerCase() !== "get") return false;
+  if ((cfg.__retryCount ?? 0) >= GET_RETRY_DELAYS_MS.length) return false;
+  if (axios.isCancel(error) || error.code === "ECONNABORTED" || error.code === "ETIMEDOUT") return false;
+  if (!error.response) return true;
+  return [502, 503, 504].includes(error.response.status);
+}
+
+/** 把 /chat/sessions/4659/messages 归成 /chat/sessions/:id/messages，埋点不按 id 打散 */
+function retryPathKey(url: string | undefined): string {
+  return (url ?? "").replace(/\?.*$/, "").replace(/\/\d+(?=\/|$)/g, "/:id");
+}
+
+function trackRetry(name: string, cfg: RetryConfig | undefined, extra: Record<string, string | number> = {}) {
+  if (typeof umami === "undefined" || !cfg?.__retryCount) return;
+  umami.track(name, { path: retryPathKey(cfg.url), retries: cfg.__retryCount, ...extra });
+}
+
 api.interceptors.response.use(
   (response) => {
     adoptRenewedToken(response.headers);
+    trackRetry("api_get_retry_ok", response.config as RetryConfig);
     return response;
   },
-  (error) => {
+  async (error: AxiosError) => {
+    if (isRetryableGetError(error)) {
+      const cfg = error.config as RetryConfig;
+      const n = cfg.__retryCount ?? 0;
+      await new Promise((r) => setTimeout(r, GET_RETRY_DELAYS_MS[n]));
+      cfg.__retryCount = n + 1;
+      return api.request(cfg);
+    }
+    trackRetry("api_get_retry_failed", error.config as RetryConfig, {
+      kind: error.response ? `http_${error.response.status}` : error.code ?? "network",
+    });
     // 4xx/5xx 上也可能带着续期头（比如一次 404）——照收，别浪费。
     adoptRenewedToken(error.response?.headers);
     // 票过期那一刻页面上常有好几个请求在飞。用户看到横幅、马上重新登录成功，

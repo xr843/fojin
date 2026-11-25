@@ -1106,6 +1106,7 @@
   "chat.session_group_yesterday": "昨天",
   "chat.session_group_week": "7 天内",
   "chat.session_group_older": "更早",
+  "chat.load_session_network": "网络不稳定，会话没加载出来，请再点一次",
   "chat.load_session_failed": "加载会话失败",
   "chat.load_older_failed": "加载历史消息失败",
   "chat.delete_session_title": "删除会话",
