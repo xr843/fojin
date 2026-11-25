@@ -23,7 +23,11 @@ export const FACET_URL_PARAM: Record<FacetGroup, string> = {
 };
 
 /** 与后端 CANONS 同序。 */
-export const CANON_CODES = ["taisho", "xuzang", "jiaxing", "nanchuan", "pali", "kangyur", "gretil"] as const;
+export const CANON_CODES = [
+  "taisho", "xuzang", "jiaxing", "nanchuan",
+  "bubian", "zangwai", "gazetteer", "guotu", "stone", "othercbeta",
+  "pali", "kangyur", "gretil",
+] as const;
 
 /** 与后端 SECTIONS 同序（大正藏编号顺序）。 */
 export const SECTION_CODES = [

@@ -40,13 +40,26 @@ from typing import Any
 FACET_GROUPS = ("canon", "lang", "dynasty", "section")
 
 # canon code → cbeta_id prefixes. Codes match canon_from_cbeta_id where it has
-# one; jiaxing / nanchuan are listed so a future import shows up without a code
-# change (both are absent from the index today — the bucket is simply empty).
+# one. Prefixes must not overlap: every live id falls in exactly one bucket
+# (tests/test_search_facets.py checks this).
+def _numbered(letter: str) -> tuple[str, ...]:
+    """「字母 + 数字」开头的经号：G2241 要算佛教大藏经，但 GA/GB（寺志）、GRETIL- 不能算；
+    S0001 不能吞 SC-；C1710 不能吞 CC0001。"""
+    return tuple(f"{letter}{d}" for d in range(10))
+
+
 CANONS: dict[str, tuple[str, ...]] = {
     "taisho": ("T",),
     "xuzang": ("X",),
     "jiaxing": ("J",),
     "nanchuan": ("N",),
+    # 2026-11-25 导入的其余 CBETA 各藏
+    "bubian": ("B",),
+    "zangwai": ("ZW",),
+    "gazetteer": ("GA", "GB"),
+    "guotu": ("D",),
+    "stone": ("I",),
+    "othercbeta": ("A", *_numbered("C"), "CC", "F", *_numbered("G"), "K", "L", "M", "P", *_numbered("S"), "U", "ZS"),
     "pali": ("SC-", "VRI-"),
     "kangyur": ("84K-",),
     "gretil": ("GRETIL-",),
