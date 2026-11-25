@@ -101,6 +101,7 @@ from app.services.quote_fulljuan import load_full_juan_check
 from app.services.quote_verifier import juans_to_recheck, log_quote_mutations, verify_quoted_content
 from app.services.rag_retrieval import retrieve_rag_context
 from app.services.study_memory import build_study_memory, render_memory_block
+from app.services.work_stats import lookup_work_stats
 
 logger = logging.getLogger(__name__)
 
@@ -578,6 +579,11 @@ async def _prepare_chat(
             db, message, prev_query=prev_user_msg, scope_text_ids=scope_text_ids,
             named_works=card_named_works,
         )
+        # 问「多少字 / 每卷字数」：补上收录文本的统计（不进 sources，不是经文出处）。
+        # 放在检索片段前面：上下文超预算时 prompt_builder 从尾部截断，放后面会被截掉。
+        stats_block = await lookup_work_stats(db, message, prev_user_msg)
+        if stats_block:
+            context_text = (stats_block + "\n\n" + context_text).strip()
 
     # Reading context: enhance prompt when user is reading a specific text
     reading_context = None
