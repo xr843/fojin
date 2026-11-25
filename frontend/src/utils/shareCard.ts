@@ -12,6 +12,8 @@ export interface ShareCardInput {
   heading: string;
   /** 底部落款，如「佛津 fojin.app · 原文逐字可核对」 */
   footer: string;
+  /** 经句正文字体（CSS font-family 串）；不给就用衬线 */
+  textFont?: string;
 }
 
 const W = 1080;
@@ -67,7 +69,10 @@ export function wrapCjk(measure: (s: string) => number, text: string, maxWidth: 
 export async function renderShareCard(input: ShareCardInput): Promise<Blob> {
   if (document.fonts?.load) {
     try {
-      await Promise.all([document.fonts.load(`64px ${SERIF}`, input.text), document.fonts.load(`32px ${SERIF}`, input.source)]);
+      await Promise.all([
+        document.fonts.load(`64px ${input.textFont ?? SERIF}`, input.text),
+        document.fonts.load(`32px ${SERIF}`, input.source),
+      ]);
     } catch {
       /* 字体没加载出来就用回退字体，不阻塞生成 */
     }
@@ -98,7 +103,7 @@ export async function renderShareCard(input: ShareCardInput): Promise<Blob> {
   let size = Array.from(input.text).length <= 16 ? 88 : 64;
   let lines: string[] = [];
   for (; size >= 40; size -= 4) {
-    ctx.font = `${size}px ${SERIF}`;
+    ctx.font = `${size}px ${input.textFont ?? SERIF}`;
     lines = wrapCjk((s) => ctx.measureText(s).width, input.text, W - 240);
     if (lines.length * size * 1.75 <= 760) break;
   }

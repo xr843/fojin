@@ -65,3 +65,23 @@
   font-display: swap;
   src: url('/fonts/MaShanZheng-title-v2.woff2') format('woff2');
 }
+
+/* 今日经句（/daily）专用的两份小字体，只含经句池用到的字（backend/scripts/build_daily_fonts.py 生成）：
+   - 毛笔：马善政（与站名「佛津」同一支），只收简体汉字、不收标点（它的标点又宽又居中）；
+     它没有的「槃」「罣」从文楷借字形加粗补上。
+   - 文楷：霞鹜文楷，繁简汉字 + 全部标点；繁体界面整句用它（马善政没有繁体字形）。
+   只有 /daily 引用这两个 family，别的页面不会下载。文件名带版本号，理由同上方 title-v2。 */
+@font-face {
+  font-family: 'FoJin Daily Brush';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/daily-brush-v1.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'FoJin Daily Kai';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/daily-kai-v1.woff2') format('woff2');
+}
