@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Modal, Spin, message } from "antd";
 import { getVernacular } from "../api/client";
-import { pickDaily } from "../utils/dailyPassage";
+import { pickDaily, quotePassage } from "../utils/dailyPassage";
 import { lunarLabel } from "../utils/lunar";
 import { renderShareCard } from "../utils/shareCard";
 import { localizeHan } from "../utils/hanScript";
@@ -43,7 +43,7 @@ export default function DailyPage() {
   const dateLabel = lunar ? `${dateKey} · ${localizeHan(t("daily.lunar", { d: lunar }), lang)}` : dateKey;
   const title = localizeHan(passage.title_zh, lang);
   const sourceLine = `《${title}》${t("daily.juan", { n: passage.juan_num })}`;
-  const text = localizeHan(passage.text, lang);
+  const text = quotePassage(localizeHan(passage.text, lang), lang);
 
   const vernacular = useQuery({
     queryKey: ["daily-vernacular", passage.text_id, passage.text],

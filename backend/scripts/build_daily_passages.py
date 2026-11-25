@@ -30,6 +30,7 @@ API = "https://fojin.app/api/verify/claim?q="
 
 
 PRIMARY_CLASSES = {"sutra", "treatise"}
+SENTENCE_END = "。？！"
 
 
 def verify(q: str, hint: str | None = None) -> dict | None:
@@ -86,6 +87,10 @@ def main() -> None:
         if not line or line.startswith("#"):
             continue
         q, _, hint = line.partition("|")
+        if q[-1] not in SENTENCE_END:  # 每句必须是完整的自然句，以句末标点收尾
+            dropped.append(q)
+            print("--  （缺句末标点）" + q, flush=True)
+            continue
         r = verify(q, hint or None)
         (kept if r else dropped).append(r or q)
         print(("OK  " if r else "--  ") + q, flush=True)

@@ -9,11 +9,12 @@ vi.mock("../utils/shareCard", () => ({
   renderShareCard: vi.fn(async () => new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" })),
 }));
 
-vi.mock("../utils/dailyPassage", () => ({
+vi.mock("../utils/dailyPassage", async (orig) => ({
+  ...(await orig<typeof import("../utils/dailyPassage")>()),
   pickDaily: () => ({
     dateKey: "2026-11-24",
     passage: {
-      text: "應無所住而生其心",
+      text: "應無所住而生其心。",
       title_zh: "金剛般若波羅蜜經",
       cbeta_id: "T0235",
       text_id: 7,
@@ -46,11 +47,13 @@ describe("每日一段页", () => {
   it("经名直达原文那一行；问小津带着原文与经名去问答页", () => {
     renderPage();
     expect(screen.getByText("今日经句 · 2026-11-24 · 农历十月十六")).toBeInTheDocument();
+    // 经句加引号、以句末标点收尾（简体界面用“”）
+    expect(document.querySelector(".daily-text")?.textContent).toBe("“应无所住而生其心。”");
     const src = screen.getByRole("link", { name: /金[剛刚]般若波[羅罗]蜜[經经]》卷1/ });
     expect(src.getAttribute("href")).toBe("/texts/7/read?juan=1&anchor=p0749c22&hl=1949-1957");
     fireEvent.click(screen.getByRole("button", { name: /问小津/ }));
     const params = new URL(screen.getByTestId("loc").textContent!, "http://x").searchParams;
-    expect(params.get("context")).toBe("應無所住而生其心"); // 送原文（繁体原字），不送转换后的字形
+    expect(params.get("context")).toBe("應無所住而生其心。"); // 送原文（繁体原字），不送转换后的字形
     expect(params.get("source")).toBe("金剛般若波羅蜜經");
     expect(params.get("q")).toBeTruthy();
   });
