@@ -4,9 +4,9 @@
 
 **以 AI 问答为核心的佛典平台：RAG 检索全球最大的开放佛典聚合（660+ 数据源、30+ 语种、三藏跨语检索），每个答案都链回它引用的原经段落。**
 
-用自然语言提问，FoJin 的「小津」直接从藏经里答你 —— 检索增强生成（RAG）覆盖 68 万+ 段经文向量，关键词重排 + 本经召回，**可点击的 `【《经名》第N卷】` 引文**一点即开对应原文，反幻觉校验，引文抽屉还能 **汉 / 巴利 / 藏文 并列对照跨藏经**。也可切换 **15 位历史法师人格** 提问，每位限定其宗派核心经典。
+用自然语言提问，FoJin 的「小津」直接从藏经里答你 —— 检索增强生成（RAG）覆盖 66 万+ 段经文向量，关键词重排 + 本经召回，**可点击的 `【《经名》第N卷】` 引文**一点即开对应原文，反幻觉校验，引文抽屉还能 **汉 / 巴利 / 藏文 并列对照跨藏经**。也可切换 **15 位历史法师人格** 提问，每位限定其宗派核心经典。
 
-让这些答案可信的，是底下这套语料。FoJin 把 **660+ 个数据源** 聚合成一个可检索平台 —— 10,500+ 部经典、23,500+ 卷全文（汉、巴利、藏、梵四大传统），**全球首个 LLM 驱动的三藏对读 RAG 平台**（CBETA × SuttaCentral × 84000，段落级对应由 LLM 验证），11 万+ 实体的知识图谱地图，32 部辞典 748K 词条。每个功能的存在，都是为了让答案更有据可查 —— 也让你拿到答案后能继续深挖。
+让这些答案可信的，是底下这套语料。FoJin 把 **660+ 个数据源** 聚合成一个可检索平台 —— 11,600+ 部经典、25,000+ 卷全文（汉、巴利、藏、梵四大传统，含 CBETA 全部可再发布的藏经），**全球首个 LLM 驱动的三藏对读 RAG 平台**（CBETA × SuttaCentral × 84000，段落级对应由 LLM 验证），11 万+ 实体的知识图谱地图，39 部辞典 74.7 万词条。每个功能的存在，都是为了让答案更有据可查 —— 也让你拿到答案后能继续深挖。
 
 FoJin 的定位是 **开放、跨藏、可验证的佛学知识基础设施** —— 不只是一个供人阅读的网站，而是一套别的工具可以「调用」的语料。每一段经文都带一个稳定、可解析的跨藏 **URN**（`fojin:cbeta/T0001.1`），而 **[`fojin-mcp`](https://pypi.org/project/fojin-mcp/)** 服务器让 AI 助手（Claude、ChatGPT、任意 [MCP](https://modelcontextprotocol.io) 客户端）直接从 FoJin 已校验的引文作答。
 
@@ -20,28 +20,29 @@ FoJin 的定位是 **开放、跨藏、可验证的佛学知识基础设施** �
 
 佛教典籍散落在全球数百个数据库中 —— CBETA、SuttaCentral、BDRC、SAT、84000、GRETIL 等等。每家界面、语种、数据格式都不一样。当你心里有个**问题** —— "《心经》说的'色即是空'到底什么意思？"、"这段经文的巴利本和汉译本差在哪？" —— 你花在**找对那段经文**上的时间，往往比读懂它还多。
 
-**FoJin 直接替你回答这个问题。** 用自然语言问，小津从 660+ 个源里检索出相关段落，给出你能逐条核对的可点击引文。FoJin 做的其他一切 —— 全文阅读、跨藏对齐、知识图谱、32 部辞典 —— 都是为了让答案更有据可查，也让你拿到答案后能继续深挖：
+**FoJin 直接替你回答这个问题。** 用自然语言问，小津从 660+ 个源里检索出相关段落，给出你能逐条核对的可点击引文。FoJin 做的其他一切 —— 全文阅读、跨藏对齐、知识图谱、39 部辞典 —— 都是为了让答案更有据可查，也让你拿到答案后能继续深挖：
 
 | 你需要做什么 | FoJin 怎么帮 |
 |---|---|
-| **提个问题，得到有出处的答案** | **AI 问答（小津）** —— RAG 覆盖 68 万+ 段经文、重排、本经召回、可点击 `【《经名》第N卷】` 引文、跨藏引文抽屉、反幻觉校验 |
+| **提个问题，得到有出处的答案** | **AI 问答（小津）** —— RAG 覆盖 66 万+ 段经文、重排、本经召回、可点击 `【《经名》第N卷】` 引文、跨藏引文抽屉、反幻觉校验；**研读记忆**记得你读过什么、问过什么 |
 | **相信这个答案** | **可验证答案** —— 确定性引文白名单 + 逐字引号降级 + 每条答案信任状态；temp=0 下约 98% 对外可信 |
 | 研究一个多步的难题 | **研究助手**（`/research`）—— 跨语料 + 辞典 + 知识图谱规划检索，再走同一套闸门综合成带引文的答案 |
 | **核对一段文字是否出自佛经** | **[fojin.ai](https://fojin.ai)** —— 贴进 3,000 字以内（文章、网传佛语、AI 回答），逐句比对汉文大藏经原文，标出「出自佛经 / 论典 / 注疏 / 宗派与祖师著作 / 藏经中未见」，出处链接定位到原文那一行并常亮高亮；原文里连着的几句合成一段 |
-| 从 AI 助手里调用 FoJin | **MCP 服务器** —— [`uvx fojin-mcp`](https://pypi.org/project/fojin-mcp/)；6 个只读、URN 可寻址工具，供 Claude / ChatGPT 调用 |
+| 从 AI 助手里调用 FoJin | **MCP 服务器** —— 托管在 `mcp.fojin.ai`（免安装、免 key）或 [`uvx fojin-mcp`](https://pypi.org/project/fojin-mcp/)；8 个只读、URN 可寻址工具，供 Claude / ChatGPT 调用 |
 | 用某位法师的口吻问 | **法师人格模式** —— 15 位历史法师，各自限定其宗派核心经典 RAG |
-| 跨数据库找一部经 | **多维检索** 覆盖 660+ 数据源中的 10,500+ 部 |
-| 在线阅读全文 | **8,900+ 部** 共 23,500+ 卷 CBETA 风格全文 |
+| 跨数据库找一部经 | **多维检索** 覆盖 660+ 数据源中的 11,600+ 部，可按藏经筛选（大正藏、卍续藏、嘉兴藏、补编、藏外、佛寺志……） |
+| 在线阅读全文 | **10,000+ 部** 共 25,000+ 卷 CBETA 风格全文，页栏行引用与目次 |
+| 每天一句可靠的经文 | **今日经句**（`/daily`）—— 每天一句完整经句，全藏逐字核对出处、直达原文那一行，附白话讲解与分享图 |
 | 对照不同语种译本 | **平行阅读** 30+ 语种侧边栏对照 |
 | **跨藏经对读经文** | **三语跨藏对读** —— 3,000+ 条 LLM 验证段对，覆盖《妙法蓮華經》↔ Toh 113（**259 对**）、《小品般若波羅蜜經》↔ Toh 11 Aṣṭasāhasrikā（**127 对**）、维摩诘、心经、四阿含 ↔ 尼柯耶全集、法句等 11 个 pair 定义 |
-| 查佛学术语 | **32 部辞典 748K 词条**（汉/梵/巴利/藏/英语种） |
+| 查佛学术语 | **39 部辞典 74.7 万词条**（汉/梵/巴利/藏/英语种） |
 | 探索人物关系 | **知识图谱** 110K+ 实体 / 28K+ 关系（含 22K+ 师承链） |
-| 找相似经文 | **语义相似度** 由 680K+ 向量驱动（pgvector + HNSW） |
+| 找相似经文 | **语义相似度** 由 66 万+ 向量驱动（pgvector + HNSW） |
 | 探索佛教地理 | **知识图谱地图** 地理实体、寺院位置、师承弧线（Deck.GL） |
 | 跟踪源更新 | **动态信息流** 660+ 数据源实时更新 |
 | 可视化历史 | **时间线 + 仪表板** 朝代分布、翻译趋势、分类分析 |
-| 个人组织 | **收藏夹、书签、批注** 个人学习用 |
-| 学术引用 | **引用导出**（BibTeX、RIS、APA）|
+| 个人组织 | **收藏夹、书签、批注、个人摘录**（划选经文存下、可附笔记） |
+| 学术引用 | **CBETA 标准逐行引用**（如 `(CBETA, T08, no. 235, p. 749a9-10)`），覆盖佛津收录的全部 CBETA 藏经；另有 BibTeX、RIS、APA 导出 |
 
 ## 快速开始
 
@@ -60,8 +61,18 @@ docker compose up -d         # 数据库迁移自动执行
 # CBETA 经目导入
 docker exec fojin-backend python scripts/import_catalog.py
 
-# CBETA 全文（需 xml-p5 仓库）
-docker exec fojin-backend python scripts/import_content.py --all --xml-dir /data/xml-p5
+# CBETA 大正藏（T）、卍续藏（X）全文（需 xml-p5 仓库）
+docker exec fojin-backend python scripts/import_content.py --collection T --xml-dir /data/xml-p5
+docker exec fojin-backend python scripts/import_content.py --collection X --xml-dir /data/xml-p5
+
+# 校勘与页栏行锚点（逐行引用要用）
+docker exec fojin-backend python scripts/import_apparatus.py --collection T --xml-dir /data/xml-p5
+docker exec fojin-backend python scripts/import_apparatus.py --collection X --xml-dir /data/xml-p5
+
+# CBETA 其余各藏（嘉兴藏、补编、藏外……）——只增不改，自动跳过著作权受限的四套，
+# 磁盘到 86% 自动停、可断点续跑。先用 --plan 看清单
+docker exec fojin-backend python scripts/import_cbeta_canons.py --xml-dir /data/xml-p5 --plan
+docker exec fojin-backend python scripts/import_cbeta_canons.py --xml-dir /data/xml-p5
 
 # 生成 embedding（支持增量）
 docker exec fojin-backend python -m scripts.archive.misc.generate_embeddings --source cbeta
@@ -84,16 +95,18 @@ uvx fojin-mcp                 # 免安装直接运行
 # 或：pip install fojin-mcp && fojin-mcp
 ```
 
-它对外暴露 6 个**只读**工具（走公开 API），每个返回的经文都带稳定、可解析的跨藏 **URN**（`fojin:cbeta/T0001.1`）：
+它对外暴露 8 个**只读**工具（走公开 API），每个返回的经文都带稳定、可解析的跨藏 **URN**（`fojin:cbeta/T0001.1`）：
 
 | 工具 | 作用 |
 |---|---|
 | `search_corpus` | 跨聚合藏经语义检索 |
 | `read_passage` | 读取指定经典 / 卷 |
 | `get_parallels` | 某段经文的跨藏平行（汉 ↔ 巴利 ↔ 藏） |
-| `lookup_dictionary` | 32 部辞典术语查询 |
+| `lookup_dictionary` | 39 部辞典术语查询 |
 | `lookup_entity` | 知识图谱实体事实 |
 | `resolve_urn` | 把 FoJin URN 解析到原典位置 |
+| `verify_quote` | **逐字核对** —— 这句话真的在藏经里吗、真的在你说的那一卷吗？「引文真不真」与「出处对不对」分开回答，差几个字时给逐字差异 |
+| `commentaries` | 某段经文历代注家怎么讲 —— 定位到卷与行 |
 
 Claude Desktop 配置和 ChatGPT 接入见 **[`mcp-server/README.md`](../mcp-server/README.md)**。该服务器是一个薄的只读客户端：**不含任何凭据、不打包任何语料**，只调用 FoJin 的公开端点 —— 默认目标 `https://fojin.app/api`，可用 `FOJIN_API_BASE_URL` 改指向自托管实例。
 
@@ -105,7 +118,13 @@ Claude Desktop 配置和 ChatGPT 接入见 **[`mcp-server/README.md`](../mcp-ser
 
 ### 全文阅读
 
-8,900+ 部佛典 / 23,500+ 卷全文在线阅读。CBETA 风格排版，智能识别偈颂/散文，自动重排段落，字号可调。
+10,000+ 部佛典 / 25,000+ 卷全文在线阅读。CBETA 风格排版，智能识别偈颂/散文，自动重排段落，字号可调。
+
+**CBETA 可再发布的藏经全部收录。** 除大正藏（T）、卍续藏（X）外，另收 CBETA 2026.R2 的其余各藏——嘉兴藏、大藏经补编、藏外佛教文献、汉译南传大藏经、国图善本、佛寺志、北朝佛教石刻，以及赵城金藏、高丽藏、永乐北藏、乾隆藏等历代藏经，新增 1,108 部、6,600 万字，CBETA 合计约 4,700 部。著作权不在 CBETA 开放授权内的印顺、太虚、吕澂、演培四套刻意不收，详见 [NOTICE](../NOTICE)。
+
+**引用到行。** 佛津收录的每一套 CBETA 藏经都支持 CBETA 标准的页栏行：可显示行首或原书换行，划选后复制 `(CBETA, T08, no. 235, p. 749a9-10)` 这样的引用，打开目次，也可把行首（`T08n0235_p0749a05`）贴进搜索框直接跳到那一行。
+
+**个人摘录。** 划选一段经文存下（可附笔记），经文里显示底纹，个人中心汇总。
 
 ### 平行阅读（30 语种）
 
@@ -151,7 +170,7 @@ RAG 检索层自动在命中 alignment 时把 `parallel_chunks` 注入 LLM conte
 
 ### 辞典查询
 
-32 部权威辞典共 748,000+ 词条，覆盖汉/巴/梵/藏/英 6 语种 —— NTI Reader、DPD、Apte、Monier-Williams、Rangjung Yeshe、佛光、丁福保、Soothill 等。完整词典清单见英文 README 详情。
+39 部权威辞典共 747,000+ 词条，覆盖汉/巴/梵/藏/英 6 语种 —— NTI Reader、DPD、Apte、Monier-Williams、Rangjung Yeshe、佛光、丁福保、Soothill 等。完整词典清单见英文 README 详情。
 
 ### 知识图谱
 
@@ -159,9 +178,10 @@ RAG 检索层自动在命中 alignment 时把 `parallel_chunks` 注入 LLM conte
 
 ### AI 问答 —— 小津
 
-**这是 FoJin 的核心。** 自然语言提问，小津从藏经原文中作答，使用 RAG（检索增强生成）覆盖 68 万+ embedding 向量 + HNSW 索引快速语义检索。答案之所以站得住，是因为检索把向量相似度、关键词重排和**本经召回**（你问的那部经一定被拉进上下文）结合起来，而且每一句被引用的原文，在能变成可点击引文之前都会先与检索到的来源核对。功能包括：
+**这是 FoJin 的核心。** 自然语言提问，小津从藏经原文中作答，使用 RAG（检索增强生成）覆盖 66 万+ embedding 向量 + HNSW 索引快速语义检索。答案之所以站得住，是因为检索把向量相似度、关键词重排和**本经召回**（你问的那部经一定被拉进上下文）结合起来，而且每一句被引用的原文，在能变成可点击引文之前都会先与检索到的来源核对。功能包括：
 
 - 多轮对话上下文感知
+- **研读记忆** —— 小津记得你最近读的经、问过的主题和你希望的讲法，接着上次往下聊；默认开启，可在个人中心查看与关闭
 - 关键词 + 可选 API cross-encoder **重排**提升答案质量
 - **可点击引用** `【《经名》第N卷】` 格式 —— 点击在侧栏抽屉打开原文上下文，**MVP 经典还显示跨藏经对读多语标签**（见上方三语对读章节）
 - **GFM markdown 表格** —— 比较类回答（如"中观 vs 唯识"）正常渲染表格
@@ -250,7 +270,7 @@ D3 交互图表可视化佛教文献史 —— 朝代分布、翻译趋势、语
 
 ### 收藏夹、书签、批注
 
-收藏经典到个人 collection，书签段落，添加批注供学习研究。
+收藏经典到个人 collection，书签段落，添加批注，存个人摘录（划选的经文 + 笔记，经文里显示底纹），供学习研究。
 
 ### 引用导出
 
@@ -286,7 +306,7 @@ FoJin 聚合全球主要佛教数字项目的数据。按研究领域分类（�
 | 数据库 | PostgreSQL 15 + pgvector (HNSW) + pg_trgm |
 | 搜索 | Elasticsearch 8 (ICU 分词) |
 | 缓存 | Redis 7 |
-| AI | RAG（680K+ 向量，BGE-M3，HNSW）+ 14 法师人格 + 多 LLM 厂商（OpenAI/Anthropic/DeepSeek/DashScope/Gemini/+10 家）+ 确定性引文/引号闸门 |
+| AI | RAG（66 万+ 向量，BGE-M3，HNSW）+ 15 法师人格 + 多 LLM 厂商（OpenAI/Anthropic/DeepSeek/DashScope/Gemini/+10 家）+ 确定性引文/引号闸门 |
 | 集成 | MCP 服务器（[`fojin-mcp`](https://pypi.org/project/fojin-mcp/)，stdio）+ 公开 REST API（OpenAPI/Swagger 文档）+ 跨藏 URN 方案 |
 | 部署 | Docker Compose, Nginx (gzip, 安全头), Cloudflare CDN |
 | CI | GitHub Actions（lint、test、安全扫描） |
@@ -344,9 +364,15 @@ cd backend && pytest tests/ -q
 - [x] 服务端 SEO meta 注入（每部经典独立标题/描述）
 - [x] **确定性答案可验证性** —— 引文白名单 + 逐字引号降级 + 每条答案信任状态；temp=0 下 `served_trustworthy_rate` 约 98%，作为评测回归门槛
 - [x] **跨藏 URN 方案** —— 稳定、可解析的经文标识（`fojin:cbeta/T0001.1`），与 CBETA / SuttaCentral / 84000 / GRETIL / VRI 互通
-- [x] **MCP 服务器 —— 已发布到 PyPI（[`fojin-mcp`](https://pypi.org/project/fojin-mcp/)）** —— 6 个只读、URN 可寻址工具，供 Claude Desktop / ChatGPT 调用
+- [x] **MCP 服务器 —— 已发布到 PyPI（[`fojin-mcp`](https://pypi.org/project/fojin-mcp/)）** —— 8 个只读、URN 可寻址工具，供 Claude Desktop / ChatGPT 调用
 - [x] **Agentic 研究助手**（`/research`）—— 规划 → 检索（语料 + 辞典 + 知识图谱）→ 走同一套引文闸门的有据综合
 - [x] **fojin.ai 引文溯源**（「这段话，出自佛经吗？」）—— 贴一段文字，逐句给出藏经出处，出处链接打开阅读页定位到行并整句高亮；整段原文按上下文认出处、连续句合并（`POST /api/verify/trace`）
+- [x] **CBETA 其余各藏**（2026.R2）—— 再收 20 套藏经、1,108 部、6,600 万字；著作权受限的不收；全文检索与逐行引用已覆盖（AI 问答检索暂未覆盖）
+- [x] **全部 CBETA 藏经逐行引用** —— 卍续藏行号按本版重建（去掉混入的新文丰 R 版行号），4,700+ 部有行首与目次
+- [x] **研读记忆** —— 小津记得你的阅读、提问主题与偏好（上线前 90 题配对评测，通过事先定好的引文忠实度与首字延迟门槛）
+- [x] **个人摘录** —— 划选经文存下并附笔记，阅读页显示底纹，个人中心汇总
+- [x] **今日经句**（`/daily`）—— 每天一句全藏逐字核对的完整经句，直达原文那一行，附白话与分享图
+- [x] **搜索按藏经筛选** —— 大正藏 / 卍续藏 / 嘉兴藏 / 补编 / 藏外 / 佛寺志 / 国图善本 / 石刻 / 其他 CBETA 藏经
 - [x] **对齐飞轮** —— anchor-expansion 候选挖掘 + 人工评审后提升为 ground-truth 对齐
 
 **正在做**：
