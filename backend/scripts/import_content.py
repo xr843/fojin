@@ -24,13 +24,13 @@ from sqlalchemy import select, text, update
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from elasticsearch import AsyncElasticsearch
+from elasticsearch import AsyncElasticsearch, NotFoundError
 from elasticsearch.helpers import async_bulk
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import settings
 from app.core.elasticsearch import init_es
-from app.core.elasticsearch import CONTENT_INDEX_NAME
+from app.core.elasticsearch import CONTENT_INDEX_NAME, INDEX_NAME
 from app.core.xml_parser import collection_of, find_all_xml_files, parse_tei_xml
 from app.services.gaiji import GaijiNormalizer, build_normalizer, normalize_for_index
 from app.models.text import BuddhistText
@@ -198,6 +198,15 @@ async def import_work(
             }
 
     await async_bulk(es, gen_es_actions(), raise_on_error=False)
+
+    # 经题索引（buddhist_texts）里的「有正文」也要跟着更新：经目先于正文入索引时这两个字段是空的，
+    # 搜索卡片会显示「目录数据」（2026-11-25 新导入的 1,108 部就因此全显示成无正文）。
+    try:
+        await es.update(
+            index=INDEX_NAME, id=str(bt.id), doc={"has_content": True, "content_char_count": total_chars}
+        )
+    except NotFoundError:
+        pass  # 经题没进索引（极少数旧数据）——不影响正文导入
 
     return len(unique_juans)
 
