@@ -3035,3 +3035,17 @@ export async function browseTaisho(fromNo: number, toNo: number, catalogOnly = f
   });
   return data;
 }
+
+// 问答回答下方的「相关词条」卡片：只读辞典，与问答生成、引文核验无关。POST 让问题原文不进 URL。
+export interface RelatedTermCard {
+  id: number;
+  headword: string;
+  source_code: string;
+  source_name: string;
+  excerpt: string;
+}
+
+export async function getRelatedTerms(q: string): Promise<RelatedTermCard[]> {
+  const { data } = await api.post<{ items: RelatedTermCard[] }>("/dictionary/related", { q });
+  return data.items;
+}
