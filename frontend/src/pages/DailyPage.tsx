@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Modal, Spin, message } from "antd";
 import { getVernacular } from "../api/client";
-import { pickDaily, quotePassage } from "../utils/dailyPassage";
+import { pickDaily, quotePassage, splitClauses } from "../utils/dailyPassage";
 import { lunarLabel } from "../utils/lunar";
 import { renderShareCard } from "../utils/shareCard";
 import { localizeHan } from "../utils/hanScript";
@@ -91,7 +91,11 @@ export default function DailyPage() {
 
       <div className="daily-date">{t("daily.heading", { date: dateLabel })}</div>
       <blockquote className="daily-text" lang="zh">
-        {text}
+        {splitClauses(text).map((c, i) => (
+          <span key={i} className="daily-clause">
+            {c}
+          </span>
+        ))}
       </blockquote>
       <div className="daily-source">
         —— <Link to={passage.reader_path} data-umami-event="daily_open_source">{sourceLine}</Link>

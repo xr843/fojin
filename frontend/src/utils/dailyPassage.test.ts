@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { beijingDateKey, dailyIndex, pickDaily, quotePassage, DAILY_PASSAGES, type DailyPassage } from "./dailyPassage";
+import { beijingDateKey, dailyIndex, pickDaily, quotePassage, splitClauses, DAILY_PASSAGES, type DailyPassage } from "./dailyPassage";
 import { wrapCjk } from "./shareCard";
 
 const P = (n: number): DailyPassage => ({
@@ -48,6 +48,22 @@ describe("经句引号", () => {
     expect(quotePassage("應無所住而生其心。", "zh-Hant")).toBe("「應無所住而生其心。」");
     expect(quotePassage("应无所住而生其心。", "zh")).toBe("“应无所住而生其心。”");
     expect(quotePassage("应无所住而生其心。", "en")).toBe("“应无所住而生其心。”");
+  });
+});
+
+describe("经句按分句换行", () => {
+  it("每段带自己的标点，引号跟着首尾分句", () => {
+    expect(splitClauses("“若以色见我，以音声求我，是人行邪道，不能见如来。”")).toEqual([
+      "“若以色见我，", "以音声求我，", "是人行邪道，", "不能见如来。”",
+    ]);
+    expect(splitClauses("「應無所住而生其心。」")).toEqual(["「應無所住而生其心。」"]);
+  });
+
+  it("池里每句切完拼回去一字不差", () => {
+    for (const p of DAILY_PASSAGES) {
+      const q = quotePassage(p.text, "zh");
+      expect(splitClauses(q).join("")).toBe(q);
+    }
   });
 });
 
