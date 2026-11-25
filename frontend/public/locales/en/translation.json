@@ -461,6 +461,7 @@
   "home.select_source": "Select source",
   "home.hot_label": "Popular",
   "home.guest_tip.dismiss": "Dismiss",
+  "home.continue_reading": "Continue",
   "home.recent_reading": "Recently read",
   "home.recent_remove": "Remove “{{title}}” from recently read",
   "home.read_just_now": "just now",

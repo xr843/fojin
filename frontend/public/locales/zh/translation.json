@@ -461,6 +461,7 @@
   "home.select_source": "选择数据源",
   "home.hot_label": "热门检索",
   "home.guest_tip.dismiss": "关闭提示",
+  "home.continue_reading": "接着读",
   "home.recent_reading": "最近阅读",
   "home.recent_remove": "从最近阅读中移除《{{title}}》",
   "home.read_just_now": "刚刚",

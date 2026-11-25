@@ -1,4 +1,4 @@
-/** 首页：功能卡是真链接（键盘可达）、游客提示关闭后记住、热门检索带点击埋点。 */
+/** 首页：功能卡是真链接（键盘可达）、游客提示关闭后记住、热门检索收进搜索下拉。 */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -61,13 +61,13 @@ describe("HomePage 无障碍与记忆", () => {
     expect(second.container.querySelector(".home-tip")).toBeNull();
   });
 
-  it("热门检索按钮带点击埋点，事件属性是标签原文", () => {
+  it("热门检索不再单占一行：输入框为空时点开，下拉里列出热门词", async () => {
     const { container } = renderHome();
-    const tags = [...container.querySelectorAll<HTMLElement>(".home-hot-tag")];
-    expect(tags.length).toBeGreaterThan(0);
-    for (const b of tags) {
-      expect(b.dataset.umamiEvent).toBe("home_hot_tag");
-      expect(b.dataset.umamiEventTag).toBe(b.textContent);
-    }
+    expect(container.querySelector(".home-hot-tags")).toBeNull();
+    const input = screen.getByRole("combobox");
+    fireEvent.mouseDown(input);
+    fireEvent.focus(input);
+    expect(await screen.findByText("热门检索")).toBeTruthy();
+    expect(await screen.findByText("金刚经")).toBeTruthy();
   });
 });
