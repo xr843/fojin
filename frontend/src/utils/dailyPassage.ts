@@ -37,3 +37,12 @@ export function pickDaily(now: Date, pool: DailyPassage[] = DAILY_PASSAGES): { p
   const dateKey = beijingDateKey(now);
   return { passage: pool[dailyIndex(dateKey, pool.length)], dateKey };
 }
+
+/**
+ * 给经句加引号：繁体界面用「」，简体与其他界面用“”（大陆通行）。
+ * 池里存的是不带引号、带句末标点的原句；引号只在展示与分享时加。
+ * 不引 hanScript（它会把 OpenCC 拖进首页的静态导入链）。
+ */
+export function quotePassage(text: string, lang: string): string {
+  return lang.startsWith("zh-Hant") || lang === "zh-TW" || lang === "zh-HK" ? `「${text}」` : `“${text}”`;
+}

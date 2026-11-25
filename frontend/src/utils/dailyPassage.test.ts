@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { beijingDateKey, dailyIndex, pickDaily, DAILY_PASSAGES, type DailyPassage } from "./dailyPassage";
+import { beijingDateKey, dailyIndex, pickDaily, quotePassage, DAILY_PASSAGES, type DailyPassage } from "./dailyPassage";
 import { wrapCjk } from "./shareCard";
 
 const P = (n: number): DailyPassage => ({
@@ -29,6 +29,9 @@ describe("每日一段", () => {
     for (const p of DAILY_PASSAGES) {
       expect(p.reader_path).toMatch(/^\/texts\/\d+\/read\?juan=\d+/);
       expect(p.title_zh && p.cbeta_id && p.text).toBeTruthy();
+      // 每句是完整的自然句：以句末标点收尾；引号由页面加，池里不带
+      expect(p.text, p.text).toMatch(/[。？！]$/);
+      expect(p.text, p.text).not.toMatch(/^[「“]/);
     }
     // 相邻两条不是同一部经（生成时已按经打散）
     for (let i = 1; i < DAILY_PASSAGES.length; i++) {
@@ -37,6 +40,14 @@ describe("每日一段", () => {
         expect(i).toBeGreaterThan(DAILY_PASSAGES.length - 4);
       }
     }
+  });
+});
+
+describe("经句引号", () => {
+  it("繁体界面用「」，简体和英文界面用“”", () => {
+    expect(quotePassage("應無所住而生其心。", "zh-Hant")).toBe("「應無所住而生其心。」");
+    expect(quotePassage("应无所住而生其心。", "zh")).toBe("“应无所住而生其心。”");
+    expect(quotePassage("应无所住而生其心。", "en")).toBe("“应无所住而生其心。”");
   });
 });
 
@@ -53,6 +64,10 @@ describe("分享图断行", () => {
       "一切有為法，如夢幻泡影，",
       "如露亦如電，應作如是觀",
     ]);
+  });
+
+  it("后引号不放行首", () => {
+    expect(wrapCjk(measure, "一二三。”", 30)).toEqual(["一二三。”"]);
   });
 
   it("标点不放行首，跟在上一行末尾", () => {

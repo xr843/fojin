@@ -24,10 +24,15 @@ const SERIF = '"Noto Serif SC", "Source Han Serif SC", "Songti SC", serif';
  */
 export function wrapCjk(measure: (s: string) => number, text: string, maxWidth: number): string[] {
   const BREAK_AFTER = "，。；：？！、";
-  const NO_LINE_START = "，。、；：？！」』）》,.;:?!";
+  const NO_LINE_START = "，。、；：？！」』）》”,.;:?!";
   const lines: string[] = [];
   let line = "";
   for (const ch of Array.from(text)) {
+    if (!line && lines.length && NO_LINE_START.includes(ch)) {
+      // 上一行刚以标点收尾（如「。」），紧跟的后引号「”」也挂在上一行
+      lines[lines.length - 1] += ch;
+      continue;
+    }
     if (measure(line + ch) <= maxWidth || !line) {
       line += ch;
       continue;
