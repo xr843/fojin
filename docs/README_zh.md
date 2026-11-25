@@ -28,7 +28,7 @@ FoJin 的定位是 **开放、跨藏、可验证的佛学知识基础设施** �
 | **相信这个答案** | **可验证答案** —— 确定性引文白名单 + 逐字引号降级 + 每条答案信任状态；temp=0 下约 98% 对外可信 |
 | 研究一个多步的难题 | **研究助手**（`/research`）—— 跨语料 + 辞典 + 知识图谱规划检索，再走同一套闸门综合成带引文的答案 |
 | **核对一段文字是否出自佛经** | **[fojin.ai](https://fojin.ai)** —— 贴进 3,000 字以内（文章、网传佛语、AI 回答），逐句比对汉文大藏经原文，标出「出自佛经 / 论典 / 注疏 / 宗派与祖师著作 / 藏经中未见」，出处链接定位到原文那一行并常亮高亮；原文里连着的几句合成一段 |
-| 从 AI 助手里调用 FoJin | **MCP 服务器** —— 托管在 `mcp.fojin.ai`（免安装、免 key）或 [`uvx fojin-mcp`](https://pypi.org/project/fojin-mcp/)；8 个只读、URN 可寻址工具，供 Claude / ChatGPT 调用 |
+| 从 AI 助手里调用 FoJin | **MCP 服务器** —— 托管在 `mcp.fojin.ai`（免安装、免 key）或 [`uvx fojin-mcp`](https://pypi.org/project/fojin-mcp/)；9 个只读、URN 可寻址工具，供 Claude / ChatGPT 调用 |
 | 用某位法师的口吻问 | **法师人格模式** —— 15 位历史法师，各自限定其宗派核心经典 RAG |
 | 跨数据库找一部经 | **多维检索** 覆盖 660+ 数据源中的 11,600+ 部，可按藏经筛选（大正藏、卍续藏、嘉兴藏、补编、藏外、佛寺志……） |
 | 在线阅读全文 | **10,000+ 部** 共 25,000+ 卷 CBETA 风格全文，页栏行引用与目次 |
@@ -95,7 +95,7 @@ uvx fojin-mcp                 # 免安装直接运行
 # 或：pip install fojin-mcp && fojin-mcp
 ```
 
-它对外暴露 8 个**只读**工具（走公开 API），每个返回的经文都带稳定、可解析的跨藏 **URN**（`fojin:cbeta/T0001.1`）：
+它对外暴露 9 个**只读**工具（走公开 API），每个返回的经文都带稳定、可解析的跨藏 **URN**（`fojin:cbeta/T0001.1`）：
 
 | 工具 | 作用 |
 |---|---|
@@ -107,6 +107,7 @@ uvx fojin-mcp                 # 免安装直接运行
 | `resolve_urn` | 把 FoJin URN 解析到原典位置 |
 | `verify_quote` | **逐字核对** —— 这句话真的在藏经里吗、真的在你说的那一卷吗？「引文真不真」与「出处对不对」分开回答，差几个字时给逐字差异 |
 | `commentaries` | 某段经文历代注家怎么讲 —— 定位到卷与行 |
+| `cite` | **生成引用** —— 给 URN 或 CBETA 行首（`T12n0374_p0450a12`），返回 CBETA 写法的中文引用、行级 URN、BibTeX / RIS / CSL-JSON，以及这段文字的许可与署名要求 |
 
 Claude Desktop 配置和 ChatGPT 接入见 **[`mcp-server/README.md`](../mcp-server/README.md)**。该服务器是一个薄的只读客户端：**不含任何凭据、不打包任何语料**，只调用 FoJin 的公开端点 —— 默认目标 `https://fojin.app/api`，可用 `FOJIN_API_BASE_URL` 改指向自托管实例。
 
