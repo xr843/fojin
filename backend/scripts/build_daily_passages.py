@@ -98,6 +98,7 @@ def main() -> None:
     rows = interleave(kept)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(rows, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    print("⚠️ 接着在 frontend/ 下跑 node scripts/daily-hans.mjs 补简体字段（首页用）", flush=True)
     print(f"\n收 {len(rows)} 段，丢 {len(dropped)} 段 → {OUT}")
     for q in dropped:
         print("  未收：", q)

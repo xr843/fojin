@@ -5,7 +5,9 @@
   "cbeta_id": "T0235",
   "text_id": 7,
   "juan_num": 1,
-  "reader_path": "/texts/7/read?juan=1&anchor=p0749c22&hl=1949-1957"
+  "reader_path": "/texts/7/read?juan=1&anchor=p0749c22&hl=1949-1957",
+  "text_hans": "应无所住而生其心。",
+  "title_hans": "金刚般若波罗蜜经"
  },
  {
   "text": "諸法從本來，常自寂滅相。佛子行道已，來世得作佛。",
@@ -13,7 +15,9 @@
   "cbeta_id": "T0262",
   "text_id": 6513,
   "juan_num": 1,
-  "reader_path": "/texts/6513/read?juan=1&anchor=p0008b25&hl=9642-9665"
+  "reader_path": "/texts/6513/read?juan=1&anchor=p0008b25&hl=9642-9665",
+  "text_hans": "诸法从本来，常自寂灭相。佛子行道已，来世得作佛。",
+  "title_hans": "妙法莲华经"
  },
  {
   "text": "心如工畫師，能畫諸世間，五蘊悉從生，無法而不造。",
@@ -21,7 +25,9 @@
   "cbeta_id": "T0279",
   "text_id": 12,
   "juan_num": 19,
-  "reader_path": "/texts/12/read?juan=19&anchor=p0102a21&hl=3899-3922"
+  "reader_path": "/texts/12/read?juan=19&anchor=p0102a21&hl=3899-3922",
+  "text_hans": "心如工画师，能画诸世间，五蕴悉从生，无法而不造。",
+  "title_hans": "大方广佛华严经"
  },
  {
   "text": "若菩薩欲得淨土，當淨其心；隨其心淨，則佛土淨。",
@@ -29,7 +35,9 @@
   "cbeta_id": "T0475",
   "text_id": 28,
   "juan_num": 1,
-  "reader_path": "/texts/28/read?juan=1&anchor=p0538c04&hl=2854-2876"
+  "reader_path": "/texts/28/read?juan=1&anchor=p0538c04&hl=2854-2876",
+  "text_hans": "若菩萨欲得净土，当净其心；随其心净，则佛土净。",
+  "title_hans": "维摩诘所说经"
  },
  {
   "text": "此有故彼有，此起故彼起。",
@@ -37,7 +45,9 @@
   "cbeta_id": "T0099",
   "text_id": 3,
   "juan_num": 12,
-  "reader_path": "/texts/3/read?juan=12&anchor=p0086a29&hl=13435-13447"
+  "reader_path": "/texts/3/read?juan=12&anchor=p0086a29&hl=13435-13447",
+  "text_hans": "此有故彼有，此起故彼起。",
+  "title_hans": "杂阿含经"
  },
  {
   "text": "眾因緣生法，我說即是無，亦為是假名，亦是中道義。",
@@ -45,7 +55,9 @@
   "cbeta_id": "T1564",
   "text_id": 40,
   "juan_num": 4,
-  "reader_path": "/texts/40/read?juan=4&anchor=p0033b11&hl=5309-5332"
+  "reader_path": "/texts/40/read?juan=4&anchor=p0033b11&hl=5309-5332",
+  "text_hans": "众因缘生法，我说即是无，亦为是假名，亦是中道义。",
+  "title_hans": "中论"
  },
  {
   "text": "菩提本無樹，明鏡亦非臺；本來無一物，何處惹塵埃。",
@@ -53,7 +65,9 @@
   "cbeta_id": "T2008",
   "text_id": 58,
   "juan_num": 1,
-  "reader_path": "/texts/58/read?juan=1"
+  "reader_path": "/texts/58/read?juan=1",
+  "text_hans": "菩提本无树，明镜亦非台；本来无一物，何处惹尘埃。",
+  "title_hans": "六祖大师法宝坛经"
  },
  {
   "text": "知見立知，即無明本；知見無見，斯即涅槃。",
@@ -61,7 +75,9 @@
   "cbeta_id": "T0945",
   "text_id": 65,
   "juan_num": 5,
-  "reader_path": "/texts/65/read?juan=5&anchor=p0124c09&hl=531-547"
+  "reader_path": "/texts/65/read?juan=5&anchor=p0124c09&hl=531-547",
+  "text_hans": "知见立知，即无明本；知见无见，斯即涅槃。",
+  "title_hans": "大佛顶如来密因修证了义诸菩萨万行首楞严经"
  },
  {
   "text": "色不異空，空不異色；色即是空，空即是色。",
@@ -69,7 +85,9 @@
   "cbeta_id": "T0251",
   "text_id": 9,
   "juan_num": 1,
-  "reader_path": "/texts/9/read?juan=1"
+  "reader_path": "/texts/9/read?juan=1",
+  "text_hans": "色不异空，空不异色；色即是空，空即是色。",
+  "title_hans": "般若波罗蜜多心经"
  },
  {
   "text": "一切眾生悉有佛性。",
@@ -77,7 +95,9 @@
   "cbeta_id": "T0374",
   "text_id": 15,
   "juan_num": 6,
-  "reader_path": "/texts/15/read?juan=6"
+  "reader_path": "/texts/15/read?juan=6",
+  "text_hans": "一切众生悉有佛性。",
+  "title_hans": "大般涅槃经"
  },
  {
   "text": "佛法大海，信為能入，智為能度。",
@@ -85,7 +105,9 @@
   "cbeta_id": "T1509",
   "text_id": 39,
   "juan_num": 1,
-  "reader_path": "/texts/39/read?juan=1&anchor=p0063a01&hl=8264-8278"
+  "reader_path": "/texts/39/read?juan=1&anchor=p0063a01&hl=8264-8278",
+  "text_hans": "佛法大海，信为能入，智为能度。",
+  "title_hans": "大智度论"
  },
  {
   "text": "知足之人，雖臥地上，猶為安樂。",
@@ -93,7 +115,9 @@
   "cbeta_id": "T0389",
   "text_id": 21,
   "juan_num": 1,
-  "reader_path": "/texts/21/read?juan=1&anchor=p1111c06&hl=1572-1585"
+  "reader_path": "/texts/21/read?juan=1&anchor=p1111c06&hl=1572-1585",
+  "text_hans": "知足之人，虽卧地上，犹为安乐。",
+  "title_hans": "佛垂般涅槃略说教诫经"
  },
  {
   "text": "諸惡莫作，諸善奉行，自淨其意，是諸佛教。",
@@ -101,7 +125,9 @@
   "cbeta_id": "T0125",
   "text_id": 4,
   "juan_num": 1,
-  "reader_path": "/texts/4/read?juan=1&anchor=p0551a13&hl=2607-2626"
+  "reader_path": "/texts/4/read?juan=1&anchor=p0551a13&hl=2607-2626",
+  "text_hans": "诸恶莫作，诸善奉行，自净其意，是诸佛教。",
+  "title_hans": "增壹阿含经"
  },
  {
   "text": "初發心時，便成正覺。",
@@ -109,7 +135,9 @@
   "cbeta_id": "T0278",
   "text_id": 11,
   "juan_num": 8,
-  "reader_path": "/texts/11/read?juan=8&anchor=p0449c14&hl=9760-9768"
+  "reader_path": "/texts/11/read?juan=8&anchor=p0449c14&hl=9760-9768",
+  "text_hans": "初发心时，便成正觉。",
+  "title_hans": "大方广佛华严经"
  },
  {
   "text": "諸行無常，是生滅法；生滅滅已，寂滅為樂。",
@@ -117,7 +145,9 @@
   "cbeta_id": "T0007",
   "text_id": 6268,
   "juan_num": 3,
-  "reader_path": "/texts/6268/read?juan=3&anchor=p0204c23&hl=4733-4752"
+  "reader_path": "/texts/6268/read?juan=3&anchor=p0204c23&hl=4733-4752",
+  "text_hans": "诸行无常，是生灭法；生灭灭已，寂灭为乐。",
+  "title_hans": "大般涅槃经"
  },
  {
   "text": "當自熾燃，熾燃於法，勿他熾燃；當自歸依，歸依於法，勿他歸依。",
@@ -125,7 +155,9 @@
   "cbeta_id": "T0001",
   "text_id": 1,
   "juan_num": 2,
-  "reader_path": "/texts/1/read?juan=2&anchor=p0015b06&hl=7843-7872"
+  "reader_path": "/texts/1/read?juan=2&anchor=p0015b06&hl=7843-7872",
+  "text_hans": "当自炽燃，炽燃于法，勿他炽燃；当自归依，归依于法，勿他归依。",
+  "title_hans": "长阿含经"
  },
  {
   "text": "不可以少善根福德因緣，得生彼國。",
@@ -133,7 +165,9 @@
   "cbeta_id": "T0366",
   "text_id": 20,
   "juan_num": 1,
-  "reader_path": "/texts/20/read?juan=1&anchor=p0347b09&hl=1134-1148"
+  "reader_path": "/texts/20/read?juan=1&anchor=p0347b09&hl=1134-1148",
+  "text_hans": "不可以少善根福德因缘，得生彼国。",
+  "title_hans": "佛说阿弥陀经"
  },
  {
   "text": "世間無常，國土危脆；四大苦空，五陰無我。",
@@ -141,7 +175,9 @@
   "cbeta_id": "T0779",
   "text_id": 7007,
   "juan_num": 1,
-  "reader_path": "/texts/7007/read?juan=1&anchor=p0715b07&hl=48-67"
+  "reader_path": "/texts/7007/read?juan=1&anchor=p0715b07&hl=48-67",
+  "text_hans": "世间无常，国土危脆；四大苦空，五阴无我。",
+  "title_hans": "佛说八大人觉经"
  },
  {
   "text": "不可怨以怨，終已得休息；行忍得息怨，此名如來法。",
@@ -149,7 +185,9 @@
   "cbeta_id": "T0212",
   "text_id": 6469,
   "juan_num": 16,
-  "reader_path": "/texts/6469/read?juan=16&anchor=p0697a04&hl=6101-6124"
+  "reader_path": "/texts/6469/read?juan=16&anchor=p0697a04&hl=6101-6124",
+  "text_hans": "不可怨以怨，终已得休息；行忍得息怨，此名如来法。",
+  "title_hans": "出曜经"
  },
  {
   "text": "是日已過，命則隨減，如少水魚，斯有何樂？",
@@ -157,7 +195,9 @@
   "cbeta_id": "T0210",
   "text_id": 6467,
   "juan_num": 1,
-  "reader_path": "/texts/6467/read?juan=1&anchor=p0559a26&hl=313-332"
+  "reader_path": "/texts/6467/read?juan=1&anchor=p0559a26&hl=313-332",
+  "text_hans": "是日已过，命则随减，如少水鱼，斯有何乐？",
+  "title_hans": "法句经"
  },
  {
   "text": "由假說我法，有種種相轉，彼依識所變，此能變唯三。",
@@ -165,7 +205,9 @@
   "cbeta_id": "T1586",
   "text_id": 45,
   "juan_num": 1,
-  "reader_path": "/texts/45/read?juan=1"
+  "reader_path": "/texts/45/read?juan=1",
+  "text_hans": "由假说我法，有种种相转，彼依识所变，此能变唯三。",
+  "title_hans": "唯识三十论颂"
  },
  {
   "text": "知幻即離，不作方便；離幻即覺，亦無漸次。",
@@ -173,7 +215,9 @@
   "cbeta_id": "T0842",
   "text_id": 64,
   "juan_num": 1,
-  "reader_path": "/texts/64/read?juan=1&anchor=p0914a20&hl=1585-1604"
+  "reader_path": "/texts/64/read?juan=1&anchor=p0914a20&hl=1585-1604",
+  "text_hans": "知幻即离，不作方便；离幻即觉，亦无渐次。",
+  "title_hans": "大方广圆觉修多罗了义经"
  },
  {
   "text": "一切業障海，皆從妄想生，若欲懺悔者，端坐念實相。",
@@ -181,7 +225,9 @@
   "cbeta_id": "T0277",
   "text_id": 6528,
   "juan_num": 1,
-  "reader_path": "/texts/6528/read?juan=1&anchor=p0393b10&hl=6798-6821"
+  "reader_path": "/texts/6528/read?juan=1&anchor=p0393b10&hl=6798-6821",
+  "text_hans": "一切业障海，皆从妄想生，若欲忏悔者，端坐念实相。",
+  "title_hans": "佛说观普贤菩萨行法经"
  },
  {
   "text": "凡所有相，皆是虛妄。若見諸相非相，則見如來。",
@@ -189,7 +235,9 @@
   "cbeta_id": "T0235",
   "text_id": 7,
   "juan_num": 1,
-  "reader_path": "/texts/7/read?juan=1&anchor=p0749a24&hl=732-753"
+  "reader_path": "/texts/7/read?juan=1&anchor=p0749a24&hl=732-753",
+  "text_hans": "凡所有相，皆是虚妄。若见诸相非相，则见如来。",
+  "title_hans": "金刚般若波罗蜜经"
  },
  {
   "text": "十方佛土中，唯有一乘法，無二亦無三，除佛方便說。",
@@ -197,7 +245,9 @@
   "cbeta_id": "T0262",
   "text_id": 6513,
   "juan_num": 1,
-  "reader_path": "/texts/6513/read?juan=1&anchor=p0008a17&hl=9161-9184"
+  "reader_path": "/texts/6513/read?juan=1&anchor=p0008a17&hl=9161-9184",
+  "text_hans": "十方佛土中，唯有一乘法，无二亦无三，除佛方便说。",
+  "title_hans": "妙法莲华经"
  },
  {
   "text": "若人欲了知，三世一切佛，應觀法界性，一切唯心造。",
@@ -205,7 +255,9 @@
   "cbeta_id": "T0279",
   "text_id": 12,
   "juan_num": 19,
-  "reader_path": "/texts/12/read?juan=19&anchor=p0102a29&hl=4003-4026"
+  "reader_path": "/texts/12/read?juan=19&anchor=p0102a29&hl=4003-4026",
+  "text_hans": "若人欲了知，三世一切佛，应观法界性，一切唯心造。",
+  "title_hans": "大方广佛华严经"
  },
  {
   "text": "以一切眾生病，是故我病；若一切眾生病滅，則我病滅。",
@@ -213,7 +265,9 @@
   "cbeta_id": "T0475",
   "text_id": 28,
   "juan_num": 2,
-  "reader_path": "/texts/28/read?juan=2&anchor=p0544b21&hl=512-536"
+  "reader_path": "/texts/28/read?juan=2&anchor=p0544b21&hl=512-536",
+  "text_hans": "以一切众生病，是故我病；若一切众生病灭，则我病灭。",
+  "title_hans": "维摩诘所说经"
  },
  {
   "text": "心惱故眾生惱，心淨故眾生淨。",
@@ -221,7 +275,9 @@
   "cbeta_id": "T0099",
   "text_id": 3,
   "juan_num": 10,
-  "reader_path": "/texts/3/read?juan=10&anchor=p0069c12&hl=10004-10017"
+  "reader_path": "/texts/3/read?juan=10&anchor=p0069c12&hl=10004-10017",
+  "text_hans": "心恼故众生恼，心净故众生净。",
+  "title_hans": "杂阿含经"
  },
  {
   "text": "諸法不自生，亦不從他生，不共不無因，是故知無生。",
@@ -229,7 +285,9 @@
   "cbeta_id": "T1564",
   "text_id": 40,
   "juan_num": 1,
-  "reader_path": "/texts/40/read?juan=1&anchor=p0002b06&hl=1515-1538"
+  "reader_path": "/texts/40/read?juan=1&anchor=p0002b06&hl=1515-1538",
+  "text_hans": "诸法不自生，亦不从他生，不共不无因，是故知无生。",
+  "title_hans": "中论"
  },
  {
   "text": "佛法在世間，不離世間覺；離世覓菩提，恰如求兔角。",
@@ -237,7 +295,9 @@
   "cbeta_id": "T2008",
   "text_id": 58,
   "juan_num": 1,
-  "reader_path": "/texts/58/read?juan=1&anchor=p0351c09&hl=7130-7153"
+  "reader_path": "/texts/58/read?juan=1&anchor=p0351c09&hl=7130-7153",
+  "text_hans": "佛法在世间，不离世间觉；离世觅菩提，恰如求兔角。",
+  "title_hans": "六祖大师法宝坛经"
  },
  {
   "text": "淨極光通達，寂照含虛空，却來觀世間，猶如夢中事。",
@@ -245,7 +305,9 @@
   "cbeta_id": "T0945",
   "text_id": 65,
   "juan_num": 6,
-  "reader_path": "/texts/65/read?juan=6&anchor=p0131a23&hl=4255-4279"
+  "reader_path": "/texts/65/read?juan=6&anchor=p0131a23&hl=4255-4279",
+  "text_hans": "净极光通达，寂照含虚空，却来观世间，犹如梦中事。",
+  "title_hans": "大佛顶如来密因修证了义诸菩萨万行首楞严经"
  },
  {
   "text": "心無罣礙，無罣礙故，無有恐怖，遠離顛倒夢想，究竟涅槃。",
@@ -253,7 +315,9 @@
   "cbeta_id": "T0251",
   "text_id": 9,
   "juan_num": 1,
-  "reader_path": "/texts/9/read?juan=1&anchor=p0848c14&hl=235-262"
+  "reader_path": "/texts/9/read?juan=1&anchor=p0848c14&hl=235-262",
+  "text_hans": "心无罣碍，无罣碍故，无有恐怖，远离颠倒梦想，究竟涅槃。",
+  "title_hans": "般若波罗蜜多心经"
  },
  {
   "text": "依法不依人，依義不依語，依智不依識。",
@@ -261,7 +325,9 @@
   "cbeta_id": "T0374",
   "text_id": 15,
   "juan_num": 6,
-  "reader_path": "/texts/15/read?juan=6&anchor=p0401b28&hl=8562-8578"
+  "reader_path": "/texts/15/read?juan=6&anchor=p0401b28&hl=8562-8578",
+  "text_hans": "依法不依人，依义不依语，依智不依识。",
+  "title_hans": "大般涅槃经"
  },
  {
   "text": "慈悲是佛道之根本。",
@@ -269,7 +335,9 @@
   "cbeta_id": "T1509",
   "text_id": 39,
   "juan_num": 27,
-  "reader_path": "/texts/39/read?juan=27&anchor=p0256c16&hl=744-751"
+  "reader_path": "/texts/39/read?juan=27&anchor=p0256c16&hl=744-751",
+  "text_hans": "慈悲是佛道之根本。",
+  "title_hans": "大智度论"
  },
  {
   "text": "汝等比丘，若欲脫諸苦惱，當觀知足。",
@@ -277,7 +345,9 @@
   "cbeta_id": "T0389",
   "text_id": 21,
   "juan_num": 1,
-  "reader_path": "/texts/21/read?juan=1&anchor=p1111c05&hl=1541-1556"
+  "reader_path": "/texts/21/read?juan=1&anchor=p1111c05&hl=1541-1556",
+  "text_hans": "汝等比丘，若欲脱诸苦恼，当观知足。",
+  "title_hans": "佛垂般涅槃略说教诫经"
  },
  {
   "text": "心為法本，心尊心使，中心念善，即行即為，受其善報，如影隨形。",
@@ -285,7 +355,9 @@
   "cbeta_id": "T0125",
   "text_id": 4,
   "juan_num": 51,
-  "reader_path": "/texts/4/read?juan=51&anchor=p0827b15&hl=3146-3175"
+  "reader_path": "/texts/4/read?juan=51&anchor=p0827b15&hl=3146-3175",
+  "text_hans": "心为法本，心尊心使，中心念善，即行即为，受其善报，如影随形。",
+  "title_hans": "增壹阿含经"
  },
  {
   "text": "一切有為法，如夢幻泡影，如露亦如電，應作如是觀。",
@@ -293,7 +365,9 @@
   "cbeta_id": "T0235",
   "text_id": 7,
   "juan_num": 1,
-  "reader_path": "/texts/7/read?juan=1&anchor=p0752b28&hl=6931-6957"
+  "reader_path": "/texts/7/read?juan=1&anchor=p0752b28&hl=6931-6957",
+  "text_hans": "一切有为法，如梦幻泡影，如露亦如电，应作如是观。",
+  "title_hans": "金刚般若波罗蜜经"
  },
  {
   "text": "我深敬汝等，不敢輕慢。",
@@ -301,7 +375,9 @@
   "cbeta_id": "T0262",
   "text_id": 6513,
   "juan_num": 6,
-  "reader_path": "/texts/6513/read?juan=6&anchor=p0050c19&hl=6337-6346"
+  "reader_path": "/texts/6513/read?juan=6&anchor=p0050c19&hl=6337-6346",
+  "text_hans": "我深敬汝等，不敢轻慢。",
+  "title_hans": "妙法莲华经"
  },
  {
   "text": "信為道元功德母，長養一切諸善法，斷除疑網出愛流，開示涅槃無上道。",
@@ -309,7 +385,9 @@
   "cbeta_id": "T0279",
   "text_id": 12,
   "juan_num": 14,
-  "reader_path": "/texts/12/read?juan=14&anchor=p0072b18&hl=4397-4428"
+  "reader_path": "/texts/12/read?juan=14&anchor=p0072b18&hl=4397-4428",
+  "text_hans": "信为道元功德母，长养一切诸善法，断除疑网出爱流，开示涅槃无上道。",
+  "title_hans": "大方广佛华严经"
  },
  {
   "text": "不斷煩惱而入涅槃，是為宴坐。",
@@ -317,7 +395,9 @@
   "cbeta_id": "T0475",
   "text_id": 28,
   "juan_num": 1,
-  "reader_path": "/texts/28/read?juan=1&anchor=p0539c25&hl=5063-5075"
+  "reader_path": "/texts/28/read?juan=1&anchor=p0539c25&hl=5063-5075",
+  "text_hans": "不断烦恼而入涅槃，是为宴坐。",
+  "title_hans": "维摩诘所说经"
  },
  {
   "text": "當觀色無常，如是觀者，則為正觀。",
@@ -325,7 +405,9 @@
   "cbeta_id": "T0099",
   "text_id": 3,
   "juan_num": 1,
-  "reader_path": "/texts/3/read?juan=1&anchor=p0001a07&hl=61-76"
+  "reader_path": "/texts/3/read?juan=1&anchor=p0001a07&hl=61-76",
+  "text_hans": "当观色无常，如是观者，则为正观。",
+  "title_hans": "杂阿含经"
  },
  {
   "text": "不生亦不滅，不常亦不斷，不一亦不異，不來亦不出。",
@@ -333,7 +415,9 @@
   "cbeta_id": "T1564",
   "text_id": 40,
   "juan_num": 1,
-  "reader_path": "/texts/40/read?juan=1&anchor=p0001b14&hl=36-59"
+  "reader_path": "/texts/40/read?juan=1&anchor=p0001b14&hl=36-59",
+  "text_hans": "不生亦不灭，不常亦不断，不一亦不异，不来亦不出。",
+  "title_hans": "中论"
  },
  {
   "text": "何期自性，本自清淨；何期自性，本不生滅；何期自性，本自具足；何期自性，本無動搖；何期自性，能生萬法。",
@@ -341,7 +425,9 @@
   "cbeta_id": "T2008",
   "text_id": 58,
   "juan_num": 1,
-  "reader_path": "/texts/58/read?juan=1&anchor=p0349a19&hl=2558-2608"
+  "reader_path": "/texts/58/read?juan=1&anchor=p0349a19&hl=2558-2608",
+  "text_hans": "何期自性，本自清净；何期自性，本不生灭；何期自性，本自具足；何期自性，本无动摇；何期自性，能生万法。",
+  "title_hans": "六祖大师法宝坛经"
  },
  {
   "text": "過去心不可得，現在心不可得，未來心不可得。",
@@ -349,7 +435,9 @@
   "cbeta_id": "T0235",
   "text_id": 7,
   "juan_num": 1,
-  "reader_path": "/texts/7/read?juan=1&anchor=p0751b27&hl=5144-5164"
+  "reader_path": "/texts/7/read?juan=1&anchor=p0751b27&hl=5144-5164",
+  "text_hans": "过去心不可得，现在心不可得，未来心不可得。",
+  "title_hans": "金刚般若波罗蜜经"
  },
  {
   "text": "三界無安，猶如火宅，眾苦充滿，甚可怖畏。",
@@ -357,7 +445,9 @@
   "cbeta_id": "T0262",
   "text_id": 6513,
   "juan_num": 2,
-  "reader_path": "/texts/6513/read?juan=2&anchor=p0014c22&hl=6594-6613"
+  "reader_path": "/texts/6513/read?juan=2&anchor=p0014c22&hl=6594-6613",
+  "text_hans": "三界无安，犹如火宅，众苦充满，甚可怖畏。",
+  "title_hans": "妙法莲华经"
  },
  {
   "text": "知我說法，如筏喻者，法尚應捨，何況非法。",
@@ -365,7 +455,9 @@
   "cbeta_id": "T0235",
   "text_id": 7,
   "juan_num": 1,
-  "reader_path": "/texts/7/read?juan=1&anchor=p0749b10&hl=1052-1071"
+  "reader_path": "/texts/7/read?juan=1&anchor=p0749b10&hl=1052-1071",
+  "text_hans": "知我说法，如筏喻者，法尚应舍，何况非法。",
+  "title_hans": "金刚般若波罗蜜经"
  },
  {
   "text": "若以色見我，以音聲求我，是人行邪道，不能見如來。",
@@ -373,6 +465,8 @@
   "cbeta_id": "T0235",
   "text_id": 7,
   "juan_num": 1,
-  "reader_path": "/texts/7/read?juan=1&anchor=p0752a17&hl=6109-6132"
+  "reader_path": "/texts/7/read?juan=1&anchor=p0752a17&hl=6109-6132",
+  "text_hans": "若以色见我，以音声求我，是人行邪道，不能见如来。",
+  "title_hans": "金刚般若波罗蜜经"
  }
 ]

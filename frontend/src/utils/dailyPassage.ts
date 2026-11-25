@@ -16,6 +16,9 @@ export interface DailyPassage {
   juan_num: number;
   /** 站内路径，直达阅读器那一行并高亮，如 /texts/7/read?juan=1&anchor=p0749c22&hl=… */
   reader_path: string;
+  /** 简体版（scripts/daily-hans.mjs 用 OpenCC 预先算好）：首页不能引 OpenCC，靠它显示简体 */
+  text_hans?: string;
+  title_hans?: string;
 }
 
 export const DAILY_PASSAGES = passages as DailyPassage[];
@@ -67,4 +70,13 @@ export const ONE_LINE_MAX_CHARS = 36;
  */
 export function splitClauses(text: string): string[] {
   return text.match(/[「“]?[^，。；：？！、]+[，。；：？！、]*[」”]?/g) ?? [text];
+}
+
+/**
+ * 首页用的经句与经名：按界面语言选繁/简，不经过 OpenCC（hanScript 会把 550KB 拖进首屏）。
+ * 池里原文是繁体；简体取预先算好的 text_hans/title_hans，缺了就退回原文。
+ */
+export function passageInScript(p: DailyPassage, lang: string): { text: string; title: string } {
+  if (scriptForLanguage(lang) === "traditional") return { text: p.text, title: p.title_zh };
+  return { text: p.text_hans ?? p.text, title: p.title_hans ?? p.title_zh };
 }

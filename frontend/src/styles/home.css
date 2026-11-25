@@ -315,7 +315,7 @@
   margin-right: 4px;
 }
 
-.home-hot-tag, .home-daily-tag {
+.home-hot-tag {
   font-family: "Noto Serif SC", serif;
   font-size: 12px;
   color: var(--fj-ink-light);
@@ -328,7 +328,7 @@
   white-space: nowrap;
 }
 
-.home-hot-tag:hover, .home-daily-tag:hover {
+.home-hot-tag:hover {
   color: var(--fj-highlight);
   border-color: var(--fj-gold);
   background: var(--fj-surface);
@@ -336,7 +336,7 @@
 
 /* Dark mode: the translucent-white pill turns dark so the (now light) label
    reads over the night hero. */
-:root[data-theme="dark"] .home-hot-tag, :root[data-theme="dark"] .home-daily-tag {
+:root[data-theme="dark"] .home-hot-tag {
   background: rgba(74, 65, 51, 0.72);
 }
 
@@ -943,7 +943,7 @@
   .search-combo-btn { padding: 0 16px; font-size: 14px; }
 
   .home-hot-tags { margin-bottom: 24px; gap: 6px; }
-  .home-hot-tag, .home-daily-tag { padding: 2px 10px; font-size: 12px; }
+  .home-hot-tag { padding: 2px 10px; font-size: 12px; }
 
   /* 手机：标签单独一行，卡片横向滑动（列表自己滚，页面不横向溢出） */
   .home-recent { flex-direction: column; align-items: stretch; gap: 6px; margin: -12px 0 20px; }
@@ -1002,15 +1002,55 @@
   color: #e0d6c2;
 }
 
-.home-hot-divider {
-  width: 1px;
-  height: 14px;
-  background: var(--fj-border);
-  margin: 0 4px;
-}
-/* 「今日一段」入口（在「热门检索」前面），金边朱字与普通检索词区分 */
-.home-daily-tag, .home-daily-tag:hover {
-  border-color: var(--fj-gold);
-  color: var(--fj-accent);
+
+/* ---------- 今日经句（搜索框下、热门检索上） ----------
+   直接显示当天那一句：小号朱字标签 + 经句（毛笔/文楷，与 /daily 同字体）+ 经名，点进 /daily。
+   分句 inline-block，只在标点处换行；长句在窄屏折成两行，不出现孤字。 */
+.home-daily {
+  display: block;
+  max-width: 820px;
+  margin: -6px auto 18px;
+  padding: 4px 12px;
+  text-align: center;
+  color: var(--fj-ink);
   text-decoration: none;
+  line-height: 1.6;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+.home-daily:hover { background: rgba(255, 255, 255, 0.45); color: var(--fj-ink); }
+.home-daily-label {
+  display: inline-block;
+  vertical-align: 3px;
+  margin-right: 12px;
+  padding: 1px 8px;
+  font-family: "Noto Serif SC", serif;
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: var(--fj-accent);
+  border: 1px solid var(--fj-gold);
+  border-radius: 10px;
+}
+.home-daily-text { font-size: 22px; letter-spacing: 1px; }
+.home-daily-clause { display: inline-block; }
+.home-daily-source {
+  display: inline-block;
+  margin-left: 10px;
+  font-family: "Noto Serif SC", serif;
+  font-size: 13px;
+  color: var(--fj-ink-muted);
+}
+:root[data-theme="dark"] .home-daily,
+:root[data-theme="dark"] .home-daily:hover { color: #f0e8d8; }
+:root[data-theme="dark"] .home-daily:hover { background: rgba(74, 65, 51, 0.5); }
+:root[data-theme="dark"] .home-daily-source { color: #d8cdb8; }
+@media (min-width: 769px) and (max-height: 820px) {
+  .home-daily { margin: -4px auto 12px; }
+  .home-daily-text { font-size: 20px; }
+}
+@media (max-width: 768px) {
+  .home-daily { margin: -4px auto 14px; padding: 4px 8px; }
+  .home-daily-label { display: block; width: fit-content; margin: 0 auto 4px; }
+  .home-daily-text { font-size: 19px; }
+  .home-daily-source { display: block; margin: 2px 0 0; }
 }
