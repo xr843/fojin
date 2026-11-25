@@ -10,6 +10,7 @@ import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import { CITATION_URL_SCHEME, injectCitationLinks, parseCitationHref } from "../utils/citationLinks";
 import { localizeHan } from "../utils/hanScript";
 import ChatRelatedTerms from "../components/ChatRelatedTerms";
+import { fetchSessionMessagesWithRetry, sessionLoadFailureKind } from "../utils/sessionLoad";
 import { isNearBottom } from "../utils/scrollBottom";
 import {
   ArrowUpOutlined,
@@ -1074,7 +1075,7 @@ export default function ChatPage() {
   const loadSession = useCallback(async (sid: number, silent = false, scrollTo: "top" | "bottom" = "top") => {
     bumpViewEpoch();
     try {
-      const data = await getChatSessionMessages(sid, 1, 50);
+      const data = await fetchSessionMessagesWithRetry(sid);
       setSessionId(sid);
       syncSessionParam(sid);
       setMessages(data.messages);
@@ -1096,9 +1097,12 @@ export default function ChatPage() {
         // 程序化滚动不一定触发 scroll 事件，不能只靠事件更新。
         handleMessagesScroll();
       }, 100);
-    } catch {
+    } catch (err) {
       syncSessionParam(undefined);   // 别把打不开的 id 留在地址栏里
-      if (!silent) message.error(t("chat.load_session_failed"));
+      const kind = sessionLoadFailureKind(err);
+      if (typeof umami !== "undefined") umami.track("chat_session_load_failed", { kind, silent: silent ? 1 : 0 });
+      // 网络类失败（请求已自动重试过仍不行）明说是网络问题、可以再点；会话被删/无权限等仍是原提示
+      if (!silent) message.error(t(kind === "network" || kind === "bad_body" ? "chat.load_session_network" : "chat.load_session_failed"));
     }
   }, [syncSessionParam, handleMessagesScroll, scrollToBottom, bumpViewEpoch, t]);
 
