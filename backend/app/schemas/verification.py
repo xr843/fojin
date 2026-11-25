@@ -34,6 +34,16 @@ class QuoteMatch(BaseModel):
     # treatise / commentary / school / history / apocrypha / later / unknown)
     # — see app/services/canon_class.py. Matches arrive earliest-in-canon first.
     canon_class: str | None = None
+    # ---- 2026-11-25 机器可读引用（只在开放接口 /api/verify/quote 上填；问答链路不填）----
+    # 前 3 条命中才定位到行（每条要读一卷全文）；定位不到保持 None，reader_url 仍是卷级。
+    line_ref: str | None = None  # CBETA 页栏行，如 0450a12
+    cbeta_line_head: str | None = None  # CBETA 行首，如 T12n0374_p0450a12
+    line_urn: str | None = None  # 行级 URN，如 fojin:cbeta/T0374.14#p0450a12
+    citation: str | None = None  # 可直接粘贴的中文引用，与阅读器「复制引用」同一写法
+    # 这段文字的许可与署名要求（CBETA 为 CC BY-NC-SA 3.0 TW：署名、非商业、相同方式共享）
+    license: str | None = None
+    license_url: str | None = None
+    attribution: str | None = None
 
 
 class DiffOp(BaseModel):

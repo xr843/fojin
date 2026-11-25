@@ -107,9 +107,12 @@ def main() -> int:
             print(f"{i}/{len(ids)}", file=sys.stderr)
     out = Path(a.out_dir)
     (out / "cbeta-refs").mkdir(parents=True, exist_ok=True)
-    (out / "cbeta-refs" / "stems.json").write_text(
-        json.dumps(vols, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
-    )
+    stems_json = json.dumps(vols, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    (out / "cbeta-refs" / "stems.json").write_text(stems_json)
+    # 后端（开放引用接口 /api/cite、核验接口的行级引用）读同一份；测试会比对两份一致
+    backend_copy = Path(__file__).resolve().parent.parent / "app" / "data" / "cbeta_stems.json"
+    if backend_copy.parent.exists():
+        backend_copy.write_text(stems_json)
     toc_dir = out / "cbeta-toc"
     toc_dir.mkdir(parents=True, exist_ok=True)
     for old in toc_dir.glob("*.json"):

@@ -2,8 +2,8 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "app.fojin/fojin-mcp",
   "title": "fojin — Buddhist Canon Tools",
-  "description": "Buddhist canon tools: search, passages, cross-canon parallels, dictionaries — all URN-cited.",
-  "version": "0.4.0",
+  "description": "Verify Buddhist-scripture quotes verbatim, cite to the CBETA line, search the Buddhist canons.",
+  "version": "0.5.0",
   "websiteUrl": "https://fojin.app",
   "repository": {
     "url": "https://github.com/xr843/fojin",

@@ -23,6 +23,7 @@ from app.schemas.text import (
 from app.services.canon_class import CANON_ORDER_SCRIPT, canon_order_key
 from app.services.embedding import generate_embedding
 from app.services.gaiji import GaijiNormalizer, expand_for_query
+from app.services.machine_citation import license_for
 from app.services.passage_locator import fast_normalise
 from app.services.rag_retrieval import MIN_RELEVANCE_SCORE
 from app.services.search_facets import (
@@ -33,6 +34,7 @@ from app.services.search_facets import (
     parse_facet_aggs,
     split_multi,
 )
+from app.services.urn import build_urn
 
 logger = logging.getLogger(__name__)
 
@@ -1111,6 +1113,8 @@ async def search_semantic(
             has_content=r["has_content"],
             snippet=r["snippet"],
             similarity_score=round(r["score"], 4),
+            urn=build_urn(r["cbeta_id"], r["juan_num"]),
+            license=license_for(r["cbeta_id"])["license"],
         )
         for r in sorted_results
     ]
