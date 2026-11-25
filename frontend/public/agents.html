@@ -273,7 +273,7 @@
 
 <section>
   <div class="wrap">
-    <h2 class="serif"><span class="en">Tools</span>八个工具</h2>
+    <h2 class="serif"><span class="en">Tools</span>九个工具</h2>
     <p class="section-lede">
       托管在 <code>mcp.fojin.ai</code>，匿名可用、按客户端限流、全部只读。
       同一套工具也可以用 <code>uvx fojin-mcp</code> 在本地以 stdio 方式运行。
@@ -287,7 +287,14 @@
         <tr>
           <td><code>verify_quote</code></td>
           <td><strong>逐字核验引文</strong>：这句话在藏经里存不存在、在哪几处；
-              并且分开回答「引文是否为真」与「出处是否属实」。找不到时给出最接近的原文与相似度。</td>
+              并且分开回答「引文是否为真」与「出处是否属实」。找不到时给出最接近的原文与相似度。
+              前几处命中精确到行：CBETA 行首（<code>T12n0374_p0450a12</code>）、行级 URN、可直接粘贴的引用与许可。</td>
+        </tr>
+        <tr>
+          <td><code>cite</code></td>
+          <td><strong>生成引用</strong>：给一个 URN 或 CBETA 行首，返回可粘贴的中文引用
+              （《大般涅槃經》卷14：「…」(CBETA, T12, no. 374, p. 450a12)）、BibTeX、RIS、CSL-JSON，
+              以及这段文字的许可与署名要求。</td>
         </tr>
         <tr>
           <td><code>search_corpus</code></td>
@@ -385,7 +392,8 @@
     <h2 class="serif"><span class="en">The URN contract</span>可解析的引证</h2>
     <p class="section-lede">
       每一段经文都带一个可移植的标识，形如 <code>fojin:cbeta/T0251.1</code>
-      （典藏 / 编号 . 卷）。它可以被直接引用、可以回到 <code>resolve_urn</code> 验证，
+      （典藏 / 编号 . 卷），精确到行时写作 <code>fojin:cbeta/T0374.14#p0450a12</code>，
+      与学界通用的 CBETA 行首 <code>T12n0374_p0450a12</code> 一一对应。它可以被直接引用、可以回到 <code>resolve_urn</code> 验证，
       也可以解析成人能点开的阅读链接。跨藏经统一编号，与 CBETA、SuttaCentral
       (<code>sc/</code>)、84000 (<code>84k/toh</code>)、GRETIL 的既有编号互通。
     </p>
@@ -393,7 +401,12 @@
       <li><strong>引 URN，不要引页码。</strong>URN 稳定、可机读，且能被第三方独立核对。</li>
       <li><strong>只引工具返回的文字。</strong>凭记忆复述佛典几乎必然产生异文。</li>
       <li><strong>核验之后再输出。</strong><code>verify_quote</code> 一次调用即可。</li>
+      <li><strong>把许可一并交给读者。</strong>每段文字都带 <code>license</code>：CBETA 为
+        CC BY-NC-SA 3.0 TW（署名、非商业、相同方式共享），84000 为 CC BY-NC-ND 4.0，SuttaCentral 为 CC0，
+        GRETIL 未声明许可。详见 <a href="https://github.com/xr843/fojin/blob/master/NOTICE">NOTICE</a>。</li>
     </ul>
+    <p>HTTP：<code>GET https://fojin.app/api/citations/cite?ref=T12n0374_p0450a12</code>
+      或 <code>?urn=fojin:cbeta/T0374.14%23p0450a12</code>（<code>#</code> 要写成 <code>%23</code>）。</p>
   </div>
 </section>
 

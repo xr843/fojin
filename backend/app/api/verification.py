@@ -21,6 +21,7 @@ from app.core.elasticsearch import get_es
 from app.database import get_db
 from app.schemas.verification import ClaimVerdict, QuoteMatch, QuoteVerdict
 from app.services.claim_check import attribute_by_context, check_claim, credit_runs
+from app.services.machine_citation_api import enrich_verdict
 from app.services.quote_lookup import (
     MIN_LOOKUP_QUOTE_CHARS,
     QuoteTooShortError,
@@ -50,9 +51,11 @@ async def verify_quote_endpoint(
     Rate limit: strict (see rate_limit_verify_quote)."""
     es: AsyncElasticsearch = get_es()
     try:
-        return await verify_quote(db, es, q, cite=cite, juan=juan)
+        verdict = await verify_quote(db, es, q, cite=cite, juan=juan)
     except QuoteTooShortError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    # 开放接口专属：前几条命中补行号、行级 URN、可粘贴引用、许可署名（问答链路不走这里）
+    return await enrich_verdict(db, verdict)
 
 
 @router.get("/claim", response_model=ClaimVerdict)

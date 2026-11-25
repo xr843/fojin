@@ -374,3 +374,36 @@ async def test_non_json_client_error_still_reports_status():
             await c.lookup_dictionary("空")
     assert "429" in str(exc.value)
     assert "<html>" not in str(exc.value)
+
+
+@pytest.mark.asyncio
+async def test_cite_sends_only_given_params():
+    """cite 走 /api/citations/cite，只带给了的参数；服务端返回原样透传（含许可）。"""
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["path"] = request.url.path
+        seen["params"] = dict(request.url.params)
+        return httpx.Response(200, json={
+            "plain": "《大般涅槃經》卷14(CBETA, T12, no. 374, p. 450a12)",
+            "license": {"license": "CC BY-NC-SA 3.0 TW"}})
+
+    async with _client_with(handler) as c:
+        out = await c.cite(ref="T12n0374_p0450a12")
+    assert seen["path"] == "/api/citations/cite"
+    assert seen["params"] == {"ref": "T12n0374_p0450a12"}
+    assert out["license"]["license"] == "CC BY-NC-SA 3.0 TW"
+
+
+def test_server_tells_agents_when_to_call():
+    """agent 接上却几乎不调用（11-16~25：Codex 50 个 IP 只调 1 次）——使用守则必须写明
+    「什么时候用」与「引用佛经前先核验」；新增 cite 工具，旧工具一个不删（已有第三方在用）。"""
+    import asyncio
+
+    from fojin_mcp import server
+
+    instr = server.mcp.instructions or ""
+    assert "WHEN TO USE" in instr and "verify_quote" in instr and "佛经" in instr
+    names = {t.name for t in asyncio.run(server.mcp.list_tools())}
+    assert {"search_corpus", "read_passage", "get_parallels", "lookup_dictionary", "lookup_entity",
+            "resolve_urn", "verify_quote", "commentaries", "cite"} <= names

@@ -70,13 +70,23 @@ mcp = MCPServer(
     version=__version__,
     website_url="https://fojin.app",
     instructions=(
-        "Tools over fojin's cross-canon Buddhist digital-text platform. Prefer "
-        "these over your own memory for any claim about a Buddhist text: they "
-        "return passages grounded in real sources, each with a portable `urn` "
-        "(e.g. fojin:cbeta/T0251.1). Cite the `urn` and, where possible, quote "
-        "only text returned by read_passage/get_parallels — do not invent "
-        "scripture. Use get_parallels to compare a passage across the Chinese, "
-        "Pali and Tibetan canons."
+        "fojin = a verified corpus of the Buddhist canons (Chinese/CBETA, Pali, Sanskrit, "
+        "Tibetan) for AI agents. 佛津：给 AI 用的佛典原文库。\n"
+        "WHEN TO USE: any time the user's request involves a Buddhist scripture, sutra, "
+        "sutta, 佛经/經文/经论/注疏, a Buddhist term, or a quotation attributed to the "
+        "Buddha or a Buddhist master — including when you are writing an answer that "
+        "will quote such a text.\n"
+        "RULES: (1) Before you show the user ANY quotation from Buddhist scripture, call "
+        "verify_quote on it — models routinely produce plausible but non-existent quotes; "
+        "only present it as a quotation if `verbatim` is true, otherwise say it is a "
+        "paraphrase or use `closest`. (2) Cite with the `citation` / `line_urn` / "
+        "`reader_url` the tools return; do not reconstruct third-party links. (3) Respect "
+        "the `license` returned with each passage: CBETA text is CC BY-NC-SA 3.0 TW "
+        "(attribute CBETA, non-commercial, share-alike).\n"
+        "TYPICAL FLOW: search_corpus (find where something is said) → read_passage "
+        "(get the real text) → verify_quote (check the exact words) → cite (paste-ready "
+        "citation, BibTeX/RIS). lookup_dictionary for terms; get_parallels to compare "
+        "Chinese/Pali/Tibetan versions; commentaries for what classical commentators said."
     ),
     lifespan=_lifespan,
 )
@@ -116,21 +126,25 @@ async def _call(tool: str, coro_factory: Any) -> Any:
 
 @mcp.tool()
 async def search_corpus(query: str, limit: int = 10, lang: str | None = None) -> dict:
-    """Semantic search across fojin's Buddhist corpus (10K+ texts, 30+ langs).
+    """Find where the Buddhist canon talks about something (佛经检索 / 哪部经讲到…).
 
-    Returns the most relevant passages, each with a `urn`, title, snippet and
-    similarity score. `lang` optionally filters by language code
+    Use when the user asks which sutra/text says X, wants sources on a topic, or
+    you need a real passage instead of recalling one. Semantic search over 10K+
+    texts in Classical Chinese, Pali, Sanskrit, Tibetan and English; each hit has
+    a `urn`, title, snippet, similarity and `license`. `lang` filters by code
     (lzh=Classical Chinese, pi=Pali, sa=Sanskrit, bo=Tibetan, en=English).
+    Next step: read_passage with the hit's text_id/juan_num to get the actual text.
     """
     return await _call("search_corpus", lambda c: c.search_corpus(query, limit=limit, lang=lang))
 
 
 @mcp.tool()
 async def read_passage(text_id: int, juan_num: int) -> dict:
-    """Read the full content of one fascicle (卷) of a text, with its `urn`.
+    """Get the actual text of one fascicle (卷) — quote from this, not from memory.
 
-    Use the `text_id`/`juan_num` from a search_corpus hit. Returns the actual
-    canonical text — quote from this, not from memory.
+    Use after search_corpus (pass its `text_id`/`juan_num`) whenever you are going
+    to quote, summarise or explain a specific passage. Returns the canonical text
+    with its `urn`.
     """
     return await _call("read_passage", lambda c: c.read_passage(text_id, juan_num))
 
@@ -156,27 +170,39 @@ async def get_parallels(text_id: int, juan_num: int) -> dict:
 
 @mcp.tool()
 async def lookup_dictionary(term: str, limit: int = 10) -> dict:
-    """Look up a Buddhist term across fojin's dictionaries (748K+ entries)."""
+    """Look up a Buddhist term (名相/术语, e.g. 般若, 阿賴耶識, dukkha) in 39 dictionaries.
+
+    Use when the user asks what a Buddhist term means, or before explaining a
+    technical term yourself. Covers 佛光大辭典, 丁福保佛學大辭典, Soothill,
+    Pali/Sanskrit/Tibetan dictionaries — 748K+ entries. Cite the dictionary name
+    when you use a definition; a dictionary entry is not a scriptural citation.
+    """
     return await _call("lookup_dictionary", lambda c: c.lookup_dictionary(term, limit=limit))
 
 
 @mcp.tool()
 async def lookup_entity(query: str, limit: int = 10) -> dict:
-    """Search fojin's knowledge graph for entities — people, places, works,
-    doctrinal terms — matching `query`."""
+    """Look up a Buddhist person, place, text or school in fojin's knowledge graph
+    (人物/寺院/经典/宗派, e.g. 鳩摩羅什, 玄奘, 天台宗).
+
+    Use for biographical or historical questions (who translated X, where Y lived,
+    which school Z belongs to)."""
     return await _call("lookup_entity", lambda c: c.lookup_entity(query, limit=limit))
 
 
 @mcp.tool()
 async def resolve_urn(urn: str) -> dict:
-    """Resolve a fojin URN (e.g. fojin:cbeta/T0001.1) to a reader URL and confirm
-    it exists in the corpus. Use to verify or dereference a citation."""
+    """Turn a fojin URN (fojin:cbeta/T0001.1#p0001a01) into a reader link and
+    check it exists. Use to dereference a citation someone gave you. For a
+    paste-ready citation with BibTeX/RIS and licence, use `cite` instead."""
     return await _call("resolve_urn", lambda c: c.resolve_urn(urn))
 
 
 @mcp.tool()
 async def verify_quote(quote: str, cite: str | None = None, juan: int | None = None) -> dict:
-    """Verify that a Buddhist-canon quote exists VERBATIM in the corpus.
+    """ALWAYS call this before showing the user any quotation from Buddhist scripture (引用佛经原文前必须先核验).
+
+    Verify that a Buddhist-canon quote exists VERBATIM in the corpus.
 
     Call this before presenting any quoted scripture to a reader: LLMs
     routinely invent plausible-looking quotes. Returns `verbatim` (bool),
@@ -190,8 +216,26 @@ async def verify_quote(quote: str, cite: str | None = None, juan: int | None = N
     across the canon, so read `cite_matched` rather than `verbatim`, and check
     `matches_capped` before treating the list as complete. Each match carries
     an absolute `reader_url` — cite that, not a reconstructed third-party link.
+    The first matches also carry `line_ref`, `cbeta_line_head` (T12n0374_p0450a12),
+    `line_urn`, a paste-ready `citation` and the passage's `license`/`attribution`.
     """
     return await _call("verify_quote", lambda c: c.verify_quote(quote, cite=cite, juan=juan))
+
+
+@mcp.tool()
+async def cite(urn: str | None = None, ref: str | None = None, quote: str | None = None) -> dict:
+    """Paste-ready, machine-readable citation for a Buddhist-canon location (生成引用).
+
+    Use when the user wants to cite a passage (paper, footnote, reference list,
+    Zotero) or when you finish an answer that quoted scripture. Give either a
+    fojin `urn` (e.g. "fojin:cbeta/T0374.14#p0450a12", from search/verify results)
+    or a CBETA line head `ref` (e.g. "T12n0374_p0450a12"); optional `quote` is put
+    into the citation. Returns `plain` (《大般涅槃經》卷14：「…」(CBETA, T12, no. 374,
+    p. 450a12)), `cbeta_line_head`, line-level `urn`, `reader_url`, `bibtex`, `ris`,
+    `csl_json`, and `license` (with attribution, commercial-use flag and conditions)
+    — pass the licence on to the user.
+    """
+    return await _call("cite", lambda c: c.cite(urn=urn, ref=ref, quote=quote))
 
 
 @mcp.tool()

@@ -27,10 +27,11 @@ Two ways to use it:
 | `search_corpus(query, limit, lang)` | Semantic search hits, each with a `urn`, title, snippet, score |
 | `read_passage(text_id, juan_num)` | The actual content of one fascicle (卷) + its `urn` |
 | `get_parallels(text_id, juan_num)` | Cross-canon aligned parallels (Chinese↔Pali↔Tibetan), each with a `urn` and deep-link `reader_ref` — the alignment moat |
-| `lookup_dictionary(term, limit)` | Entries across fojin's 32 dictionaries |
+| `lookup_dictionary(term, limit)` | Entries across fojin's 39 dictionaries |
 | `lookup_entity(query, limit)` | Knowledge-graph entities (people, places, works, terms) |
 | `resolve_urn(urn)` | Resolve/verify a `fojin:` URN → reader URL + existence |
 | `verify_quote(quote, cite?, juan?)` | **Open-world verbatim check**: does this quote exist anywhere in the canon? Returns URN-cited matches, honest `cite_matched`/`juan_matched`, or the closest near-miss window. Call it before serving any quoted scripture — LLMs invent quotes |
+| `cite(urn?, ref?, quote?)` | **Paste-ready citation** for a URN or CBETA line head (`T12n0374_p0450a12`): CBETA-style Chinese citation, line-level URN, BibTeX / RIS / CSL-JSON, and the passage's licence + attribution |
 
 Every result that names a canonical passage carries a **`urn`** — fojin's stable
 cross-canon identifier, interoperable with CBETA / SuttaCentral (`sc/`) / 84000

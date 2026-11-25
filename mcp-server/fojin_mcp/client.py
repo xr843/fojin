@@ -219,6 +219,21 @@ class FojinClient:
             "/commentary/passage", {"q": quote, "limit": _clamp(limit, 1, 50)}
         )
 
+    async def cite(
+        self, *, urn: str | None = None, ref: str | None = None, quote: str | None = None
+    ) -> dict[str, Any]:
+        """Machine-readable citation for one location (fojin URN or CBETA line
+        head): paste-ready Chinese citation, CBETA line head, line-level URN,
+        BibTeX / RIS / CSL-JSON and the passage's licence + attribution."""
+        params: dict[str, Any] = {}
+        if urn:
+            params["urn"] = urn
+        if ref:
+            params["ref"] = ref
+        if quote:
+            params["quote"] = quote
+        return await self._get("/citations/cite", params)
+
     async def verify_quote(
         self, quote: str, *, cite: str | None = None, juan: int | None = None
     ) -> dict[str, Any]:

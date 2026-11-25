@@ -172,6 +172,9 @@ class SemanticSearchHit(BaseModel):
     has_content: bool = False
     snippet: str  # 匹配的文本片段
     similarity_score: float  # 余弦相似度分数
+    # 2026-11-25：llms.txt 写明「每条结果都带 URN」，此前只有 MCP 层补了、HTTP 接口没有
+    urn: str | None = None
+    license: str | None = None  # 这段文字的许可，如 CC BY-NC-SA 3.0 TW（CBETA）
 
 
 class SemanticSearchResponse(BaseModel):

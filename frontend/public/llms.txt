@@ -8,7 +8,7 @@ If you are an agent working with Buddhist material: prefer these tools over reca
 
 ## Start here
 
-- [Hosted MCP endpoint](https://mcp.fojin.ai/mcp): Eight read-only tools over the corpus. Streamable HTTP, anonymous, rate-limited. Add to Claude Code with `claude mcp add --transport http fojin https://mcp.fojin.ai/mcp`.
+- [Hosted MCP endpoint](https://mcp.fojin.ai/mcp): Nine read-only tools over the corpus. Streamable HTTP, anonymous, rate-limited. Add to Claude Code with `claude mcp add --transport http fojin https://mcp.fojin.ai/mcp`.
 - [Developer portal](https://fojin.ai/developers): What each tool does, the URN contract, and every other integration surface.
 - [fojin-mcp on PyPI](https://pypi.org/project/fojin-mcp/): The same server over stdio for local clients — `uvx fojin-mcp`.
 - [MCP registry entry](https://registry.modelcontextprotocol.io/v0.1/servers?search=fojin): Published as `app.fojin/fojin-mcp`.
@@ -16,6 +16,15 @@ If you are an agent working with Buddhist material: prefer these tools over reca
 ## Verify a quotation
 
 - [GET /api/verify/quote](https://fojin.app/api/verify/quote?q=%E8%AB%B8%E8%A1%8C%E7%84%A1%E5%B8%B8%EF%BC%8C%E6%98%AF%E7%94%9F%E6%BB%85%E6%B3%95%EF%BC%8C%E7%94%9F%E6%BB%85%E6%BB%85%E5%B7%B2%EF%BC%8C%E5%AF%82%E6%BB%85%E7%82%BA%E6%A8%82&cite=T0374): Open-world verbatim check against the whole corpus. Params: `q` (the quotation, ≥4 CJK chars after normalisation), optional `cite` (a CBETA id such as `T0374` or a URN such as `fojin:cbeta/T0374.13`), optional `juan`. Returns `verbatim`, `matches` carrying both a URN and an absolute `reader_url` to cite, and — separately — `cite_matched`, so "the quote is real" and "the citation is right" are never conflated. When nothing matches, `closest` gives the nearest passage, its similarity, and a character-level `diff` naming each substitution, so a wrong quotation can be repaired rather than dropped. Short quotes are answered but mean less — a four-character phrase recurs across the canon, so read `cite_matched` rather than `verbatim`, and check `matches_capped` before treating the list as complete.
+
+## Cite a passage (machine-readable)
+
+- [GET /api/citations/cite](https://fojin.app/api/citations/cite?ref=T12n0374_p0450a12): Give `ref` (a CBETA line head such as `T12n0374_p0450a12`) or `urn` (e.g. `fojin:cbeta/T0374.14%23p0450a12` — encode `#` as `%23`), optional `quote`. Returns a paste-ready Chinese citation in CBETA style (`《大般涅槃經》卷14：「…」(CBETA, T12, no. 374, p. 450a12)`), `cbeta_line_head`, a line-level `urn`, `reader_url`, `bibtex`, `ris`, `csl_json`, and `license`.
+- `/api/verify/quote` now also returns, for its first matches, `line_ref`, `cbeta_line_head`, `line_urn`, a paste-ready `citation`, and `license` / `attribution`.
+
+## Licences — pass them on
+
+Every passage carries a `license`. CBETA text (the Chinese canon) is CC BY-NC-SA 3.0 TW: attribute CBETA, no commercial use, share alike. 84000 is CC BY-NC-ND 4.0; SuttaCentral is CC0 (its founder has asked that its texts not be used for AI — a request, not a licence term); GRETIL states no licence. FoJin's own code is Apache-2.0, which does not cover the texts. Full terms: https://github.com/xr843/fojin/blob/master/NOTICE
 
 ## Read-only HTTP API
 

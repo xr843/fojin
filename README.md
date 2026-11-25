@@ -120,7 +120,7 @@ uvx fojin-mcp                 # zero-install run
 # or: pip install fojin-mcp && fojin-mcp
 ```
 
-It exposes eight **read-only** tools over the public API, each returning passages with a stable, resolvable cross-canon **URN** (`fojin:cbeta/T0001.1`):
+It exposes nine **read-only** tools over the public API, each returning passages with a stable, resolvable cross-canon **URN** (`fojin:cbeta/T0001.1`):
 
 | Tool | What it does |
 |---|---|
@@ -132,6 +132,7 @@ It exposes eight **read-only** tools over the public API, each returning passage
 | `resolve_urn` | Resolve a FoJin URN to its source location |
 | `verify_quote` | **Verbatim check** — is this sentence really in the canon, and really where you said? Answers "is the quote real" and "is the citation right" separately, with a character-level diff when it is close but not exact |
 | `commentaries` | For one passage, what the historical commentators wrote on it — anchored to juan and line |
+| `cite` | Paste-ready citation for a URN or CBETA line head (`T12n0374_p0450a12`): CBETA-style citation, line-level URN, BibTeX / RIS / CSL-JSON, plus the passage's licence and attribution |
 
 Claude Desktop config and ChatGPT setup are in **[`mcp-server/README.md`](mcp-server/README.md)**. The server is a thin, read-only client: it holds no credentials, bundles no corpus, and only calls FoJin's public endpoints — its default target is `https://fojin.app/api`, overridable via `FOJIN_API_BASE_URL` to point at a self-hosted instance.
 
