@@ -343,7 +343,7 @@ async def get_related_terms(body: RelatedTermsRequest, db: AsyncSession = Depend
     """问答回答下方的「相关词条」卡片：从问题里取词，只在中文释义类辞典里找词头完全相同的条目。
     与问答的生成、引文核验无关（见 services/dictionary_related.py）。
     用 POST：问题原文不进 URL，免得写进访问日志。"""
-    return {"items": await related_terms(db, body.q[:500])}
+    return await related_terms(db, body.q[:500])
 
 
 @router.get("/{entry_id}")

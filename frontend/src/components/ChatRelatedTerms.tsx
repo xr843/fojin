@@ -22,7 +22,7 @@ export default function ChatRelatedTerms({ question }: { question: string }) {
     staleTime: Infinity,
     retry: false,
   });
-  if (!data || data.length === 0) return null;
+  if (!data || data.items.length === 0) return null;
 
   return (
     <section className="chat-related-terms" aria-label={t("chat.related_terms.title")}>
@@ -31,7 +31,7 @@ export default function ChatRelatedTerms({ question }: { question: string }) {
         <span className="chat-related-terms-note">{t("chat.related_terms.note")}</span>
       </div>
       <div className="chat-related-terms-grid">
-        {data.map((c) => (
+        {data.items.map((c) => (
           <Link
             key={c.id}
             className="chat-related-term"
@@ -47,6 +47,20 @@ export default function ChatRelatedTerms({ question }: { question: string }) {
             <span className="chat-related-term-source">{localizeHan(c.source_name, lang)}</span>
           </Link>
         ))}
+      </div>
+      {/* 卡片最多 4 张、只取中文释义辞典；想看某个词在全部辞典里的释义，一点就到辞典页 */}
+      <div className="chat-related-terms-more">
+        {data.headwords
+          .filter((h) => h.dict_count > data.items.filter((c) => c.headword === h.headword).length)
+          .map((h) => (
+            <Link
+              key={h.headword}
+              to={`/dictionary?q=${encodeURIComponent(h.headword)}`}
+              data-umami-event="chat_related_term_all"
+            >
+              {t("chat.related_terms.all", { term: localizeHan(h.headword, lang), n: h.dict_count })}
+            </Link>
+          ))}
       </div>
     </section>
   );
