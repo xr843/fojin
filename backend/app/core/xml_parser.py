@@ -497,6 +497,16 @@ def _parse_cbeta_id(cbeta_id: str) -> tuple[str, str, str] | None:
     return None
 
 
+# 补遗编号（Ba001、ZWa044、GAa001、Ia001…）在 CBETA 里全是现代编者写的前后附文：出版/编辑说明、解题、
+# 卷首语、目录、征稿启事、编委会名单、鸣谢等（2026-11-25 逐篇核对 112 篇，无一是古籍原文）。
+# 库里保留（直接打开原网址仍可读），但不进搜索索引、不进站点地图。
+FRONT_MATTER_ID_RE = re.compile(r"^[A-Z]+a\d+[a-z]?$")
+
+
+def is_front_matter(cbeta_id: str | None) -> bool:
+    return bool(cbeta_id) and bool(FRONT_MATTER_ID_RE.match(cbeta_id))
+
+
 def collection_of(cbeta_id: str | None) -> str | None:
     """经号所属的藏：T0235 → T、JB095 → J、GA0023 → GA、X0288 → X；认不出返回 None。
 

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from app.core.xml_parser import collection_of, find_all_xml_files
+from app.core.xml_parser import FRONT_MATTER_ID_RE, collection_of, find_all_xml_files, is_front_matter
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from import_apparatus import juans_safe_for_anchors
@@ -63,3 +63,20 @@ def test_anchors_only_for_juans_matching_stored_content():
     parsed = {1: "如是我聞", 2: "一時佛在", 3: "新卷"}
     stored = {1: "如是我聞", 2: "一時佛住"}  # 卷 2 库里的正文与这份 XML 不同；卷 3 库里没有
     assert juans_safe_for_anchors(parsed, stored) == {1}
+
+
+@pytest.mark.parametrize("cbeta_id", ["Ba001", "Ba023", "ZWa044", "GAa001", "GBa001", "Ia001"])
+def test_front_matter_ids(cbeta_id):
+    assert is_front_matter(cbeta_id)
+
+
+@pytest.mark.parametrize("cbeta_id", ["B0130", "ZW0044", "GA0023", "I0001", "JA042", "JB095", "T0235", "X0288",
+                                      "T0128a", "SC-an1", "GRETIL-x", "", None])
+def test_not_front_matter(cbeta_id):
+    # 正文经号（含 JA042 这种字母分部、T0128a 这种字母后缀）一律不能被当成附文藏起来
+    assert not is_front_matter(cbeta_id)
+
+
+def test_front_matter_regex_is_postgres_compatible():
+    # 站点地图用 Postgres 的 ~ 运算符跑同一个正则：只能用 POSIX 也认的写法
+    assert "(?" not in FRONT_MATTER_ID_RE.pattern

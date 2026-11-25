@@ -110,9 +110,16 @@ async def get_text_count(session: AsyncSession) -> int:
 
 
 async def get_all_text_ids_with_dates(session: AsyncSession) -> list[tuple[int, str]]:
-    """Return (id, created_at_date_str) for all texts, ordered by id."""
+    """Return (id, created_at_date_str) for all texts, ordered by id.
+
+    CBETA 的现代附文（补遗编号，见 app.core.xml_parser.is_front_matter）不进站点地图。
+    """
+    from app.core.xml_parser import FRONT_MATTER_ID_RE
+
     result = await session.execute(
-        select(BuddhistText.id, BuddhistText.created_at).order_by(BuddhistText.id)
+        select(BuddhistText.id, BuddhistText.created_at)
+        .where(~BuddhistText.cbeta_id.op("~")(FRONT_MATTER_ID_RE.pattern))
+        .order_by(BuddhistText.id)
     )
     return [(row[0], row[1].strftime("%Y-%m-%d")) for row in result.all()]
 
