@@ -4,6 +4,7 @@ import {
   formatLineRange,
   lineHead,
   lineLevelSupported,
+  collectionOf,
   parseCbetaLocator,
   parseStem,
   stemFor,
@@ -79,7 +80,7 @@ describe("formatCbetaCitation", () => {
     ).toBe("《阿毘達磨俱舍論》卷3：「[1]根」(CBETA, T29, no. 1558, p. 13b11)[1] 根【大】，境【宋】");
   });
 
-  it("卍续藏只给到册与经号：库里的 X 行号混着 R 版页码，给页栏行会出错", () => {
+  it("卍续藏给到页栏行（11-25 按本藏行号重建后）", () => {
     expect(
       formatCbetaCitation({
         title: "金剛經註疏",
@@ -90,7 +91,21 @@ describe("formatCbetaCitation", () => {
         stem: "X24n0456",
         startRef: "0706a04",
       }),
-    ).toBe("《金剛經註疏》卷1：「如是」(CBETA, X24, no. 456)");
+    ).toBe("《金剛經註疏》卷1：「如是」(CBETA, X24, no. 456, p. 706a4)");
+  });
+
+  it("嘉興藏经号带 A/B 分部", () => {
+    expect(
+      formatCbetaCitation({
+        title: "蕅益三頌",
+        juan: 1,
+        juanCount: 1,
+        quote: "舉則不似",
+        cbetaId: "JB095",
+        stem: "J20nB095",
+        startRef: "0450a05",
+      }),
+    ).toBe("《蕅益三頌》：「舉則不似」(CBETA, J20, no. B95, p. 450a5)");
   });
 
   it("没有册号数据时退回经号", () => {
@@ -102,9 +117,18 @@ describe("formatCbetaCitation", () => {
 
 describe("lineHead / lineLevelSupported", () => {
   it("行首格式", () => expect(lineHead("T08n0235", "0749a05")).toBe("T08n0235_p0749a05"));
-  it("只有大正藏开放行级", () => {
-    expect(lineLevelSupported("T0235")).toBe(true);
-    expect(lineLevelSupported("X0456")).toBe(false);
+  it("行级引用覆盖佛津收录的 CBETA 各藏，不含没收的四套", () => {
+    for (const id of ["T0235", "X0456", "JB095", "JA042", "GA0023", "G2241", "ZWa044", "Ba001", "N0006"]) {
+      expect(lineLevelSupported(id), id).toBe(true);
+    }
+    for (const id of ["TX0001", "Y0001", "LC0001", "YP0001", "SC-dn1"]) {
+      expect(lineLevelSupported(id), id).toBe(false);
+    }
+  });
+  it("经号归藏", () => {
+    expect(collectionOf("JB095")).toBe("J");
+    expect(collectionOf("GA0023")).toBe("GA");
+    expect(collectionOf("ZWa044")).toBe("ZW");
   });
 });
 
@@ -112,6 +136,8 @@ describe("parseCbetaLocator", () => {
   it("行首", () => {
     expect(parseCbetaLocator("T08n0235_p0749a05")).toEqual({ cbetaId: "T0235", ref: "0749a05" });
     expect(parseCbetaLocator(" T02n0128a_p0835b12 ")).toEqual({ cbetaId: "T0128a", ref: "0835b12" });
+    expect(parseCbetaLocator("J20nB095_p0450a05")).toEqual({ cbetaId: "JB095", ref: "0450a05" });
+    expect(parseCbetaLocator("ZW08na044_p0123b04")).toEqual({ cbetaId: "ZWa044", ref: "0123b04" });
   });
   it("书目格式，含版本号与页码范围（取起点）", () => {
     expect(parseCbetaLocator("(CBETA 2026.R2, T08, no. 235, p. 749a5-7)")).toEqual({ cbetaId: "T0235", ref: "0749a05" });

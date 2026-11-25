@@ -992,7 +992,7 @@ export default function TextReaderPage() {
     staleTime: Infinity,
   });
   const stem = cbetaId ? stemFor(cbetaStems, cbetaId, juanNum) : null;
-  // 行级（页栏行）只对大正藏开放：库里卍续藏的行号混着 R 版页码，见 utils/cbetaCitation.ts。
+  // 行级（页栏行）只对行号可靠的藏开放（大正藏、卍续藏、嘉興藏等），见 utils/cbetaCitation.ts。
   const lineLevel = !!cbetaId && !!stem && lineLevelSupported(cbetaId);
   const { data: toc } = useQuery({
     queryKey: ["cbetaToc", cbetaId],
@@ -1275,7 +1275,7 @@ export default function TextReaderPage() {
   // 手机「更多」：2026-10-10 生产 390px 实测，两排 9 颗工具按钮 + 字号行把首段正文推到
   // y=480，首屏只剩约 12 行经文。收进一个菜单，工具栏只剩一行。
   const checkMark = (on: boolean) => (on ? <CheckOutlined /> : null);
-  // 行首：关 / 行首 / 原书换行（同 CBETA「顯示行首」「原書換行」）。只对大正藏提供，见 lineLevel。
+  // 行首：关 / 行首 / 原书换行（同 CBETA「顯示行首」「原書換行」）。只对行号可靠的藏提供，见 lineLevel。
   const lineHeadItems: MenuProps["items"] = (["off", "labels", "orig"] as const).map((m) => ({
     key: `lh-${m}`,
     label: t(`reader.lineref.mode_${m}`),
@@ -1689,7 +1689,7 @@ export default function TextReaderPage() {
             transform: "translateX(-50%)",
           }}
         >
-          {/* 大正藏给 CBETA 行首（T08n0235_p0749a05）；卍续藏的行号混着 R 版页码，只标经号与卷。 */}
+          {/* 行号可靠的藏给 CBETA 行首（T08n0235_p0749a05）；其余只标经号与卷。 */}
           <span className="cbeta-line-locator-ref">
             {lineLevel && stem ? lineHead(stem, lineLocator.ref) : `${content.cbeta_id} · ${t("reader.toc.juan", { n: juanNum })}`}
           </span>

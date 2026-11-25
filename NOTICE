@@ -39,7 +39,7 @@ Texts stored locally  (only these four hold full text)
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
-CBETA (Chinese Buddhist Electronic Text Association)          169.4M chars, 60.8%
+CBETA (Chinese Buddhist Electronic Text Association)          213.6M chars, 66.2%
   — since 2023-08-07 run by 財團法人佛教電子佛典基金會 (CBETA Foundation)
 https://cbeta.org
 License: CC BY-NC-SA 3.0 Taiwan (中華民國)
@@ -55,18 +55,24 @@ CBETA's own conditions (使用說明) on top of the CC licence: redistribution
   DOCX / EPUB exports append CBETA's statement, version information and the
   licence URI on a closing 版權說明 page (backend/app/services/text_export.py).
 Usage: Full text of the Chinese Buddhist Canon imported and indexed locally
-  (cbeta-org/xml-p5, imported 2026-03/04; only the T 大正藏 and X 卍續藏
-  collections hold full text on FoJin).
+  (cbeta-org/xml-p5). T 大正藏 and X 卍續藏 were imported 2026-03/04. On
+  2026-11-25, from CBETA 2026.R2: J 嘉興藏 (285 works), B 大藏經補編 (200),
+  ZW 藏外佛教文獻 (202) and part of N 漢譯南傳大藏經 (28) — 715 works, 44.2M
+  chars. The other permitted collections (rest of N, D, GA/GB, G, I, A/C/F/K/L/
+  M/P/S/U, ZS, CC — 393 works) are catalogued but not yet imported (disk).
 IMPORTANT — the CC license does NOT cover 《印順法師佛學著作集》、《太虛大師全書》
   (印順文教基金會) or 《呂澂佛學著作集》 (copyright with the publishers); those
   require separate permission from the copyright holders.
-  Verified 2026-11-11: FoJin holds no full text from any of them — on prod, every
-  CBETA text with content has a T or X number (2,390 + 1,230), and no title
-  matches 印順 / 太虛 / 呂澂 / 妙雲. Keep it that way, or obtain permission.
+  FoJin therefore does not import the Y (印順), TX (太虛), LC (呂澂) or YP
+  (《演培法師全集》, rights holder not stated by CBETA) collections, nor two
+  CBETA 選集 items edited/translated by modern scholars (CC0002 黃連忠校訂
+  《敦博本六祖壇經校訂全文》, CC0003 觀空還譯《解深密經疏（補篇）》) — enforced by
+  backend/scripts/import_cbeta_canons.py (EXCLUDED_COLLECTIONS / EXCLUDED_WORKS).
+  Keep it that way, or obtain permission.
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
-84000: Translating the Words of the Buddha             66.3M chars, 23.8%
+84000: Translating the Words of the Buddha             66.3M chars, 20.5%
 https://84000.co
 License: CC BY-NC-ND 4.0
   (verified: https://84000.co/documents/terms-of-use — that page is marked
@@ -108,7 +114,7 @@ On the "no excerpts" wording, and why FoJin's citations are not caught by it:
 
 --------------------------------------------------------------------------------
 GRETIL (Göttingen Register of Electronic Texts in Indian Languages)
-https://gretil.sub.uni-goettingen.de                    32.5M chars, 11.7%
+https://gretil.sub.uni-goettingen.de                    32.5M chars, 10.1%
 License: NOT STATED — no license, terms-of-use or copyright statement was found
   on GRETIL's main index page, and no dedicated terms page could be located
   (checked 2026-08-13; this is a negative finding from a page-level check, not a
@@ -120,7 +126,7 @@ Usage: Sanskrit Buddhist e-texts downloaded and indexed locally.
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
-SuttaCentral                                            10.5M chars, 3.8%
+SuttaCentral                                            10.5M chars, 3.2%
 https://suttacentral.net
 License: CC0 1.0 (public domain dedication) — for the Pali root texts AND for
   the translations.
