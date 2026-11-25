@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { beijingDateKey, dailyIndex, pickDaily, passageFontFamily, quotePassage, splitClauses, DAILY_PASSAGES, type DailyPassage } from "./dailyPassage";
+import { beijingDateKey, dailyIndex, pickDaily, passageFontFamily, passageInScript, quotePassage, splitClauses, DAILY_PASSAGES, type DailyPassage } from "./dailyPassage";
 import { wrapCjk } from "./shareCard";
 import { localizeHan } from "./hanScript";
 import glyphs from "../data/dailyFontGlyphs.json";
@@ -111,5 +111,21 @@ describe("分享图断行", () => {
 
   it("标点不放行首，跟在上一行末尾", () => {
     expect(wrapCjk(measure, "一二三，四五", 30)).toEqual(["一二三，", "四五"]);
+  });
+});
+
+describe("首页经句的繁简（不经 OpenCC）", () => {
+  it("池里预算的简体字段与 OpenCC 转换一致（重跑 build_daily_passages.py 后要跑 node scripts/daily-hans.mjs）", () => {
+    for (const p of DAILY_PASSAGES) {
+      expect(p.text_hans, p.text).toBe(localizeHan(p.text, "zh"));
+      expect(p.title_hans, p.title_zh).toBe(localizeHan(p.title_zh, "zh"));
+    }
+  });
+
+  it("繁体界面取原文，简体与英文界面取简体字段", () => {
+    const p = DAILY_PASSAGES[0];
+    expect(passageInScript(p, "zh-Hant")).toEqual({ text: p.text, title: p.title_zh });
+    expect(passageInScript(p, "zh")).toEqual({ text: p.text_hans, title: p.title_hans });
+    expect(passageInScript(p, "en").text).toBe(p.text_hans);
   });
 });

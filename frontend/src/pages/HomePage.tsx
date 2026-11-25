@@ -18,6 +18,7 @@ import { InfoCircleOutlined, CloseOutlined } from "@ant-design/icons";
 import SourceSelector from "../components/SourceSelector";
 import XiaojinPet from "../components/XiaojinPet";
 import HomeRecentReading from "../components/HomeRecentReading";
+import HomeDaily from "../components/HomeDaily";
 import { getStats, getSources, getFilters, getSearchSuggestItems, getHomeShowcase } from "../api/client";
 import { askQueryFrom, buildHomeSuggestOptions, itemsFromSuggestResponse, type SuggestGroup } from "./homeSuggest";
 import { getLangName } from "../utils/sourceUrls";
@@ -236,13 +237,11 @@ export default function HomePage() {
           )}
         </div>
 
+        {/* 今日经句：直接显示当天那一句，点进 /daily */}
+        <HomeDaily />
+
         {/* 热门检索 */}
         <div className="home-hot-tags">
-          {/* 每日一段不是检索词：放在「热门检索」前面、用竖线隔开；同一行，首页一屏高度不变 */}
-          <Link to="/daily" className="home-daily-tag" data-umami-event="home_daily">
-            {t("daily.home_tag")}
-          </Link>
-          <span className="home-hot-divider" aria-hidden="true" />
           <span className="home-hot-label">{t("home.hot_label")}</span>
           {hotTags.map((tag) => (
             <button
