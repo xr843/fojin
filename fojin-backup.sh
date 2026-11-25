@@ -9,7 +9,8 @@
 #     之前误以为"零备份"并加了重复脚本 backup_db.sh,经核实既有此脚本完备
 #     (CORE dump 排除可再生 text_embeddings + OSS 60 天异地 + configs/secrets),
 #     遂以本忠实副本取代之。修改生产脚本逻辑须先改 host 再同步此副本。
-# 最近同步:2026-10-15(加 pipefail + dump 完整性校验 + 上传成功才 prune;此前副本缺 umami 段)。
+# 最近同步:2026-11-25(本地 pg/umami 只留 2 天:导入 CBETA 其余各藏后每份 dump 变大,4 天会把磁盘推过 85%;OSS 仍留 60 天)。
+# 上次同步:2026-10-15(加 pipefail + dump 完整性校验 + 上传成功才 prune;此前副本缺 umami 段)。
 # 以下为 host 脚本正文(逐字):
 # ─────────────────────────────────────────────────────────────────────────
 # FoJin auto backup — postgres dump + configs/secrets tarball
@@ -162,9 +163,9 @@ if [ -s "${BACKUP_DIR}/${CRON_FILE}" ]; then
         && echo "[$(date)] OSS cron upload success: ${BUCKET}/configs/${CRON_FILE}"
 fi
 
-# ── 4. Local retention: keep 3 days ─────────────────────────────────────
-find "$BACKUP_DIR" -name 'fojin_pg_*.sql.gz' -mtime +3 -delete 2>/dev/null
-find "$BACKUP_DIR" -name 'fojin_umami_*.sql.gz' -mtime +3 -delete 2>/dev/null
+# ── 4. Local retention: pg/umami keep 2 days (OSS keeps 60d), configs/cron 4 days ──
+find "$BACKUP_DIR" -name 'fojin_pg_*.sql.gz' -mtime +1 -delete 2>/dev/null
+find "$BACKUP_DIR" -name 'fojin_umami_*.sql.gz' -mtime +1 -delete 2>/dev/null
 find "$BACKUP_DIR" -name 'fojin_configs_*.tar.gz' -mtime +3 -delete 2>/dev/null
 find "$BACKUP_DIR" -name 'fojin_cron_*.txt' -mtime +3 -delete 2>/dev/null
 
