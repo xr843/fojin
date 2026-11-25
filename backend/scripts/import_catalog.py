@@ -25,6 +25,7 @@ from elasticsearch.helpers import async_bulk
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import settings
+from app.core.elasticsearch import init_es
 from app.core.elasticsearch import INDEX_NAME
 from app.scripts_shared import CATEGORIES, CBETA_ONLINE_BASE, parse_dynasty_translator
 
@@ -401,7 +402,7 @@ async def main():
         id_map = await upsert_to_postgres(session, records, source_id=source_id)
         print(f"  PostgreSQL: {len(id_map)} records upserted.")
 
-    es = AsyncElasticsearch(settings.es_host)
+    es = await init_es()  # 生产 ES 开了认证
     try:
         await index_to_elasticsearch(es, records, id_map)
     finally:

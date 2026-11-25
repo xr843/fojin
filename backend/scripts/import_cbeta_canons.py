@@ -33,12 +33,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import import_apparatus
 import import_content
-from elasticsearch import AsyncElasticsearch
 from import_catalog import create_text_identifiers, index_to_elasticsearch, scan_xml_directory, transform_entry
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import settings
+from app.core.elasticsearch import init_es
 from app.core.xml_parser import collection_of, find_all_xml_files
 from app.models.text import BuddhistText
 from app.services.gaiji import build_normalizer
@@ -130,10 +130,11 @@ async def insert_catalog(session_factory, es, records: list[dict]) -> dict[str, 
             ).all()
         )
     print(f"  经目：新增 {len(new_ids)} 部，已在库 {len(all_ids) - len(new_ids)} 部", flush=True)
-    if new_ids:
-        await index_to_elasticsearch(es, [r for r in records if r["cbeta_id"] in new_ids], new_ids)
-        async with session_factory() as session:
-            await create_text_identifiers(session, new_ids)
+    # 标题索引与标识对本批全部经都做（都是幂等的）：上次若在这一步之前中断，重跑能补齐。
+    # 只处理本脚本范围内的藏（records 已过滤），库里原有的 T/X 不会进到这里。
+    await index_to_elasticsearch(es, records, all_ids)
+    async with session_factory() as session:
+        await create_text_identifiers(session, all_ids)
     return all_ids
 
 
@@ -167,7 +168,7 @@ async def main() -> None:
 
     engine = create_async_engine(settings.database_url)
     session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    es = AsyncElasticsearch(settings.es_host)
+    es = await init_es()  # 生产 ES 开了认证，必须走与网站同一套连接
     try:
         ids = await insert_catalog(session_factory, es, todo)
         async with session_factory() as s:
