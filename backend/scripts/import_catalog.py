@@ -45,8 +45,8 @@ TEI_NS = "http://www.tei-c.org/ns/1.0"
 
 
 def _extract_work_id_from_filename(filename: str) -> str | None:
-    """Extract CBETA work ID from XML filename. e.g. T01n0001.xml -> T0001"""
-    m = re.match(r"^([A-Z]+)\d+n([A-Z]?\d+[a-z]?)(?:_\d+)?\.xml$", filename)
+    """Extract CBETA work ID from XML filename. e.g. T01n0001.xml -> T0001, B00na001.xml -> Ba001"""
+    m = re.match(r"^([A-Z]+)\d+n([A-Za-z]?\d+[a-z]?)(?:_\d+)?\.xml$", filename)
     if not m:
         return None
     prefix = m.group(1)

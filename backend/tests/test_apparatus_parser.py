@@ -245,3 +245,44 @@ def test_apparatus_omission_reading(tmp_path):
     assert rdg["is_omission"] is True
     assert rdg["reading"] == ""
     assert rdg["witnesses"] == ["【宋】"]
+
+
+def test_line_anchor_inside_paragraph_ignores_r_edition(tmp_path):
+    """卍续藏段内也夹着新文丰 R 版 <lb>（与 X 版逐行交替，全藏约 417 万条）：同样不能当行号。
+    修前段内的 R 版行号全进了锚点，X 的引用只能开到卷。"""
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+<TEI xmlns="http://www.tei-c.org/ns/1.0" xmlns:cb="http://www.cbeta.org/ns/1.0"><teiHeader/><text><body>
+<lb ed="X" n="0002c18"/><lb ed="R022" n="0005a10"/><p>閱正法華
+<lb ed="X" n="0002c19"/><lb ed="R022" n="0005a11"/>寔無可讚</p>
+</body></text></TEI>
+"""
+    juan = parse_tei_xml(_write(tmp_path, xml))[0]
+    assert {la["line"] for la in juan["line_anchors"]} == {"0002c18", "0002c19"}
+    assert _ref_at(juan, "寔無可讚") == "0002c19"
+    # 正文不受影响：与去掉全部 R 版 <lb> 的同一段解析结果逐字相同
+    plain = parse_tei_xml(_write(tmp_path, xml.replace('<lb ed="R022" n="0005a10"/>', "").replace(
+        '<lb ed="R022" n="0005a11"/>', "")))[0]
+    assert juan["content"] == plain["content"]
+
+
+def test_line_anchor_inside_paragraph_ignores_old_type(tmp_path):
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+<TEI xmlns="http://www.tei-c.org/ns/1.0" xmlns:cb="http://www.cbeta.org/ns/1.0"><teiHeader/><text><body>
+<lb n="0002a04" ed="Y"/><p>唯心，為大師出家之法名
+<lb n="0002a05" ed="Y"/><lb n="0002a06" ed="Y" type="old"/>覺昌隆</p>
+</body></text></TEI>
+"""
+    juan = parse_tei_xml(_write(tmp_path, xml))[0]
+    assert {la["line"] for la in juan["line_anchors"]} == {"0002a04", "0002a05"}
+
+
+def test_honorific_lb_is_a_real_line(tmp_path):
+    """type="honorific"（抬头另起行）是本藏真实的行，要保留。"""
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+<TEI xmlns="http://www.tei-c.org/ns/1.0" xmlns:cb="http://www.cbeta.org/ns/1.0"><teiHeader/><text><body>
+<lb n="0001a01" ed="J"/><p>恭惟
+<lb n="0001a02" ed="J" type="honorific"/>皇上聖德</p>
+</body></text></TEI>
+"""
+    juan = parse_tei_xml(_write(tmp_path, xml))[0]
+    assert _ref_at(juan, "皇上") == "0001a02"

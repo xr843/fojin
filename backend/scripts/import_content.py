@@ -30,7 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.config import settings
 from app.core.elasticsearch import CONTENT_INDEX_NAME
-from app.core.xml_parser import find_all_xml_files, parse_tei_xml
+from app.core.xml_parser import collection_of, find_all_xml_files, parse_tei_xml
 from app.services.gaiji import GaijiNormalizer, build_normalizer, normalize_for_index
 from app.models.text import BuddhistText
 
@@ -99,7 +99,8 @@ async def get_texts_for_collection(session: AsyncSession, collection: str) -> li
     result = await session.execute(
         select(BuddhistText).where(BuddhistText.cbeta_id.startswith(collection))
     )
-    return list(result.scalars().all())
+    # startswith 会把 GA/GB 算进 G、TX 算进 T——按经号解析出的藏精确过滤。
+    return [bt for bt in result.scalars().all() if collection_of(bt.cbeta_id) == collection]
 
 
 async def get_single_text(session: AsyncSession, work_id: str) -> BuddhistText | None:

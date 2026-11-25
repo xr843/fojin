@@ -29,7 +29,7 @@ from pathlib import Path
 from lxml import etree
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from app.core.xml_parser import find_all_xml_files
+from app.core.xml_parser import find_all_xml_files, is_alt_edition_lb
 
 TEI = "{http://www.tei-c.org/ns/1.0}"
 CB = "{http://www.cbeta.org/ns/1.0}"
@@ -49,7 +49,7 @@ def scan_file(path: Path):
             level = int(el.get("level") or 1)
             if title and not title.replace(" ", "").isdigit():
                 yield ("mulu", level, title)
-        elif tag == f"{TEI}lb" and (not el.get("ed") or el.get("ed", "").startswith(("T", "X"))):
+        elif tag == f"{TEI}lb" and not is_alt_edition_lb(el):
             n = el.get("n")
             if n:
                 yield ("lb", n)

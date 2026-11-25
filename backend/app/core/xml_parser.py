@@ -40,6 +40,16 @@ CONTENT_TAGS = {
 }
 
 # Elements to skip entirely (including their children)
+def is_alt_edition_lb(elem) -> bool:
+    """并列的别版行号：卍续藏里的新文丰版 `ed="R022"` 等、印順著作集 `type="old"`（旧版）。
+
+    这些 <lb> 的页栏行编号属于另一个版本，会和本藏行号撞车（X0288 的 R022 0005a10 在卷首，
+    X 的 0005a10 在后面），一律不进行号锚点。全藏实测只有 X 带 R 版（约 417 万条，与 X 版 421 万
+    条交替出现），其他各藏的 <lb> 只有本藏 ed。
+    """
+    return bool(re.match(r"R\d", elem.get("ed", ""))) or elem.get("type") == "old"
+
+
 SKIP_TAGS = {
     f"{{{TEI_NS}}}note",
     f"{{{TEI_NS}}}app",
@@ -161,9 +171,9 @@ def _extract_text(elem) -> str:
             if child.tail:
                 parts.append(child.tail)
         elif child.tag == f"{{{TEI_NS}}}lb":
-            # Page-column-line marker (e.g. n="0001a09").
+            # Page-column-line marker (e.g. n="0001a09"). 段内的别版行号同样跳过（见 is_alt_edition_lb）。
             n = child.get("n")
-            if n:
+            if n and not is_alt_edition_lb(child):
                 parts.append(f"\x00L:{n}\x00")
             if child.tail:
                 parts.append(child.tail)
@@ -290,7 +300,7 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
             # 并列的别版行号不算：卍续藏 ed="R022" 等（新文丰版）、印順著作集 type="old"（旧版）。
             # 它们的编号会和本藏撞车（X0288 的 R022 0005a10 在卷首、X 0005a10 在后面），
             # 段外只留最后一个 <lb>，混进来就会把行号贴错位置。
-            if n and not re.match(r"R\d", elem.get("ed", "")) and elem.get("type") != "old":
+            if n and not is_alt_edition_lb(elem):
                 pending_lb.append(f"\x00L:{n}\x00")
             return
 
@@ -474,12 +484,26 @@ def _parse_cbeta_id(cbeta_id: str) -> tuple[str, str, str] | None:
         suffix = m.group(3)
         return ("J", f"{sub}{num_str}", suffix)
 
+    # 补遗编号：B00na001 → Ba001、ZW08na044 → ZWa044（大藏經補編、藏外佛教文獻等的附录篇）
+    m = re.match(r"^([A-Z]+)a(\d+)([a-z]?)$", cbeta_id)
+    if m:
+        return (m.group(1), f"a{m.group(2).zfill(3)}", m.group(3))
+
     # Standard: T0001, X0001, etc.
     m = re.match(r"^([A-Z]+)(\d+)([a-z]?)$", cbeta_id)
     if m:
         return (m.group(1), m.group(2).zfill(4), m.group(3))
 
     return None
+
+
+def collection_of(cbeta_id: str | None) -> str | None:
+    """经号所属的藏：T0235 → T、JB095 → J、GA0023 → GA、X0288 → X；认不出返回 None。
+
+    按藏筛经时不能用 startswith：「G」会把 GA/GB 也选进来，「T」会把 TX 选进来。
+    """
+    parsed = _parse_cbeta_id(cbeta_id or "")
+    return parsed[0] if parsed else None
 
 
 def find_all_xml_files(cbeta_id: str, xml_base_dir: str) -> list[Path]:
@@ -603,11 +627,11 @@ def parse_tei_apparatus(xml_path: str | Path) -> dict:
     """
     xml_path = Path(xml_path)
     if not xml_path.exists():
-        return {"witnesses": {}, "entries": []}
+        return {"witnesses": {}, "entries": [], "line_anchors": [], "contents": {}}
     try:
         tree = etree.parse(str(xml_path))
     except etree.XMLSyntaxError:
-        return {"witnesses": {}, "entries": []}
+        return {"witnesses": {}, "entries": [], "line_anchors": [], "contents": {}}
     root = tree.getroot()
 
     witnesses = parse_witnesses(root)
@@ -663,4 +687,4 @@ def parse_tei_apparatus(xml_path: str | Path) -> dict:
             "aligned": aligned,
             "readings": app["readings"],
         })
-    return {"witnesses": witnesses, "entries": entries, "line_anchors": line_anchors}
+    return {"witnesses": witnesses, "entries": entries, "line_anchors": line_anchors, "contents": contents}
