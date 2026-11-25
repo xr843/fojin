@@ -9,6 +9,7 @@ import { MARKDOWN_REMARK_PLUGINS } from "../utils/markdownPlugins";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import { CITATION_URL_SCHEME, injectCitationLinks, parseCitationHref } from "../utils/citationLinks";
 import { localizeHan } from "../utils/hanScript";
+import ChatRelatedTerms from "../components/ChatRelatedTerms";
 import { isNearBottom } from "../utils/scrollBottom";
 import {
   ArrowUpOutlined,
@@ -335,6 +336,8 @@ interface MessageBubbleProps {
   onSourceClick: (source: ChatSource, phase?: SourceClickPhase, quote?: string) => void;
   /** 回答下方入口胶囊：展开右栏并列出这条回答的引文。 */
   onOpenCitationPanel: (m: ChatMessageItem) => void;
+  /** 这条回答对应的读者问题（上一条 user 消息）；用来取「相关词条」卡片。 */
+  question?: string;
 }
 
 /** One chat message row, memoised on (m, isStreaming, sending, user). A streaming
@@ -346,6 +349,7 @@ interface MessageBubbleProps {
 function MessageBubbleInner({
   m, isStreaming, sending, user, markdownComponents, isLast = false, expectedFirstTokenS = null, regenerateModels,
   onSuggestionClick, onShare, onRetry, onContinue, onRegenerate, onFeedback, onSourceClick, onOpenCitationPanel,
+  question = "",
 }: MessageBubbleProps) {
   // Read t here (not as a prop): on a mid-conversation language switch, i18next's
   // subscription re-renders the bubble — which memo does NOT block, since memo
@@ -538,6 +542,8 @@ function MessageBubbleInner({
                     ))}
                   </div>
                 )}
+                {/* 相关词条：辞典释义卡片，单独请求、不经过引文核验，标「词条」与经文出处分开。 */}
+                {!isStreaming && question && <ChatRelatedTerms question={question} />}
               </>
             )
           ) : (
@@ -605,7 +611,8 @@ export const MessageBubble = memo(
     prev.user === next.user &&
     prev.isLast === next.isLast &&
     prev.expectedFirstTokenS === next.expectedFirstTokenS &&
-    prev.regenerateModels === next.regenerateModels,
+    prev.regenerateModels === next.regenerateModels &&
+    prev.question === next.question,
 );
 
 /**
@@ -2077,6 +2084,7 @@ export default function ChatPage() {
                 onFeedback={handleFeedbackMessage}
                 onSourceClick={handleSourceClick}
                 onOpenCitationPanel={handleOpenCitationPanel}
+                question={m.role === "assistant" && messages[i - 1]?.role === "user" ? messages[i - 1].content : ""}
               />
             ))}
             {/* Streaming cursor is shown inline via ▌ in the message bubble */}
