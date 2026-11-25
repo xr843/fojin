@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.config import settings
 from app.core.elasticsearch import init_es
 from app.core.elasticsearch import INDEX_NAME
+from app.core.xml_parser import is_front_matter
 from app.scripts_shared import CATEGORIES, CBETA_ONLINE_BASE, parse_dynasty_translator
 
 # DILA metadata repo URLs
@@ -350,8 +351,8 @@ async def index_to_elasticsearch(es: AsyncElasticsearch, records: list[dict], id
     async def gen_actions():
         for rec in records:
             db_id = id_map.get(rec["cbeta_id"])
-            if db_id is None:
-                continue
+            if db_id is None or is_front_matter(rec["cbeta_id"]):
+                continue  # 现代附文不进经题索引（见 is_front_matter）
             doc = {k: v for k, v in rec.items() if v is not None}
             doc["lang"] = "lzh"
             doc["source_code"] = "cbeta"

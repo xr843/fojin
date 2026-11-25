@@ -31,7 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.config import settings
 from app.core.elasticsearch import init_es
 from app.core.elasticsearch import CONTENT_INDEX_NAME, INDEX_NAME
-from app.core.xml_parser import collection_of, find_all_xml_files, parse_tei_xml
+from app.core.xml_parser import collection_of, find_all_xml_files, is_front_matter, parse_tei_xml
 from app.services.gaiji import GaijiNormalizer, build_normalizer, normalize_for_index
 from app.models.text import BuddhistText
 
@@ -196,6 +196,9 @@ async def import_work(
                     "source_code": "cbeta",
                 },
             }
+
+    if is_front_matter(bt.cbeta_id):
+        return len(unique_juans)  # 现代附文：只存库、不进搜索（见 is_front_matter）
 
     await async_bulk(es, gen_es_actions(), raise_on_error=False)
 
