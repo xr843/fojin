@@ -41,7 +41,7 @@ interface TourStep {
 }
 interface HistoryTour {
   id: string;
-  /** transmission＝传法求经（按时代）；school＝宗派传承 */
+  /** 分组。现只有 school（佛法东传＋八宗）一组；保留字段以便以后再分 */
   group: "transmission" | "school";
   /** 按钮上的短名（两字）；同一宗派的支线只有家族首条有 */
   short?: string;
@@ -56,7 +56,8 @@ interface HistoryTour {
 const TOURS = TOURS_DATA.tours as unknown as HistoryTour[];
 /** 按钮上露出的路线：没有家族的，加上每个家族的首条（禅宗 → 东土六祖） */
 const TOUR_BUTTONS = TOURS.filter((x) => !x.family || x.family === x.id);
-const TOUR_GROUPS = ["transmission", "school"] as const;
+/** 数据里出现过的分组（2026-11-27 起只剩一组「佛法东传＋八宗」，只有一组时不画组框和组名） */
+const TOUR_GROUPS = [...new Set(TOUR_BUTTONS.map((x) => x.group))];
 
 const ZOOMS = [1, 1.5, 2.2, 3.2, 4.6, 6.5];
 const DEFAULT_ZOOM = 2;
@@ -492,8 +493,8 @@ export default function HistoryPage() {
       <div className="history-tours" role="group" aria-label={t("history.tours")}>
         <span className="history-tours-k">{t("history.tours")}</span>
         {TOUR_GROUPS.map((g) => (
-          <span key={g} className="history-tours-group">
-            <span className="history-tours-gname">{t(`history.tours_${g}`)}</span>
+          <span key={g} className={TOUR_GROUPS.length > 1 ? "history-tours-group" : "history-tours-row"}>
+            {TOUR_GROUPS.length > 1 && <span className="history-tours-gname">{t(`history.tours_${g}`)}</span>}
             {TOUR_BUTTONS.filter((x) => x.group === g).map((x) => {
               // 禅宗按钮：在禅宗任何一支里都算选中
               const on = !!tour && (tour.id === x.id || (!!x.family && tour.family === x.family));

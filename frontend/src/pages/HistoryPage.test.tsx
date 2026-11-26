@@ -39,6 +39,18 @@ vi.mock("../data/historyTours.json", () => ({
         ],
       },
       {
+        id: "roots",
+        group: "school",
+        short: "雙源",
+        title: "兩個源頭",
+        intro: "兩位初祖。",
+        steps: [
+          { id: "A000294", y: 645, t: "源一。" },
+          { id: "A001719", y: 680, t: "源二。", p: -1 },
+          { id: "A001019", y: 670, t: "源一之徒。", p: 0 },
+        ],
+      },
+      {
         id: "tree2",
         group: "school",
         family: "tree",
@@ -195,7 +207,7 @@ describe("佛教史长卷", () => {
     expect(new Set(starts).size).toBe(1);
     // 同一家族只露一个按钮（树宗），说明栏标题是「家族短名 · 支线」，支线在说明栏里切换
     expect(screen.queryByRole("button", { name: "旁支" })).toBeInTheDocument();
-    expect([...document.querySelectorAll(".history-tours button")].map((b) => b.textContent)).toEqual(["唯识", "树宗"]);
+    expect([...document.querySelectorAll(".history-tours button")].map((b) => b.textContent)).toEqual(["唯识", "树宗", "双源"]);
     expect(screen.getByText("树宗 · 主干")).toBeInTheDocument();
     // 切到旁支：树宗按钮仍是选中态；主干上的玄奘、慧能不变淡（同一家族），窥基是当前支线
     fireEvent.click(screen.getByRole("button", { name: "旁支" }));
@@ -243,5 +255,12 @@ describe("佛教史长卷", () => {
     expect(new URLSearchParams(screen.getByTestId("loc").textContent!.split("?")[1]).get("y")).toBe(y);
     fireEvent.keyDown(window, { key: " " });
     expect(await screen.findByRole("button", { name: /暂停/ })).toBeInTheDocument();
+  });
+
+  it("p=-1：路线里另一个源头，不连线（密宗有善无畏、金刚智两位初祖）", async () => {
+    renderPage("/history?tour=roots");
+    await waitFor(() => expect(document.querySelectorAll(".history-tour-num")).toHaveLength(3));
+    // 三站只有一条线：源一 → 源一之徒；源二不连
+    expect(document.querySelectorAll(".history-tour-path path")).toHaveLength(1);
   });
 });

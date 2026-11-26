@@ -623,3 +623,10 @@ a.history-view:hover {
   outline: 1px dashed color-mix(in srgb, var(--fj-cinnabar) 55%, transparent);
   outline-offset: 1px;
 }
+
+.history-tours-row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
