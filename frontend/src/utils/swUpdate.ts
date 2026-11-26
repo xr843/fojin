@@ -6,7 +6,10 @@
  * 接管——但已经显示的页面还是旧代码，要再刷新才看到新版。读者不知道，以为没改。
  *
  * public/sw-update.js 负责定时与切回标签时检查新版；这里在新 SW 接管（controllerchange）时：
- * - 刚打开不久（< FRESH_MS）且没在输入框里打字 → 直接刷新一次，读者几乎察觉不到；
+ * - 刚打开不久（< FRESH_MS）且读者还没动过页面（没点过、没按过键）→ 直接刷新一次，几乎察觉不到；
+ *   ⚠️ 只看「输入框里有没有字」不够：读者在问答页提交问题后输入框已清空，小津正在答，
+ *   这时刷新会把正在生成的回答整个丢掉、变成新对话（2026-11-26 读者反馈「提交后页面
+ *   刷新一下就变成新的对话了，第一次打开问答页时偶尔出现」）。
  * - 否则标记「有新版」：页面底部提示一行（可点刷新），下次站内换页时顺手整页刷新；
  * 首次安装（之前没有 controller）不算更新，不刷新。
  *
@@ -17,6 +20,7 @@
 // 新 SW 在大陆网络下重下全部文件约需一分钟：两分钟内接管的都算「刚打开」
 const FRESH_MS = 120_000;
 const PRELOAD_RELOAD_KEY = "fojin.sw.preloadReloadAt";
+const INTERACTION_EVENTS = ["pointerdown", "keydown", "touchstart"] as const;
 
 let updateReady = false;
 const listeners = new Set<() => void>();
@@ -40,8 +44,13 @@ function typing(): boolean {
 }
 
 /** 新版已接管时决定：现在就刷新，还是先提示。导出给测试用。 */
-export function handleControllerChange(now: number, loadedAt: number, reload: () => void): "reloaded" | "deferred" {
-  if (now - loadedAt < FRESH_MS && !typing()) {
+export function handleControllerChange(
+  now: number,
+  loadedAt: number,
+  reload: () => void,
+  interacted = false,
+): "reloaded" | "deferred" {
+  if (now - loadedAt < FRESH_MS && !interacted && !typing()) {
     reload();
     return "reloaded";
   }
@@ -67,6 +76,13 @@ export function installSwUpdateHandling(): void {
   if (typeof window === "undefined") return;
   const loadedAt = Date.now();
   const reload = () => window.location.reload();
+  // 读者一旦点过、按过键，就认为页面上可能有进行中的事（提问、展开、选择），不再自动刷新
+  let interacted = false;
+  const markInteracted = () => {
+    interacted = true;
+    for (const type of INTERACTION_EVENTS) window.removeEventListener(type, markInteracted, true);
+  };
+  for (const type of INTERACTION_EVENTS) window.addEventListener(type, markInteracted, { capture: true, passive: true });
   window.addEventListener("vite:preloadError", (e) => {
     if (handlePreloadError(Date.now(), reload)) e.preventDefault();
   });
@@ -76,6 +92,6 @@ export function installSwUpdateHandling(): void {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     if (!hadController || handled) return;
     handled = true;
-    handleControllerChange(Date.now(), loadedAt, reload);
+    handleControllerChange(Date.now(), loadedAt, reload, interacted);
   });
 }
