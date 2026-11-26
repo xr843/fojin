@@ -52,7 +52,6 @@ import AnswerSummaryBar from "../components/AnswerSummaryBar";
 import CitationSidebar, { type CitationPanelRequest } from "../components/CitationSidebar";
 import StudyContinueStrip from "../components/StudyContinueStrip";
 import AnswerCitationEntry from "../components/AnswerCitationEntry";
-import ChatTable from "../components/ChatTable";
 import { getMasters } from "../api/client";
 import { findSavedAnswer } from "./chatRecovery";
 import type { CitationTarget } from "../components/CitationDrawer";
@@ -998,7 +997,6 @@ export default function ChatPage() {
       }
       return <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>;
     },
-    table: ChatTable,
   }), []);
 
   /** 自动跟随流式输出，但用户上滚阅读时不抢滚动条。

@@ -2018,7 +2018,5 @@
   "read.search_button": "找经",
   "app.update_ready": "佛津已更新",
   "app.update_reload": "刷新查看",
-  "app.update_dismiss": "关闭",
-  "chat.table_expand": "全屏看表",
-  "chat.table_full_title": "表格"
+  "app.update_dismiss": "关闭"
 }
