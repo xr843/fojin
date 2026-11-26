@@ -62,3 +62,18 @@ describe("布局铬高度 token", () => {
     expect(m![1]).toMatch(/min-height:\s*calc\(100dvh - var\(--fj-header-h\)/);
   });
 });
+
+describe("/chat 不显示页脚（所有尺寸）", () => {
+  it("页脚隐藏与 --fj-footer-h 置 0 是顶层规则，不在媒体查询里", () => {
+    // 2026-11-26 读者反馈：900px 高的桌面上 80 卷字数表看不全，只好缩小网页比例。
+    // 原先只在手机/矮屏（≤760px）去掉页脚，桌面仍占 50px。
+    expect(rule(".layout-content-inner:has(.chat-shell)")).toMatch(/--fj-footer-h:\s*0px/);
+    expect(rule("body:has(.chat-shell) .ant-layout-footer")).toMatch(/display:\s*none/);
+  });
+
+  it("问答里的表格比正文紧（逐卷字数表动辄二十多行）", () => {
+    const td = rule(".chat-markdown th, .chat-markdown td");
+    expect(td).toMatch(/padding:\s*3px 10px/);
+    expect(td).toMatch(/line-height:\s*1\.45/);
+  });
+});
