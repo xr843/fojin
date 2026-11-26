@@ -44,6 +44,7 @@ function renderPage(entry = "/read") {
         <MemoryRouter initialEntries={[entry]}>
           <Routes>
             <Route path="/read" element={<><ReadPage /><LocationProbe /></>} />
+            <Route path="/search" element={<LocationProbe />} />
           </Routes>
         </MemoryRouter>
       </QueryClientProvider>
@@ -59,6 +60,29 @@ beforeEach(() => {
 });
 
 describe("读经页", () => {
+  it("顶部可以直接找经：回车进「搜经典」结果页，继续读仍在页面上", () => {
+    localStorage.setItem(
+      "fojin-reading-history",
+      JSON.stringify([{ textId: 9, title: "般若波羅蜜多心經", juan: 1, ratio: 0.3, ts: 1 }]),
+    );
+    renderPage();
+    expect(screen.getByText("继续读")).toBeInTheDocument();
+    const box = screen.getByPlaceholderText(/输入经名、译者或编号/);
+    fireEvent.change(box, { target: { value: " 解深密经 " } });
+    fireEvent.keyDown(box, { key: "Enter", code: "Enter", keyCode: 13 });
+    expect(screen.getByTestId("loc").textContent).toBe(
+      "/search?" + new URLSearchParams({ q: "解深密经", tab: "catalog" }).toString(),
+    );
+  });
+
+  it("空白不跳转", () => {
+    renderPage();
+    const box = screen.getByPlaceholderText(/输入经名、译者或编号/);
+    fireEvent.change(box, { target: { value: "   " } });
+    fireEvent.keyDown(box, { key: "Enter", code: "Enter", keyCode: 13 });
+    expect(screen.getByTestId("loc").textContent).toBe("/read");
+  });
+
   it("没有阅读记录时不显示「继续读」，有记录时链到上次的卷", () => {
     const { unmount } = renderPage();
     expect(screen.queryByText("继续读")).toBeNull();

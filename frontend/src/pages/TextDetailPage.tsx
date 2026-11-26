@@ -159,7 +159,8 @@ export default function TextDetailPage() {
         className="td-breadcrumb"
         items={[
           { title: <span style={{ cursor: "pointer" }} onClick={() => navigate("/")}><HomeOutlined /> {t("nav.home", "首页")}</span> },
-          { title: <span style={{ cursor: "pointer" }} onClick={() => navigate("/search")}>{t("nav.search", "搜索")}</span> },
+          // 「读经」页有找经的搜索框与继续读，比空白搜索页更合适做上一级（2026-11-26 读者反馈）
+          { title: <span style={{ cursor: "pointer" }} onClick={() => navigate("/read")}>{t("nav.read")}</span> },
           { title: t("textDetail.breadcrumbDetails") },
         ]}
       />

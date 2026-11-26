@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo, type ReactNode } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router";
+import { Link, useParams, useNavigate, useSearchParams } from "react-router";
 import { extendToSentenceEnd, findQuoteSpans } from "../utils/citationMatch";
 import { useTranslation } from "react-i18next";
 import { Helmet } from "react-helmet-async";
@@ -1370,6 +1370,8 @@ export default function TextReaderPage() {
               </span>
             ),
           },
+          // 「读经」页有找经的搜索框，读完一部想换一部从这里回去（2026-11-26 读者反馈）
+          { title: <Link to="/read">{t("nav.read")}</Link> },
           {
             title: (
               <span

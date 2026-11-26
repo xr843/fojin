@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
-import { Empty, Spin } from "antd";
+import { Empty, Input, Spin } from "antd";
 import { browseTaisho } from "../api/client";
 import { getLocalizedCollections } from "../data/collections";
 import { getLocalizedPopularSutras } from "../data/popularSutras";
@@ -28,6 +28,7 @@ export default function ReadPage() {
   const lang = i18n.language;
   const traditional = scriptForLanguage(lang) === "traditional";
 
+  const navigate = useNavigate();
   const [history] = useState(() => getReadingHistory().slice(0, 4));
   // 已在「继续读」里的经不再在常读经典重复出现
   const popular = useMemo(() => {
@@ -89,6 +90,22 @@ export default function ReadPage() {
       <div className="sources-header">
         <h1 className="sources-title">{t("read.title")}</h1>
         <p className="sources-desc">{t("read.subtitle")}</p>
+        {/* 找别的经直接在这里搜（2026-11-26 读者反馈：原先要 读经→点进正在读的经→经典详情→
+            面包屑「搜索」才能搜，三步）。只搜经典（书名、译者、编号），结果页同「搜经典」标签。 */}
+        <Input.Search
+          className="read-search"
+          size="large"
+          allowClear
+          placeholder={t("read.search_placeholder")}
+          enterButton={t("read.search_button")}
+          aria-label={t("read.search_placeholder")}
+          onSearch={(v) => {
+            const q = v.trim();
+            if (!q) return;
+            if (typeof umami !== "undefined") umami.track("read_search");
+            navigate(`/search?${new URLSearchParams({ q, tab: "catalog" }).toString()}`);
+          }}
+        />
       </div>
 
       {history.length > 0 && (
