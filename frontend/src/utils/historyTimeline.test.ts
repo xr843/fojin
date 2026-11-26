@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aliveAt, formatYears, layoutLanes, packRows, personSpan, translationRiver, type HistoryPerson } from "./historyTimeline";
+import { aliveAt, fixZhuAfterSimplify, formatYears, layoutLanes, packRows, personSpan, translationRiver, type HistoryPerson } from "./historyTimeline";
 import { dynastyAt, dynastySpan } from "../data/historyDynasties";
 
 function person(over: Partial<HistoryPerson>): HistoryPerson {
@@ -89,5 +89,15 @@ describe("佛教史长卷排布", () => {
     expect(dynastySpan("後秦")).toEqual([384, 417]);
     expect(dynastyAt(645)?.name).toBe("唐");
     expect(dynastyAt(270)?.name).toBe("西晉");
+  });
+
+  it("繁转简后把表示著述的「着」改回「著」，助词「着」不动", () => {
+    expect(fixZhuAfterSimplify("着《佛国记》")).toBe("著《佛国记》");
+    expect(fixZhuAfterSimplify("着有《宗镜录》、另着〈唯心诀〉")).toBe("著有《宗镜录》、另著〈唯心诀〉");
+    expect(fixZhuAfterSimplify("撰着、所着")).toBe("撰著、所著");
+    expect(fixZhuAfterSimplify("随着时代，接着又往南岳")).toBe("随着时代，接着又往南岳");
+    expect(fixZhuAfterSimplify("文偃为最着，杂着被编为三十卷")).toBe("文偃为最著，杂著被编为三十卷");
+    expect(fixZhuAfterSimplify("讲无量寿经，着安乐集二卷")).toBe("讲无量寿经，著安乐集二卷");
+    expect(fixZhuAfterSimplify("随着论疏，接着讲记")).toBe("随着论疏，接着讲记");
   });
 });
