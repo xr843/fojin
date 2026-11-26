@@ -4,6 +4,22 @@ import { MemoryRouter, useLocation } from "react-router";
 import { HelmetProvider } from "react-helmet-async";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import HistoryPage from "./HistoryPage";
+
+vi.mock("../data/historyTours.json", () => ({
+  default: {
+    tours: [
+      {
+        id: "weishi",
+        title: "唯識傳承",
+        intro: "玄奘傳窺基。",
+        steps: [
+          { id: "A000294", y: 645, t: "貞觀十九年回長安譯經。" },
+          { id: "A001019", y: 670, t: "從玄奘學。" },
+        ],
+      },
+    ],
+  },
+}));
 import type { HistoryData, HistoryPerson } from "../utils/historyTimeline";
 
 function person(over: Partial<HistoryPerson>): HistoryPerson {
@@ -110,5 +126,28 @@ describe("佛教史长卷", () => {
     const paths = document.querySelectorAll(".history-lineage path");
     expect(paths).toHaveLength(1);
     expect(paths[0].getAttribute("class")).toBe("history-lineage-st");
+  });
+
+  it("导览：点路线 → 说明栏显示第 1 站，路线上的人标序号、其余变淡；下一站 / 方向键换站；退出", async () => {
+    renderPage();
+    await screen.findByRole("button", { name: "玄奘" });
+    fireEvent.click(screen.getByRole("button", { name: "唯识传承" }));
+    expect(screen.getByTestId("loc").textContent).toContain("tour=weishi");
+    expect(await screen.findByText("第 1 / 2 站")).toBeInTheDocument();
+    expect(screen.getByText("贞观十九年回长安译经。")).toBeInTheDocument();
+    expect(document.querySelectorAll(".history-tour-num")).toHaveLength(2);
+    expect(document.querySelector(".history-bar.is-tour-current")?.textContent).toContain("玄奘");
+    const huineng = screen.getAllByRole("button", { name: "慧能" }).find((b) => b.classList.contains("history-bar"));
+    expect(huineng?.className).toContain("is-dim");
+
+    fireEvent.click(screen.getByRole("button", { name: "下一站" }));
+    expect(await screen.findByText("第 2 / 2 站")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "下一站" })).toBeDisabled();
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    expect(await screen.findByText("第 1 / 2 站")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "退出导览" }));
+    expect(screen.getByTestId("loc").textContent).not.toContain("tour=");
+    expect(document.querySelectorAll(".history-tour-num")).toHaveLength(0);
   });
 });

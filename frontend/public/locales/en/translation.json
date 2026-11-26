@@ -2076,5 +2076,10 @@
   "history.school.pureland": "Pure Land",
   "history.school.chan": "Chan",
   "history.school.esoteric": "Esoteric",
-  "history.school.other": "Others"
+  "history.school.other": "Others",
+  "history.tours": "Guided tours",
+  "history.tour_prev": "Previous",
+  "history.tour_next": "Next",
+  "history.tour_exit": "Exit tour",
+  "history.tour_step": "Stop {{k}} of {{n}}"
 }
