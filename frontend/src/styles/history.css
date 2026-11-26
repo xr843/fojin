@@ -1,6 +1,6 @@
 /* 佛教史长卷（HistoryPage.tsx）。宣纸底 + 朱砂/墨/金三色区分译经师、僧、居士。 */
+/* 长卷要横向空间：不设最大宽度，宽屏铺满（11-26 用户截图 1860 宽屏两边各空 230px） */
 .history-page {
-  max-width: 1400px;
   margin: 0 auto;
 }
 .history-head {
@@ -351,4 +351,49 @@ a.history-view:hover {
   .history-scroll {
     max-height: calc(100vh - var(--fj-header-h) - 300px);
   }
+}
+
+/* 宗派泳道 */
+.history-lane {
+  position: absolute;
+  left: 0;
+  border-top: 1px solid color-mix(in srgb, var(--fj-border) 80%, transparent);
+  pointer-events: none;
+}
+.history-lane--alt {
+  background: color-mix(in srgb, var(--fj-bg-alt) 55%, transparent);
+}
+.history-lane-label {
+  position: sticky;
+  left: 8px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 2px 8px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--fj-accent);
+}
+.history-lane-label small {
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--fj-ink-muted);
+}
+/* 师承连线：师（上游）实线、弟子虚线 */
+.history-lineage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 3;
+  overflow: visible;
+}
+.history-lineage path {
+  fill: none;
+  stroke: var(--fj-cinnabar);
+  stroke-width: 1.6;
+}
+.history-lineage-st {
+  stroke-dasharray: 4 3;
 }

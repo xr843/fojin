@@ -17,6 +17,8 @@ export interface HistoryPerson {
   dn: string;
   alt: string[];
   dy: string;
+  /** 宗派泳道（译经 三论 义学 天台 华严 唯识 律 净土 禅 密 其他），见 backend/scripts/history_core_people.tsv */
+  sc: string;
   b: [number, number] | null;
   d: [number, number] | null;
   monk: boolean;
@@ -118,6 +120,64 @@ export function packRows(
     placed.push({ ...it, row });
   }
   return { placed, rows: rowEnds.length };
+}
+
+/** 宗派泳道的先后：译经在最前（佛教入华从译经开始），其余大致按宗派成立先后，「其他」垫底。 */
+export const SCHOOL_ORDER = ["译经", "三论", "义学", "天台", "华严", "唯识", "律", "净土", "禅", "密", "其他"]; // i18n-exempt — 数据里的宗派值，显示走 history.school.* 键
+
+/** 宗派值 → 翻译键后缀 */
+export const SCHOOL_KEY: Record<string, string> = {
+  译经: "translation", // i18n-exempt
+  三论: "sanlun", // i18n-exempt
+  义学: "yixue", // i18n-exempt
+  天台: "tiantai", // i18n-exempt
+  华严: "huayan", // i18n-exempt
+  唯识: "weishi", // i18n-exempt
+  律: "vinaya", // i18n-exempt
+  净土: "pureland", // i18n-exempt
+  禅: "chan", // i18n-exempt
+  密: "esoteric", // i18n-exempt
+  其他: "other", // i18n-exempt
+};
+
+export interface LaneLayout {
+  items: PlacedPerson[];
+  /** 每条泳道：标题占 firstRow 那一行，人物从下一行起 */
+  lanes: Array<{ key: string; firstRow: number; rows: number; count: number }>;
+  rows: number;
+}
+
+/**
+ * 按宗派分泳道：每条泳道先占一行写名字，再在泳道内贪心分行。groupBy 为 null 时不分泳道（按年代看）。
+ */
+export function layoutLanes(
+  people: HistoryPerson[],
+  pxPerYear: number,
+  labelPx: (p: HistoryPerson) => number,
+  groupBy: ((p: HistoryPerson) => string) | null,
+  order: string[] = SCHOOL_ORDER,
+): LaneLayout {
+  if (!groupBy) {
+    const { placed, rows } = packRows(people, pxPerYear, labelPx);
+    return { items: placed, lanes: [], rows };
+  }
+  const groups = new Map<string, HistoryPerson[]>();
+  for (const p of people) {
+    const k = order.includes(groupBy(p)) ? groupBy(p) : order[order.length - 1];
+    groups.set(k, [...(groups.get(k) ?? []), p]);
+  }
+  const items: PlacedPerson[] = [];
+  const lanes: LaneLayout["lanes"] = [];
+  let row = 0;
+  for (const key of order) {
+    const members = groups.get(key);
+    if (!members?.length) continue;
+    const { placed, rows } = packRows(members, pxPerYear, labelPx);
+    lanes.push({ key, firstRow: row, rows: rows + 1, count: placed.length });
+    for (const it of placed) items.push({ ...it, row: row + 1 + it.row });
+    row += rows + 1;
+  }
+  return { items, lanes, rows: row };
 }
 
 /**

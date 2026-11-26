@@ -2063,5 +2063,18 @@
   "history.bio_source": "小傳、師承、生卒據 DILA 人名規範資料庫。",
   "history.dila_link": "查看 DILA 條目",
   "history.approx": "約",
-  "history.back_to_timeline": "← 回到佛教史長卷"
+  "history.back_to_timeline": "← 回到佛教史長卷",
+  "history.view_by_school": "按宗派",
+  "history.view_by_year": "按年代",
+  "history.school.translation": "譯經",
+  "history.school.sanlun": "三論",
+  "history.school.yixue": "義學",
+  "history.school.tiantai": "天台",
+  "history.school.huayan": "華嚴",
+  "history.school.weishi": "唯識",
+  "history.school.vinaya": "律",
+  "history.school.pureland": "淨土",
+  "history.school.chan": "禪",
+  "history.school.esoteric": "密",
+  "history.school.other": "其他"
 }

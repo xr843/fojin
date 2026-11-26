@@ -7,21 +7,21 @@ import HistoryPage from "./HistoryPage";
 import type { HistoryData, HistoryPerson } from "../utils/historyTimeline";
 
 function person(over: Partial<HistoryPerson>): HistoryPerson {
-  return { id: "A0", n: "某", dn: "某", alt: [], dy: "唐", b: null, d: null, monk: true, tr: false, bio: "", te: [], st: [], bios: [], men: [], works: [], wn: 0, ...over };
+  return { id: "A0", n: "某", dn: "某", alt: [], dy: "唐", sc: "禅", b: null, d: null, monk: true, tr: false, bio: "", te: [], st: [], bios: [], men: [], works: [], wn: 0, ...over };
 }
 
 const DATA: HistoryData = {
   source: "DILA", source_url: "", license: "CC BY-SA 3.0", license_url: "",
   people: [
     person({
-      id: "A000294", n: "玄奘", dn: "玄奘", b: [602, 603], d: [664, 664], tr: true, wn: 78, st: ["A001019"],
+      id: "A000294", n: "玄奘", dn: "玄奘", sc: "唯识", b: [602, 603], d: [664, 664], tr: true, wn: 78, st: ["A001019"],
       bio: "俗姓陳，唯識宗創始人。",
       bios: [{ t: "唐高僧傳 · 釋玄奘傳", u: "/texts/71/read?juan=4&anchor=p0446c08", lh: "T50n2060_p0446c08" }],
       works: [{ t: "成唯識論", c: "T1585", u: "/texts/44" }],
     }),
-    person({ id: "A001019", n: "窺基", dn: "窺基", b: [632, 632], d: [682, 682], te: ["A000294"] }),
+    person({ id: "A001019", n: "窺基", dn: "窺基", sc: "唯识", b: [632, 632], d: [682, 682], te: ["A000294"] }),
     person({ id: "A001719", n: "慧能", dn: "惠能", b: [638, 638], d: [713, 713] }),
-    person({ id: "A000366", n: "安世高", dn: "安清", dy: "東漢", tr: true, wn: 34, bio: "建和二年（148），至洛陽譯經" }),
+    person({ id: "A000366", n: "安世高", dn: "安清", dy: "東漢", sc: "译经", tr: true, wn: 34, bio: "建和二年（148），至洛陽譯經" }),
   ],
 };
 
@@ -91,5 +91,24 @@ describe("佛教史长卷", () => {
     fireEvent.click(screen.getByText("只看译经师"));
     expect(screen.queryByRole("button", { name: "慧能" })).toBeNull();
     expect(screen.getByRole("button", { name: "玄奘" })).toBeInTheDocument();
+  });
+
+  it("默认按宗派分泳道，?v=time 按年代混排", async () => {
+    const { unmount } = renderPage();
+    await screen.findByRole("button", { name: "玄奘" });
+    const labels = [...document.querySelectorAll(".history-lane-label")].map((e) => e.textContent);
+    expect(labels).toEqual(["译经1", "唯识2", "禅1"]);
+    unmount();
+    renderPage("/history?v=time");
+    await screen.findByRole("button", { name: "玄奘" });
+    expect(document.querySelectorAll(".history-lane-label")).toHaveLength(0);
+  });
+
+  it("选中一个人：画出到师、弟子的连线（弟子虚线）", async () => {
+    renderPage("/history?p=A000294");
+    await screen.findByRole("dialog");
+    const paths = document.querySelectorAll(".history-lineage path");
+    expect(paths).toHaveLength(1);
+    expect(paths[0].getAttribute("class")).toBe("history-lineage-st");
   });
 });
