@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Input, Select, Spin, Empty, Slider, Checkbox, Alert, Tooltip, Segmented, Button } from "antd";
@@ -461,6 +461,9 @@ export default function KnowledgeGraphPage() {
       <div className="kg-header">
         <ApartmentOutlined />
         <h3>{t("nav.kg")}</h3>
+        <Link className="kg-to-history" to="/history">
+          {t("history.back_to_timeline")}
+        </Link>
         {kgStats && (
           <Tooltip title={t("kg.view_stats")}>
             <span

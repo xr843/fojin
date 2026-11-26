@@ -12,8 +12,9 @@ describe("activeNavPath", () => {
     ["/share/qa/12", "/chat"],
     ["/dictionary", "/dictionary"],
     ["/sources", "/sources"],
-    ["/kg", "/kg"],
-    ["/person/3", "/kg"],
+    ["/history", "/history"],
+    ["/kg", "/history"],
+    ["/person/3", "/history"],
     ["/admin/users", "/admin"],
   ])("%s → %s", (path, nav) => {
     expect(activeNavPath(path)).toBe(nav);

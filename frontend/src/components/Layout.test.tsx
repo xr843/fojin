@@ -40,10 +40,10 @@ describe("Layout 顶部导航", () => {
     expect(screen.queryByText("开放数据")).toBeNull();
   });
 
-  it("导航按真实使用量排序：AI 问答 · 读经 · 佛学辞典 · 数据源 · 知识图谱", () => {
+  it("导航按真实使用量排序：AI 问答 · 读经 · 佛学辞典 · 数据源 · 佛教史", () => {
     const { container } = renderLayout();
 
-    const order = ["AI 问答", "读经", "佛学辞典", "数据源", "知识图谱"];
+    const order = ["AI 问答", "读经", "佛学辞典", "数据源", "佛教史"];
     for (const label of order) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }

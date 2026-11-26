@@ -22,13 +22,13 @@ test.describe("导航", () => {
     await expect(page).toHaveURL(/\/sources/);
   });
 
-  test("点击导航栏链接到知识图谱页", async ({ page }) => {
+  test("点击导航栏链接到佛教史长卷", async ({ page }) => {
     await page.goto("/");
 
-    const kgLink = page.locator(".nav-desktop").getByText(/知识图谱|Knowledge/);
-    await kgLink.click();
+    const historyLink = page.locator(".nav-desktop").getByText(/佛教史|History/);
+    await historyLink.click();
 
-    await expect(page).toHaveURL(/\/kg/);
+    await expect(page).toHaveURL(/\/history/);
   });
 
   test("点击导航栏链接到 AI 问答页", async ({ page }) => {

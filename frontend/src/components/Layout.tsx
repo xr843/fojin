@@ -123,7 +123,8 @@ export default function Layout() {
     // 差异化，等重构(跨藏对比表 + 内联可点证据 + 流式)后再上线。后端 API 与
     // fojin-mcp 保留，/research 路由仍可直达。
     // { icon: <ExperimentOutlined />, label: t("nav.research"), path: "/research" },
-    { icon: <ApartmentOutlined />, label: t("nav.kg"), path: "/kg" },
+    // 2026-11-26 用户定：知识图谱板块改为「中国佛教史长卷」（/history），关系图保留为长卷页上的切换视图（/kg）。
+    { icon: <ApartmentOutlined />, label: t("nav.history"), path: "/history" },
     // 佛教地理暂从导航撤下（2026-10-17 用户要求）。路由 /map 仍可直达（首页卡片、分享链接、
     // SEO 收录不受影响），恢复时取消下一行注释。
     // { icon: <GlobalOutlined />, label: t("nav.geo"), path: "/map" },

@@ -1016,3 +1016,10 @@
 :root[data-theme="dark"] .kg-result-degree {
   color: var(--fj-ink-light);
 }
+
+/* 2026-11-26 知识图谱并入「佛教史」板块：图谱页回到长卷的入口 */
+.kg-to-history {
+  font-size: 13px;
+  color: var(--fj-accent);
+  margin-left: 4px;
+}
