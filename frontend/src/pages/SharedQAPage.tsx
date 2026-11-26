@@ -4,10 +4,13 @@ import { Helmet } from "react-helmet-async";
 import { Spin, Button, Result } from "antd";
 import { RobotOutlined, MessageOutlined, ShareAltOutlined } from "@ant-design/icons";
 import Markdown from "react-markdown";
+import ChatTable from "../components/ChatTable";
 import { MARKDOWN_REMARK_PLUGINS } from "../utils/markdownPlugins";
 import rehypeSanitize from "rehype-sanitize";
 import { useTranslation } from "react-i18next";
 import { getSharedQA, type SharedQA } from "../api/client";
+
+const SHARED_MD_COMPONENTS = { table: ChatTable };
 
 function dateLocale(language: string): string {
   if (language.startsWith("zh-Hant")) return "zh-Hant";
@@ -161,7 +164,7 @@ export default function SharedQAPage() {
             fontFamily: '"Noto Serif SC", serif',
           }}
         >
-          <Markdown remarkPlugins={MARKDOWN_REMARK_PLUGINS} rehypePlugins={[rehypeSanitize]}>{data.answer}</Markdown>
+          <Markdown remarkPlugins={MARKDOWN_REMARK_PLUGINS} rehypePlugins={[rehypeSanitize]} components={SHARED_MD_COMPONENTS}>{data.answer}</Markdown>
         </div>
       </div>
 
