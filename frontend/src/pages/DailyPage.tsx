@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Modal, Spin, message } from "antd";
 import { getVernacular } from "../api/client";
-import { ONE_LINE_MAX_CHARS, passageFontFamily, pickDaily, quotePassage, splitClauses } from "../utils/dailyPassage";
+import { festivalName, ONE_LINE_MAX_CHARS, passageFontFamily, pickDaily, quotePassage, splitClauses } from "../utils/dailyPassage";
 import { lunarLabel } from "../utils/lunar";
 import { renderShareCard } from "../utils/shareCard";
 import { localizeHan } from "../utils/hanScript";
@@ -33,14 +33,17 @@ export default function DailyPage() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const navigate = useNavigate();
-  const [{ passage, dateKey }] = useState(() => pickDaily(new Date()));
+  const [{ passage, dateKey, festival }] = useState(() => pickDaily(new Date()));
   const [showVernacular, setShowVernacular] = useState(false);
   const [card, setCard] = useState<{ url: string; file: File } | null>(null);
   const [making, setMaking] = useState(false);
 
   // 农历只给中文界面；超出月表返回 null 就只显示公历
   const lunar = lang.startsWith("zh") ? lunarLabel(dateKey) : null;
-  const dateLabel = lunar ? `${dateKey} · ${localizeHan(t("daily.lunar", { d: lunar }), lang)}` : dateKey;
+  const lunarDate = lunar ? `${dateKey} · ${localizeHan(t("daily.lunar", { d: lunar }), lang)}` : dateKey;
+  // 佛教节日当天在日期后加节日名（分享图标题同用这一串）
+  const fest = festivalName(festival, lang);
+  const dateLabel = fest ? `${lunarDate} · ${fest}` : lunarDate;
   const title = localizeHan(passage.title_zh, lang);
   const sourceLine = `《${title}》${t("daily.juan", { n: passage.juan_num })}`;
   const text = quotePassage(localizeHan(passage.text, lang), lang);

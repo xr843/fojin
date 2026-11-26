@@ -24,7 +24,7 @@ from fontTools.pens.transformPen import TransformPen
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.ttLib import TTFont
 
-VERSION = 1
+VERSION = 2
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PUBLIC = ROOT / "frontend/public/fonts"
 MANIFEST = ROOT / "frontend/src/data/dailyFontGlyphs.json"

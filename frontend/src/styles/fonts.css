@@ -76,12 +76,12 @@
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url('/fonts/daily-brush-v1.woff2') format('woff2');
+  src: url('/fonts/daily-brush-v2.woff2') format('woff2');
 }
 @font-face {
   font-family: 'FoJin Daily Kai';
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url('/fonts/daily-kai-v1.woff2') format('woff2');
+  src: url('/fonts/daily-kai-v2.woff2') format('woff2');
 }

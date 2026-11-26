@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { beijingDateKey, dailyIndex, pickDaily, passageFontFamily, passageInScript, quotePassage, splitClauses, DAILY_PASSAGES, type DailyPassage } from "./dailyPassage";
+import { beijingDateKey, dailyIndex, festivalFor, festivalName, pickDaily, passageFontFamily, passageInScript, quotePassage, splitClauses, DAILY_FESTIVALS, DAILY_PASSAGES, type DailyFestival, type DailyPassage } from "./dailyPassage";
 import { wrapCjk } from "./shareCard";
 import { localizeHan } from "./hanScript";
 import glyphs from "../data/dailyFontGlyphs.json";
@@ -58,7 +58,7 @@ describe("经句字体子集", () => {
     const brush = new Set(Array.from(glyphs.brush));
     const kai = new Set(Array.from(glyphs.kai));
     const PUNCT = "，。；：？！、“”「」";
-    for (const p of DAILY_PASSAGES) {
+    for (const p of [...DAILY_PASSAGES, ...DAILY_FESTIVALS]) {
       for (const lang of ["zh", "zh-Hant"]) {
         for (const c of Array.from(quotePassage(localizeHan(p.text, lang), lang))) {
           expect(kai.has(c), `文楷子集缺「${c}」（${p.text}）`).toBe(true);
@@ -127,5 +127,47 @@ describe("首页经句的繁简（不经 OpenCC）", () => {
     expect(passageInScript(p, "zh-Hant")).toEqual({ text: p.text, title: p.title_zh });
     expect(passageInScript(p, "zh")).toEqual({ text: p.text_hans, title: p.title_hans });
     expect(passageInScript(p, "en").text).toBe(p.text_hans);
+  });
+});
+
+describe("佛教节日经句", () => {
+  it("按农历日期换句：腊八、佛诞、观音诞", () => {
+    expect(festivalFor("2027-01-15")?.name).toBe("释迦牟尼佛成道日"); // 腊月初八
+    expect(festivalFor("2027-05-13")?.name).toBe("释迦牟尼佛圣诞"); // 四月初八
+    expect(festivalFor("2027-03-26")?.name).toBe("观世音菩萨圣诞"); // 二月十九
+    expect(festivalFor("2026-11-26")).toBeNull(); // 十月十八，平日
+  });
+
+  it("三十日的节日遇小月在廿九过；大月的廿九不算", () => {
+    expect(festivalFor("2027-10-28")?.name).toBe("药师佛圣诞"); // 九月小月，廿九
+    expect(festivalFor("2027-08-31")?.name).toBe("地藏菩萨圣诞"); // 七月大月，三十
+    expect(festivalFor("2027-08-30")).toBeNull(); // 七月廿九，大月不提前
+  });
+
+  it("节日当天替换轮换句，平日照常轮换", () => {
+    const fest = pickDaily(new Date("2027-01-15T04:00:00Z"));
+    expect(fest.festival?.name).toBe("释迦牟尼佛成道日");
+    expect(fest.passage.text).toBe(fest.festival?.text);
+    const plain = pickDaily(new Date("2027-01-16T04:00:00Z"));
+    expect(plain.festival).toBeNull();
+    expect(DAILY_PASSAGES).toContain(plain.passage);
+  });
+
+  it("节日名只给中文界面，繁体界面用繁体", () => {
+    const f = festivalFor("2027-03-26") as DailyFestival;
+    expect(festivalName(f, "zh")).toBe("观世音菩萨圣诞");
+    expect(festivalName(f, "zh-Hant")).toBe("觀世音菩薩聖誕");
+    expect(festivalName(f, "en")).toBeNull();
+  });
+
+  it("每个节日经句都带阅读器链接（定位到行，至少到卷）、简体字段，并且是完整自然句", () => {
+    expect(DAILY_FESTIVALS.length).toBeGreaterThanOrEqual(16);
+    for (const f of DAILY_FESTIVALS) {
+      expect(f.key).toMatch(/^\d{2}-\d{2}$/);
+      // 行号定位不到时（少室六门等）退回到卷，与轮换池同一标准
+      expect(f.reader_path, f.name).toMatch(/^\/texts\/\d+\/read\?juan=\d+/);
+      expect(f.text_hans && f.title_hans && f.name_hant, f.name).toBeTruthy();
+      expect("。？！").toContain(f.text.slice(-1));
+    }
   });
 });

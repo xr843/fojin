@@ -12,7 +12,11 @@
 顺序按经打散（轮流取各部经），相邻两天不落在同一部经。
 
 用法（只用标准库；接口有限流，每条间隔 6 秒）：
-    python backend/scripts/build_daily_passages.py
+    python backend/scripts/build_daily_passages.py              # 轮换池
+    python backend/scripts/build_daily_passages.py --festivals  # 佛教节日经句
+
+节日（daily_festival_candidates.txt → dailyFestivals.json）：按农历日期，当天替换轮换池那一句。
+每个节日取第一条在指定那部经里逐字核对通过的；一条都不过就不配，当天照常轮换。
 """
 
 import json
@@ -26,6 +30,8 @@ from collections import OrderedDict
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CANDIDATES = ROOT / "backend/scripts/daily_passages_candidates.txt"
 OUT = ROOT / "frontend/src/data/dailyPassages.json"
+FESTIVAL_CANDIDATES = ROOT / "backend/scripts/daily_festival_candidates.txt"
+FESTIVAL_OUT = ROOT / "frontend/src/data/dailyFestivals.json"
 API = "https://fojin.app/api/verify/claim?q="
 
 
@@ -104,5 +110,34 @@ def main() -> None:
         print("  未收：", q)
 
 
+def main_festivals() -> None:
+    chosen: OrderedDict[str, dict] = OrderedDict()
+    missing: OrderedDict[str, str] = OrderedDict()
+    for line in FESTIVAL_CANDIDATES.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        key, name, q, hint = line.split("|")
+        if key in chosen:
+            continue
+        if q[-1] not in SENTENCE_END or not hint:  # 节日句必须指定原经，才能保证「和这位佛菩萨相关」
+            print(f"--  {key} {name}（缺句末标点或未指定经）{q}", flush=True)
+            missing.setdefault(key, name)
+            continue
+        r = verify(q, hint)
+        print(("OK  " if r else "--  ") + f"{key} {name} {q}", flush=True)
+        if r:
+            chosen[key] = {"key": key, "name": name, **r}
+            missing.pop(key, None)
+        else:
+            missing.setdefault(key, name)
+        time.sleep(6)
+    FESTIVAL_OUT.write_text(json.dumps(list(chosen.values()), ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    print("⚠️ 接着在 frontend/ 下跑 node scripts/daily-hans.mjs 补简体/繁体字段", flush=True)
+    print(f"\n配上 {len(chosen)} 个节日 → {FESTIVAL_OUT}")
+    for key, name in missing.items():
+        print("  没配上（当天照常轮换）：", key, name)
+
+
 if __name__ == "__main__":
-    main()
+    main_festivals() if "--festivals" in sys.argv[1:] else main()

@@ -37,3 +37,26 @@ export function lunarLabel(dateKey: string): string | null {
   if (day < 1 || day > 30) return null;
   return (m.leap ? "闰" : "") + MONTHS[m.month - 1] + dayName(day); // i18n-exempt — 农历历法名称（数据，只在中文界面显示）
 }
+
+export interface LunarParts {
+  month: number;
+  day: number;
+  leap: boolean;
+  /** 这个农历月有几天（29 或 30）：三十日的节日遇小月要在廿九过 */
+  monthDays: number;
+}
+
+/** dateKey（北京日期）→ 农历月、日；超出月表返回 null。 */
+export function lunarParts(dateKey: string): LunarParts | null {
+  if (dateKey >= table.until) return null;
+  const months = table.months;
+  let i = months.length - 1;
+  while (i >= 0 && months[i].start > dateKey) i--;
+  if (i < 0) return null;
+  const m = months[i];
+  const day = toDays(dateKey) - toDays(m.start) + 1;
+  const end = i + 1 < months.length ? months[i + 1].start : table.until;
+  const monthDays = toDays(end) - toDays(m.start);
+  if (day < 1 || day > 30) return null;
+  return { month: m.month, day, leap: Boolean(m.leap), monthDays };
+}
