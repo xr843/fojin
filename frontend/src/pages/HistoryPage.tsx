@@ -22,11 +22,21 @@ import {
 import TOURS_DATA from "../data/historyTours.json";
 import "../styles/history.css";
 
+/** 导览路线。step.p：上一站（师）在本路线里的序号，缺省为前一站——传承分叉时（临济下分黄龙、杨岐）画成树；
+ *  gap：中间隔了几代（道邃→羲寂），连线画虚线。g：分组（禅宗五条归在一起）。 */
+interface TourStep {
+  id: string;
+  y: number;
+  t: string;
+  p?: number;
+  gap?: boolean;
+}
 interface HistoryTour {
   id: string;
+  g?: string;
   title: string;
   intro: string;
-  steps: Array<{ id: string; y: number; t: string }>;
+  steps: TourStep[];
 }
 const TOURS: HistoryTour[] = TOURS_DATA.tours;
 
@@ -322,23 +332,44 @@ export default function HistoryPage() {
 
       <div className="history-tours" role="group" aria-label={t("history.tours")}>
         <span className="history-tours-k">{t("history.tours")}</span>
-        {TOURS.map((x) => (
-          <button
-            key={x.id}
-            type="button"
-            className={`history-chip${tour?.id === x.id ? " history-chip--on" : ""}`}
-            aria-pressed={tour?.id === x.id}
-            onClick={() => startTour(tour?.id === x.id ? null : x.id)}
-          >
-            {L(x.title)}
-          </button>
-        ))}
+        {TOURS.map((x, i) => {
+          const chip = (
+            <button
+              key={x.id}
+              type="button"
+              className={`history-chip${tour?.id === x.id ? " history-chip--on" : ""}`}
+              aria-pressed={tour?.id === x.id}
+              onClick={() => startTour(tour?.id === x.id ? null : x.id)}
+            >
+              {L(x.title)}
+            </button>
+          );
+          if (!x.g) return chip;
+          if (TOURS[i - 1]?.g === x.g) return null;
+          // 同组的路线收在一个框里，前面写组名
+          return (
+            <span key={`g-${x.g}`} className="history-tours-group">
+              <span className="history-tours-gname">{L(x.g)}</span>
+              {TOURS.filter((y) => y.g === x.g).map((y) => (
+                <button
+                  key={y.id}
+                  type="button"
+                  className={`history-chip${tour?.id === y.id ? " history-chip--on" : ""}`}
+                  aria-pressed={tour?.id === y.id}
+                  onClick={() => startTour(tour?.id === y.id ? null : y.id)}
+                >
+                  {L(y.title)}
+                </button>
+              ))}
+            </span>
+          );
+        })}
       </div>
 
       {tour && step ? (
         <div className="history-tour-panel" role="status">
           <div className="history-tour-head">
-            <strong>{L(tour.title)}</strong>
+            <strong>{L(tour.g ? `${tour.g} · ${tour.title}` : tour.title)}</strong>
             <span className="history-tour-intro">{L(tour.intro)}</span>
             <button type="button" className="history-chip history-chip--clear" onClick={() => startTour(null)}>
               {t("history.tour_exit")}
@@ -437,7 +468,7 @@ export default function HistoryPage() {
               </div>
             ))}
             {cursor !== null && <div className="history-cursor" style={{ left: xOf(cursor), height }} />}
-            {tour && !selected && <TourPath ids={tour.steps.map((x) => x.id)} current={step?.id ?? ""} placedById={placedById} xOf={xOf} width={width} height={height} />}
+            {tour && !selected && <TourPath steps={tour.steps} current={step?.id ?? ""} placedById={placedById} xOf={xOf} width={width} height={height} />}
             {selected && (
               <LineageLines
                 selectedId={selected.id}
@@ -664,32 +695,39 @@ function LineageLines({
   );
 }
 
-/** 导览：按站序把路线上的人串起来（从每个人条子的起点附近连到下一位）。 */
+/** 导览：按师承把路线上的人连起来——每站连到它的上一站（step.p，缺省为前一站），分叉时自然成树；隔代的画虚线。 */
 function TourPath({
-  ids,
+  steps,
   current,
   placedById,
   xOf,
   width,
   height,
 }: {
-  ids: string[];
+  steps: TourStep[];
   current: string;
   placedById: Map<string, { span: PersonSpan; row: number }>;
   xOf: (year: number) => number;
   width: number;
   height: number;
 }) {
-  const pts = ids
-    .map((id) => ({ id, pl: placedById.get(id) }))
-    .filter((x): x is { id: string; pl: { span: PersonSpan; row: number } } => !!x.pl)
-    .map(({ id, pl }) => ({ id, x: xOf(pl.span.start) + 8, y: TOP + pl.row * ROW_H + 9 }));
-  if (pts.length < 2) return null;
-  const d = pts.map((p, i) => `${i ? "L" : "M"} ${p.x} ${p.y}`).join(" ");
-  const cur = pts.find((p) => p.id === current);
+  const pt = (id: string) => {
+    const pl = placedById.get(id);
+    return pl ? { x: xOf(pl.span.start) + 8, y: TOP + pl.row * ROW_H + 9 } : null;
+  };
+  const edges = steps.flatMap((st, i) => {
+    if (i === 0) return [];
+    const parent = steps[st.p ?? i - 1];
+    const a = parent ? pt(parent.id) : null;
+    const b = pt(st.id);
+    return a && b ? [{ key: `${i}`, a, b, gap: !!st.gap }] : [];
+  });
+  const cur = pt(current);
   return (
     <svg className="history-lineage history-tour-path" width={width} height={height} aria-hidden>
-      <path d={d} />
+      {edges.map(({ key, a, b, gap }) => (
+        <path key={key} d={`M ${a.x} ${a.y} C ${a.x} ${(a.y + b.y) / 2}, ${b.x} ${(a.y + b.y) / 2}, ${b.x} ${b.y}`} className={gap ? "history-tour-gap" : undefined} />
+      ))}
       {cur && <circle cx={cur.x} cy={cur.y} r={13} />}
     </svg>
   );
