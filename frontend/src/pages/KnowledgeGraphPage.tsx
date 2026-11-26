@@ -209,7 +209,7 @@ export default function KnowledgeGraphPage() {
     return ALL_PREDICATE_VALUES;
   });
   const [showStats, setShowStats] = useState(false);
-  const [showTimeline, setShowTimeline] = useState(false);
+  const [showTimeline] = useState(false);
   const [curatedOpen, setCuratedOpen] = useState(!isMobile);
 
   // ── Progressive expand state ──────────────────────────────────────────────
@@ -478,15 +478,12 @@ export default function KnowledgeGraphPage() {
             </span>
           </Tooltip>
         )}
-        <Tooltip title={t("kg.timeline_title")}>
-          <span
-            className={`kg-timeline-toggle${showTimeline ? " active" : ""}`}
-            onClick={() => setShowTimeline((v) => !v)}
-          >
-            <FieldTimeOutlined />
-            <span>{t("kg.timeline_title")}</span>
-          </span>
-        </Tooltip>
+        {/* 2026-11-26 用户定：旧「佛教人物时间轴」（KG 人物按年分桶，名僧多无年份）改为直达佛教史长卷。
+            旧视图代码保留，恢复时把 showTimeline 的 setter 接回下面这个按钮即可。 */}
+        <Link className="kg-timeline-toggle" to="/history">
+          <FieldTimeOutlined />
+          <span>{t("history.title")}</span>
+        </Link>
       </div>
       {showTimeline && (
         <div className="kg-timeline-panel">
