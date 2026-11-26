@@ -1360,12 +1360,15 @@ em {
 .chat-markdown thead {
   background: var(--fj-bg-alt);
 }
+/* 表格比正文紧：逐卷字数、对照表动辄二三十行，行高照正文（1.6 + 上下 7px）一张表就比
+   回答区还高（2026-11-26 读者反馈 80 卷字数表看不全）。每行约 38px → 28px，
+   80 卷表（21 行）在 1622×900 的窗口里滚到表头时能整张看全。 */
 .chat-markdown th, .chat-markdown td {
   border: 1px solid var(--fj-border);
-  padding: 7px 12px;
+  padding: 3px 10px;
   text-align: left;
   vertical-align: top;
-  line-height: 1.6;
+  line-height: 1.45;
 }
 .chat-markdown th {
   font-weight: 600;
@@ -1650,15 +1653,13 @@ em {
 .chat-guest-note-close:focus-visible { background: rgba(0, 0, 0, 0.06); color: var(--fj-ink); }
 :root[data-theme="dark"] .chat-guest-note-close:hover { background: rgba(255, 255, 255, 0.1); }
 
-/* 手机上 /chat 不显示页脚：版权一行对聊天没有用，却和输入框一起压缩回答可读区。
+/* /chat 不显示页脚：版权一行对聊天没有用，却和输入框一起压缩回答可读区。
    页脚高度写在外壳的高度计算里（--fj-footer-h），在承载 /chat 的那一层把它置 0，
    外壳才真的多出这 50px。
-   矮屏同理（2026-11-21 用户反馈：笔记本矮窗口里输入框把回答区挤小）；
-   高度阈值与 chatComposer.ts 的 COMPOSER_SHORT_VIEWPORT_QUERY 同一个数。 */
-@media (max-width: 768px), (max-height: 760px) {
-  .layout-content-inner:has(.chat-shell) { --fj-footer-h: 0px; }
-  body:has(.chat-shell) .ant-layout-footer { display: none; }
-}
+   原先只在手机与矮屏（≤760px，2026-11-21 反馈）去掉；2026-11-26 读者反馈 80 卷逐卷字数表
+   在 900px 高的桌面上也看不全、只好缩小网页比例，改为所有尺寸都不显示。 */
+.layout-content-inner:has(.chat-shell) { --fj-footer-h: 0px; }
+body:has(.chat-shell) .ant-layout-footer { display: none; }
 
 /* ========== Layout Content ========== */
 .layout-content-inner {
