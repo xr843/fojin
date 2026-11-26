@@ -1,0 +1,71 @@
+import { describe, expect, it } from "vitest";
+import { aliveAt, formatYears, packRows, personSpan, translationRiver, type HistoryPerson } from "./historyTimeline";
+import { dynastyAt, dynastySpan } from "../data/historyDynasties";
+
+function person(over: Partial<HistoryPerson>): HistoryPerson {
+  return { id: "A1", n: "某", dn: "某", alt: [], dy: "唐", b: null, d: null, monk: true, tr: false, bio: "", te: [], st: [], bios: [], men: [], works: [], wn: 0, ...over };
+}
+
+describe("佛教史长卷排布", () => {
+  it("生卒俱全：按生卒画条；DILA 记成区间的年份标「约」", () => {
+    const xz = person({ n: "玄奘", b: [602, 603], d: [664, 664] });
+    expect(personSpan(xz)).toEqual({ start: 602, end: 664, kind: "full", approx: true });
+    expect(formatYears(xz, "约")).toBe("约602–664");
+    expect(formatYears(person({ b: [638, 638], d: [713, 713] }))).toBe("638–713");
+  });
+
+  it("只知卒年：往前推 60 年起头，算推算", () => {
+    expect(personSpan(person({ d: [535, 536] }))).toEqual({ start: 475, end: 536, kind: "death", approx: true });
+  });
+
+  it("生卒不详：用小传里落在本朝的纪年定位（安世高「建和二年（148）」）", () => {
+    const an = person({ dy: "東漢", bio: "桓帝建和二年（148），經西域諸國至洛陽譯經，凡二十餘年" });
+    expect(personSpan(an)).toEqual({ start: 138, end: 158, kind: "bio", approx: true });
+  });
+
+  it("生卒不详、小传也无纪年：落在朝代上，且不算「某年在世」", () => {
+    const p = person({ dy: "北魏 東魏" });
+    const s = personSpan(p);
+    expect(s).toEqual({ start: 386, end: 534, kind: "dynasty", approx: true });
+    expect(aliveAt(s, 500)).toBe(false);
+  });
+
+  it("小传里的纪年不在本朝范围内的不采用", () => {
+    expect(personSpan(person({ dy: "東漢", bio: "後人於明萬曆（1600）重刻其經" }))?.kind).toBe("dynasty");
+  });
+
+  it("分行：时间重叠的人不在同一行，名字占的地方也算", () => {
+    const a = person({ id: "a", b: [600, 600], d: [650, 650] });
+    const b = person({ id: "b", b: [640, 640], d: [700, 700] });
+    const c = person({ id: "c", b: [655, 655], d: [700, 700] });
+    const noLabel = packRows([a, b, c], 1, () => 0, 0);
+    expect(noLabel.rows).toBe(2);
+    expect(noLabel.placed.find((x) => x.person.id === "c")?.row).toBe(0);
+    // 名字有 40px 宽：a 的名字写到 690，c（655 起）只能换行
+    const withLabel = packRows([a, b, c], 1, () => 40, 0);
+    expect(withLabel.rows).toBe(3);
+  });
+
+  it("分行：只知朝代的人排在所有有年份的人下面", () => {
+    const a = person({ id: "a", b: [600, 600], d: [650, 650] });
+    const u = person({ id: "u", dy: "唐" });
+    const { placed, rows } = packRows([u, a], 1, () => 0, 0);
+    expect(rows).toBe(2);
+    expect(placed.find((x) => x.person.id === "u")?.row).toBe(1);
+  });
+
+  it("译经长河：只算译经师，著译部数摊进生卒条的后三分之二", () => {
+    const tr = person({ tr: true, wn: 30, b: [600, 600], d: [690, 690] });
+    const bins = translationRiver([tr, person({ wn: 99, b: [600, 600], d: [690, 690] })], 600, 700, 10);
+    const total = bins.reduce((s, x) => s + x, 0);
+    expect(total).toBeCloseTo(30, 5);
+    expect(bins[0]).toBe(0); // 600–609 在前三分之一，不摊
+  });
+
+  it("朝代：DILA 的「東晉 後秦」取第一个认得的；某年落在哪朝", () => {
+    expect(dynastySpan("東晉 後秦")).toEqual([317, 420]);
+    expect(dynastySpan("後秦")).toEqual([384, 417]);
+    expect(dynastyAt(645)?.name).toBe("唐");
+    expect(dynastyAt(270)?.name).toBe("西晉");
+  });
+});

@@ -38,7 +38,7 @@ describe("HomePage 无障碍与记忆", () => {
       expect(c.getAttribute("href")).toMatch(/^\//);
       expect(c.tabIndex).toBe(0);
     }
-    expect(cards.map((c) => c.getAttribute("href"))).toEqual(["/chat", "/read", "/dictionary", "/sources", "/kg"]);
+    expect(cards.map((c) => c.getAttribute("href"))).toEqual(["/chat", "/read", "/dictionary", "/sources", "/history"]);
   });
 
   it("有阅读记录时，读经卡链接指向上次那一卷", () => {

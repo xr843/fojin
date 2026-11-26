@@ -1,0 +1,354 @@
+/* 佛教史长卷（HistoryPage.tsx）。宣纸底 + 朱砂/墨/金三色区分译经师、僧、居士。 */
+.history-page {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.history-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.history-title {
+  font-family: var(--fj-font-serif, serif);
+  font-size: 26px;
+  letter-spacing: 0.08em;
+  color: var(--fj-ink);
+  margin: 0 0 4px;
+}
+.history-sub {
+  margin: 0;
+  color: var(--fj-ink-light);
+  font-size: 14px;
+}
+.history-views {
+  display: inline-flex;
+  border: 1px solid var(--fj-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.history-view {
+  padding: 4px 14px;
+  font-size: 13px;
+  color: var(--fj-ink-light);
+}
+.history-view--on {
+  background: var(--fj-accent);
+  color: var(--fj-on-accent);
+}
+a.history-view:hover {
+  color: var(--fj-accent);
+}
+.history-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.history-search {
+  width: min(320px, 100%);
+}
+.history-zoom {
+  display: inline-flex;
+  gap: 4px;
+}
+.history-cursor-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-height: 34px;
+  padding: 4px 10px;
+  margin-bottom: 8px;
+  background: var(--fj-card-bg);
+  border: 1px solid var(--fj-border);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--fj-ink);
+}
+.history-hint {
+  color: var(--fj-ink-muted);
+}
+.history-alive {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.history-chip {
+  padding: 0 8px;
+  line-height: 22px;
+  font-size: 13px;
+  color: var(--fj-ink);
+  background: var(--fj-surface);
+  border: 1px solid var(--fj-border);
+  border-radius: 11px;
+  cursor: pointer;
+}
+.history-chip:hover,
+.history-chip:focus-visible {
+  border-color: var(--fj-accent);
+  color: var(--fj-accent);
+}
+.history-chip--clear {
+  padding: 0 7px;
+  color: var(--fj-ink-muted);
+}
+.history-loading {
+  padding: 80px 0;
+  text-align: center;
+}
+.history-scroll {
+  overflow: auto;
+  max-height: calc(100vh - var(--fj-header-h) - 260px);
+  min-height: 360px;
+  border: 1px solid var(--fj-border);
+  border-radius: 6px;
+  background: var(--fj-surface-alt);
+  overscroll-behavior: contain;
+}
+.history-canvas {
+  position: relative;
+  cursor: crosshair;
+}
+.history-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px dashed color-mix(in srgb, var(--fj-border) 70%, transparent);
+  pointer-events: none;
+}
+.history-header {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: var(--fj-surface-alt);
+  box-shadow: 0 1px 0 var(--fj-border);
+}
+.history-tick-label {
+  position: absolute;
+  top: 0;
+  padding: 4px 3px;
+  font-size: 11px;
+  color: var(--fj-ink-muted);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.history-band {
+  position: absolute;
+  height: 20px;
+  line-height: 20px;
+  font-size: 12px;
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--fj-ink);
+  border-right: 1px solid var(--fj-surface-alt);
+  pointer-events: none;
+}
+.history-band--0 {
+  background: var(--fj-timeline-band-a);
+}
+.history-band--0:nth-of-type(even) {
+  background: var(--fj-timeline-band-b);
+}
+.history-band--1 {
+  background: color-mix(in srgb, var(--fj-gold) 28%, transparent);
+  color: var(--fj-ink-light);
+}
+.history-river {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+.history-river i {
+  position: absolute;
+  bottom: 0;
+  background: color-mix(in srgb, var(--fj-accent) 55%, transparent);
+  border-radius: 1px 1px 0 0;
+}
+.history-river-label {
+  position: sticky;
+  left: 6px;
+  top: 0;
+  z-index: 1;
+  font-size: 11px;
+  color: var(--fj-ink-muted);
+}
+.history-cursor {
+  position: absolute;
+  top: 0;
+  width: 0;
+  border-left: 2px solid var(--fj-cinnabar);
+  pointer-events: none;
+  z-index: 2;
+}
+.history-bar {
+  position: absolute;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: opacity 0.15s;
+}
+.history-bar--tr {
+  --bar-c: var(--fj-accent);
+}
+.history-bar--monk {
+  --bar-c: var(--fj-ink-light);
+}
+.history-bar--lay {
+  --bar-c: var(--fj-gold);
+}
+.history-bar {
+  background: var(--bar-c);
+  color: var(--fj-surface);
+}
+/* 年份不全的：底色淡、名字用墨色（白字在淡底上看不清）；推算的那一头再淡出 */
+.history-bar--death,
+.history-bar--birth,
+.history-bar--bio,
+.history-bar--dynasty {
+  color: var(--fj-ink);
+}
+.history-bar--death {
+  background: linear-gradient(to right, color-mix(in srgb, var(--bar-c) 8%, transparent), color-mix(in srgb, var(--bar-c) 45%, transparent) 60%);
+}
+.history-bar--birth {
+  background: linear-gradient(to left, color-mix(in srgb, var(--bar-c) 8%, transparent), color-mix(in srgb, var(--bar-c) 45%, transparent) 60%);
+}
+.history-bar--bio,
+.history-bar--dynasty {
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--bar-c) 30%, transparent) 0 5px, color-mix(in srgb, var(--bar-c) 12%, transparent) 5px 9px);
+}
+.history-swatch.history-bar--tr,
+.history-swatch.history-bar--monk,
+.history-swatch.history-bar--lay {
+  background: var(--bar-c);
+}
+.history-bar-name {
+  position: absolute;
+  top: 0;
+  left: 5px;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.history-bar-name--out {
+  color: var(--fj-ink);
+}
+.history-bar.is-selected {
+  outline: 2px solid var(--fj-cinnabar);
+  outline-offset: 1px;
+  z-index: 3;
+}
+.history-bar.is-related {
+  outline: 2px dashed var(--fj-cinnabar);
+  outline-offset: 1px;
+}
+.history-bar.is-dim {
+  opacity: 0.35;
+}
+.history-bar:focus-visible {
+  outline: 2px solid var(--fj-info);
+}
+.history-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 10px 0 4px;
+  font-size: 12px;
+  color: var(--fj-ink-light);
+}
+.history-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.history-swatch {
+  display: inline-block;
+  width: 18px;
+  height: 10px;
+  border-radius: 2px;
+}
+.history-swatch--approx {
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--fj-ink-light) 35%, transparent) 0 3px, color-mix(in srgb, var(--fj-ink-light) 10%, transparent) 3px 6px);
+}
+.history-attrib {
+  font-size: 12px;
+  color: var(--fj-ink-muted);
+  margin: 0;
+}
+.history-card-meta {
+  color: var(--fj-ink-light);
+  margin: 0 0 6px;
+}
+.history-card-note {
+  display: block;
+  font-size: 12px;
+  color: var(--fj-ink-muted);
+}
+.history-card-alt {
+  font-size: 13px;
+  color: var(--fj-ink-light);
+}
+.history-card-bio {
+  line-height: 1.75;
+  color: var(--fj-ink);
+}
+.history-card h4 {
+  margin: 16px 0 6px;
+  font-size: 14px;
+  color: var(--fj-ink);
+}
+.history-card-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 6px 0;
+}
+.history-card-k {
+  font-size: 13px;
+  color: var(--fj-ink-muted);
+  margin-right: 4px;
+}
+.history-card-links {
+  margin: 0;
+  padding-left: 18px;
+}
+.history-card-links li {
+  margin: 3px 0;
+}
+.history-card-links a {
+  color: var(--fj-highlight);
+}
+.history-card-cid {
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--fj-ink-muted);
+}
+.history-card-more,
+.history-card-src {
+  font-size: 12px;
+  color: var(--fj-ink-muted);
+}
+.history-card-src a {
+  margin-left: 4px;
+}
+
+@media (max-width: 640px) {
+  .history-title {
+    font-size: 21px;
+  }
+  .history-scroll {
+    max-height: calc(100vh - var(--fj-header-h) - 300px);
+  }
+}

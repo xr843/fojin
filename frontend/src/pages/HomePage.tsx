@@ -341,16 +341,12 @@ export default function HomePage() {
           <Link
             className="home-feature-card"
             data-umami-event="home_card"
-            data-umami-event-card="kg"
-            to="/kg"
+            data-umami-event-card="history"
+            to="/history"
           >
             <ApartmentOutlined className="home-feature-icon" />
-            <div className="home-feature-title">{t("home.feature_kg_title")}</div>
-            <div className="home-feature-desc">
-              {sc.kg
-                ? `${pickHan(sc.kg.subject, sc.kg.subject_hans, i18n.language)} → ${sc.kg.predicate} → ${pickHan(sc.kg.object, sc.kg.object_hans, i18n.language)}`
-                : t("home.feature_kg_desc")}
-            </div>
+            <div className="home-feature-title">{t("home.feature_history_title")}</div>
+            <div className="home-feature-desc">{t("home.feature_history_desc")}</div>
           </Link>
         </div>
 

@@ -28,6 +28,7 @@ const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 const ParallelReaderPage = lazy(() => import("./pages/ParallelReaderPage"));
 const KnowledgeGraphPage = lazy(() => import("./pages/KnowledgeGraphPage"));
+const HistoryPage = lazy(() => import("./pages/HistoryPage"));
 const PersonPage = lazy(() => import("./pages/PersonPage"));
 const ChatPage = lazy(() => import("./pages/ChatPage"));
 const ResearchPage = lazy(() => import("./pages/ResearchPage"));
@@ -109,6 +110,7 @@ function App() {
               <Route path="/admin/alignment/review" element={<AdminAlignmentPage />} />
             </Route>
             <Route path="/parallel/:textId" element={<ParallelReaderPage />} />
+            <Route path="/history" element={<RouteErrorBoundary><HistoryPage /></RouteErrorBoundary>} />
             <Route path="/kg" element={<RouteErrorBoundary><KnowledgeGraphPage /></RouteErrorBoundary>} />
             <Route path="/person/:id" element={<RouteErrorBoundary><PersonPage /></RouteErrorBoundary>} />
             {/* /exports 暂不对外公开 — 见 Layout.tsx 导航项注释与 ENABLE_OPEN_DATA_EXPORTS */}
