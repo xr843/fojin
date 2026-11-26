@@ -4,7 +4,7 @@ import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { AutoComplete, Button, Drawer, Empty, Segmented, Spin, Tooltip } from "antd";
-import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
+import { MinusOutlined, PauseOutlined, CaretRightOutlined, PlusOutlined } from "@ant-design/icons";
 import { localizeHan, scriptForLanguage } from "../utils/hanScript";
 import { BANDS, TIMELINE_END, TIMELINE_START, dynastyAt } from "../data/historyDynasties";
 import {
@@ -58,6 +58,14 @@ const ROW_H = 24;
 const TOP = AXIS_H + BAND_H * 2 + RIVER_H + 10;
 const PAD = 24;
 const CHAR_PX = 13;
+/** 播放年代：从公元 60 年（白马寺前后）起，每拍 5 年 */
+const PLAY_FROM = 60;
+const PLAY_STEP_YEARS = 5;
+/** 中国本部的框（播放年代时地图固定看这里） */
+const CHINA_VIEW: Array<[number, number]> = [
+  [102, 22],
+  [123, 41],
+];
 
 function track(name: string, data?: Record<string, string | number>) {
   if (typeof umami !== "undefined") umami.track(name, data);
@@ -82,6 +90,8 @@ export default function HistoryPage() {
   const { data, isLoading, isError } = useQuery({ queryKey: ["history-people"], queryFn: fetchHistory, staleTime: Infinity });
 
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
+  // 自动播放中（见下方「自动播放」一节）
+  const [playing, setPlaying] = useState(false);
   const [onlyTr, setOnlyTr] = useState(false);
   const [search, setSearch] = useState("");
   const selectedId = params.get("p");
@@ -152,6 +162,7 @@ export default function HistoryPage() {
   const openPerson = useCallback(
     (id: string, via: string) => {
       setParam("p", id);
+      setPlaying(false);
       track("history_open_person", { id, via });
     },
     [setParam],
@@ -206,6 +217,8 @@ export default function HistoryPage() {
         },
         { replace: true },
       );
+      // 换路线 / 退出导览时停下
+      setPlaying(false);
       if (id) track("history_tour", { id });
     },
     [setParams],
@@ -233,6 +246,52 @@ export default function HistoryPage() {
   }, [tour, stepIdx, goStep]);
   const tourOrder = useMemo(() => new Map((tour?.steps ?? []).map((x, i) => [x.id, i])), [tour]);
 
+  // ---- 自动播放（借鉴江山时序的「拖动时间看天下」）：导览中逐站走，否则年份每拍前进 5 年 ----
+  const togglePlay = useCallback(() => {
+    setPlaying((v) => {
+      if (!v) track("history_play", { mode: tour ? "tour" : "years" });
+      return !v;
+    });
+  }, [tour]);
+  useEffect(() => {
+    if (!playing) return;
+    const id = window.setTimeout(
+      () => {
+        if (tour) {
+          if (stepIdx >= tour.steps.length - 1) setPlaying(false);
+          else goStep(stepIdx + 1);
+          return;
+        }
+        const next = cursor === null ? PLAY_FROM : cursor + PLAY_STEP_YEARS;
+        if (next > 1949) setPlaying(false);
+        else setParam("y", String(next));
+      },
+      tour ? 4500 : cursor === null ? 0 : 450,
+    );
+    return () => window.clearTimeout(id);
+  }, [playing, tour, stepIdx, cursor, goStep, setParam]);
+  // 空格键播放 / 暂停（焦点在输入框、按钮上时不抢）
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (e.key !== " " || (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "BUTTON" || el.isContentEditable))) return;
+      e.preventDefault();
+      togglePlay();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [togglePlay]);
+
+
+  // 播放年份时让游标留在长卷视野里（落到右侧三分之一外就往前翻一屏）
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!playing || tour || cursor === null || !el) return;
+    const x = xOf(cursor);
+    if (x < el.scrollLeft + 40 || x > el.scrollLeft + el.clientWidth * 0.7) el.scrollTo({ left: Math.max(0, x - el.clientWidth * 0.25) });
+    // xOf 只依赖 px
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing, cursor, tour, px]);
 
   // 首次打开：没指定人也没指定年时，停在东晉—唐（佛教史最密的一段）
   const initialScrolled = useRef(false);
@@ -303,7 +362,14 @@ export default function HistoryPage() {
       const pts: MapPoint[] = alive
         .filter((p) => p.o)
         .map((p) => ({ id: p.id, lon: p.o![0], lat: p.o![1], label: L(p.n), kind: "alive" as const, person: p.id }));
-      return { points: pts, edges: [], focus: pts.length > 1 ? pts.map((x) => [x.lon, x.lat] as [number, number]) : [], caption: t("history.map_alive", { y: cursor }) };
+      // 播放中镜头不动（每 5 年重新框一次会晃得看不清），停下来再框住那一年的人
+      // 播放中镜头固定在中国本部（每 5 年重新框一次会晃；西域、天竺籍的人会把镜头拉到整个亚洲）
+      return {
+        points: pts,
+        edges: [],
+        focus: playing ? CHINA_VIEW : pts.length < 2 ? [] : pts.map((x) => [x.lon, x.lat] as [number, number]),
+        caption: t("history.map_alive", { y: cursor }),
+      };
     }
     return {
       points: people.filter((p) => shown.includes(p) && p.o).map((p) => ({ id: p.id, lon: p.o![0], lat: p.o![1], label: L(p.n), kind: "base" as const, person: p.id })),
@@ -311,7 +377,7 @@ export default function HistoryPage() {
       focus: [],
       caption: t("history.map_base"),
     };
-  }, [data, tour, stepIdx, selected, cursor, alive, shown, byId, L, t]);
+  }, [data, tour, stepIdx, selected, cursor, alive, shown, byId, L, t, playing]);
 
   const options = useMemo(() => {
     const q = search.trim();
@@ -388,6 +454,15 @@ export default function HistoryPage() {
             { label: t("history.filter_translators"), value: "tr" },
           ]}
         />
+        <Button
+          size="small"
+          type={playing ? "primary" : "default"}
+          icon={playing ? <PauseOutlined /> : <CaretRightOutlined />}
+          onClick={togglePlay}
+          aria-pressed={playing}
+        >
+          {playing ? t("history.pause") : tour ? t("history.play_tour") : t("history.play_years")}
+        </Button>
         <Button size="small" onClick={() => { setMapOpen(!showMap); track("history_map_toggle", { open: String(!showMap) }); }}>
           {showMap ? t("history.map_hide") : t("history.map_show")}
         </Button>
@@ -596,6 +671,7 @@ export default function HistoryPage() {
                 traditional={scriptForLanguage(lang) === "traditional"}
                 onPick={(id) => openPerson(id, "map")}
                 attribution={t("history.map_attribution")}
+                overlay={!tour && !selected && cursor !== null ? `${cursor} · ${L(dynastyAt(cursor)?.name ?? "")}` : null}
               />
             </Suspense>
           </aside>

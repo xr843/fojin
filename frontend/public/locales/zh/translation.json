@@ -2091,5 +2091,8 @@
   "history.map_tour": "本路线各站地点（取自该站说明）",
   "history.map_origin": "籍贯",
   "history.map_burial": "葬",
-  "history.map_attribution": "地点坐标：DILA 地名规范库（CC BY-SA 3.0）"
+  "history.map_attribution": "地点坐标：DILA 地名规范库（CC BY-SA 3.0）",
+  "history.play_years": "播放年代",
+  "history.play_tour": "自动导览",
+  "history.pause": "暂停"
 }
