@@ -16,12 +16,13 @@
 
 import logging
 import re
+import time
 
+from opencc import OpenCC
 from sqlalchemy import text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.named_works import CARD_WORK_ALIASES, extract_named_works, resolve_named_work
-from app.services.precise_retrieval import _to_traditional
 from app.services.text_titles import strip_volume_range
 
 logger = logging.getLogger(__name__)
@@ -99,37 +100,79 @@ def _drop_contained(titles: list[str]) -> list[str]:
     return [t for t in titles if not any(t != o and t in o for o in titles)]
 
 
+# 题名比对一律在「简体 + 异体归一」的空间里做。不能把问题转繁去比：OpenCC 简转繁会把
+# 「占察」转成「佔察」、经名用字却是「占」，一简对多繁的字都会这样对不上（2026-11-26
+# 「《占察善恶业报经》有多少字数」实测没认出）。繁转简是多对一，不会出这种错。
+_t2s = OpenCC("t2s")
+_FOLD_TABLE = str.maketrans({"毘": "毗", "呪": "咒", "註": "注", "讚": "赞", "勅": "敕"})
+_TITLE_INDEX_TTL = 6 * 3600
+_title_index: tuple[float, list[tuple[str, int]]] | None = None
+
+
+def fold(s: str) -> str:
+    """繁转简 + 大藏经常见异体归一；「阿毗达磨/达摩」两种写法都常见，统一成「达摩」。"""
+    return _t2s.convert(s or "").translate(_FOLD_TABLE).replace("达磨", "达摩")
+
+
+async def _titles(db: AsyncSession) -> list[tuple[str, int]]:
+    """[(归一后的题名, text_id)]，有正文的汉文本；进程内缓存 6 小时（约 1.2 万条）。"""
+    global _title_index
+    now = time.monotonic()
+    if _title_index is None or now - _title_index[0] > _TITLE_INDEX_TTL:
+        rows = (
+            await db.execute(
+                sql_text("SELECT id, title_zh FROM buddhist_texts WHERE lang = 'lzh' AND has_content ORDER BY cbeta_id")
+            )
+        ).all()
+        _title_index = (now, [(fold(r[1]), r[0]) for r in rows if r[1]])
+    return _title_index[1]
+
+
+def _match_name(index: list[tuple[str, int]], name: str) -> list[int]:
+    """《》里的书名：归一后与题名完全相同，或只差开头的「佛说」。"""
+    f = fold(name)
+    return [tid for t, tid in index if t == f or t == "佛说" + f]
+
+
+def _match_in_question(index: list[tuple[str, int]], question: str) -> tuple[list[int], int]:
+    """问题里直接含完整题名（可省「佛说」），只留最长的那些。返回 (ids, 最长题名字数)。"""
+    fq = fold(question)
+    hits: list[tuple[str, int]] = []
+    for t, tid in index:
+        if len(t) >= MIN_TITLE_CHARS and t in fq:
+            hits.append((t, tid))
+        elif t.startswith("佛说") and len(t) >= MIN_TITLE_CHARS + 2 and t[2:] in fq:
+            hits.append((t[2:], tid))
+    keep = set(_drop_contained(list({h[0] for h in hits})))
+    return [tid for h, tid in hits if h in keep], max((len(h) for h in keep), default=0)
+
+
+_FOLDED_ALIASES = {fold(k): k for k in CARD_WORK_ALIASES}
+
+
 async def _resolve_ids(db: AsyncSession, question: str) -> list[int]:
-    # 1) 《》点名的，走与卡片同一套精确解析（别名表 → 简转繁 → 异体字）
+    index = await _titles(db)
+    fq = fold(question)
+
+    # 1) 《》点名的：别名表里有的按别名（「《华严经》」指 60/80 卷本），否则按题名精确匹配
     ids: list[int] = []
     for name in extract_named_works(question):
-        ids.extend(await resolve_named_work(db, name))
+        alias = _FOLDED_ALIASES.get(fold(name))
+        if alias:
+            ids.extend(await resolve_named_work(db, alias))
+        else:
+            ids.extend(_match_name(index, name) or await resolve_named_work(db, name))
     if ids:
         return list(dict.fromkeys(ids))
 
     # 2) 问题里直接含完整题名（「80卷大方廣佛華嚴經共有多少字」）。取最长的那些，免得
     #    「華嚴經」这类短题名把一截当成另一部书。
-    trad = _to_traditional(question)
-    rows = (
-        await db.execute(
-            sql_text(
-                "SELECT id, title_zh FROM buddhist_texts WHERE lang = 'lzh' AND has_content "
-                "AND char_length(title_zh) >= :m AND (position(title_zh IN :q) > 0 OR position(title_zh IN :t) > 0 "
-                "OR (title_zh LIKE '佛說%' AND char_length(title_zh) >= :m + 2 "
-                "AND position(substr(title_zh, 3) IN :t) > 0)) "
-                "ORDER BY cbeta_id LIMIT 40"
-            ),
-            {"m": MIN_TITLE_CHARS, "q": question, "t": trad},
-        )
-    ).all()
-    keep = _drop_contained(list({r[1] for r in rows}))
-    title_ids = [r[0] for r in rows if r[1] in keep]
-    longest_title = max((len(t) for t in keep), default=0)
+    title_ids, longest_title = _match_in_question(index, question)
 
     # 3) 通称别名（「华严经」「俱舍论」）。问题里写了比别名更长的完整题名时以题名为准
     #    （「大方廣佛華嚴經」要连 40 卷本一起给，别名「华严经」只指 60/80 卷本）。
     for alias, ids_or_name in _alias_candidates():
-        if alias in question or _to_traditional(alias) in question:
+        if fold(alias) in fq:
             if len(alias) >= longest_title:
                 if isinstance(ids_or_name, tuple):
                     rows = await db.execute(

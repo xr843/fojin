@@ -119,3 +119,30 @@ def test_common_names_far_from_formal_titles():
     for name in ("无量寿经", "药师经", "维摩经", "楞伽经", "中论"):
         assert name in ws._EXTRA_ALIASES, name
     assert ws._EXTRA_ALIASES["楞伽经"] == ("T0670", "T0671", "T0672")
+
+
+def test_fold_avoids_one_to_many_traditional_forms():
+    # 简转繁会把「占察」转成「佔察」，经名却是「占」；在简体空间比就不会错
+    assert ws.fold("占察善惡業報經") == ws.fold("占察善恶业报经")
+    assert ws.fold("阿毘達磨大毘婆沙論") == ws.fold("阿毗达摩大毗婆沙论")
+
+
+_INDEX = [
+    (ws.fold("占察善惡業報經"), 1),
+    (ws.fold("占察善惡業報經玄義"), 2),
+    (ws.fold("佛說無量壽經"), 3),
+    (ws.fold("大方廣佛華嚴經"), 4),
+    (ws.fold("華嚴經"), 5),
+]
+
+
+def test_match_bracketed_name_exactly():
+    assert ws._match_name(_INDEX, "占察善恶业报经") == [1]  # 不带出注疏《玄義》
+    assert ws._match_name(_INDEX, "无量寿经") == [3]  # 可省「佛说」
+
+
+def test_match_full_title_in_question_keeps_longest():
+    ids, longest = ws._match_in_question(_INDEX, "80卷大方廣佛華嚴經共有多少字")
+    assert ids == [4] and longest == 7
+    ids, _ = ws._match_in_question(_INDEX, "占察善恶业报经有多少字")
+    assert ids == [1]
