@@ -50,7 +50,16 @@ _SHORT_ALIASES: dict[str, str] = {
     k[:-1]: k for k in CARD_WORK_ALIASES if k[-1] in "经论" and len(k) >= 3 and not k.endswith("品")
 }
 # 「华严」三译都给，再按问题里的卷数挑（别名表里的「华严经」只指 60/80 卷本，是卡片检索用的）
-_EXTRA_ALIASES: dict[str, tuple[str, ...]] = {"华严": ("T0278", "T0279", "T0293")}
+# 另加：通俗叫法与正式题名差得远、别名表又没有的（2026-11-26 用 22 部常问经论实测补齐）。
+_EXTRA_ALIASES: dict[str, tuple[str, ...]] = {
+    "华严": ("T0278", "T0279", "T0293"),
+    "无量寿经": ("T0360",),
+    "药师经": ("T0450",),
+    "药师琉璃光如来本愿功德经": ("T0450",),
+    "维摩经": ("T0475",),
+    "楞伽经": ("T0670", "T0671", "T0672"),
+    "中论": ("T1564",),
+}
 
 _CN_NUM = {"一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
 _JUAN_HINT_RE = re.compile(r"([\d]+|[一二两三四五六七八九十百]+)\s*卷")
@@ -105,7 +114,9 @@ async def _resolve_ids(db: AsyncSession, question: str) -> list[int]:
         await db.execute(
             sql_text(
                 "SELECT id, title_zh FROM buddhist_texts WHERE lang = 'lzh' AND has_content "
-                "AND char_length(title_zh) >= :m AND (position(title_zh IN :q) > 0 OR position(title_zh IN :t) > 0) "
+                "AND char_length(title_zh) >= :m AND (position(title_zh IN :q) > 0 OR position(title_zh IN :t) > 0 "
+                "OR (title_zh LIKE '佛說%' AND char_length(title_zh) >= :m + 2 "
+                "AND position(substr(title_zh, 3) IN :t) > 0)) "
                 "ORDER BY cbeta_id LIMIT 40"
             ),
             {"m": MIN_TITLE_CHARS, "q": question, "t": trad},

@@ -112,3 +112,10 @@ def test_juan_hint():
     assert ws.juan_hint("四十卷本") == 40
     assert ws.juan_hint("六十卷") == 60
     assert ws.juan_hint("华严经有几卷") is None
+
+
+def test_common_names_far_from_formal_titles():
+    # 22 部常问经论实测里没认出的 5 部（正式题名与通俗叫法差得远）
+    for name in ("无量寿经", "药师经", "维摩经", "楞伽经", "中论"):
+        assert name in ws._EXTRA_ALIASES, name
+    assert ws._EXTRA_ALIASES["楞伽经"] == ("T0670", "T0671", "T0672")
