@@ -5,6 +5,11 @@ import { HelmetProvider } from "react-helmet-async";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import HistoryPage from "./HistoryPage";
 
+// 地图依赖 WebGL，jsdom 里换成只列出点的替身
+vi.mock("../components/history/HistoryMap", () => ({
+  default: ({ points }: { points: Array<{ label: string }> }) => <ul data-testid="map">{points.map((p) => <li key={p.label}>{p.label}</li>)}</ul>,
+}));
+
 vi.mock("../data/historyTours.json", () => ({
   default: {
     tours: [
@@ -13,8 +18,8 @@ vi.mock("../data/historyTours.json", () => ({
         title: "唯識傳承",
         intro: "玄奘傳窺基。",
         steps: [
-          { id: "A000294", y: 645, t: "貞觀十九年回長安譯經。" },
-          { id: "A001019", y: 670, t: "從玄奘學。" },
+          { id: "A000294", y: 645, t: "貞觀十九年回長安譯經。", pl: [108.95, 34.27, "長安"] },
+          { id: "A001019", y: 670, t: "從玄奘學。", pl: [108.95, 34.27, "大慈恩寺"] },
         ],
       },
       {
@@ -43,10 +48,12 @@ const DATA: HistoryData = {
     person({
       id: "A000294", n: "玄奘", dn: "玄奘", sc: "唯识", b: [602, 603], d: [664, 664], tr: true, wn: 78, st: ["A001019"],
       bio: "俗姓陳，唯識宗創始人。",
+      o: [112.821, 34.581, "緱氏", "high"],
+      bu: [108.95, 34.15, "樊川", "high"],
       bios: [{ t: "唐高僧傳 · 釋玄奘傳", u: "/texts/71/read?juan=4&anchor=p0446c08", lh: "T50n2060_p0446c08" }],
       works: [{ t: "成唯識論", c: "T1585", u: "/texts/44" }],
     }),
-    person({ id: "A001019", n: "窺基", dn: "窺基", sc: "唯识", b: [632, 632], d: [682, 682], te: ["A000294"] }),
+    person({ id: "A001019", n: "窺基", dn: "窺基", sc: "唯识", b: [632, 632], d: [682, 682], te: ["A000294"], o: [108.9, 34.3, "長安", "high"] }),
     person({ id: "A001719", n: "慧能", dn: "惠能", b: [638, 638], d: [713, 713] }),
     person({ id: "A000366", n: "安世高", dn: "安清", dy: "東漢", sc: "译经", tr: true, wn: 34, bio: "建和二年（148），至洛陽譯經" }),
   ],
@@ -174,5 +181,30 @@ describe("佛教史长卷", () => {
     expect(new Set(starts).size).toBe(1);
     expect(document.querySelector(".history-tours-gname")?.textContent).toBe("禅宗");
     expect(screen.getByText("禅宗 · 分叉")).toBeInTheDocument();
+  });
+
+  it("地图跟着变：平时标籍贯；点年份标那年在世的人；选中人标籍贯、葬地与师承；导览标各站地点", async () => {
+    const { unmount } = renderPage();
+    await screen.findByText(/高僧籍贯分布/);
+    expect(within(screen.getByTestId("map")).getAllByRole("listitem")).toHaveLength(2); // 两人有籍贯
+    unmount();
+
+    const r2 = renderPage("/history?y=650");
+    await screen.findByText("公元 650 年在世的人 · 标在籍贯");
+    expect(within(screen.getByTestId("map")).getByText("玄奘")).toBeInTheDocument();
+    r2.unmount();
+
+    const r3 = renderPage("/history?p=A000294");
+    await screen.findByRole("dialog");
+    const m3 = within(await screen.findByTestId("map"));
+    expect(m3.getByText("玄奘 · 籍贯 缑氏")).toBeInTheDocument();
+    expect(m3.getByText("葬 樊川")).toBeInTheDocument();
+    expect(m3.getByText("窥基")).toBeInTheDocument();
+    r3.unmount();
+
+    renderPage("/history?tour=weishi&s=1");
+    const m4 = within(await screen.findByTestId("map"));
+    expect(m4.getByText("玄奘 · 长安")).toBeInTheDocument();
+    expect(m4.getByText("窥基 · 大慈恩寺")).toBeInTheDocument();
   });
 });

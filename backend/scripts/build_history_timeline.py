@@ -1,6 +1,6 @@
 """佛教史长卷（/history）的人物数据：DILA 人名规范库 + 核心名单 → frontend/public/history-people.json
 
-数据来源：法鼓文理学院 DILA「佛學規範資料庫·人名」
+数据来源：法鼓文理学院 DILA「佛學規範資料庫」人名、地名两库
   https://github.com/DILA-edu/Authority-Databases （CC BY-SA 3.0 Unported，须署名、相同方式共享）
 核心名单：backend/scripts/history_core_people.tsv（按 DILA 编号逐位指定——同名极多，绝不按名字匹配）
 
@@ -9,7 +9,7 @@
 
   docker run --rm --network <net> --env-file /home/admin/fojin/.env \\
     -v /home/admin/fojin/backend:/app:ro -v /tmp/hist:/work \\
-    <backend image> python scripts/build_history_timeline.py /work/person.xml /work/history-people.json
+    <backend image> python scripts/build_history_timeline.py /work/person.xml /work/history-people.json /work/place.xml
 
 再把输出拷回仓库 frontend/public/history-people.json 提交。
 """
@@ -94,6 +94,13 @@ def parse_dila(path: str, wanted: set[str]) -> dict[str, dict]:
                 rec["bio"] = _clean_bio(text)
             elif ty == "worksInTripitaka":
                 rec["works"] = [w.strip() for w in text.split("\n") if w.strip()]
+        # 籍贯 / 葬地：DILA 地名规范库编号（PL…），坐标在 load_places 里补
+        for ty, key in (("placeOfOrigin", "origin"), ("placeOfBurial", "burial")):
+            note = next((n for n in el.findall(NS + "note") if n.get("type") == ty), None)
+            pn = note.find(NS + "placeName") if note is not None else None
+            ref = pn.find(NS + "ref") if pn is not None else None
+            if pn is not None and ref is not None and (ref.text or "").startswith("PL"):
+                rec[key] = ((pn.text or "").strip(), ref.text.strip())
         occ = el.find(NS + "occupation")
         rec["translator"] = bool(occ is not None and occ.text and "譯" in occ.text)
         out[pid] = rec
@@ -208,7 +215,21 @@ def load_core() -> list[tuple[str, str, str]]:
     return rows
 
 
-def build(xml_path: str, out_path: str) -> None:
+def load_places(path: str) -> dict[str, tuple[float, float, str]]:
+    """DILA 地名规范库（authority_place，同为 CC BY-SA 3.0）：PL 编号 → (经度, 纬度, 可信度)。"""
+    out: dict[str, tuple[float, float, str]] = {}
+    for _, el in ET.iterparse(path, events=("end",)):
+        if el.tag != NS + "place":
+            continue
+        geo = el.find(f"{NS}location/{NS}geo")
+        if geo is not None and (geo.text or "").strip():
+            lon, lat = (float(x) for x in geo.text.split()[:2])
+            out[el.get(XML_NS + "id")] = (lon, lat, geo.get("cert") or "")
+        el.clear()
+    return out
+
+
+def build(xml_path: str, out_path: str, place_path: str | None = None) -> None:
     core = load_core()
     people = parse_dila(xml_path, {i for i, _, _ in core})
     for pid, display, _ in core:
@@ -218,6 +239,7 @@ def build(xml_path: str, out_path: str) -> None:
     if missing:
         sys.exit(f"DILA 里找不到这些编号：{missing}")
     asyncio.run(resolve(people))
+    places = load_places(place_path) if place_path else {}
     inset = set(people)
     result = []
     for pid, display, school in core:
@@ -243,6 +265,11 @@ def build(xml_path: str, out_path: str) -> None:
             "works": p["works"],
             "wn": p["works_n"],
         }
+        # 籍贯、葬地落到地图上：[经度, 纬度, 地名, 可信度]（坐标两位小数够用，文件小一半）
+        for key, short in (("origin", "o"), ("burial", "bu")):
+            if p.get(key) and p[key][1] in places:
+                lon, lat, cert = places[p[key][1]]
+                rec[short] = [round(lon, 3), round(lat, 3), p[key][0], cert]
         result.append(rec)
     # 师承只记了一边的，补成双向
     by = {r["id"]: r for r in result}
@@ -263,10 +290,11 @@ def build(xml_path: str, out_path: str) -> None:
     pathlib.Path(out_path).write_text(json.dumps(doc, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     dated = sum(1 for r in result if r["b"] or r["d"])
     print(f"{len(result)} 人，有年份 {dated}，有本传链接 {sum(1 for r in result if r['bios'])}，只有提及 {sum(1 for r in result if r['men'])}，"
-          f"有著译链接 {sum(1 for r in result if r['works'])}，师承连线 {sum(len(r['st']) for r in result)}")
+          f"有著译链接 {sum(1 for r in result if r['works'])}，师承连线 {sum(len(r['st']) for r in result)}，"
+          f"籍贯上图 {sum(1 for r in result if r.get('o'))}，葬地上图 {sum(1 for r in result if r.get('bu'))}")
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        sys.exit("用法：build_history_timeline.py <DILA person.xml> <输出 json>")
-    build(sys.argv[1], sys.argv[2])
+    if len(sys.argv) not in (3, 4):
+        sys.exit("用法：build_history_timeline.py <DILA person.xml> <输出 json> [DILA place.xml]")
+    build(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) == 4 else None)

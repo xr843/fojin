@@ -2081,5 +2081,15 @@
   "history.tour_prev": "Previous",
   "history.tour_next": "Next",
   "history.tour_exit": "Exit tour",
-  "history.tour_step": "Stop {{k}} of {{n}}"
+  "history.tour_step": "Stop {{k}} of {{n}}",
+  "history.map_title": "Map",
+  "history.map_show": "Show map",
+  "history.map_hide": "Hide map",
+  "history.map_base": "Birthplaces · click the timeline to see who was alive, and where",
+  "history.map_alive": "Alive in {{y}} CE · shown at birthplace",
+  "history.map_person": "Birthplace, burial place, and teachers' and students' birthplaces",
+  "history.map_tour": "Places on this tour (from each stop's note)",
+  "history.map_origin": "born",
+  "history.map_burial": "buried",
+  "history.map_attribution": "Places: DILA Place Authority (CC BY-SA 3.0)"
 }

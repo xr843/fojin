@@ -2081,5 +2081,15 @@
   "history.tour_prev": "上一站",
   "history.tour_next": "下一站",
   "history.tour_exit": "退出导览",
-  "history.tour_step": "第 {{k}} / {{n}} 站"
+  "history.tour_step": "第 {{k}} / {{n}} 站",
+  "history.map_title": "地图",
+  "history.map_show": "显示地图",
+  "history.map_hide": "收起地图",
+  "history.map_base": "高僧籍贯分布 · 点时间轴看那一年在世的人在哪里",
+  "history.map_alive": "公元 {{y}} 年在世的人 · 标在籍贯",
+  "history.map_person": "籍贯、葬地，及师承诸人的籍贯",
+  "history.map_tour": "本路线各站地点（取自该站说明）",
+  "history.map_origin": "籍贯",
+  "history.map_burial": "葬",
+  "history.map_attribution": "地点坐标：DILA 地名规范库（CC BY-SA 3.0）"
 }
