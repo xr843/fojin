@@ -46,6 +46,7 @@ Every passage carries a `license`. CBETA text (the Chinese canon) is CC BY-NC-SA
 ## Notes for crawlers and agents
 
 - Rate limits apply per client IP; `/api/search/semantic` and `/api/verify/quote` are stricter than the default because they are compute-heavy. Back off on `429` and honour `Retry-After`.
+- Chinese canon coverage: the Taishō (`T`) and the Xuzangjing (`X`), plus — since 2026-11-25 — about 1,100 further works from CBETA's other collections (Jiaxing `J`, the supplements `B`, Zangwai `ZW`, the Zhonghua and Guojia tushuguan collections, stone-carved sutras, monastery gazetteers and more; CBETA 2026.R2). The new collections are in full-text search, `/api/verify/quote`, `/api/citations/cite` and the reader, but not yet in `/api/search/semantic` (no embeddings), so a semantic search will not surface them — verify or full-text search instead.
 - Quote verification currently covers the Classical Chinese (`lzh`) corpus, and does not yet fold CBETA gaiji variant characters. The response repeats these limits in its `caveats` field — surface them rather than over-claiming.
 - Source texts are under their upstream licences (CBETA, SuttaCentral, 84000, GRETIL); alignment data is CC BY-SA. Cite the URN when you quote.
 
