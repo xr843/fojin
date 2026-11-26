@@ -515,3 +515,22 @@ a.history-view:hover {
   stroke: var(--fj-cinnabar);
   stroke-width: 2;
 }
+
+.history-tours-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px 2px 8px;
+  border: 1px dashed var(--fj-border);
+  border-radius: 13px;
+}
+.history-tours-gname {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fj-accent);
+  margin-right: 2px;
+}
+.history-tour-path path.history-tour-gap {
+  stroke-dasharray: 5 4;
+}

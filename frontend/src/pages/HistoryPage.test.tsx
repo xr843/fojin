@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router";
 import { HelmetProvider } from "react-helmet-async";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -15,6 +15,17 @@ vi.mock("../data/historyTours.json", () => ({
         steps: [
           { id: "A000294", y: 645, t: "貞觀十九年回長安譯經。" },
           { id: "A001019", y: 670, t: "從玄奘學。" },
+        ],
+      },
+      {
+        id: "tree",
+        g: "禪宗",
+        title: "分叉",
+        intro: "一師二徒。",
+        steps: [
+          { id: "A000294", y: 645, t: "師。" },
+          { id: "A001019", y: 670, t: "徒一。", p: 0 },
+          { id: "A001719", y: 680, t: "徒二（隔代）。", p: 0, gap: true },
         ],
       },
     ],
@@ -149,5 +160,19 @@ describe("佛教史长卷", () => {
     fireEvent.click(screen.getByRole("button", { name: "退出导览" }));
     expect(screen.getByTestId("loc").textContent).not.toContain("tour=");
     expect(document.querySelectorAll(".history-tour-num")).toHaveLength(0);
+  });
+
+  it("分叉路线：每站连到自己的师（p），隔代画虚线；同组路线收在组名下", async () => {
+    renderPage("/history?tour=tree");
+    await screen.findByText("第 1 / 3 站");
+    await waitFor(() => expect(document.querySelectorAll(".history-tour-num")).toHaveLength(3));
+    const paths = [...document.querySelectorAll(".history-tour-path path")];
+    expect(paths).toHaveLength(2);
+    expect(paths.filter((x) => x.getAttribute("class") === "history-tour-gap")).toHaveLength(1);
+    // 两条边都从同一个起点（玄奘）出发
+    const starts = paths.map((x) => x.getAttribute("d")?.split(" C")[0]);
+    expect(new Set(starts).size).toBe(1);
+    expect(document.querySelector(".history-tours-gname")?.textContent).toBe("禅宗");
+    expect(screen.getByText("禅宗 · 分叉")).toBeInTheDocument();
   });
 });
