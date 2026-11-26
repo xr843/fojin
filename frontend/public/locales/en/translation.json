@@ -2063,5 +2063,18 @@
   "history.bio_source": "Biography, lineage and dates from the DILA Person Authority.",
   "history.dila_link": "View DILA entry",
   "history.approx": "c. ",
-  "history.back_to_timeline": "← Back to the timeline"
+  "history.back_to_timeline": "← Back to the timeline",
+  "history.view_by_school": "By school",
+  "history.view_by_year": "By period",
+  "history.school.translation": "Translators",
+  "history.school.sanlun": "Sanlun",
+  "history.school.yixue": "Doctrinal studies",
+  "history.school.tiantai": "Tiantai",
+  "history.school.huayan": "Huayan",
+  "history.school.weishi": "Yogācāra",
+  "history.school.vinaya": "Vinaya",
+  "history.school.pureland": "Pure Land",
+  "history.school.chan": "Chan",
+  "history.school.esoteric": "Esoteric",
+  "history.school.other": "Others"
 }

@@ -10,8 +10,9 @@ import { BANDS, TIMELINE_END, TIMELINE_START, dynastyAt } from "../data/historyD
 import {
   aliveAt,
   formatYears,
-  packRows,
+  layoutLanes,
   personSpan,
+  SCHOOL_KEY,
   translationRiver,
   type HistoryData,
   type HistoryPerson,
@@ -55,6 +56,8 @@ export default function HistoryPage() {
   const [onlyTr, setOnlyTr] = useState(false);
   const [search, setSearch] = useState("");
   const selectedId = params.get("p");
+  // 默认按宗派分泳道；?v=time 按年代混排
+  const byYear = params.get("v") === "time";
   const yParam = Number(params.get("y"));
   const cursor = params.get("y") && Number.isFinite(yParam) ? yParam : null;
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -64,14 +67,15 @@ export default function HistoryPage() {
   const spans = useMemo(() => new Map((data?.people ?? []).map((p) => [p.id, personSpan(p)])), [data]);
   const shown = useMemo(() => (data?.people ?? []).filter((p) => !onlyTr || p.tr), [data, onlyTr]);
 
-  const { placed, rows } = useMemo(() => {
-    return packRows(shown, px, (p) => {
+  const { items: placed, lanes, rows } = useMemo(() => {
+    const labelFn = (p: HistoryPerson) => {
       const s = spans.get(p.id);
       const barPx = s ? (s.end - s.start) * px : 0;
       const labelPx = p.n.length * CHAR_PX + 10;
       return barPx >= labelPx ? 0 : labelPx;
-    });
-  }, [shown, px, spans]);
+    };
+    return layoutLanes(shown, px, labelFn, byYear ? null : (p) => p.sc);
+  }, [shown, px, spans, byYear]);
 
   const river = useMemo(() => translationRiver(data?.people ?? [], TIMELINE_START, TIMELINE_END, 10), [data]);
   const riverMax = Math.max(1, ...river);
@@ -80,7 +84,8 @@ export default function HistoryPage() {
   const related = useMemo(() => new Set(selected ? [...selected.te, ...selected.st] : []), [selected]);
 
   const xOf = (year: number) => PAD + (year - TIMELINE_START) * px;
-  const width = PAD * 2 + (TIMELINE_END - TIMELINE_START) * px;
+  // 人物卡开着时右边多留一块，最右端的人（印光、虚云）才能滚到卡片左边
+  const width = PAD * 2 + (TIMELINE_END - TIMELINE_START) * px + (selected ? 480 : 0);
   const height = TOP + rows * ROW_H + 16;
 
   const setParam = useCallback(
@@ -117,16 +122,25 @@ export default function HistoryPage() {
     [setParam],
   );
 
-  // 深链 / 搜索选中：把这个人滚到视野中间
+  // 深链 / 搜索选中：这个人不在视野里就滚过去。右侧人物卡会挡住约 460px，横向可见区要扣掉；
+  // 分宗派泳道后人可能在很下面，纵向也要判断（11-26 实测：?p=智顗 停在最上面的译经泳道）。
   const placedById = useMemo(() => new Map(placed.map((x) => [x.person.id, x])), [placed]);
   useEffect(() => {
     if (!selectedId) return;
     const pl = placedById.get(selectedId);
-    if (!pl) return;
     const el = scrollRef.current;
+    if (!pl || !el) return;
+    const covered = Math.min(460, el.clientWidth * 0.5);
+    const left = xOf(pl.span.start);
+    const right = Math.min(xOf(pl.span.end), left + 200);
+    const hVisible = left >= el.scrollLeft && right <= el.scrollLeft + el.clientWidth - covered;
     const rowTop = TOP + pl.row * ROW_H;
-    const visible = el && el.scrollLeft < xOf(pl.span.start) && xOf(pl.span.end) < el.scrollLeft + el.clientWidth;
-    if (!visible) scrollToYear((pl.span.start + pl.span.end) / 2, Math.max(0, rowTop - 120));
+    const vVisible = rowTop >= el.scrollTop + TOP && rowTop + ROW_H <= el.scrollTop + el.clientHeight;
+    if (hVisible && vVisible) return;
+    el.scrollTo({
+      left: hVisible ? el.scrollLeft : Math.max(0, left - (el.clientWidth - covered) / 3),
+      top: vVisible ? el.scrollTop : Math.max(0, rowTop - TOP - 3 * ROW_H),
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, placedById]);
 
@@ -210,6 +224,17 @@ export default function HistoryPage() {
           allowClear
         />
         <Segmented
+          value={byYear ? "time" : "school"}
+          onChange={(v) => {
+            setParam("v", v === "time" ? "time" : null);
+            track("history_view", { view: String(v) });
+          }}
+          options={[
+            { label: t("history.view_by_school"), value: "school" },
+            { label: t("history.view_by_year"), value: "time" },
+          ]}
+        />
+        <Segmented
           value={onlyTr ? "tr" : "all"}
           onChange={(v) => setOnlyTr(v === "tr")}
           options={[
@@ -288,7 +313,29 @@ export default function HistoryPage() {
                 )}
               </div>
             </div>
+            {lanes.map((l, i) => (
+              <div
+                key={l.key}
+                className={`history-lane${i % 2 ? " history-lane--alt" : ""}`}
+                style={{ top: TOP + l.firstRow * ROW_H, height: l.rows * ROW_H, width }}
+              >
+                <span className="history-lane-label">
+                  {t(`history.school.${SCHOOL_KEY[l.key] ?? "other"}`)}
+                  <small>{l.count}</small>
+                </span>
+              </div>
+            ))}
             {cursor !== null && <div className="history-cursor" style={{ left: xOf(cursor), height }} />}
+            {selected && (
+              <LineageLines
+                selectedId={selected.id}
+                related={[...selected.te.map((id) => [id, "te"] as const), ...selected.st.map((id) => [id, "st"] as const)]}
+                placedById={placedById}
+                xOf={xOf}
+                width={width}
+                height={height}
+              />
+            )}
             {placed.map(({ person: p, span, row }) => {
               const left = xOf(span.start);
               const w = Math.max(3, (span.end - span.start) * px);
@@ -340,6 +387,8 @@ export default function HistoryPage() {
         open={!!selected}
         onClose={() => setParam("p", null)}
         width="min(440px, 100vw)"
+        // 不加遮罩：卡片开着时长卷仍可见、可点（看师承连线、换人）
+        mask={false}
         title={selected ? L(selected.n) : ""}
         destroyOnHidden
       >
@@ -388,7 +437,7 @@ function PersonCard({
   return (
     <div className="history-card">
       <p className="history-card-meta">
-        {[L(p.dy), years || t("history.years_unknown"), role].filter(Boolean).join(" · ")}
+        {[L(p.dy), years || t("history.years_unknown"), role, t(`history.school.${SCHOOL_KEY[p.sc] ?? "other"}`)].filter(Boolean).join(" · ")}
         {span && span.kind !== "full" && kindNote && <span className="history-card-note">{kindNote}</span>}
       </p>
       {(p.dn !== p.n || p.alt.length > 0) && (
@@ -455,5 +504,46 @@ function PersonCard({
         </a>
       </p>
     </div>
+  );
+}
+
+/** 选中一个人时，把他和师、弟子的条子连起来：师在上游用实线，弟子用虚线。 */
+function LineageLines({
+  selectedId,
+  related,
+  placedById,
+  xOf,
+  width,
+  height,
+}: {
+  selectedId: string;
+  related: ReadonlyArray<readonly [string, "te" | "st"]>;
+  placedById: Map<string, { span: PersonSpan; row: number }>;
+  xOf: (year: number) => number;
+  width: number;
+  height: number;
+}) {
+  const me = placedById.get(selectedId);
+  if (!me) return null;
+  const y = (row: number) => TOP + row * ROW_H + 9;
+  const x1 = xOf(me.span.start) + 6;
+  const y1 = y(me.row);
+  return (
+    <svg className="history-lineage" width={width} height={height} aria-hidden>
+      {related.map(([id, kind]) => {
+        const o = placedById.get(id);
+        if (!o) return null;
+        const x2 = Math.min(Math.max(x1, xOf(o.span.start) + 6), xOf(o.span.end) - 6);
+        const y2 = y(o.row);
+        const mid = (y1 + y2) / 2;
+        return (
+          <path
+            key={id}
+            d={`M ${x1} ${y1} C ${x1} ${mid}, ${x2} ${mid}, ${x2} ${y2}`}
+            className={kind === "te" ? "history-lineage-te" : "history-lineage-st"}
+          />
+        );
+      })}
+    </svg>
   );
 }

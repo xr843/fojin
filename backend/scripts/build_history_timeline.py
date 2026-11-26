@@ -192,29 +192,35 @@ async def resolve(people: dict[str, dict]) -> None:
             p["works"] = works
 
 
-def load_core() -> list[tuple[str, str]]:
+SCHOOLS = ("译经", "三论", "义学", "天台", "华严", "唯识", "律", "净土", "禅", "密", "其他")
+
+
+def load_core() -> list[tuple[str, str, str]]:
+    """核心名单：编号、显示名、宗派泳道（见 tsv 文件头）。"""
     rows = []
     for line in CORE.read_text(encoding="utf-8").splitlines():
         if not line.strip() or line.startswith("#"):
             continue
-        cols = line.split("\t")
-        rows.append((cols[0].strip(), cols[1].strip() if len(cols) > 1 else ""))
+        cols = [c.strip() for c in line.split("\t")] + ["", ""]
+        if cols[2] not in SCHOOLS:
+            sys.exit(f"{cols[0]} 的宗派「{cols[2]}」不在 {SCHOOLS} 里")
+        rows.append((cols[0], cols[1], cols[2]))
     return rows
 
 
 def build(xml_path: str, out_path: str) -> None:
     core = load_core()
-    people = parse_dila(xml_path, {i for i, _ in core})
-    for pid, display in core:
+    people = parse_dila(xml_path, {i for i, _, _ in core})
+    for pid, display, _ in core:
         if pid in people:
             people[pid]["display"] = display
-    missing = [i for i, _ in core if i not in people]
+    missing = [i for i, _, _ in core if i not in people]
     if missing:
         sys.exit(f"DILA 里找不到这些编号：{missing}")
     asyncio.run(resolve(people))
     inset = set(people)
     result = []
-    for pid, display in core:
+    for pid, display, school in core:
         p = people[pid]
         teachers = sorted({o for ty, o in p["relations"] if ty == "teacher" and o in inset})
         students = sorted({o for ty, o in p["relations"] if ty == "student" and o in inset})
@@ -224,6 +230,7 @@ def build(xml_path: str, out_path: str) -> None:
             "dn": p["name"],
             "alt": [a for a in p["alt"] if a != display][:6],
             "dy": p.get("dynasty", ""),
+            "sc": school,
             "b": p["birth"],
             "d": p["death"],
             "monk": p.get("monk", False),

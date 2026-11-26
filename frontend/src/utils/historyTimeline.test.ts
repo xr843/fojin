@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { aliveAt, formatYears, packRows, personSpan, translationRiver, type HistoryPerson } from "./historyTimeline";
+import { aliveAt, formatYears, layoutLanes, packRows, personSpan, translationRiver, type HistoryPerson } from "./historyTimeline";
 import { dynastyAt, dynastySpan } from "../data/historyDynasties";
 
 function person(over: Partial<HistoryPerson>): HistoryPerson {
-  return { id: "A1", n: "某", dn: "某", alt: [], dy: "唐", b: null, d: null, monk: true, tr: false, bio: "", te: [], st: [], bios: [], men: [], works: [], wn: 0, ...over };
+  return { id: "A1", n: "某", dn: "某", alt: [], dy: "唐", sc: "禅", b: null, d: null, monk: true, tr: false, bio: "", te: [], st: [], bios: [], men: [], works: [], wn: 0, ...over };
 }
 
 describe("佛教史长卷排布", () => {
@@ -52,6 +52,28 @@ describe("佛教史长卷排布", () => {
     const { placed, rows } = packRows([u, a], 1, () => 0, 0);
     expect(rows).toBe(2);
     expect(placed.find((x) => x.person.id === "u")?.row).toBe(1);
+  });
+
+  it("宗派泳道：按既定先后排，每条泳道先占一行标题；不认识的宗派归「其他」", () => {
+    const chan = person({ id: "c", sc: "禅", b: [638, 638], d: [713, 713] });
+    const tr = person({ id: "t", sc: "译经", b: [602, 602], d: [664, 664] });
+    const tr2 = person({ id: "t2", sc: "译经", b: [610, 610], d: [660, 660] });
+    const odd = person({ id: "x", sc: "某宗", b: [700, 700], d: [760, 760] });
+    const { items, lanes, rows } = layoutLanes([chan, tr, tr2, odd], 1, () => 0, (p) => p.sc);
+    expect(lanes.map((l) => [l.key, l.firstRow, l.rows, l.count])).toEqual([
+      ["译经", 0, 3, 2],
+      ["禅", 3, 2, 1],
+      ["其他", 5, 2, 1],
+    ]);
+    expect(rows).toBe(7);
+    expect(items.find((i) => i.person.id === "c")?.row).toBe(4);
+    expect(items.find((i) => i.person.id === "x")?.row).toBe(6);
+  });
+
+  it("按年代看：不分泳道", () => {
+    const { lanes, rows } = layoutLanes([person({ b: [600, 600], d: [650, 650] })], 1, () => 0, null);
+    expect(lanes).toEqual([]);
+    expect(rows).toBe(1);
   });
 
   it("译经长河：只算译经师，著译部数摊进生卒条的后三分之二", () => {
