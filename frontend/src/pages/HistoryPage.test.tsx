@@ -15,6 +15,8 @@ vi.mock("../data/historyTours.json", () => ({
     tours: [
       {
         id: "weishi",
+        group: "school",
+        short: "唯識",
         title: "唯識傳承",
         intro: "玄奘傳窺基。",
         steps: [
@@ -24,7 +26,10 @@ vi.mock("../data/historyTours.json", () => ({
       },
       {
         id: "tree",
-        g: "禪宗",
+        group: "school",
+        short: "樹宗",
+        family: "tree",
+        branch: "主幹",
         title: "分叉",
         intro: "一師二徒。",
         steps: [
@@ -32,6 +37,15 @@ vi.mock("../data/historyTours.json", () => ({
           { id: "A001019", y: 670, t: "徒一。", p: 0 },
           { id: "A001719", y: 680, t: "徒二（隔代）。", p: 0, gap: true },
         ],
+      },
+      {
+        id: "tree2",
+        group: "school",
+        family: "tree",
+        branch: "旁支",
+        title: "旁支",
+        intro: "只有窺基一站。",
+        steps: [{ id: "A001019", y: 670, t: "窺基。" }],
       },
     ],
   },
@@ -149,7 +163,7 @@ describe("佛教史长卷", () => {
   it("导览：点路线 → 说明栏显示第 1 站，路线上的人标序号、其余变淡；下一站 / 方向键换站；退出", async () => {
     renderPage();
     await screen.findByRole("button", { name: "玄奘" });
-    fireEvent.click(screen.getByRole("button", { name: "唯识传承" }));
+    fireEvent.click(screen.getByRole("button", { name: "唯识" }));
     expect(screen.getByTestId("loc").textContent).toContain("tour=weishi");
     expect(await screen.findByText("第 1 / 2 站")).toBeInTheDocument();
     expect(screen.getByText("贞观十九年回长安译经。")).toBeInTheDocument();
@@ -179,8 +193,16 @@ describe("佛教史长卷", () => {
     // 两条边都从同一个起点（玄奘）出发
     const starts = paths.map((x) => x.getAttribute("d")?.split(" C")[0]);
     expect(new Set(starts).size).toBe(1);
-    expect(document.querySelector(".history-tours-gname")?.textContent).toBe("禅宗");
-    expect(screen.getByText("禅宗 · 分叉")).toBeInTheDocument();
+    // 同一家族只露一个按钮（树宗），说明栏标题是「家族短名 · 支线」，支线在说明栏里切换
+    expect(screen.queryByRole("button", { name: "旁支" })).toBeInTheDocument();
+    expect([...document.querySelectorAll(".history-tours button")].map((b) => b.textContent)).toEqual(["唯识", "树宗"]);
+    expect(screen.getByText("树宗 · 主干")).toBeInTheDocument();
+    // 切到旁支：树宗按钮仍是选中态；主干上的玄奘、慧能不变淡（同一家族），窥基是当前支线
+    fireEvent.click(screen.getByRole("button", { name: "旁支" }));
+    expect(screen.getByTestId("loc").textContent).toContain("tour=tree2");
+    expect(screen.getByRole("button", { name: "树宗" })).toHaveAttribute("aria-pressed", "true");
+    await waitFor(() => expect(document.querySelector(".history-bar.is-tour-current")?.textContent).toContain("窥基"));
+    expect([...document.querySelectorAll(".history-bar.is-family")].map((b) => b.textContent).join()).toMatch(/玄奘/);
   });
 
   it("地图跟着变：平时标籍贯；点年份标那年在世的人；选中人标籍贯、葬地与师承；导览标各站地点", async () => {

@@ -41,13 +41,22 @@ interface TourStep {
 }
 interface HistoryTour {
   id: string;
-  g?: string;
+  /** transmission＝传法求经（按时代）；school＝宗派传承 */
+  group: "transmission" | "school";
+  /** 按钮上的短名（两字）；同一宗派的支线只有家族首条有 */
+  short?: string;
+  /** 同一宗派的几条支线（禅宗五支）：按钮只显示一个，支线在说明栏里选 */
+  family?: string;
+  branch?: string;
   title: string;
   intro: string;
   steps: TourStep[];
 }
 // JSON 推断不出元组类型，按约定断言（historyTours.json 的格式见文件头 _note）
 const TOURS = TOURS_DATA.tours as unknown as HistoryTour[];
+/** 按钮上露出的路线：没有家族的，加上每个家族的首条（禅宗 → 东土六祖） */
+const TOUR_BUTTONS = TOURS.filter((x) => !x.family || x.family === x.id);
+const TOUR_GROUPS = ["transmission", "school"] as const;
 
 const ZOOMS = [1, 1.5, 2.2, 3.2, 4.6, 6.5];
 const DEFAULT_ZOOM = 2;
@@ -245,6 +254,10 @@ export default function HistoryPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [tour, stepIdx, goStep]);
   const tourOrder = useMemo(() => new Map((tour?.steps ?? []).map((x, i) => [x.id, i])), [tour]);
+  // 同一宗派的几条支线：说明栏里选支线；长卷上整个宗派的人都不变淡（当前支线另有序号与高亮）
+  const tourFamily = useMemo(() => (tour?.family ? TOURS.filter((x) => x.family === tour.family) : []), [tour]);
+  const tourFamilyRoot = tourFamily.find((x) => x.id === x.family) ?? null;
+  const familyIds = useMemo(() => new Set(tourFamily.flatMap((x) => x.steps.map((st) => st.id))), [tourFamily]);
 
   // ---- 自动播放（借鉴江山时序的「拖动时间看天下」）：导览中逐站走，否则年份每拍前进 5 年 ----
   const togglePlay = useCallback(() => {
@@ -478,49 +491,54 @@ export default function HistoryPage() {
 
       <div className="history-tours" role="group" aria-label={t("history.tours")}>
         <span className="history-tours-k">{t("history.tours")}</span>
-        {TOURS.map((x, i) => {
-          const chip = (
-            <button
-              key={x.id}
-              type="button"
-              className={`history-chip${tour?.id === x.id ? " history-chip--on" : ""}`}
-              aria-pressed={tour?.id === x.id}
-              onClick={() => startTour(tour?.id === x.id ? null : x.id)}
-            >
-              {L(x.title)}
-            </button>
-          );
-          if (!x.g) return chip;
-          if (TOURS[i - 1]?.g === x.g) return null;
-          // 同组的路线收在一个框里，前面写组名
-          return (
-            <span key={`g-${x.g}`} className="history-tours-group">
-              <span className="history-tours-gname">{L(x.g)}</span>
-              {TOURS.filter((y) => y.g === x.g).map((y) => (
+        {TOUR_GROUPS.map((g) => (
+          <span key={g} className="history-tours-group">
+            <span className="history-tours-gname">{t(`history.tours_${g}`)}</span>
+            {TOUR_BUTTONS.filter((x) => x.group === g).map((x) => {
+              // 禅宗按钮：在禅宗任何一支里都算选中
+              const on = !!tour && (tour.id === x.id || (!!x.family && tour.family === x.family));
+              return (
                 <button
-                  key={y.id}
+                  key={x.id}
                   type="button"
-                  className={`history-chip${tour?.id === y.id ? " history-chip--on" : ""}`}
-                  aria-pressed={tour?.id === y.id}
-                  onClick={() => startTour(tour?.id === y.id ? null : y.id)}
+                  className={`history-chip${on ? " history-chip--on" : ""}`}
+                  aria-pressed={on}
+                  title={L(x.family ? TOURS.filter((y) => y.family === x.family).map((y) => y.branch ?? y.title).join("、") : x.title)}
+                  onClick={() => startTour(on ? null : x.id)}
                 >
-                  {L(y.title)}
+                  {L(x.short ?? x.title)}
                 </button>
-              ))}
-            </span>
-          );
-        })}
+              );
+            })}
+          </span>
+        ))}
       </div>
 
       {tour && step ? (
         <div className="history-tour-panel" role="status">
           <div className="history-tour-head">
-            <strong>{L(tour.g ? `${tour.g} · ${tour.title}` : tour.title)}</strong>
+            <strong>{L(tourFamilyRoot ? `${tourFamilyRoot.short ?? ""} · ${tour.branch ?? tour.title}` : tour.title)}</strong>
             <span className="history-tour-intro">{L(tour.intro)}</span>
             <button type="button" className="history-chip history-chip--clear" onClick={() => startTour(null)}>
               {t("history.tour_exit")}
             </button>
           </div>
+          {tourFamily.length > 1 && (
+            <div className="history-tour-branches" role="group" aria-label={t("history.tour_branches")}>
+              <span className="history-tour-branches-k">{t("history.tour_branches")}</span>
+              {tourFamily.map((x) => (
+                <button
+                  key={x.id}
+                  type="button"
+                  className={`history-chip${x.id === tour.id ? " history-chip--on" : ""}`}
+                  aria-pressed={x.id === tour.id}
+                  onClick={() => x.id !== tour.id && startTour(x.id)}
+                >
+                  {L(x.branch ?? x.title)}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="history-tour-step">
             <span className="history-tour-count">{t("history.tour_step", { k: stepIdx + 1, n: tour.steps.length })}</span>
             <button type="button" className="history-tour-name" onClick={() => openPerson(step.id, "tour")}>
@@ -637,7 +655,8 @@ export default function HistoryPage() {
                 selectedId === p.id ? "is-selected" : "",
                 related.has(p.id) ? "is-related" : "",
                 selected && selectedId !== p.id && !related.has(p.id) ? "is-dim" : "",
-                !selected && tour && !tourOrder.has(p.id) ? "is-dim" : "",
+                !selected && tour && !tourOrder.has(p.id) && !familyIds.has(p.id) ? "is-dim" : "",
+                !selected && tour && !tourOrder.has(p.id) && familyIds.has(p.id) ? "is-family" : "",
                 !selected && tour && tourOrder.has(p.id) ? "is-tour" : "",
                 !selected && step?.id === p.id ? "is-tour-current" : "",
               ].join(" ");

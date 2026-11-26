@@ -605,3 +605,21 @@ a.history-view:hover {
   pointer-events: none;
   font-variant-numeric: tabular-nums;
 }
+
+/* 导览两组（传法求经 / 宗派传承）与禅宗支线 */
+.history-tour-branches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 6px;
+}
+.history-tour-branches-k {
+  font-size: 12px;
+  color: var(--fj-ink-muted);
+  margin-right: 2px;
+}
+.history-bar.is-family {
+  outline: 1px dashed color-mix(in srgb, var(--fj-cinnabar) 55%, transparent);
+  outline-offset: 1px;
+}
