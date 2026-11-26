@@ -18,7 +18,16 @@ import {
   type HistoryPerson,
   type PersonSpan,
 } from "../utils/historyTimeline";
+import TOURS_DATA from "../data/historyTours.json";
 import "../styles/history.css";
+
+interface HistoryTour {
+  id: string;
+  title: string;
+  intro: string;
+  steps: Array<{ id: string; y: number; t: string }>;
+}
+const TOURS: HistoryTour[] = TOURS_DATA.tours;
 
 const ZOOMS = [1, 1.5, 2.2, 3.2, 4.6, 6.5];
 const DEFAULT_ZOOM = 2;
@@ -58,6 +67,10 @@ export default function HistoryPage() {
   const selectedId = params.get("p");
   // 默认按宗派分泳道；?v=time 按年代混排
   const byYear = params.get("v") === "time";
+  // 导览：?tour=chan&s=2（第 3 站）
+  const tour = TOURS.find((x) => x.id === params.get("tour")) ?? null;
+  const stepIdx = tour ? Math.min(Math.max(0, Number(params.get("s")) || 0), tour.steps.length - 1) : 0;
+  const step = tour ? tour.steps[stepIdx] : null;
   const yParam = Number(params.get("y"));
   const cursor = params.get("y") && Number.isFinite(yParam) ? yParam : null;
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -122,34 +135,88 @@ export default function HistoryPage() {
     [setParam],
   );
 
-  // 深链 / 搜索选中：这个人不在视野里就滚过去。右侧人物卡会挡住约 460px，横向可见区要扣掉；
+  // 深链 / 搜索选中 / 导览换站：这个人不在视野里就滚过去。右侧人物卡会挡住约 460px，横向可见区要扣掉；
   // 分宗派泳道后人可能在很下面，纵向也要判断（11-26 实测：?p=智顗 停在最上面的译经泳道）。
   const placedById = useMemo(() => new Map(placed.map((x) => [x.person.id, x])), [placed]);
-  useEffect(() => {
-    if (!selectedId) return;
-    const pl = placedById.get(selectedId);
-    const el = scrollRef.current;
-    if (!pl || !el) return;
-    const covered = Math.min(460, el.clientWidth * 0.5);
-    const left = xOf(pl.span.start);
-    const right = Math.min(xOf(pl.span.end), left + 200);
-    const hVisible = left >= el.scrollLeft && right <= el.scrollLeft + el.clientWidth - covered;
-    const rowTop = TOP + pl.row * ROW_H;
-    const vVisible = rowTop >= el.scrollTop + TOP && rowTop + ROW_H <= el.scrollTop + el.clientHeight;
-    if (hVisible && vVisible) return;
-    el.scrollTo({
-      left: hVisible ? el.scrollLeft : Math.max(0, left - (el.clientWidth - covered) / 3),
-      top: vVisible ? el.scrollTop : Math.max(0, rowTop - TOP - 3 * ROW_H),
-    });
+  const ensureVisible = useCallback(
+    (id: string, coveredRight: boolean) => {
+      const pl = placedById.get(id);
+      const el = scrollRef.current;
+      if (!pl || !el) return;
+      const covered = coveredRight ? Math.min(460, el.clientWidth * 0.5) : 0;
+      const left = xOf(pl.span.start);
+      const right = Math.min(xOf(pl.span.end), left + 200);
+      const hVisible = left >= el.scrollLeft && right <= el.scrollLeft + el.clientWidth - covered;
+      const rowTop = TOP + pl.row * ROW_H;
+      const vVisible = rowTop >= el.scrollTop + TOP && rowTop + ROW_H <= el.scrollTop + el.clientHeight;
+      if (hVisible && vVisible) return;
+      el.scrollTo({
+        left: hVisible ? el.scrollLeft : Math.max(0, left - (el.clientWidth - covered) / 3),
+        top: vVisible ? el.scrollTop : Math.max(0, rowTop - TOP - 3 * ROW_H),
+      });
+    },
+    // xOf 只依赖 px
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, placedById]);
+    [placedById, px],
+  );
+  useEffect(() => {
+    if (selectedId) ensureVisible(selectedId, true);
+  }, [selectedId, ensureVisible]);
+  useEffect(() => {
+    if (step && !selectedId) ensureVisible(step.id, false);
+    // 只在换站时滚；关掉人物卡不要把视野拽回来
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step?.id, placedById]);
+
+  const startTour = useCallback(
+    (id: string | null) => {
+      setParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete("p");
+          next.delete("s");
+          if (id) {
+            next.set("tour", id);
+            next.delete("y");
+          } else next.delete("tour");
+          return next;
+        },
+        { replace: true },
+      );
+      if (id) track("history_tour", { id });
+    },
+    [setParams],
+  );
+  const goStep = useCallback(
+    (k: number) => {
+      if (!tour) return;
+      const s2 = Math.min(Math.max(0, k), tour.steps.length - 1);
+      setParam("s", String(s2));
+      track("history_tour_step", { id: tour.id, s: s2 });
+    },
+    [tour, setParam],
+  );
+  // 导览中左右方向键换站（焦点在输入框时不抢）
+  useEffect(() => {
+    if (!tour) return;
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+      if (e.key === "ArrowRight") goStep(stepIdx + 1);
+      else if (e.key === "ArrowLeft") goStep(stepIdx - 1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [tour, stepIdx, goStep]);
+  const tourOrder = useMemo(() => new Map((tour?.steps ?? []).map((x, i) => [x.id, i])), [tour]);
 
   // 首次打开：没指定人也没指定年时，停在东晉—唐（佛教史最密的一段）
   const initialScrolled = useRef(false);
   useEffect(() => {
     if (initialScrolled.current || !data || !scrollRef.current) return;
     initialScrolled.current = true;
-    if (!selectedId) scrollToYear(cursor ?? 520);
+    // 有人物或导览时由上面的 ensureVisible 负责定位，这里不能再把视野拽回 520 年
+    if (!selectedId && !tour) scrollToYear(cursor ?? 520);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
@@ -252,6 +319,48 @@ export default function HistoryPage() {
         </span>
       </div>
 
+      <div className="history-tours" role="group" aria-label={t("history.tours")}>
+        <span className="history-tours-k">{t("history.tours")}</span>
+        {TOURS.map((x) => (
+          <button
+            key={x.id}
+            type="button"
+            className={`history-chip${tour?.id === x.id ? " history-chip--on" : ""}`}
+            aria-pressed={tour?.id === x.id}
+            onClick={() => startTour(tour?.id === x.id ? null : x.id)}
+          >
+            {L(x.title)}
+          </button>
+        ))}
+      </div>
+
+      {tour && step ? (
+        <div className="history-tour-panel" role="status">
+          <div className="history-tour-head">
+            <strong>{L(tour.title)}</strong>
+            <span className="history-tour-intro">{L(tour.intro)}</span>
+            <button type="button" className="history-chip history-chip--clear" onClick={() => startTour(null)}>
+              {t("history.tour_exit")}
+            </button>
+          </div>
+          <div className="history-tour-step">
+            <span className="history-tour-count">{t("history.tour_step", { k: stepIdx + 1, n: tour.steps.length })}</span>
+            <button type="button" className="history-tour-name" onClick={() => openPerson(step.id, "tour")}>
+              {L(byId.get(step.id)?.n ?? "")}
+            </button>
+            <span className="history-tour-years">{byId.get(step.id) ? formatYears(byId.get(step.id)!, t("history.approx")) : ""}</span>
+            <span className="history-tour-text">{L(step.t)}</span>
+            <span className="history-tour-nav">
+              <Button size="small" disabled={stepIdx === 0} onClick={() => goStep(stepIdx - 1)}>
+                {t("history.tour_prev")}
+              </Button>
+              <Button size="small" type="primary" disabled={stepIdx === tour.steps.length - 1} onClick={() => goStep(stepIdx + 1)}>
+                {t("history.tour_next")}
+              </Button>
+            </span>
+          </div>
+        </div>
+      ) : (
       <div className="history-cursor-bar" role="status">
         {cursor === null ? (
           <span className="history-hint">{t("history.cursor_prompt")}</span>
@@ -273,6 +382,7 @@ export default function HistoryPage() {
           </>
         )}
       </div>
+      )}
 
       {isLoading ? (
         <div className="history-loading"><Spin /></div>
@@ -326,6 +436,7 @@ export default function HistoryPage() {
               </div>
             ))}
             {cursor !== null && <div className="history-cursor" style={{ left: xOf(cursor), height }} />}
+            {tour && !selected && <TourPath ids={tour.steps.map((x) => x.id)} current={step?.id ?? ""} placedById={placedById} xOf={xOf} width={width} height={height} />}
             {selected && (
               <LineageLines
                 selectedId={selected.id}
@@ -347,6 +458,9 @@ export default function HistoryPage() {
                 selectedId === p.id ? "is-selected" : "",
                 related.has(p.id) ? "is-related" : "",
                 selected && selectedId !== p.id && !related.has(p.id) ? "is-dim" : "",
+                !selected && tour && !tourOrder.has(p.id) ? "is-dim" : "",
+                !selected && tour && tourOrder.has(p.id) ? "is-tour" : "",
+                !selected && step?.id === p.id ? "is-tour-current" : "",
               ].join(" ");
               return (
                 <button
@@ -357,6 +471,7 @@ export default function HistoryPage() {
                   title={`${L(p.n)} ${formatYears(p, t("history.approx")) || t("history.years_unknown")} · ${L(p.dy)}`}
                   onClick={() => openPerson(p.id, "bar")}
                 >
+                  {!selected && tourOrder.has(p.id) && <span className="history-tour-num">{(tourOrder.get(p.id) ?? 0) + 1}</span>}
                   <span className={inside ? "history-bar-name" : "history-bar-name history-bar-name--out"} style={inside ? undefined : { left: w + 4 }}>
                     {L(p.n)}
                   </span>
@@ -544,6 +659,37 @@ function LineageLines({
           />
         );
       })}
+    </svg>
+  );
+}
+
+/** 导览：按站序把路线上的人串起来（从每个人条子的起点附近连到下一位）。 */
+function TourPath({
+  ids,
+  current,
+  placedById,
+  xOf,
+  width,
+  height,
+}: {
+  ids: string[];
+  current: string;
+  placedById: Map<string, { span: PersonSpan; row: number }>;
+  xOf: (year: number) => number;
+  width: number;
+  height: number;
+}) {
+  const pts = ids
+    .map((id) => ({ id, pl: placedById.get(id) }))
+    .filter((x): x is { id: string; pl: { span: PersonSpan; row: number } } => !!x.pl)
+    .map(({ id, pl }) => ({ id, x: xOf(pl.span.start) + 8, y: TOP + pl.row * ROW_H + 9 }));
+  if (pts.length < 2) return null;
+  const d = pts.map((p, i) => `${i ? "L" : "M"} ${p.x} ${p.y}`).join(" ");
+  const cur = pts.find((p) => p.id === current);
+  return (
+    <svg className="history-lineage history-tour-path" width={width} height={height} aria-hidden>
+      <path d={d} />
+      {cur && <circle cx={cur.x} cy={cur.y} r={13} />}
     </svg>
   );
 }

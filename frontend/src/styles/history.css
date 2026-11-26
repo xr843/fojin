@@ -397,3 +397,121 @@ a.history-view:hover {
 .history-lineage-st {
   stroke-dasharray: 4 3;
 }
+
+/* 导览 */
+.history-tours {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.history-tours-k {
+  font-size: 13px;
+  color: var(--fj-ink-muted);
+  margin-right: 2px;
+}
+.history-chip--on {
+  background: var(--fj-accent);
+  border-color: var(--fj-accent);
+  color: var(--fj-on-accent);
+}
+.history-chip--on:hover,
+.history-chip--on:focus-visible {
+  color: var(--fj-on-accent);
+}
+.history-tour-panel {
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  background: var(--fj-card-bg);
+  border: 1px solid var(--fj-accent);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--fj-ink);
+}
+.history-tour-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.history-tour-head strong {
+  font-size: 15px;
+  color: var(--fj-accent);
+}
+.history-tour-intro {
+  color: var(--fj-ink-light);
+  flex: 1;
+  min-width: 200px;
+}
+.history-tour-step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+.history-tour-count {
+  font-size: 12px;
+  color: var(--fj-ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+.history-tour-name {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fj-highlight);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.history-tour-years {
+  font-size: 12px;
+  color: var(--fj-ink-muted);
+}
+.history-tour-text {
+  flex: 1 1 360px;
+  line-height: 1.6;
+}
+.history-tour-nav {
+  display: inline-flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.history-tour-num {
+  position: absolute;
+  left: -9px;
+  top: -5px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 8px;
+  background: var(--fj-cinnabar);
+  color: #fff;
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+  z-index: 4;
+  pointer-events: none;
+}
+.history-bar.is-tour {
+  outline: 1.5px solid var(--fj-cinnabar);
+  outline-offset: 1px;
+  z-index: 3;
+}
+.history-bar.is-tour-current {
+  outline-width: 3px;
+}
+.history-tour-path path {
+  stroke-dasharray: none;
+  stroke-width: 2;
+  opacity: 0.75;
+}
+.history-tour-path circle {
+  fill: none;
+  stroke: var(--fj-cinnabar);
+  stroke-width: 2;
+}

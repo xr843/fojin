@@ -2076,5 +2076,10 @@
   "history.school.pureland": "淨土",
   "history.school.chan": "禪",
   "history.school.esoteric": "密",
-  "history.school.other": "其他"
+  "history.school.other": "其他",
+  "history.tours": "導覽",
+  "history.tour_prev": "上一站",
+  "history.tour_next": "下一站",
+  "history.tour_exit": "退出導覽",
+  "history.tour_step": "第 {{k}} / {{n}} 站"
 }
