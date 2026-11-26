@@ -9,6 +9,7 @@ import { localizeHan } from "../utils/hanScript";
 import { BANDS, TIMELINE_END, TIMELINE_START, dynastyAt } from "../data/historyDynasties";
 import {
   aliveAt,
+  fixZhuAfterSimplify,
   formatYears,
   layoutLanes,
   personSpan,
@@ -57,7 +58,7 @@ async function fetchHistory(): Promise<HistoryData> {
 export default function HistoryPage() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
-  const L = useCallback((s: string) => localizeHan(s, lang), [lang]);
+  const L = useCallback((s: string) => fixZhuAfterSimplify(localizeHan(s, lang)), [lang]);
   const [params, setParams] = useSearchParams();
   const { data, isLoading, isError } = useQuery({ queryKey: ["history-people"], queryFn: fetchHistory, staleTime: Infinity });
 
