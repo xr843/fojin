@@ -980,3 +980,6 @@
 }
 /* 深色主题：「今日经句」小标签用深底胶囊（同原热门检索标签），不叠描边 */
 :root[data-theme="dark"] .home-daily-label { text-shadow: none; background: rgba(74, 65, 51, 0.72); }
+/* 佛教节日当天：标签换成节日名，实底朱色，与平日的描边标签区分开 */
+.home-daily-label--festival { color: #fff; background: var(--fj-accent); border-color: var(--fj-accent); letter-spacing: 1px; }
+:root[data-theme="dark"] .home-daily-label--festival { color: #fff; background: var(--fj-accent); }

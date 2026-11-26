@@ -6,7 +6,9 @@
  * 不靠人记忆写出处，核不到的不收。
  */
 import passages from "../data/dailyPassages.json";
+import festivals from "../data/dailyFestivals.json";
 import { scriptForLanguage } from "./hanLocale";
+import { lunarParts } from "./lunar";
 
 export interface DailyPassage {
   text: string;
@@ -23,6 +25,35 @@ export interface DailyPassage {
 
 export const DAILY_PASSAGES = passages as DailyPassage[];
 
+/**
+ * 佛教节日（汉传通行农历日期）当天换成与这位佛菩萨相关的经句，同样全藏逐字核对过，
+ * 由 build_daily_passages.py --festivals 生成。节日名是数据（简体 name / 繁体 name_hant）。
+ */
+export interface DailyFestival extends DailyPassage {
+  /** 农历「月-日」，如 "02-19"；"07-30" 遇小月在廿九 */
+  key: string;
+  name: string;
+  name_hant?: string;
+}
+
+export const DAILY_FESTIVALS = festivals as DailyFestival[];
+
+/** 这一天（北京日期）是不是佛教节日；闰月不算（节日按本月过）。 */
+export function festivalFor(dateKey: string, pool: DailyFestival[] = DAILY_FESTIVALS): DailyFestival | null {
+  const p = lunarParts(dateKey);
+  if (!p || p.leap) return null;
+  const mm = String(p.month).padStart(2, "0");
+  const keys = [`${mm}-${String(p.day).padStart(2, "0")}`];
+  if (p.day === 29 && p.monthDays === 29) keys.push(`${mm}-30`);
+  return pool.find((f) => keys.includes(f.key)) ?? null;
+}
+
+/** 节日名按界面繁简取；非中文界面不显示（农历也只给中文界面）。 */
+export function festivalName(f: DailyFestival | null, lang: string): string | null {
+  if (!f || !lang.startsWith("zh")) return null;
+  return scriptForLanguage(lang) === "traditional" ? (f.name_hant ?? f.name) : f.name;
+}
+
 /** 北京时间的日期键 YYYY-MM-DD：零点在北京切换，海外读者也看同一段。 */
 export function beijingDateKey(now: Date): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
@@ -37,9 +68,14 @@ export function dailyIndex(dateKey: string, n: number): number {
   return ((days % n) + n) % n;
 }
 
-export function pickDaily(now: Date, pool: DailyPassage[] = DAILY_PASSAGES): { passage: DailyPassage; dateKey: string } {
+export function pickDaily(
+  now: Date,
+  pool: DailyPassage[] = DAILY_PASSAGES,
+): { passage: DailyPassage; dateKey: string; festival: DailyFestival | null } {
   const dateKey = beijingDateKey(now);
-  return { passage: pool[dailyIndex(dateKey, pool.length)], dateKey };
+  // 节日当天用节日经句；轮换序号照常按天数走，节日过后接着原来的顺序
+  const festival = festivalFor(dateKey);
+  return { passage: festival ?? pool[dailyIndex(dateKey, pool.length)], dateKey, festival };
 }
 
 /**
