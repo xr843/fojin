@@ -12,6 +12,7 @@ import { escapeHtml } from "../../utils/sanitize";
 import { useEffectiveTheme } from "../../hooks/useTheme";
 import { typeColors } from "./typeColors";
 import { collapseAttributionIfNarrow } from "./mapAttribution";
+import { patchZhLabels } from "./zhMapStyle";
 import { useNarrowViewport } from "../../hooks/useNarrowViewport";
 import type { KGGeoEntity, KGLineageArc } from "../../api/client";
 
@@ -245,44 +246,7 @@ export default function DeckGLMap({
       .then((r) => r.json())
       .then((style: { layers?: Array<{ id: string; type: string; layout?: Record<string, unknown> }> }) => {
         if (cancelled || !style.layers) return;
-        const twReplace = [
-          "case",
-          ["==", ["get", "iso_a2"], "TW"], "台灣省", // i18n-exempt
-          ["==", ["get", "ISO_A2"], "TW"], "台灣省", // i18n-exempt
-          ["==", ["get", "iso_3166_1"], "TW"], "台灣省", // i18n-exempt
-          ["==", ["get", "iso_3166_1_alpha_2"], "TW"], "台灣省", // i18n-exempt
-          ["==", ["get", "name"], "中華民國"], "台灣省", // i18n-exempt
-          ["==", ["get", "name"], "中华民国"], "台灣省", // i18n-exempt
-          ["==", ["get", "name"], "Taiwan"], "台灣省", // i18n-exempt
-          ["==", ["get", "name"], "Republic of China"], "台灣省", // i18n-exempt
-          ["==", ["get", "name:zh"], "中華民國"], "台灣省", // i18n-exempt
-          ["==", ["get", "name:zh"], "中华民国"], "台灣省", // i18n-exempt
-          ["==", ["get", "name:zh-Hant"], "中華民國"], "台灣省", // i18n-exempt
-          ["==", ["get", "name:zh-Hant"], "臺灣"], "台灣省", // i18n-exempt
-          ["==", ["get", "name:zh-Hant"], "台灣"], "台灣省", // i18n-exempt
-          ["==", ["get", "name:zh-Hans"], "中华民国"], "台灣省", // i18n-exempt
-          ["==", ["get", "name:zh-Hans"], "台湾"], "台灣省", // i18n-exempt
-          ["==", ["get", "name:en"], "Taiwan"], "台灣省", // i18n-exempt
-          ["==", ["get", "name:en"], "Republic of China"], "台灣省", // i18n-exempt
-          [
-            "coalesce",
-            ["get", "name:zh-Hans"],
-            ["get", "name:zh"],
-            ["get", "name:zh-Hant"],
-            ["get", "name:ja"],
-            ["get", "name_int"],
-            ["get", "name:latin"],
-            ["get", "name:en"],
-            ["get", "name"],
-          ],
-        ];
-        for (const layer of style.layers) {
-          if (layer.type !== "symbol" || !layer.layout) continue;
-          if (!("text-field" in layer.layout)) continue;
-          const orig = JSON.stringify(layer.layout["text-field"] ?? "");
-          if (!orig.includes("name")) continue;
-          layer.layout["text-field"] = twReplace;
-        }
+        patchZhLabels(style);
         // 换底图（卫星 / 主题）会整体重建样式。地形若还开着，MapLibre 会在新样式的着色器
         // 就绪前画地形深度，抛 `shaderPreludeCode` of undefined（2026-10-17 本地复现）。
         // 先关地形，新样式 style.load 后由上面的 effect 重新挂上。

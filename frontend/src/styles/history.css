@@ -534,3 +534,58 @@ a.history-view:hover {
 .history-tour-path path.history-tour-gap {
   stroke-dasharray: 5 4;
 }
+
+/* 长卷 + 地图：宽屏左右并排（地图占右侧约三分之一），窄屏地图在上 */
+.history-main {
+  display: block;
+}
+.history-main--map {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(380px, 34vw, 640px);
+  gap: 10px;
+  align-items: stretch;
+}
+.history-main--map .history-scroll {
+  min-width: 0;
+}
+.history-map {
+  position: relative;
+  min-height: 360px;
+  max-height: calc(100vh - var(--fj-header-h) - 260px);
+  border: 1px solid var(--fj-border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--fj-surface-alt);
+}
+.history-map-caption {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 48px;
+  z-index: 2;
+  padding: 3px 8px;
+  font-size: 12px;
+  color: var(--fj-ink);
+  background: color-mix(in srgb, var(--fj-surface) 85%, transparent);
+  border-radius: 4px;
+  pointer-events: none;
+  width: fit-content;
+}
+@media (max-width: 1199px) {
+  .history-main--map {
+    display: flex;
+    flex-direction: column-reverse;
+  }
+  .history-map {
+    height: 300px;
+    min-height: 300px;
+  }
+}
+
+/* 宽屏打开人物卡时右侧让位，长卷与地图都不被卡片挡住 */
+@media (min-width: 1200px) {
+  .history-page--card {
+    padding-right: 452px;
+    transition: padding-right 0.2s;
+  }
+}

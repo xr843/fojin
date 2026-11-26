@@ -30,6 +30,9 @@ export interface HistoryPerson {
   men: HistoryLink[];
   works: HistoryLink[];
   wn: number;
+  /** 籍贯 / 葬地 [经度, 纬度, 地名, 可信度]（DILA 地名库） */
+  o?: [number, number, string, string];
+  bu?: [number, number, string, string];
 }
 
 export interface HistoryData {

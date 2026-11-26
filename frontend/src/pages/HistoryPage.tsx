@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { Link, useSearchParams } from "react-router";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { AutoComplete, Button, Drawer, Empty, Segmented, Spin, Tooltip } from "antd";
 import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
-import { localizeHan } from "../utils/hanScript";
+import { localizeHan, scriptForLanguage } from "../utils/hanScript";
 import { BANDS, TIMELINE_END, TIMELINE_START, dynastyAt } from "../data/historyDynasties";
 import {
   aliveAt,
@@ -20,7 +20,13 @@ import {
   type PersonSpan,
 } from "../utils/historyTimeline";
 import TOURS_DATA from "../data/historyTours.json";
+import { useEffectiveTheme } from "../hooks/useTheme";
+import { useNarrowViewport } from "../hooks/useNarrowViewport";
+import type { MapEdge, MapPoint } from "../components/history/HistoryMap";
 import "../styles/history.css";
+
+// 地图（maplibre 约 800KB）单独分包：长卷先出来，地图随后
+const HistoryMap = lazy(() => import("../components/history/HistoryMap"));
 
 /** 导览路线。step.p：上一站（师）在本路线里的序号，缺省为前一站——传承分叉时（临济下分黄龙、杨岐）画成树；
  *  gap：中间隔了几代（道邃→羲寂），连线画虚线。g：分组（禅宗五条归在一起）。 */
@@ -28,6 +34,8 @@ interface TourStep {
   id: string;
   y: number;
   t: string;
+  /** 该站地点 [经度, 纬度, 地名]（DILA 地名库），说不准的不标 */
+  pl?: [number, number, string];
   p?: number;
   gap?: boolean;
 }
@@ -38,7 +46,8 @@ interface HistoryTour {
   intro: string;
   steps: TourStep[];
 }
-const TOURS: HistoryTour[] = TOURS_DATA.tours;
+// JSON 推断不出元组类型，按约定断言（historyTours.json 的格式见文件头 _note）
+const TOURS = TOURS_DATA.tours as unknown as HistoryTour[];
 
 const ZOOMS = [1, 1.5, 2.2, 3.2, 4.6, 6.5];
 const DEFAULT_ZOOM = 2;
@@ -85,6 +94,8 @@ export default function HistoryPage() {
   const yParam = Number(params.get("y"));
   const cursor = params.get("y") && Number.isFinite(yParam) ? yParam : null;
   const scrollRef = useRef<HTMLDivElement>(null);
+  // 窄于 1200px：地图默认收起、人物卡盖在长卷上
+  const narrow = useNarrowViewport("(max-width: 1199px)");
 
   const px = ZOOMS[zoom];
   const byId = useMemo(() => new Map((data?.people ?? []).map((p) => [p.id, p])), [data]);
@@ -171,8 +182,9 @@ export default function HistoryPage() {
     [placedById, px],
   );
   useEffect(() => {
-    if (selectedId) ensureVisible(selectedId, true);
-  }, [selectedId, ensureVisible]);
+    // 宽屏时页面右侧给人物卡让位（history-page--card），长卷不被挡；窄屏人物卡盖在上面，要扣掉
+    if (selectedId) ensureVisible(selectedId, narrow);
+  }, [selectedId, ensureVisible, narrow]);
   useEffect(() => {
     if (step && !selectedId) ensureVisible(step.id, false);
     // 只在换站时滚；关掉人物卡不要把视野拽回来
@@ -221,6 +233,7 @@ export default function HistoryPage() {
   }, [tour, stepIdx, goStep]);
   const tourOrder = useMemo(() => new Map((tour?.steps ?? []).map((x, i) => [x.id, i])), [tour]);
 
+
   // 首次打开：没指定人也没指定年时，停在东晉—唐（佛教史最密的一段）
   const initialScrolled = useRef(false);
   useEffect(() => {
@@ -245,6 +258,61 @@ export default function HistoryPage() {
     [cursor, shown, spans],
   );
 
+  // ---- 地图：随导览 / 选中的人 / 游标年份变 ----
+  const dark = useEffectiveTheme() === "dark";
+  const [mapOpen, setMapOpen] = useState<boolean | null>(null);
+  const showMap = mapOpen ?? !narrow;
+  const mapModel = useMemo((): { points: MapPoint[]; edges: MapEdge[]; focus: Array<[number, number]>; caption: string } => {
+    const people = data?.people ?? [];
+    const ll = (v: { 0: number; 1: number }) => [v[0], v[1]] as [number, number];
+    if (tour) {
+      const pts: MapPoint[] = [];
+      const edges: MapEdge[] = [];
+      tour.steps.forEach((st, i) => {
+        if (!st.pl) return;
+        const who = byId.get(st.id);
+        pts.push({ id: `t${i}`, lon: st.pl[0], lat: st.pl[1], label: `${L(who?.n ?? "")} · ${L(st.pl[2])}`, kind: i === stepIdx ? "current" : "tour", n: i + 1, person: st.id });
+        // 连到最近一个有地点的上游（师）
+        let p = st.p ?? i - 1;
+        while (p >= 0 && !tour.steps[p]?.pl) p = tour.steps[p]?.p ?? p - 1;
+        const par = p >= 0 ? tour.steps[p] : null;
+        if (i > 0 && par?.pl) edges.push({ from: ll(par.pl), to: ll(st.pl), gap: st.gap });
+      });
+      const cur = tour.steps[stepIdx]?.pl;
+      return {
+        points: pts,
+        edges,
+        focus: stepIdx === 0 || !cur ? pts.map((x) => [x.lon, x.lat] as [number, number]) : [ll(cur)],
+        caption: t("history.map_tour"),
+      };
+    }
+    if (selected) {
+      const pts: MapPoint[] = [];
+      const edges: MapEdge[] = [];
+      if (selected.o) pts.push({ id: "o", lon: selected.o[0], lat: selected.o[1], label: `${L(selected.n)} · ${t("history.map_origin")} ${L(selected.o[2])}`, kind: "focus", person: selected.id });
+      if (selected.bu) pts.push({ id: "bu", lon: selected.bu[0], lat: selected.bu[1], label: `${t("history.map_burial")} ${L(selected.bu[2])}`, kind: "burial", person: selected.id });
+      for (const rid of [...selected.te, ...selected.st]) {
+        const r = byId.get(rid);
+        if (!r?.o) continue;
+        pts.push({ id: `r${rid}`, lon: r.o[0], lat: r.o[1], label: L(r.n), kind: "related", person: rid });
+        if (selected.o) edges.push({ from: ll(r.o), to: ll(selected.o) });
+      }
+      return { points: pts, edges, focus: pts.map((x) => [x.lon, x.lat] as [number, number]), caption: t("history.map_person") };
+    }
+    if (cursor !== null) {
+      const pts: MapPoint[] = alive
+        .filter((p) => p.o)
+        .map((p) => ({ id: p.id, lon: p.o![0], lat: p.o![1], label: L(p.n), kind: "alive" as const, person: p.id }));
+      return { points: pts, edges: [], focus: pts.length > 1 ? pts.map((x) => [x.lon, x.lat] as [number, number]) : [], caption: t("history.map_alive", { y: cursor }) };
+    }
+    return {
+      points: people.filter((p) => shown.includes(p) && p.o).map((p) => ({ id: p.id, lon: p.o![0], lat: p.o![1], label: L(p.n), kind: "base" as const, person: p.id })),
+      edges: [],
+      focus: [],
+      caption: t("history.map_base"),
+    };
+  }, [data, tour, stepIdx, selected, cursor, alive, shown, byId, L, t]);
+
   const options = useMemo(() => {
     const q = search.trim();
     if (!q || !data) return [];
@@ -268,7 +336,7 @@ export default function HistoryPage() {
     s && s.kind !== "full" ? t(`history.kind_${s.kind}`) : null;
 
   return (
-    <div className="history-page">
+    <div className={`history-page${selected && !narrow ? " history-page--card" : ""}`}>
       <Helmet>
         <title>{`${t("history.title")} - ${t("app.name")}`}</title>
         <meta name="description" content={t("history.meta_desc")} />
@@ -320,6 +388,9 @@ export default function HistoryPage() {
             { label: t("history.filter_translators"), value: "tr" },
           ]}
         />
+        <Button size="small" onClick={() => { setMapOpen(!showMap); track("history_map_toggle", { open: String(!showMap) }); }}>
+          {showMap ? t("history.map_hide") : t("history.map_show")}
+        </Button>
         <span className="history-zoom">
           <Tooltip title={t("history.zoom_out")}>
             <Button size="small" icon={<MinusOutlined />} aria-label={t("history.zoom_out")} disabled={zoom === 0} onClick={() => setZoom((z) => Math.max(0, z - 1))} />
@@ -421,6 +492,7 @@ export default function HistoryPage() {
       ) : isError || !data ? (
         <Empty description={t("history.load_error")} />
       ) : (
+        <div className={`history-main${showMap ? " history-main--map" : ""}`}>
         <div className="history-scroll" ref={scrollRef}>
           <div className="history-canvas" style={{ width, height }} onClick={onCanvasClick}>
             {ticks.map((y) => (
@@ -511,6 +583,23 @@ export default function HistoryPage() {
               );
             })}
           </div>
+        </div>
+        {showMap && (
+          <aside className="history-map" aria-label={t("history.map_title")}>
+            <div className="history-map-caption">{mapModel.caption}</div>
+            <Suspense fallback={<div className="history-loading"><Spin /></div>}>
+              <HistoryMap
+                points={mapModel.points}
+                edges={mapModel.edges}
+                focus={mapModel.focus}
+                dark={dark}
+                traditional={scriptForLanguage(lang) === "traditional"}
+                onPick={(id) => openPerson(id, "map")}
+                attribution={t("history.map_attribution")}
+              />
+            </Suspense>
+          </aside>
+        )}
         </div>
       )}
 
