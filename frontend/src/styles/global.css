@@ -1994,3 +1994,39 @@ body:has(.chat-shell) .ant-layout-footer { display: none; }
 .chat-related-terms-more a { color: var(--fj-ink-light); }
 .chat-related-terms-more a:hover { color: var(--fj-highlight); }
 .chat-related-terms-more:empty { display: none; }
+
+/* 部署后新版本已就绪的提示（components/SwUpdateNotice.tsx） */
+.sw-update-notice {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px 8px 16px;
+  border-radius: 20px;
+  background: var(--fj-ink, #2b2b2b);
+  color: #fff;
+  font-size: 13px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+}
+.sw-update-reload {
+  border: 0;
+  border-radius: 14px;
+  padding: 3px 12px;
+  background: var(--fj-accent);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+.sw-update-close {
+  border: 0;
+  background: none;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
