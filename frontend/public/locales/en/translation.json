@@ -2094,5 +2094,8 @@
   "history.map_attribution": "Places: DILA Place Authority (CC BY-SA 3.0)",
   "history.play_years": "Play through time",
   "history.play_tour": "Autoplay tour",
-  "history.pause": "Pause"
+  "history.pause": "Pause",
+  "history.tours_transmission": "Transmission",
+  "history.tours_school": "Schools",
+  "history.tour_branches": "Branches"
 }

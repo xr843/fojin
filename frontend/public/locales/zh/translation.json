@@ -2094,5 +2094,8 @@
   "history.map_attribution": "地点坐标：DILA 地名规范库（CC BY-SA 3.0）",
   "history.play_years": "播放年代",
   "history.play_tour": "自动导览",
-  "history.pause": "暂停"
+  "history.pause": "暂停",
+  "history.tours_transmission": "传法求经",
+  "history.tours_school": "宗派传承",
+  "history.tour_branches": "支线"
 }
