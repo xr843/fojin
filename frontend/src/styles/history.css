@@ -589,3 +589,19 @@ a.history-view:hover {
     transition: padding-right 0.2s;
   }
 }
+
+/* 播放年份时地图右下角的大字年份 */
+.history-map-year {
+  position: absolute;
+  right: 14px;
+  bottom: 30px;
+  z-index: 2;
+  font-family: var(--fj-font-serif, serif);
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: color-mix(in srgb, var(--fj-accent) 80%, transparent);
+  text-shadow: 0 1px 0 var(--fj-surface), 0 0 8px var(--fj-surface);
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}

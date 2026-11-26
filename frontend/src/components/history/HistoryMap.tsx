@@ -56,6 +56,7 @@ export default function HistoryMap({
   traditional = false,
   onPick,
   attribution,
+  overlay = null,
 }: {
   points: MapPoint[];
   edges: MapEdge[];
@@ -66,6 +67,8 @@ export default function HistoryMap({
   traditional?: boolean;
   onPick: (personId: string) => void;
   attribution: string;
+  /** 地图右下角的大字年份（如「645 · 唐」），播放年份时看时代流转 */
+  overlay?: string | null;
 }) {
   const ref = useRef<MapRef>(null);
   // 底图地名改中文（MapTiler 的 language 参数对中文不生效，要改样式里的文字层，与 /map 共用同一补丁）
@@ -147,6 +150,8 @@ export default function HistoryMap({
 
   if (!style) return null;
   return (
+    <>
+    {overlay && <div className="history-map-year" aria-hidden>{overlay}</div>}
     <Map
       ref={ref}
       initialViewState={{ longitude: 112, latitude: 32, zoom: 3.6 }}
@@ -217,6 +222,8 @@ export default function HistoryMap({
             "text-offset": [0, 1.1],
             "text-anchor": "top",
             "text-max-width": 10,
+            // 当前站、选中的人优先摆字，其余撞了就让（text-allow-overlap 不支持按点取值，写成表达式整层都不画）
+            "symbol-sort-key": ["match", ["get", "kind"], "current", 0, "focus", 0, 1],
             "text-font": ["Noto Sans Regular"],
           }}
           paint={{
@@ -227,5 +234,6 @@ export default function HistoryMap({
         />
       </Source>
     </Map>
+    </>
   );
 }

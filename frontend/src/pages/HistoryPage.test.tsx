@@ -207,4 +207,19 @@ describe("佛教史长卷", () => {
     expect(m4.getByText("玄奘 · 长安")).toBeInTheDocument();
     expect(m4.getByText("窥基 · 大慈恩寺")).toBeInTheDocument();
   });
+
+  it("播放年代：从公元 60 年起每拍前进 5 年，暂停后停住；空格键也能播放", async () => {
+    renderPage();
+    await screen.findAllByRole("button", { name: "玄奘" });
+    fireEvent.click(screen.getByRole("button", { name: /播放年代/ }));
+    const loc = () => screen.getByTestId("loc").textContent ?? "";
+    await waitFor(() => expect(loc()).toContain("y=60"));
+    await waitFor(() => expect(loc()).toContain("y=65"), { timeout: 2000 });
+    fireEvent.click(screen.getByRole("button", { name: /暂停/ }));
+    const y = new URLSearchParams(screen.getByTestId("loc").textContent!.split("?")[1]).get("y");
+    await new Promise((r) => setTimeout(r, 700));
+    expect(new URLSearchParams(screen.getByTestId("loc").textContent!.split("?")[1]).get("y")).toBe(y);
+    fireEvent.keyDown(window, { key: " " });
+    expect(await screen.findByRole("button", { name: /暂停/ })).toBeInTheDocument();
+  });
 });

@@ -2091,5 +2091,8 @@
   "history.map_tour": "Places on this tour (from each stop's note)",
   "history.map_origin": "born",
   "history.map_burial": "buried",
-  "history.map_attribution": "Places: DILA Place Authority (CC BY-SA 3.0)"
+  "history.map_attribution": "Places: DILA Place Authority (CC BY-SA 3.0)",
+  "history.play_years": "Play through time",
+  "history.play_tour": "Autoplay tour",
+  "history.pause": "Pause"
 }
