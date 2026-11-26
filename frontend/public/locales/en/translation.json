@@ -2015,5 +2015,8 @@
   "admin_dashboard.module_usage.event.daily_share": "Daily: share image",
   "daily.lunar": "Lunar {{d}}",
   "read.search_placeholder": "Search by title, translator or number, e.g. Diamond Sutra, Xuanzang, T0235",
-  "read.search_button": "Find"
+  "read.search_button": "Find",
+  "app.update_ready": "FoJin has been updated",
+  "app.update_reload": "Reload",
+  "app.update_dismiss": "Dismiss"
 }

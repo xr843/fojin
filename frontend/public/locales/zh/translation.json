@@ -2015,5 +2015,8 @@
   "admin_dashboard.module_usage.event.daily_share": "今日经句：分享图",
   "daily.lunar": "农历{{d}}",
   "read.search_placeholder": "输入经名、译者或编号，如 金刚经、玄奘、T0235",
-  "read.search_button": "找经"
+  "read.search_button": "找经",
+  "app.update_ready": "佛津已更新",
+  "app.update_reload": "刷新查看",
+  "app.update_dismiss": "关闭"
 }

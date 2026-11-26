@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import { Layout as AntLayout, Typography, Button, Dropdown, Space, Drawer, Modal, Badge } from "antd";
 import { Outlet, useNavigate, useLocation } from "react-router";
+import SwUpdateNotice from "./SwUpdateNotice";
 import { activeNavPath } from "./navActive";
 
 import AudioPlayerProvider from "../audio/AudioPlayerProvider";
@@ -452,6 +453,7 @@ export default function Layout() {
           <PlayerBar />
         </AudioPlayerProvider>
       </Content>
+      <SwUpdateNotice />
       <Footer
         style={{
           textAlign: "center",

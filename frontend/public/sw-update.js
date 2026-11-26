@@ -31,20 +31,7 @@
     if (document.visibilityState === "visible") checkForUpdate();
   });
 
-  // With skipWaiting + clientsClaim, a new SW can take over mid-session.
-  // The running page then no longer matches the active precache (old lazy
-  // chunks 404 after a redeploy). Reload once so page and SW stay in sync.
-  // Guard: on the very first install clientsClaim also fires
-  // controllerchange (null -> SW); don't reload first-time visitors.
-  var hadController = !!navigator.serviceWorker.controller;
-  var reloaded = false;
-  navigator.serviceWorker.addEventListener("controllerchange", function () {
-    if (!hadController) {
-      hadController = true;
-      return;
-    }
-    if (reloaded) return;
-    reloaded = true;
-    window.location.reload();
-  });
+  // 新版 SW 接管（controllerchange）后刷不刷新，由 src/utils/swUpdate.ts 决定：
+  // 刚打开不久且没在打字 → 自动刷新；否则底部提示「佛津已更新」、站内换页时再刷新。
+  // 这里原先无条件 reload，读者正在问答框里打字也会被刷掉（2026-11-26 改）。
 })();

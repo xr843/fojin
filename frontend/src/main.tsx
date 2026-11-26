@@ -18,6 +18,7 @@ import "./styles/global.css";
 import "./umami";
 import { dropServerCanonical } from "./seo/dropServerCanonical";
 import { toSeoLang } from "./seo/langUrl";
+import { installSwUpdateHandling } from "./utils/swUpdate";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,6 +30,7 @@ const queryClient = new QueryClient({
 });
 
 dropServerCanonical(window.location.pathname, toSeoLang(currentUILang(i18n)));
+installSwUpdateHandling();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
