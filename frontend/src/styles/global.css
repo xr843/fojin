@@ -2030,3 +2030,40 @@ body:has(.chat-shell) .ant-layout-footer { display: none; }
   cursor: pointer;
   padding: 0 4px;
 }
+
+/* 长表「全屏看表」按钮与弹窗（ChatTable.tsx）：系统显示缩放 125%/150% 时回答区只剩
+   300–440px 高，装不下 20 行的表；弹窗里行距再压一档并让表头吸顶。 */
+.chat-table-expand {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 4px;
+  padding: 2px 8px;
+  font-size: 13px;
+  color: var(--fj-accent);
+  background: transparent;
+  border: 1px solid var(--fj-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.chat-table-expand:hover,
+.chat-table-expand:focus-visible {
+  color: var(--fj-highlight);
+  border-color: var(--fj-accent);
+}
+.chat-table-full table {
+  display: table;
+  width: auto;
+  margin: 0 auto;
+  font-size: 13.5px;
+}
+.chat-table-full th,
+.chat-table-full td {
+  padding: 1px 10px;
+  line-height: 1.35;
+}
+.chat-table-full thead th {
+  position: sticky;
+  top: 0;
+  background: var(--fj-bg-alt);
+}

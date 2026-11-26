@@ -2018,5 +2018,7 @@
   "read.search_button": "Find",
   "app.update_ready": "FoJin has been updated",
   "app.update_reload": "Reload",
-  "app.update_dismiss": "Dismiss"
+  "app.update_dismiss": "Dismiss",
+  "chat.table_expand": "Full-screen table",
+  "chat.table_full_title": "Table"
 }
