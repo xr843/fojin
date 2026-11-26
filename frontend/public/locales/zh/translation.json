@@ -2013,5 +2013,7 @@
   "admin_dashboard.module_usage.event.daily_vernacular": "今日经句：白话",
   "admin_dashboard.module_usage.event.daily_ask": "今日经句：问小津",
   "admin_dashboard.module_usage.event.daily_share": "今日经句：分享图",
-  "daily.lunar": "农历{{d}}"
+  "daily.lunar": "农历{{d}}",
+  "read.search_placeholder": "输入经名、译者或编号，如 金刚经、玄奘、T0235",
+  "read.search_button": "找经"
 }

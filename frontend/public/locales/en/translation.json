@@ -2013,5 +2013,7 @@
   "admin_dashboard.module_usage.event.daily_vernacular": "Daily: plain reading",
   "admin_dashboard.module_usage.event.daily_ask": "Daily: ask",
   "admin_dashboard.module_usage.event.daily_share": "Daily: share image",
-  "daily.lunar": "Lunar {{d}}"
+  "daily.lunar": "Lunar {{d}}",
+  "read.search_placeholder": "Search by title, translator or number, e.g. Diamond Sutra, Xuanzang, T0235",
+  "read.search_button": "Find"
 }

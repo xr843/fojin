@@ -121,7 +121,10 @@ describe("TextDetailPage", () => {
 
     await waitFor(() => expect(screen.getByText("般若波罗蜜多心经")).toBeInTheDocument());
     expect(screen.getByText("Home")).toBeInTheDocument();
-    expect(screen.getByText("Search")).toBeInTheDocument();
+    // 面包屑上一级是「读经」（那里有找经的搜索框），不再是空白搜索页
+    const crumb = document.querySelector(".td-breadcrumb") as HTMLElement;
+    expect(crumb.textContent).toContain("Read");
+    expect(crumb.textContent).not.toContain("Search");
     expect(screen.getByText("Text details")).toBeInTheDocument();
     expect(screen.getByText("Translator")).toBeInTheDocument();
     expect(screen.getByText("Dynasty")).toBeInTheDocument();

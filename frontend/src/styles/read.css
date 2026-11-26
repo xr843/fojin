@@ -224,3 +224,10 @@
     order: 3;
   }
 }
+
+/* 读经页顶部的找经搜索框（只搜经典：书名、译者、编号） */
+.read-page .read-search {
+  display: block;
+  max-width: 560px;
+  margin: 18px auto 0;
+}
