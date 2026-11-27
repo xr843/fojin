@@ -164,12 +164,6 @@ a.history-view:hover {
   right: 0;
   pointer-events: none;
 }
-.history-river i {
-  position: absolute;
-  bottom: 0;
-  background: color-mix(in srgb, var(--fj-accent) 55%, transparent);
-  border-radius: 1px 1px 0 0;
-}
 .history-river-label {
   position: sticky;
   left: 6px;
@@ -710,4 +704,52 @@ a.history-view:hover {
   padding: 0;
   width: 12px;
   justify-content: center;
+}
+
+/* 译经长河：每格是开元录记了译出年份的经，点开列出 */
+.history-river-bar {
+  position: absolute;
+  bottom: 0;
+  padding: 0;
+  border: 0;
+  pointer-events: auto;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--fj-accent) 55%, transparent);
+  border-radius: 1px 1px 0 0;
+}
+.history-river-bar:hover,
+.history-river-bar:focus-visible {
+  background: color-mix(in srgb, var(--fj-accent) 85%, transparent);
+}
+.history-river-bar.is-on {
+  background: var(--fj-cinnabar);
+}
+.history-river-list {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  max-height: 220px;
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.history-river-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 8px;
+  align-items: baseline;
+}
+.history-river-y {
+  min-width: 2.6em;
+  color: var(--fj-ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+.history-river-j,
+.history-river-w {
+  color: var(--fj-ink-muted);
+}
+.history-river-src {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--fj-ink-muted);
 }

@@ -186,23 +186,37 @@ export function layoutLanes(
   return { items, lanes, rows: row };
 }
 
-/**
- * 译经长河：每位译经师在藏的著译部数（wn）平摊到他在世的年代里，按 binYears 一格累加。
- * 只是「哪个年代译得多」的估算——DILA 没有逐部的译出年份。
- */
-export function translationRiver(people: HistoryPerson[], from: number, to: number, binYears = 10): number[] {
-  const bins = new Array(Math.ceil((to - from) / binYears)).fill(0) as number[];
-  for (const p of people) {
-    if (!p.tr || p.wn <= 0) continue;
-    const s = personSpan(p);
-    if (!s) continue;
-    // 译经多在中晚年：取生卒条的后 2/3（只有朝代的整段平摊）
-    const start = s.kind === "dynasty" ? s.start : s.start + (s.end - s.start) / 3;
-    const years = Math.max(1, s.end - start);
-    for (let y = Math.floor(start); y < s.end; y++) {
-      const i = Math.floor((y - from) / binYears);
-      if (i >= 0 && i < bins.length) bins[i] += p.wn / years;
-    }
+/** 《开元释教录》夹注记下译出年份的一部经（public/history-translations.json，见 backend/scripts/build_history_translations.py） */
+export interface TranslationItem {
+  /** 公元年（DILA 时间规范库换算） */
+  y: number;
+  /** 经名、卷数（如「四十卷」） */
+  t: string;
+  j: string;
+  /** 译人（通行名） */
+  w: string;
+  /** 夹注原文里的年号，如「弘始五年癸卯」 */
+  h: string;
+  /** 开元录卷次、行首（p0512b04 的 0512b04） */
+  ju: number;
+  lh: string;
+  /** 藏内经典 id（对上了才有） */
+  tid?: number;
+}
+
+export interface TranslationData {
+  source: string;
+  /** 开元录在佛津的经典 id */
+  kaiyuan: number;
+  items: TranslationItem[];
+}
+
+/** 译经长河：按 binYears 一格分组（只算开元录记了译出年份的，不估算） */
+export function translationBins(items: TranslationItem[], from: number, to: number, binYears = 10): TranslationItem[][] {
+  const bins: TranslationItem[][] = Array.from({ length: Math.ceil((to - from) / binYears) }, () => []);
+  for (const it of items) {
+    const i = Math.floor((it.y - from) / binYears);
+    if (i >= 0 && i < bins.length) bins[i].push(it);
   }
   return bins;
 }

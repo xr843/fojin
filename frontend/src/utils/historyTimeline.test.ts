@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aliveAt, personRole, fixZhuAfterSimplify, formatYears, layoutLanes, packRows, personSpan, translationRiver, type HistoryPerson } from "./historyTimeline";
+import { aliveAt, personRole, fixZhuAfterSimplify, formatYears, layoutLanes, packRows, personSpan, translationBins, type HistoryPerson, type TranslationItem } from "./historyTimeline";
 import { dynastyAt, dynastySpan } from "../data/historyDynasties";
 
 function person(over: Partial<HistoryPerson>): HistoryPerson {
@@ -76,12 +76,10 @@ describe("佛教史长卷排布", () => {
     expect(rows).toBe(1);
   });
 
-  it("译经长河：只算译经师，著译部数摊进生卒条的后三分之二", () => {
-    const tr = person({ tr: true, wn: 30, b: [600, 600], d: [690, 690] });
-    const bins = translationRiver([tr, person({ wn: 99, b: [600, 600], d: [690, 690] })], 600, 700, 10);
-    const total = bins.reduce((s, x) => s + x, 0);
-    expect(total).toBeCloseTo(30, 5);
-    expect(bins[0]).toBe(0); // 600–609 在前三分之一，不摊
+  it("译经长河：按十年一格放开元录记了年份的经，界外的不算", () => {
+    const it = (y: number): TranslationItem => ({ y, t: "某經", j: "一卷", w: "某", h: "某年", ju: 1, lh: "0000a00" });
+    const bins = translationBins([it(403), it(409), it(410), it(1200), it(-5)], 400, 420, 10);
+    expect(bins.map((b) => b.map((x) => x.y))).toEqual([[403, 409], [410]]);
   });
 
   it("朝代：DILA 的「東晉 後秦」取第一个认得的；某年落在哪朝", () => {

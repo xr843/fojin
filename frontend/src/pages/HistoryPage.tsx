@@ -15,7 +15,9 @@ import {
   personRole,
   personSpan,
   SCHOOL_KEY,
-  translationRiver,
+  translationBins,
+  type TranslationData,
+  type TranslationItem,
   type HistoryData,
   type HistoryPerson,
   type PersonSpan,
@@ -107,6 +109,21 @@ async function fetchHistory(): Promise<HistoryData> {
   return r.json();
 }
 
+/** 开元录译出年份（译经长河），见 backend/scripts/build_history_translations.py */
+async function fetchTranslations(): Promise<TranslationData> {
+  const r = await fetch("/history-translations.json");
+  if (!r.ok) throw new Error(`history translations ${r.status}`);
+  return r.json();
+}
+
+const RIVER_BIN = 10;
+
+/** 从第 i 格往 dir 方向找下一个有经的格子，没有返回 -1 */
+function nearestBin(bins: unknown[][], i: number, dir: 1 | -1): number {
+  for (let k = i + dir; k >= 0 && k < bins.length; k += dir) if (bins[k].length > 0) return k;
+  return -1;
+}
+
 /**
  * 中国佛教史长卷：从东汉到民国，核心人物的一生排成一条时间轴（借鉴「江山时序」的拖时间轴读史）。
  * 点名字看生平、师承、僧传本传原文与藏内著译；点时间轴看那一年谁在世。
@@ -154,8 +171,13 @@ export default function HistoryPage() {
     return layoutLanes(shown, px, labelFn, byYear ? null : (p) => p.sc);
   }, [shown, px, spans, byYear]);
 
-  const river = useMemo(() => translationRiver(data?.people ?? [], TIMELINE_START, TIMELINE_END, 10), [data]);
-  const riverMax = Math.max(1, ...river);
+  const { data: trData } = useQuery({ queryKey: ["history-translations"], queryFn: fetchTranslations, staleTime: Infinity });
+  const river = useMemo(() => translationBins(trData?.items ?? [], TIMELINE_START, TIMELINE_END, RIVER_BIN), [trData]);
+  const riverMax = Math.max(1, ...river.map((b) => b.length));
+  // 译经长河点开的十年：?r=650
+  const rParam = params.get("r");
+  const riverIdx = rParam !== null && Number.isFinite(Number(rParam)) ? Math.floor((Number(rParam) - TIMELINE_START) / RIVER_BIN) : -1;
+  const selRiver = riverIdx >= 0 && river[riverIdx]?.length ? riverIdx : -1;
 
   const selected = selectedId ? byId.get(selectedId) ?? null : null;
   const related = useMemo(() => new Set(selected ? [...selected.te, ...selected.st] : []), [selected]);
@@ -191,6 +213,7 @@ export default function HistoryPage() {
           else {
             next.set("e", ev.id);
             next.set("y", String(ev.y));
+            next.delete("r");
             // 点大事＝看这件事：退出导览、关人物卡（否则导览说明栏和导览地图会压住大事面板——11-27 用户截图）
             // 播放年代时自动打开的大事不在导览里，这里不影响
             if (via !== "play") {
@@ -204,6 +227,26 @@ export default function HistoryPage() {
         { replace: true },
       );
       if (ev) track("history_event", { id: ev.id, via });
+    },
+    [setParams],
+  );
+
+  /** 点译经长河的一格：列出这十年开元录记下译出的经（退出导览、关人物卡和大事面板，同大事） */
+  const selectRiver = useCallback(
+    (idx: number | null, via: string) => {
+      setParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (idx === null) next.delete("r");
+          else {
+            next.set("r", String(TIMELINE_START + idx * RIVER_BIN));
+            for (const k of ["e", "tour", "s", "p"]) next.delete(k);
+          }
+          return next;
+        },
+        { replace: true },
+      );
+      if (idx !== null) track("history_river", { y: TIMELINE_START + idx * RIVER_BIN, via });
     },
     [setParams],
   );
@@ -273,6 +316,7 @@ export default function HistoryPage() {
             next.set("tour", id);
             next.delete("y");
             next.delete("e");
+            next.delete("r");
           } else next.delete("tour");
           return next;
         },
@@ -367,7 +411,7 @@ export default function HistoryPage() {
     if (initialScrolled.current || !data || !scrollRef.current) return;
     initialScrolled.current = true;
     // 有人物或导览时由上面的 ensureVisible 负责定位，这里不能再把视野拽回 520 年
-    if (!selectedId && !tour) scrollToYear(cursor ?? 520);
+    if (!selectedId && !tour) scrollToYear(cursor ?? (rParam !== null && Number.isFinite(Number(rParam)) ? Number(rParam) + 5 : 520));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
@@ -381,6 +425,7 @@ export default function HistoryPage() {
         const next = new URLSearchParams(prev);
         next.set("y", String(year));
         next.delete("e");
+        next.delete("r");
         return next;
       },
       { replace: true },
@@ -693,6 +738,18 @@ export default function HistoryPage() {
           </div>
         </div>
       )}
+      {!selEvent && selRiver >= 0 && trData && (
+        <RiverPanel
+          items={river[selRiver]}
+          start={TIMELINE_START + selRiver * RIVER_BIN}
+          kaiyuan={trData.kaiyuan}
+          prev={nearestBin(river, selRiver, -1)}
+          next={nearestBin(river, selRiver, 1)}
+          onGo={(i) => selectRiver(i, "nav")}
+          onClose={() => selectRiver(null, "close")}
+          L={L}
+        />
+      )}
       <div className="history-cursor-bar" role="status">
         {cursor === null ? (
           <span className="history-hint">{t("history.cursor_prompt")}</span>
@@ -767,11 +824,19 @@ export default function HistoryPage() {
               </div>
               <div className="history-river" style={{ top: AXIS_H + BAND_H * 2 + EVENT_H + 4, height: RIVER_H }} title={t("history.river_hint")}>
                 <span className="history-river-label">{t("history.river")}</span>
-                {river.map((v, i) =>
-                  v > 0 ? (
-                    <i
+                {river.map((b, i) =>
+                  b.length > 0 ? (
+                    <button
                       key={i}
-                      style={{ left: xOf(TIMELINE_START + i * 10), width: Math.max(1, 10 * px - 1), height: Math.max(1, (v / riverMax) * (RIVER_H - 4)) }}
+                      type="button"
+                      className={`history-river-bar${i === selRiver ? " is-on" : ""}`}
+                      aria-label={t("history.river_decade", { a: TIMELINE_START + i * RIVER_BIN, b: TIMELINE_START + i * RIVER_BIN + RIVER_BIN - 1, d: L(dynastyAt(TIMELINE_START + i * RIVER_BIN + 5)?.name ?? ""), n: b.length })}
+                      title={`${TIMELINE_START + i * RIVER_BIN}–${TIMELINE_START + i * RIVER_BIN + RIVER_BIN - 1} · ${b.length}`}
+                      style={{ left: xOf(TIMELINE_START + i * RIVER_BIN), width: Math.max(2, RIVER_BIN * px - 1), height: Math.max(3, (b.length / riverMax) * (RIVER_H - 4)) }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        selectRiver(i === selRiver ? null : i, "bar");
+                      }}
                     />
                   ) : null,
                 )}
@@ -891,6 +956,71 @@ export default function HistoryPage() {
           />
         )}
       </Drawer>
+    </div>
+  );
+}
+
+/** 译经长河点开的一格：这十年开元录记下译出的经，逐部给夹注年号、读经链接和开元录原文行 */
+function RiverPanel({
+  items,
+  start,
+  kaiyuan,
+  prev,
+  next,
+  onGo,
+  onClose,
+  L,
+}: {
+  items: TranslationItem[];
+  start: number;
+  kaiyuan: number;
+  prev: number;
+  next: number;
+  onGo: (i: number) => void;
+  onClose: () => void;
+  L: (s: string) => string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="history-event-panel history-river-panel" role="status">
+      <div className="history-tour-head">
+        <strong>{t("history.river_decade", { a: start, b: start + RIVER_BIN - 1, d: L(dynastyAt(start + 5)?.name ?? ""), n: items.length })}</strong>
+        <span className="history-tour-intro">{t("history.river_intro")}</span>
+        <span className="history-tour-nav">
+          <Button size="small" disabled={prev < 0} onClick={() => onGo(prev)}>
+            {t("history.river_prev")}
+          </Button>
+          <Button size="small" disabled={next < 0} onClick={() => onGo(next)}>
+            {t("history.river_next")}
+          </Button>
+          <button type="button" className="history-chip history-chip--clear" onClick={onClose} aria-label={t("history.river_close")}>
+            ×
+          </button>
+        </span>
+      </div>
+      <ol className="history-river-list">
+        {items.map((x) => (
+          <li key={`${x.lh}-${x.t}`}>
+            <span className="history-river-y">{x.y}</span>
+            {x.tid ? (
+              <Link to={`/texts/${x.tid}/read`} onClick={() => track("history_link", { kind: "river_text" })}>
+                《{L(x.t)}》
+              </Link>
+            ) : (
+              <span>《{L(x.t)}》</span>
+            )}
+            <span className="history-river-j">{L(x.j)}</span>
+            <span className="history-river-w">{L(x.w)}</span>
+            <Link
+              className="history-river-src"
+              to={`/texts/${kaiyuan}/read?juan=${x.ju}&anchor=p${x.lh}`}
+              onClick={() => track("history_link", { kind: "river_src" })}
+            >
+              「{L(x.h)}」{t("history.river_src", { juan: x.ju })}
+            </Link>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }
