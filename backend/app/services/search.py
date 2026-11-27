@@ -595,15 +595,16 @@ async def search_content(
             }
         }
     }
-    # 夹注（双行小注）也搜：一切经音义的释义、开元录的译出年份都只在夹注里。权重低于正文，
-    # 同样的词正文里有时排在前面。
-    notes_clause: dict = {"match": {"notes": {"query": query, "analyzer": "cjk_content", "boost": NOTES_BOOST}}}
+    # 夹注（双行小注）只补漏、不改排序：4 字以上的查询，夹注里逐字出现的卷也算命中，但计 0 分——
+    # 正文命中的排序与没有夹注时完全一样，只靠夹注命中的排在最后。
+    # （#1568 曾按词给夹注加权，常用词「如是我聞」「般若」的前五名被注疏、经录挤掉，2026-11-27 回滚。）
+    notes_clause = _notes_recall_clause(query)
 
     gaiji_clauses = _gaiji_should_clauses(query, gaiji_normalizer)
     if gaiji_clauses:
         content_query: dict = {
             "bool": {
-                "should": [primary_clause, notes_clause, *gaiji_clauses],
+                "should": [primary_clause, *gaiji_clauses, *([notes_clause] if notes_clause else [])],
                 "minimum_should_match": 1,
             }
         }
@@ -612,15 +613,32 @@ async def search_content(
             query,
             len(gaiji_clauses),
         )
-    else:
+    elif notes_clause:
         content_query = {"bool": {"should": [primary_clause, notes_clause], "minimum_should_match": 1}}
+    else:
+        content_query = primary_clause
 
     return await _run_content_search(
         es, content_query, page, size, sources, lang, dynasty=dynasty, canon=canon, section=section, facets=facets
     )
 
 
-NOTES_BOOST = 0.5
+NOTES_MIN_HAN = 4  # 短于此的查询（般若、心经）不搜夹注：夹注里到处都有，只会带进噪声
+_HAN_RE = re.compile(r"[\u3400-\u9fff]")
+
+
+def _notes_recall_clause(query: str) -> dict | None:
+    """夹注逐字含整句的卷也算命中，计 0 分（constant_score boost 0），不影响正文命中的排序。
+    2026-11-27 生产索引实测：16 个常用查询前 100 名与不搜夹注时完全相同；「上許斤反」多出一切经音义。"""
+    if len(_HAN_RE.findall(query)) < NOTES_MIN_HAN:
+        return None
+    return {
+        "constant_score": {
+            "filter": {"match_phrase": {"notes": {"query": query, "analyzer": "cjk_content"}}},
+            "boost": 0.0,
+        }
+    }
+
 
 
 def _with_note_fragments(hl: dict) -> list[str]:

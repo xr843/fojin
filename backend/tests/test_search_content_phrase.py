@@ -164,12 +164,17 @@ async def test_default_mode_is_unchanged_plain_match() -> None:
     es.search.return_value = {"hits": {"hits": []}, "aggregations": {}}
     await search_content(es, "應無所住而生其心")
     query = es.search.await_args.kwargs["body"]["query"]
-    # 默认模式仍是普通 match（不是短语）；正文之外也搜夹注，权重较低（2026-11-27）
+    # 默认模式仍是普通 match（不是短语）；4 字以上另加「夹注逐字含整句」的 0 分补漏（不改排序）
     assert query == {
         "bool": {
             "should": [
                 {"match": {"content": {"query": "應無所住而生其心", "analyzer": "cjk_content"}}},
-                {"match": {"notes": {"query": "應無所住而生其心", "analyzer": "cjk_content", "boost": 0.5}}},
+                {
+                    "constant_score": {
+                        "filter": {"match_phrase": {"notes": {"query": "應無所住而生其心", "analyzer": "cjk_content"}}},
+                        "boost": 0.0,
+                    }
+                },
             ],
             "minimum_should_match": 1,
         }
