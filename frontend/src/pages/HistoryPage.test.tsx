@@ -62,7 +62,7 @@ vi.mock("../data/historyTours.json", () => ({
     ],
   },
 }));
-import type { HistoryData, HistoryPerson } from "../utils/historyTimeline";
+import type { HistoryData, HistoryPerson, TranslationData } from "../utils/historyTimeline";
 
 function person(over: Partial<HistoryPerson>): HistoryPerson {
   return { id: "A0", n: "某", dn: "某", alt: [], dy: "唐", sc: "禅", b: null, d: null, monk: true, tr: false, bio: "", te: [], st: [], bios: [], men: [], works: [], wn: 0, ...over };
@@ -104,8 +104,21 @@ function renderPage(url = "/history") {
   );
 }
 
+const TR: TranslationData = {
+  source: "開元錄",
+  kaiyuan: 76,
+  items: [
+    { y: 403, t: "摩訶般若波羅蜜經", j: "四十卷", w: "鳩摩羅什", h: "弘始五年癸卯", ju: 4, lh: "0512b04", tid: 6 },
+    { y: 406, t: "維摩詰所說經", j: "三卷", w: "鳩摩羅什", h: "弘始八年", ju: 4, lh: "0512b20" },
+    { y: 645, t: "大菩薩藏經", j: "二十卷", w: "玄奘", h: "貞觀十九年", ju: 8, lh: "0555b01", tid: 9 },
+  ],
+};
+
 beforeEach(() => {
-  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(DATA), { status: 200 })));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string) => new Response(JSON.stringify(String(url).includes("translations") ? TR : DATA), { status: 200 })),
+  );
   Element.prototype.scrollTo = vi.fn();
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -303,5 +316,26 @@ describe("佛教史长卷", () => {
     fireEvent.click(screen.getByRole("button", { name: "唯识" }));
     expect(loc()).toContain("tour=weishi");
     expect(loc()).not.toContain("e=");
+  });
+
+  it("译经长河：每格是开元录记了年份的经；点一格列出这十年的经，有读经链接和开元录原文行；上一个十年；再点关掉", async () => {
+    renderPage("/history?tour=weishi");
+    await screen.findAllByRole("button", { name: "玄奘" });
+    const loc = () => screen.getByTestId("loc").textContent ?? "";
+    const bar = await screen.findByRole("button", { name: /^400–409 年 .* 译出 2 部$/ });
+    fireEvent.click(bar);
+    expect(loc()).toContain("r=400");
+    expect(loc()).not.toContain("tour=");
+    const panel = document.querySelector(".history-river-panel") as HTMLElement;
+    expect(within(panel).getByRole("link", { name: "《摩诃般若波罗蜜经》" }).getAttribute("href")).toBe("/texts/6/read");
+    // 没对上藏内经典的只列名，不给读经链接
+    expect(within(panel).queryByRole("link", { name: "《维摩诘所说经》" })).toBeNull();
+    expect(within(panel).getByRole("link", { name: /弘始五年癸卯.*开元录卷4/ }).getAttribute("href")).toBe("/texts/76/read?juan=4&anchor=p0512b04");
+    expect(within(panel).getByRole("button", { name: "上一个十年" })).toBeDisabled();
+    fireEvent.click(within(panel).getByRole("button", { name: "下一个十年" }));
+    expect(loc()).toContain("r=640");
+    fireEvent.click(screen.getByRole("button", { name: /^640–649 年/ }));
+    expect(loc()).not.toContain("r=");
+    expect(document.querySelector(".history-river-panel")).toBeNull();
   });
 });
