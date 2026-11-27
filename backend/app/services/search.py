@@ -595,12 +595,15 @@ async def search_content(
             }
         }
     }
+    # 夹注（双行小注）也搜：一切经音义的释义、开元录的译出年份都只在夹注里。权重低于正文，
+    # 同样的词正文里有时排在前面。
+    notes_clause: dict = {"match": {"notes": {"query": query, "analyzer": "cjk_content", "boost": NOTES_BOOST}}}
 
     gaiji_clauses = _gaiji_should_clauses(query, gaiji_normalizer)
     if gaiji_clauses:
         content_query: dict = {
             "bool": {
-                "should": [primary_clause, *gaiji_clauses],
+                "should": [primary_clause, notes_clause, *gaiji_clauses],
                 "minimum_should_match": 1,
             }
         }
@@ -610,11 +613,19 @@ async def search_content(
             len(gaiji_clauses),
         )
     else:
-        content_query = primary_clause
+        content_query = {"bool": {"should": [primary_clause, notes_clause], "minimum_should_match": 1}}
 
     return await _run_content_search(
         es, content_query, page, size, sources, lang, dynasty=dynasty, canon=canon, section=section, facets=facets
     )
+
+
+NOTES_BOOST = 0.5
+
+
+def _with_note_fragments(hl: dict) -> list[str]:
+    """正文片段在前；夹注片段加括号接在后面（阅读页里夹注也是括号小字），读者一眼分得清。"""
+    return list(hl.get("content", [])) + [f"（{f}）" for f in hl.get("notes", [])]
 
 
 async def _run_content_search(
@@ -658,7 +669,13 @@ async def _run_content_search(
                 "number_of_fragments": 3,
                 "pre_tags": ["<em>"],
                 "post_tags": ["</em>"],
-            }
+            },
+            "notes": {
+                "fragment_size": 120,
+                "number_of_fragments": 2,
+                "pre_tags": ["<em>"],
+                "post_tags": ["</em>"],
+            },
         }
     }
 
@@ -718,7 +735,7 @@ async def _run_content_search(
             ih_src = ih["_source"]
             matched_juans.append({
                 "juan_num": ih_src.get("juan_num", 1),
-                "highlight": ih.get("highlight", {}).get("content", []),
+                "highlight": _with_note_fragments(ih.get("highlight", {})),
                 "score": ih["_score"],
             })
 
@@ -731,7 +748,7 @@ async def _run_content_search(
             "juan_num": src.get("juan_num", 1),
             "lang": src.get("lang", "lzh"),
             "source_code": src.get("source_code"),
-            "highlight": hit.get("highlight", {}).get("content", []),
+            "highlight": _with_note_fragments(hit.get("highlight", {})),
             "score": hit["_score"],
             "matched_juan_count": inner_total,
             "matched_juans": matched_juans,

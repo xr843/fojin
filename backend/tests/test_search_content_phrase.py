@@ -164,7 +164,16 @@ async def test_default_mode_is_unchanged_plain_match() -> None:
     es.search.return_value = {"hits": {"hits": []}, "aggregations": {}}
     await search_content(es, "應無所住而生其心")
     query = es.search.await_args.kwargs["body"]["query"]
-    assert query == {"match": {"content": {"query": "應無所住而生其心", "analyzer": "cjk_content"}}}
+    # 默认模式仍是普通 match（不是短语）；正文之外也搜夹注，权重较低（2026-11-27）
+    assert query == {
+        "bool": {
+            "should": [
+                {"match": {"content": {"query": "應無所住而生其心", "analyzer": "cjk_content"}}},
+                {"match": {"notes": {"query": "應無所住而生其心", "analyzer": "cjk_content", "boost": 0.5}}},
+            ],
+            "minimum_should_match": 1,
+        }
+    }
 
 
 def _cworked(text_id: int, cbeta_id: str, juan: int = 1) -> dict:
