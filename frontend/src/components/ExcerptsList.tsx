@@ -4,7 +4,7 @@ import { Button, Empty, Input, Pagination, Popconfirm, Spin, message } from "ant
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { deleteExcerpt, listExcerpts, updateExcerptNote, type ExcerptItem } from "../api/client";
-import { localizeHan } from "../utils/hanScript";
+import { localizeTitle } from "../utils/hanScript";
 import { excerptReaderUrl } from "../utils/excerptUrl";
 import "../styles/excerpts.css";
 
@@ -34,7 +34,7 @@ function ExcerptRow({ item }: { item: ExcerptItem }) {
     <li className="excerpt-row">
       <div className="excerpt-row-head">
         <Link to={excerptReaderUrl(item)} className="excerpt-row-title">
-          《{localizeHan(item.title_zh, lang)}》
+          《{localizeTitle(item.title_zh, lang)}》
         </Link>
         <span className="excerpt-row-where">
           {t("profile.excerpt_juan", { n: item.juan_num })}

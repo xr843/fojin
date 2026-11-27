@@ -2,7 +2,7 @@ import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { getStudyMemory } from "../api/client";
-import { localizeHan } from "../utils/hanScript";
+import { localizeTitle } from "../utils/hanScript";
 import "../styles/study-memory.css";
 
 const MAX_CHIPS = 3;
@@ -34,7 +34,7 @@ export default function StudyContinueStrip() {
               data-umami-event="study_memory_continue"
               data-umami-event-kind="reading"
             >
-              《{localizeHan(r.title_zh, lang)}》{t("study_memory.juan", { n: r.juan_num })}
+              《{localizeTitle(r.title_zh, lang)}》{t("study_memory.juan", { n: r.juan_num })}
             </Link>
           ))}
           {topics.map((tp) => (

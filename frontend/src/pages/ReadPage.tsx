@@ -11,7 +11,7 @@ import { TAISHO_SECTIONS } from "../data/taishoSections";
 import { satTextUrl } from "../utils/satUrls";
 import { LangAlternates } from "../seo/LangAlternates";
 import { scriptForLanguage } from "../utils/hanLocale";
-import { localizeHan } from "../utils/hanScript";
+import { localizeTitle } from "../utils/hanScript";
 import { getReadingHistory } from "../utils/readingHistory";
 import "../styles/sources.css";
 import "../styles/read.css";
@@ -114,7 +114,7 @@ export default function ReadPage() {
           <div className="read-cards">
             {history.map((e) => (
               <Link key={e.textId} className="read-card" to={`/texts/${e.textId}/read?juan=${e.juan}`}>
-                <span className="read-card-title">《{localizeHan(e.title, lang)}》</span>
+                <span className="read-card-title">《{localizeTitle(e.title, lang)}》</span>
                 <span className="read-card-meta">{t("home.juan_n", { n: e.juan })}</span>
               </Link>
             ))}
@@ -186,10 +186,10 @@ export default function ReadPage() {
                         data-umami-event="read_sat_out"
                         data-umami-event-id={x.cbeta_id}
                       >
-                        {localizeHan(x.title_zh, lang)}
+                        {localizeTitle(x.title_zh, lang)}
                       </a>
                       <span className="read-list-meta">
-                        {[x.dynasty && localizeHan(x.dynasty, lang), x.translator && localizeHan(x.translator, lang)]
+                        {[x.dynasty && localizeTitle(x.dynasty, lang), x.translator && localizeTitle(x.translator, lang)]
                           .filter(Boolean)
                           .join(" · ")}
                       </span>
@@ -216,12 +216,12 @@ export default function ReadPage() {
                 {texts.map((x) => (
                   <li key={x.id}>
                     <Link className="read-list-title" to={`/texts/${x.id}`}>
-                      {localizeHan(x.title_zh, lang)}
+                      {localizeTitle(x.title_zh, lang)}
                     </Link>
                     <span className="read-list-meta">
                       {[
-                        x.dynasty && localizeHan(x.dynasty, lang),
-                        x.translator && localizeHan(x.translator, lang),
+                        x.dynasty && localizeTitle(x.dynasty, lang),
+                        x.translator && localizeTitle(x.translator, lang),
                         x.fascicle_count ? t("read.fascicles", { n: x.fascicle_count }) : null,
                       ]
                         .filter(Boolean)

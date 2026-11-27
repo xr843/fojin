@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { AimOutlined } from "@ant-design/icons";
 import type { ChatRetrieval, ChatSource } from "../api/client";
 import type { TextId } from "../types/branded";
-import { localizeHan } from "../utils/hanScript";
+import { localizeTitle } from "../utils/hanScript";
 import { locateInfoFrom, snippetOf } from "../utils/passageLocate";
 import CommentaryExcerpts from "./CommentaryExcerpts";
 
@@ -50,7 +50,7 @@ export default function PassageLocateCard({ sources, retrieval, onOpen }: Props)
 
   if (!info) return null;
 
-  const title = localizeHan(info.title, i18n.language);
+  const title = localizeTitle(info.title, i18n.language);
   const others = info.texts > 1 ? info.texts - 1 : 0;
 
   const handleOpen = () => {

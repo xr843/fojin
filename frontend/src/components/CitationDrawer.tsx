@@ -15,7 +15,7 @@ import {
 } from "../api/client";
 import { countQuoteOccurrences, extendToSentenceEnd, findQuoteSpans, normalizeForMatch } from "../utils/citationMatch";
 import DrawerPassageActions from "./DrawerPassageActions";
-import { localizeHan } from "../utils/hanScript";
+import { localizeHan, localizeTitle } from "../utils/hanScript";
 import { reflowText } from "../utils/textReflow";
 import { hasDisplayConfidence } from "../utils/parallelDisplay";
 
@@ -530,7 +530,7 @@ export default function CitationDrawer({ target, onClose }: Props) {
   // 让简体读者看到繁体，后者让繁體讀者看到简体。localizeHan 把两边收敛到同一处。
   const titleText = target
     ? t("reader.citation.title_with_juan", {
-        title: localizeHan(target.titleZh || data?.title_zh || "", i18n.language),
+        title: localizeTitle(target.titleZh || data?.title_zh || "", i18n.language),
         n: target.juanNum,
       })
     : t("reader.citation.title");
@@ -641,7 +641,7 @@ export default function CitationDrawer({ target, onClose }: Props) {
               >
                 <div style={{ fontSize: 12, color: "var(--fj-ink-muted)", marginBottom: 8 }}>
                   {t("reader.citation.source_title", {
-                    title: localizeHan(source.base_title || "", i18n.language),
+                    title: localizeTitle(source.base_title || "", i18n.language),
                     n: source.total,
                   })}
                 </div>

@@ -7,7 +7,7 @@ import { SoundOutlined } from "@ant-design/icons";
 
 import { getAvailableAudio, type AudioCatalogItem } from "../api/client";
 import { formatDuration } from "../audio/format";
-import { localizeHan } from "../utils/hanScript";
+import { localizeTitle } from "../utils/hanScript";
 import "../styles/sources.css";
 
 /**
@@ -58,12 +58,12 @@ export default function ReadAloudPage() {
           <li key={it.text_id} className="readaloud-item">
             <div className="readaloud-item-main">
               <Link to={`/texts/${it.text_id}/read?juan=${it.juans[0]?.juan_num ?? 1}`}>
-                {localizeHan(it.title_zh, i18n.language)}
+                {localizeTitle(it.title_zh, i18n.language)}
               </Link>
               <span className="readaloud-meta">
                 {[it.dynasty, it.translator]
                   .filter(Boolean)
-                  .map((s) => localizeHan(String(s), i18n.language))
+                  .map((s) => localizeTitle(String(s), i18n.language))
                   .join(" ")}
                 {it.taisho_id ? ` · ${it.taisho_id}` : ""}
               </span>

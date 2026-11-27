@@ -6,7 +6,7 @@ import { Helmet } from "react-helmet-async";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Typography, Spin, Button, Select, Breadcrumb, Row, Col, message, Tooltip, Tag, Popover, Dropdown, Drawer, theme, type MenuProps } from "antd";
 import { getLastPosition, recordReading } from "../utils/readingHistory";
-import { localizeHan } from "../utils/hanScript";
+import { localizeTitle } from "../utils/hanScript";
 import {
   HomeOutlined,
   LeftOutlined,
@@ -776,7 +776,7 @@ export default function TextReaderPage() {
         // 按当前界面语言存经名：首页「读经」卡与「继续阅读」不能加载 OpenCC（550 KB），
         // 只能原样显示存下来的标题；存繁体会让简体界面混排。阅读页本就加载了 OpenCC。
         title: content.title_zh
-          ? localizeHan(content.title_zh, i18n.language)
+          ? localizeTitle(content.title_zh, i18n.language)
           : t("reader.text_fallback", { id: textId }),
         juan: juanNum,
         ratio: (window.innerHeight / 3 - rect.top) / rect.height,

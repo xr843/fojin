@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { ChatSource } from "../api/client";
 import type { ParsedCitation } from "../utils/citationLinks";
 import { isCheckedQuote } from "../utils/answerCitations";
-import { localizeHan } from "../utils/hanScript";
+import { localizeTitle } from "../utils/hanScript";
 import { CitationPreviewContext } from "./citationPreviewContext";
 import "../styles/chat-citation-preview.css";
 
@@ -220,7 +220,7 @@ export function InlineCitation({ parsed, children, onOpen }: InlineCitationProps
   }, [open]);
 
   const excerpt = parsed.quote ? null : excerptFor(parsed, data?.sources);
-  const title = localizeHan(parsed.titleZh, i18n.language);
+  const title = localizeTitle(parsed.titleZh, i18n.language);
   const card = open
     ? createPortal(
         <div

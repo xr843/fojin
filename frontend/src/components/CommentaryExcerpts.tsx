@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { getCommentaryCorpus, getCommentaryExcerpts } from "../api/client";
-import { localizeHan } from "../utils/hanScript";
+import { localizeTitle } from "../utils/hanScript";
 
 /**
  * 「注疏怎么讲这几句」——贴原文定位卡片里的一个展开区。
@@ -94,7 +94,7 @@ export default function CommentaryExcerpts({ textId, quote }: Props) {
               {items.map((e) => (
                 <section key={e.work} className="chat-comm-item">
                   <div className="chat-comm-head">
-                    <strong>《{localizeHan(e.title ?? e.work, i18n.language)}》</strong>
+                    <strong>《{localizeTitle(e.title ?? e.work, i18n.language)}》</strong>
                     <span className="chat-comm-ref">{e.line_from}–{e.line_to}</span>
                     {e.reader_url && (
                       <a

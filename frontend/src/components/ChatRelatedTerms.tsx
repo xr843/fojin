@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { getRelatedTerms } from "../api/client";
-import { localizeHan } from "../utils/hanScript";
+import { localizeHan, localizeProse } from "../utils/hanScript";
 
 /**
  * 问答回答下方的「相关词条」（借鉴如是佛典 AI 问答，2026-11-25）：读者问题里的名相，在中文释义类
@@ -43,7 +43,7 @@ export default function ChatRelatedTerms({ question }: { question: string }) {
               <span className="chat-related-term-tag">{t("chat.related_terms.tag")}</span>
               <span className="chat-related-term-head">{localizeHan(c.headword, lang)}</span>
             </span>
-            <span className="chat-related-term-excerpt">{localizeHan(c.excerpt, lang)}</span>
+            <span className="chat-related-term-excerpt">{localizeProse(c.excerpt, lang)}</span>
             <span className="chat-related-term-source">{localizeHan(c.source_name, lang)}</span>
           </Link>
         ))}
