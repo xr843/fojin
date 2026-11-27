@@ -749,7 +749,13 @@ a.history-view:hover {
   color: var(--fj-ink-muted);
 }
 .history-river-src {
-  margin-left: auto;
+  flex-basis: 100%;
+  padding-left: calc(2.6em + 8px);
   font-size: 12px;
+  line-height: 1.5;
   color: var(--fj-ink-muted);
+}
+.history-river-src a {
+  margin-left: 4px;
+  white-space: nowrap;
 }

@@ -742,7 +742,7 @@ export default function HistoryPage() {
         <RiverPanel
           items={river[selRiver]}
           start={TIMELINE_START + selRiver * RIVER_BIN}
-          kaiyuan={trData.kaiyuan}
+          cbeta={trData.cbeta}
           prev={nearestBin(river, selRiver, -1)}
           next={nearestBin(river, selRiver, 1)}
           onGo={(i) => selectRiver(i, "nav")}
@@ -960,11 +960,14 @@ export default function HistoryPage() {
   );
 }
 
-/** 译经长河点开的一格：这十年开元录记下译出的经，逐部给夹注年号、读经链接和开元录原文行 */
+/**
+ * 译经长河点开的一格：这十年开元录记下译出的经，逐部给读经链接和夹注原文。
+ * 佛津阅读页不显示夹注（11-27 生产实测：开元录卷4 只见经名卷数），出处链到 CBETA Online 那一行。
+ */
 function RiverPanel({
   items,
   start,
-  kaiyuan,
+  cbeta,
   prev,
   next,
   onGo,
@@ -973,7 +976,7 @@ function RiverPanel({
 }: {
   items: TranslationItem[];
   start: number;
-  kaiyuan: number;
+  cbeta: string;
   prev: number;
   next: number;
   onGo: (i: number) => void;
@@ -1011,13 +1014,17 @@ function RiverPanel({
             )}
             <span className="history-river-j">{L(x.j)}</span>
             <span className="history-river-w">{L(x.w)}</span>
-            <Link
-              className="history-river-src"
-              to={`/texts/${kaiyuan}/read?juan=${x.ju}&anchor=p${x.lh}`}
-              onClick={() => track("history_link", { kind: "river_src" })}
-            >
-              「{L(x.h)}」{t("history.river_src", { juan: x.ju })}
-            </Link>
+            <span className="history-river-src">
+              「{L(x.h)}」
+              <a
+                href={`https://cbetaonline.dila.edu.tw/zh/${cbeta}_p${x.lh}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => track("history_link", { kind: "river_src" })}
+              >
+                {t("history.river_src", { juan: x.ju })} ↗
+              </a>
+            </span>
           </li>
         ))}
       </ol>

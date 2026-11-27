@@ -107,8 +107,9 @@ function renderPage(url = "/history") {
 const TR: TranslationData = {
   source: "開元錄",
   kaiyuan: 76,
+  cbeta: "T55n2154",
   items: [
-    { y: 403, t: "摩訶般若波羅蜜經", j: "四十卷", w: "鳩摩羅什", h: "弘始五年癸卯", ju: 4, lh: "0512b04", tid: 6 },
+    { y: 403, t: "摩訶般若波羅蜜經", j: "四十卷", w: "鳩摩羅什", h: "弘始五年癸卯四月二十三日出", ju: 4, lh: "0512b04", tid: 6 },
     { y: 406, t: "維摩詰所說經", j: "三卷", w: "鳩摩羅什", h: "弘始八年", ju: 4, lh: "0512b20" },
     { y: 645, t: "大菩薩藏經", j: "二十卷", w: "玄奘", h: "貞觀十九年", ju: 8, lh: "0555b01", tid: 9 },
   ],
@@ -330,7 +331,12 @@ describe("佛教史长卷", () => {
     expect(within(panel).getByRole("link", { name: "《摩诃般若波罗蜜经》" }).getAttribute("href")).toBe("/texts/6/read");
     // 没对上藏内经典的只列名，不给读经链接
     expect(within(panel).queryByRole("link", { name: "《维摩诘所说经》" })).toBeNull();
-    expect(within(panel).getByRole("link", { name: /弘始五年癸卯.*开元录卷4/ }).getAttribute("href")).toBe("/texts/76/read?juan=4&anchor=p0512b04");
+    // 夹注原文直接显示（佛津阅读页不显示夹注），出处链到 CBETA Online 那一行
+    expect(panel.textContent).toContain("「弘始五年癸卯四月二十三日出」");
+    expect(within(panel).getAllByRole("link", { name: /开元录卷4/ }).map((x) => x.getAttribute("href"))).toEqual([
+      "https://cbetaonline.dila.edu.tw/zh/T55n2154_p0512b04",
+      "https://cbetaonline.dila.edu.tw/zh/T55n2154_p0512b20",
+    ]);
     expect(within(panel).getByRole("button", { name: "上一个十年" })).toBeDisabled();
     fireEvent.click(within(panel).getByRole("button", { name: "下一个十年" }));
     expect(loc()).toContain("r=640");
