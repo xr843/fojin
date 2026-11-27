@@ -28,3 +28,15 @@ def test_long_notes_capped_at_chunk_length():
 def test_chunk_not_found_or_ambiguous_returns_none():
     assert splice_notes("不在正文裏", CONTENT, [(3, "x")]) is None
     assert splice_notes("般若", CONTENT, [(3, "x")]) is None  # 出现两处，不猜
+
+
+def test_context_block_shows_notes_but_source_text_unchanged():
+    """交给模型的上下文用附了夹注的 llm_text；chunk_text（引文核对、前端显示）不变。"""
+    from app.services.rag_retrieval import _format_context_block
+
+    r = {"text_id": 1, "juan_num": 4, "chunk_index": 0, "title_zh": "開元釋教錄", "score": 1.0,
+         "chunk_text": "四十卷小品", "llm_text": "四十卷（弘始五年出）小品"}  # fmt: skip
+    block = _format_context_block(r)
+    assert "四十卷（弘始五年出）小品" in block
+    assert r["chunk_text"] == "四十卷小品"
+    assert "四十卷小品" in _format_context_block({**r, "llm_text": None})

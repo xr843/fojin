@@ -654,7 +654,8 @@ def _format_context_block(result: dict) -> str:
             f"\n[用户原文定位] 本段逐字包含用户消息中的「{result['located_quote']}」。"
             "若该句另有更早的原始出处（如儒、道典籍或诗文），本书只是引用，不要把本书说成它的出处。"
         )
-    body = result["chunk_text"]
+    # llm_text：附了夹注的段落（只给模型看）；chunk_text 本身不变，引文核对仍以它为准
+    body = result.get("llm_text") or result["chunk_text"]
     parallels = result.get("parallel_chunks") or []
     mitra = result.get("mitra_parallels") or []
     if parallels or mitra:
@@ -1264,11 +1265,19 @@ async def retrieve_rag_context(
             if ENABLE_MITRA_RAG_PARALLELS:
                 await _attach_mitra_parallels(db, search_results, query)
 
+        if settings.rag_inline_notes and search_results:
+            try:
+                from app.services.inline_note_context import chunks_with_notes
+
+                for i, body in (await chunks_with_notes(db, search_results)).items():
+                    search_results[i]["llm_text"] = body
+            except Exception:
+                logger.warning("inline notes for RAG context failed; using plain chunks", exc_info=True)
+
         sources = [
             ChatSource(
-                # mitra_parallels is an internal LLM-context-only field (inline
-                # foreign text, no chunk coords) — never sent to the frontend.
-                **{k: v for k, v in r.items() if k not in ("source_id", "cbeta_id", "mitra_parallels")}
+                # mitra_parallels / llm_text are internal LLM-context-only fields — never sent to the frontend.
+                **{k: v for k, v in r.items() if k not in ("source_id", "cbeta_id", "mitra_parallels", "llm_text")}
                 | {
                     "source_id": r.get("source_id"),
                     # Portable cross-canon citation id, juan-level (line anchors

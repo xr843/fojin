@@ -116,6 +116,9 @@ class Settings(BaseSettings):
     # alignment_pairs table doesn't cover (esp. Sanskrit). Set false to roll
     # back to alignment_pairs-only parallels without a redeploy.
     enable_mitra_rag_parallels: bool = True
+    # 检索段落附夹注（CBETA 双行小注），只加在交给模型的上下文里（services/inline_note_context.py）。
+    # 默认关：须先过 eval/notes_pair_eval.py 的四条预注册门槛。
+    rag_inline_notes: bool = False
 
     # Quality gate for the MITRA parallels: keep only rows whose proxy quality
     # score (mitra_e_score) clears mitra_min_score. NULL-permissive — unscored
