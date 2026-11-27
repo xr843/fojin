@@ -12,6 +12,7 @@ import {
   fixZhuAfterSimplify,
   formatYears,
   layoutLanes,
+  personRole,
   personSpan,
   SCHOOL_KEY,
   translationRiver,
@@ -807,7 +808,7 @@ export default function HistoryPage() {
               const cls = [
                 "history-bar",
                 `history-bar--${span.kind}`,
-                p.tr ? "history-bar--tr" : p.monk ? "history-bar--monk" : "history-bar--lay",
+                { translator: "history-bar--tr", monk: "history-bar--monk", nun: "history-bar--monk", lay: "history-bar--lay" }[personRole(p)],
                 selectedId === p.id ? "is-selected" : "",
                 related.has(p.id) ? "is-related" : "",
                 selected && selectedId !== p.id && !related.has(p.id) ? "is-dim" : "",
@@ -911,7 +912,7 @@ function PersonCard({
 }) {
   const { t } = useTranslation();
   const years = formatYears(p, t("history.approx"));
-  const role = p.tr ? t("history.legend_translator") : p.monk ? t("history.legend_monk") : t("history.legend_lay");
+  const role = t(`history.role_${personRole(p)}`);
   const people = (ids: string[]) =>
     ids
       .map((id) => byId.get(id))
@@ -924,7 +925,7 @@ function PersonCard({
   return (
     <div className="history-card">
       <p className="history-card-meta">
-        {[L(p.dy), years || t("history.years_unknown"), role, t(`history.school.${SCHOOL_KEY[p.sc] ?? "other"}`)].filter(Boolean).join(" · ")}
+        {[...new Set([L(p.dy), years || t("history.years_unknown"), role, t(`history.school.${SCHOOL_KEY[p.sc] ?? "other"}`)])].filter(Boolean).join(" · ")}
         {span && span.kind !== "full" && kindNote && <span className="history-card-note">{kindNote}</span>}
       </p>
       {(p.dn !== p.n || p.alt.length > 0) && (

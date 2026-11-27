@@ -2105,5 +2105,10 @@
   "history.event_sources": "Source",
   "history.event_year": "{{y}} CE",
   "history.event_ref": "{{src}}, fasc. {{juan}}",
-  "history.map_event": "{{y}} CE · where it happened, and who was alive"
+  "history.map_event": "{{y}} CE · where it happened, and who was alive",
+  "history.school.nun": "Nuns",
+  "history.role_translator": "Translator",
+  "history.role_monk": "Monastic",
+  "history.role_nun": "Nun",
+  "history.role_lay": "Lay Buddhist"
 }
