@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aliveAt, fixZhuAfterSimplify, formatYears, layoutLanes, packRows, personSpan, translationRiver, type HistoryPerson } from "./historyTimeline";
+import { aliveAt, personRole, fixZhuAfterSimplify, formatYears, layoutLanes, packRows, personSpan, translationRiver, type HistoryPerson } from "./historyTimeline";
 import { dynastyAt, dynastySpan } from "../data/historyDynasties";
 
 function person(over: Partial<HistoryPerson>): HistoryPerson {
@@ -99,5 +99,11 @@ describe("佛教史长卷排布", () => {
     expect(fixZhuAfterSimplify("文偃为最着，杂着被编为三十卷")).toBe("文偃为最著，杂著被编为三十卷");
     expect(fixZhuAfterSimplify("讲无量寿经，着安乐集二卷")).toBe("讲无量寿经，著安乐集二卷");
     expect(fixZhuAfterSimplify("随着论疏，接着讲记")).toBe("随着论疏，接着讲记");
+  });
+
+  it("身份：比丘尼泳道的人即便 DILA 没标「僧人」也显示比丘尼，不会被当成居士", () => {
+    expect(personRole(person({ sc: "比丘尼", monk: false, f: true }))).toBe("nun");
+    expect(personRole(person({ sc: "其他", monk: false }))).toBe("lay");
+    expect(personRole(person({ tr: true }))).toBe("translator");
   });
 });

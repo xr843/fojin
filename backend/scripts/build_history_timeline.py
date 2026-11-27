@@ -101,6 +101,8 @@ def parse_dila(path: str, wanted: set[str]) -> dict[str, dict]:
             ref = pn.find(NS + "ref") if pn is not None else None
             if pn is not None and ref is not None and (ref.text or "").startswith("PL"):
                 rec[key] = ((pn.text or "").strip(), ref.text.strip())
+        sex = el.find(NS + "sex")
+        rec["female"] = sex is not None and sex.get("value") == "2"
         occ = el.find(NS + "occupation")
         rec["translator"] = bool(occ is not None and occ.text and "譯" in occ.text)
         out[pid] = rec
@@ -199,7 +201,7 @@ async def resolve(people: dict[str, dict]) -> None:
             p["works"] = works
 
 
-SCHOOLS = ("译经", "三论", "义学", "天台", "华严", "唯识", "律", "净土", "禅", "密", "其他")
+SCHOOLS = ("译经", "三论", "义学", "天台", "华严", "唯识", "律", "净土", "禅", "密", "比丘尼", "其他")
 
 
 def load_core() -> list[tuple[str, str, str]]:
@@ -256,6 +258,7 @@ def build(xml_path: str, out_path: str, place_path: str | None = None) -> None:
             "b": p["birth"],
             "d": p["death"],
             "monk": p.get("monk", False),
+            **({"f": True} if p.get("female") else {}),
             "tr": p["translator"],
             "bio": p.get("bio", ""),
             "te": teachers,
