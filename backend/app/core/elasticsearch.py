@@ -149,6 +149,9 @@ CONTENT_INDEX_SETTINGS = {
                 "term_vector": "with_positions_offsets",
                 "fields": {"nopunct": {"type": "text", "analyzer": "cjk_nopunct"}},
             },
+            # 本卷全部夹注（CBETA 双行小注），按原文顺序以「　」相连。正文 content 不含夹注（见
+            # models.text.TextInlineNote）；检索时与正文一起搜、权重较低。由 scripts/index_inline_notes.py 写入。
+            "notes": {"type": "text", "analyzer": "cjk_content", "term_vector": "with_positions_offsets"},
             "char_count": {"type": "integer"},
             "lang": {"type": "keyword"},
             "source_code": {"type": "keyword"},

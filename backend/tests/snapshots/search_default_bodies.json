@@ -271,6 +271,16 @@
         "pre_tags": [
          "<em>"
         ]
+       },
+       "notes": {
+        "fragment_size": 120,
+        "number_of_fragments": 2,
+        "post_tags": [
+         "</em>"
+        ],
+        "pre_tags": [
+         "<em>"
+        ]
        }
       }
      },
@@ -295,15 +305,41 @@
       "pre_tags": [
        "<em>"
       ]
+     },
+     "notes": {
+      "fragment_size": 120,
+      "number_of_fragments": 2,
+      "post_tags": [
+       "</em>"
+      ],
+      "pre_tags": [
+       "<em>"
+      ]
      }
     }
    },
    "query": {
-    "match": {
-     "content": {
-      "analyzer": "cjk_content",
-      "query": "四圣谛"
-     }
+    "bool": {
+     "minimum_should_match": 1,
+     "should": [
+      {
+       "match": {
+        "content": {
+         "analyzer": "cjk_content",
+         "query": "四圣谛"
+        }
+       }
+      },
+      {
+       "match": {
+        "notes": {
+         "analyzer": "cjk_content",
+         "boost": 0.5,
+         "query": "四圣谛"
+        }
+       }
+      }
+     ]
     }
    },
    "size": 20
@@ -335,6 +371,16 @@
         "pre_tags": [
          "<em>"
         ]
+       },
+       "notes": {
+        "fragment_size": 120,
+        "number_of_fragments": 2,
+        "post_tags": [
+         "</em>"
+        ],
+        "pre_tags": [
+         "<em>"
+        ]
        }
       }
      },
@@ -359,15 +405,41 @@
       "pre_tags": [
        "<em>"
       ]
+     },
+     "notes": {
+      "fragment_size": 120,
+      "number_of_fragments": 2,
+      "post_tags": [
+       "</em>"
+      ],
+      "pre_tags": [
+       "<em>"
+      ]
      }
     }
    },
    "query": {
-    "match": {
-     "content": {
-      "analyzer": "cjk_content",
-      "query": "四圣谛"
-     }
+    "bool": {
+     "minimum_should_match": 1,
+     "should": [
+      {
+       "match": {
+        "content": {
+         "analyzer": "cjk_content",
+         "query": "四圣谛"
+        }
+       }
+      },
+      {
+       "match": {
+        "notes": {
+         "analyzer": "cjk_content",
+         "boost": 0.5,
+         "query": "四圣谛"
+        }
+       }
+      }
+     ]
     }
    },
    "size": 5
@@ -712,6 +784,16 @@
         "pre_tags": [
          "<em>"
         ]
+       },
+       "notes": {
+        "fragment_size": 120,
+        "number_of_fragments": 2,
+        "post_tags": [
+         "</em>"
+        ],
+        "pre_tags": [
+         "<em>"
+        ]
        }
       }
      },
@@ -736,15 +818,41 @@
       "pre_tags": [
        "<em>"
       ]
+     },
+     "notes": {
+      "fragment_size": 120,
+      "number_of_fragments": 2,
+      "post_tags": [
+       "</em>"
+      ],
+      "pre_tags": [
+       "<em>"
+      ]
      }
     }
    },
    "query": {
-    "match": {
-     "content": {
-      "analyzer": "cjk_content",
-      "query": "心经"
-     }
+    "bool": {
+     "minimum_should_match": 1,
+     "should": [
+      {
+       "match": {
+        "content": {
+         "analyzer": "cjk_content",
+         "query": "心经"
+        }
+       }
+      },
+      {
+       "match": {
+        "notes": {
+         "analyzer": "cjk_content",
+         "boost": 0.5,
+         "query": "心经"
+        }
+       }
+      }
+     ]
     }
    },
    "size": 20
@@ -776,6 +884,16 @@
         "pre_tags": [
          "<em>"
         ]
+       },
+       "notes": {
+        "fragment_size": 120,
+        "number_of_fragments": 2,
+        "post_tags": [
+         "</em>"
+        ],
+        "pre_tags": [
+         "<em>"
+        ]
        }
       }
      },
@@ -800,15 +918,41 @@
       "pre_tags": [
        "<em>"
       ]
+     },
+     "notes": {
+      "fragment_size": 120,
+      "number_of_fragments": 2,
+      "post_tags": [
+       "</em>"
+      ],
+      "pre_tags": [
+       "<em>"
+      ]
      }
     }
    },
    "query": {
-    "match": {
-     "content": {
-      "analyzer": "cjk_content",
-      "query": "心经"
-     }
+    "bool": {
+     "minimum_should_match": 1,
+     "should": [
+      {
+       "match": {
+        "content": {
+         "analyzer": "cjk_content",
+         "query": "心经"
+        }
+       }
+      },
+      {
+       "match": {
+        "notes": {
+         "analyzer": "cjk_content",
+         "boost": 0.5,
+         "query": "心经"
+        }
+       }
+      }
+     ]
     }
    },
    "size": 5
@@ -1137,6 +1281,16 @@
         "pre_tags": [
          "<em>"
         ]
+       },
+       "notes": {
+        "fragment_size": 120,
+        "number_of_fragments": 2,
+        "post_tags": [
+         "</em>"
+        ],
+        "pre_tags": [
+         "<em>"
+        ]
        }
       }
      },
@@ -1161,15 +1315,41 @@
       "pre_tags": [
        "<em>"
       ]
+     },
+     "notes": {
+      "fragment_size": 120,
+      "number_of_fragments": 2,
+      "post_tags": [
+       "</em>"
+      ],
+      "pre_tags": [
+       "<em>"
+      ]
      }
     }
    },
    "query": {
-    "match": {
-     "content": {
-      "analyzer": "cjk_content",
-      "query": "般若"
-     }
+    "bool": {
+     "minimum_should_match": 1,
+     "should": [
+      {
+       "match": {
+        "content": {
+         "analyzer": "cjk_content",
+         "query": "般若"
+        }
+       }
+      },
+      {
+       "match": {
+        "notes": {
+         "analyzer": "cjk_content",
+         "boost": 0.5,
+         "query": "般若"
+        }
+       }
+      }
+     ]
     }
    },
    "size": 20
@@ -1201,6 +1381,16 @@
         "pre_tags": [
          "<em>"
         ]
+       },
+       "notes": {
+        "fragment_size": 120,
+        "number_of_fragments": 2,
+        "post_tags": [
+         "</em>"
+        ],
+        "pre_tags": [
+         "<em>"
+        ]
        }
       }
      },
@@ -1225,15 +1415,41 @@
       "pre_tags": [
        "<em>"
       ]
+     },
+     "notes": {
+      "fragment_size": 120,
+      "number_of_fragments": 2,
+      "post_tags": [
+       "</em>"
+      ],
+      "pre_tags": [
+       "<em>"
+      ]
      }
     }
    },
    "query": {
-    "match": {
-     "content": {
-      "analyzer": "cjk_content",
-      "query": "般若"
-     }
+    "bool": {
+     "minimum_should_match": 1,
+     "should": [
+      {
+       "match": {
+        "content": {
+         "analyzer": "cjk_content",
+         "query": "般若"
+        }
+       }
+      },
+      {
+       "match": {
+        "notes": {
+         "analyzer": "cjk_content",
+         "boost": 0.5,
+         "query": "般若"
+        }
+       }
+      }
+     ]
     }
    },
    "size": 5
@@ -1562,6 +1778,16 @@
         "pre_tags": [
          "<em>"
         ]
+       },
+       "notes": {
+        "fragment_size": 120,
+        "number_of_fragments": 2,
+        "post_tags": [
+         "</em>"
+        ],
+        "pre_tags": [
+         "<em>"
+        ]
        }
       }
      },
@@ -1586,15 +1812,41 @@
       "pre_tags": [
        "<em>"
       ]
+     },
+     "notes": {
+      "fragment_size": 120,
+      "number_of_fragments": 2,
+      "post_tags": [
+       "</em>"
+      ],
+      "pre_tags": [
+       "<em>"
+      ]
      }
     }
    },
    "query": {
-    "match": {
-     "content": {
-      "analyzer": "cjk_content",
-      "query": "阿弥陀"
-     }
+    "bool": {
+     "minimum_should_match": 1,
+     "should": [
+      {
+       "match": {
+        "content": {
+         "analyzer": "cjk_content",
+         "query": "阿弥陀"
+        }
+       }
+      },
+      {
+       "match": {
+        "notes": {
+         "analyzer": "cjk_content",
+         "boost": 0.5,
+         "query": "阿弥陀"
+        }
+       }
+      }
+     ]
     }
    },
    "size": 20
@@ -1626,6 +1878,16 @@
         "pre_tags": [
          "<em>"
         ]
+       },
+       "notes": {
+        "fragment_size": 120,
+        "number_of_fragments": 2,
+        "post_tags": [
+         "</em>"
+        ],
+        "pre_tags": [
+         "<em>"
+        ]
        }
       }
      },
@@ -1650,15 +1912,41 @@
       "pre_tags": [
        "<em>"
       ]
+     },
+     "notes": {
+      "fragment_size": 120,
+      "number_of_fragments": 2,
+      "post_tags": [
+       "</em>"
+      ],
+      "pre_tags": [
+       "<em>"
+      ]
      }
     }
    },
    "query": {
-    "match": {
-     "content": {
-      "analyzer": "cjk_content",
-      "query": "阿弥陀"
-     }
+    "bool": {
+     "minimum_should_match": 1,
+     "should": [
+      {
+       "match": {
+        "content": {
+         "analyzer": "cjk_content",
+         "query": "阿弥陀"
+        }
+       }
+      },
+      {
+       "match": {
+        "notes": {
+         "analyzer": "cjk_content",
+         "boost": 0.5,
+         "query": "阿弥陀"
+        }
+       }
+      }
+     ]
     }
    },
    "size": 5
