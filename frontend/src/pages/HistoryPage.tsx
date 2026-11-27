@@ -27,6 +27,7 @@ import EVENTS_DATA from "../data/historyEvents.json";
 import { useEffectiveTheme } from "../hooks/useTheme";
 import { useNarrowViewport } from "../hooks/useNarrowViewport";
 import type { MapEdge, MapPoint } from "../components/history/HistoryMap";
+import HistoryShareButton from "../components/history/HistoryShareButton";
 import "../styles/history.css";
 
 // 地图（maplibre 约 800KB）单独分包：长卷先出来，地图随后
@@ -99,6 +100,12 @@ const CHINA_VIEW: Array<[number, number]> = [
   [123, 41],
 ];
 
+/** 分享图正文太长会挤出卡片：按字截断加省略号 */
+function clipText(s: string, n: number): string {
+  const chars = Array.from(s.replace(/\s+/g, ""));
+  return chars.length <= n ? chars.join("") : `${chars.slice(0, n - 1).join("")}…`;
+}
+
 function track(name: string, data?: Record<string, string | number>) {
   if (typeof umami !== "undefined") umami.track(name, data);
 }
@@ -155,6 +162,8 @@ export default function HistoryPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   // 窄于 1200px：地图默认收起、人物卡盖在长卷上
   const narrow = useNarrowViewport("(max-width: 1199px)");
+  // 手机：导览 / 大事 / 译经长河面板改成底部弹层（history.css），长卷留在弹层上方
+  const phone = useNarrowViewport("(max-width: 640px)");
 
   const px = ZOOMS[zoom];
   const byId = useMemo(() => new Map((data?.people ?? []).map((p) => [p.id, p])), [data]);
@@ -558,8 +567,20 @@ export default function HistoryPage() {
   const kindNote = (s: PersonSpan | null | undefined) =>
     s && s.kind !== "full" ? t(`history.kind_${s.kind}`) : null;
 
+  // 手机上弹层打开时把长卷滚到顶栏下方：弹层压住屏幕下半，长卷要在它上面看得见
+  const sheetOpen = !!(tour || selEvent || selRiver >= 0);
+  const sheetKey = tour ? `t:${tour.id}` : selEvent ? `e:${selEvent.id}` : selRiver >= 0 ? `r:${selRiver}` : "";
+  useEffect(() => {
+    if (!phone || !sheetKey) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    const headerH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--fj-header-h")) || 56;
+    window.scrollTo({ top: window.scrollY + el.getBoundingClientRect().top - headerH - 6 });
+    // data：深链打开时长卷要等数据到了才画出来，那时再滚一次
+  }, [phone, sheetKey, data]);
+
   return (
-    <div className={`history-page${selected && !narrow ? " history-page--card" : ""}`}>
+    <div className={`history-page${selected && !narrow ? " history-page--card" : ""}${phone && sheetOpen ? " history-page--sheet" : ""}`}>
       <Helmet>
         <title>{`${t("history.title")} - ${t("app.name")}`}</title>
         <meta name="description" content={t("history.meta_desc")} />
@@ -592,6 +613,7 @@ export default function HistoryPage() {
           aria-label={t("history.search_placeholder")}
           allowClear
         />
+        <div className="history-tools-row">
         <Segmented
           value={byYear ? "time" : "school"}
           onChange={(v) => {
@@ -631,6 +653,7 @@ export default function HistoryPage() {
             <Button size="small" icon={<PlusOutlined />} aria-label={t("history.zoom_in")} disabled={zoom === ZOOMS.length - 1} onClick={() => setZoom((z) => Math.min(ZOOMS.length - 1, z + 1))} />
           </Tooltip>
         </span>
+        </div>
       </div>
 
       <div className="history-tours" role="group" aria-label={t("history.tours")}>
@@ -716,6 +739,14 @@ export default function HistoryPage() {
               <Button size="small" disabled={EVENTS[EVENTS.length - 1].id === selEvent.id} onClick={() => selectEvent(EVENTS[EVENTS.indexOf(selEvent) + 1]?.id ?? null, "next")}>
                 {t("history.event_next")}
               </Button>
+              <HistoryShareButton
+                heading={`${t("history.title")} · ${t("history.event_year", { y: `${selEvent.approx ? t("history.approx") : ""}${selEvent.y}` })} · ${L(selEvent.s)}`}
+                text={clipText(L(selEvent.q.split("｜")[0]), 140)}
+                source={selEvent.refs[0] ? t("history.event_ref", { src: L(selEvent.refs[0].src), juan: selEvent.refs[0].juan }) : ""}
+                url={`${window.location.origin}/history?e=${selEvent.id}`}
+                fileName={`fojin-history-${selEvent.id}.png`}
+                onShare={(step) => track("history_share", { kind: "event", step })}
+              />
               <button type="button" className="history-chip history-chip--clear" onClick={() => selectEvent(null, "close")} aria-label={t("history.event_close")}>
                 ×
               </button>
@@ -1072,6 +1103,16 @@ function PersonCard({
         </p>
       )}
       {p.bio && <p className="history-card-bio">{L(p.bio)}</p>}
+      <div className="history-card-share">
+        <HistoryShareButton
+          heading={`${t("history.title")} · ${L(p.n)}${years ? `（${years}）` : ""}`}
+          text={clipText(L(p.bio || p.n), 150)}
+          source={t("history.card_source_person")}
+          url={`${window.location.origin}/history?p=${p.id}`}
+          fileName={`fojin-history-${p.id}.png`}
+          onShare={(step) => track("history_share", { kind: "person", step })}
+        />
+      </div>
 
       {(p.te.length > 0 || p.st.length > 0) && (
         <section>

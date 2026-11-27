@@ -6,6 +6,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import HistoryPage from "./HistoryPage";
 
 // 地图依赖 WebGL，jsdom 里换成只列出点的替身
+vi.mock("../utils/shareCard", () => ({
+  renderShareCard: vi.fn(async () => new Blob(["png"], { type: "image/png" })),
+}));
 vi.mock("../components/history/HistoryMap", () => ({
   default: ({ points }: { points: Array<{ label: string }> }) => <ul data-testid="map">{points.map((p) => <li key={p.label}>{p.label}</li>)}</ul>,
 }));
@@ -344,4 +347,18 @@ describe("佛教史长卷", () => {
     expect(loc()).not.toContain("r=");
     expect(document.querySelector(".history-river-panel")).toBeNull();
   });
+
+  it("分享：大事面板点「分享」出预览图；「复制链接」复制带 ?e= 的深链", async () => {
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    renderPage("/history?e=huichang&y=845");
+    await screen.findAllByRole("button", { name: "玄奘" });
+    const panel = document.querySelector(".history-event-panel") as HTMLElement;
+    fireEvent.click(within(panel).getByRole("button", { name: /分享/ }));
+    const img = await screen.findByRole("img", { name: /会昌法难/ });
+    expect(img.getAttribute("src")).toMatch(/^data:image\/png/);
+    fireEvent.click(screen.getByRole("button", { name: "复制链接" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringMatching(/\/history\?e=huichang$/)));
+  });
 });
+
