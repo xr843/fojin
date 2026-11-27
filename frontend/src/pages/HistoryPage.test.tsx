@@ -360,5 +360,28 @@ describe("佛教史长卷", () => {
     fireEvent.click(screen.getByRole("button", { name: "复制链接" }));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringMatching(/\/history\?e=huichang$/)));
   });
+
+  it("选了年份：在世的人在长卷可见区下方时，长卷下边缘提示「下方还有 N 位在世」，点了滚过去；泳道标签显示本年人数", async () => {
+    // jsdom 没有布局：让长卷可见区只够露出表头加第一行
+    const ch = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientHeight");
+    Object.defineProperty(HTMLElement.prototype, "clientHeight", {
+      configurable: true,
+      get() {
+        return (this as HTMLElement).classList?.contains("history-scroll") ? 230 : 0;
+      },
+    });
+    try {
+      renderPage("/history?y=650");
+      await screen.findAllByRole("button", { name: "玄奘" });
+      const hint = await screen.findByRole("button", { name: /下方还有 \d+ 位在世/ });
+      const scrollTo = Element.prototype.scrollTo as unknown as ReturnType<typeof vi.fn>;
+      scrollTo.mockClear();
+      fireEvent.click(hint);
+      expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ top: expect.any(Number) }));
+      expect(document.querySelectorAll(".history-lane-alive").length).toBeGreaterThan(0);
+    } finally {
+      if (ch) Object.defineProperty(HTMLElement.prototype, "clientHeight", ch);
+    }
+  });
 });
 
