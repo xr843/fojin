@@ -99,8 +99,8 @@ describe("佛教史长卷排布", () => {
     expect(fixZhuAfterSimplify("随着论疏，接着讲记")).toBe("随着论疏，接着讲记");
   });
 
-  it("身份：比丘尼泳道的人即便 DILA 没标「僧人」也显示比丘尼，不会被当成居士", () => {
-    expect(personRole(person({ sc: "比丘尼", monk: false, f: true }))).toBe("nun");
+  it("身份：比丘尼与僧人同在各宗泳道，凭名单标记显示比丘尼，不会被当成居士或僧", () => {
+    expect(personRole(person({ sc: "律", monk: true, f: true, nun: true }))).toBe("nun");
     expect(personRole(person({ sc: "其他", monk: false }))).toBe("lay");
     expect(personRole(person({ tr: true }))).toBe("translator");
   });

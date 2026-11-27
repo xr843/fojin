@@ -24,6 +24,8 @@ export interface HistoryPerson {
   monk: boolean;
   /** 女性（DILA sex=2） */
   f?: boolean;
+  /** 比丘尼（名单标记；她们按宗派与僧人同在一道） */
+  nun?: boolean;
   tr: boolean;
   bio: string;
   te: string[];
@@ -128,7 +130,7 @@ export function packRows(
 }
 
 /** 宗派泳道的先后：译经在最前（佛教入华从译经开始），其余大致按宗派成立先后，「其他」垫底。 */
-export const SCHOOL_ORDER = ["译经", "三论", "义学", "天台", "华严", "唯识", "律", "净土", "禅", "密", "比丘尼", "其他"]; // i18n-exempt — 数据里的宗派值，显示走 history.school.* 键
+export const SCHOOL_ORDER = ["译经", "三论", "义学", "天台", "华严", "唯识", "律", "净土", "禅", "密", "其他"]; // i18n-exempt — 数据里的宗派值，显示走 history.school.* 键
 
 /** 宗派值 → 翻译键后缀 */
 export const SCHOOL_KEY: Record<string, string> = {
@@ -142,7 +144,6 @@ export const SCHOOL_KEY: Record<string, string> = {
   净土: "pureland", // i18n-exempt
   禅: "chan", // i18n-exempt
   密: "esoteric", // i18n-exempt
-  比丘尼: "nun", // i18n-exempt
   其他: "other", // i18n-exempt
 };
 
@@ -246,9 +247,9 @@ export function fixZhuAfterSimplify(s: string): string {
     .replace(/(?<![随接跟顺沿朝向为])着(?=[^，。、；（）《》]{1,6}(集|论|疏|记|录|钞)[一二三四五六七八九十]+卷)/g, "著"); // i18n-exempt — 文字校正规则，不是界面文案
 }
 
-/** 人物身份：译经师 / 僧 / 比丘尼 / 居士。DILA 的「是否僧人」对比丘尼常缺，按泳道补（否则会被标成居士）。 */
+/** 人物身份：译经师 / 僧 / 比丘尼 / 居士。比丘尼与僧人同在各宗泳道里，身份看名单标记 nun（DILA 的「是否僧人」对比丘尼常缺）。 */
 export function personRole(p: HistoryPerson): "translator" | "monk" | "nun" | "lay" {
   if (p.tr) return "translator";
-  if (p.sc === "比丘尼") return "nun"; // i18n-exempt — 数据里的泳道值
+  if (p.nun) return "nun";
   return p.monk ? "monk" : "lay";
 }
