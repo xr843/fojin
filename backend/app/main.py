@@ -91,6 +91,7 @@ from app.api import (
     search_unified,
     seo,
     seo_dict,
+    seo_history,
     seo_persons,
     share,
     sitemap,
@@ -635,6 +636,10 @@ app.include_router(seo_persons.router)
 # SEO: per-dictionary-headword SSR landing pages (~300k unique headwords
 # across 700k+ entries).
 app.include_router(seo_dict.router)
+
+# SEO / share cards for /history（中国佛教史长卷）: per ?p= / ?e= / ?r= / ?tour= og:* so a shared
+# person or event isn't carded as the homepage.
+app.include_router(seo_history.router)
 
 
 # Observability: instrument HTTP metrics and mount /metrics (network-internal;

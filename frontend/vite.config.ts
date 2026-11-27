@@ -30,6 +30,18 @@ function seoPages(): Plugin {
         mkdirSync(dirname(out), { recursive: true });
         writeFileSync(out, localizeShell(template, entry));
       }
+
+      // /history 分享卡片用：大事、导览的标题字段（后端 app/api/seo_history.py 读这个文件；
+      // 数据本身打包在 JS 里，后端拿不到）
+      const events = JSON.parse(readFileSync(resolve(__dirname, "src/data/historyEvents.json"), "utf-8")).events;
+      const tours = JSON.parse(readFileSync(resolve(__dirname, "src/data/historyTours.json"), "utf-8")).tours;
+      writeFileSync(
+        resolve(distDir, "history-share.json"),
+        JSON.stringify({
+          events: Object.fromEntries(events.map((e: { id: string; y: number; s: string; t: string; q: string }) => [e.id, { y: e.y, s: e.s, t: e.t, q: e.q }])),
+          tours: Object.fromEntries(tours.map((x: { id: string; title: string; intro: string }) => [x.id, { title: x.title, intro: x.intro }])),
+        }),
+      );
     },
   };
 }

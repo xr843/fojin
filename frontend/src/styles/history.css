@@ -51,6 +51,9 @@ a.history-view:hover {
 .history-search {
   width: min(320px, 100%);
 }
+.history-tools-row {
+  display: contents; /* 宽屏：跟搜索框同一行排开，与原来一样 */
+}
 .history-zoom {
   display: inline-flex;
   gap: 4px;
@@ -166,9 +169,15 @@ a.history-view:hover {
 }
 .history-river-label {
   position: sticky;
-  left: 6px;
+  left: 0;
   top: 0;
-  z-index: 1;
+  /* 不透明底、压在标记之上：横向滚动时右边的大事名从它下面过去，不再压字 */
+  z-index: 4;
+  padding: 0 6px;
+  border-radius: 0 3px 3px 0;
+  background: var(--fj-surface-alt);
+  /* 右侧一小段渐隐：被盖住一半的大事名不会突兀地露半截 */
+  box-shadow: 10px 0 8px -2px var(--fj-surface-alt);
   font-size: 11px;
   color: var(--fj-ink-muted);
 }
@@ -758,4 +767,97 @@ a.history-view:hover {
 .history-river-src a {
   margin-left: 4px;
   white-space: nowrap;
+}
+
+/* ── 手机（≤640px）──
+   顶部控件压成两行（搜索一行、其余一行横向滑），导览按钮一行横向滑；
+   导览 / 大事 / 译经长河面板改成底部弹层，长卷留在弹层上方（打开时页面自动把长卷滚到顶栏下）。 */
+@media (max-width: 640px) {
+  .history-head {
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .history-sub {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .history-tools {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+  .history-search {
+    width: 100%;
+  }
+  .history-tools-row,
+  .history-tours {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .history-tools-row::-webkit-scrollbar,
+  .history-tours::-webkit-scrollbar {
+    display: none;
+  }
+  .history-tools-row > *,
+  .history-tours > * {
+    flex: 0 0 auto;
+  }
+  /* 一行横向滑：宽度钉死在屏宽，否则会被内容撑到 520px，把整页撑宽、手机随之缩放（底部弹层跑出可见区） */
+  .history-tools-row,
+  .history-tours {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .history-tours-row,
+  .history-tours-group {
+    flex-wrap: nowrap;
+  }
+  .history-page--sheet {
+    padding-bottom: 48vh;
+  }
+  .history-page--sheet .history-tour-panel,
+  .history-page--sheet .history-event-panel {
+    position: fixed;
+    left: 6px;
+    right: 6px;
+    bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+    z-index: 30;
+    max-height: 46vh;
+    margin: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.16);
+  }
+  .history-page--sheet .history-scroll {
+    max-height: calc(52vh - var(--fj-header-h) - 14px);
+    min-height: 200px;
+  }
+}
+
+
+/* 分享：人物卡里一行按钮；预览弹窗里的竖图 */
+.history-card-share {
+  margin: 4px 0 10px;
+}
+.history-share img {
+  display: block;
+  width: 100%;
+  border-radius: 6px;
+  border: 1px solid var(--fj-border);
+}
+.history-share-hint {
+  margin: 8px 0;
+  font-size: 12px;
+  color: var(--fj-ink-muted);
+}
+.history-share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
