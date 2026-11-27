@@ -2046,7 +2046,7 @@
   "history.river_next": "下一個十年",
   "history.river_close": "關閉",
   "history.river_read": "讀經",
-  "history.river_src": "開元錄卷{{juan}}",
+  "history.river_src": "開元錄卷{{juan}} 原文（CBETA）",
   "history.river_total": "開元錄記了譯出年份的 {{n}} 部",
   "history.years_unknown": "生卒不詳",
   "history.kind_death": "只知卒年，生年一端為推算",

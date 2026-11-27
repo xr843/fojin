@@ -9,6 +9,8 @@
 3. 「右……部……卷。」后面那句是译人（沙門鳩摩羅什。秦言童壽……），按它归属本组各部；
 4. 经名＋译人对上佛津藏内经典的，带阅读页链接。
 
+佛津阅读页不显示夹注，所以出处给夹注原文（从年号起）并链到 CBETA Online 那一行。
+
 去掉：「今移在某錄」「總刪之」「不錄」之类改隶/删除的互见条目（同一部经别处另有正条）。
 
 2026-11-27 实测：2,193 部里 467 部夹注有年号，460 部换算成唯一公元年；去互见后 453 部，268 部对上藏内经典。
@@ -218,7 +220,8 @@ def extract(xml_path: str, eras: dict) -> list[dict]:
                        "j": _clean(tok.group(3)), "y": None, "h": None, "note": note}  # fmt: skip
                 e = era_re.search(note)
                 if e:
-                    row["h"] = e.group(0)
+                    # 夹注从年号起的一段（到「見某錄」或 40 字为止）：佛津阅读页不显示夹注，面板里直接给原文
+                    row["h"] = re.split(r"見", note[e.start() :], maxsplit=1)[0][:40]
                     row["y"] = to_ad(eras, e.group(2), cn(e.group(3)), e.group(4), name, e.group(1))
                 rows.append(row)
                 pending.append(row)
@@ -283,6 +286,8 @@ def main() -> None:
     data = {
         "source": "《開元釋教錄》卷1–10 總括群經錄夾注；年號換算：DILA 時間規範資料庫（CC BY-SA 3.0）",
         "kaiyuan": kaiyuan_id,
+        # CBETA Online 行号前缀：佛津阅读页不显示夹注，出处链到 CBETA Online 那一行（显示夹注）
+        "cbeta": "T55n2154",
         "items": items,
     }
     with open(out_path, "w", encoding="utf8") as f:

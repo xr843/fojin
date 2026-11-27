@@ -195,7 +195,7 @@ export interface TranslationItem {
   j: string;
   /** 译人（通行名） */
   w: string;
-  /** 夹注原文里的年号，如「弘始五年癸卯」 */
+  /** 夹注原文，从年号起（如「弘始四年正月五日出至九年閏五月重校正」） */
   h: string;
   /** 开元录卷次、行首（p0512b04 的 0512b04） */
   ju: number;
@@ -208,6 +208,8 @@ export interface TranslationData {
   source: string;
   /** 开元录在佛津的经典 id */
   kaiyuan: number;
+  /** CBETA Online 行号前缀（T55n2154）：佛津阅读页不显示夹注，出处链到 CBETA Online 那一行 */
+  cbeta: string;
   items: TranslationItem[];
 }
 
