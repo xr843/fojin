@@ -37,4 +37,16 @@ describe("locateQuote", () => {
     expect(locateQuote(el, "一時佛在", "0001a01")).toBeNull();
     el.remove();
   });
+
+  it("夹注：新划选连夹注一起找得回；此前存的摘录（不含夹注）跳过夹注也找得回", () => {
+    const el = mount(
+      '<p><span class="cbeta-line" data-ref="0512b04"></span>摩訶般若波羅蜜經四十卷<span class="inline-note">（弘始五年出）</span>小品般若</p>',
+    );
+    expect(locateQuote(el, "四十卷（弘始五年出）小品", "0512b04")?.toString()).toBe("四十卷（弘始五年出）小品");
+    const old = locateQuote(el, "四十卷小品", "0512b04");
+    expect(old).not.toBeNull();
+    expect(old!.toString()).toContain("四十卷");
+    el.remove();
+  });
 });
+

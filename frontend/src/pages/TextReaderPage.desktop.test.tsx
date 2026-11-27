@@ -8,6 +8,7 @@ import {
   checkBookmark,
   getJuanAudio,
   getJuanContent,
+  getJuanInlineNotes,
   getJuanLanguages,
   getJuanLineAnchors,
   getJuanList,
@@ -25,6 +26,7 @@ vi.mock("../api/client", async () => {
     getJuanContent: vi.fn(),
     getJuanLanguages: vi.fn(),
     getJuanLineAnchors: vi.fn(),
+    getJuanInlineNotes: vi.fn(),
     getJuanAudio: vi.fn(),
     getJuanApparatus: vi.fn(),
     checkBookmark: vi.fn(),
@@ -78,6 +80,7 @@ beforeEach(() => {
     text_id: TEXT_ID, juan_num: 1, languages: ["lzh"], default_lang: "lzh",
   });
   vi.mocked(getJuanLineAnchors).mockResolvedValue({ text_id: TEXT_ID, juan_num: 1, anchors: [] });
+  vi.mocked(getJuanInlineNotes).mockResolvedValue({ notes: [] });
   vi.mocked(getJuanAudio).mockRejectedValue(new Error("404"));
   vi.mocked(checkBookmark).mockResolvedValue(false);
 });
@@ -286,3 +289,28 @@ describe("阅读器：?quote= 从问答页原文面板过来", () => {
     expect(container.querySelector(".quote-mark")).toBeNull();
   });
 });
+
+describe("阅读器：夹注（CBETA 双行小注）", () => {
+  it("夹注按位置插回、小字括号、每条只画一次；段首的夹注放在该段开头", async () => {
+    vi.mocked(getJuanContent).mockResolvedValue({
+      text_id: TEXT_ID, cbeta_id: "T0676", title_zh: "解深密經", juan_num: 1, total_juans: 5,
+      // 0-7 如是我聞四十卷。 | 10-12 骸骨。 | 15-17 拯濟。（行末有句号，重排不会把几段并成一段）
+      content: "如是我聞四十卷。\n\n骸骨。\n\n拯濟。", char_count: 13,
+      prev_juan: null, next_juan: 2, canon: "taisho", canon_label: "大正藏",
+    });
+    vi.mocked(getJuanInlineNotes).mockResolvedValue({
+      notes: [
+        { char_offset: 7, content: "弘始五年出" },
+        { char_offset: 13, content: "上戶皆反" },
+        { char_offset: 15, content: "段首注" },
+      ],
+    });
+    const { container } = await renderReader();
+    await waitFor(() => expect(container.querySelectorAll(".inline-note")).toHaveLength(3));
+    const paras = Array.from(container.querySelectorAll(".reader-content p, p")).map((p) => p.textContent ?? "");
+    expect(paras).toContain("如是我聞四十卷（弘始五年出）。");
+    expect(paras).toContain("骸骨。（上戶皆反）");
+    expect(paras).toContain("（段首注）拯濟。");
+  });
+});
+

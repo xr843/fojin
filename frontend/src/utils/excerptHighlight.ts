@@ -5,7 +5,9 @@
  * - 去掉空白再比（CBETA 有硬换行，选区 toString 会带进换行/空格）；
  * - 跳过校勘标记 <sup class="apparatus-marker">[n]</sup>，原文里的「[n]」同样去掉；
  *   行首标签是 CSS ::before 画的，不在文字里，不用管；
- * - 从记下的那一行起往后找，找不到（行号重导后变了）再退回全卷找第一处。
+ * - 从记下的那一行起往后找，找不到（行号重导后变了）再退回全卷找第一处；
+ * - 夹注 <span class="inline-note">（2026-11-27 起显示）：先连夹注一起找（新划选会带进夹注），
+ *   找不到再跳过夹注找——此前存的摘录里没有夹注。
  *
  * 高亮用 CSS Custom Highlight API：不改经文 DOM（经文的行号锚点、划词、续读都靠 DOM），
  * 不支持的浏览器（Firefox < 140 等）不显示底纹，摘录本身照常保存、在「我的摘录」里可见。
@@ -22,14 +24,17 @@ interface CharPos {
   offset: number;
 }
 
-function indexContainer(container: HTMLElement, lineRef: string | null | undefined) {
+function indexContainer(container: HTMLElement, lineRef: string | null | undefined, skipNotes = false) {
   const chars: string[] = [];
   const map: CharPos[] = [];
   let lineStart = -1;
   const walker = document.createTreeWalker(container, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
     acceptNode(n) {
-      if (n.nodeType === Node.ELEMENT_NODE && (n as Element).classList.contains("apparatus-marker")) {
-        return NodeFilter.FILTER_REJECT; // 跳过整个子树
+      if (n.nodeType === Node.ELEMENT_NODE) {
+        const cl = (n as Element).classList;
+        if (cl.contains("apparatus-marker") || (skipNotes && cl.contains("inline-note"))) {
+          return NodeFilter.FILTER_REJECT; // 跳过整个子树
+        }
       }
       return NodeFilter.FILTER_ACCEPT;
     },
@@ -58,12 +63,18 @@ function indexContainer(container: HTMLElement, lineRef: string | null | undefin
 export function locateQuote(container: HTMLElement, quote: string, lineRef?: string | null): Range | null {
   const q = normalizeQuote(quote);
   if (!q) return null;
-  const { str, map, lineStart } = indexContainer(container, lineRef);
-  let at = lineStart >= 0 ? str.indexOf(q, lineStart) : -1;
-  if (at < 0) at = str.indexOf(q);
-  if (at < 0) return null;
+  for (const skipNotes of [false, true]) {
+    const { str, map, lineStart } = indexContainer(container, lineRef, skipNotes);
+    let at = lineStart >= 0 ? str.indexOf(q, lineStart) : -1;
+    if (at < 0) at = str.indexOf(q);
+    if (at >= 0) return rangeOf(map, at, q.length);
+  }
+  return null;
+}
+
+function rangeOf(map: CharPos[], at: number, len: number): Range {
   const start = map[at];
-  const end = map[at + q.length - 1];
+  const end = map[at + len - 1];
   const range = document.createRange();
   range.setStart(start.node, start.offset);
   range.setEnd(end.node, end.offset + 1);

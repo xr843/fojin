@@ -136,3 +136,34 @@ def test_paragraphs_still_extracted(tmp_path):
     content = juans[0]["content"]
     assert "如是我聞" in content
     assert "祇樹給孤獨園" in content
+
+
+# 夹注 / 双行小注：开元录、一切经音义式的结构。正文必须与不含夹注时逐字相同，夹注另给位置。
+NOTES_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<TEI xmlns="http://www.tei-c.org/ns/1.0" xmlns:cb="http://www.cbeta.org/ns/1.0">
+<teiHeader><fileDesc><titleStmt><title>x</title></titleStmt>
+<publicationStmt><p>x</p></publicationStmt>
+<sourceDesc><bibl>x</bibl></sourceDesc></fileDesc></teiHeader>
+<text><body>
+<milestone n="1" unit="juan"/>
+<p><lb n="0512b04" ed="T"/>摩訶般若波羅蜜經四十卷<note place="inline">弘始五年<lb n="0512b05" ed="T"/>四月出<note n="0512001" resp="CBETA" type="mod">校勘</note></note></p>
+<p>骸骨。 <note place="inline">上戶皆反</note></p>
+<p><note place="inline">整段都是注</note></p>
+<p>拯濟。</p>
+</body></text></TEI>
+"""
+
+
+def test_inline_notes_kept_apart_body_unchanged(tmp_path):
+    """夹注不进正文（正文与原解析器逐字相同：段尾空格照旧去掉、整段注不成行），
+    位置是它前面那个字之后；注里的 <lb> 不成行号，注里的校勘注不进夹注文字。"""
+    (j,) = parse_tei_xml(_write(tmp_path, NOTES_XML))
+    assert j["content"] == "摩訶般若波羅蜜經四十卷\n\n骸骨。\n\n拯濟。"
+    notes = j["inline_notes"]
+    assert [n["text"] for n in notes] == ["弘始五年四月出", "上戶皆反", "整段都是注"]
+    c = j["content"]
+    assert c[: notes[0]["offset"]].endswith("四十卷")
+    assert c[: notes[1]["offset"]].endswith("骸骨。")
+    # 整段只有注：接在前一段末尾（不另起一行）
+    assert notes[2]["offset"] == notes[1]["offset"]
+    assert [a["line"] for a in j["line_anchors"]] == ["0512b04"]

@@ -30,7 +30,7 @@ import {
 } from "@ant-design/icons";
 import { trackAudio } from "../audio/telemetry";
 import { useAudioPlayer } from "../audio/useAudioPlayback";
-import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBookmark, addBookmark, listExcerpts, removeBookmark, searchDictionaryGrouped, getJuanApparatus, getJuanLineAnchors, getJuanAudio, type ApparatusEntryItem } from "../api/client";
+import { getJuanList, getJuanContent, getJuanLanguages, getTextDetail, checkBookmark, addBookmark, listExcerpts, removeBookmark, searchDictionaryGrouped, getJuanApparatus, getJuanLineAnchors, getJuanInlineNotes, getJuanAudio, type ApparatusEntryItem } from "../api/client";
 import { isNarrowViewport, useNarrowViewport, PHONE_VIEWPORT_QUERY } from "../hooks/useNarrowViewport";
 
 const AI_PANEL_PREF_KEY = "fojin.reader.aiPanel";
@@ -97,12 +97,16 @@ interface LineAnchorConv { off: number; ref: string }
 /** stem：本卷的 CBETA 文件主名（如 T08n0235），用于行首显示；null = 不显示行首。 */
 /** ?hl= 所查整句的范围（UTF-16 偏移，[start, end)）：在两端插零宽 .quote-mark，标记之间常亮。 */
 interface QuoteSpan { start: number; end: number }
+/** 夹注：off = 它在正文里的 UTF-16 位置。after：off-1 那个字在某一段里，夹注接在它后面；
+ * 否则（前一个字是被重排丢掉的换行——段首就是夹注）放在 off 那个字前面。全卷统一定，保证只画一次。 */
+interface InlineNoteConv { off: number; text: string; after: boolean }
 type ReaderCtx = {
   numbered: ApparatusNumbered[];
   lineAnchors: LineAnchorConv[];
   stem: string | null;
   t: TFn;
   quote?: QuoteSpan | null;
+  notes?: InlineNoteConv[];
 } | null;
 
 /** Build a map from Python code-point index → JS UTF-16 index for `raw`.
@@ -163,9 +167,9 @@ function ApparatusMarker({ no, entry, t }: { no: number; entry: ApparatusEntryIt
  * markers (校勘 [n]) after each lemma, and zero-width line-anchor spans (carrying
  * the CBETA page-col-line ref) for the on-demand citation locator and URN scroll. */
 function renderSegmentChildren(seg: Extract<TextSegment, { text: string }>, ctx: NonNullable<ReaderCtx>): ReactNode {
-  const { numbered, lineAnchors, stem, t, quote } = ctx;
+  const { numbered, lineAnchors, stem, t, quote, notes = [] } = ctx;
   const { text, offsets } = seg;
-  if (!offsets.length || (!numbered.length && !lineAnchors.length && !quote)) return text;
+  if (!offsets.length || (!numbered.length && !lineAnchors.length && !quote && !notes.length)) return text;
   const segStart = offsets[0];
   const segEnd = offsets[offsets.length - 1];
   const offToLocal = new Map<number, number>();
@@ -202,6 +206,22 @@ function renderSegmentChildren(seg: Extract<TextSegment, { text: string }>, ctx:
       ins.push({ pos: offToLocal.get(last)! + 1, order: 2, node: <span key="qe" className="quote-mark" data-q="end" /> });
     }
   }
+  // 夹注跟在它前面那个字之后；前一个字是被丢掉的换行时（段首就是夹注）放在 off 那个字之前（见 InlineNoteConv）。
+  // 排在校勘标记之后（校勘标在正文字上）。
+  notes.forEach((n, k) => {
+    const key = n.after ? n.off - 1 : n.off;
+    if (!offToLocal.has(key)) return;
+    const pos = offToLocal.get(key)! + (n.after ? 1 : 0);
+    ins.push({
+      pos,
+      order: 1.5,
+      node: (
+        <span key={`nt${k}`} className="inline-note">
+          （{n.text}）
+        </span>
+      ),
+    });
+  });
   for (const m of numbered) {
     const cs = m.start;
     if (cs < segStart || cs > segEnd || !offToLocal.has(cs)) continue;
@@ -972,6 +992,24 @@ export default function TextReaderPage() {
     retry: false,
   });
   const audioPlayer = useAudioPlayer();
+  // 夹注 / 双行小注：原书正文的一部分，但不在 content 里（见 backend TextInlineNote），按位置插回。
+  // 每卷都取（没有夹注的卷返回空）。
+  const { data: inlineNoteData } = useQuery({
+    queryKey: ["juanInlineNotes", textId, juanNum],
+    queryFn: () => getJuanInlineNotes(Number(textId), juanNum),
+    enabled: !!textId,
+    staleTime: 3600000,
+  });
+  const inlineNotes = useMemo<InlineNoteConv[]>(() => {
+    const raw = content?.content;
+    if (!inlineNoteData?.notes?.length || !raw) return [];
+    const m = cpToU16Map(raw);
+    const conv = (cp: number) => (cp >= 0 && cp < m.length ? m[cp] : m[m.length - 1]);
+    const notes = inlineNoteData.notes.map((n) => ({ off: conv(n.char_offset), text: n.content }));
+    const shown = new Set<number>();
+    for (const seg of reflowedContent) if ("offsets" in seg) for (const o of seg.offsets) shown.add(o);
+    return notes.map((n) => ({ ...n, after: shown.has(n.off - 1) }));
+  }, [inlineNoteData, content?.content, reflowedContent]);
   const lineAnchors = useMemo<LineAnchorConv[]>(() => {
     const raw = content?.content;
     if (!lineAnchorData?.anchors || !raw) return [];
@@ -1023,8 +1061,8 @@ export default function TextReaderPage() {
 
   // One context drives the inline layers: apparatus markers (only when toggled on)
   // and always-embedded zero-width line anchors (so selection/URN can locate a line).
-  const readerCtx: ReaderCtx = (apparatusOn && apparatusNumbered.length) || lineAnchors.length || quoteSpan
-    ? { numbered: apparatusOn ? apparatusNumbered : [], lineAnchors, stem: lineLevel ? stem : null, t, quote: quoteSpan }
+  const readerCtx: ReaderCtx = (apparatusOn && apparatusNumbered.length) || lineAnchors.length || quoteSpan || inlineNotes.length
+    ? { numbered: apparatusOn ? apparatusNumbered : [], lineAnchors, stem: lineLevel ? stem : null, t, quote: quoteSpan, notes: inlineNotes }
     : null;
 
   // URN deep-link: ?anchor=p0001a09 → scroll to that CBETA line + brief flash.

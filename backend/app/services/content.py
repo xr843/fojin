@@ -2,7 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.text import BuddhistText, TextApparatus, TextContent, TextLineAnchor
+from app.models.text import BuddhistText, TextApparatus, TextContent, TextInlineNote, TextLineAnchor
 from app.schemas.text import JuanContentResponse, JuanInfo, JuanLanguagesResponse, JuanListResponse
 
 
@@ -165,3 +165,14 @@ async def get_juan_line_anchors(session: AsyncSession, text_id: int, juan_num: i
         .order_by(TextLineAnchor.char_offset)
     )
     return [{"char_offset": off, "line_ref": ref} for off, ref in result.all()]
+
+
+async def get_juan_inline_notes(session: AsyncSession, text_id: int, juan_num: int) -> list[dict]:
+    """夹注 / 双行小注 for one juan, in source order. Each: {char_offset, content}; the note
+    follows content[char_offset-1]. Not part of TextContent.content (see TextInlineNote)."""
+    result = await session.execute(
+        select(TextInlineNote.char_offset, TextInlineNote.content)
+        .where(TextInlineNote.text_id == text_id, TextInlineNote.juan_num == juan_num)
+        .order_by(TextInlineNote.seq)
+    )
+    return [{"char_offset": off, "content": c} for off, c in result.all()]

@@ -784,6 +784,18 @@ export interface JuanLineAnchorsResponse {
   anchors: LineAnchorItem[];
 }
 
+/** 夹注 / 双行小注（CBETA <note place="inline">）：不在正文 content 里，按位置插回阅读页。
+ * char_offset 是 content 的 code-point 偏移，夹注跟在 content[char_offset-1] 之后。 */
+export interface InlineNoteItem {
+  char_offset: number;
+  content: string;
+}
+
+export async function getJuanInlineNotes(textId: number, juanNum: number): Promise<{ notes: InlineNoteItem[] }> {
+  const { data } = await api.get<{ notes: InlineNoteItem[] }>(`/texts/${textId}/juans/${juanNum}/notes`);
+  return data;
+}
+
 export async function getJuanLineAnchors(textId: number, juanNum: number): Promise<JuanLineAnchorsResponse> {
   const { data } = await api.get<JuanLineAnchorsResponse>(`/texts/${textId}/juans/${juanNum}/line-anchors`);
   return data;

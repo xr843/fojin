@@ -18,6 +18,7 @@ from app.services.audio import get_juan_audio, has_juan_audio
 from app.services.content import (
     get_juan_apparatus,
     get_juan_content,
+    get_juan_inline_notes,
     get_juan_languages,
     get_juan_line_anchors,
     get_juan_list,
@@ -130,6 +131,17 @@ class JuanLineAnchorsResponse(BaseModel):
     text_id: int
     juan_num: int
     anchors: list[LineAnchorItem] = []
+
+
+class InlineNoteItem(BaseModel):
+    char_offset: int
+    content: str
+
+
+class JuanInlineNotesResponse(BaseModel):
+    text_id: int
+    juan_num: int
+    notes: list[InlineNoteItem] = []
 
 
 class AudioCueItem(BaseModel):
@@ -292,6 +304,19 @@ async def read_juan_line_anchors(
     Loaded lazily by the reader; a juan can carry several hundred anchors."""
     anchors = await get_juan_line_anchors(db, text_id, juan_num)
     return JuanLineAnchorsResponse(text_id=text_id, juan_num=juan_num, anchors=anchors)
+
+
+@router.get("/texts/{text_id}/juans/{juan_num}/notes", response_model=JuanInlineNotesResponse)
+async def read_juan_inline_notes(
+    text_id: int,
+    juan_num: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """夹注 / 双行小注（CBETA <note place="inline">）for a juan: {char_offset, content},
+    in source order. The note sits after content[char_offset-1]; the body text itself never
+    contains notes, so all other offsets are unaffected. Empty for works without notes."""
+    notes = await get_juan_inline_notes(db, text_id, juan_num)
+    return JuanInlineNotesResponse(text_id=text_id, juan_num=juan_num, notes=notes)
 
 
 @router.get("/texts/{text_id}/juans/{juan_num}/audio", response_model=TextAudioResponse)
