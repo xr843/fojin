@@ -7,9 +7,9 @@ the reader splices them back in.
 
 Safety: offsets come from the freshly parsed XML body. When it equals the stored body character
 for character, they are used as is. When it differs (stored body from an older parser — 「┌│」 vs
-全角空格 — or a juan fixed by hand, e.g. 資持記卷11), each note is carried over through a character
-alignment of the two bodies, and only kept if the 4 characters before it (or after it) are the same
-in both; juans less than 90% alike are skipped whole. The stored body is never changed.
+全角空格 — or a juan fixed by hand), each note is placed by the 8 characters before it (else after
+it), ignoring line breaks, and only if that context occurs exactly once in the stored juan; a juan
+where fewer than half the notes can be placed is skipped whole. The stored body is never changed.
 
 Idempotent per work (delete + reinsert). Only touches text_inline_notes.
 
@@ -20,7 +20,6 @@ Usage (run in a one-off container, not the live backend — see memory: imports 
 
 import argparse
 import asyncio
-import difflib
 import logging
 import os
 import sys
@@ -43,8 +42,6 @@ def _has_inline_notes(path) -> bool:
         return 'place="inline"' in f.read()
 
 
-CONTEXT = 4  # 夹注前（或后）这么多字两边一致才搬
-MIN_RATIO = 0.9  # 两份正文相似度低于此，改用「上下文唯一」逐条找
 UNIQUE_CONTEXT = 8  # 逐条找时用夹注前（或后）这么多字，在库里正文中必须恰好出现一次
 
 
@@ -64,42 +61,6 @@ def locate_by_context(parsed: str, stored: str, notes: list[dict]) -> tuple[list
             m = keep[flat.index(before) + UNIQUE_CONTEXT - 1] + 1
         elif len(after) == UNIQUE_CONTEXT and flat.count(after) == 1:
             m = keep[flat.index(after)]
-        if m is None:
-            dropped += 1
-        else:
-            out.append({**n, "offset": m})
-    return out, dropped
-
-
-def remap_notes(parsed: str, stored: str, notes: list[dict]) -> tuple[list[dict], int] | None:
-    """把夹注位置从 XML 解析正文搬到库里正文。返回 (搬过去的夹注, 丢掉的条数)；两份正文差太多返回 None。"""
-    sm = difflib.SequenceMatcher(None, parsed, stored, autojunk=False)
-    if sm.ratio() < MIN_RATIO:
-        return None
-    # parsed 下标 → stored 下标（只对两边相同的字）
-    pmap: dict[int, int] = {}
-    for tag, i1, i2, j1, _ in sm.get_opcodes():
-        if tag == "equal":
-            for k in range(i2 - i1):
-                pmap[i1 + k] = j1 + k
-    out: list[dict] = []
-    dropped = 0
-    for n in notes:
-        o = n["offset"]
-        m = None
-        # 接在前一个字后面：前 CONTEXT 个字两边一致
-        if o > 0 and (o - 1) in pmap:
-            cand = pmap[o - 1] + 1
-            k = min(CONTEXT, o, cand)
-            if k and parsed[o - k : o] == stored[cand - k : cand]:
-                m = cand
-        # 否则看后面：后 CONTEXT 个字两边一致
-        if m is None and o in pmap:
-            cand = pmap[o]
-            if parsed[o : o + CONTEXT] == stored[cand : cand + CONTEXT] and parsed[o : o + CONTEXT]:
-                m = cand
-        if m is None and o == 0:
-            m = 0
         if m is None:
             dropped += 1
         else:
@@ -127,13 +88,9 @@ def notes_for_work(xml_files, stored: dict[int, str]) -> tuple[dict[int, list[di
             continue
         best = None
         for j in cands:
-            r = remap_notes(j["content"], stored[jn], j["inline_notes"])
-            if r is None:
-                r = locate_by_context(j["content"], stored[jn], j["inline_notes"])
-                # 逐条找也几乎找不到（不是同一段文字）：这一卷不写
-                if len(r[0]) < 0.5 * len(j["inline_notes"]):
-                    r = None
-            if r is not None and (best is None or len(r[0]) > len(best[0])):
+            r = locate_by_context(j["content"], stored[jn], j["inline_notes"])
+            # 一半都找不到：不是同一段文字（資持記卷11 是另一种编排），这一卷不写
+            if len(r[0]) >= 0.5 * len(j["inline_notes"]) and (best is None or len(r[0]) > len(best[0])):
                 best = r
         if best is None:
             skipped.append(jn)

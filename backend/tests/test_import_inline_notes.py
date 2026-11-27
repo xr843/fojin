@@ -10,28 +10,14 @@ mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(mod)
 
 
-def test_remap_across_format_difference():
-    """库里正文是旧版解析（「┌」处为全角空格、少一个换行）：夹注跟着前面的字走。"""
-    parsed = "大般若經┌四百卷\n\n骸骨。拯濟。" * 5
-    stored = "大般若經　四百卷\n骸骨。拯濟。" * 5
-    i = parsed.index("骸骨。") + 3
-    notes = [{"offset": i, "text": "上戶皆反"}]
-    (out, dropped) = mod.remap_notes(parsed, stored, notes)
+def test_format_difference_located_by_context():
+    """库里正文是旧版解析（「┌」处为全角空格、换行不同）：按夹注前 8 字（不计换行）找回位置。"""
+    parsed = "大般若經┌四百卷\n\n骸骨。一二三四五拯濟。"
+    stored = "大般若經\u3000四百卷\n骸骨。一二三\n四五拯濟。"
+    i = parsed.index("五") + 1
+    out, dropped = mod.locate_by_context(parsed, stored, [{"offset": i, "text": "注"}])
     assert dropped == 0
-    assert stored[: out[0]["offset"]].endswith("骸骨。")
-
-
-def test_note_dropped_when_context_differs():
-    """夹注前后的字在库里被改掉了（手工修过的卷）：不猜，丢掉这一条。"""
-    parsed = "甲乙丙丁戊己庚辛壬癸" * 6 + "子丑寅卯"
-    stored = "甲乙丙丁戊己庚辛壬癸" * 6 + "辰巳午未"
-    notes = [{"offset": len(parsed) - 2, "text": "注"}]
-    out, dropped = mod.remap_notes(parsed, stored, notes)
-    assert (out, dropped) == ([], 1)
-
-
-def test_juan_skipped_when_bodies_differ_a_lot():
-    assert mod.remap_notes("如是我聞一時佛在", "爾時世尊告諸比丘", [{"offset": 2, "text": "x"}]) is None
+    assert stored[: out[0]["offset"]].replace("\n", "").endswith("一二三四五")
 
 
 def test_reordered_juan_located_by_unique_context():
