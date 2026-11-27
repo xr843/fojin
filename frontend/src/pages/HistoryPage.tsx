@@ -79,9 +79,10 @@ const DEFAULT_ZOOM = 2;
 const AXIS_H = 26;
 const BAND_H = 22;
 const RIVER_H = 44;
-/** 大事一行（名字撞了就落到第二行） */
+/** 大事：最多三行；三行都排不下的只画菱形（名字在悬停提示里），点击照样能打开 */
 const EVENT_ROW_H = 17;
-const EVENT_H = EVENT_ROW_H * 2 + 4;
+const EVENT_ROWS = 3;
+const EVENT_H = EVENT_ROW_H * EVENT_ROWS + 4;
 const ROW_H = 24;
 const TOP = AXIS_H + BAND_H * 2 + EVENT_H + RIVER_H + 10;
 const PAD = 24;
@@ -189,6 +190,13 @@ export default function HistoryPage() {
           else {
             next.set("e", ev.id);
             next.set("y", String(ev.y));
+            // 点大事＝看这件事：退出导览、关人物卡（否则导览说明栏和导览地图会压住大事面板——11-27 用户截图）
+            // 播放年代时自动打开的大事不在导览里，这里不影响
+            if (via !== "play") {
+              next.delete("tour");
+              next.delete("s");
+              next.delete("p");
+            }
           }
           return next;
         },
@@ -263,6 +271,7 @@ export default function HistoryPage() {
           if (id) {
             next.set("tour", id);
             next.delete("y");
+            next.delete("e");
           } else next.delete("tour");
           return next;
         },
@@ -472,14 +481,32 @@ export default function HistoryPage() {
 
   // 大事名字在顶部一行排不下就落到第二行
   const eventsPlaced = useMemo(() => {
-    const ends = [-Infinity, -Infinity];
-    return EVENTS.map((ev) => {
-      const x = PAD + (ev.y - TIMELINE_START) * px;
+    type Placed = { ev: HistoryEvent; row: number; compact: boolean; x: number };
+    const ends = new Array(EVENT_ROWS).fill(-Infinity) as number[];
+    const last: Array<Placed | null> = new Array(EVENT_ROWS).fill(null);
+    const out: Placed[] = [];
+    const DIAMOND = 12;
+    for (const ev of EVENTS) {
+      const x = PAD + (ev.y - TIMELINE_START) * px - 5;
       const w = ev.s.length * 12 + 20;
-      const row = ends[0] + 4 <= x ? 0 : ends[1] + 4 <= x ? 1 : ends[0] <= ends[1] ? 0 : 1;
-      ends[row] = x + w;
-      return { ev, row };
-    });
+      let row = ends.findIndex((end) => end + 4 <= x);
+      let compact = false;
+      if (row === -1) {
+        // 三行都满：找一行把上一个的名字收起（只留菱形）给新来的让位
+        row = last.findIndex((it) => !!it && !it.compact && it.x + DIAMOND + 4 <= x);
+        if (row !== -1) last[row]!.compact = true;
+      }
+      if (row === -1) {
+        // 还是让不开：新来的只画菱形，放在最早空出的一行
+        compact = true;
+        row = ends.indexOf(Math.min(...ends));
+      }
+      const item: Placed = { ev, row, compact, x };
+      ends[row] = compact ? Math.max(ends[row], x + DIAMOND) : x + w;
+      last[row] = item;
+      out.push(item);
+    }
+    return out;
   }, [px]);
 
   const kindNote = (s: PersonSpan | null | undefined) =>
@@ -719,11 +746,12 @@ export default function HistoryPage() {
               ))}
               <div className="history-events" style={{ top: AXIS_H + BAND_H * 2 + 2, height: EVENT_H }}>
                 <span className="history-river-label">{t("history.events")}</span>
-                {eventsPlaced.map(({ ev, row }) => (
+                {eventsPlaced.map(({ ev, row, compact }) => (
                   <button
                     key={ev.id}
                     type="button"
-                    className={`history-evt${selEvent?.id === ev.id ? " is-on" : ""}`}
+                    aria-label={L(ev.s)}
+                    className={`history-evt${compact ? " history-evt--compact" : ""}${selEvent?.id === ev.id ? " is-on" : ""}`}
                     style={{ left: xOf(ev.y) - 5, top: row * EVENT_ROW_H }}
                     title={`${ev.approx ? t("history.approx") : ""}${ev.y} · ${L(ev.s)}`}
                     onClick={(e) => {
@@ -732,7 +760,7 @@ export default function HistoryPage() {
                     }}
                   >
                     <i aria-hidden />
-                    {L(ev.s)}
+                    {!compact && L(ev.s)}
                   </button>
                 ))}
               </div>

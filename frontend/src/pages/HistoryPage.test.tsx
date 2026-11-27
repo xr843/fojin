@@ -289,4 +289,19 @@ describe("佛教史长卷", () => {
     expect(screen.getByTestId("loc").textContent).toContain("y=67");
     fireEvent.click(screen.getByRole("button", { name: /暂停/ }));
   });
+
+  it("导览中点大事：退出导览、显示大事面板（11-27 用户截图：导览说明栏压住了大事）；再开导览清掉大事", async () => {
+    renderPage("/history?tour=weishi&s=1");
+    await screen.findByText("第 2 / 2 站");
+    await screen.findAllByRole("button", { name: /玄奘/ });
+    fireEvent.click(screen.getByRole("button", { name: "会昌法难" }));
+    const loc = () => screen.getByTestId("loc").textContent ?? "";
+    expect(loc()).toContain("e=huichang");
+    expect(loc()).not.toContain("tour=");
+    expect(document.querySelector(".history-tour-panel")).toBeNull();
+    expect(document.querySelector(".history-event-panel")).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "唯识" }));
+    expect(loc()).toContain("tour=weishi");
+    expect(loc()).not.toContain("e=");
+  });
 });
