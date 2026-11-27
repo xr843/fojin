@@ -414,13 +414,19 @@ export default function HistoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing, cursor, tour, px]);
 
-  // 首次打开：没指定人也没指定年时，停在东晉—唐（佛教史最密的一段）
+  // 首次打开：没指定人、年份、导览时从头展开——滚到最左（公元元年），永平求法、摄摩腾都在首屏。
+  // （先试过对准公元 50 年，摄摩腾的条从更早开始，名字被左边缘切掉。）
+  // 原先居中停在 520 年（东晋—唐，最密的一段），读者一进来站在故事中间，左边三百年看不见，
+  // 左边缘还切掉「朱士行」「竺法护」半个名字（2026-11-27 用户截图）。
   const initialScrolled = useRef(false);
   useEffect(() => {
     if (initialScrolled.current || !data || !scrollRef.current) return;
     initialScrolled.current = true;
     // 有人物或导览时由上面的 ensureVisible 负责定位，这里不能再把视野拽回 520 年
-    if (!selectedId && !tour) scrollToYear(cursor ?? (rParam !== null && Number.isFinite(Number(rParam)) ? Number(rParam) + 5 : 520));
+    if (selectedId || tour) return;
+    if (cursor !== null) scrollToYear(cursor);
+    else if (rParam !== null && Number.isFinite(Number(rParam))) scrollToYear(Number(rParam) + 5);
+    else scrollRef.current.scrollTo({ left: 0 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 

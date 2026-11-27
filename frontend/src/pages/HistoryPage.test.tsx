@@ -383,5 +383,16 @@ describe("佛教史长卷", () => {
       if (ch) Object.defineProperty(HTMLElement.prototype, "clientHeight", ch);
     }
   });
+
+  it("不带参数打开：长卷从头展开（左边缘在东汉），不再居中停在 520 年", async () => {
+    const scrollTo = Element.prototype.scrollTo as unknown as ReturnType<typeof vi.fn>;
+    scrollTo.mockClear();
+    renderPage("/history");
+    await screen.findAllByRole("button", { name: "玄奘" });
+    const lefts = scrollTo.mock.calls.map((c) => (c[0] as ScrollToOptions)?.left).filter((x): x is number => typeof x === "number");
+    expect(lefts.length).toBeGreaterThan(0);
+    // 默认缩放每年 2.2px：公元 50 年在 ~110px 处；旧行为把 520 年居中，left 在 1000px 以上
+    expect(lefts[0]).toBeLessThan(200);
+  });
 });
 
