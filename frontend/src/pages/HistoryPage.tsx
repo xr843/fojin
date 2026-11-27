@@ -20,6 +20,7 @@ import {
   type PersonSpan,
 } from "../utils/historyTimeline";
 import TOURS_DATA from "../data/historyTours.json";
+import EVENTS_DATA from "../data/historyEvents.json";
 import { useEffectiveTheme } from "../hooks/useTheme";
 import { useNarrowViewport } from "../hooks/useNarrowViewport";
 import type { MapEdge, MapPoint } from "../components/history/HistoryMap";
@@ -54,6 +55,20 @@ interface HistoryTour {
 }
 // JSON 推断不出元组类型，按约定断言（historyTours.json 的格式见文件头 _note）
 const TOURS = TOURS_DATA.tours as unknown as HistoryTour[];
+
+/** 大事年表：每条原文都在 CBETA 逐字命中（historyEvents.json 文件头 _note） */
+interface HistoryEvent {
+  id: string;
+  y: number;
+  approx?: boolean;
+  s: string;
+  t: string;
+  q: string;
+  refs: Array<{ src: string; juan: number; lh: string; u: string }>;
+  pl?: [number, number, string];
+  note?: string;
+}
+const EVENTS = (EVENTS_DATA.events as unknown as HistoryEvent[]).slice().sort((a, b) => a.y - b.y);
 /** 按钮上露出的路线：没有家族的，加上每个家族的首条（禅宗 → 东土六祖） */
 const TOUR_BUTTONS = TOURS.filter((x) => !x.family || x.family === x.id);
 /** 数据里出现过的分组（2026-11-27 起只剩一组「佛法东传＋八宗」，只有一组时不画组框和组名） */
@@ -64,8 +79,11 @@ const DEFAULT_ZOOM = 2;
 const AXIS_H = 26;
 const BAND_H = 22;
 const RIVER_H = 44;
+/** 大事一行（名字撞了就落到第二行） */
+const EVENT_ROW_H = 17;
+const EVENT_H = EVENT_ROW_H * 2 + 4;
 const ROW_H = 24;
-const TOP = AXIS_H + BAND_H * 2 + RIVER_H + 10;
+const TOP = AXIS_H + BAND_H * 2 + EVENT_H + RIVER_H + 10;
 const PAD = 24;
 const CHAR_PX = 13;
 /** 播放年代：从公元 60 年（白马寺前后）起，每拍 5 年 */
@@ -105,6 +123,8 @@ export default function HistoryPage() {
   const [onlyTr, setOnlyTr] = useState(false);
   const [search, setSearch] = useState("");
   const selectedId = params.get("p");
+  // 大事：?e=huichang
+  const selEvent = EVENTS.find((x) => x.id === params.get("e")) ?? null;
   // 默认按宗派分泳道；?v=time 按年代混排
   const byYear = params.get("v") === "time";
   // 导览：?tour=chan&s=2（第 3 站）
@@ -154,6 +174,27 @@ export default function HistoryPage() {
         },
         { replace: true },
       );
+    },
+    [setParams],
+  );
+
+  /** 选一件大事：游标跳到那一年（看那年谁在世），面板显示原文与出处 */
+  const selectEvent = useCallback(
+    (id: string | null, via: string) => {
+      const ev = EVENTS.find((x) => x.id === id);
+      setParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (!ev) next.delete("e");
+          else {
+            next.set("e", ev.id);
+            next.set("y", String(ev.y));
+          }
+          return next;
+        },
+        { replace: true },
+      );
+      if (ev) track("history_event", { id: ev.id, via });
     },
     [setParams],
   );
@@ -277,13 +318,16 @@ export default function HistoryPage() {
           return;
         }
         const next = cursor === null ? PLAY_FROM : cursor + PLAY_STEP_YEARS;
-        if (next > 1949) setPlaying(false);
+        // 这一拍里有大事：游标停在那一年并打开它（下一拍多停一会儿读原文）
+        const hit = EVENTS.find((ev) => ev.y > (cursor ?? PLAY_FROM - 1) && ev.y <= next);
+        if (hit) selectEvent(hit.id, "play");
+        else if (next > 1949) setPlaying(false);
         else setParam("y", String(next));
       },
-      tour ? 4500 : cursor === null ? 0 : 450,
+      tour ? 4500 : cursor === null ? 0 : selEvent && selEvent.y === cursor ? 3200 : 450,
     );
     return () => window.clearTimeout(id);
-  }, [playing, tour, stepIdx, cursor, goStep, setParam]);
+  }, [playing, tour, stepIdx, cursor, goStep, setParam, selectEvent, selEvent]);
   // 空格键播放 / 暂停（焦点在输入框、按钮上时不抢）
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -322,7 +366,15 @@ export default function HistoryPage() {
     const rect = e.currentTarget.getBoundingClientRect();
     const year = Math.round((e.clientX - rect.left - PAD) / px + TIMELINE_START);
     if (year < TIMELINE_START || year > TIMELINE_END) return;
-    setParam("y", String(year));
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("y", String(year));
+        next.delete("e");
+        return next;
+      },
+      { replace: true },
+    );
     track("history_cursor", { year });
   };
 
@@ -376,6 +428,12 @@ export default function HistoryPage() {
       const pts: MapPoint[] = alive
         .filter((p) => p.o)
         .map((p) => ({ id: p.id, lon: p.o![0], lat: p.o![1], label: L(p.n), kind: "alive" as const, person: p.id }));
+      // 选中的大事有地点：标出来并飞过去（原文没写地点的不标）
+      const evPl = selEvent?.y === cursor ? selEvent.pl : undefined;
+      if (evPl && selEvent) {
+        pts.push({ id: `e-${selEvent.id}`, lon: evPl[0], lat: evPl[1], label: `${L(selEvent.s)} · ${L(evPl[2])}`, kind: "current", n: 0 });
+        return { points: pts, edges: [], focus: playing ? CHINA_VIEW : [[evPl[0], evPl[1]]], caption: t("history.map_event", { y: cursor }) };
+      }
       // 播放中镜头不动（每 5 年重新框一次会晃得看不清），停下来再框住那一年的人
       // 播放中镜头固定在中国本部（每 5 年重新框一次会晃；西域、天竺籍的人会把镜头拉到整个亚洲）
       return {
@@ -391,7 +449,7 @@ export default function HistoryPage() {
       focus: [],
       caption: t("history.map_base"),
     };
-  }, [data, tour, stepIdx, selected, cursor, alive, shown, byId, L, t, playing]);
+  }, [data, tour, stepIdx, selected, cursor, alive, shown, byId, L, t, playing, selEvent]);
 
   const options = useMemo(() => {
     const q = search.trim();
@@ -410,6 +468,18 @@ export default function HistoryPage() {
     const out: number[] = [];
     for (let y = Math.ceil(TIMELINE_START / step) * step; y <= TIMELINE_END; y += step) out.push(y);
     return out;
+  }, [px]);
+
+  // 大事名字在顶部一行排不下就落到第二行
+  const eventsPlaced = useMemo(() => {
+    const ends = [-Infinity, -Infinity];
+    return EVENTS.map((ev) => {
+      const x = PAD + (ev.y - TIMELINE_START) * px;
+      const w = ev.s.length * 12 + 20;
+      const row = ends[0] + 4 <= x ? 0 : ends[1] + 4 <= x ? 1 : ends[0] <= ends[1] ? 0 : 1;
+      ends[row] = x + w;
+      return { ev, row };
+    });
   }, [px]);
 
   const kindNote = (s: PersonSpan | null | undefined) =>
@@ -558,6 +628,43 @@ export default function HistoryPage() {
           </div>
         </div>
       ) : (
+      <>
+      {selEvent && (
+        <div className="history-event-panel" role="status">
+          <div className="history-tour-head">
+            <strong>
+              {t("history.event_year", { y: `${selEvent.approx ? t("history.approx") : ""}${selEvent.y}` })} · {L(dynastyAt(selEvent.y)?.name ?? "")} · {L(selEvent.s)}
+            </strong>
+            <span className="history-tour-intro">{L(selEvent.t)}</span>
+            <span className="history-tour-nav">
+              <Button size="small" disabled={EVENTS[0].id === selEvent.id} onClick={() => selectEvent(EVENTS[EVENTS.indexOf(selEvent) - 1]?.id ?? null, "prev")}>
+                {t("history.event_prev")}
+              </Button>
+              <Button size="small" disabled={EVENTS[EVENTS.length - 1].id === selEvent.id} onClick={() => selectEvent(EVENTS[EVENTS.indexOf(selEvent) + 1]?.id ?? null, "next")}>
+                {t("history.event_next")}
+              </Button>
+              <button type="button" className="history-chip history-chip--clear" onClick={() => selectEvent(null, "close")} aria-label={t("history.event_close")}>
+                ×
+              </button>
+            </span>
+          </div>
+          <blockquote className="history-event-quote">
+            {selEvent.q.split("｜").map((q) => (
+              <span key={q}>「{L(q)}」</span>
+            ))}
+          </blockquote>
+          <div className="history-event-refs">
+            <span className="history-tour-branches-k">{t("history.event_sources")}</span>
+            {selEvent.refs.map((r) => (
+              <Link key={r.lh} to={r.u} onClick={() => track("history_link", { kind: "event" })}>
+                {t("history.event_ref", { src: L(r.src), juan: r.juan })}
+                <span className="history-card-cid">{r.lh}</span>
+              </Link>
+            ))}
+            {selEvent.note && <span className="history-event-note">{L(selEvent.note)}</span>}
+          </div>
+        </div>
+      )}
       <div className="history-cursor-bar" role="status">
         {cursor === null ? (
           <span className="history-hint">{t("history.cursor_prompt")}</span>
@@ -579,6 +686,7 @@ export default function HistoryPage() {
           </>
         )}
       </div>
+      </>
       )}
 
       {isLoading ? (
@@ -609,7 +717,26 @@ export default function HistoryPage() {
                   {(b.to - b.from) * px > L(b.name).length * 12 + 6 ? L(b.name) : ""}
                 </div>
               ))}
-              <div className="history-river" style={{ top: AXIS_H + BAND_H * 2 + 4, height: RIVER_H }} title={t("history.river_hint")}>
+              <div className="history-events" style={{ top: AXIS_H + BAND_H * 2 + 2, height: EVENT_H }}>
+                <span className="history-river-label">{t("history.events")}</span>
+                {eventsPlaced.map(({ ev, row }) => (
+                  <button
+                    key={ev.id}
+                    type="button"
+                    className={`history-evt${selEvent?.id === ev.id ? " is-on" : ""}`}
+                    style={{ left: xOf(ev.y) - 5, top: row * EVENT_ROW_H }}
+                    title={`${ev.approx ? t("history.approx") : ""}${ev.y} · ${L(ev.s)}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      selectEvent(ev.id, "marker");
+                    }}
+                  >
+                    <i aria-hidden />
+                    {L(ev.s)}
+                  </button>
+                ))}
+              </div>
+              <div className="history-river" style={{ top: AXIS_H + BAND_H * 2 + EVENT_H + 4, height: RIVER_H }} title={t("history.river_hint")}>
                 <span className="history-river-label">{t("history.river")}</span>
                 {river.map((v, i) =>
                   v > 0 ? (

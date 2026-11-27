@@ -208,7 +208,8 @@ export default function HistoryMap({
         <Layer
           id="hm-tour-n"
           type="symbol"
-          filter={["in", ["get", "kind"], ["literal", ["tour", "current"]]]}
+          // n=0 是大事地点（没有站序），不写数字
+          filter={["all", ["in", ["get", "kind"], ["literal", ["tour", "current"]]], [">", ["get", "n"], 0]]}
           layout={{ "text-field": ["to-string", ["get", "n"]], "text-size": 10, "text-allow-overlap": true, "text-font": ["Noto Sans Regular"] }}
           paint={{ "text-color": "#ffffff" }}
         />

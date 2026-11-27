@@ -2097,5 +2097,13 @@
   "history.pause": "Pause",
   "history.tours_transmission": "Transmission",
   "history.tours_school": "Schools",
-  "history.tour_branches": "Branches"
+  "history.tour_branches": "Branches",
+  "history.events": "Events",
+  "history.event_prev": "Previous",
+  "history.event_next": "Next",
+  "history.event_close": "Close",
+  "history.event_sources": "Source",
+  "history.event_year": "{{y}} CE",
+  "history.event_ref": "{{src}}, fasc. {{juan}}",
+  "history.map_event": "{{y}} CE · where it happened, and who was alive"
 }

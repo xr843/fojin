@@ -2097,5 +2097,13 @@
   "history.pause": "暂停",
   "history.tours_transmission": "传法求经",
   "history.tours_school": "宗派传承",
-  "history.tour_branches": "支线"
+  "history.tour_branches": "支线",
+  "history.events": "大事",
+  "history.event_prev": "上一件",
+  "history.event_next": "下一件",
+  "history.event_close": "关闭",
+  "history.event_sources": "原文出处",
+  "history.event_year": "公元 {{y}} 年",
+  "history.event_ref": "《{{src}}》卷{{juan}}",
+  "history.map_event": "公元 {{y}} 年 · 大事地点与那年在世的人"
 }

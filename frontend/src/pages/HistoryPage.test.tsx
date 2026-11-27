@@ -263,4 +263,30 @@ describe("佛教史长卷", () => {
     // 三站只有一条线：源一 → 源一之徒；源二不连
     expect(document.querySelectorAll(".history-tour-path path")).toHaveLength(1);
   });
+
+  it("大事：顶部标记点开 → 跳到那一年，面板显示原文与出处链接；上一件 / 下一件；点空白处关闭", async () => {
+    renderPage();
+    await screen.findAllByRole("button", { name: "玄奘" });
+    fireEvent.click(screen.getByRole("button", { name: "会昌法难" }));
+    const loc = () => screen.getByTestId("loc").textContent ?? "";
+    expect(loc()).toContain("e=huichang");
+    expect(loc()).toContain("y=845");
+    const panel = document.querySelector(".history-event-panel") as HTMLElement;
+    expect(panel.querySelector(".history-event-quote")?.textContent).toContain("毁拆天下寺院");
+    expect(within(panel).getByRole("link", { name: /《佛祖统纪》卷54/ }).getAttribute("href")).toMatch(/^\/texts\/\d+\/read\?juan=54&anchor=p0471b10/);
+    fireEvent.click(within(panel).getByRole("button", { name: "下一件" }));
+    expect(loc()).toContain("e=kaibao");
+    fireEvent.click(document.querySelector(".history-canvas")!, { clientX: 300 });
+    expect(loc()).not.toContain("e=");
+    expect(document.querySelector(".history-event-panel")).toBeNull();
+  });
+
+  it("播放年代走到大事那一年会停下并打开它（公元 67 年永平求法）", async () => {
+    renderPage("/history?y=55");
+    await screen.findAllByRole("button", { name: "玄奘" });
+    fireEvent.click(screen.getByRole("button", { name: /播放年代/ }));
+    await waitFor(() => expect(screen.getByTestId("loc").textContent).toContain("e=yongping"), { timeout: 3000 });
+    expect(screen.getByTestId("loc").textContent).toContain("y=67");
+    fireEvent.click(screen.getByRole("button", { name: /暂停/ }));
+  });
 });
