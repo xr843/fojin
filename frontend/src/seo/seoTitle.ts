@@ -1,4 +1,4 @@
-import { localizeHan } from "../utils/hanScript";
+import { localizeTitle } from "../utils/hanScript";
 import type { SeoLang } from "./langUrl";
 
 // 从 langUrl.ts 拆出：它被 main.tsx 静态导入，带着 OpenCC 会让每个页面首屏多下 ~550 KB。
@@ -9,6 +9,6 @@ import type { SeoLang } from "./langUrl";
  */
 export function seoTitle(title: string, lang: SeoLang): string {
   if (lang !== "zh" || !title) return title;
-  const simplified = localizeHan(title, "zh");
+  const simplified = localizeTitle(title, "zh");
   return simplified === title ? title : `${simplified}（${title}）`;
 }

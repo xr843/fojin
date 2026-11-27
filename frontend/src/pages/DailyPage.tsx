@@ -8,7 +8,7 @@ import { getVernacular } from "../api/client";
 import { festivalName, ONE_LINE_MAX_CHARS, passageFontFamily, pickDaily, quotePassage, splitClauses } from "../utils/dailyPassage";
 import { lunarLabel } from "../utils/lunar";
 import { renderShareCard } from "../utils/shareCard";
-import { localizeHan } from "../utils/hanScript";
+import { localizeHan, localizeTitle } from "../utils/hanScript";
 import "../styles/daily.css";
 
 function blobToDataUrl(blob: Blob): Promise<string> {
@@ -44,7 +44,7 @@ export default function DailyPage() {
   // 佛教节日当天在日期后加节日名（分享图标题同用这一串）
   const fest = festivalName(festival, lang);
   const dateLabel = fest ? `${lunarDate} · ${fest}` : lunarDate;
-  const title = localizeHan(passage.title_zh, lang);
+  const title = localizeTitle(passage.title_zh, lang);
   const sourceLine = `《${title}》${t("daily.juan", { n: passage.juan_num })}`;
   const text = quotePassage(localizeHan(passage.text, lang), lang);
   const textChars = Array.from(text).length;

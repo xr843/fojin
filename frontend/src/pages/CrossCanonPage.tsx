@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Tag, Input, Empty, Spin } from "antd";
 import { TranslationOutlined, SearchOutlined } from "@ant-design/icons";
 import { getAlignmentCatalog } from "../api/client";
-import { localizeHan } from "../utils/hanScript";
+import { localizeTitle } from "../utils/hanScript";
 import { taishoSection, SECTION_ORDER } from "../data/taishoSections";
 
 const LANG_LABELS: Record<string, { labelKey: string; color: string }> = {
@@ -53,7 +53,7 @@ export default function CrossCanonPage() {
           text_id: e.text_id,
           // CBETA's title_zh is always traditional; render it in the reader's
           // script. Also makes the search box below match what's on screen.
-          title: localizeHan(e.title_zh || e.cbeta_id, i18n.language),
+          title: localizeTitle(e.title_zh || e.cbeta_id, i18n.language),
           section: taishoSection(e.cbeta_id),
           sample_juan: e.sample_juan,
           total: 0,

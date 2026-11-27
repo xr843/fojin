@@ -28,7 +28,7 @@ import {
   type ResourceCategory,
 } from "../data/collections";
 import { getAlignmentCatalog } from "../api/client";
-import { localizeHan } from "../utils/hanScript";
+import { localizeTitle } from "../utils/hanScript";
 import "../styles/sources.css";
 import "../styles/collections.css";
 import { LangAlternates } from "../seo/LangAlternates";
@@ -282,7 +282,7 @@ function ParallelCatalogSection({ navigate }: { navigate: ReturnType<typeof useN
         // 中文简体 visitor gets 大方廣佛華嚴經 sitting under 华严经系列.
         g = {
           text_id: e.text_id,
-          title: localizeHan(e.title_zh || e.cbeta_id, i18n.language),
+          title: localizeTitle(e.title_zh || e.cbeta_id, i18n.language),
           cbeta_id: e.cbeta_id,
           sample_juan: e.sample_juan,
           total: 0,

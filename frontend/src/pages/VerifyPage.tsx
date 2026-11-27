@@ -16,7 +16,7 @@ import { verifyCardUrl, verifyClaim, type ClaimSegment, type ClaimVerdict } from
 import { currentUILang } from "../i18n";
 import { LangAlternates } from "../seo/LangAlternates";
 import { langUrl, toSeoLang } from "../seo/langUrl";
-import { localizeHan } from "../utils/hanScript";
+import { localizeTitle } from "../utils/hanScript";
 import "../styles/sources.css";
 import "../styles/verify.css";
 
@@ -67,7 +67,7 @@ function Segment({ seg, language }: { seg: ClaimSegment; language: string }) {
           <span className="verify-close-text">「{seg.close.window_normalised}」</span>
           {(() => {
             const c = seg.close;
-            const title = `《${localizeHan(c.title_zh ?? c.cbeta_id ?? "", language)}》${t("verify.juan", { n: c.juan_num })}`;
+            const title = `《${localizeTitle(c.title_zh ?? c.cbeta_id ?? "", language)}》${t("verify.juan", { n: c.juan_num })}`;
             const path = inAppPath(c.reader_url);
             return path ? (
               <Link to={path} className="verify-source">
@@ -84,7 +84,7 @@ function Segment({ seg, language }: { seg: ClaimSegment; language: string }) {
         <div className="verify-seg-sources">
           {t("verify.segment_found")}
           {seg.sources.map((s) => {
-            const title = `《${localizeHan(s.title_zh ?? s.cbeta_id ?? "", language)}》`;
+            const title = `《${localizeTitle(s.title_zh ?? s.cbeta_id ?? "", language)}》`;
             const path = inAppPath(s.reader_url);
             const label = `${title}${t("verify.juan", { n: s.juan_num })}`;
             return path ? (

@@ -4,7 +4,7 @@ import { Button, Tooltip } from "antd";
 import { BookOutlined, CheckCircleFilled, CloseOutlined } from "@ant-design/icons";
 import type { ChatMessageItem, ChatSource } from "../api/client";
 import { distinctSourceFascicles, extractAnswerCitations, type AnswerCitation } from "../utils/answerCitations";
-import { localizeHan } from "../utils/hanScript";
+import { localizeTitle } from "../utils/hanScript";
 import { quoteCheckDetail } from "../utils/trustDetail";
 import { trustStatusColor, trustStatusLabelKey } from "../utils/trustDisplay";
 
@@ -102,7 +102,7 @@ export default function CitationPanel({
                     <button type="button" className="chat-cpanel-item" onClick={() => onOpenCitation(c)}>
                       <span className="chat-cpanel-item-title">
                         {t("reader.citation.title_with_juan", {
-                          title: localizeHan(c.target.titleZh, lang),
+                          title: localizeTitle(c.target.titleZh, lang),
                           n: c.target.juanNum,
                         })}
                       </span>
@@ -133,7 +133,7 @@ export default function CitationPanel({
                       onClick={() => onOpenSource(s)}
                     >
                       {t("reader.citation.title_with_juan", {
-                        title: localizeHan(s.title_zh ?? "", lang),
+                        title: localizeTitle(s.title_zh ?? "", lang),
                         n: s.juan_num,
                       })}
                     </button>

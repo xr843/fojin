@@ -8,7 +8,7 @@ import Markdown, { defaultUrlTransform, type Components } from "react-markdown";
 import { MARKDOWN_REMARK_PLUGINS } from "../utils/markdownPlugins";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import { CITATION_URL_SCHEME, injectCitationLinks, parseCitationHref } from "../utils/citationLinks";
-import { localizeHan } from "../utils/hanScript";
+import { localizeTitle } from "../utils/hanScript";
 import ChatRelatedTerms from "../components/ChatRelatedTerms";
 import { fetchSessionMessagesWithRetry, sessionLoadFailureKind } from "../utils/sessionLoad";
 import { isNearBottom } from "../utils/scrollBottom";
@@ -458,7 +458,7 @@ function MessageBubbleInner({
                           ? m.retrieval.refs.map((r) => (
                               <SourceChipButton
                                 key={`${r.text_id}:${r.juan_num}`}
-                                label={t("reader.citation.title_with_juan", { title: localizeHan(r.title_zh ?? "", lang), n: r.juan_num })}
+                                label={t("reader.citation.title_with_juan", { title: localizeTitle(r.title_zh ?? "", lang), n: r.juan_num })}
                                 onClick={() => onSourceClick(
                                   { text_id: r.text_id as TextId, juan_num: r.juan_num, chunk_index: r.chunk_index ?? undefined, chunk_text: "", score: 0, title_zh: r.title_zh ?? undefined },
                                   "retrieved",
@@ -515,7 +515,7 @@ function MessageBubbleInner({
                     {sourceChips.map((s) => (
                       <SourceChipButton
                         key={`${s.text_id}:${s.juan_num}`}
-                        label={t("reader.citation.title_with_juan", { title: localizeHan(s.title_zh ?? "", lang), n: s.juan_num })}
+                        label={t("reader.citation.title_with_juan", { title: localizeTitle(s.title_zh ?? "", lang), n: s.juan_num })}
                         onClick={() => onSourceClick(s)}
                       />
                     ))}
@@ -1793,7 +1793,7 @@ export default function ChatPage() {
             const title = s.title_zh
               // 导出的 .md 是给人读的：经名跟随导出时的界面语言，与用户屏幕上
               // 刚看到的 chip 一致，否则文件里的《雜阿含經》对不上页面的《杂阿含经》。
-              ? t("chat.export_source_titled", { title: localizeHan(s.title_zh, i18n.language), n: s.juan_num })
+              ? t("chat.export_source_titled", { title: localizeTitle(s.title_zh, i18n.language), n: s.juan_num })
               : t("chat.export_source_untitled", { id: s.text_id, n: s.juan_num });
             md += `- 📖 ${title} (${Math.round(s.score * 100)}%)\n`;
           }

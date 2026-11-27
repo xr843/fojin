@@ -4,7 +4,7 @@ import {
   extractPrecedingQuote,
   pickSourceForQuote,
 } from "./citationMatch";
-import { localizeHan } from "./hanScript";
+import { localizeTitle } from "./hanScript";
 
 /**
  * Custom URL scheme for citation links. Lives here rather than in ChatPage so
@@ -133,7 +133,7 @@ export function injectCitationLinks(
       // 第N卷 placeholder the LLM left unsubstituted into a real number.
       // Non-卷 qualifiers (卷上, 第十八愿) carry no 第…卷 slot and are kept.
       const label = tail.replace(/第[^】卷]*卷/, `第${juan}卷`); // i18n-exempt — rewrites the LLM's Chinese citation marker, must match answer text
-      return `[【《${localizeHan(title, language)}》${label}】](${url})`;
+      return `[【《${localizeTitle(title, language)}》${label}】](${url})`;
     },
   );
 
@@ -151,7 +151,7 @@ export function injectCitationLinks(
         const source = titleMap.get(simplifiedTitle);
         if (!source) return bareMatch;
         const { url } = buildCitation(source, simplifiedTitle, null, null);
-        return `[《${localizeHan(title, language)}》](${url})`;
+        return `[《${localizeTitle(title, language)}》](${url})`;
       });
     })
     .join("");

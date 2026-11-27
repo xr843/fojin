@@ -4,7 +4,7 @@ import { Button, Empty, Input, Spin, Switch, message } from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { getStudyMemory, saveStudyMemory } from "../api/client";
-import { localizeHan } from "../utils/hanScript";
+import { localizeHan, localizeTitle } from "../utils/hanScript";
 import "../styles/study-memory.css";
 
 /**
@@ -98,7 +98,7 @@ export default function StudyMemoryPanel() {
                   {data.reading.map((r) => (
                     <dd key={`r${r.text_id}`}>
                       <Link to={`/texts/${r.text_id}/read?juan=${r.juan_num}`}>
-                        《{localizeHan(r.title_zh, lang)}》{t("study_memory.juan", { n: r.juan_num })}
+                        《{localizeTitle(r.title_zh, lang)}》{t("study_memory.juan", { n: r.juan_num })}
                       </Link>
                     </dd>
                   ))}
@@ -119,7 +119,7 @@ export default function StudyMemoryPanel() {
                   <dt>{t("study_memory.excerpts")}</dt>
                   {data.excerpts.map((e, i) => (
                     <dd key={`e${i}`}>
-                      《{localizeHan(e.title_zh, lang)}》「{localizeHan(e.quote, lang)}」
+                      《{localizeTitle(e.title_zh, lang)}》「{localizeHan(e.quote, lang)}」
                     </dd>
                   ))}
                 </>
