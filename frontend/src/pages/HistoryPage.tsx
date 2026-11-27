@@ -447,6 +447,40 @@ export default function HistoryPage() {
     [cursor, shown, spans],
   );
 
+  // 选了年份后，那年在世的人分散在各宗派泳道里，多半在长卷可见区外（11-27 用户：1947 年「在世 7 位」只看见法尊）。
+  // 记下长卷的纵向可见区，算出上下各还有几位，在长卷边缘提示、点了滚过去。
+  const [view, setView] = useState({ top: 0, h: 0 });
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    let raf = 0;
+    const read = () => {
+      raf = 0;
+      setView((v) => (v.top === el.scrollTop && v.h === el.clientHeight ? v : { top: el.scrollTop, h: el.clientHeight }));
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(read);
+    };
+    read();
+    el.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [data]);
+  const aliveRows = useMemo(
+    () => alive.map((p) => placedById.get(p.id)?.row).filter((r): r is number => r !== undefined),
+    [alive, placedById],
+  );
+  // 表头（年代刻度、朝代、大事、译经长河）吸顶占 TOP 高，人物行的可见区是 [top+TOP, top+h]
+  const aliveAbove = aliveRows.filter((r) => TOP + r * ROW_H + ROW_H <= view.top + TOP);
+  const aliveBelow = aliveRows.filter((r) => view.h > 0 && TOP + r * ROW_H >= view.top + view.h);
+  const scrollToRow = (row: number) => {
+    scrollRef.current?.scrollTo({ top: Math.max(0, TOP + row * ROW_H - TOP - 2 * ROW_H) });
+  };
+
   // ---- 地图：随导览 / 选中的人 / 游标年份变 ----
   const dark = useEffectiveTheme() === "dark";
   const [mapOpen, setMapOpen] = useState<boolean | null>(null);
@@ -811,6 +845,22 @@ export default function HistoryPage() {
         <Empty description={t("history.load_error")} />
       ) : (
         <div className={`history-main${showMap ? " history-main--map" : ""}`}>
+        <div className="history-scroll-wrap">
+        {cursor !== null && aliveAbove.length > 0 && (
+          <button
+            type="button"
+            className="history-alive-hint history-alive-hint--up"
+            style={{ top: TOP + 6 }}
+            onClick={() => scrollToRow(Math.max(...aliveAbove))}
+          >
+            {t("history.alive_above", { n: aliveAbove.length })}
+          </button>
+        )}
+        {cursor !== null && aliveBelow.length > 0 && (
+          <button type="button" className="history-alive-hint history-alive-hint--down" onClick={() => scrollToRow(Math.min(...aliveBelow))}>
+            {t("history.alive_below", { n: aliveBelow.length })}
+          </button>
+        )}
         <div className="history-scroll" ref={scrollRef}>
           <div className="history-canvas" style={{ width, height }} onClick={onCanvasClick}>
             {ticks.map((y) => (
@@ -882,6 +932,11 @@ export default function HistoryPage() {
                 <span className="history-lane-label">
                   {t(`history.school.${SCHOOL_KEY[l.key] ?? "other"}`)}
                   <small>{l.count}</small>
+                  {cursor !== null &&
+                    (() => {
+                      const n = aliveRows.filter((r) => r >= l.firstRow && r < l.firstRow + l.rows).length;
+                      return n > 0 ? <small className="history-lane-alive">{t("history.lane_alive", { n })}</small> : null;
+                    })()}
                 </span>
               </div>
             ))}
@@ -930,6 +985,7 @@ export default function HistoryPage() {
               );
             })}
           </div>
+        </div>
         </div>
         {showMap && (
           <aside className="history-map" aria-label={t("history.map_title")}>

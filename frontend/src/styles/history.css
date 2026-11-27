@@ -548,7 +548,8 @@ a.history-view:hover {
   gap: 10px;
   align-items: stretch;
 }
-.history-main--map .history-scroll {
+.history-main--map .history-scroll,
+.history-main--map .history-scroll-wrap {
   min-width: 0;
 }
 .history-map {
@@ -861,3 +862,30 @@ a.history-view:hover {
   flex-wrap: wrap;
   gap: 8px;
 }
+
+/* 选了年份：那年在世的人有在长卷可见区外的，在长卷上 / 下边缘提示，点了滚过去 */
+.history-scroll-wrap {
+  position: relative;
+}
+.history-alive-hint {
+  position: absolute;
+  left: 50%;
+  z-index: 6;
+  transform: translateX(-50%);
+  padding: 3px 12px;
+  border: 1px solid var(--fj-cinnabar);
+  border-radius: 14px;
+  background: var(--fj-card-bg);
+  color: var(--fj-cinnabar);
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+.history-alive-hint--down {
+  bottom: 14px;
+}
+.history-lane-alive {
+  margin-left: 6px;
+  color: var(--fj-cinnabar);
+}
+
