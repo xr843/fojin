@@ -319,27 +319,11 @@
     }
    },
    "query": {
-    "bool": {
-     "minimum_should_match": 1,
-     "should": [
-      {
-       "match": {
-        "content": {
-         "analyzer": "cjk_content",
-         "query": "四圣谛"
-        }
-       }
-      },
-      {
-       "match": {
-        "notes": {
-         "analyzer": "cjk_content",
-         "boost": 0.5,
-         "query": "四圣谛"
-        }
-       }
-      }
-     ]
+    "match": {
+     "content": {
+      "analyzer": "cjk_content",
+      "query": "四圣谛"
+     }
     }
    },
    "size": 20
@@ -419,27 +403,11 @@
     }
    },
    "query": {
-    "bool": {
-     "minimum_should_match": 1,
-     "should": [
-      {
-       "match": {
-        "content": {
-         "analyzer": "cjk_content",
-         "query": "四圣谛"
-        }
-       }
-      },
-      {
-       "match": {
-        "notes": {
-         "analyzer": "cjk_content",
-         "boost": 0.5,
-         "query": "四圣谛"
-        }
-       }
-      }
-     ]
+    "match": {
+     "content": {
+      "analyzer": "cjk_content",
+      "query": "四圣谛"
+     }
     }
    },
    "size": 5
@@ -832,27 +800,11 @@
     }
    },
    "query": {
-    "bool": {
-     "minimum_should_match": 1,
-     "should": [
-      {
-       "match": {
-        "content": {
-         "analyzer": "cjk_content",
-         "query": "心经"
-        }
-       }
-      },
-      {
-       "match": {
-        "notes": {
-         "analyzer": "cjk_content",
-         "boost": 0.5,
-         "query": "心经"
-        }
-       }
-      }
-     ]
+    "match": {
+     "content": {
+      "analyzer": "cjk_content",
+      "query": "心经"
+     }
     }
    },
    "size": 20
@@ -932,27 +884,11 @@
     }
    },
    "query": {
-    "bool": {
-     "minimum_should_match": 1,
-     "should": [
-      {
-       "match": {
-        "content": {
-         "analyzer": "cjk_content",
-         "query": "心经"
-        }
-       }
-      },
-      {
-       "match": {
-        "notes": {
-         "analyzer": "cjk_content",
-         "boost": 0.5,
-         "query": "心经"
-        }
-       }
-      }
-     ]
+    "match": {
+     "content": {
+      "analyzer": "cjk_content",
+      "query": "心经"
+     }
     }
    },
    "size": 5
@@ -1329,27 +1265,11 @@
     }
    },
    "query": {
-    "bool": {
-     "minimum_should_match": 1,
-     "should": [
-      {
-       "match": {
-        "content": {
-         "analyzer": "cjk_content",
-         "query": "般若"
-        }
-       }
-      },
-      {
-       "match": {
-        "notes": {
-         "analyzer": "cjk_content",
-         "boost": 0.5,
-         "query": "般若"
-        }
-       }
-      }
-     ]
+    "match": {
+     "content": {
+      "analyzer": "cjk_content",
+      "query": "般若"
+     }
     }
    },
    "size": 20
@@ -1429,27 +1349,11 @@
     }
    },
    "query": {
-    "bool": {
-     "minimum_should_match": 1,
-     "should": [
-      {
-       "match": {
-        "content": {
-         "analyzer": "cjk_content",
-         "query": "般若"
-        }
-       }
-      },
-      {
-       "match": {
-        "notes": {
-         "analyzer": "cjk_content",
-         "boost": 0.5,
-         "query": "般若"
-        }
-       }
-      }
-     ]
+    "match": {
+     "content": {
+      "analyzer": "cjk_content",
+      "query": "般若"
+     }
     }
    },
    "size": 5
@@ -1826,27 +1730,11 @@
     }
    },
    "query": {
-    "bool": {
-     "minimum_should_match": 1,
-     "should": [
-      {
-       "match": {
-        "content": {
-         "analyzer": "cjk_content",
-         "query": "阿弥陀"
-        }
-       }
-      },
-      {
-       "match": {
-        "notes": {
-         "analyzer": "cjk_content",
-         "boost": 0.5,
-         "query": "阿弥陀"
-        }
-       }
-      }
-     ]
+    "match": {
+     "content": {
+      "analyzer": "cjk_content",
+      "query": "阿弥陀"
+     }
     }
    },
    "size": 20
@@ -1926,27 +1814,11 @@
     }
    },
    "query": {
-    "bool": {
-     "minimum_should_match": 1,
-     "should": [
-      {
-       "match": {
-        "content": {
-         "analyzer": "cjk_content",
-         "query": "阿弥陀"
-        }
-       }
-      },
-      {
-       "match": {
-        "notes": {
-         "analyzer": "cjk_content",
-         "boost": 0.5,
-         "query": "阿弥陀"
-        }
-       }
-      }
-     ]
+    "match": {
+     "content": {
+      "analyzer": "cjk_content",
+      "query": "阿弥陀"
+     }
     }
    },
    "size": 5
