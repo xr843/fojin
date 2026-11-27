@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import ARRAY, JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import ARRAY, JSON, Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -121,3 +121,20 @@ class TextLineAnchor(Base):
     juan_num: Mapped[int] = mapped_column(Integer)
     char_offset: Mapped[int] = mapped_column(Integer)
     line_ref: Mapped[str] = mapped_column(String(20))
+
+
+class TextInlineNote(Base):
+    """CBETA 夹注 / 双行小注（<note place="inline">）：原书正文的一部分，但不在 TextContent.content 里——
+    正文与其上所有位置（行号、校勘、引文高亮、检索、向量）都以不含夹注的正文为准，夹注另存、按位置
+    插回阅读页。char_offset：夹注在正文里的位置（跟在 content[char_offset-1] 之后）。"""
+
+    __tablename__ = "text_inline_notes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    text_id: Mapped[int] = mapped_column(Integer, ForeignKey("buddhist_texts.id", ondelete="CASCADE"))
+    juan_num: Mapped[int] = mapped_column(Integer)
+    char_offset: Mapped[int] = mapped_column(Integer)
+    seq: Mapped[int] = mapped_column(Integer)
+    content: Mapped[str] = mapped_column(Text)
+
+    __table_args__ = (Index("ix_text_inline_notes_text_juan", "text_id", "juan_num", "seq"),)

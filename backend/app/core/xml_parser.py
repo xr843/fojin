@@ -3,7 +3,10 @@ CBETA TEI P5 XML parser.
 
 Parses CBETA XML files and extracts plain text content split by juan (fascicle).
 Handles <milestone unit="juan">, <cb:juan>, <p>, <lg>/<l>, <head> elements.
-Skips <note>, <app> (critical apparatus) elements.
+Skips <note>, <app> (critical apparatus) elements. Inline notes (<note place="inline">,
+夹注 / 双行小注 — part of the original text, e.g. all the glosses of 一切經音義) are not
+put into the body; they are returned separately with their offset (juan["inline_notes"]),
+so the stored body and every offset into it stay exactly as before.
 Resolves gaiji (缺字) via cbeta_gaiji.json for PUA characters.
 """
 
@@ -28,8 +31,58 @@ XML_ID = "{http://www.w3.org/XML/1998/namespace}id"
 # FINAL cleaned juan content can be recovered. They are stripped out before the
 # content is stored; the recovered offsets drive the standoff critical apparatus
 # (校勘异文) and <lb> page-col-line anchors.
-#   anchor:  \x00A:<xml:id>\x00      line:  \x00L:<n>\x00
-_SENTINEL_RE = re.compile("\x00([AL]):([^\x00]*)\x00")
+#   anchor:  \x00A:<xml:id>\x00      line:  \x00L:<n>\x00      inline note:  \x00N:<note text>\x00
+_SENTINEL_RE = re.compile("\x00([ALN]):([^\x00]*)\x00")
+_NOTE_SENTINEL_RE = re.compile("\x00N:[^\x00]*\x00")
+
+
+def _is_inline_note(elem) -> bool:
+    return elem.tag == f"{{{TEI_NS}}}note" and elem.get("place") == "inline"
+
+
+def _note_text(elem) -> str:
+    """Plain text of an inline note: gaiji resolved; editorial notes, apparatus, anchors and
+    <lb> inside it dropped (an <lb> inside a note never became a line anchor — kept that way so
+    line anchors are unchanged). A nested inline note is kept in parentheses."""
+    parts = [elem.text or ""]
+    for child in elem:
+        if child.tag == f"{{{TEI_NS}}}g":
+            parts.append(_resolve_gaiji(child))
+        elif _is_inline_note(child):
+            parts.append(f"（{_note_text(child)}）")
+        elif child.tag in SKIP_TAGS or child.tag in (f"{{{TEI_NS}}}anchor", f"{{{TEI_NS}}}lb"):
+            pass
+        else:
+            parts.append(_note_text(child))
+        if child.tail:
+            parts.append(child.tail)
+    return re.sub(r"\s*\n\s*", "", "".join(parts)).strip().replace("\x00", "")
+
+
+def _bare(text: str) -> str:
+    """text without inline-note sentinels — what the body looked like before notes were kept."""
+    return _NOTE_SENTINEL_RE.sub("", text)
+
+
+def _strip_keep_notes(text: str) -> str:
+    """str.strip() that treats inline-note sentinels as transparent: removes exactly the
+    whitespace the old parser's .strip() removed from the note-free text, keeping the notes."""
+    if "\x00N:" not in text:
+        return text.strip()
+    parts = _NOTE_SENTINEL_RE.split(text)
+    notes = _NOTE_SENTINEL_RE.findall(text)
+    for i in range(len(parts)):
+        parts[i] = parts[i].lstrip()
+        if parts[i]:
+            break
+    for i in range(len(parts) - 1, -1, -1):
+        parts[i] = parts[i].rstrip()
+        if parts[i]:
+            break
+    out = [parts[0]]
+    for n, part in zip(notes, parts[1:], strict=True):
+        out += [n, part]
+    return "".join(out)
 
 # Elements whose text content we want to extract (leaf content elements)
 CONTENT_TAGS = {
@@ -153,7 +206,14 @@ def _extract_text(elem) -> str:
         parts.append(elem.text)
 
     for child in elem:
-        if child.tag in SKIP_TAGS:
+        if _is_inline_note(child):
+            # 夹注：不进正文，记下位置（见 _clean_anchors）
+            note = _note_text(child)
+            if note:
+                parts.append(f"\x00N:{note}\x00")
+            if child.tail:
+                parts.append(child.tail)
+        elif child.tag in SKIP_TAGS:
             # Skip this child but get its tail
             if child.tail:
                 parts.append(child.tail)
@@ -208,15 +268,18 @@ def _extract_reading_text(elem) -> str:
     return "".join(parts)
 
 
-def _clean_anchors(text: str) -> tuple[str, dict[str, int], list[dict]]:
-    """Strip anchor/line sentinels from text, recovering their char offsets.
+def _clean_anchors(text: str) -> tuple[str, dict[str, int], list[dict], list[dict]]:
+    """Strip anchor/line/note sentinels from text, recovering their char offsets.
 
-    Returns (clean_text, {anchor_id: offset}, [{"offset": o, "line": ref}]).
+    Returns (clean_text, {anchor_id: offset}, [{"offset": o, "line": ref}],
+    [{"offset": o, "text": note}]) — a note's offset is where it sat in the text (it follows
+    the character before it).
     Offsets are indices into clean_text. Walking sentinels left-to-right and
     tracking only the cleaned length keeps every offset exact.
     """
     anchors: dict[str, int] = {}
     line_anchors: list[dict] = []
+    notes: list[dict] = []
     out: list[str] = []
     clean_len = 0
     i = 0
@@ -227,11 +290,13 @@ def _clean_anchors(text: str) -> tuple[str, dict[str, int], list[dict]]:
         kind, payload = m.group(1), m.group(2)
         if kind == "A":
             anchors[payload] = clean_len
+        elif kind == "N":
+            notes.append({"offset": clean_len, "text": payload})
         else:
             line_anchors.append({"offset": clean_len, "line": payload})
         i = m.end()
     out.append(text[i:])
-    return "".join(out), anchors, line_anchors
+    return "".join(out), anchors, line_anchors, notes
 
 
 def parse_tei_xml(xml_path: str | Path) -> list[dict]:
@@ -266,20 +331,35 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
     # 先记着，贴到下一段正文的开头。连续几个 <lb> 之间没有正文（卷首空行、被跳过的经号行）
     # 时只留最后一个：前面那几行没有字可选，贴上去只会让「行首」显示叠出空行号。
     pending_lb: list[str] = []
+    # 整段只有夹注（正文为空，如音義、直音里词条下另起一段的注）：不能自成一行（会多出换行、后面位置全变），
+    # 接到前一段末尾；本卷还没有正文时先记着，贴到下一段开头。
+    pending_notes: list[str] = []
 
     def with_pending_lb(text: str) -> str:
+        if pending_notes:
+            text = "".join(pending_notes) + text
+            pending_notes.clear()
         if not pending_lb:
             return text
         out = pending_lb[-1] + text
         pending_lb.clear()
         return out
 
+    def attach_orphan_notes(text: str) -> None:
+        notes = "".join(_NOTE_SENTINEL_RE.findall(text))
+        if not notes:
+            return
+        if current_lines:
+            current_lines[-1] += notes
+        else:
+            pending_notes.append(notes)
+
     def flush_juan():
         nonlocal current_lines
         # Keep blank lines (paragraph boundaries) but strip leading/trailing empties
         text = "\n".join(current_lines)
-        text = text.strip()
-        clean, anchors, line_anchors = _clean_anchors(text)
+        text = _strip_keep_notes(text)
+        clean, anchors, line_anchors, notes = _clean_anchors(text)
         if clean:
             juans.append({
                 "juan_num": current_juan,
@@ -287,6 +367,7 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
                 "char_count": len(clean.replace("\n", "").replace(" ", "")),
                 "anchors": anchors,
                 "line_anchors": line_anchors,
+                "inline_notes": notes,
             })
         current_lines = []
 
@@ -331,15 +412,15 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
                         flush_juan()
                         current_juan = juan_int
                 # Extract juan title text (e.g. "阿毘達磨俱舍論卷第一")
-                juan_text = _extract_text(elem).strip()
-                if juan_text:
+                juan_text = _strip_keep_notes(_extract_text(elem))
+                if _bare(juan_text):
                     current_lines.append(with_pending_lb(juan_text))
             return
 
         # Extract byline (author/translator info)
         if tag == f"{{{TEI_NS}}}byline":
-            text = _extract_text(elem).strip()
-            if text:
+            text = _strip_keep_notes(_extract_text(elem))
+            if _bare(text):
                 current_lines.append(with_pending_lb(text))
             return
 
@@ -349,8 +430,11 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
 
         # Extract text from content elements
         if tag in CONTENT_TAGS:
-            text = _extract_text(elem).strip()
-            if text:
+            text = _strip_keep_notes(_extract_text(elem))
+            # 整段只有夹注（正文为空）的段落照旧不进正文——进了就多一行、后面的位置全变；夹注接到前一段末尾
+            if not _bare(text):
+                attach_orphan_notes(text)
+            else:
                 # Insert blank line between <p> elements to preserve paragraph
                 # boundaries. The frontend reflowText handles mid-word splits
                 # by only breaking when the previous line ends with punctuation.
@@ -375,8 +459,8 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
         # Deliberately narrow: only type="xu", not a general front-matter filter.
         if tag == f"{{{CB_NS}}}div" and elem.get("type") == "xu":
             pending_lb.clear()  # 序文前的行号不属于正文，别贴到正文开头
-            preface_text = _extract_text(elem).strip()
-            if preface_text:
+            preface_text = _strip_keep_notes(_extract_text(elem))
+            if _bare(preface_text):
                 preface_lines.append(preface_text)
             return
 
@@ -397,8 +481,8 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
 
     # If no juans were found but there is content, treat everything as juan 1
     if not juans and current_lines:
-        text = "\n".join(line for line in current_lines if line.strip()).strip()
-        clean, anchors, line_anchors = _clean_anchors(text)
+        text = _strip_keep_notes("\n".join(line for line in current_lines if _bare(line).strip()))
+        clean, anchors, line_anchors, notes = _clean_anchors(text)
         if clean:
             juans.append({
                 "juan_num": 1,
@@ -406,14 +490,15 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
                 "char_count": len(clean.replace("\n", "").replace(" ", "")),
                 "anchors": anchors,
                 "line_anchors": line_anchors,
+                "inline_notes": notes,
             })
 
     # Last resort: a preface-only work (no scripture body at all). Emit the
     # sidelined paratext rather than returning [] — which import_work would
     # silently skip, leaving the work with has_content=False and unindexed.
     if not juans and preface_lines:
-        text = "\n".join(preface_lines).strip()
-        clean, anchors, line_anchors = _clean_anchors(text)
+        text = _strip_keep_notes("\n".join(preface_lines))
+        clean, anchors, line_anchors, notes = _clean_anchors(text)
         if clean:
             juans.append({
                 "juan_num": 1,
@@ -421,6 +506,7 @@ def parse_tei_xml(xml_path: str | Path) -> list[dict]:
                 "char_count": len(clean.replace("\n", "").replace(" ", "")),
                 "anchors": anchors,
                 "line_anchors": line_anchors,
+                "inline_notes": notes,
             })
 
     return juans
