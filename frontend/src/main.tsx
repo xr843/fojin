@@ -16,6 +16,7 @@ import App from "./App";
 import i18n, { currentUILang } from "./i18n";
 import "./styles/global.css";
 import "./umami";
+import { installAnalyticsSignals } from "./analyticsSignals";
 import { dropServerCanonical } from "./seo/dropServerCanonical";
 import { toSeoLang } from "./seo/langUrl";
 import { installSwUpdateHandling } from "./utils/swUpdate";
@@ -31,6 +32,7 @@ const queryClient = new QueryClient({
 
 dropServerCanonical(window.location.pathname, toSeoLang(currentUILang(i18n)));
 installSwUpdateHandling();
+installAnalyticsSignals();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
