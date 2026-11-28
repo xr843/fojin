@@ -368,6 +368,35 @@ describe("sendChatMessageStream", () => {
     }
   });
 
+  it("诊断：流结束时报告字节数与帧类型（相邻去重），在 onDone 之前", async () => {
+    const { sendChatMessageStream } = await import("./client");
+    const order: string[] = [];
+    let stats: { bytes: number; frames: string[]; status: number } | null = null;
+    const callbacks = {
+      onToken: vi.fn(),
+      onSources: vi.fn(),
+      onSessionId: vi.fn(),
+      onError: vi.fn(),
+      onDone: vi.fn(() => order.push("done")),
+      onStreamStats: vi.fn((s) => { stats = s; order.push("stats"); }),
+    };
+    const promise = sendChatMessageStream("hello", undefined, null, callbacks);
+    const xhr = MockStreamXHR.instances[0];
+    xhr.status = 200;
+    xhr.responseText =
+      ": pad\n\n" +
+      'data: {"type": "searching", "message": "x"}\n\n' +
+      'data: {"type": "reasoning", "chars": 1}\n\n' +
+      'data: {"type": "reasoning", "chars": 2}\n\n' +
+      'data: {"type": "done"}\n\n';
+    xhr.onprogress?.();
+    await promise;
+    expect(order).toEqual(["stats", "done"]);
+    expect(stats!.frames).toEqual(["searching", "reasoning", "done"]);
+    expect(stats!.bytes).toBe(xhr.responseText.length);
+    expect(stats!.status).toBe(200);
+  });
+
   it("uses the active UI language for client-side network errors", async () => {
     const { sendChatMessageStream } = await import("./client");
     const callbacks = {

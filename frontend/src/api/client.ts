@@ -2482,6 +2482,18 @@ export interface StreamCallbacks {
    */
   onError: (message: string, code?: string) => void;
   onDone: () => void;
+  /**
+   * 流结束时的诊断（在 onDone 之前调用）：收到多少字节、按顺序收到了哪些帧、HTTP 状态。
+   * 只给「一个字都没收到」(silent_done) 埋点用——事后能分清是服务端没发、发了没解析，还是被截断。
+   */
+  onStreamStats?: (stats: StreamStats) => void;
+}
+
+export interface StreamStats {
+  bytes: number;
+  /** 收到的帧类型，按顺序、相邻去重，最多 12 个 */
+  frames: string[];
+  status: number;
 }
 
 export interface ReadingContext {
@@ -2565,6 +2577,13 @@ export function sendChatMessageStream(
     let lastIndex = 0;
     let buffer = "";
     let done = false;
+    const frames: string[] = [];
+    const noteFrame = (type: string) => {
+      if (frames.length < 12 && frames[frames.length - 1] !== type) frames.push(type);
+    };
+    const reportStats = () => {
+      callbacks.onStreamStats?.({ bytes: xhr.responseText?.length ?? 0, frames: [...frames], status: xhr.status });
+    };
 
     // 断流监测：手机切到后台时浏览器会暂停收数据，切回来先重新计时，不能把这段当成断流。
     let lastActivityAt = Date.now();
@@ -2600,6 +2619,7 @@ export function sendChatMessageStream(
         if (!payload) continue;
         try {
           const event = JSON.parse(payload);
+          noteFrame(String(event.type));
           switch (event.type) {
             case "token":
               callbacks.onToken(event.content);
@@ -2653,6 +2673,7 @@ export function sendChatMessageStream(
             case "done":
               done = true;
               stopWatch();
+              reportStats();
               callbacks.onDone();
               resolve();
               return;
@@ -2694,6 +2715,7 @@ export function sendChatMessageStream(
           try { detail = JSON.parse(xhr.responseText).detail || detail; } catch { /* ignore */ }
           callbacks.onError(detail, `http_${xhr.status}`);
         }
+        reportStats();
         callbacks.onDone();
         resolve();
       }

@@ -44,3 +44,24 @@ async def take_guest_result(redis, request_id: str) -> dict[str, Any] | None:
     if isinstance(raw, bytes):
         raw = raw.decode()
     return json.loads(raw)
+
+
+# --- 提前结束的诊断记录（2026-11-28）---
+# 「一个字都没收到」（前端 silent_done）30 天 9 次：服务端约 1 秒就以 200 结束，但容器日志每次部署清空，
+# 事后查不到是哪条路提前结束的。这里把每次提前结束的原因推进 Redis 列表，只留最近 200 条、保留 30 天，
+# 不存提问内容（只存长度）。查看：docker exec fojin-redis redis-cli LRANGE chat:early_end 0 50
+EARLY_END_KEY = "chat:early_end"
+EARLY_END_KEEP = 200
+
+
+async def note_early_end(redis, **fields: Any) -> None:
+    if redis is None:
+        return
+    try:
+        import time
+
+        await redis.lpush(EARLY_END_KEY, json.dumps({"ts": int(time.time()), **fields}, ensure_ascii=False))
+        await redis.ltrim(EARLY_END_KEY, 0, EARLY_END_KEEP - 1)
+        await redis.expire(EARLY_END_KEY, 30 * 86400)
+    except Exception as exc:  # 诊断记录绝不能影响回答
+        logger.warning("early-end note failed: %s", exc)
