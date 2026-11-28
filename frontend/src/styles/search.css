@@ -283,6 +283,18 @@
   margin-bottom: 4px;
 }
 
+/* 检索片段可点：点了打开阅读器并定位到这段原文（useSnippetOpen）。 */
+.s-snippet-link {
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background-color 0.15s;
+}
+
+.s-snippet-link:hover {
+  background: var(--fj-sand-light, #faf7f2);
+  color: var(--fj-ink);
+}
+
 .s-card-meta em {
   color: var(--fj-highlight);
   font-style: normal;

@@ -4,7 +4,8 @@ import { Tag, Button } from "antd";
 import { LinkOutlined, ReadOutlined } from "@ant-design/icons";
 import { Link } from "react-router";
 import { sanitizeHighlight } from "../../utils/sanitize";
-import { buildCbetaReadUrl, buildReaderUrl } from "../../utils/sourceUrls";
+import { buildCbetaReadUrl, buildReaderUrl, highlightToQuote } from "../../utils/sourceUrls";
+import { useSnippetOpen } from "./useSnippetOpen";
 import type { ContentSearchHit } from "../../api/client";
 
 const LANG_KEYS: Record<string, string> = {
@@ -19,6 +20,9 @@ export default function ContentCard({ hit }: { hit: ContentSearchHit }) {
   const [expanded, setExpanded] = useState(false);
   const hasMore = hit.matched_juan_count > 1;
   const cbetaUrl = buildCbetaReadUrl(hit.cbeta_id);
+  const openSnippet = useSnippetOpen();
+  // 每段片段带自己的原文去阅读器（?quote=），点哪段就定位到哪段；「阅读」用该卷第一段。
+  const readUrl = (juan: number, h?: string) => buildReaderUrl(hit.text_id, juan, h ? highlightToQuote(h) : null);
 
   return (
     <div className="s-card">
@@ -40,13 +44,14 @@ export default function ContentCard({ hit }: { hit: ContentSearchHit }) {
         <div className="s-content-juan">
           <div className="s-content-juan-label">{t("search.juan_best", { num: hit.juan_num })}</div>
           {hit.highlight.map((h, j) => (
-            <div key={j} className="s-card-meta" style={{ lineHeight: 1.7 }}
+            <div key={j} className="s-card-meta s-snippet-link" style={{ lineHeight: 1.7 }}
+              onClick={openSnippet(readUrl(hit.juan_num, h))}
               dangerouslySetInnerHTML={{ __html: `...${sanitizeHighlight(h)}...` }} />
           ))}
           {/* 站内阅读器排在前面：它带标注、校勘、跨藏对照，CBETA 外链只作次要出口。
               两者都是次级文字入口——卡片唯一的视觉重点是经名。 */}
           <div className="s-card-links">
-            <Link className="s-card-action" to={buildReaderUrl(hit.text_id, hit.juan_num)}>
+            <Link className="s-card-action" to={readUrl(hit.juan_num, hit.highlight[0])}>
               <ReadOutlined aria-hidden="true" />
               {t("search.read")}
             </Link>
@@ -65,11 +70,12 @@ export default function ContentCard({ hit }: { hit: ContentSearchHit }) {
             <div key={j.juan_num} className="s-content-juan">
               <div className="s-content-juan-label">{t("search.juan_n", { num: j.juan_num })}</div>
               {j.highlight.map((h, k) => (
-                <div key={k} className="s-card-meta" style={{ lineHeight: 1.7 }}
+                <div key={k} className="s-card-meta s-snippet-link" style={{ lineHeight: 1.7 }}
+                  onClick={openSnippet(readUrl(j.juan_num, h))}
                   dangerouslySetInnerHTML={{ __html: `...${sanitizeHighlight(h)}...` }} />
               ))}
               <div className="s-card-links">
-                <Link className="s-card-action" to={buildReaderUrl(hit.text_id, j.juan_num)}>
+                <Link className="s-card-action" to={readUrl(j.juan_num, j.highlight[0])}>
                   <ReadOutlined aria-hidden="true" />
                   {t("search.read")}
                 </Link>

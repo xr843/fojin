@@ -49,6 +49,17 @@ describe("SearchSourceCard", () => {
     expect(verifyQuote).toHaveBeenCalledWith("应无所住而生其心");
   });
 
+  // 核对接口的 reader_url 带行号与整句偏移；原先卡片自己拼只带卷号的链接，点进去停在卷首。
+  it("有 reader_url 时用它的站内路径直达并高亮所查原文（不跳去生产域名）", async () => {
+    vi.mocked(verifyQuote).mockResolvedValue({
+      ...T0235,
+      matches: [{ ...T0235.matches[0], reader_url: "https://fojin.app/texts/7/read?juan=1&anchor=p0749c22&hl=1949-1957" }],
+    });
+    renderCard("应无所住而生其心");
+    const title = await screen.findByRole("link", { name: "《金剛般若波羅蜜經》第1卷" });
+    expect(title.getAttribute("href")).toBe("/texts/7/read?juan=1&anchor=p0749c22&hl=1949-1957");
+  });
+
   it("最早一部是注疏/经录时不显示", async () => {
     vi.mocked(verifyQuote).mockResolvedValue({
       ...T0235,

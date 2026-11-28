@@ -47,9 +47,25 @@ export function buildCbetaReadUrl(cbetaId: string): string | null {
  * 所有指向站内阅读器的链接都应经过这里：曾经有卡片手写 `/read/:id/:juan`，
  * 那条路由从不存在，点进去一律 404。
  */
-export function buildReaderUrl(textId: number, juanNum?: number | null): string {
+export function buildReaderUrl(textId: number, juanNum?: number | null, quote?: string | null): string {
   const base = `/texts/${textId}/read`;
-  return juanNum == null ? base : `${base}?juan=${juanNum}`;
+  if (juanNum == null) return base;
+  // ?quote= 让阅读器在整卷里找到这段原文、滚过去并整句高亮（TextReaderPage 的 quoteSpan，
+  // 折叠繁简、忽略标点与 CBETA 硬换行）；找不到时阅读器停在卷首，与不带它一样。
+  const q = quote?.trim();
+  return q ? `${base}?juan=${juanNum}&quote=${encodeURIComponent(q)}` : `${base}?juan=${juanNum}`;
+}
+
+/** 全文检索高亮片段（含 <em> 与 HTML 实体）→ 纯文本原文，用作阅读器的 ?quote=。 */
+export function highlightToQuote(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, "")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .trim();
 }
 
 const SOURCE_LABEL_KEYS: Record<string, string> = {

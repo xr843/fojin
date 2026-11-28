@@ -15,6 +15,18 @@ function track(event: string, data: Record<string, string | number>) {
  * 逐字命中且最早的一部是经/律/论，才在结果上方写出原典。
  * 其余情况（没命中、命中的是经录/语录/注疏、接口出错）一律不渲染，搜索结果照常。
  */
+/** 核对接口给的 reader_url 带 anchor（行号）与 hl（整句偏移），能直达并高亮所查原文；
+ *  只取站内路径部分，免得在 localhost/预览环境跳去生产域名。 */
+function readerPath(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url, window.location.origin);
+    return u.pathname.startsWith("/texts/") ? u.pathname + u.search : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function SearchSourceCard({ query }: { query: string }) {
   const { t } = useTranslation();
   const q = Array.from(query.trim()).slice(0, 400).join("");
@@ -44,7 +56,7 @@ export default function SearchSourceCard({ query }: { query: string }) {
           <span className="s-source-label">{t("search.source.label")}</span>
           <Link
             className="s-source-title"
-            to={`/texts/${match.text_id}/read?juan=${match.juan_num}`}
+            to={readerPath(match.reader_url) ?? `/texts/${match.text_id}/read?juan=${match.juan_num}`}
             onClick={() => track("search_source_open", { to: "reader", cbeta: match.cbeta_id ?? "" })}
           >
             《{title}》{t("search.source.juan", { n: match.juan_num })}
