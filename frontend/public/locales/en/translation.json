@@ -278,7 +278,7 @@
   "admin_dashboard.module_usage.funnel.trace": "Citation trace (submitted → done)",
   "admin_dashboard.module_usage.funnel.forgot_password": "Forgot password (opened → submitted)",
   "admin_dashboard.answer_quality.title": "Answer quality",
-  "admin_dashboard.answer_quality.subtitle": "Answer quality (behavior signals relative to Q&A volume; explicit thumbs are shown in the Platform activity feedback rate. This batch is cumulative since deployment.)",
+  "admin_dashboard.answer_quality.subtitle": "For the period selected above: citation clicks, copies and retries as a share of questions asked. Thumbs up/down are in the Platform activity feedback rate.",
   "admin_dashboard.answer_quality.citation_click_rate": "Citation click rate",
   "admin_dashboard.answer_quality.citation_click_tooltip": "Citation source opens / Q&A questions = {{clicks}} / {{questions}}. Higher values suggest users are verifying and trusting sources.",
   "admin_dashboard.answer_quality.copy_rate": "Copy rate",
@@ -2160,5 +2160,6 @@
   "admin_dashboard.platform_activity.chat_reading_section": "Chat and reading",
   "admin_dashboard.reading.total_reads_members": "Reads (signed-in)",
   "admin_dashboard.reading.collapse": "Show less",
-  "admin_dashboard.reading.show_all": "Show all {{n}}"
+  "admin_dashboard.reading.show_all": "Show all {{n}}",
+  "admin_dashboard.module_usage.top_keywords_days": "Popular search terms (last {{n}} days, top 10)"
 }
