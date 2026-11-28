@@ -21,6 +21,7 @@ from app.schemas.admin import (
     DailyCount,
 )
 from app.services.daily_metrics import ANONYMOUS_MESSAGES
+from app.services.usage_service import MEMBER_TRACKING_SINCE, member_code, member_section_views
 
 logger = logging.getLogger(__name__)
 
@@ -270,9 +271,39 @@ async def daily_active_user_detail(db: AsyncSession, target_day: date) -> dict:
 
     chat_by_uid = {uid: n for uid, n in chat_rows}
     read_by_uid = {uid: n for uid, n in read_rows}
-    uids = set(chat_by_uid) | set(read_by_uid)
+
+    # 辞典 / 佛教史 / 检索：数据库不记，取网站统计里登录用户代号的浏览次数（11-28 起才有）。
+    # 只查过辞典、看过佛教史的登录用户也算当天活跃。
+    tracked = target_day >= MEMBER_TRACKING_SINCE
+    views_by_uid: dict[int, dict[str, int]] = {}
+    if tracked:
+        by_code = await member_section_views(start, end)
+        if by_code:
+            all_ids = (await db.execute(select(User.id))).scalars().all()
+            code_to_uid = {member_code(uid): uid for uid in all_ids}
+            for code, sections in by_code.items():
+                uid = code_to_uid.get(code)
+                if uid is not None:
+                    views_by_uid[uid] = sections
+
+    guest_messages = (await db.execute(
+        select(DailyMetricCount.count).where(
+            DailyMetricCount.metric == ANONYMOUS_MESSAGES, DailyMetricCount.day == target_day
+        )
+    )).scalar_one_or_none() or 0
+
+    uids = set(chat_by_uid) | set(read_by_uid) | set(views_by_uid)
+    base = {
+        "date": target_day.isoformat(),
+        "guest_messages": guest_messages,
+        "sections_tracked": tracked,
+        "members_since": MEMBER_TRACKING_SINCE.isoformat(),
+    }
     if not uids:
-        return {"date": target_day.isoformat(), "total": 0, "users": []}
+        return {**base, "total": 0, "users": []}
+
+    def _views(uid: int, section: str) -> int | None:
+        return views_by_uid.get(uid, {}).get(section, 0) if tracked else None
 
     users = (await db.execute(select(User).where(User.id.in_(uids)))).scalars().all()
     detail = [
@@ -284,14 +315,24 @@ async def daily_active_user_detail(db: AsyncSession, target_day: date) -> dict:
             "role": u.role,
             "chat_messages": chat_by_uid.get(u.id, 0),
             "texts_read": read_by_uid.get(u.id, 0),
+            "dict_views": _views(u.id, "dict"),
+            "history_views": _views(u.id, "history"),
+            "search_views": _views(u.id, "search"),
             "last_active_at": u.last_active_at,
             "api_provider": u.api_provider,
         }
         for u in users
     ]
     # Busiest first: chat is the heavier signal, then reading.
-    detail.sort(key=lambda d: (d["chat_messages"], d["texts_read"]), reverse=True)
-    return {"date": target_day.isoformat(), "total": len(detail), "users": detail}
+    detail.sort(
+        key=lambda d: (
+            d["chat_messages"],
+            d["texts_read"],
+            (d["dict_views"] or 0) + (d["history_views"] or 0) + (d["search_views"] or 0),
+        ),
+        reverse=True,
+    )
+    return {**base, "total": len(detail), "users": detail}
 
 
 async def list_users(

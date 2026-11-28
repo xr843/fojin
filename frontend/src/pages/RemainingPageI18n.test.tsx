@@ -279,7 +279,7 @@ describe("remaining page i18n", () => {
     await waitFor(() => expect(screen.getByText("Total users")).toBeInTheDocument());
     expect(screen.getByText("Recent 30-day trend")).toBeInTheDocument();
     expect(screen.getAllByText("Platform activity").length).toBeGreaterThan(0);
-    expect(screen.getByText("Module usage")).toBeInTheDocument();
+    expect(screen.getByText("Usage by section")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("Answer quality")).toBeInTheDocument());
     expect(screen.getByText("Popular search terms (Top 10)")).toBeInTheDocument();
   });

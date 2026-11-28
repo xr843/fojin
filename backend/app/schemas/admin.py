@@ -60,6 +60,10 @@ class ActiveUserDetail(BaseModel):
     role: str
     chat_messages: int  # role='user' messages that day
     texts_read: int  # ReadingHistory rows touched that day
+    # 网站统计里按登录代号数的浏览次数；None = 该日早于代号上报（11-28），无从统计
+    dict_views: int | None = None
+    history_views: int | None = None
+    search_views: int | None = None
     last_active_at: datetime | None = None
     api_provider: str | None = None  # BYOK provider, null = uses platform key
 
@@ -68,6 +72,9 @@ class ActiveUserDayDetail(BaseModel):
     date: str
     total: int
     users: list[ActiveUserDetail]
+    guest_messages: int = 0  # 当天游客提问条数（内容不落库，只计数）
+    sections_tracked: bool = False
+    members_since: str | None = None
 
 
 class AdminUserItem(BaseModel):
@@ -164,9 +171,23 @@ class AnswerQuality(BaseModel):
     retry_rate: float | None = None
 
 
+class SectionUsageItem(BaseModel):
+    """板块总览一行：本周期 / 上一周期动手的人与次数，登录用户数（按代号）与浏览次数（含爬虫，仅参考）。"""
+
+    section: str
+    users: int
+    count: int
+    prev_users: int
+    prev_count: int
+    members: int
+    pageviews: int
+
+
 class AdminModuleUsage(BaseModel):
     days: int
     events: list[ModuleEventItem]
+    sections: list[SectionUsageItem] = []
+    members_since: str | None = None
     top_search_keywords: list[KeywordItem]
     answer_quality: AnswerQuality
     # 被排除的站长本人事件数（访问过 /admin 的设备）与本机开发事件数，看板上注明口径用

@@ -1519,6 +1519,10 @@ export interface ActiveUserDetail {
   role: string;
   chat_messages: number;
   texts_read: number;
+  /** 网站统计里按登录代号数的浏览次数；null = 该日早于代号上报（11-28），无从统计。旧后端没有这些字段 */
+  dict_views?: number | null;
+  history_views?: number | null;
+  search_views?: number | null;
   last_active_at: string | null;
   api_provider: string | null;
 }
@@ -1527,6 +1531,10 @@ export interface ActiveUserDayDetail {
   date: string;
   total: number;
   users: ActiveUserDetail[];
+  /** 当天游客提问条数 */
+  guest_messages?: number;
+  sections_tracked?: boolean;
+  members_since?: string | null;
 }
 
 export interface AdminUserItem {
@@ -1664,9 +1672,24 @@ export interface AnswerQuality {
   retry_rate: number | null;
 }
 
+export interface SectionUsageItem {
+  section: string;
+  /** 本周期动手的人（不同访客）与次数 */
+  users: number;
+  count: number;
+  prev_users: number;
+  prev_count: number;
+  /** 登录用户数（按代号，11-28 起） */
+  members: number;
+  /** 浏览次数（含爬虫，仅参考） */
+  pageviews: number;
+}
+
 export interface AdminModuleUsage {
   days: number;
   events: ModuleEventItem[];
+  sections?: SectionUsageItem[];
+  members_since?: string | null;
   top_search_keywords: KeywordItem[];
   answer_quality: AnswerQuality;
   /** 被排除的站长本人 + 本机开发事件数 */

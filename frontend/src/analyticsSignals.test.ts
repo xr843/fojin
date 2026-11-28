@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ENGAGE_MIN_MS, sectionOf, shouldEngage } from "./analyticsSignals";
+import { ENGAGE_MIN_MS, memberCode, sectionOf, shouldEngage } from "./analyticsSignals";
 
 describe("统计信号：板块归属", () => {
   it("各板块路径归到看板用的板块名", () => {
@@ -26,5 +26,11 @@ describe("统计信号：有效访问", () => {
     sent.add("read");
     expect(shouldEngage(true, 60_000, "read", sent)).toBe(false); // 已记过
     expect(shouldEngage(true, 60_000, "dict", sent)).toBe(true); // 换板块再记一次
+  });
+});
+
+describe("统计信号：登录代号", () => {
+  it("与后端 usage_service.member_code 同一算法（后端测试钉同一个值）", async () => {
+    expect(await memberCode(1)).toBe("eb6cd069bd1e9973");
   });
 });

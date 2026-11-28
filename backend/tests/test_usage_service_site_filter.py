@@ -52,7 +52,7 @@ def _run(event_rows):
 
 def test_every_umami_query_is_scoped_to_fojin_site_and_drops_staff():
     _run([])
-    assert len(_FakeSession.calls) == 2
+    assert len(_FakeSession.calls) == 3  # 事件、检索词、板块总览
     for sql, params in _FakeSession.calls:
         assert "FROM website WHERE domain = :domain" in sql, sql
         assert "url_path LIKE '/admin%'" in sql, sql
@@ -72,3 +72,9 @@ def test_users_and_excluded_staff_are_reported():
     assert "trace_error" not in by_name
     assert out["excluded_staff_events"] == 52
     assert out["answer_quality"]["chat_questions"] == 10
+
+
+def test_member_code_matches_frontend_algorithm():
+    # 前端 analyticsSignals.ts 的 memberCode(1) 在浏览器里算出的值（frontend 同名测试钉同一个数）。
+    # 两边任何一边改盐或改算法，后台就再也对不上账号——这里会先红。
+    assert usage_service.member_code(1) == "eb6cd069bd1e9973"

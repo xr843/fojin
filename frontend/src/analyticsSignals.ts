@@ -52,7 +52,7 @@ function whenUmami(fn: (u: Umami) => void, waited = 0): void {
   else if (waited < 15000) window.setTimeout(() => whenUmami(fn, waited + 300), 300);
 }
 
-async function memberCode(userId: number): Promise<string> {
+export async function memberCode(userId: number): Promise<string> {
   const bytes = new TextEncoder().encode(`${userId}|${MEMBER_SALT}`);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   return Array.from(new Uint8Array(digest).slice(0, 8), (b) => b.toString(16).padStart(2, "0")).join("");

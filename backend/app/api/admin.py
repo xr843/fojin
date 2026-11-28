@@ -119,6 +119,8 @@ async def stats_module_usage(
     return AdminModuleUsage(
         days=days,
         events=result["events"],
+        sections=result.get("sections", []),
+        members_since=result.get("members_since"),
         top_search_keywords=result["top_search_keywords"],
         answer_quality=result["answer_quality"],
         excluded_staff_events=result.get("excluded_staff_events", 0),
