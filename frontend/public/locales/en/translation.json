@@ -791,14 +791,14 @@
   "chat.unlimited_usage": "for unlimited usage.",
   "chat.login": "Log in",
   "chat.login_quota_hint": " to enjoy the AI Buddhist assistant. Configure your own API Key for unlimited usage.",
-  "chat.guest_save_hint": "This conversation won't be saved — it's gone after refresh. Sign in to keep your chat history.",
+  "chat.guest_save_hint": "This conversation won't be saved (kept for 10 minutes only to recover an answer if the connection drops) — it's gone after refresh. Sign in to keep your chat history.",
   "chat.guest_save_hint_cta": "Sign in to save",
   "chat.guest_note_quota": "{{n}} free questions left today",
   "chat.guest_note_exhausted": "No free questions left today",
-  "chat.guest_note_unsaved": "this chat won't be saved",
+  "chat.guest_note_unsaved": "this chat won't be saved (kept for 10 minutes only to recover an answer if the connection drops)",
   "chat.guest_note_login": "Sign in for more",
   "chat.guest_note_dismiss": "Dismiss",
-  "chat.guest_quota_save_hint": "{{n}} free questions left today. This conversation won't be saved — it's gone after refresh.",
+  "chat.guest_quota_save_hint": "{{n}} free questions left today. This conversation won't be saved (kept for 10 minutes only to recover an answer if the connection drops) — it's gone after refresh.",
   "chat.hot_questions": [
     "What does 'form is emptiness' mean in the Heart Sutra?",
     "How do Kumārajīva and Xuanzang's translation styles differ?",
@@ -2161,5 +2161,6 @@
   "admin_dashboard.reading.total_reads_members": "Reads (signed-in)",
   "admin_dashboard.reading.collapse": "Show less",
   "admin_dashboard.reading.show_all": "Show all {{n}}",
-  "admin_dashboard.module_usage.top_keywords_days": "Popular search terms (last {{n}} days, top 10)"
+  "admin_dashboard.module_usage.top_keywords_days": "Popular search terms (last {{n}} days, top 10)",
+  "admin_dashboard.module_usage.event.chat_quota_hit": "Guest hit the free limit"
 }

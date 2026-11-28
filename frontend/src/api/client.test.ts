@@ -331,6 +331,43 @@ describe("sendChatMessageStream", () => {
     await i18n.changeLanguage("zh");
   });
 
+  it("断流监测：前台 30 秒无数据判 stalled 并中止；中途收到数据会重新计时；只报一次", async () => {
+    vi.useFakeTimers();
+    try {
+      const { sendChatMessageStream, STREAM_STALL_MS } = await import("./client");
+      const callbacks = {
+        onToken: vi.fn(),
+        onSources: vi.fn(),
+        onSessionId: vi.fn(),
+        onError: vi.fn(),
+        onDone: vi.fn(),
+      };
+      const promise = sendChatMessageStream("hello", undefined, null, callbacks, {
+        clientRequestId: "0123456789abcdef0123456789abcdef",
+      });
+      const xhr = MockStreamXHR.instances[0];
+      expect(JSON.parse(xhr.send.mock.calls[0][0]).client_request_id).toBe("0123456789abcdef0123456789abcdef");
+
+      vi.advanceTimersByTime(STREAM_STALL_MS - 5_000);
+      xhr.responseText = 'data: {"type": "reasoning", "chars": 3}\n\n';
+      xhr.onprogress?.(); // 收到数据 → 重新计时
+      vi.advanceTimersByTime(STREAM_STALL_MS - 2_000);
+      expect(callbacks.onError).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(3_000);
+      await promise;
+      expect(xhr.abort).toHaveBeenCalled();
+      expect(callbacks.onError).toHaveBeenCalledWith(expect.any(String), "stalled");
+      expect(callbacks.onDone).toHaveBeenCalledTimes(1);
+
+      xhr.onerror?.(); // 中止后迟到的回调不得重复报
+      vi.advanceTimersByTime(60_000);
+      expect(callbacks.onError).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("uses the active UI language for client-side network errors", async () => {
     const { sendChatMessageStream } = await import("./client");
     const callbacks = {

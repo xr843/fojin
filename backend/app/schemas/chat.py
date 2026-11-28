@@ -17,6 +17,9 @@ class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=20000)
     session_id: int | None = None
     master_id: str | None = None
+    # 游客断线找回（2026-11-28）：浏览器随机生成的 32 位十六进制编号。答案生成完后在 Redis
+    # 暂存 10 分钟，断线后凭它取回一次即删（app/services/guest_result.py）。登录用户不需要。
+    client_request_id: str | None = Field(None, pattern=r"^[0-9a-f]{32}$")
     # Reading context (sent when AI is invoked from the reader page).
     # selected_text / page_content caps must accommodate real CBETA juan
     # lengths — many fascicles (e.g. 大般若經) exceed 50K chars and the

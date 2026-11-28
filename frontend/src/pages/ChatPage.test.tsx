@@ -19,6 +19,7 @@ import {
   getRandomHotQuestions,
   getChatSessionMessages,
   sendChatMessageStream,
+  getGuestResult,
   updateChatSession,
   deleteChatSession,
   type ChatSessionItem,
@@ -49,6 +50,7 @@ vi.mock("../api/client", async () => {
     getMasters: vi.fn(),
     getRandomHotQuestions: vi.fn(),
     sendChatMessageStream: vi.fn(),
+    getGuestResult: vi.fn(),
     deleteChatSession: vi.fn(),
     updateChatSession: vi.fn(),
     updateChatMessageFeedback: vi.fn(),
@@ -555,6 +557,35 @@ describe("ChatPage 首屏结构", () => {
     await waitFor(() => {
       expect(screen.getByText("请求失败，请重试")).toBeInTheDocument();
     });
+  });
+
+  it("游客断线找回: 带随机编号发送；30 秒无数据（stalled）后凭编号取回答案并显示", async () => {
+    useAuthStore.setState({ token: null, user: null });
+    vi.mocked(getChatQuota).mockResolvedValue({
+      limit: 10, used: 0, remaining: 10, has_byok: false, authenticated: false,
+    });
+    let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
+    let opts: Parameters<typeof sendChatMessageStream>[4] | undefined;
+    vi.mocked(sendChatMessageStream).mockImplementation(
+      async (_m, _s, _mid, callbacks, options) => { cb = callbacks; opts = options; },
+    );
+    vi.mocked(getGuestResult).mockResolvedValueOnce({
+      content: "这是服务端暂存的完整回答。",
+      sources: [],
+    });
+    const { container } = await renderEmpty();
+    fireEvent.click(container.querySelector(".chat-hero-card")!);
+    await waitFor(() => expect(cb).toBeDefined());
+    expect(opts?.clientRequestId).toMatch(/^[0-9a-f]{32}$/);
+
+    cb!.onError("网络断开", "stalled");
+    cb!.onDone();
+
+    await waitFor(() => {
+      expect(screen.getByText("这是服务端暂存的完整回答。")).toBeInTheDocument();
+    });
+    expect(getGuestResult).toHaveBeenCalledWith(opts!.clientRequestId);
+    expect(screen.queryByText("请求失败，请重试")).not.toBeInTheDocument();
   });
 
   // 响应耗时必须在**登录用户**身上也成立。这是它上线当天就挂掉的地方：
@@ -2493,8 +2524,11 @@ describe("断流后找回已生成的回答", () => {
     expect(vi.mocked(message.success)).toHaveBeenCalled();
   });
 
-  it("游客：回答不落库，照旧报失败，不去会话里找", async () => {
+  // 2026-11-28 起游客也能找回：不去会话里找（游客不落库），改凭编号取服务端暂存的答案；
+  // 3 分钟内取不到才报失败。
+  it("游客：不去会话里找，凭编号取暂存答案；3 分钟取不到才报失败", async () => {
     useAuthStore.setState({ token: null, user: null });
+    vi.mocked(getGuestResult).mockResolvedValue(null);
     let cb: Parameters<typeof sendChatMessageStream>[3] | undefined;
     vi.mocked(sendChatMessageStream).mockImplementation(
       async (_m, _s, _mid, callbacks) => { cb = callbacks; },
@@ -2503,10 +2537,17 @@ describe("断流后找回已生成的回答", () => {
     fireEvent.click(container.querySelector(".chat-hero-card")!);
     await waitFor(() => expect(cb).toBeDefined());
 
-    cb!.onError("网络错误，请稍后重试", "network");
-    cb!.onDone();
+    vi.useFakeTimers({ toFake: ["setTimeout", "Date"] });
+    try {
+      cb!.onError("网络错误，请稍后重试", "network");
+      cb!.onDone();
+      await vi.advanceTimersByTimeAsync(4 * 60_000);
+    } finally {
+      vi.useRealTimers();
+    }
 
     await waitFor(() => expect(screen.getByText("请求失败，请重试")).toBeInTheDocument());
+    expect(vi.mocked(getGuestResult).mock.calls.length).toBeGreaterThan(10);
     expect(vi.mocked(message.error)).toHaveBeenCalled();
     expect(vi.mocked(getChatSessionMessages)).not.toHaveBeenCalled();
   });

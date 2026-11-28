@@ -53,11 +53,12 @@ import CitationSidebar, { type CitationPanelRequest } from "../components/Citati
 import StudyContinueStrip from "../components/StudyContinueStrip";
 import AnswerCitationEntry from "../components/AnswerCitationEntry";
 import { getMasters } from "../api/client";
-import { findSavedAnswer } from "./chatRecovery";
+import { findSavedAnswer, randomRequestId } from "./chatRecovery";
 import type { CitationTarget } from "../components/CitationDrawer";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   sendChatMessageStream,
+  getGuestResult,
   getChatSessions,
   getChatSessionMessages,
   deleteChatSession,
@@ -1363,6 +1364,8 @@ export default function ChatPage() {
     // Compiler 判为不纯（「已思考 N 秒」那处 :412 已经栽过一次）。
     const startedAt = Date.now();
     let firstTokenMs: number | null = null;
+    // 游客断线找回编号：答案生成完后服务端暂存 10 分钟，凭它取回一次（登录用户回库找，不需要）。
+    const guestRequestId = user ? null : randomRequestId();
 
     // 这条回答在 messages 里的 id 会**在流中途变**：后端在 done 之前先发
     // message_id（services/chat.py:1356 → :1361），onMessageId 用真实的
@@ -1515,7 +1518,47 @@ export default function ChatPage() {
         // 连接断了不等于回答没生成：生产上这类断开几乎都在 Cloudflare→浏览器这一段，
         // 后端早已生成完并存库（排查见 chatRecovery.ts）。登录用户的回答在库里，先去找；
         // 游客不落库，找不回，照旧报错。
-        if ((code === "network" || code === "client_timeout") && user) {
+        // 游客：凭发送时的随机编号去取服务端暂存的答案（10 分钟内、取一次即删）。
+        if ((code === "network" || code === "client_timeout" || code === "stalled") && !user && guestRequestId) {
+          recovering = true;
+          message.info(t("chat.stream.recovering"));
+          void (async () => {
+            const deadline = Date.now() + 3 * 60_000;
+            while (Date.now() < deadline) {
+              const got = await getGuestResult(guestRequestId);
+              if (got && got.content) {
+                const applied = viewEpochRef.current === myEpoch;
+                if (typeof umami !== "undefined") {
+                  umami.track("chat_recovered", {
+                    reason: code,
+                    stage: tokenCount > 0 ? "mid_stream" : "no_token",
+                    applied: applied ? 1 : 0,
+                    seconds: Math.round((Date.now() - startedAt) / 1000),
+                    guest: 1,
+                  });
+                }
+                if (!applied) return;
+                patchLive((m) => ({
+                  ...m,
+                  content: got.content,
+                  sources: got.sources ?? m.sources,
+                  trust_status: got.trust_status ?? m.trust_status,
+                  reasoningFinal: m.reasoningText ?? m.reasoningFinal ?? null,
+                  reasoningText: null,
+                }));
+                message.success(t("chat.stream.recovered"));
+                return;
+              }
+              await new Promise((r) => setTimeout(r, 4000));
+            }
+            patchLive((m) =>
+              m.content === THINKING_SENTINEL ? { ...m, content: REQUEST_FAILED_SENTINEL } : m,
+            );
+            message.error(errMsg);
+          })();
+          return;
+        }
+        if ((code === "network" || code === "client_timeout" || code === "stalled") && user) {
           recovering = true;
           message.info(t("chat.stream.recovering"));
           void (async () => {
@@ -1603,6 +1646,7 @@ export default function ChatPage() {
       // catalog id would otherwise raise.
       modelId: effectiveModelId === "deepseek:v4-pro" ? null : effectiveModelId,
       attachmentIds: attachmentIdsForSend.length ? attachmentIdsForSend : null,
+      clientRequestId: guestRequestId,
     });
   }, [sending, sessionId, activeMasterId, modelId, user, attachments, refetchSessions, refetchQuota, queryClient, scrollToBottom, setShowJumpToBottom, syncSessionParam, loadSession, bumpViewEpoch, t]);
 

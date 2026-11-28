@@ -42,6 +42,7 @@ export const MODULE_GROUPS: GroupDef[] = [
       one("master_select"),
       one("master_link"),
       one("chat_regenerate"),
+      one("chat_quota_hit"),
       one("xiaojin_chat"),
       one("study_memory_continue"),
       one("study_memory_save"),

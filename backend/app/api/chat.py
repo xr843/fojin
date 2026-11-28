@@ -4,6 +4,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
+from fastapi import Path as ApiPath
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -52,6 +53,7 @@ from app.services.chat import (
     update_session,
 )
 from app.services.chat_trust import trust_status_from_diagnostic
+from app.services.guest_result import take_guest_result
 from app.services.master_profiles import list_masters
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -131,6 +133,7 @@ async def chat_stream(
             text_id=data.text_id, juan_num=data.juan_num, selected_text=data.selected_text, page_content=data.page_content,
             hot_question_id=data.hot_question_id, model_id=data.model_id,
             attachment_ids=data.attachment_ids, regenerate=data.regenerate,
+            guest_result_id=data.client_request_id,
         ),
         media_type="text/event-stream",
         headers={
@@ -140,6 +143,20 @@ async def chat_stream(
             "Connection": "keep-alive",
         },
     )
+
+
+@router.get("/guest-result/{request_id}")
+async def chat_guest_result(
+    request: Request,
+    request_id: str = ApiPath(..., pattern=r"^[0-9a-f]{32}$"),
+):
+    """游客断线后取回已生成的答案（一次性，取后即删；10 分钟过期）。
+
+    还没生成完或已过期时 404，前端会隔几秒再来取。编号由浏览器随机生成（128 位），猜不到。"""
+    result = await take_guest_result(getattr(request.app.state, "redis", None), request_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="not ready")
+    return result
 
 
 @router.post("/attachments", status_code=201)
