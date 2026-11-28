@@ -281,7 +281,7 @@ describe("remaining page i18n", () => {
     expect(screen.getAllByText("Platform activity").length).toBeGreaterThan(0);
     expect(screen.getByText("Usage by section")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("Answer quality")).toBeInTheDocument());
-    expect(screen.getByText("Popular search terms (Top 10)")).toBeInTheDocument();
+    expect(screen.getByText("Popular search terms (last 7 days, top 10)")).toBeInTheDocument();
   });
 
   it("renders answer-quality review details in the active UI language", async () => {

@@ -75,6 +75,7 @@ _ANSWERS = sql_text(
     WHERE role = 'assistant'
       AND content LIKE '%【《%'
       AND sources IS NOT NULL
+      AND CAST(sources AS TEXT) NOT IN ('null', '[]')
       AND created_at > :since
     ORDER BY id DESC
     LIMIT :limit
@@ -87,6 +88,8 @@ def _title_index(raw_sources: str) -> dict[str, int]:
     try:
         payload = json.loads(raw_sources)
     except (TypeError, ValueError):
+        return {}
+    if not payload:  # 无引文的回答存的是 JSON null（不是 SQL NULL），读出来是 None
         return {}
     items = payload if isinstance(payload, list) else payload.get("sources") or []
     out: dict[str, int] = {}

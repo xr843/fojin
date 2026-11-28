@@ -710,7 +710,7 @@ function AnswerQualityAndKeywords() {
         </Card>
       </Col>
       <Col xs={24} lg={12}>
-        <Card title={t("admin_dashboard.module_usage.top_keywords")} style={{ height: "100%" }}>
+        <Card title={t("admin_dashboard.module_usage.top_keywords_days", { n: days })} style={{ height: "100%" }}>
           {data.top_search_keywords.length === 0 ? (
             <Empty />
           ) : (

@@ -4,7 +4,7 @@ import hashlib
 import logging
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import case, func, select
+from sqlalchemy import Text, case, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cache import cache_get as _cache_get
@@ -387,7 +387,12 @@ async def get_platform_activity(db: AsyncSession, redis=None, days: int = 7) -> 
             select(func.count(ChatMessage.id)).where(
                 ChatMessage.created_at >= cutoff,
                 ChatMessage.role == "assistant",
-                ChatMessage.sources.is_(None),
+                # sources 列是 SQLAlchemy JSON：写入 None 时存的是 JSON 的 null，不是 SQL NULL，
+                # 只判 IS NULL 会永远数出 0（2026-11-28 才发现：6 月起每月 7–100 条无引文回答，看板一直 0.0%）。
+                or_(
+                    ChatMessage.sources.is_(None),
+                    cast(ChatMessage.sources, Text).in_(["null", "[]"]),
+                ),
             )
         )
     ).scalar() or 0

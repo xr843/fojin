@@ -226,13 +226,13 @@ async def _query_module_usage(days: int) -> dict[str, Any]:
     keyword_sql = text(
         base_cte
         + """
-        SELECT ed.string_value AS keyword, count(*) AS cnt
+        SELECT btrim(ed.string_value) AS keyword, count(*) AS cnt
         FROM event_data ed
         JOIN ev ON ev.event_id = ed.website_event_id
         WHERE ev.event_name = 'search'
           AND NOT ev.is_staff
           AND ed.data_key = 'keyword'
-        GROUP BY ed.string_value
+        GROUP BY btrim(ed.string_value)
         ORDER BY cnt DESC
         LIMIT 10
         """
