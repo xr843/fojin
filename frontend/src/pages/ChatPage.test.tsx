@@ -1790,8 +1790,19 @@ describe("断流埋点 chat_stream_error", () => {
   it("流悄无声息地结束（没有 error 帧、也没有 token）→ 记为 empty_done", async () => {
     const track = withUmami();
     const cb = await startSend();
+    // 诊断字段（2026-11-28）：服务端发了哪些帧、多少字节——分清没发正文 / 没解析 / 被截断
+    cb.onStreamStats!({ bytes: 2141, frames: ["searching", "done"], status: 200 });
     cb.onDone!();
-    expect(errEvents(track)).toEqual([{ stage: "empty_done", reason: "silent_done" }]);
+    expect(errEvents(track)).toEqual([
+      expect.objectContaining({
+        stage: "empty_done",
+        reason: "silent_done",
+        bytes: 2141,
+        frames: "searching,done",
+        status: 200,
+        msg_len: expect.any(Number),
+      }),
+    ]);
   });
 
   it("用户按停止 → 一个错误事件都不记", async () => {

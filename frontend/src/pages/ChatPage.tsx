@@ -59,6 +59,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   sendChatMessageStream,
   getGuestResult,
+  type StreamStats,
   getChatSessions,
   getChatSessionMessages,
   deleteChatSession,
@@ -1355,6 +1356,7 @@ export default function ChatPage() {
     // 根本不建 session、完全不落库。只有前端知道「这一条流吐没吐过 token」。
     let tokenCount = 0;
     let sawError = false;
+    let streamStats: StreamStats | null = null;
     // 断流后正在回库里找已生成的回答：期间气泡保持「生成中」，onDone 不得把它改成失败
     let recovering = false;
 
@@ -1600,6 +1602,9 @@ export default function ChatPage() {
           m.content === THINKING_SENTINEL ? { ...m, content: REQUEST_FAILED_SENTINEL } : m,
         );
       },
+      onStreamStats: (st) => {
+        streamStats = st;
+      },
       onDone: () => {
         clearTimeout(timeoutId);
         abortRef.current = null;
@@ -1609,7 +1614,15 @@ export default function ChatPage() {
         // 下面那段兜底会把气泡转成失败哨兵，但服务端不会为此留下任何痕迹，
         // 所以这里单独记一档。sawError 拦住重复计数。
         if (!sawError && tokenCount === 0 && typeof umami !== "undefined") {
-          umami.track("chat_stream_error", { stage: "empty_done", reason: "silent_done" });
+          // 诊断（2026-11-28）：收到多少字节、哪些帧——分清「服务端没发正文」「发了没解析」「被截断」
+          umami.track("chat_stream_error", {
+            stage: "empty_done",
+            reason: "silent_done",
+            bytes: streamStats?.bytes ?? -1,
+            frames: (streamStats?.frames ?? []).join(",").slice(0, 120),
+            status: streamStats?.status ?? -1,
+            msg_len: msg.length,
+          });
         }
         // Empty completion: the stream ended without ever delivering a token
         // (and without an error frame — e.g. a bare `done`). If the bubble is

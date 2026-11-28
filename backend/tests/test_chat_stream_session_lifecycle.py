@@ -687,3 +687,39 @@ def test_guest_result_endpoint_rejects_malformed_id():
     # （CI 上 test_kg / test_smoke 7 个因此连 localhost:6379 失败）。编号格式校验不需要 lifespan。
     client = TestClient(app)
     assert client.get("/api/chat/guest-result/not-a-valid-id").status_code == 422
+
+
+class _ListRedis(_FakeRedis):
+    def __init__(self):
+        super().__init__()
+        self.lists: dict[str, list[str]] = {}
+
+    async def lpush(self, key, value):
+        self.lists.setdefault(key, []).insert(0, value)
+
+    async def ltrim(self, key, start, end):
+        self.lists[key] = self.lists.get(key, [])[start : end + 1]
+
+    async def expire(self, key, seconds):
+        return True
+
+
+@pytest.mark.anyio
+async def test_prepare_rejection_is_noted_for_diagnosis_without_content():
+    """提前结束（准备阶段被拒）要留一条可查的原因：容器日志每次部署清空，查不到。不存提问内容。"""
+    import json as _json
+
+    from app.core.exceptions import ValidationError
+    from app.services.guest_result import EARLY_END_KEY
+
+    redis = _ListRedis()
+    with patch("app.services.chat._prepare_chat", new_callable=AsyncMock, side_effect=ValidationError("消息不能为空")):
+        from app.services.chat import send_message_stream
+
+        chunks = [c async for c in send_message_stream(
+            user_id=None, message="秘密提问内容", sessionmaker=_CountingSessionmaker(), redis=redis,
+        )]
+    assert any('"type": "error"' in c for c in chunks)
+    notes = [_json.loads(x) for x in redis.lists[EARLY_END_KEY]]
+    assert notes[0]["reason"] == "validation" and notes[0]["msg_len"] == len("秘密提问内容")
+    assert "秘密提问内容" not in redis.lists[EARLY_END_KEY][0]

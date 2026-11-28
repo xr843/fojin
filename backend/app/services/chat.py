@@ -50,7 +50,7 @@ from app.services.chat_trust import AnswerTiming, build_trust_status, persist_an
 from app.services.citation_guard import enforce_citation_whitelist, log_mutations
 from app.services.citation_rescue import rescue_candidates, rescue_unretrieved_citations
 from app.services.daily_metrics import ANONYMOUS_MESSAGES, increment_daily_metric
-from app.services.guest_result import stash_guest_result
+from app.services.guest_result import note_early_end, stash_guest_result
 
 # Moved to app.services.hot_questions in the P1-3 split; re-imported here so
 # `from app.services.chat import get_hot_questions` (api layer) and
@@ -1052,6 +1052,15 @@ async def send_message_stream(
             "chat/stream prepare rejected: %s: %s (user_id=%s session_id=%s)",
             type(prep_error).__name__, prep_error, user_id, session_id,
         )
+        await note_early_end(
+            redis,
+            reason=_PREP_ERROR_CODES.get(type(prep_error).__name__, "prepare"),
+            error=type(prep_error).__name__,
+            detail=str(prep_error)[:80],
+            user_id=user_id,
+            session_id=session_id,
+            msg_len=len(message or ""),
+        )
         yield _error_frame(
             str(prep_error),
             _PREP_ERROR_CODES.get(type(prep_error).__name__, "prepare"),
@@ -1434,6 +1443,14 @@ async def send_message_stream(
         logger.warning(
             "chat/stream produced no tokens and no error (session_id=%s, provider=%s)",
             chat_session_id, provider,
+        )
+        await note_early_end(
+            redis,
+            reason="empty_completion",
+            provider=provider,
+            user_id=user_id,
+            session_id=chat_session_id,
+            msg_len=len(message or ""),
         )
         empty_msg = "抱歉，本次未能生成任何回答内容，请重试。"
         yield _error_frame(empty_msg, "empty_completion")
