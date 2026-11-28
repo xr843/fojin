@@ -28,6 +28,7 @@ import {
 import { getPlatformActivity } from "../api/feed";
 import { useEffectiveTheme } from "../hooks/useTheme";
 import { adminLabel, formatAdminDate } from "./adminI18n";
+import { localizeTitle } from "../utils/hanScript";
 import { groupModuleEvents, MIN_USERS, type UsageGroup, type UsageRow } from "./adminModuleGroups";
 
 const { Text } = Typography;
@@ -739,7 +740,7 @@ function AnswerQualityAndKeywords() {
 }
 
 function PlatformActivityCard() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [days, setDays] = useState<number>(7);
   const [showAllTexts, setShowAllTexts] = useState(false);
   const { data, isLoading } = useQuery({
@@ -893,7 +894,7 @@ function PlatformActivityCard() {
               key={`${text.text_id}-${i}`}
               style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}
             >
-              <Link to={`/texts/${text.text_id}`}>{text.title_zh}</Link>
+              <Link to={`/texts/${text.text_id}`}>{localizeTitle(text.title_zh, i18n.language)}</Link>
               <span style={{ color: "var(--fj-text-secondary)" }}>{t("admin_dashboard.unit.times", { count: text.read_count })}</span>
             </div>
           ))}
