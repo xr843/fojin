@@ -628,3 +628,62 @@ async def test_attachment_ids_captured_before_prep_session_closes():
         f"closed, not detached rows. got {passed_ids!r}"
     )
     assert any('"type": "done"' in c for c in chunks)
+
+
+class _FakeRedis:
+    """够用的异步 Redis 替身：set(ex=) / getdel。"""
+
+    def __init__(self):
+        self.store: dict[str, str] = {}
+        self.ttl: dict[str, int] = {}
+
+    async def set(self, key, value, ex=None):
+        self.store[key] = value
+        self.ttl[key] = ex
+
+    async def getdel(self, key):
+        return self.store.pop(key, None)
+
+
+@pytest.mark.anyio
+async def test_guest_answer_is_stashed_for_disconnect_recovery():
+    """游客带了找回编号：答案生成完后暂存 10 分钟，取一次即删；没带编号不存。"""
+    from app.services.guest_result import GUEST_RESULT_TTL_S, guest_result_key, take_guest_result
+
+    sources = _make_fake_sources()
+    prepare_return = (
+        None, "https://api.example.com/v1", "fake-key", "test-model",
+        False, "openai", sources,
+        [{"role": "user", "content": "anon"}], [],
+    )
+    rid = "0123456789abcdef0123456789abcdef"
+    for request_id, expect_stored in ((rid, True), (None, False)):
+        redis = _FakeRedis()
+        with patch("app.services.chat._prepare_chat", new_callable=AsyncMock, return_value=prepare_return), \
+             patch("app.services.chat.httpx.AsyncClient", _make_mock_httpx_client(["游客", "答案"])):
+            from app.services.chat import send_message_stream
+
+            async for _ in send_message_stream(
+                user_id=None, message="anon question", sessionmaker=_CountingSessionmaker(),
+                redis=redis, guest_result_id=request_id,
+            ):
+                pass
+        if not expect_stored:
+            assert redis.store == {}
+            continue
+        assert redis.ttl[guest_result_key(rid)] == GUEST_RESULT_TTL_S
+        got = await take_guest_result(redis, rid)
+        assert got is not None and "游客答案" in got["content"]
+        assert got["sources"] and "trust_status" in got
+        assert await take_guest_result(redis, rid) is None  # 一次性
+
+
+def test_guest_result_endpoint_rejects_malformed_id():
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    # 不用 `with TestClient(app)`：那会跑 lifespan，把真 Redis 挂到 app.state 上，污染后面所有用例
+    # （CI 上 test_kg / test_smoke 7 个因此连 localhost:6379 失败）。编号格式校验不需要 lifespan。
+    client = TestClient(app)
+    assert client.get("/api/chat/guest-result/not-a-valid-id").status_code == 422

@@ -200,7 +200,14 @@ async def _query_module_usage(days: int) -> dict[str, Any]:
               AND created_at > now() - make_interval(days => :days + 30)
         ),
         ev AS (
-            SELECT e.event_id, e.event_name, e.session_id,
+            -- 游客用完免费次数也打 chat_stream_error（reason=quota），但那是正常的额度提示、不是故障：
+            -- 改记成 chat_quota_hit，看板上单列，不再算进「异常」（2026-11-28：7 天 80 次里占 7 次）。
+            SELECT e.event_id,
+                   CASE WHEN e.event_name = 'chat_stream_error' AND EXISTS (
+                            SELECT 1 FROM event_data q
+                            WHERE q.website_event_id = e.event_id AND q.data_key = 'reason' AND q.string_value = 'quota'
+                        ) THEN 'chat_quota_hit' ELSE e.event_name END AS event_name,
+                   e.session_id,
                    (e.session_id IN (SELECT session_id FROM staff)
                     OR coalesce(e.hostname, '') IN ('localhost', '127.0.0.1')) AS is_staff
             FROM website_event e

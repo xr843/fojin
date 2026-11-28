@@ -2474,7 +2474,8 @@ export interface StreamCallbacks {
    * @param message 给用户看的文案（会进气泡）。
    * @param code    给埋点用的稳定标识，白名单取值：服务端 error 帧里的 code
    *                （quota / upstream_timeout / empty_completion …），或本文件
-   *                产生的 http_<status> / network / client_timeout / cancelled。
+   *                产生的 http_<status> / network / client_timeout / stalled（30 秒无数据，见
+   *                STREAM_STALL_MS）/ cancelled。
    *                `cancelled` 是用户自己按的停止，**不是**故障 —— 消费方必须
    *                把它排除在失败率之外，否则「等不及推理模型、手动停止」会被
    *                当成断流计入分子。
@@ -2498,6 +2499,35 @@ export interface ChatStreamOptions {
   attachmentIds?: number[] | null;
   /** 「重新生成」：后端把本会话最后一轮从上下文里去掉，新答案落库时替换旧的那对。 */
   regenerate?: boolean;
+  /** 游客断线找回编号（32 位十六进制，浏览器随机生成）；见 getGuestResult */
+  clientRequestId?: string | null;
+}
+
+/**
+ * 多久一点数据都没收到就判定连接已死（2026-11-28）。
+ *
+ * 服务端在模型思考时约每 0.3 秒发一次进度帧、空闲时每 25 秒一次心跳；生产直连实测一次 98 秒的回答，
+ * 相邻两帧最长只隔 1.9 秒。而断流时浏览器往往一个字节都收不到，此前要干等满 5 分钟超时才开始找回
+ * （找回耗时中位约 150 秒，15/38 次超过 4 分钟）。30 秒是正常最长间隔的 15 倍以上；误判的代价
+ * 只是提前去找一次答案。
+ */
+export const STREAM_STALL_MS = 30_000;
+
+/** 判定连接已死：页面在前台、且距上次收到数据（或上次切回前台）已超过 STREAM_STALL_MS。 */
+export function isStreamStalled(now: number, lastActivityAt: number, visible: boolean): boolean {
+  return visible && now - lastActivityAt > STREAM_STALL_MS;
+}
+
+/** 游客断线后取回已生成的答案；还没生成完或已过期返回 null（取回即删，只能取一次）。 */
+export async function getGuestResult(
+  requestId: string,
+): Promise<{ content: string; sources: ChatSource[]; trust_status?: ChatTrustStatus } | null> {
+  try {
+    const { data } = await api.get(`/chat/guest-result/${requestId}`);
+    return data;
+  } catch {
+    return null;
+  }
 }
 
 export function sendChatMessageStream(
@@ -2514,6 +2544,7 @@ export function sendChatMessageStream(
     modelId,
     attachmentIds,
     regenerate,
+    clientRequestId,
   } = options;
   return new Promise<void>((resolve) => {
     // Get auth token from localStorage (same pattern as axios interceptor)
@@ -2534,6 +2565,30 @@ export function sendChatMessageStream(
     let lastIndex = 0;
     let buffer = "";
     let done = false;
+
+    // 断流监测：手机切到后台时浏览器会暂停收数据，切回来先重新计时，不能把这段当成断流。
+    let lastActivityAt = Date.now();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") lastActivityAt = Date.now();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    const stallTimer = window.setInterval(() => {
+      if (done) {
+        stopWatch();
+        return;
+      }
+      if (!isStreamStalled(Date.now(), lastActivityAt, document.visibilityState === "visible")) return;
+      done = true;
+      stopWatch();
+      xhr.abort();
+      callbacks.onError(i18n.t("chat.stream.networkError"), "stalled");
+      callbacks.onDone();
+      resolve();
+    }, 1000);
+    function stopWatch() {
+      window.clearInterval(stallTimer);
+      document.removeEventListener("visibilitychange", onVisible);
+    }
 
     function processChunk(newText: string) {
       buffer += newText;
@@ -2597,6 +2652,7 @@ export function sendChatMessageStream(
               break;
             case "done":
               done = true;
+              stopWatch();
               callbacks.onDone();
               resolve();
               return;
@@ -2606,12 +2662,14 @@ export function sendChatMessageStream(
     }
 
     xhr.onprogress = function () {
+      lastActivityAt = Date.now();
       const newData = xhr.responseText.substring(lastIndex);
       lastIndex = xhr.responseText.length;
       if (newData) processChunk(newData);
     };
 
     xhr.onload = function () {
+      stopWatch();
       // Process any remaining data
       const remaining = xhr.responseText.substring(lastIndex);
       if (remaining) processChunk(remaining);
@@ -2642,6 +2700,7 @@ export function sendChatMessageStream(
     };
 
     xhr.onerror = function () {
+      stopWatch();
       if (!done) {
         callbacks.onError(i18n.t("chat.stream.networkError"), "network");
         callbacks.onDone();
@@ -2650,6 +2709,7 @@ export function sendChatMessageStream(
     };
 
     xhr.ontimeout = function () {
+      stopWatch();
       if (!done) {
         callbacks.onError(i18n.t("chat.stream.timeout"), "client_timeout");
         callbacks.onDone();
@@ -2667,6 +2727,7 @@ export function sendChatMessageStream(
     // AbortSignal support
     if (signal) {
       signal.addEventListener("abort", () => {
+        stopWatch();
         xhr.abort();
         if (!done) {
           callbacks.onError(i18n.t("chat.stream.cancelled"), "cancelled");
@@ -2683,6 +2744,7 @@ export function sendChatMessageStream(
       ...(modelId ? { model_id: modelId } : {}),
       ...(hotQuestionId != null ? { hot_question_id: hotQuestionId } : {}),
       ...(regenerate ? { regenerate: true } : {}),
+      ...(clientRequestId ? { client_request_id: clientRequestId } : {}),
       ...(attachmentIds && attachmentIds.length > 0
         ? { attachment_ids: attachmentIds }
         : {}),

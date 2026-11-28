@@ -50,6 +50,7 @@ from app.services.chat_trust import AnswerTiming, build_trust_status, persist_an
 from app.services.citation_guard import enforce_citation_whitelist, log_mutations
 from app.services.citation_rescue import rescue_candidates, rescue_unretrieved_citations
 from app.services.daily_metrics import ANONYMOUS_MESSAGES, increment_daily_metric
+from app.services.guest_result import stash_guest_result
 
 # Moved to app.services.hot_questions in the P1-3 split; re-imported here so
 # `from app.services.chat import get_hot_questions` (api layer) and
@@ -933,6 +934,8 @@ async def send_message_stream(
     model_id: str | None = None,
     attachment_ids: list[int] | None = None,
     regenerate: bool = False,
+    # 游客断线找回编号（见 services/guest_result.py）；登录用户忽略
+    guest_result_id: str | None = None,
     # token: production SSE path passes the raw bearer token; the user is then
     # resolved INSIDE the prep-phase session (see Phase-1 below) instead of via
     # Depends(get_optional_user), which would pin a PG connection for the whole
@@ -1601,6 +1604,16 @@ async def send_message_stream(
             )
     else:
         await _record_anonymous_message(sessionmaker, corrected_answer)
+        if guest_result_id and not _is_failed_answer(corrected_answer):
+            await stash_guest_result(
+                redis,
+                guest_result_id,
+                {
+                    "content": corrected_answer,
+                    "sources": [s.model_dump() for s in sources] if sources else [],
+                    "trust_status": trust_status.model_dump(),
+                },
+            )
     yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
 

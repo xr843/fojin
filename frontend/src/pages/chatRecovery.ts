@@ -87,3 +87,17 @@ export async function findSavedAnswer(
     await deps.sleep(intervalMs);
   }
 }
+
+/**
+ * 游客断线找回编号：32 位十六进制（128 位随机数），猜不到。用 getRandomValues 而不是
+ * randomUUID——后者在部分旧浏览器和非 https 环境里没有。拿不到随机源时返回 null（不找回）。
+ */
+export function randomRequestId(): string | null {
+  try {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  } catch {
+    return null;
+  }
+}
