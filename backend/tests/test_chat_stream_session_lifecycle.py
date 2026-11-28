@@ -683,5 +683,7 @@ def test_guest_result_endpoint_rejects_malformed_id():
 
     from app.main import app
 
-    with TestClient(app) as client:
-        assert client.get("/api/chat/guest-result/not-a-valid-id").status_code == 422
+    # 不用 `with TestClient(app)`：那会跑 lifespan，把真 Redis 挂到 app.state 上，污染后面所有用例
+    # （CI 上 test_kg / test_smoke 7 个因此连 localhost:6379 失败）。编号格式校验不需要 lifespan。
+    client = TestClient(app)
+    assert client.get("/api/chat/guest-result/not-a-valid-id").status_code == 422
