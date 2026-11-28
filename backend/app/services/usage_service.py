@@ -14,7 +14,9 @@ Design goals:
   a named param — never string-interpolated.
 """
 
+import hashlib
 import logging
+from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import text
@@ -42,6 +44,69 @@ _EVENT_LABELS: dict[str, str] = {
 # don't clutter the "板块使用情况" board, and reported as rates against the
 # number of questions asked (the `chat` event).
 _QUALITY_EVENTS: tuple[str, ...] = ("citation_click", "chat_copy", "chat_retry")
+
+
+# 登录用户代号：与 frontend/src/analyticsSignals.ts 的 memberCode 同一算法同一盐——改一边必须改另一边，
+# 否则后台再也对不上账号。SHA-256("<用户 id>|<盐>") 的前 16 个十六进制字符。
+MEMBER_SALT = "fojin-umami-member-2026-11"
+# 代号从这天起才上报（#1577）；之前的日期按账号的辞典 / 佛教史 / 检索次数无从统计。
+MEMBER_TRACKING_SINCE = date(2026, 11, 28)
+
+# 路径 → 板块，与 analyticsSignals.ts 的 sectionOf 一致。
+_SECTION_SQL = """
+    CASE
+        WHEN {p} LIKE '/chat%' OR {p} LIKE '/share/qa%' THEN 'chat'
+        WHEN {p} ~ '^/texts/[0-9]+/read' OR {p} = '/read' OR {p} LIKE '/read-aloud%' THEN 'read'
+        WHEN {p} LIKE '/texts%' THEN 'texts'
+        WHEN {p} LIKE '/dictionary%' OR {p} LIKE '/dict/%' THEN 'dict'
+        WHEN {p} LIKE '/sources%' THEN 'sources'
+        WHEN {p} LIKE '/history%' THEN 'history'
+        WHEN {p} LIKE '/kg%' THEN 'kg'
+        WHEN {p} LIKE '/search%' THEN 'search'
+        WHEN {p} LIKE '/daily%' THEN 'daily'
+        WHEN {p} = '/' THEN 'home'
+        ELSE 'other'
+    END
+"""
+
+# 板块总览只数「有人动手」的事件：自动出现的（*_show / *_shown）、网络重试、出错、有效访问信号都不算使用。
+_PASSIVE_EVENT_SQL = """
+    (event_name LIKE '%\\_show' OR event_name LIKE '%\\_shown' OR event_name LIKE 'api\\_%'
+     OR event_name LIKE '%error%' OR event_name LIKE 'chat\\_session\\_load%'
+     OR event_name IN ('engaged', 'chat_recovered'))
+"""
+
+
+def member_code(user_id: int) -> str:
+    return hashlib.sha256(f"{user_id}|{MEMBER_SALT}".encode()).hexdigest()[:16]
+
+
+async def member_section_views(start: datetime, end: datetime) -> dict[str, dict[str, int]]:
+    """[start, end) 内登录用户（按代号）在各板块的浏览次数：{代号: {板块: 次数}}。Umami 不可用时返回空。"""
+    sql = text(
+        f"""
+        SELECT s.distinct_id, {_SECTION_SQL.format(p="e.url_path")} AS section, count(*)
+        FROM website_event e
+        JOIN session s ON s.session_id = e.session_id
+        WHERE e.website_id IN (SELECT website_id FROM website WHERE domain = :domain AND deleted_at IS NULL)
+          AND e.event_type = 1
+          AND e.created_at >= :start AND e.created_at < :end
+          AND s.distinct_id IS NOT NULL
+        GROUP BY 1, 2
+        """
+    )
+    try:
+        async with AsyncSession(_get_engine()) as session:
+            rows = (
+                await session.execute(sql, {"domain": settings.umami_site_domain, "start": start, "end": end})
+            ).all()
+    except Exception as exc:
+        logger.warning("Umami DB unavailable — no per-member section views: %s", exc)
+        return {}
+    out: dict[str, dict[str, int]] = {}
+    for code, section, n in rows:
+        out.setdefault(code, {})[section] = int(n)
+    return out
 
 
 def _build_umami_url() -> str:
@@ -101,6 +166,8 @@ async def get_module_usage(days: int = 7) -> dict[str, Any]:
 def _empty_usage() -> dict[str, Any]:
     return {
         "events": [],
+        "sections": [],
+        "members_since": MEMBER_TRACKING_SINCE.isoformat(),
         "top_search_keywords": [],
         "excluded_staff_events": 0,
         "answer_quality": {
@@ -171,10 +238,61 @@ async def _query_module_usage(days: int) -> dict[str, Any]:
         """
     )
 
+    # 板块总览：本周期与上一周期（等长）各板块「动手的人 / 次数」，外加登录用户数（按代号，11-28 起）。
+    sections_sql = text(
+        f"""
+        WITH site AS (
+            SELECT website_id FROM website WHERE domain = :domain AND deleted_at IS NULL
+        ),
+        staff AS (
+            SELECT DISTINCT session_id FROM website_event
+            WHERE website_id IN (SELECT website_id FROM site)
+              AND url_path LIKE '/admin%'
+              AND created_at > now() - make_interval(days => :days * 2 + 30)
+        ),
+        ev AS (
+            SELECT {_SECTION_SQL.format(p="e.url_path")} AS section, e.session_id, e.event_type, e.event_name,
+                   e.created_at > now() - make_interval(days => :days) AS cur
+            FROM website_event e
+            WHERE e.website_id IN (SELECT website_id FROM site)
+              AND e.created_at > now() - make_interval(days => :days * 2)
+              AND e.session_id NOT IN (SELECT session_id FROM staff)
+              AND coalesce(e.hostname, '') NOT IN ('localhost', '127.0.0.1')
+        )
+        SELECT ev.section,
+               count(DISTINCT ev.session_id) FILTER (WHERE cur AND event_type = 2 AND NOT {_PASSIVE_EVENT_SQL}),
+               count(*) FILTER (WHERE cur AND event_type = 2 AND NOT {_PASSIVE_EVENT_SQL}),
+               count(DISTINCT ev.session_id) FILTER (WHERE NOT cur AND event_type = 2 AND NOT {_PASSIVE_EVENT_SQL}),
+               count(*) FILTER (WHERE NOT cur AND event_type = 2 AND NOT {_PASSIVE_EVENT_SQL}),
+               count(DISTINCT s.distinct_id) FILTER (WHERE cur AND event_type = 1),
+               count(*) FILTER (WHERE cur AND event_type = 1)
+        FROM ev LEFT JOIN session s ON s.session_id = ev.session_id
+        GROUP BY ev.section
+        """
+    )
+
     async with AsyncSession(engine) as session:
         params = {"days": days, "domain": settings.umami_site_domain}
         event_rows = (await session.execute(event_sql, params)).all()
         keyword_rows = (await session.execute(keyword_sql, params)).all()
+        section_rows = (await session.execute(sections_sql, params)).all()
+
+    sections = sorted(
+        (
+            {
+                "section": r[0],
+                "users": int(r[1]),
+                "count": int(r[2]),
+                "prev_users": int(r[3]),
+                "prev_count": int(r[4]),
+                "members": int(r[5]),
+                "pageviews": int(r[6]),
+            }
+            for r in section_rows
+        ),
+        key=lambda x: (x["users"], x["count"]),
+        reverse=True,
+    )
 
     counts = {row[0]: int(row[1]) for row in event_rows if int(row[1]) > 0}
     users = {row[0]: int(row[2]) for row in event_rows}
@@ -221,6 +339,8 @@ async def _query_module_usage(days: int) -> dict[str, Any]:
 
     return {
         "events": events,
+        "sections": sections,
+        "members_since": MEMBER_TRACKING_SINCE.isoformat(),
         "top_search_keywords": top_search_keywords,
         "answer_quality": answer_quality,
         "excluded_staff_events": excluded_staff_events,
