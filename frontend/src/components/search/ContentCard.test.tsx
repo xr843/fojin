@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, Routes, Route, useLocation } from "react-router";
 import ContentCard from "./ContentCard";
 import type { ContentSearchHit } from "../../api/client";
 import type { TextId } from "../../types/branded";
@@ -37,8 +37,10 @@ describe("ContentCard 组件", () => {
   it("命中卷链接到站内阅读器 /texts/{text_id}/read?juan={juan_num}", () => {
     renderCard(makeHit({ text_id: 99 as TextId, juan_num: 7 }));
 
-    const readLink = screen.getByText("阅读").closest("a");
-    expect(readLink).toHaveAttribute("href", "/texts/99/read?juan=7");
+    const href = screen.getByText("阅读").closest("a")!.getAttribute("href")!;
+    const u = new URL(href, "https://fojin.app");
+    expect(u.pathname).toBe("/texts/99/read");
+    expect(u.searchParams.get("juan")).toBe("7");
   });
 
   it("展开的其他匹配卷各自链接到对应卷", () => {
@@ -57,7 +59,7 @@ describe("ContentCard 组件", () => {
     fireEvent.click(screen.getByText(/展开/));
 
     const links = screen.getAllByText("阅读").map((el) => el.closest("a"));
-    expect(links.map((a) => a?.getAttribute("href"))).toContain("/texts/99/read?juan=12");
+    expect(links.map((a) => a?.getAttribute("href"))).toContain("/texts/99/read?juan=12&quote=b");
   });
 
   it("站外 CBETA 链接保留，作为次要出口", () => {
@@ -98,5 +100,60 @@ describe("ContentCard 语种标签用中性色", () => {
     const { container } = renderCard(makeHit({ lang: "en" }));
     expect(screen.getByText("英文")).toBeInTheDocument();
     expect(container.querySelector(".ant-tag-blue, .ant-tag-geekblue")).toBeNull();
+  });
+});
+
+function LocationProbe() {
+  const loc = useLocation();
+  return <div data-testid="loc">{loc.pathname + loc.search}</div>;
+}
+
+function renderWithRoutes(hit: ContentSearchHit) {
+  return render(
+    <MemoryRouter initialEntries={["/search?q=x"]}>
+      <Routes>
+        <Route path="/search" element={<ContentCard hit={hit} />} />
+        <Route path="*" element={<LocationProbe />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
+// 读者反馈（2026-11-28 录屏）：点命中片段没反应；点「阅读」只到卷首，要自己往下翻找命中处。
+describe("ContentCard 直达命中处", () => {
+  const hit = makeHit({
+    text_id: 99 as TextId,
+    juan_num: 3,
+    highlight: ["不思議，<em>儼還道</em>釐擘裂袈裟", "第二段<em>命中</em>文字"],
+    matched_juans: [{ juan_num: 3, highlight: ["不思議，<em>儼還道</em>釐擘裂袈裟"], score: 1 }],
+  });
+
+  it("「阅读」带上首个命中片段的原文（?quote=），阅读器据此滚到并高亮", () => {
+    renderCard(hit);
+    const u = new URL(screen.getByText("阅读").closest("a")!.getAttribute("href")!, "https://fojin.app");
+    expect(u.searchParams.get("juan")).toBe("3");
+    expect(u.searchParams.get("quote")).toBe("不思議，儼還道釐擘裂袈裟");
+  });
+
+  it("点哪段片段就定位到哪段", () => {
+    renderWithRoutes(hit);
+    fireEvent.click(screen.getByText(/第二段/));
+    const u = new URL(screen.getByTestId("loc").textContent!, "https://fojin.app");
+    expect(u.pathname).toBe("/texts/99/read");
+    expect(u.searchParams.get("juan")).toBe("3");
+    expect(u.searchParams.get("quote")).toBe("第二段命中文字");
+  });
+
+  it("读者在片段上划选文字（要复制）时不跳走", () => {
+    renderWithRoutes(hit);
+    const sel = window.getSelection()!;
+    const node = screen.getByText(/第二段/);
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    fireEvent.click(node);
+    sel.removeAllRanges();
+    expect(screen.queryByTestId("loc")).toBeNull();
   });
 });

@@ -91,7 +91,7 @@ export default function ParallelSentenceCard({ hit }: { hit: ParallelSentenceHit
 
         <div className="s-card-links" style={{ alignItems: "center" }}>
           {canRead && (
-            <Link className="s-card-action" to={buildReaderUrl(hit.text_id, hit.juan_num)}>
+            <Link className="s-card-action" to={buildReaderUrl(hit.text_id, hit.juan_num, hit.zh_text)}>
               <ReadOutlined aria-hidden="true" />
               {t("search.read")}
             </Link>

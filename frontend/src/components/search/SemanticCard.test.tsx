@@ -78,7 +78,11 @@ describe("SemanticCard 组件", () => {
     renderCard(makeHit({ text_id: 99 as TextId, juan_num: 3, has_content: true }));
 
     const readLink = screen.getByText("阅读").closest("a");
-    expect(readLink).toHaveAttribute("href", "/texts/99/read?juan=3");
+    const u = new URL(readLink!.getAttribute("href")!, "https://fojin.app");
+    expect(u.pathname).toBe("/texts/99/read");
+    expect(u.searchParams.get("juan")).toBe("3");
+    // 带上片段原文，阅读器定位到这段
+    expect(u.searchParams.get("quote")).toBe(makeHit().snippet.trim());
   });
 
   it("has_content 为 false 时不渲染阅读按钮", () => {

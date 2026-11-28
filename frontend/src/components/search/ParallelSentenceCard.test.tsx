@@ -78,7 +78,8 @@ describe("ParallelSentenceCard 组件", () => {
   it("text_id 有效时阅读按钮链接到站内阅读器 /texts/{text_id}/read?juan={juan_num}", () => {
     renderCard(makeHit({ text_id: 99 as TextId, juan_num: 2 }));
     const readLink = screen.getByText("阅读").closest("a");
-    expect(readLink).toHaveAttribute("href", "/texts/99/read?juan=2");
+    // 带上汉文句子，阅读器定位并高亮这一句
+    expect(readLink).toHaveAttribute("href", `/texts/99/read?juan=2&quote=${encodeURIComponent("色即是空")}`);
   });
 
   it("text_id 为 0 时不渲染阅读按钮", () => {

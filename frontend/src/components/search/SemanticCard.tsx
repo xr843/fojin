@@ -3,6 +3,7 @@ import { Tag } from "antd";
 import { LinkOutlined, ReadOutlined } from "@ant-design/icons";
 import { Link } from "react-router";
 import { buildCbetaReadUrl, buildReaderUrl } from "../../utils/sourceUrls";
+import { useSnippetOpen } from "./useSnippetOpen";
 import type { SemanticSearchHit } from "../../api/client";
 
 /** 语义搜索结果卡片：展示向量匹配的经文片段和相似度分数 */
@@ -10,6 +11,9 @@ export default function SemanticCard({ hit }: { hit: SemanticSearchHit }) {
   const { t } = useTranslation();
   const cbetaUrl = hit.cbeta_id ? buildCbetaReadUrl(hit.cbeta_id) : null;
   const scorePercent = Math.round(hit.similarity_score * 100);
+  const openSnippet = useSnippetOpen();
+  // 带上片段原文，阅读器定位到这段（找不到时停在卷首，与不带一样）
+  const readUrl = hit.has_content ? buildReaderUrl(hit.text_id, hit.juan_num, hit.snippet) : null;
 
   return (
     <div className="s-card">
@@ -41,12 +45,13 @@ export default function SemanticCard({ hit }: { hit: SemanticSearchHit }) {
             padding 盒，line-clamp 只管内容盒——两者写在同一个元素上时，第 5 行会从下内边距
             里露出 8px 半截字（生产 390px 实测）。截断层不带纵向内边距，盒高正好等于 4 行。 */}
         <div className="s-semantic-snippet">
-          <div className="s-semantic-snippet-text">{hit.snippet}</div>
+          <div className={`s-semantic-snippet-text${readUrl ? " s-snippet-link" : ""}`}
+            onClick={readUrl ? openSnippet(readUrl) : undefined}>{hit.snippet}</div>
         </div>
 
         <div className="s-card-links">
-          {hit.has_content && (
-            <Link className="s-card-action" to={buildReaderUrl(hit.text_id, hit.juan_num)}>
+          {readUrl && (
+            <Link className="s-card-action" to={readUrl}>
               <ReadOutlined aria-hidden="true" />
               {t("search.read")}
             </Link>
