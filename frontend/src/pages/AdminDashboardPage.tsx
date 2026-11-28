@@ -479,8 +479,11 @@ function useModuleUsage(days: number) {
   });
 }
 
+/** 上一周期少于这个数就不画涨跌箭头：2→5 显示「↑150%」只会误导 */
+const TREND_MIN_BASE = 10;
+
 function Trend({ cur, prev }: { cur: number; prev: number }) {
-  if (prev === 0 || cur === prev) return null;
+  if (prev < TREND_MIN_BASE || cur === prev) return null;
   const pct = Math.round(((cur - prev) / prev) * 100);
   if (pct === 0) return null;
   return (

@@ -283,7 +283,8 @@ async def daily_active_user_detail(db: AsyncSession, target_day: date) -> dict:
             code_to_uid = {member_code(uid): uid for uid in all_ids}
             for code, sections in by_code.items():
                 uid = code_to_uid.get(code)
-                if uid is not None:
+                # 只打开过问答页 / 首页而没提问的不算活跃（否则整行全是 0）：要有辞典 / 佛教史 / 检索浏览
+                if uid is not None and any(sections.get(k) for k in ("dict", "history", "search")):
                     views_by_uid[uid] = sections
 
     guest_messages = (await db.execute(
